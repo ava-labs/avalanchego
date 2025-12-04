@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
@@ -92,7 +93,7 @@ var _ = e2e.DescribeSimplex("Create a Simplex [L1]", func() {
 		require.NotNil(simplexSubnet)
 
 		simplexChain := simplexSubnet.Chains[0]
-		simplexValidators := getNodesForIDs(network.Nodes, simplexSubnet.ValidatorIDs)
+		simplexValidators := getNodesWithIDs(network.Nodes, set.Of(simplexSubnet.ValidatorIDs...))
 		require.NotEmpty(simplexValidators)
 
 		sortNodes(simplexValidators)
@@ -193,13 +194,11 @@ func issueAndConfirmTx(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*
 }
 
 // Retrieve the nodes corresponding to the provided IDs
-func getNodesForIDs(nodes []*tmpnet.Node, nodeIDs []ids.NodeID) []*tmpnet.Node {
+func getNodesWithIDs(nodes []*tmpnet.Node, nodeIDs set.Set[ids.NodeID]) []*tmpnet.Node {
 	desiredNodes := make([]*tmpnet.Node, 0, len(nodeIDs))
 	for _, node := range nodes {
-		for _, nodeID := range nodeIDs {
-			if node.NodeID == nodeID {
-				desiredNodes = append(desiredNodes, node)
-			}
+		if nodeIDs.Contains(node.NodeID) {
+			desiredNodes = append(desiredNodes, node)
 		}
 	}
 	return desiredNodes
