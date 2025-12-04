@@ -211,7 +211,7 @@ func benchmarkReexecuteRange(
 	consensusRegistry := prometheus.NewRegistry()
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
-	log := tests.NewDefaultLogger("c-chain-reexecution")
+	log := tc.Log()
 
 	if metricsServerEnabled {
 		serverAddr := startServer(tc, log, prefixGatherer, metricsPort)
