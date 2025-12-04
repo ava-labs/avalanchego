@@ -597,7 +597,8 @@ type benchmarkTool struct {
 }
 
 // newBenchmarkTool creates a new benchmarkTool instance with the given name.
-// The name is used to identify all results collected by this tool.
+// The name is used as the base name for all results collected by this tool.
+// When results are added, the unit is appended to this base name.
 func newBenchmarkTool(name string) *benchmarkTool {
 	return &benchmarkTool{
 		name:    name,
@@ -606,11 +607,11 @@ func newBenchmarkTool(name string) *benchmarkTool {
 }
 
 // addResult adds a new benchmark result with the given value and unit.
-// All results added share the same benchmark name set during tool creation.
-// This is analogous to calling `b.ReportMetric()`.
+// The result name is constructed by appending the unit to the benchmark name
+// Calling `addResult` is analogous to calling `b.ReportMetric()`.
 func (b *benchmarkTool) addResult(value float64, unit string) {
 	result := benchmarkResult{
-		Name:  b.name,
+		Name:  fmt.Sprintf("%s - %s", b.name, unit),
 		Value: strconv.FormatFloat(value, 'f', -1, 64),
 		Unit:  unit,
 	}
