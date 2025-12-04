@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/libevm/core/types"
@@ -28,7 +29,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/subnet-evm/params/paramstest"
-	"github.com/ava-labs/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/subnet-evm/utils/utilstest"
 
 	agoUtils "github.com/ava-labs/avalanchego/utils"
@@ -98,15 +98,10 @@ func TestEthTxGossip(t *testing.T) {
 	}
 
 	// Ask the VM for any new transactions. We should get nothing at first.
-	emptyBloomFilter, err := gossip.NewBloomFilter(prometheus.NewRegistry(), "", config.TxGossipBloomMinTargetElements, config.TxGossipBloomTargetFalsePositiveRate, config.TxGossipBloomResetFalsePositiveRate)
-	require.NoError(err)
-	emptyBloomFilterBytes, _ := emptyBloomFilter.Marshal()
-	request := &sdk.PullGossipRequest{
-		Filter: emptyBloomFilterBytes,
-		Salt:   agoUtils.RandomBytes(32),
-	}
-
-	requestBytes, err := proto.Marshal(request)
+	requestBytes, err := gossip.MarshalAppRequest(
+		bloom.EmptyFilter.Marshal(),
+		agoUtils.RandomBytes(32),
+	)
 	require.NoError(err)
 
 	wg := &sync.WaitGroup{}
@@ -114,9 +109,9 @@ func TestEthTxGossip(t *testing.T) {
 	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
-		response := &sdk.PullGossipResponse{}
-		require.NoError(proto.Unmarshal(responseBytes, response))
-		require.Empty(response.Gossip)
+		response, err := gossip.ParseAppResponse(responseBytes)
+		require.NoError(err)
+		require.Empty(response)
 		wg.Done()
 	}
 	require.NoError(client.AppRequest(ctx, set.Of(vm.ctx.NodeID), requestBytes, onResponse))
@@ -137,19 +132,20 @@ func TestEthTxGossip(t *testing.T) {
 	// wait so we aren't throttled by the vm
 	time.Sleep(5 * time.Second)
 
-	marshaller := GossipEthTxMarshaller{}
 	// Ask the VM for new transactions. We should get the newly issued tx.
 	wg.Add(1)
 	onResponse = func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
-		response := &sdk.PullGossipResponse{}
-		require.NoError(proto.Unmarshal(responseBytes, response))
-		require.Len(response.Gossip, 1)
-
-		gotTx, err := marshaller.UnmarshalGossip(response.Gossip[0])
+		response, err := gossip.ParseAppResponse(responseBytes)
 		require.NoError(err)
-		require.Equal(signedTx.Hash(), gotTx.Tx.Hash())
+
+		txBytes, err := signedTx.MarshalBinary()
+		require.NoError(err)
+		require.Equal(
+			[][]byte{txBytes},
+			response,
+		)
 
 		wg.Done()
 	}
@@ -169,7 +165,7 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 	}
 
 	vm := &VM{
-		ethTxPullGossiper: gossip.NoOpGossiper{},
+		ethTxPullGossiper: noOpGossiper{},
 	}
 
 	require.NoError(vm.Initialize(
@@ -220,7 +216,7 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 
 	sender := &enginetest.Sender{}
 	vm := &VM{
-		ethTxPullGossiper: gossip.NoOpGossiper{},
+		ethTxPullGossiper: noOpGossiper{},
 	}
 
 	require.NoError(vm.Initialize(
@@ -262,4 +258,12 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 	require.NoError(vm.AppGossip(ctx, ids.EmptyNodeID, inboundGossipMsg))
 
 	require.True(vm.txPool.Has(signedTx.Hash()))
+}
+
+var _ gossip.Gossiper = (*noOpGossiper)(nil)
+
+type noOpGossiper struct{}
+
+func (noOpGossiper) Gossip(context.Context) error {
+	return nil
 }
