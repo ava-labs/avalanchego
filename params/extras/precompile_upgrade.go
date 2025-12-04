@@ -17,7 +17,13 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-var errNoKey = errors.New("PrecompileUpgrade cannot be empty")
+var (
+	errNoKey                                        = errors.New("PrecompileUpgrade cannot be empty")
+	errPrecompileUpgradeNilTimestamp                = errors.New("precompile upgrade block timestamp cannot be nil")
+	errPrecompileUpgradeTimestampNotMonotonic       = errors.New("precompile upgrade config block timestamp must be greater than or equal to previous timestamp")
+	errPrecompileUpgradeInvalidDisable              = errors.New("precompile upgrade disable value is invalid")
+	errPrecompileUpgradeSameKeyTimestampNotStrictly = errors.New("precompile upgrade config block timestamp for same key must be strictly greater than previous timestamp")
+)
 
 // PrecompileUpgrade is a helper struct embedded in UpgradeConfig.
 // It is used to unmarshal the json into the correct precompile config type
@@ -118,21 +124,21 @@ func (c *ChainConfig) verifyPrecompileUpgrades() error {
 		upgradeTimestamp := upgrade.Timestamp()
 
 		if upgradeTimestamp == nil {
-			return fmt.Errorf("PrecompileUpgrade (%s) at [%d]: block timestamp cannot be nil ", key, i)
+			return fmt.Errorf("%w: PrecompileUpgrade (%s) at [%d]", errPrecompileUpgradeNilTimestamp, key, i)
 		}
 		// Verify specified timestamps are monotonically increasing across all precompile keys.
 		// Note: It is OK for multiple configs of DIFFERENT keys to specify the same timestamp.
 		if previousUpgradeTimestamp != nil && *upgradeTimestamp < *previousUpgradeTimestamp {
-			return fmt.Errorf("PrecompileUpgrade (%s) at [%d]: config block timestamp (%v) < previous timestamp (%v)", key, i, *upgradeTimestamp, *previousUpgradeTimestamp)
+			return fmt.Errorf("%w: PrecompileUpgrade (%s) at [%d] has timestamp %v, previous timestamp %v", errPrecompileUpgradeTimestampNotMonotonic, key, i, *upgradeTimestamp, *previousUpgradeTimestamp)
 		}
 
 		if disabled == upgrade.IsDisabled() {
-			return fmt.Errorf("PrecompileUpgrade (%s) at [%d]: disable should be [%v]", key, i, !disabled)
+			return fmt.Errorf("%w: PrecompileUpgrade (%s) at [%d], disable should be %v", errPrecompileUpgradeInvalidDisable, key, i, !disabled)
 		}
 		// Verify specified timestamps are monotonically increasing across same precompile keys.
 		// Note: It is NOT OK for multiple configs of the SAME key to specify the same timestamp.
 		if lastTimestamp != nil && *upgradeTimestamp <= *lastTimestamp {
-			return fmt.Errorf("PrecompileUpgrade (%s) at [%d]: config block timestamp (%v) <= previous timestamp (%v) of same key", key, i, *upgradeTimestamp, *lastTimestamp)
+			return fmt.Errorf("%w: PrecompileUpgrade (%s) at [%d] has timestamp %v, previous timestamp of same key %v", errPrecompileUpgradeSameKeyTimestampNotStrictly, key, i, *upgradeTimestamp, *lastTimestamp)
 		}
 
 		if err := upgrade.Verify(c); err != nil {

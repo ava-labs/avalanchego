@@ -181,7 +181,7 @@ func TestGetBlocks(t *testing.T) {
 		request        message.BlockRequest
 		getResponse    func(t *testing.T, request message.BlockRequest) []byte
 		assertResponse func(t *testing.T, response []*types.Block)
-		expectedErr    string
+		expectedErr    error
 	}{
 		"normal resonse": {
 			request: message.BlockRequest{
@@ -228,7 +228,7 @@ func TestGetBlocks(t *testing.T) {
 			getResponse: func(_ *testing.T, _ message.BlockRequest) []byte {
 				return []byte("gibberish")
 			},
-			expectedErr: errUnmarshalResponse.Error(),
+			expectedErr: errUnmarshalResponse,
 		},
 		"invalid value replacing block": {
 			request: message.BlockRequest{
@@ -249,7 +249,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return responseBytes
 			},
-			expectedErr: "failed to unmarshal response: rlp: expected List",
+			expectedErr: errUnmarshalResponse,
 		},
 		"incorrect starting point": {
 			request: message.BlockRequest{
@@ -268,7 +268,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return response
 			},
-			expectedErr: errHashMismatch.Error(),
+			expectedErr: errHashMismatch,
 		},
 		"missing link in between blocks": {
 			request: message.BlockRequest{
@@ -291,7 +291,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return responseBytes
 			},
-			expectedErr: errHashMismatch.Error(),
+			expectedErr: errHashMismatch,
 		},
 		"no blocks": {
 			request: message.BlockRequest{
@@ -308,7 +308,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return responseBytes
 			},
-			expectedErr: errEmptyResponse.Error(),
+			expectedErr: errEmptyResponse,
 		},
 		"more than requested blocks": {
 			request: message.BlockRequest{
@@ -327,7 +327,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return responseBytes
 			},
-			expectedErr: errTooManyBlocks.Error(),
+			expectedErr: errTooManyBlocks,
 		},
 	}
 	for name, test := range tests {
@@ -336,7 +336,7 @@ func TestGetBlocks(t *testing.T) {
 			defer cancel()
 
 			responseBytes := test.getResponse(t, test.request)
-			if len(test.expectedErr) == 0 {
+			if test.expectedErr == nil {
 				mockNetClient.mockResponse(1, nil, responseBytes)
 			} else {
 				attempted := false
@@ -349,11 +349,10 @@ func TestGetBlocks(t *testing.T) {
 			}
 
 			blockResponse, err := stateSyncClient.GetBlocks(ctx, test.request.Hash, test.request.Height, test.request.Parents)
-			if len(test.expectedErr) != 0 {
-				require.ErrorContains(t, err, test.expectedErr)
+			require.ErrorIs(t, err, test.expectedErr)
+			if test.expectedErr != nil {
 				return
 			}
-			require.NoError(t, err)
 
 			test.assertResponse(t, blockResponse)
 		})

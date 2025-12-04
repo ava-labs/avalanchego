@@ -23,6 +23,8 @@ import (
 
 var (
 	_                         Backend = (*backend)(nil)
+	ErrValidateBlock                  = errors.New("failed to validate block message")
+	ErrVerifyWarpMessage              = errors.New("failed to verify warp message")
 	errParsingOffChainMessage         = errors.New("failed to parse off-chain message")
 
 	messageCacheSize = 500
@@ -141,7 +143,7 @@ func (b *backend) GetMessageSignature(ctx context.Context, unsignedMessage *aval
 	}
 
 	if err := b.Verify(ctx, unsignedMessage, nil); err != nil {
-		return nil, fmt.Errorf("failed to validate warp message: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrVerifyWarpMessage, err)
 	}
 	return b.signMessage(unsignedMessage)
 }
@@ -164,7 +166,7 @@ func (b *backend) GetBlockSignature(ctx context.Context, blockID ids.ID) ([]byte
 	}
 
 	if err := b.verifyBlockMessage(ctx, blockHashPayload); err != nil {
-		return nil, fmt.Errorf("failed to validate block message: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrValidateBlock, err)
 	}
 
 	sig, err := b.signMessage(unsignedMessage)

@@ -34,8 +34,9 @@ var (
 	// Singleton StatefulPrecompiledContract for minting native assets by permissioned callers.
 	ContractNativeMinterPrecompile contract.StatefulPrecompiledContract = createNativeMinterPrecompile()
 
-	ErrCannotMint = errors.New("non-enabled cannot mint")
-	ErrInvalidLen = errors.New("invalid input length for minting")
+	ErrCannotMint  = errors.New("non-enabled cannot mint")
+	ErrInvalidLen  = errors.New("invalid input length for minting")
+	ErrUnpackInput = errors.New("failed to unpack input")
 
 	// NativeMinterRawABI contains the raw ABI of NativeMinter contract.
 	//go:embed contract.abi
@@ -73,8 +74,11 @@ func UnpackMintNativeCoinInput(input []byte, useStrictMode bool) (common.Address
 	}
 	inputStruct := MintNativeCoinInput{}
 	err := NativeMinterABI.UnpackInputIntoInterface(&inputStruct, "mintNativeCoin", input, useStrictMode)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("%w: %w", ErrUnpackInput, err)
+	}
 
-	return inputStruct.Addr, inputStruct.Amount, err
+	return inputStruct.Addr, inputStruct.Amount, nil
 }
 
 // mintNativeCoin checks if the caller is permissioned for minting operation.

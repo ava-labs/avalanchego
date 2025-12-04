@@ -206,7 +206,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		name          string
 		upgrades      *NetworkUpgrades
 		avagoUpgrades upgrade.Config
-		valid         bool
+		wantError     error
 	}{
 		{
 			name: "Invalid_Durango_nil_upgrade",
@@ -215,7 +215,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 				DurangoTimestamp:   nil,
 			},
 			avagoUpgrades: upgrade.Mainnet,
-			valid:         false,
+			wantError:     errCannotBeNil,
 		},
 		{
 			name: "Invalid_Subnet-EVM_non-zero",
@@ -224,7 +224,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 				DurangoTimestamp:   utils.NewUint64(2),
 			},
 			avagoUpgrades: upgrade.Mainnet,
-			valid:         false,
+			wantError:     errTimestampTooEarly,
 		},
 		{
 			name: "Invalid_Durango_before_default_upgrade",
@@ -233,7 +233,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 				DurangoTimestamp:   utils.NewUint64(1),
 			},
 			avagoUpgrades: upgrade.Mainnet,
-			valid:         false,
+			wantError:     errTimestampTooEarly,
 		},
 		{
 			name: "Invalid_Mainnet_Durango_reconfigured_to_Fuji",
@@ -242,7 +242,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.GetConfig(constants.FujiID).DurangoTime),
 			},
 			avagoUpgrades: upgrade.Mainnet,
-			valid:         false,
+			wantError:     errTimestampTooEarly,
 		},
 		{
 			name: "Valid_Fuji_Durango_reconfigured_to_Mainnet",
@@ -251,7 +251,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.GetConfig(constants.MainnetID).DurangoTime),
 			},
 			avagoUpgrades: upgrade.Fuji,
-			valid:         false,
+			wantError:     errCannotBeNil, // Etna is required but not specified
 		},
 		{
 			name: "Invalid_Etna_nil",
@@ -261,7 +261,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 				EtnaTimestamp:      nil,
 			},
 			avagoUpgrades: upgrade.Mainnet,
-			valid:         false,
+			wantError:     errCannotBeNil,
 		},
 		{
 			name: "Invalid_Etna_before_Durango",
@@ -271,7 +271,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.Mainnet.DurangoTime.Add(-1)),
 			},
 			avagoUpgrades: upgrade.Mainnet,
-			valid:         false,
+			wantError:     errTimestampTooEarly,
 		},
 		{
 			name: "Valid_Granite_After_nil_Fortuna",
@@ -283,26 +283,22 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 				GraniteTimestamp:   utils.TimeToNewUint64(upgrade.Fuji.GraniteTime),
 			},
 			avagoUpgrades: upgradetest.GetConfig(upgradetest.Granite),
-			valid:         true,
+			wantError:     nil,
 		},
 	}
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
 			err := test.upgrades.verifyNetworkUpgrades(test.avagoUpgrades)
-			if test.valid {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-			}
+			require.ErrorIs(t, err, test.wantError)
 		})
 	}
 }
 
 func TestForkOrder(t *testing.T) {
 	testcases := []struct {
-		name        string
-		upgrades    *NetworkUpgrades
-		expectedErr bool
+		name      string
+		upgrades  *NetworkUpgrades
+		wantError error
 	}{
 		{
 			name: "ValidNetworkUpgrades",
@@ -310,7 +306,7 @@ func TestForkOrder(t *testing.T) {
 				SubnetEVMTimestamp: utils.NewUint64(0),
 				DurangoTimestamp:   utils.NewUint64(2),
 			},
-			expectedErr: false,
+			wantError: nil,
 		},
 		{
 			name: "Invalid order",
@@ -318,17 +314,13 @@ func TestForkOrder(t *testing.T) {
 				SubnetEVMTimestamp: utils.NewUint64(1),
 				DurangoTimestamp:   utils.NewUint64(0),
 			},
-			expectedErr: true,
+			wantError: errUnsupportedForkOrdering,
 		},
 	}
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
 			err := checkForks(test.upgrades.forkOrder())
-			if test.expectedErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
+			require.ErrorIs(t, err, test.wantError)
 		})
 	}
 }

@@ -17,10 +17,12 @@ import (
 )
 
 var (
-	errCannotBeNil = errors.New("timestamp cannot be nil")
-
 	unscheduledActivation = uint64(upgrade.UnscheduledActivationTime.Unix())
 	initiallyActiveTime   = uint64(upgrade.InitiallyActiveTime.Unix())
+
+	errCannotBeNil             = errors.New("timestamp cannot be nil")
+	errTimestampTooEarly       = errors.New("provided timestamp must be greater than or equal to the default timestamp")
+	errUnsupportedForkOrdering = errors.New("unsupported fork ordering")
 )
 
 // NetworkUpgrades contains timestamps that enable network upgrades.
@@ -267,7 +269,7 @@ func verifyWithDefault(configTimestamp *uint64, defaultTimestamp *uint64) error 
 	}
 
 	if *configTimestamp < *defaultTimestamp {
-		return fmt.Errorf("provided timestamp (%d) must be greater than or equal to the default timestamp (%d)", *configTimestamp, *defaultTimestamp)
+		return fmt.Errorf("%w: provided timestamp %d, default timestamp %d", errTimestampTooEarly, *configTimestamp, *defaultTimestamp)
 	}
 	return nil
 }

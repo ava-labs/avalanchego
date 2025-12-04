@@ -637,7 +637,7 @@ func TestPrecompileBind(t *testing.T) {
 			// Generate the binding and create a Go source file in the workspace
 			bindedFiles, err := PrecompileBind(types, tt.abi, []string{""}, nil, tt.name, bind.LangGo, nil, nil, "contract.abi", true)
 			if tt.errMsg != "" {
-				require.ErrorContains(t, err, tt.errMsg)
+				require.ErrorContains(t, err, tt.errMsg) //nolint:forbidigo // uses upstream code
 				return
 			}
 			require.NoError(t, err, "test %d: failed to generate binding: %v", i, err)

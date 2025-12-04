@@ -211,7 +211,7 @@ func TestNetworkUpgradesOverridden(t *testing.T) {
 		upgradeJSON: newUpgradeBytesJSON,
 		genesisJSON: tvm.config.genesisJSON,
 	})
-	require.ErrorContains(t, err, "mismatching Granite fork block timestamp")
+	require.ErrorContains(t, err, "mismatching Granite fork block timestamp") //nolint:forbidigo // uses upstream code
 }
 
 func mustMarshal(t *testing.T, v interface{}) string {

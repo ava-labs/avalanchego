@@ -13,6 +13,34 @@ import (
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
+var (
+	ErrGasLimitTooLow         = errors.New("gasLimit cannot be less than or equal to 0")
+	ErrGasLimitNil            = errors.New("gasLimit cannot be nil")
+	ErrMinBlockGasCostTooHigh = errors.New("minBlockGasCost cannot be greater than maxBlockGasCost")
+
+	errMinBaseFeeNil                             = errors.New("minBaseFee cannot be nil")
+	errTargetGasNil                              = errors.New("targetGas cannot be nil")
+	errBaseFeeChangeDenominatorNil               = errors.New("baseFeeChangeDenominator cannot be nil")
+	errMinBlockGasCostNil                        = errors.New("minBlockGasCost cannot be nil")
+	errMaxBlockGasCostNil                        = errors.New("maxBlockGasCost cannot be nil")
+	errBlockGasCostStepNil                       = errors.New("blockGasCostStep cannot be nil")
+	errTargetBlockRateTooLow                     = errors.New("targetBlockRate cannot be less than or equal to 0")
+	errMinBaseFeeNegative                        = errors.New("minBaseFee cannot be less than 0")
+	errTargetGasTooLow                           = errors.New("targetGas cannot be less than or equal to 0")
+	errBaseFeeChangeDenominatorTooLow            = errors.New("baseFeeChangeDenominator cannot be less than or equal to 0")
+	errMinBlockGasCostNegative                   = errors.New("minBlockGasCost cannot be less than 0")
+	errBlockGasCostStepNegative                  = errors.New("blockGasCostStep cannot be less than 0")
+	errMaxBlockGasCostNotUint64                  = errors.New("maxBlockGasCost is not a valid uint64")
+	errGasLimitExceedsHashLength                 = errors.New("gasLimit exceeds hash length")
+	errTargetBlockRateExceedsHashLength          = errors.New("targetBlockRate exceeds hash length")
+	errMinBaseFeeExceedsHashLength               = errors.New("minBaseFee exceeds hash length")
+	errTargetGasExceedsHashLength                = errors.New("targetGas exceeds hash length")
+	errBaseFeeChangeDenominatorExceedsHashLength = errors.New("baseFeeChangeDenominator exceeds hash length")
+	errMinBlockGasCostExceedsHashLength          = errors.New("minBlockGasCost exceeds hash length")
+	errMaxBlockGasCostExceedsHashLength          = errors.New("maxBlockGasCost exceeds hash length")
+	errBlockGasCostStepExceedsHashLength         = errors.New("blockGasCostStep exceeds hash length")
+)
+
 // FeeConfig specifies the parameters for the dynamic fee algorithm, which determines the gas limit, base fee, and block gas cost of blocks
 // on the network.
 //
@@ -65,40 +93,40 @@ var EmptyFeeConfig = FeeConfig{}
 func (f *FeeConfig) Verify() error {
 	switch {
 	case f.GasLimit == nil:
-		return errors.New("gasLimit cannot be nil")
+		return ErrGasLimitNil
 	case f.MinBaseFee == nil:
-		return errors.New("minBaseFee cannot be nil")
+		return errMinBaseFeeNil
 	case f.TargetGas == nil:
-		return errors.New("targetGas cannot be nil")
+		return errTargetGasNil
 	case f.BaseFeeChangeDenominator == nil:
-		return errors.New("baseFeeChangeDenominator cannot be nil")
+		return errBaseFeeChangeDenominatorNil
 	case f.MinBlockGasCost == nil:
-		return errors.New("minBlockGasCost cannot be nil")
+		return errMinBlockGasCostNil
 	case f.MaxBlockGasCost == nil:
-		return errors.New("maxBlockGasCost cannot be nil")
+		return errMaxBlockGasCostNil
 	case f.BlockGasCostStep == nil:
-		return errors.New("blockGasCostStep cannot be nil")
+		return errBlockGasCostStepNil
 	}
 
 	switch {
 	case f.GasLimit.Cmp(common.Big0) != 1:
-		return fmt.Errorf("gasLimit = %d cannot be less than or equal to 0", f.GasLimit)
+		return fmt.Errorf("%w: gasLimit = %d", ErrGasLimitTooLow, f.GasLimit)
 	case f.TargetBlockRate <= 0:
-		return fmt.Errorf("targetBlockRate = %d cannot be less than or equal to 0", f.TargetBlockRate)
+		return fmt.Errorf("%w: targetBlockRate = %d", errTargetBlockRateTooLow, f.TargetBlockRate)
 	case f.MinBaseFee.Cmp(common.Big0) == -1:
-		return fmt.Errorf("minBaseFee = %d cannot be less than 0", f.MinBaseFee)
+		return fmt.Errorf("%w: minBaseFee = %d", errMinBaseFeeNegative, f.MinBaseFee)
 	case f.TargetGas.Cmp(common.Big0) != 1:
-		return fmt.Errorf("targetGas = %d cannot be less than or equal to 0", f.TargetGas)
+		return fmt.Errorf("%w: targetGas = %d", errTargetGasTooLow, f.TargetGas)
 	case f.BaseFeeChangeDenominator.Cmp(common.Big0) != 1:
-		return fmt.Errorf("baseFeeChangeDenominator = %d cannot be less than or equal to 0", f.BaseFeeChangeDenominator)
+		return fmt.Errorf("%w: baseFeeChangeDenominator = %d", errBaseFeeChangeDenominatorTooLow, f.BaseFeeChangeDenominator)
 	case f.MinBlockGasCost.Cmp(common.Big0) == -1:
-		return fmt.Errorf("minBlockGasCost = %d cannot be less than 0", f.MinBlockGasCost)
+		return fmt.Errorf("%w: minBlockGasCost = %d", errMinBlockGasCostNegative, f.MinBlockGasCost)
 	case f.MinBlockGasCost.Cmp(f.MaxBlockGasCost) == 1:
-		return fmt.Errorf("minBlockGasCost = %d cannot be greater than maxBlockGasCost = %d", f.MinBlockGasCost, f.MaxBlockGasCost)
+		return fmt.Errorf("%w: minBlockGasCost = %d, maxBlockGasCost = %d", ErrMinBlockGasCostTooHigh, f.MinBlockGasCost, f.MaxBlockGasCost)
 	case f.BlockGasCostStep.Cmp(common.Big0) == -1:
-		return fmt.Errorf("blockGasCostStep = %d cannot be less than 0", f.BlockGasCostStep)
+		return fmt.Errorf("%w: blockGasCostStep = %d", errBlockGasCostStepNegative, f.BlockGasCostStep)
 	case !f.MaxBlockGasCost.IsUint64():
-		return fmt.Errorf("maxBlockGasCost = %d is not a valid uint64", f.MaxBlockGasCost)
+		return fmt.Errorf("%w: maxBlockGasCost = %d", errMaxBlockGasCostNotUint64, f.MaxBlockGasCost)
 	}
 	return f.checkByteLens()
 }
@@ -122,28 +150,28 @@ func (f *FeeConfig) Equal(other *FeeConfig) bool {
 // checkByteLens checks byte lengths against common.HashLen (32 bytes) and returns error
 func (f *FeeConfig) checkByteLens() error {
 	if isBiggerThanHashLen(f.GasLimit) {
-		return fmt.Errorf("gasLimit exceeds %d bytes", common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errGasLimitExceedsHashLength, common.HashLength)
 	}
 	if isBiggerThanHashLen(new(big.Int).SetUint64(f.TargetBlockRate)) {
-		return fmt.Errorf("targetBlockRate exceeds %d bytes", common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errTargetBlockRateExceedsHashLength, common.HashLength)
 	}
 	if isBiggerThanHashLen(f.MinBaseFee) {
-		return fmt.Errorf("minBaseFee exceeds %d bytes", common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errMinBaseFeeExceedsHashLength, common.HashLength)
 	}
 	if isBiggerThanHashLen(f.TargetGas) {
-		return fmt.Errorf("targetGas exceeds %d bytes", common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errTargetGasExceedsHashLength, common.HashLength)
 	}
 	if isBiggerThanHashLen(f.BaseFeeChangeDenominator) {
-		return fmt.Errorf("baseFeeChangeDenominator exceeds %d bytes", common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errBaseFeeChangeDenominatorExceedsHashLength, common.HashLength)
 	}
 	if isBiggerThanHashLen(f.MinBlockGasCost) {
-		return fmt.Errorf("minBlockGasCost exceeds %d bytes", common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errMinBlockGasCostExceedsHashLength, common.HashLength)
 	}
 	if isBiggerThanHashLen(f.MaxBlockGasCost) {
-		return fmt.Errorf("maxBlockGasCost exceeds %d bytes", common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errMaxBlockGasCostExceedsHashLength, common.HashLength)
 	}
 	if isBiggerThanHashLen(f.BlockGasCostStep) {
-		return fmt.Errorf("blockGasCostStep exceeds %d bytes", common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errBlockGasCostStepExceedsHashLength, common.HashLength)
 	}
 	return nil
 }

@@ -56,11 +56,7 @@ func FuzzPackReadAllowlistTestSkipCheck(f *testing.F) {
 		require := require.New(t)
 		res, err := UnpackReadAllowListInput(b, true)
 		oldRes, oldErr := OldUnpackReadAllowList(b)
-		if oldErr != nil {
-			require.ErrorContains(err, oldErr.Error())
-		} else {
-			require.NoError(err)
-		}
+		require.ErrorIs(err, oldErr)
 		require.Equal(oldRes, res)
 	})
 }
@@ -124,11 +120,7 @@ func FuzzPackModifyAllowlistTestSkipCheck(f *testing.F) {
 		require := require.New(t)
 		res, err := UnpackModifyAllowListInput(b, AdminRole, true)
 		oldRes, oldErr := OldUnpackModifyAllowList(b, AdminRole)
-		if oldErr != nil {
-			require.ErrorContains(err, oldErr.Error())
-		} else {
-			require.NoError(err)
-		}
+		require.ErrorIs(err, oldErr)
 		require.Equal(oldRes, res)
 	})
 }

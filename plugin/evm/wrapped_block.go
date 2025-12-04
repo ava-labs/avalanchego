@@ -420,12 +420,12 @@ func (b *wrappedBlock) syntacticVerify() error {
 		}
 	} else {
 		switch {
+		case ethHeader.ParentBeaconRoot != nil:
+			return fmt.Errorf("%w: have %x, expected nil", errInvalidParentBeaconRootBeforeCancun, *ethHeader.ParentBeaconRoot)
 		case ethHeader.ExcessBlobGas != nil:
 			return fmt.Errorf("%w: have %d, expected nil", errInvalidExcessBlobGasBeforeCancun, *ethHeader.ExcessBlobGas)
 		case ethHeader.BlobGasUsed != nil:
 			return fmt.Errorf("%w: have %d, expected nil", errInvalidBlobGasUsedBeforeCancun, *ethHeader.BlobGasUsed)
-		case ethHeader.ParentBeaconRoot != nil:
-			return fmt.Errorf("%w: have %x, expected nil", errInvalidParentBeaconRootBeforeCancun, *ethHeader.ParentBeaconRoot)
 		}
 	}
 

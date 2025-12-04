@@ -158,9 +158,9 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 
 	// Verify the signature cannot be fetched before the block is accepted
 	_, err = tvm.vm.warpBackend.GetMessageSignature(t.Context(), unsignedMessage)
-	require.ErrorContains(err, "unknown codec version")
+	require.ErrorIs(err, warp.ErrVerifyWarpMessage)
 	_, err = tvm.vm.warpBackend.GetBlockSignature(t.Context(), blk.ID())
-	require.ErrorContains(err, "failed to get block")
+	require.ErrorIs(err, warp.ErrValidateBlock)
 
 	require.NoError(tvm.vm.SetPreference(t.Context(), blk.ID()))
 	require.NoError(blk.Accept(t.Context()))

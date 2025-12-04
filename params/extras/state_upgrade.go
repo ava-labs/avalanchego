@@ -4,6 +4,7 @@
 package extras
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -12,6 +13,12 @@ import (
 	"github.com/ava-labs/libevm/common/math"
 
 	ethparams "github.com/ava-labs/libevm/params"
+)
+
+var (
+	errStateUpgradeNilTimestamp          = errors.New("state upgrade config block timestamp cannot be nil")
+	errStateUpgradeTimestampZero         = errors.New("state upgrade config block timestamp must be greater than 0")
+	errStateUpgradeTimestampNotMonotonic = errors.New("state upgrade config block timestamp must be greater than previous timestamp")
 )
 
 // StateUpgrade describes the modifications to be made to the state during
@@ -42,16 +49,16 @@ func (c *ChainConfig) verifyStateUpgrades() error {
 	for i, upgrade := range c.StateUpgrades {
 		upgradeTimestamp := upgrade.BlockTimestamp
 		if upgradeTimestamp == nil {
-			return fmt.Errorf("StateUpgrade[%d]: config block timestamp cannot be nil ", i)
+			return fmt.Errorf("%w: StateUpgrade[%d]", errStateUpgradeNilTimestamp, i)
 		}
 		// Verify the upgrade's timestamp is equal 0 (to avoid confusion with genesis).
 		if *upgradeTimestamp == 0 {
-			return fmt.Errorf("StateUpgrade[%d]: config block timestamp (%v) must be greater than 0", i, *upgradeTimestamp)
+			return fmt.Errorf("%w: StateUpgrade[%d] has timestamp %v", errStateUpgradeTimestampZero, i, *upgradeTimestamp)
 		}
 
 		// Verify specified timestamps are strictly monotonically increasing.
 		if previousUpgradeTimestamp != nil && *upgradeTimestamp <= *previousUpgradeTimestamp {
-			return fmt.Errorf("StateUpgrade[%d]: config block timestamp (%v) <= previous timestamp (%v)", i, *upgradeTimestamp, *previousUpgradeTimestamp)
+			return fmt.Errorf("%w: StateUpgrade[%d] has timestamp %v, previous timestamp %v", errStateUpgradeTimestampNotMonotonic, i, *upgradeTimestamp, *previousUpgradeTimestamp)
 		}
 		previousUpgradeTimestamp = upgradeTimestamp
 	}

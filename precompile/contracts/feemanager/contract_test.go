@@ -60,7 +60,7 @@ var (
 			},
 			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    false,
-			ExpectedErr: feemanager.ErrCannotChangeFee.Error(),
+			ExpectedErr: feemanager.ErrCannotChangeFee,
 		},
 		{
 			Name:       "set_config_from_enabled_address_succeeds_and_emits_logs",
@@ -121,7 +121,7 @@ var (
 			Config: &feemanager.Config{
 				InitialFeeConfig: &testFeeConfig,
 			},
-			ExpectedErr: "cannot be greater than maxBlockGasCost",
+			ExpectedErr: commontype.ErrMinBlockGasCostTooHigh,
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := feemanager.GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
@@ -260,7 +260,7 @@ var (
 			},
 			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vm.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection,
 		},
 		{
 			Name:       "readOnly_setFeeConfig_with_allow_role_fails",
@@ -274,7 +274,7 @@ var (
 			},
 			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vm.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection,
 		},
 		{
 			Name:       "readOnly_setFeeConfig_with_admin_role_fails",
@@ -288,7 +288,7 @@ var (
 			},
 			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vm.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection,
 		},
 		{
 			Name:       "insufficient_gas_setFeeConfig_from_admin",
@@ -302,7 +302,7 @@ var (
 			},
 			SuppliedGas: feemanager.SetFeeConfigGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vm.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas,
 		},
 		{
 			Name:       "set_config_with_extra_padded_bytes_should_fail_before_Durango",
@@ -322,7 +322,7 @@ var (
 			},
 			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    false,
-			ExpectedErr: feemanager.ErrInvalidLen.Error(),
+			ExpectedErr: feemanager.ErrInvalidLen,
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
 				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
@@ -373,7 +373,7 @@ var (
 				return config
 			},
 			SuppliedGas: feemanager.SetFeeConfigGasCost,
-			ExpectedErr: feemanager.ErrInvalidLen.Error(),
+			ExpectedErr: feemanager.ErrInvalidLen,
 			ReadOnly:    false,
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
 				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()

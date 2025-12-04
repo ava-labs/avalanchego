@@ -41,13 +41,13 @@ func TestVerify(t *testing.T) {
 				config.EXPECT().IsDurango(gomock.Any()).Return(true).AnyTimes()
 				return config
 			}(),
-			ExpectedError: "",
+			ExpectedError: nil,
 		},
 		// CUSTOM CODE STARTS HERE
 		// Add your own Verify tests here, e.g.:
 		// "your custom test name": {
 		// 	Config: NewConfig(utils.NewUint64(3), {{- if .Contract.AllowList}} admins, enableds, managers{{- end}}),
-		// 	ExpectedError: ErrYourCustomError.Error(),
+		// 	ExpectedError: ErrYourCustomError,
 		// },
 	}
 	{{- if .Contract.AllowList}}

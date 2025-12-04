@@ -37,7 +37,7 @@ var (
 			},
 			SuppliedGas: rewardmanager.AllowFeeRecipientsGasCost,
 			ReadOnly:    false,
-			ExpectedErr: rewardmanager.ErrCannotAllowFeeRecipients.Error(),
+			ExpectedErr: rewardmanager.ErrCannotAllowFeeRecipients,
 		},
 		{
 			Name:       "set_reward_address_from_no_role_fails",
@@ -51,7 +51,7 @@ var (
 			},
 			SuppliedGas: rewardmanager.SetRewardAddressGasCost,
 			ReadOnly:    false,
-			ExpectedErr: rewardmanager.ErrCannotSetRewardAddress.Error(),
+			ExpectedErr: rewardmanager.ErrCannotSetRewardAddress,
 		},
 		{
 			Name:       "disable_rewards_from_no_role_fails",
@@ -65,7 +65,7 @@ var (
 			},
 			SuppliedGas: rewardmanager.DisableRewardsGasCost,
 			ReadOnly:    false,
-			ExpectedErr: rewardmanager.ErrCannotDisableRewards.Error(),
+			ExpectedErr: rewardmanager.ErrCannotDisableRewards,
 		},
 		{
 			Name:       "set_allow_fee_recipients_from_enabled_succeeds",
@@ -380,7 +380,7 @@ var (
 			},
 			SuppliedGas: rewardmanager.AllowFeeRecipientsGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vm.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection,
 		},
 		{
 			Name:       "readOnly_set_reward_address_with_allowed_role_fails",
@@ -394,7 +394,7 @@ var (
 			},
 			SuppliedGas: rewardmanager.SetRewardAddressGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vm.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection,
 		},
 		{
 			Name:       "insufficient_gas_set_reward_address_from_allowed_role",
@@ -408,7 +408,7 @@ var (
 			},
 			SuppliedGas: rewardmanager.SetRewardAddressGasCost + rewardmanager.RewardAddressChangedEventGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vm.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas,
 		},
 		{
 			Name:       "insufficient_gas_allow_fee_recipients_from_allowed_role",
@@ -422,7 +422,7 @@ var (
 			},
 			SuppliedGas: rewardmanager.AllowFeeRecipientsGasCost + rewardmanager.FeeRecipientsAllowedEventGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vm.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas,
 		},
 		{
 			Name:       "insufficient_gas_read_current_reward_address_from_allowed_role",
@@ -436,7 +436,7 @@ var (
 			},
 			SuppliedGas: rewardmanager.CurrentRewardAddressGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vm.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas,
 		},
 		{
 			Name:       "insufficient_gas_are_fee_recipients_allowed_from_allowed_role",
@@ -450,7 +450,7 @@ var (
 			},
 			SuppliedGas: rewardmanager.AreFeeRecipientsAllowedGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vm.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas,
 		},
 	}
 )

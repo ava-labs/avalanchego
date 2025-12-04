@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/commontype"
+	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/nativeminter"
@@ -53,7 +54,7 @@ func TestVerifyWithChainConfig(t *testing.T) {
 		},
 	)
 	err = badConfig.Verify()
-	require.ErrorContains(t, err, "config block timestamp (5) <= previous timestamp (5) of same key")
+	require.ErrorIs(t, err, errPrecompileUpgradeSameKeyTimestampNotStrictly)
 
 	// cannot enable a precompile without disabling it first.
 	badConfig = *config
@@ -64,7 +65,7 @@ func TestVerifyWithChainConfig(t *testing.T) {
 		},
 	)
 	err = badConfig.Verify()
-	require.ErrorContains(t, err, "disable should be [true]")
+	require.ErrorIs(t, err, errPrecompileUpgradeInvalidDisable)
 }
 
 func TestVerifyWithChainConfigAtNilTimestamp(t *testing.T) {
@@ -93,7 +94,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 	tests := []struct {
 		name          string
 		upgrades      []PrecompileUpgrade
-		expectedError string
+		expectedError error
 	}{
 		{
 			name: "enable and disable tx allow list",
@@ -105,7 +106,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 					Config: txallowlist.NewDisableConfig(utils.NewUint64(2)),
 				},
 			},
-			expectedError: "",
+			expectedError: nil,
 		},
 		{
 			name: "invalid allow list config in tx allowlist",
@@ -120,7 +121,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 					Config: txallowlist.NewConfig(utils.NewUint64(3), admins, admins, admins),
 				},
 			},
-			expectedError: "cannot set address",
+			expectedError: allowlist.ErrAdminAndEnabledAddress,
 		},
 		{
 			name: "invalid initial fee manager config",
@@ -134,7 +135,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 						}()),
 				},
 			},
-			expectedError: "gasLimit = -1 cannot be less than or equal to 0",
+			expectedError: commontype.ErrGasLimitTooLow,
 		},
 		{
 			name: "invalid initial fee manager config gas limit 0",
@@ -148,7 +149,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 						}()),
 				},
 			},
-			expectedError: "gasLimit = 0 cannot be less than or equal to 0",
+			expectedError: commontype.ErrGasLimitTooLow,
 		},
 		{
 			name: "different upgrades are allowed to configure same timestamp for different precompiles",
@@ -160,7 +161,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 					Config: feemanager.NewConfig(utils.NewUint64(1), admins, nil, nil, nil),
 				},
 			},
-			expectedError: "",
+			expectedError: nil,
 		},
 		{
 			name: "different upgrades must be monotonically increasing",
@@ -172,7 +173,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 					Config: feemanager.NewConfig(utils.NewUint64(1), admins, nil, nil, nil),
 				},
 			},
-			expectedError: "config block timestamp (1) < previous timestamp (2)",
+			expectedError: errPrecompileUpgradeTimestampNotMonotonic,
 		},
 		{
 			name: "upgrades with same keys are not allowed to configure same timestamp for same precompiles",
@@ -184,7 +185,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 					Config: txallowlist.NewDisableConfig(utils.NewUint64(1)),
 				},
 			},
-			expectedError: "config block timestamp (1) <= previous timestamp (1) of same key",
+			expectedError: errPrecompileUpgradeSameKeyTimestampNotStrictly,
 		},
 	}
 	for _, tt := range tests {
@@ -196,11 +197,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 			config.PrecompileUpgrades = tt.upgrades
 
 			err := config.Verify()
-			if tt.expectedError == "" {
-				require.NoError(err)
-			} else {
-				require.ErrorContains(err, tt.expectedError)
-			}
+			require.ErrorIs(err, tt.expectedError)
 		})
 	}
 }
@@ -210,14 +207,14 @@ func TestVerifyPrecompiles(t *testing.T) {
 	tests := []struct {
 		name          string
 		precompiles   Precompiles
-		expectedError string
+		expectedError error
 	}{
 		{
 			name: "invalid allow list config in tx allowlist",
 			precompiles: Precompiles{
 				txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(3), admins, admins, admins),
 			},
-			expectedError: "cannot set address",
+			expectedError: allowlist.ErrAdminAndEnabledAddress,
 		},
 		{
 			name: "invalid initial fee manager config",
@@ -229,7 +226,7 @@ func TestVerifyPrecompiles(t *testing.T) {
 						return &feeConfig
 					}()),
 			},
-			expectedError: "gasLimit = -1 cannot be less than or equal to 0",
+			expectedError: commontype.ErrGasLimitTooLow,
 		},
 	}
 	for _, tt := range tests {
@@ -241,11 +238,7 @@ func TestVerifyPrecompiles(t *testing.T) {
 			config.GenesisPrecompiles = tt.precompiles
 
 			err := config.Verify()
-			if tt.expectedError == "" {
-				require.NoError(err)
-			} else {
-				require.ErrorContains(err, tt.expectedError)
-			}
+			require.ErrorIs(err, tt.expectedError)
 		})
 	}
 }
@@ -269,7 +262,7 @@ func TestVerifyRequiresSortedTimestamps(t *testing.T) {
 
 	// block timestamps must be monotonically increasing, so this config is invalid
 	err := config.Verify()
-	require.ErrorContains(t, err, "config block timestamp (1) < previous timestamp (2)")
+	require.ErrorIs(t, err, errPrecompileUpgradeTimestampNotMonotonic)
 }
 
 func TestGetPrecompileConfig(t *testing.T) {

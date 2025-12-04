@@ -25,13 +25,13 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 	}
 
 	type test struct {
-		upgrades            []PrecompileUpgrade
-		expectedErrorString string
+		upgrades      []PrecompileUpgrade
+		expectedError error
 	}
 
 	tests := map[string]test{
 		"upgrade bytes conflicts with genesis (re-enable without disable)": {
-			expectedErrorString: "disable should be [true]",
+			expectedError: errPrecompileUpgradeInvalidDisable,
 			upgrades: []PrecompileUpgrade{
 				{
 					Config: txallowlist.NewConfig(utils.NewUint64(2), admins, nil, nil),
@@ -39,7 +39,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			},
 		},
 		"upgrade bytes conflicts with genesis (disable before enable)": {
-			expectedErrorString: "config block timestamp (0) <= previous timestamp (1) of same key",
+			expectedError: errPrecompileUpgradeSameKeyTimestampNotStrictly,
 			upgrades: []PrecompileUpgrade{
 				{
 					Config: txallowlist.NewDisableConfig(utils.NewUint64(0)),
@@ -47,7 +47,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			},
 		},
 		"upgrade bytes conflicts with genesis (disable same time as enable)": {
-			expectedErrorString: "config block timestamp (1) <= previous timestamp (1) of same key",
+			expectedError: errPrecompileUpgradeSameKeyTimestampNotStrictly,
 			upgrades: []PrecompileUpgrade{
 				{
 					Config: txallowlist.NewDisableConfig(utils.NewUint64(1)),
@@ -64,14 +64,15 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			// verify with the upgrades from the test
 			chainConfig.UpgradeConfig.PrecompileUpgrades = tt.upgrades
 			err := chainConfig.Verify()
-
-			if tt.expectedErrorString != "" {
-				require.ErrorContains(t, err, tt.expectedErrorString)
-			} else {
-				require.NoError(t, err)
-			}
+			require.ErrorIs(t, err, tt.expectedError)
 		})
 	}
+}
+
+type upgradeCompatibilityTest struct {
+	configs             []*UpgradeConfig
+	startTimestamps     []uint64
+	expectedErrorString string
 }
 
 func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
@@ -271,12 +272,6 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 	}
 }
 
-type upgradeCompatibilityTest struct {
-	configs             []*UpgradeConfig
-	startTimestamps     []uint64
-	expectedErrorString string
-}
-
 func (tt *upgradeCompatibilityTest) run(t *testing.T, chainConfig ChainConfig) {
 	// apply all the upgrade bytes specified in order
 	for i, upgrade := range tt.configs {
@@ -294,7 +289,7 @@ func (tt *upgradeCompatibilityTest) run(t *testing.T, chainConfig ChainConfig) {
 		}
 
 		if tt.expectedErrorString != "" {
-			require.ErrorContains(t, err, tt.expectedErrorString)
+			require.ErrorContains(t, err, tt.expectedErrorString) //nolint:forbidigo // external libevm error
 		} else {
 			require.Nil(t, err, "expecting checkConfigCompatible call %d to return nil", i+1)
 		}

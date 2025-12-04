@@ -57,7 +57,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: nil,
 				EnabledAddresses: nil,
 			}),
-			ExpectedError: "duplicate address in admin list",
+			ExpectedError: allowlist.ErrDuplicateAdminAddress,
 		},
 		"invalid allow list config with duplicate enableds in allowlist": {
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
@@ -65,7 +65,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: nil,
 				EnabledAddresses: []common.Address{TestEnabledAddr, TestEnabledAddr},
 			}),
-			ExpectedError: "duplicate address in enabled list",
+			ExpectedError: allowlist.ErrDuplicateEnabledAddress,
 		},
 		"invalid allow list config with duplicate managers in allowlist": {
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
@@ -73,7 +73,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: []common.Address{TestManagerAddr, TestManagerAddr},
 				EnabledAddresses: nil,
 			}),
-			ExpectedError: "duplicate address in manager list",
+			ExpectedError: allowlist.ErrDuplicateManagerAddress,
 		},
 		"invalid allow list config with same admin and enabled in allowlist": {
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
@@ -81,7 +81,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: nil,
 				EnabledAddresses: []common.Address{TestAdminAddr},
 			}),
-			ExpectedError: "cannot set address as both admin and enabled",
+			ExpectedError: allowlist.ErrAdminAndEnabledAddress,
 		},
 		"invalid allow list config with same admin and manager in allowlist": {
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
@@ -89,7 +89,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: []common.Address{TestAdminAddr},
 				EnabledAddresses: nil,
 			}),
-			ExpectedError: "cannot set address as both admin and manager",
+			ExpectedError: allowlist.ErrAdminAndManagerAddress,
 		},
 		"invalid allow list config with same manager and enabled in allowlist": {
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
@@ -97,7 +97,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: []common.Address{TestManagerAddr},
 				EnabledAddresses: []common.Address{TestManagerAddr},
 			}),
-			ExpectedError: "cannot set address as both enabled and manager",
+			ExpectedError: allowlist.ErrEnabledAndManagerAddress,
 		},
 		"invalid allow list config with manager role before activation": {
 			Config: mkConfigWithUpgradeAndAllowList(module, &allowlist.AllowListConfig{
@@ -112,7 +112,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				config.EXPECT().IsDurango(gomock.Any()).Return(false)
 				return config
 			}(),
-			ExpectedError: allowlist.ErrCannotAddManagersBeforeDurango.Error(),
+			ExpectedError: allowlist.ErrCannotAddManagersBeforeDurango,
 		},
 		"nil member allow list config in allowlist": {
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
@@ -120,7 +120,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: nil,
 				EnabledAddresses: nil,
 			}),
-			ExpectedError: "",
+			ExpectedError: nil,
 		},
 		"empty member allow list config in allowlist": {
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
@@ -128,7 +128,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: []common.Address{},
 				EnabledAddresses: []common.Address{},
 			}),
-			ExpectedError: "",
+			ExpectedError: nil,
 		},
 		"valid allow list config in allowlist": {
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
@@ -136,7 +136,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: []common.Address{TestManagerAddr},
 				EnabledAddresses: []common.Address{TestEnabledAddr},
 			}),
-			ExpectedError: "",
+			ExpectedError: nil,
 		},
 	}
 }

@@ -148,6 +148,7 @@ var (
 	errInitializingLogger                         = errors.New("failed to initialize logger")
 	errShuttingDownVM                             = errors.New("shutting down VM")
 	errPathStateUnsupported                       = errors.New("path state scheme is not supported")
+	errVerifyGenesis                              = errors.New("failed to verify genesis")
 	errFirewoodSnapshotCacheDisabled              = errors.New("snapshot cache must be disabled for Firewood")
 	errFirewoodOfflinePruningUnsupported          = errors.New("offline pruning is not supported for Firewood")
 	errFirewoodStateSyncUnsupported               = errors.New("state sync is not yet supported for Firewood")
@@ -561,7 +562,7 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, a
 	}
 
 	if err := g.Verify(); err != nil {
-		return nil, fmt.Errorf("failed to verify genesis: %w", err)
+		return nil, fmt.Errorf("%w: %w", errVerifyGenesis, err)
 	}
 
 	// Align all the Ethereum upgrades to the Avalanche upgrades

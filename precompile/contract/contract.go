@@ -4,6 +4,7 @@
 package contract
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
@@ -11,6 +12,12 @@ import (
 
 const (
 	SelectorLen = 4
+)
+
+var (
+	ErrInvalidNonActivatedFunctionSelector = errors.New("invalid non-activated function selector")
+
+	errInvalidFunctionSelector = errors.New("invalid function selector")
 )
 
 type RunStatefulPrecompileFunc func(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
@@ -97,12 +104,12 @@ func (s *statefulPrecompileWithFunctionSelectors) Run(accessibleState Accessible
 	functionInput := input[SelectorLen:]
 	function, ok := s.functions[string(selector)]
 	if !ok {
-		return nil, suppliedGas, fmt.Errorf("invalid function selector %#x", selector)
+		return nil, suppliedGas, fmt.Errorf("%w: %#x", errInvalidFunctionSelector, selector)
 	}
 
 	// Check if the function is activated
 	if !function.IsActivated(accessibleState) {
-		return nil, suppliedGas, fmt.Errorf("invalid non-activated function selector %#x", selector)
+		return nil, suppliedGas, fmt.Errorf("%w: %#x", ErrInvalidNonActivatedFunctionSelector, selector)
 	}
 
 	return function.execute(accessibleState, caller, addr, functionInput, suppliedGas, readOnly)

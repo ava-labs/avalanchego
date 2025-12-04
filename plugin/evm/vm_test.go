@@ -766,10 +766,9 @@ func testReorgProtection(t *testing.T, scheme string) {
 	// should NEVER happen. However, the VM defends against this
 	// just in case.
 	err = vm1.SetPreference(t.Context(), vm1BlkC.ID())
-	require.ErrorContains(t, err, "cannot orphan finalized block", "Expected error when setting preference that would orphan finalized block")
-
+	require.ErrorContains(t, err, "cannot orphan finalized block", "Expected error when setting preference that would orphan finalized block") //nolint:forbidigo // uses upstream code
 	err = vm1BlkC.Accept(t.Context())
-	require.ErrorContains(t, err, "expected accepted block to have parent", "Expected error when accepting orphaned block")
+	require.ErrorContains(t, err, "expected accepted block to have parent", "Expected error when accepting orphaned block") //nolint:forbidigo // uses upstream code
 }
 
 // Regression test to ensure that a VM that accepts block C while preferring
@@ -1088,7 +1087,7 @@ func testStickyPreference(t *testing.T, scheme string) {
 	require.Equal(t, blkDHash, vm1.blockChain.CurrentBlock().Hash(), "expected current block to have hash %s but got %s", blkDHash.Hex(), vm1.blockChain.CurrentBlock().Hash().Hex())
 
 	// Attempt to accept out of order
-	require.ErrorContains(t, vm1BlkD.Accept(t.Context()), "expected accepted block to have parent", "unexpected error when accepting out of order block")
+	require.ErrorContains(t, vm1BlkD.Accept(t.Context()), "expected accepted block to have parent", "unexpected error when accepting out of order block") //nolint:forbidigo // uses upstream code
 
 	// Accept in order
 	require.NoError(t, vm1BlkC.Accept(t.Context()), "Block failed verification on VM1")
@@ -2572,7 +2571,8 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	tvm.vm.ctx.Metrics = metrics.NewPrefixGatherer()
 
 	// this will not be allowed
-	require.ErrorContains(t, reinitVM.Initialize(t.Context(), tvm.vm.ctx, tvm.db, genesisWithUpgradeBytes, []byte{}, []byte{}, []*commonEng.Fx{}, tvm.appSender), "mismatching Cancun fork timestamp in database")
+	err = reinitVM.Initialize(t.Context(), tvm.vm.ctx, tvm.db, genesisWithUpgradeBytes, []byte{}, []byte{}, []*commonEng.Fx{}, tvm.appSender)
+	require.ErrorContains(t, err, "mismatching Cancun fork timestamp in database") //nolint:forbidigo // uses upstream code
 
 	// Reset metrics to allow re-initialization
 	tvm.vm.ctx.Metrics = metrics.NewPrefixGatherer()
@@ -2588,47 +2588,41 @@ func TestParentBeaconRootBlock(t *testing.T) {
 		name          string
 		fork          upgradetest.Fork
 		beaconRoot    *common.Hash
-		expectedError bool
-		errString     string
+		expectedError error
 	}{
 		{
 			name:          "non-empty parent beacon root in Durango",
 			fork:          upgradetest.Durango,
 			beaconRoot:    &common.Hash{0x01},
-			expectedError: true,
-			// err string wont work because it will also fail with blob gas is non-empty (zeroed)
+			expectedError: errInvalidParentBeaconRootBeforeCancun,
 		},
 		{
 			name:          "empty parent beacon root in Durango",
 			fork:          upgradetest.Durango,
 			beaconRoot:    &common.Hash{},
-			expectedError: true,
+			expectedError: errInvalidParentBeaconRootBeforeCancun,
 		},
 		{
-			name:          "nil parent beacon root in Durango",
-			fork:          upgradetest.Durango,
-			beaconRoot:    nil,
-			expectedError: false,
+			name:       "nil parent beacon root in Durango",
+			fork:       upgradetest.Durango,
+			beaconRoot: nil,
 		},
 		{
 			name:          "non-empty parent beacon root in E-Upgrade (Cancun)",
 			fork:          upgradetest.Etna,
 			beaconRoot:    &common.Hash{0x01},
-			expectedError: true,
-			errString:     "expected empty hash",
+			expectedError: errParentBeaconRootNonEmpty,
 		},
 		{
-			name:          "empty parent beacon root in E-Upgrade (Cancun)",
-			fork:          upgradetest.Etna,
-			beaconRoot:    &common.Hash{},
-			expectedError: false,
+			name:       "empty parent beacon root in E-Upgrade (Cancun)",
+			fork:       upgradetest.Etna,
+			beaconRoot: &common.Hash{},
 		},
 		{
 			name:          "nil parent beacon root in E-Upgrade (Cancun)",
 			fork:          upgradetest.Etna,
 			beaconRoot:    nil,
-			expectedError: true,
-			errString:     "header is missing parentBeaconRoot",
+			expectedError: errMissingParentBeaconRoot,
 		},
 	}
 
@@ -2667,22 +2661,10 @@ func TestParentBeaconRootBlock(t *testing.T) {
 			parentBeaconBlock, err := wrapBlock(parentBeaconEthBlock, tvm.vm)
 			require.NoError(t, err)
 
-			errCheck := func(err error) {
-				if test.expectedError {
-					if test.errString != "" {
-						require.ErrorContains(t, err, test.errString)
-					} else {
-						require.Error(t, err)
-					}
-				} else {
-					require.NoError(t, err)
-				}
-			}
-
 			_, err = tvm.vm.ParseBlock(t.Context(), parentBeaconBlock.Bytes())
-			errCheck(err)
+			require.ErrorIs(t, err, test.expectedError)
 			err = parentBeaconBlock.Verify(t.Context())
-			errCheck(err)
+			require.ErrorIs(t, err, test.expectedError)
 		})
 	}
 }
@@ -3183,7 +3165,7 @@ func TestGenesisGasLimit(t *testing.T) {
 	vm := &VM{}
 	err = vm.Initialize(t.Context(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{})
 	// This should fail because the gas limit is different from the fee config
-	require.ErrorContains(t, err, "failed to verify genesis")
+	require.ErrorIs(t, err, errVerifyGenesis)
 
 	// This should succeed because the gas limit is the same as the fee config
 	genesis.GasLimit = params.GetExtra(genesis.Config).FeeConfig.GasLimit.Uint64()
@@ -3264,7 +3246,7 @@ func TestCreateHandlers(t *testing.T) {
 		})
 	}
 	require.NoError(t, client.BatchCall(batch))
-	require.ErrorContains(t, batch[0].Error, "batch too large")
+	require.ErrorContains(t, batch[0].Error, "batch too large") //nolint:forbidigo // uses upstream code
 
 	// All other elements should have an error indicating there's no response
 	for _, elem := range batch[1:] {
@@ -3564,8 +3546,7 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 				// On subnet-evm, InvalidateExecution causes the transaction to be excluded from the block.
 				// BuildBlock will create a block but it will fail verification because it's empty
 				// and subnet-evm doesn't allow empty blocks.
-				require.Error(t, err, "BuildBlock should fail because it would create an empty block")
-				require.ErrorContains(t, err, "empty block", "Should fail with empty block error")
+				require.ErrorIs(t, err, errEmptyBlock)
 				return
 			}
 			require.NoError(t, err)

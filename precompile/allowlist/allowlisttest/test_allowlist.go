@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
+	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
@@ -105,7 +106,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "no_role_set_enabled",
@@ -119,7 +120,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "no_role_set_admin",
@@ -133,7 +134,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "enabled_set_no_role",
@@ -147,7 +148,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "enabled_set_enabled",
@@ -161,7 +162,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "enabled_set_admin",
@@ -175,7 +176,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "no_role_set_manager_pre_Durango",
@@ -194,7 +195,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: 0,
 			ReadOnly:    false,
-			ExpectedErr: "invalid non-activated function selector",
+			ExpectedErr: contract.ErrInvalidNonActivatedFunctionSelector,
 		},
 		{
 			Name:       "no_role_set_manager",
@@ -213,7 +214,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "enabled_role_set_manager_pre_Durango",
@@ -232,7 +233,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: 0,
 			ReadOnly:    false,
-			ExpectedErr: "invalid non-activated function selector",
+			ExpectedErr: contract.ErrInvalidNonActivatedFunctionSelector,
 		},
 		{
 			Name:       "enabled_set_manager",
@@ -251,7 +252,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "admin_set_manager_pre_Durango",
@@ -270,7 +271,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: 0,
 			ReadOnly:    false,
-			ExpectedErr: "invalid non-activated function selector",
+			ExpectedErr: contract.ErrInvalidNonActivatedFunctionSelector,
 		},
 		{
 			Name:       "admin_set_manager",
@@ -311,7 +312,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			SuppliedGas: allowlist.ModifyAllowListGasCost + allowlist.AllowListEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			ExpectedErr: "",
+			ExpectedErr: nil,
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				res := allowlist.GetAllowListStatus(state, contractAddress, TestNoRoleAddr)
 				require.Equal(t, allowlist.NoRole, res)
@@ -333,7 +334,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			SuppliedGas: allowlist.ModifyAllowListGasCost + allowlist.AllowListEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			ExpectedErr: "",
+			ExpectedErr: nil,
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				res := allowlist.GetAllowListStatus(state, contractAddress, TestNoRoleAddr)
 				require.Equal(t, allowlist.EnabledRole, res)
@@ -360,7 +361,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "manager_set_no_role_to_admin",
@@ -374,7 +375,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "manager_set_enabled_to_admin",
@@ -388,7 +389,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "manager_set_enabled_role_to_manager",
@@ -407,7 +408,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "manager_set_enabled_role_to_no_role",
@@ -443,7 +444,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "manager_set_admin_role_to_enabled",
@@ -457,7 +458,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "manager_set_admin_to_manager",
@@ -476,7 +477,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "manager_set_manager_to_no_role",
@@ -490,7 +491,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    false,
-			ExpectedErr: allowlist.ErrCannotModifyAllowList.Error(),
+			ExpectedErr: allowlist.ErrCannotModifyAllowList,
 		},
 		{
 			Name:       "admin_set_no_role_with_readOnly_enabled",
@@ -504,7 +505,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vm.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection,
 		},
 		{
 			Name:       "admin_set_no_role_insufficient_gas",
@@ -518,7 +519,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			},
 			SuppliedGas: allowlist.ModifyAllowListGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vm.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas,
 		},
 		{
 			Name:       "no_role_read_allow_list",
@@ -571,7 +572,7 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 				return input
 			}, SuppliedGas: allowlist.ReadAllowListGasCost - 1,
 			ReadOnly:    true,
-			ExpectedErr: vm.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas,
 		},
 		{
 			Name: "initial_config_sets_admins",

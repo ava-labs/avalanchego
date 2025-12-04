@@ -14,7 +14,15 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 )
 
-var ErrCannotAddManagersBeforeDurango = errors.New("cannot add managers before Durango")
+var (
+	ErrAdminAndEnabledAddress         = errors.New("cannot set address as both admin and enabled")
+	ErrAdminAndManagerAddress         = errors.New("cannot set address as both admin and manager")
+	ErrCannotAddManagersBeforeDurango = errors.New("cannot add managers before Durango")
+	ErrDuplicateEnabledAddress        = errors.New("duplicate address in enabled list")
+	ErrDuplicateAdminAddress          = errors.New("duplicate address in admin list")
+	ErrDuplicateManagerAddress        = errors.New("duplicate address in manager list")
+	ErrEnabledAndManagerAddress       = errors.New("cannot set address as both enabled and manager")
+)
 
 // AllowListConfig specifies the initial set of addresses with Admin or Enabled roles.
 type AllowListConfig struct {
@@ -63,7 +71,7 @@ func (c *AllowListConfig) Verify(chainConfig precompileconfig.ChainConfig, upgra
 	// check for duplicates in enabled list
 	for _, enabledAddr := range c.EnabledAddresses {
 		if _, ok := addressMap[enabledAddr]; ok {
-			return fmt.Errorf("duplicate address in enabled list: %s", enabledAddr)
+			return fmt.Errorf("%w: %s", ErrDuplicateEnabledAddress, enabledAddr)
 		}
 		addressMap[enabledAddr] = EnabledRole
 	}
@@ -72,9 +80,9 @@ func (c *AllowListConfig) Verify(chainConfig precompileconfig.ChainConfig, upgra
 	for _, adminAddr := range c.AdminAddresses {
 		if role, ok := addressMap[adminAddr]; ok {
 			if role == AdminRole {
-				return fmt.Errorf("duplicate address in admin list: %s", adminAddr)
+				return fmt.Errorf("%w: %s", ErrDuplicateAdminAddress, adminAddr)
 			} else {
-				return fmt.Errorf("cannot set address as both admin and enabled: %s", adminAddr)
+				return fmt.Errorf("%w: %s", ErrAdminAndEnabledAddress, adminAddr)
 			}
 		}
 		addressMap[adminAddr] = AdminRole
@@ -93,11 +101,11 @@ func (c *AllowListConfig) Verify(chainConfig precompileconfig.ChainConfig, upgra
 		if role, ok := addressMap[managerAddr]; ok {
 			switch role {
 			case ManagerRole:
-				return fmt.Errorf("duplicate address in manager list: %s", managerAddr)
+				return fmt.Errorf("%w: %s", ErrDuplicateManagerAddress, managerAddr)
 			case AdminRole:
-				return fmt.Errorf("cannot set address as both admin and manager: %s", managerAddr)
+				return fmt.Errorf("%w: %s", ErrAdminAndManagerAddress, managerAddr)
 			case EnabledRole:
-				return fmt.Errorf("cannot set address as both enabled and manager: %s", managerAddr)
+				return fmt.Errorf("%w: %s", ErrEnabledAndManagerAddress, managerAddr)
 			}
 		}
 		addressMap[managerAddr] = ManagerRole

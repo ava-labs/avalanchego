@@ -4,6 +4,7 @@
 package nativeminter
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -15,7 +16,12 @@ import (
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
-var _ precompileconfig.Config = (*Config)(nil)
+var (
+	_ precompileconfig.Config = (*Config)(nil)
+
+	ErrInitialMintNilAmount     = errors.New("initial mint cannot contain nil amount")
+	ErrInitialMintInvalidAmount = errors.New("initial mint cannot contain invalid amount")
+)
 
 // Config implements the precompileconfig.Config interface while adding in the
 // ContractNativeMinter specific precompile config.
@@ -90,11 +96,11 @@ func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	// ensure that all of the initial mint values in the map are non-nil positive values
 	for addr, amount := range c.InitialMint {
 		if amount == nil {
-			return fmt.Errorf("initial mint cannot contain nil amount for address %s", addr)
+			return fmt.Errorf("%w for address %s", ErrInitialMintNilAmount, addr)
 		}
 		bigIntAmount := (*big.Int)(amount)
 		if bigIntAmount.Sign() < 1 {
-			return fmt.Errorf("initial mint cannot contain invalid amount %v for address %s", bigIntAmount, addr)
+			return fmt.Errorf("%w: amount %v for address %s", ErrInitialMintInvalidAmount, bigIntAmount, addr)
 		}
 	}
 	return c.AllowListConfig.Verify(chainConfig, c.Upgrade)
