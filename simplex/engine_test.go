@@ -386,7 +386,8 @@ func buildQCWithBytes(t testing.TB, configs []*Config, msg []byte) []byte {
 	sigs := make([]simplex.Signature, 0, len(configs))
 
 	for _, config := range configs {
-		signer, _ := NewBLSAuth(config)
+		signer, _, err := NewBLSAuth(config)
+		require.NoError(t, err)
 		sig, _ := signer.Sign(msg)
 		sigs = append(sigs, simplex.Signature{
 			Signer: config.Ctx.NodeID[:],
@@ -394,7 +395,8 @@ func buildQCWithBytes(t testing.TB, configs []*Config, msg []byte) []byte {
 		})
 	}
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	agg := SignatureAggregator{verifier: &verifier}
 
 	qc, err := agg.Aggregate(sigs)

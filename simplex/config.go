@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	pSimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
@@ -24,11 +23,6 @@ type Config struct {
 
 	Sender             sender.ExternalSender
 	OutboundMsgBuilder message.OutboundMsgBuilder
-
-	// Validators is a map of node IDs to their validator information.
-	// This tells the node about the current membership set, and should be consistent
-	// across all nodes in the subnet.
-	Validators map[ids.NodeID]*validators.GetValidatorOutput
 
 	VM block.ChainVM
 

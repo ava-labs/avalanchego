@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -454,12 +455,18 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			{
 				"validatorOnly": true,
 				"simplexParameters": {
-							"MaxProposalWait":1000,
-							"MaxRebroadcastWait":1000,
-							"initialValidators": [
-								"NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
-								"NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh"
-							]
+						"MaxProposalWait":1000,
+						"MaxRebroadcastWait":1000,
+						"initialValidators": [
+								{
+										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								},
+								{
+										"nodeID": "NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								}
+						]
 				}
 			}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
@@ -470,6 +477,27 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				require.True(config.ValidatorOnly)
 				require.Equal(time.Duration(1000), config.SimplexParameters.MaxProposalWait)
 				require.Equal(time.Duration(1000), config.SimplexParameters.MaxRebroadcastWait)
+
+				pkBytes, err := base64.StdEncoding.DecodeString(
+					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",
+				)
+				require.NoError(err)
+
+				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
+				require.NoError(err)
+				validator := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator, config.SimplexParameters.InitialValidators[0])
+
+				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
+				require.NoError(err)
+				validator2 := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID2,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator2, config.SimplexParameters.InitialValidators[1])
 			},
 			expectedErr: nil,
 		},
@@ -536,29 +564,49 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 					"simplexParameters": {
 						"MaxProposalWait":1000,
 						"MaxRebroadcastWait":1000,
-						 "initialValidators": [
-							"NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
-							"NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh"
+						"initialValidators": [
+								{
+										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								},
+								{
+										"nodeID": "NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								}
 						]
 					},
 					"validatorOnly": true
 				}
 			}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				require.Len(given, 1)
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
-				// should respect defaults
+
+				require.True(config.ValidatorOnly)
 				require.Equal(time.Duration(1000), config.SimplexParameters.MaxProposalWait)
 				require.Equal(time.Duration(1000), config.SimplexParameters.MaxRebroadcastWait)
-				require.Equal(2, len(config.SimplexParameters.InitialValidators))
+
+				pkBytes, err := base64.StdEncoding.DecodeString(
+					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",
+				)
+				require.NoError(err)
+
 				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
 				require.NoError(err)
-				require.True(config.SimplexParameters.InitialValidators.Contains(nodeID))
+				validator := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator, config.SimplexParameters.InitialValidators[0])
+
 				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
 				require.NoError(err)
-				require.True(config.SimplexParameters.InitialValidators.Contains(nodeID2))
+				validator2 := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID2,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator2, config.SimplexParameters.InitialValidators[1])
 			},
 			expectedErr: nil,
 		},

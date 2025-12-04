@@ -27,13 +27,13 @@ type Config struct {
 	ValidatorOnly bool `json:"validatorOnly" yaml:"validatorOnly"`
 	// AllowedNodes is the set of node IDs that are explicitly allowed to connect to this Subnet when
 	// ValidatorOnly is enabled.
-	AllowedNodes set.Set[ids.NodeID] `json:"allowedNodes"        yaml:"allowedNodes"`
+	AllowedNodes set.Set[ids.NodeID] `json:"allowedNodes" yaml:"allowedNodes"`
 
 	// Deprecated: Use either SnowParameters or SimplexParameters instead.
 	ConsensusParameters *snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
 
 	SnowParameters    *snowball.Parameters `json:"snowballParameters" yaml:"snowballParameters"`
-	SimplexParameters *simplex.Parameters  `json:"simplexParameters" yaml:"simplexParameters"`
+	SimplexParameters *simplex.Parameters  `json:"simplexParameters"  yaml:"simplexParameters"`
 
 	// ProposerMinBlockDelay is the minimum delay this node will enforce when
 	// building a snowman++ block.

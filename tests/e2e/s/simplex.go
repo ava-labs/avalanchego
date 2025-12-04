@@ -12,11 +12,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
@@ -43,9 +43,18 @@ func NewSimplexSubnetOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*t
 		panic(err)
 	}
 
-	initialValidators := set.NewSet[ids.NodeID](len(nodes))
+	// declare the initial validator set for the simplex subnet
+	initialValidators := make([]simplex.SimplexValidatorInfo, 0, len(nodes))
 	for _, node := range nodes {
-		initialValidators.Add(node.NodeID)
+		key, err := node.GetBLSSigningKey()
+		if err != nil {
+			panic(err)
+		}
+
+		initialValidators = append(initialValidators, simplex.SimplexValidatorInfo{
+			NodeID:    node.NodeID,
+			PublicKey: key.PublicKey().Compress(),
+		})
 	}
 
 	return &tmpnet.Subnet{

@@ -63,8 +63,8 @@ type Engine struct {
 
 // The VM must be initialized before creating the engine
 func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config *Config) (*Engine, error) {
-	if _, ok := config.Validators[config.Ctx.NodeID]; !ok {
-		config.Log.Info("Node is not a validator for the subnet",
+	if isNonValidator(config) {
+		config.Log.Info("Out node is not a validator for the subnet",
 			zap.Stringer("nodeID", config.Ctx.NodeID),
 			zap.Stringer("chainID", config.Ctx.ChainID),
 			zap.Stringer("subnetID", config.Ctx.SubnetID),
@@ -72,7 +72,10 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		return nonValidatingEngine(consensusCtx, config)
 	}
 
-	signer, verifier := NewBLSAuth(config)
+	signer, verifier, err := NewBLSAuth(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create BLS auth: %w", err)
+	}
 	qcDeserializer := &QCDeserializer{
 		verifier: &verifier,
 	}
@@ -328,4 +331,13 @@ func nonValidatingEngine(consensusCtx *snow.ConsensusContext, config *Config) (*
 	}
 
 	return engine, nil
+}
+
+func isNonValidator(config *Config) bool {
+	for _, node := range config.Params.InitialValidators {
+		if node.NodeID == config.Ctx.NodeID {
+			return false
+		}
+	}
+	return true
 }

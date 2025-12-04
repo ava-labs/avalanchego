@@ -43,14 +43,17 @@ type BLSVerifier struct {
 	canonicalNodeIDIndices map[ids.NodeID]int
 }
 
-func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier) {
-	verifier := createVerifier(config)
+func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier, error) {
+	verifier, err := createVerifier(config)
+	if err != nil {
+		return BLSSigner{}, BLSVerifier{}, err
+	}
 
 	return BLSSigner{
 		chainID:   config.Ctx.ChainID,
 		networkID: config.Ctx.NetworkID,
 		signBLS:   config.SignBLS,
-	}, verifier
+	}, verifier, nil
 }
 
 // Sign returns a signature on the given message using BLS signature scheme.
@@ -113,19 +116,22 @@ func (v BLSVerifier) Verify(message []byte, signature []byte, signer simplex.Nod
 	return nil
 }
 
-func createVerifier(config *Config) BLSVerifier {
+func createVerifier(config *Config) (BLSVerifier, error) {
 	verifier := BLSVerifier{
 		nodeID2PK: make(map[ids.NodeID]*bls.PublicKey),
 		networkID: config.Ctx.NetworkID,
 		chainID:   config.Ctx.ChainID,
 	}
 
-	nodeIDs := make([]ids.NodeID, 0, len(config.Validators))
-	for _, node := range config.Validators {
-		verifier.nodeID2PK[node.NodeID] = node.PublicKey
+	nodeIDs := make([]ids.NodeID, 0, len(config.Params.InitialValidators))
+	for _, node := range config.Params.InitialValidators {
+		pk, err := bls.PublicKeyFromCompressedBytes(node.PublicKey)
+		if err != nil {
+			return BLSVerifier{}, fmt.Errorf("failed to parse public key for node %s: %w", node.NodeID, err)
+		}
+		verifier.nodeID2PK[node.NodeID] = pk
 		nodeIDs = append(nodeIDs, node.NodeID)
 	}
-
 	utils.Sort(nodeIDs)
 	verifier.canonicalNodeIDs = nodeIDs
 	verifier.canonicalNodeIDIndices = make(map[ids.NodeID]int, len(nodeIDs))
@@ -133,5 +139,5 @@ func createVerifier(config *Config) BLSVerifier {
 		verifier.canonicalNodeIDIndices[nodeID] = i
 	}
 
-	return verifier
+	return verifier, nil
 }

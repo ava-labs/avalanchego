@@ -1771,7 +1771,6 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		Log:                ctx.Log,
 		Sender:             m.Net,
 		OutboundMsgBuilder: m.MsgCreator,
-		Validators:         m.Validators.GetMap(ctx.SubnetID),
 		VM:                 vm,
 		WAL:                wal,
 		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,

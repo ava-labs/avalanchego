@@ -9,15 +9,19 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var ErrInvalidParameters = errors.New("simplex parameters must be valid")
 
+type SimplexValidatorInfo struct {
+	NodeID    ids.NodeID `json:"nodeID"    yaml:"nodeID"`
+	PublicKey []byte     `json:"publicKey" yaml:"publicKey"`
+}
+
 type Parameters struct {
-	MaxProposalWait    time.Duration       `json:"maxProposalWait"    yaml:"maxProposalWait"`
-	MaxRebroadcastWait time.Duration       `json:"maxRebroadcastWait" yaml:"maxRebroadcastWait"`
-	InitialValidators  set.Set[ids.NodeID] `json:"initialValidators"        yaml:"initialValidators"`
+	MaxProposalWait    time.Duration          `json:"maxProposalWait"    yaml:"maxProposalWait"`
+	MaxRebroadcastWait time.Duration          `json:"maxRebroadcastWait" yaml:"maxRebroadcastWait"`
+	InitialValidators  []SimplexValidatorInfo `json:"initialValidators"  yaml:"initialValidators"`
 }
 
 var DefaultParameters = Parameters{
