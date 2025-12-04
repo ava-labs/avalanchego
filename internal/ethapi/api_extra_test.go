@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -47,7 +46,7 @@ func TestBlockchainAPI_GetChainConfig(t *testing.T) {
 	api := NewBlockChainAPI(backend)
 
 	gotConfig := api.GetChainConfig(t.Context())
-	assert.Equal(t, params.ToWithUpgradesJSON(wantConfig), gotConfig)
+	require.Equal(t, params.ToWithUpgradesJSON(wantConfig), gotConfig)
 }
 
 // Copy one test case from TestCall
@@ -204,9 +203,9 @@ func TestBlockChainAPI_stateQueryBlockNumberAllowed(t *testing.T) {
 
 			err := api.stateQueryBlockNumberAllowed(testCase.blockNumOrHash)
 			if testCase.wantErrMessage == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, testCase.wantErrMessage)
+				require.EqualError(t, err, testCase.wantErrMessage)
 			}
 		})
 	}

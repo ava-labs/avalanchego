@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/commontype"
@@ -2740,10 +2739,10 @@ func TestStandaloneDB(t *testing.T) {
 	require.Equal(t, newBlock.Block.Hash(), common.Hash(blk.ID()))
 
 	// Ensure that the shared database is empty
-	assert.True(t, isDBEmpty(baseDB))
+	require.True(t, isDBEmpty(baseDB))
 	// Ensure that the standalone database is not empty
-	assert.False(t, isDBEmpty(vm.db))
-	assert.False(t, isDBEmpty(vm.acceptedBlockDB))
+	require.False(t, isDBEmpty(vm.db))
+	require.False(t, isDBEmpty(vm.acceptedBlockDB))
 }
 
 func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {

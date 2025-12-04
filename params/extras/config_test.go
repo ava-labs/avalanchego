@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/commontype"
@@ -86,7 +85,7 @@ $`,
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			got := test.config.Description()
-			assert.Regexp(t, test.wantRegex, got, "config description mismatch")
+			require.Regexp(t, test.wantRegex, got, "config description mismatch")
 		})
 	}
 }
@@ -176,10 +175,10 @@ func TestChainConfigVerify(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := test.config.Verify()
 			if test.errRegex == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
 				require.Error(t, err)
-				assert.Regexp(t, test.errRegex, err.Error())
+				require.Regexp(t, test.errRegex, err.Error())
 			}
 		})
 	}

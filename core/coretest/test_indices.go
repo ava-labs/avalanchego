@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,10 +24,10 @@ func CheckTxIndices(t *testing.T, expectedTail *uint64, indexedFrom uint64, inde
 		var stored uint64
 		tailValue := *expectedTail
 
-		require.EventuallyWithTf(t,
-			func(c *assert.CollectT) {
+		require.Eventually(t,
+			func() bool {
 				stored = *rawdb.ReadTxIndexTail(db)
-				assert.Equalf(c, tailValue, stored, "expected tail to be %d, found %d", tailValue, stored)
+				return tailValue == stored
 			},
 			30*time.Second, 500*time.Millisecond, "expected tail to be %d eventually", tailValue)
 	}

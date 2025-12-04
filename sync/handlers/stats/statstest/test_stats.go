@@ -1,17 +1,19 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stats
+package statstest
 
 import (
 	"sync"
 	"time"
+
+	"github.com/ava-labs/subnet-evm/sync/handlers/stats"
 )
 
-var _ HandlerStats = &MockHandlerStats{}
+var _ stats.HandlerStats = (*TestHandlerStats)(nil)
 
-// MockHandlerStats is mock for capturing and asserting on handler metrics in test
-type MockHandlerStats struct {
+// TestHandlerStats is test for capturing and asserting on handler metrics in test
+type TestHandlerStats struct {
 	lock sync.Mutex
 
 	BlockRequestCount,
@@ -44,7 +46,7 @@ type MockHandlerStats struct {
 	LeafRequestProcessingTimeSum time.Duration
 }
 
-func (m *MockHandlerStats) Reset() {
+func (m *TestHandlerStats) Reset() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.BlockRequestCount = 0
@@ -75,157 +77,157 @@ func (m *MockHandlerStats) Reset() {
 	m.LeafRequestProcessingTimeSum = 0
 }
 
-func (m *MockHandlerStats) IncBlockRequest() {
+func (m *TestHandlerStats) IncBlockRequest() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.BlockRequestCount++
 }
 
-func (m *MockHandlerStats) IncMissingBlockHash() {
+func (m *TestHandlerStats) IncMissingBlockHash() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.MissingBlockHashCount++
 }
 
-func (m *MockHandlerStats) UpdateBlocksReturned(num uint16) {
+func (m *TestHandlerStats) UpdateBlocksReturned(num uint16) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.BlocksReturnedSum += uint32(num)
 }
 
-func (m *MockHandlerStats) UpdateBlockRequestProcessingTime(duration time.Duration) {
+func (m *TestHandlerStats) UpdateBlockRequestProcessingTime(duration time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.BlockRequestProcessingTimeSum += duration
 }
 
-func (m *MockHandlerStats) IncCodeRequest() {
+func (m *TestHandlerStats) IncCodeRequest() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.CodeRequestCount++
 }
 
-func (m *MockHandlerStats) IncMissingCodeHash() {
+func (m *TestHandlerStats) IncMissingCodeHash() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.MissingCodeHashCount++
 }
 
-func (m *MockHandlerStats) IncTooManyHashesRequested() {
+func (m *TestHandlerStats) IncTooManyHashesRequested() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.TooManyHashesRequested++
 }
 
-func (m *MockHandlerStats) IncDuplicateHashesRequested() {
+func (m *TestHandlerStats) IncDuplicateHashesRequested() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.DuplicateHashesRequested++
 }
 
-func (m *MockHandlerStats) UpdateCodeReadTime(duration time.Duration) {
+func (m *TestHandlerStats) UpdateCodeReadTime(duration time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.CodeReadTimeSum += duration
 }
 
-func (m *MockHandlerStats) UpdateCodeBytesReturned(bytes uint32) {
+func (m *TestHandlerStats) UpdateCodeBytesReturned(bytes uint32) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.CodeBytesReturnedSum += bytes
 }
 
-func (m *MockHandlerStats) IncLeafsRequest() {
+func (m *TestHandlerStats) IncLeafsRequest() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.LeafsRequestCount++
 }
 
-func (m *MockHandlerStats) IncInvalidLeafsRequest() {
+func (m *TestHandlerStats) IncInvalidLeafsRequest() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.InvalidLeafsRequestCount++
 }
 
-func (m *MockHandlerStats) UpdateLeafsReturned(numLeafs uint16) {
+func (m *TestHandlerStats) UpdateLeafsReturned(numLeafs uint16) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.LeafsReturnedSum += uint32(numLeafs)
 }
 
-func (m *MockHandlerStats) UpdateLeafsRequestProcessingTime(duration time.Duration) {
+func (m *TestHandlerStats) UpdateLeafsRequestProcessingTime(duration time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.LeafRequestProcessingTimeSum += duration
 }
 
-func (m *MockHandlerStats) UpdateReadLeafsTime(duration time.Duration) {
+func (m *TestHandlerStats) UpdateReadLeafsTime(duration time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.LeafsReadTime += duration
 }
 
-func (m *MockHandlerStats) UpdateGenerateRangeProofTime(duration time.Duration) {
+func (m *TestHandlerStats) UpdateGenerateRangeProofTime(duration time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.GenerateRangeProofTime += duration
 }
 
-func (m *MockHandlerStats) UpdateSnapshotReadTime(duration time.Duration) {
+func (m *TestHandlerStats) UpdateSnapshotReadTime(duration time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.SnapshotReadTime += duration
 }
 
-func (m *MockHandlerStats) UpdateRangeProofValsReturned(numProofVals int64) {
+func (m *TestHandlerStats) UpdateRangeProofValsReturned(numProofVals int64) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.ProofValsReturned += numProofVals
 }
 
-func (m *MockHandlerStats) IncMissingRoot() {
+func (m *TestHandlerStats) IncMissingRoot() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.MissingRootCount++
 }
 
-func (m *MockHandlerStats) IncTrieError() {
+func (m *TestHandlerStats) IncTrieError() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.TrieErrorCount++
 }
 
-func (m *MockHandlerStats) IncProofError() {
+func (m *TestHandlerStats) IncProofError() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.ProofErrorCount++
 }
 
-func (m *MockHandlerStats) IncSnapshotReadError() {
+func (m *TestHandlerStats) IncSnapshotReadError() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.SnapshotReadErrorCount++
 }
 
-func (m *MockHandlerStats) IncSnapshotReadAttempt() {
+func (m *TestHandlerStats) IncSnapshotReadAttempt() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.SnapshotReadAttemptCount++
 }
 
-func (m *MockHandlerStats) IncSnapshotReadSuccess() {
+func (m *TestHandlerStats) IncSnapshotReadSuccess() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.SnapshotReadSuccessCount++
 }
 
-func (m *MockHandlerStats) IncSnapshotSegmentValid() {
+func (m *TestHandlerStats) IncSnapshotSegmentValid() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.SnapshotSegmentValidCount++
 }
 
-func (m *MockHandlerStats) IncSnapshotSegmentInvalid() {
+func (m *TestHandlerStats) IncSnapshotSegmentInvalid() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.SnapshotSegmentInvalidCount++

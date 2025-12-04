@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/holiman/uint256"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/commontype"
@@ -1439,7 +1438,6 @@ func StatefulPrecompiles(t *testing.T, create createFunc) {
 		MaxBlockGasCost:  big.NewInt(4_000_000),
 		BlockGasCostStep: big.NewInt(500_000),
 	}
-	assert := assert.New(t)
 	tests := map[string]test{
 		"allow list": {
 			addTx: func(gen *BlockGen) {
@@ -1501,23 +1499,23 @@ func StatefulPrecompiles(t *testing.T, create createFunc) {
 			},
 			verifyState: func(sdb *state.StateDB) error {
 				res := feemanager.GetFeeManagerStatus(sdb, addr1)
-				assert.Equal(allowlist.AdminRole, res)
+				require.Equal(t, allowlist.AdminRole, res)
 
 				storedConfig := feemanager.GetStoredFeeConfig(sdb)
-				assert.Equal(testFeeConfig, storedConfig)
+				require.Equal(t, testFeeConfig, storedConfig)
 
 				feeConfig, _, err := blockchain.GetFeeConfigAt(blockchain.CurrentHeader())
 				require.NoError(t, err)
-				assert.Equal(testFeeConfig, feeConfig)
+				require.Equal(t, testFeeConfig, feeConfig)
 				return nil
 			},
 			verifyGenesis: func(sdb *state.StateDB) {
 				res := feemanager.GetFeeManagerStatus(sdb, addr1)
-				assert.Equal(allowlist.AdminRole, res)
+				require.Equal(t, allowlist.AdminRole, res)
 
 				feeConfig, _, err := blockchain.GetFeeConfigAt(blockchain.Genesis().Header())
 				require.NoError(t, err)
-				assert.Equal(params.GetExtra(&config).FeeConfig, feeConfig)
+				require.Equal(t, params.GetExtra(&config).FeeConfig, feeConfig)
 			},
 		},
 	}

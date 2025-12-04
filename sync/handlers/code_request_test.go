@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
-	"github.com/ava-labs/subnet-evm/sync/handlers/stats"
+	"github.com/ava-labs/subnet-evm/sync/handlers/stats/statstest"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -34,7 +34,7 @@ func TestCodeRequestHandler(t *testing.T) {
 	maxSizeCodeHash := crypto.Keccak256Hash(maxSizeCodeBytes)
 	rawdb.WriteCode(database, maxSizeCodeHash, maxSizeCodeBytes)
 
-	mockHandlerStats := &stats.MockHandlerStats{}
+	mockHandlerStats := &statstest.TestHandlerStats{}
 	codeRequestHandler := NewCodeRequestHandler(database, message.Codec, mockHandlerStats)
 
 	tests := map[string]struct {

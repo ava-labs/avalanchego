@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
@@ -48,7 +47,7 @@ func AssertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 		// check snapshot consistency
 		snapshotVal := rawdb.ReadAccountSnapshot(clientDB, accHash)
 		expectedSnapshotVal := types.SlimAccountRLP(acc)
-		assert.Equal(t, expectedSnapshotVal, snapshotVal)
+		require.Equal(t, expectedSnapshotVal, snapshotVal)
 
 		// check code consistency
 		if !bytes.Equal(acc.CodeHash, types.EmptyCodeHash[:]) {
@@ -56,7 +55,7 @@ func AssertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 			code := rawdb.ReadCode(clientDB, codeHash)
 			actualHash := crypto.Keccak256Hash(code)
 			require.NotEmpty(t, code)
-			assert.Equal(t, codeHash, actualHash)
+			require.Equal(t, codeHash, actualHash)
 		}
 		if acc.Root == types.EmptyRootHash {
 			return nil
@@ -76,16 +75,16 @@ func AssertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 		AssertTrieConsistency(t, acc.Root, serverTrieDB, clientTrieDB, func(key, val []byte) error {
 			storageTrieLeavesCount++
 			snapshotVal := rawdb.ReadStorageSnapshot(clientDB, accHash, common.BytesToHash(key))
-			assert.Equal(t, val, snapshotVal)
+			require.Equal(t, val, snapshotVal)
 			return nil
 		})
 
-		assert.Equal(t, storageTrieLeavesCount, snapshotStorageKeysCount)
+		require.Equal(t, storageTrieLeavesCount, snapshotStorageKeysCount)
 		return nil
 	})
 
 	// Check that the number of accounts in the snapshot matches the number of leaves in the accounts trie
-	assert.Equal(t, trieAccountLeaves, numSnapshotAccounts)
+	require.Equal(t, trieAccountLeaves, numSnapshotAccounts)
 }
 
 // FillAccountsWithOverlappingStorage adds [numAccounts] randomly generated accounts to the secure trie at [root]

@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/commontype"
@@ -115,7 +114,7 @@ func BlockGasCostTest(t *testing.T, feeConfig commontype.FeeConfig) {
 				},
 			)
 
-			assert.Equal(t, test.expected, BlockGasCost(
+			require.Equal(t, test.expected, BlockGasCost(
 				config,
 				feeConfig,
 				parent,
@@ -216,7 +215,7 @@ func BlockGasCostWithStepTest(t *testing.T, feeConfig commontype.FeeConfig) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expected, BlockGasCostWithStep(
+			require.Equal(t, test.expected, BlockGasCostWithStep(
 				feeConfig,
 				test.parentCost,
 				blockGasCostStep,

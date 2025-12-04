@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
@@ -151,7 +150,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 
 	enabled, err := syncDisabledVM.StateSyncEnabled(t.Context())
 	require.NoError(t, err)
-	assert.False(t, enabled, "sync should be disabled")
+	require.False(t, enabled, "sync should be disabled")
 
 	// Process the first 10 blocks from the serverVM
 	for i := uint64(1); i < 10; i++ {
@@ -209,7 +208,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 
 	enabled, err = syncReEnabledVM.StateSyncEnabled(t.Context())
 	require.NoError(t, err)
-	assert.True(t, enabled, "sync should be enabled")
+	require.True(t, enabled, "sync should be enabled")
 
 	vmSetup.syncerVM = syncReEnabledVM
 	testSyncerVM(t, vmSetup, test)
