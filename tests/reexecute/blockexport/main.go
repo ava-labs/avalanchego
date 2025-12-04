@@ -21,7 +21,6 @@ var (
 	blockDirDstArg string
 	startBlockArg  uint64
 	endBlockArg    uint64
-	chanSizeArg    int
 )
 
 func init() {
@@ -29,7 +28,6 @@ func init() {
 	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination block directory to write blocks into.")
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
-	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 
 	flag.Parse()
 }
@@ -39,12 +37,14 @@ func main() {
 	defer tc.RecoverAndExit()
 
 	r := require.New(tc)
+
+	chanSize := 100
 	blockChan, err := reexecute.CreateBlockChanFromLevelDB(
 		tc,
 		blockDirSrcArg,
 		startBlockArg,
 		endBlockArg,
-		chanSizeArg,
+		chanSize,
 		tc.DeferCleanup,
 	)
 	r.NoError(err)
