@@ -51,16 +51,6 @@ func FuzzPackReadAllowlistTest(f *testing.F) {
 	})
 }
 
-func FuzzPackReadAllowlistTestSkipCheck(f *testing.F) {
-	f.Fuzz(func(t *testing.T, b []byte) {
-		require := require.New(t)
-		res, err := UnpackReadAllowListInput(b, true)
-		oldRes, oldErr := OldUnpackReadAllowList(b)
-		require.ErrorIs(err, oldErr)
-		require.Equal(oldRes, res)
-	})
-}
-
 func TestPackReadAllowlistTest(f *testing.T) {
 	testPackReadAllowlistTest(f, common.Address{})
 }
@@ -69,7 +59,6 @@ func testPackReadAllowlistTest(t *testing.T, address common.Address) {
 	t.Helper()
 	t.Run(fmt.Sprintf("TestPackReadAllowlistTest, address %v", address), func(t *testing.T) {
 		require := require.New(t)
-		// use new Pack/Unpack methods
 		input, err := PackReadAllowList(address)
 		require.NoError(err)
 		// exclude 4 bytes for function selector
@@ -77,30 +66,6 @@ func testPackReadAllowlistTest(t *testing.T, address common.Address) {
 		unpacked, err := UnpackReadAllowListInput(input, true)
 		require.NoError(err)
 		require.Equal(address, unpacked)
-
-		// use old Pack/Unpack methods
-		input = OldPackReadAllowList(address)
-		// exclude 4 bytes for function selector
-		input = input[4:]
-		require.NoError(err)
-		unpacked, err = OldUnpackReadAllowList(input)
-		require.NoError(err)
-		require.Equal(address, unpacked)
-
-		// now mix and match old and new methods
-		input, err = PackReadAllowList(address)
-		require.NoError(err)
-		// exclude 4 bytes for function selector
-		input = input[4:]
-		input2 := OldPackReadAllowList(address)
-		// exclude 4 bytes for function selector
-		input2 = input2[4:]
-		require.Equal(input, input2)
-		unpacked, err = UnpackReadAllowListInput(input2, true)
-		require.NoError(err)
-		unpacked2, err := OldUnpackReadAllowList(input)
-		require.NoError(err)
-		require.Equal(unpacked, unpacked2)
 	})
 }
 
@@ -115,21 +80,10 @@ func FuzzPackModifyAllowListTest(f *testing.F) {
 	})
 }
 
-func FuzzPackModifyAllowlistTestSkipCheck(f *testing.F) {
-	f.Fuzz(func(t *testing.T, b []byte) {
-		require := require.New(t)
-		res, err := UnpackModifyAllowListInput(b, AdminRole, true)
-		oldRes, oldErr := OldUnpackModifyAllowList(b, AdminRole)
-		require.ErrorIs(err, oldErr)
-		require.Equal(oldRes, res)
-	})
-}
-
 func testPackModifyAllowListTest(t *testing.T, address common.Address, role Role) {
 	t.Helper()
 	t.Run(fmt.Sprintf("TestPackModifyAllowlistTest, address %v, role %s", address, role.String()), func(t *testing.T) {
 		require := require.New(t)
-		// use new Pack/Unpack methods
 		input, err := PackModifyAllowList(address, role)
 		require.NoError(err)
 		// exclude 4 bytes for function selector
@@ -137,34 +91,6 @@ func testPackModifyAllowListTest(t *testing.T, address common.Address, role Role
 		unpacked, err := UnpackModifyAllowListInput(input, role, true)
 		require.NoError(err)
 		require.Equal(address, unpacked)
-
-		// use old Pack/Unpack methods
-		input, err = OldPackModifyAllowList(address, role)
-		require.NoError(err)
-		// exclude 4 bytes for function selector
-		input = input[4:]
-		require.NoError(err)
-
-		unpacked, err = OldUnpackModifyAllowList(input, role)
-		require.NoError(err)
-
-		require.Equal(address, unpacked)
-
-		// now mix and match new and old methods
-		input, err = PackModifyAllowList(address, role)
-		require.NoError(err)
-		// exclude 4 bytes for function selector
-		input = input[4:]
-		input2, err := OldPackModifyAllowList(address, role)
-		require.NoError(err)
-		// exclude 4 bytes for function selector
-		input2 = input2[4:]
-		require.Equal(input, input2)
-		unpacked, err = UnpackModifyAllowListInput(input2, role, true)
-		require.NoError(err)
-		unpacked2, err := OldUnpackModifyAllowList(input, role)
-		require.NoError(err)
-		require.Equal(unpacked, unpacked2)
 	})
 }
 
@@ -175,48 +101,6 @@ func FuzzPackReadAllowListOutputTest(f *testing.F) {
 		require.NoError(t, err)
 		require.Equal(t, packedOutput, role.Bytes())
 	})
-}
-
-func OldPackReadAllowList(address common.Address) []byte {
-	input := make([]byte, 0, contract.SelectorLen+common.HashLength)
-	input = append(input, readAllowListSignature...)
-	input = append(input, common.BytesToHash(address[:]).Bytes()...)
-	return input
-}
-
-func OldUnpackReadAllowList(input []byte) (common.Address, error) {
-	if len(input) != allowListInputLen {
-		return common.Address{}, fmt.Errorf("invalid input length for read allow list: %d", len(input))
-	}
-	return common.BytesToAddress(input), nil
-}
-
-func OldPackModifyAllowList(address common.Address, role Role) ([]byte, error) {
-	// function selector (4 bytes) + hash for address
-	input := make([]byte, 0, contract.SelectorLen+common.HashLength)
-
-	switch role {
-	case AdminRole:
-		input = append(input, setAdminSignature...)
-	case ManagerRole:
-		input = append(input, setManagerSignature...)
-	case EnabledRole:
-		input = append(input, setEnabledSignature...)
-	case NoRole:
-		input = append(input, setNoneSignature...)
-	default:
-		return nil, fmt.Errorf("cannot pack modify list input with invalid role: %s", role)
-	}
-
-	input = append(input, common.BytesToHash(address[:]).Bytes()...)
-	return input, nil
-}
-
-func OldUnpackModifyAllowList(input []byte, _ Role) (common.Address, error) {
-	if len(input) != allowListInputLen {
-		return common.Address{}, fmt.Errorf("invalid input length for modifying allow list: %d", len(input))
-	}
-	return common.BytesToAddress(input), nil
 }
 
 func getRole(roleIndex uint) Role {

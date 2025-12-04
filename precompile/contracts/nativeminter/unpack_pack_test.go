@@ -19,7 +19,7 @@ import (
 
 var mintSignature = contract.CalculateFunctionSelector("mintNativeCoin(address,uint256)") // address, amount
 
-func FuzzPackMintNativeCoinEqualTest(f *testing.F) {
+func FuzzPackMintNativeCoinTest(f *testing.F) {
 	key, err := crypto.GenerateKey()
 	require.NoError(f, err)
 	addr := crypto.PubkeyToAddress(key.PublicKey)
@@ -36,7 +36,25 @@ func FuzzPackMintNativeCoinEqualTest(f *testing.F) {
 		// otherwise the value will be truncated when packed,
 		// and thus unpacked output will not be equal to the value
 		doCheckOutputs := bigIntVal.Cmp(abi.MaxUint256) <= 0
-		testOldPackMintNativeCoinEqual(t, common.BytesToAddress(b), bigIntVal, doCheckOutputs)
+		testPackMintNativeCoin(t, common.BytesToAddress(b), bigIntVal, doCheckOutputs)
+	})
+}
+
+func testPackMintNativeCoin(t *testing.T, addr common.Address, amount *big.Int, checkOutputs bool) {
+	t.Helper()
+	t.Run(fmt.Sprintf("TestPackMintNativeCoin, addr: %s, amount: %s", addr.String(), amount.String()), func(t *testing.T) {
+		input, err := PackMintNativeCoin(addr, amount)
+		if err != nil {
+			return
+		}
+
+		input = input[4:]
+		unpackedAddr, unpackedAmount, err := UnpackMintNativeCoinInput(input, true)
+		require.NoError(t, err)
+		if checkOutputs {
+			require.Equal(t, addr, unpackedAddr)
+			require.Equal(t, amount.Bytes(), unpackedAmount.Bytes())
+		}
 	})
 }
 
@@ -50,53 +68,46 @@ func TestUnpackMintNativeCoinInput(t *testing.T) {
 		input          []byte
 		strictMode     bool
 		expectedErr    error
-		expectedOldErr error
 		expectedAddr   common.Address
 		expectedAmount *big.Int
 	}{
 		{
-			name:           "empty input strict mode",
-			input:          []byte{},
-			strictMode:     true,
-			expectedErr:    ErrInvalidLen,
-			expectedOldErr: ErrInvalidLen,
+			name:        "empty input strict mode",
+			input:       []byte{},
+			strictMode:  true,
+			expectedErr: ErrInvalidLen,
 		},
 		{
-			name:           "empty input",
-			input:          []byte{},
-			strictMode:     false,
-			expectedErr:    ErrUnpackInput,
-			expectedOldErr: ErrInvalidLen,
+			name:        "empty input",
+			input:       []byte{},
+			strictMode:  false,
+			expectedErr: ErrUnpackInput,
 		},
 		{
-			name:           "input with extra bytes strict mode",
-			input:          append(testInputBytes, make([]byte, 32)...),
-			strictMode:     true,
-			expectedErr:    ErrInvalidLen,
-			expectedOldErr: ErrInvalidLen,
+			name:        "input with extra bytes strict mode",
+			input:       append(testInputBytes, make([]byte, 32)...),
+			strictMode:  true,
+			expectedErr: ErrInvalidLen,
 		},
 		{
 			name:           "input with extra bytes",
 			input:          append(testInputBytes, make([]byte, 32)...),
 			strictMode:     false,
 			expectedErr:    nil,
-			expectedOldErr: ErrInvalidLen,
 			expectedAddr:   constants.BlackholeAddr,
 			expectedAmount: common.Big2,
 		},
 		{
-			name:           "input with extra bytes (not divisible by 32) strict mode",
-			input:          append(testInputBytes, make([]byte, 33)...),
-			strictMode:     true,
-			expectedErr:    ErrInvalidLen,
-			expectedOldErr: ErrInvalidLen,
+			name:        "input with extra bytes (not divisible by 32) strict mode",
+			input:       append(testInputBytes, make([]byte, 33)...),
+			strictMode:  true,
+			expectedErr: ErrInvalidLen,
 		},
 		{
 			name:           "input with extra bytes (not divisible by 32)",
 			input:          append(testInputBytes, make([]byte, 33)...),
 			strictMode:     false,
 			expectedErr:    nil,
-			expectedOldErr: ErrInvalidLen,
 			expectedAddr:   constants.BlackholeAddr,
 			expectedAmount: common.Big2,
 		},
@@ -109,12 +120,6 @@ func TestUnpackMintNativeCoinInput(t *testing.T) {
 				require.Equal(t, test.expectedAddr, unpackedAddress)
 				require.Equal(t, test.expectedAmount, unpackedAmount, "expected %s, got %s", test.expectedAmount.String(), unpackedAmount.String())
 			}
-			oldUnpackedAddress, oldUnpackedAmount, oldErr := OldUnpackMintNativeCoinInput(test.input)
-			require.ErrorIs(t, oldErr, test.expectedOldErr)
-			if test.expectedOldErr == nil {
-				require.Equal(t, test.expectedAddr, oldUnpackedAddress)
-				require.Equal(t, test.expectedAmount, oldUnpackedAmount, "expected %s, got %s", test.expectedAmount.String(), oldUnpackedAmount.String())
-			}
 		})
 	}
 }
@@ -123,53 +128,4 @@ func TestFunctionSignatures(t *testing.T) {
 	// Test that the mintNativeCoin signature is correct
 	abiMintNativeCoin := NativeMinterABI.Methods["mintNativeCoin"]
 	require.Equal(t, mintSignature, abiMintNativeCoin.ID)
-}
-
-func testOldPackMintNativeCoinEqual(t *testing.T, addr common.Address, amount *big.Int, checkOutputs bool) {
-	t.Helper()
-	t.Run(fmt.Sprintf("TestUnpackAndPacks, addr: %s, amount: %s", addr.String(), amount.String()), func(t *testing.T) {
-		input, err := OldPackMintNativeCoinInput(addr, amount)
-		input2, err2 := PackMintNativeCoin(addr, amount)
-		require.ErrorIs(t, err2, err)
-		if err != nil {
-			return
-		}
-		require.Equal(t, input, input2)
-
-		input = input[4:]
-		to, assetAmount, err := OldUnpackMintNativeCoinInput(input)
-		unpackedAddr, unpackedAmount, err2 := UnpackMintNativeCoinInput(input, true)
-		require.ErrorIs(t, err2, err)
-		if err != nil {
-			return
-		}
-		require.Equal(t, to, unpackedAddr)
-		require.Equal(t, assetAmount.Bytes(), unpackedAmount.Bytes())
-		if checkOutputs {
-			require.Equal(t, addr, to)
-			require.Equal(t, amount.Bytes(), assetAmount.Bytes())
-		}
-	})
-}
-
-func OldPackMintNativeCoinInput(address common.Address, amount *big.Int) ([]byte, error) {
-	// function selector (4 bytes) + input(hash for address + hash for amount)
-	res := make([]byte, contract.SelectorLen+mintInputLen)
-	err := contract.PackOrderedHashesWithSelector(res, mintSignature, []common.Hash{
-		common.BytesToHash(address[:]),
-		common.BigToHash(amount),
-	})
-
-	return res, err
-}
-
-func OldUnpackMintNativeCoinInput(input []byte) (common.Address, *big.Int, error) {
-	mintInputAddressSlot := 0
-	mintInputAmountSlot := 1
-	if len(input) != mintInputLen {
-		return common.Address{}, nil, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
-	}
-	to := common.BytesToAddress(contract.PackedHash(input, mintInputAddressSlot))
-	assetAmount := new(big.Int).SetBytes(contract.PackedHash(input, mintInputAmountSlot))
-	return to, assetAmount, nil
 }
