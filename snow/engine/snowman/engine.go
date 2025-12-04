@@ -57,6 +57,7 @@ type Engine struct {
 	common.AcceptedHandler
 	common.AncestorsHandler
 	common.AppHandler
+	common.SimplexHandler
 	validators.Connector
 
 	requestID uint32
@@ -140,6 +141,7 @@ func New(config Config) (*Engine, error) {
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
 		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
 		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
+		SimplexHandler:              common.NewNoOpSimplexHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 		Connector:                   config.VM,
 		pending:                     make(map[ids.ID]snowman.Block),
@@ -429,11 +431,6 @@ func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID u
 		return err
 	}
 	return e.executeDeferredWork(ctx)
-}
-
-func (e *Engine) SimplexMessage(_ context.Context, _ ids.NodeID, _ *p2p.Simplex) error {
-	e.Ctx.Log.Debug("received unsupported SimplexMessage call")
-	return nil
 }
 
 func (e *Engine) Shutdown(ctx context.Context) error {

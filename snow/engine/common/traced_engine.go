@@ -246,13 +246,13 @@ func (e *tracedEngine) PushQuery(ctx context.Context, nodeID ids.NodeID, request
 	return e.engine.PushQuery(ctx, nodeID, requestID, container, requestedHeight)
 }
 
-func (e *tracedEngine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+func (e *tracedEngine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.SimplexMessage", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 	))
 	defer span.End()
 
-	return e.engine.SimplexMessage(ctx, nodeID, msg)
+	return e.engine.Simplex(ctx, nodeID, msg)
 }
 
 func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {

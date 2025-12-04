@@ -207,7 +207,7 @@ func (e *Engine) tick() {
 	}
 }
 
-func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
 	if e.nonValidator {
 		e.logger.Debug("non-validator received simplex message; dropping")
 		return nil

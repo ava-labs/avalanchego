@@ -25,7 +25,12 @@ import (
 
 var simplexSubnetName = "simplex"
 
-func NewSimplexSubnetOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*tmpnet.Node) *tmpnet.Subnet {
+func NewSimplexSubnetOrPanic(nodes ...*tmpnet.Node) *tmpnet.Subnet {
+	key, err := secp256k1.NewPrivateKey()
+	if err != nil {
+		panic(err)
+	}
+
 	if len(nodes) == 0 {
 		panic("a subnet must be validated by at least one node")
 	}
@@ -58,7 +63,7 @@ func NewSimplexSubnetOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*t
 	}
 
 	return &tmpnet.Subnet{
-		Name: name,
+		Name: simplexSubnetName,
 		Config: tmpnet.ConfigMap{
 			"simplexParameters": map[string]interface{}{
 				"initialValidators": initialValidators,
@@ -73,17 +78,6 @@ func NewSimplexSubnetOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*t
 			},
 		},
 		ValidatorIDs: tmpnet.NodesToIDs(nodes...),
-	}
-}
-
-func SimplexSubnetsOrPanic(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
-	key, err := secp256k1.NewPrivateKey()
-	if err != nil {
-		panic(err)
-	}
-
-	return []*tmpnet.Subnet{
-		NewSimplexSubnetOrPanic(simplexSubnetName, key, nodes...),
 	}
 }
 

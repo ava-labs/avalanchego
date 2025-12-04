@@ -788,9 +788,13 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 // node restart to pick up configuration changes.
 func restartRequired(subnets []*Subnet) bool {
 	for _, subnet := range subnets {
+		consensusParameters, ok := subnet.Config["consensusParameters"].(map[string]interface{})
+		if !ok {
+			continue
+		}
 		// we need to restart if the subnet specifies simplex consensus, so it can
 		// initialize its chains using a simplex engine
-		if subnet.Config["consensusParameters"] != nil && subnet.Config["consensusParameters"].(map[string]interface{})["simplexParameters"] != nil {
+		if consensusParameters["simplexParameters"] != nil {
 			return true
 		}
 	}

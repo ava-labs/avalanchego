@@ -556,7 +556,7 @@ func (e *Engine) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) e
 	return errAppGossip
 }
 
-func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
 	if e.SimplexF != nil {
 		return e.SimplexF(ctx, nodeID, msg)
 	}

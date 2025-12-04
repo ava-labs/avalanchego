@@ -432,5 +432,5 @@ type InternalHandler interface {
 
 type SimplexHandler interface {
 	// Notify this engine of a simplex message from nodeID.
-	SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error
+	Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error
 }

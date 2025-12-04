@@ -40,7 +40,7 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	}
 
 	for _, msg := range allSimplexMessages {
-		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	}
 }
 
@@ -507,7 +507,7 @@ func FuzzSimplexVotes(f *testing.F) {
 			},
 		}
 
-		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	})
 }
 
@@ -526,7 +526,7 @@ func FuzzSimplexEmptyVotes(f *testing.F) {
 			},
 		}
 
-		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	})
 }
 
@@ -554,7 +554,7 @@ func FuzzSimplexFinalizeVotes(f *testing.F) {
 			},
 		}
 
-		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	})
 }
 
@@ -583,7 +583,7 @@ func FuzzSimplexNotarizations(f *testing.F) {
 			},
 		}
 
-		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	})
 }
 
@@ -612,7 +612,7 @@ func FuzzSimplexFinalizations(f *testing.F) {
 			},
 		}
 
-		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	})
 }
 
@@ -631,7 +631,7 @@ func FuzzSimplexReplicationRequests(f *testing.F) {
 			},
 		}
 
-		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	})
 }
 
@@ -670,7 +670,7 @@ func FuzzSimplexReplicationResponses(f *testing.F) {
 			},
 		}
 
-		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	})
 }
 
@@ -701,7 +701,7 @@ func FuzzSimplexBlockProposals(f *testing.F) {
 			},
 		}
 
-		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	})
 }
 
@@ -720,7 +720,7 @@ func FuzzSimplexEmptyNotarizations(f *testing.F) {
 			},
 		}
 
-		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	})
 }
 

@@ -50,8 +50,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	require.NoError(tc, err)
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	xsvmSubnets := vms.XSVMSubnetsOrPanic(nodes...)
-	simplexSubnets := s.SimplexSubnetsOrPanic(nodes...)
-	subnets := append(xsvmSubnets, simplexSubnets...)
+	simplexSubnet := s.NewSimplexSubnetOrPanic(nodes...)
+	subnets := append(xsvmSubnets, simplexSubnet)
 
 	upgradeToActivate := upgradetest.Latest
 	if !flagVars.ActivateLatest() {

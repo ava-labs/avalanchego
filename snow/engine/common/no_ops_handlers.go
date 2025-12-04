@@ -238,7 +238,7 @@ func NewNoOpSimplexHandler(log logging.Logger) SimplexHandler {
 	return &noOpSimplexHandler{log: log}
 }
 
-func (nop *noOpSimplexHandler) SimplexMessage(_ context.Context, nodeID ids.NodeID, _ *p2p.Simplex) error {
+func (nop *noOpSimplexHandler) Simplex(_ context.Context, nodeID ids.NodeID, _ *p2p.Simplex) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.SimplexOp),
