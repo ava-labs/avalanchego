@@ -1,0 +1,20 @@
+name: Bench
+
+on:
+  workflow_dispatch:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+      - run: go mod download
+        shell: bash
+      - run: ./scripts/run_task.sh build-bench-precompiles
+        shell: bash
