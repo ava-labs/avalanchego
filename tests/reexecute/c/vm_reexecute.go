@@ -592,14 +592,14 @@ type benchmarkResult struct {
 }
 
 type benchmarkTool struct {
-	name             string
-	benchmarkResults []benchmarkResult
+	name    string
+	results []benchmarkResult
 }
 
 func newBenchmarkTool(name string) *benchmarkTool {
 	return &benchmarkTool{
-		name:             name,
-		benchmarkResults: make([]benchmarkResult, 0),
+		name:    name,
+		results: make([]benchmarkResult, 0),
 	}
 }
 
@@ -609,16 +609,16 @@ func (b *benchmarkTool) addResult(value float64, unit string) {
 		Value: strconv.FormatFloat(value, 'f', -1, 64),
 		Unit:  unit,
 	}
-	b.benchmarkResults = append(b.benchmarkResults, result)
+	b.results = append(b.results, result)
 }
 
-func (b *benchmarkTool) saveToFile(filePath string) error {
-	output, err := json.MarshalIndent(b.benchmarkResults, "", "  ")
+func (b *benchmarkTool) saveToFile(path string) error {
+	output, err := json.MarshalIndent(b.results, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(filePath, output, perms.ReadWrite)
+	return os.WriteFile(path, output, perms.ReadWrite)
 }
 
 // parseCustomLabels parses a comma-separated list of key-value pairs into a map
