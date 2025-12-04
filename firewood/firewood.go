@@ -95,8 +95,8 @@ func New(path string) (*DB, error) {
 	}, nil
 }
 
-// Get returns a key value pair or database.ErrNotFound if `key` is not in the
-// DB.
+// Get returns a key value pair or [database.ErrNotFound] if `key` is not in the
+// [DB].
 func (db *DB) Get(key []byte) ([]byte, error) {
 	key = Prefix(appPrefix, key)
 
@@ -116,7 +116,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	return val, err
 }
 
-// Put inserts a key value pair into DB.
+// Put inserts a key value pair into [DB].
 func (db *DB) Put(key []byte, val []byte) {
 	db.pending.Put(Prefix(appPrefix, key), val)
 }
@@ -125,7 +125,7 @@ func (db *DB) Delete(key []byte) {
 	db.pending.Delete(Prefix(appPrefix, key))
 }
 
-// Height returns the last height of DB written to by Flush.
+// Height returns the last height of [DB] written to by [DB.Flush].
 //
 // If this returns false, the height has not been initialized yet.
 func (db *DB) Height() (uint64, bool) {
@@ -151,7 +151,7 @@ func (db *DB) Abort() {
 	db.pending = changes{}
 }
 
-// Flush flushes pending writes to disk and increments Height.
+// Flush flushes pending writes to disk and increments [DB.Height].
 func (db *DB) Flush() error {
 	if !db.heightInitialized {
 		db.heightInitialized = true
@@ -179,7 +179,7 @@ func (db *DB) Close(ctx context.Context) error {
 	return db.db.Close(ctx)
 }
 
-// Prefix prefixes `key` with `prefix` + PrefixDelimiter.
+// Prefix prefixes `key` with `prefix` + [PrefixDelimiter].
 func Prefix(prefix []byte, key []byte) []byte {
 	k := make([]byte, len(prefix)+1+len(key))
 
