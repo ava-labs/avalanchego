@@ -26,39 +26,34 @@ const metricsHistory = {
 
 let metricsInterval = null;
 
-const tabLoaded = {};
 function showTab(tabId, event) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     event.target.classList.add('active');
     document.getElementById('tab-' + tabId).classList.add('active');
     
-    // Load tab data on first view
-    if (!tabLoaded[tabId]) {
-        tabLoaded[tabId] = true;
-        if (tabId === 'network') {
-            fetchPeersDetailed();
-            fetchNetworkStats();
-            fetchACPs();
-        } else if (tabId === 'chains') {
-            fetchVMs();
-            fetchSubnets();
-        } else if (tabId === 'health') {
-            fetchHealthDetailed();
-            fetchLiveness();
-            fetchReadiness();
-        } else if (tabId === 'advanced') {
-            fetchUpgrades();
-            fetchTxFees();
-            fetchPChainHeight();
-            fetchCChainInfo();
-            fetchValidators();
-        } else if (tabId === 'metrics') {
-            startMetricsPolling();
-            fetchMetricsOnce();
-        } else if (tabId === 'l1validators') {
-            fetchL1ValidatorsOverview();
-        }
+    // Load tab-specific data when switching tabs
+    if (tabId === 'network') {
+        fetchPeersDetailed();
+        fetchNetworkStats();
+        fetchACPs();
+    } else if (tabId === 'chains') {
+        fetchVMs();
+        fetchSubnets();
+    } else if (tabId === 'health') {
+        fetchHealthDetailed();
+        fetchLiveness();
+        fetchReadiness();
+    } else if (tabId === 'advanced') {
+        fetchUpgrades();
+        fetchTxFees();
+        fetchPChainHeight();
+        fetchCChainInfo();
+        fetchValidators();
+    } else if (tabId === 'metrics') {
+        fetchMetricsOnce();
+    } else if (tabId === 'l1validators') {
+        fetchL1ValidatorsOverview();
     }
     
     // Handle metrics polling based on tab visibility
@@ -1118,27 +1113,79 @@ async function fetchReadiness() {
     ` : '<div class="error-state">Failed</div>';
 }
 
-// Chains
+// Chains - show all chains we are actually syncing
 async function fetchChains() {
+    const PRIMARY_NETWORK_ID = '11111111111111111111111111111111LpoYY';
+    const el = document.getElementById('chainsCard');
+    
+    // Get tracked subnets from config and all blockchains
+    const [configData, blockchainsData] = await Promise.all([
+        rpcCall('/ext/admin', 'admin.getConfig'),
+        rpcCall('/ext/P', 'platform.getBlockchains')
+    ]);
+    
+    // Parse tracked subnets from config
+    let trackedSubnetIds = new Set([PRIMARY_NETWORK_ID]);
+    if (configData?.result?.config) {
+        const config = configData.result.config;
+        const trackSubnets = config['track-subnets'] || config.trackSubnets || '';
+        if (trackSubnets) {
+            trackSubnets.split(',').forEach(id => {
+                const trimmed = id.trim();
+                if (trimmed) trackedSubnetIds.add(trimmed);
+            });
+        }
+    }
+    
+    // Build list of chains to check - primary chains + tracked subnet chains
     const chains = [
-        { id: 'P', name: 'Platform Chain', desc: 'Validators, subnets, staking' },
-        { id: 'X', name: 'Exchange Chain', desc: 'Asset transfers' },
-        { id: 'C', name: 'Contract Chain', desc: 'EVM smart contracts' }
+        { id: 'P', name: 'P-Chain', subnetID: PRIMARY_NETWORK_ID },
+        { id: 'X', name: 'X-Chain', subnetID: PRIMARY_NETWORK_ID },
+        { id: 'C', name: 'C-Chain', subnetID: PRIMARY_NETWORK_ID }
     ];
+    
+    // Add chains from tracked subnets
+    if (blockchainsData?.result?.blockchains) {
+        for (const bc of blockchainsData.result.blockchains) {
+            const sid = bc.subnetID || PRIMARY_NETWORK_ID;
+            // Only include chains from tracked subnets (excluding primary network chains already added)
+            if (trackedSubnetIds.has(sid) && sid !== PRIMARY_NETWORK_ID) {
+                chains.push({
+                    id: bc.id,
+                    name: bc.name || 'Unnamed Chain',
+                    subnetID: sid
+                });
+            }
+        }
+    }
+    
+    // Check bootstrap status for each chain
     const results = await Promise.all(chains.map(async c => {
         const r = await rpcCall('/ext/info', 'info.isBootstrapped', { chain: c.id });
         return { ...c, synced: r?.result?.isBootstrapped };
     }));
-    document.getElementById('statChains').textContent = results.filter(r => r.synced).length + '/3';
-    document.getElementById('chainsCard').innerHTML = '<div class="chain-grid">' + results.map(c => `
-        <div class="chain-item">
-            <div class="chain-header">
-                <span class="chain-name">${c.name} <span class="chain-badge">${c.id}</span></span>
-                <span class="chain-status ${c.synced ? 'synced' : 'syncing'}">${c.synced ? 'Synced' : 'Syncing'}</span>
+    
+    const syncedCount = results.filter(r => r.synced).length;
+    document.getElementById('statChains').textContent = syncedCount + '/' + results.length;
+    
+    if (results.length === 0) {
+        el.innerHTML = '<div class="empty-state">No chains found</div>';
+        return;
+    }
+    
+    el.innerHTML = '<div class="chain-grid">' + results.map(c => {
+        const isPrimary = c.subnetID === PRIMARY_NETWORK_ID;
+        const badge = c.id.length > 10 ? c.id.substring(0, 6) + '...' : c.id;
+        return `
+            <div class="chain-item">
+                <div class="chain-header">
+                    <span class="chain-name">${esc(c.name)} <span class="chain-badge">${esc(badge)}</span></span>
+                    <span class="chain-status ${c.synced ? 'synced' : 'syncing'}">${c.synced ? 'Synced' : 'Syncing'}</span>
+                </div>
+                ${!isPrimary ? `<div class="chain-desc" style="font-size:0.6rem;color:var(--text-muted);">L1/Subnet chain</div>` : ''}
             </div>
-            <div class="chain-desc">${c.desc}</div>
-        </div>
-    `).join('') + '</div>';
+        `;
+    }).join('') + '</div>';
 }
 
 // Subnets - show tracked subnets with health, and all other subnets separately
@@ -1425,16 +1472,49 @@ function updateTimestamp() {
     document.getElementById('lastUpdated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
 }
 
+function getCurrentTab() {
+    const activeTab = document.querySelector('.tab.active');
+    if (!activeTab) return 'overview';
+    // Extract tab id from onclick attribute or use a data attribute
+    const onclick = activeTab.getAttribute('onclick') || '';
+    const match = onclick.match(/showTab\('([^']+)'/);
+    return match ? match[1] : 'overview';
+}
+
+async function refreshCurrentTab() {
+    const currentTab = getCurrentTab();
+    const promises = [];
+    
+    // Always refresh overview data (includes stats that show on all pages)
+    promises.push(
+        fetchNodeInfo(), fetchNetworkInfo(), fetchUptime(), fetchPeers(),
+        fetchHealth(), fetchChains(), fetchSubnets(), fetchVMs()
+    );
+    
+    // Refresh tab-specific data based on current tab
+    if (currentTab === 'network') {
+        promises.push(fetchPeersDetailed(), fetchNetworkStats(), fetchACPs());
+    } else if (currentTab === 'health') {
+        promises.push(fetchHealthDetailed(), fetchLiveness(), fetchReadiness());
+    } else if (currentTab === 'advanced') {
+        promises.push(fetchUpgrades(), fetchTxFees(), fetchPChainHeight(), fetchCChainInfo(), fetchValidators());
+    } else if (currentTab === 'metrics') {
+        promises.push(fetchMetricsOnce());
+    } else if (currentTab === 'l1validators') {
+        promises.push(fetchL1ValidatorsOverview());
+    }
+    
+    await Promise.all(promises);
+}
+
 async function refreshAll() {
     const btn = document.getElementById('refreshAllBtn');
     btn.classList.add('spinning');
-    await Promise.all([
-        fetchNodeInfo(), fetchNetworkInfo(), fetchUptime(), fetchPeers(),
-        fetchHealth(), fetchChains(), fetchSubnets(), fetchVMs()
-    ]);
+    await refreshCurrentTab();
     updateTimestamp();
     btn.classList.remove('spinning');
 }
 
+// Initialize on page load
 refreshAll();
 
