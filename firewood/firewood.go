@@ -16,9 +16,9 @@ import (
 const PrefixDelimiter = '/'
 
 var (
-	consensusPrefix = []byte("consensus")
-	heightKey       = []byte("height")
-	appPrefix       = []byte("app")
+	reservedPrefix = []byte("reserved")
+	heightKey      = []byte("height")
+	appPrefix      = []byte("app")
 )
 
 type changes struct {
@@ -73,7 +73,7 @@ func New(path string) (*DB, error) {
 		return nil, fmt.Errorf("opening firewood db: %w", err)
 	}
 
-	heightKey := Prefix(consensusPrefix, heightKey)
+	heightKey := Prefix(reservedPrefix, heightKey)
 	heightBytes, err := db.Get(heightKey)
 	if err != nil {
 		return nil, fmt.Errorf("getting height: %w", err)

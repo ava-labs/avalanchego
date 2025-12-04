@@ -51,7 +51,7 @@ func TestDBPut(t *testing.T) {
 		},
 		{
 			name: "write to reserved key",
-			key:  Prefix(consensusPrefix, heightKey),
+			key:  Prefix(reservedPrefix, heightKey),
 			val:  []byte("foo"),
 			want: []byte("foo"),
 		},
