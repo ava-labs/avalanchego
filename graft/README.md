@@ -64,6 +64,8 @@ git fetch origin
 git reset --hard origin/[TARGET BRANCH]
 git push --force
 
+cd graft
+
 # Do the graft again
 task [REPOSITORY NAME]-subtree-merge
 ```
