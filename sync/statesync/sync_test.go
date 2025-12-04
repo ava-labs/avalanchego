@@ -71,7 +71,7 @@ func testSync(t *testing.T, test syncTest) {
 	})
 	require.NoError(t, err, "failed to create state syncer")
 	// begin sync
-	s.Start(ctx)
+	require.NoError(t, s.Start(ctx))
 	waitFor(t, t.Context(), s.Wait, test.expectedError, testSyncTimeout)
 	if test.expectedError != nil {
 		return
@@ -98,7 +98,7 @@ func waitFor(t *testing.T, ctx context.Context, resultFunc func(context.Context)
 	if ctx.Err() != nil {
 		// print a stack trace to assist with debugging
 		var stackBuf bytes.Buffer
-		pprof.Lookup("goroutine").WriteTo(&stackBuf, 2)
+		require.NoErrorf(t, pprof.Lookup("goroutine").WriteTo(&stackBuf, 2), "error trying to print stack trace for timeout")
 		t.Log(stackBuf.String())
 		// fail the test
 		require.Fail(t, "unexpected timeout waiting for sync result")

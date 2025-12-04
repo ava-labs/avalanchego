@@ -38,7 +38,7 @@ func (i *InitialRewardConfig) Verify() error {
 	}
 }
 
-func (i *InitialRewardConfig) Configure(state contract.StateDB) error {
+func (i *InitialRewardConfig) Configure(state contract.StateDB) {
 	// enable allow fee recipients
 	if i.AllowFeeRecipients {
 		EnableAllowFeeRecipients(state)
@@ -50,7 +50,6 @@ func (i *InitialRewardConfig) Configure(state contract.StateDB) error {
 		// set reward address
 		StoreRewardAddress(state, i.RewardAddress)
 	}
-	return nil
 }
 
 // Config implements the StatefulPrecompileConfig interface while adding in the

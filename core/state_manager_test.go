@@ -55,8 +55,8 @@ func TestCappedMemoryTrieWriter(t *testing.T) {
 		require.NoError(t, w.InsertTrie(block))
 		require.Zero(t, m.LastDereference, "should not have dereferenced block on insert")
 		require.Zero(t, m.LastCommit, "should not have committed block on insert")
+		require.NoError(t, w.AcceptTrie(block))
 
-		w.AcceptTrie(block)
 		if i <= tipBufferSize {
 			require.Zero(t, m.LastDereference, "should not have dereferenced block on accept")
 		} else {
@@ -70,7 +70,7 @@ func TestCappedMemoryTrieWriter(t *testing.T) {
 			m.LastCommit = common.Hash{}
 		}
 
-		w.RejectTrie(block)
+		require.NoError(t, w.RejectTrie(block))
 		require.Equal(t, block.Root(), m.LastDereference, "should have dereferenced block on reject")
 		require.Zero(t, m.LastCommit, "should not have committed block on reject")
 		m.LastDereference = common.Hash{}
@@ -94,12 +94,12 @@ func TestNoPruningTrieWriter(t *testing.T) {
 		require.Zero(t, m.LastDereference, "should not have dereferenced block on insert")
 		require.Zero(t, m.LastCommit, "should not have committed block on insert")
 
-		w.AcceptTrie(block)
+		require.NoError(t, w.AcceptTrie(block))
 		require.Zero(t, m.LastDereference, "should not have dereferenced block on accept")
 		require.Equal(t, block.Root(), m.LastCommit, "should have committed block on accept")
 		m.LastCommit = common.Hash{}
 
-		w.RejectTrie(block)
+		require.NoError(t, w.RejectTrie(block))
 		require.Equal(t, block.Root(), m.LastDereference, "should have dereferenced block on reject")
 		require.Zero(t, m.LastCommit, "should not have committed block on reject")
 		m.LastDereference = common.Hash{}

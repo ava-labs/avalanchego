@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
@@ -104,7 +105,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 				require.NoError(t, syncerVM.AppRequestFailed(t.Context(), nodeID, requestID, commonEng.ErrTimeout))
 				require.NoError(t, syncerVM.Client.Shutdown())
 			} else {
-				syncerVM.AppResponse(t.Context(), nodeID, requestID, response)
+				require.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response))
 			}
 		},
 		expectedErr: context.Canceled,
@@ -118,13 +119,18 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	test.responseIntercept = nil
 	test.expectedErr = nil
 
+	var atomicErr utils.Atomic[error]
 	syncDisabledVM := &VM{}
 	appSender := &enginetest.Sender{T: t}
 	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
 	appSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 		nodeID, hasItem := nodeSet.Pop()
 		require.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
-		go vmSetup.serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request)
+		go func() {
+			if err := vmSetup.serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request); err != nil {
+				atomicErr.Set(err)
+			}
+		}()
 		return nil
 	}
 	// Reset metrics to allow re-initialization
@@ -191,7 +197,11 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
 	vmSetup.serverAppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 		if test.responseIntercept == nil {
-			go syncReEnabledVM.AppResponse(ctx, nodeID, requestID, response)
+			go func() {
+				if err := syncReEnabledVM.AppResponse(ctx, nodeID, requestID, response); err != nil {
+					atomicErr.Set(err)
+				}
+			}()
 		} else {
 			go test.responseIntercept(syncReEnabledVM, nodeID, requestID, response)
 		}
@@ -212,6 +222,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 
 	vmSetup.syncerVM = syncReEnabledVM
 	testSyncerVM(t, vmSetup, test)
+	require.NoError(t, atomicErr.Get())
 }
 
 func TestVMShutdownWhileSyncing(t *testing.T) {
@@ -311,15 +322,23 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	require.True(enabled)
 
 	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
+	var atomicErr utils.Atomic[error]
 	serverVM.appSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 		if test.responseIntercept == nil {
-			go syncerVM.vm.AppResponse(ctx, nodeID, requestID, response)
+			go func() {
+				if err := syncerVM.vm.AppResponse(ctx, nodeID, requestID, response); err != nil {
+					atomicErr.Set(err)
+				}
+			}()
 		} else {
 			go test.responseIntercept(syncerVM.vm, nodeID, requestID, response)
 		}
 
 		return nil
 	}
+	t.Cleanup(func() {
+		require.NoError(atomicErr.Get())
+	})
 
 	// connect peer to [syncerVM]
 	require.NoError(

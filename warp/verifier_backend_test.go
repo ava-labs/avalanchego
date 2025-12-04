@@ -58,8 +58,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.NoError(t, err)
 				signature, err := snowCtx.WarpSigner.Sign(msg)
 				require.NoError(t, err)
-
-				backend.AddMessage(msg)
+				require.NoError(t, backend.AddMessage(msg))
 				return msg.Bytes(), signature
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {

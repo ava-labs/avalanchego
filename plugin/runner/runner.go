@@ -29,5 +29,8 @@ func Run(versionStr string) {
 		fmt.Printf("failed to set fd limit correctly due to: %s", err)
 		os.Exit(1)
 	}
-	rpcchainvm.Serve(context.Background(), &evm.VM{})
+	if err := rpcchainvm.Serve(context.Background(), &evm.VM{}); err != nil {
+		fmt.Printf("failed to serve VM: %s", err)
+		os.Exit(1)
+	}
 }

@@ -63,7 +63,9 @@ func TestUptimeTracker(t *testing.T) {
 		[]*commonEng.Fx{},
 		appSender,
 	))
-	defer vm.Shutdown(t.Context())
+	t.Cleanup(func() {
+		require.NoError(vm.Shutdown(t.Context()))
+	})
 
 	// Mock the clock to control time progression
 	clock := vm.clock
