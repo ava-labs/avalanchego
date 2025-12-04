@@ -585,17 +585,22 @@ func startCollector(tc tests.TestContext, log logging.Logger, name string, label
 	)
 }
 
+// benchmarkResult represents a single benchmark measurement.
 type benchmarkResult struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 	Unit  string `json:"unit"`
 }
 
+// benchmarkTool collects and manages benchmark results for a named benchmark.
+// It allows adding multiple results and saving them to a file in JSON format.
 type benchmarkTool struct {
 	name    string
 	results []benchmarkResult
 }
 
+// newBenchmarkTool creates a new benchmarkTool instance with the given name.
+// The name is used to identify all results collected by this tool.
 func newBenchmarkTool(name string) *benchmarkTool {
 	return &benchmarkTool{
 		name:    name,
@@ -603,6 +608,9 @@ func newBenchmarkTool(name string) *benchmarkTool {
 	}
 }
 
+// addResult adds a new benchmark result with the given value and unit.
+// All results added share the same benchmark name set during tool creation.
+// This is analogous to calling `b.ReportMetric()`.
 func (b *benchmarkTool) addResult(value float64, unit string) {
 	result := benchmarkResult{
 		Name:  b.name,
@@ -612,6 +620,9 @@ func (b *benchmarkTool) addResult(value float64, unit string) {
 	b.results = append(b.results, result)
 }
 
+// saveToFile writes all collected benchmark results to a JSON file at the
+// specified path. The output is formatted with indentation for readability.
+// Returns an error if marshaling or file writing fails.
 func (b *benchmarkTool) saveToFile(path string) error {
 	output, err := json.MarshalIndent(b.results, "", "  ")
 	if err != nil {
