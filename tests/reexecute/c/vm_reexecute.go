@@ -282,6 +282,8 @@ func benchmarkReexecuteRange(
 
 	benchmarkTool := newBenchmarkTool(benchmarkName)
 	getTopLevelMetrics(tc, benchmarkTool, prefixGatherer, elapsed) // Report the desired top-level metrics
+
+	benchmarkTool.logResults(log)
 	if len(benchmarkOutputFile) != 0 {
 		r.NoError(benchmarkTool.saveToFile(benchmarkOutputFile))
 	}
@@ -625,6 +627,16 @@ func (b *benchmarkTool) saveToFile(path string) error {
 	}
 
 	return os.WriteFile(path, output, perms.ReadWrite)
+}
+
+// logResults logs all collected benchmark results using the provided logger.
+func (b *benchmarkTool) logResults(log logging.Logger) {
+	for _, result := range b.results {
+		log.Info(b.name,
+			zap.String("value", result.Value),
+			zap.String("unit", result.Unit),
+		)
+	}
 }
 
 // parseCustomLabels parses a comma-separated list of key-value pairs into a map
