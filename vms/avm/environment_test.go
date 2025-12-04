@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -113,7 +114,8 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	}
 
 	vm := &VM{
-		Config: vmStaticConfig,
+		Config:         vmStaticConfig,
+		StateMigration: state.NoMigration{},
 	}
 
 	vmDynamicConfig := DefaultConfig
@@ -408,12 +410,12 @@ func issueAndAccept(
 	require *require.Assertions,
 	vm *VM,
 	tx *txs.Tx,
-) {
+) ids.ID {
 	txID, err := vm.issueTxFromRPC(tx)
 	require.NoError(err)
 	require.Equal(tx.ID(), txID)
 
-	buildAndAccept(require, vm, txID)
+	return buildAndAccept(require, vm, txID)
 }
 
 // buildAndAccept expects the context lock not to be held
@@ -421,7 +423,7 @@ func buildAndAccept(
 	require *require.Assertions,
 	vm *VM,
 	txID ids.ID,
-) {
+) ids.ID {
 	msg, err := vm.WaitForEvent(context.Background())
 	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
@@ -442,4 +444,6 @@ func buildAndAccept(
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), blk.ID()))
 	require.NoError(blk.Accept(context.Background()))
+
+	return blk.ID()
 }

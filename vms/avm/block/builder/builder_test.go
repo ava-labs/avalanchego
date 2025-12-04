@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/codecmock"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -291,8 +292,11 @@ func TestBuilderBuildBlock(t *testing.T) {
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert created block has one tx, tx1,
 				// and other fields are set correctly.
-				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
-					func(block *block.StandardBlock) snowman.Block {
+				manager.EXPECT().NewBlock(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(
+						block *block.StandardBlock,
+						_ atomic.SharedMemory,
+					) snowman.Block {
 						require.Len(t, block.Transactions, 1)
 						require.Equal(t, tx1, block.Transactions[0])
 						require.Equal(t, preferredHeight+1, block.Height())
@@ -350,8 +354,11 @@ func TestBuilderBuildBlock(t *testing.T) {
 				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert that the created block has the right timestamp
-				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
-					func(block *block.StandardBlock) snowman.Block {
+				manager.EXPECT().NewBlock(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(
+						block *block.StandardBlock,
+						_ atomic.SharedMemory,
+					) snowman.Block {
 						require.Equal(t, preferredTimestamp.Unix(), block.Timestamp().Unix())
 						return nil
 					},
@@ -422,8 +429,11 @@ func TestBuilderBuildBlock(t *testing.T) {
 				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert that the created block has the right timestamp
-				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
-					func(block *block.StandardBlock) snowman.Block {
+				manager.EXPECT().NewBlock(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(
+						block *block.StandardBlock,
+						_ atomic.SharedMemory,
+					) snowman.Block {
 						require.Equal(t, now.Unix(), block.Timestamp().Unix())
 						return nil
 					},
@@ -526,7 +536,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	parentBlk, err := block.NewStandardBlock(parentID, 0, parentTimestamp, txs, cm)
 	require.NoError(err)
 	state.AddBlock(parentBlk)
-	state.SetLastAccepted(parentBlk.ID())
+	state.SetLastAccepted(parentBlk.ID(), parentBlk.Height())
 
 	metrics, err := metrics.New(registerer)
 	require.NoError(err)

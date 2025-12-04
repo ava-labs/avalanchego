@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 )
 
 var _ vms.Factory = (*Factory)(nil)
@@ -16,5 +17,9 @@ type Factory struct {
 }
 
 func (f *Factory) New(logging.Logger) (interface{}, error) {
-	return &VM{Config: f.Config}, nil
+	return &VM{
+			Config:         f.Config,
+			StateMigration: &state.FirewoodMigration{CommitFrequency: 1_000},
+		},
+		nil
 }

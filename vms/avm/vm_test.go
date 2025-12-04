@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
 
@@ -14,12 +15,17 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -30,7 +36,7 @@ import (
 func TestInvalidGenesis(t *testing.T) {
 	require := require.New(t)
 
-	vm := &VM{}
+	vm := &VM{StateMigration: state.NoMigration{}}
 	ctx := snowtest.Context(t, snowtest.XChainID)
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -701,4 +707,271 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	_, err = peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
 	require.ErrorIs(err, database.ErrNotFound)
+}
+
+// Tests that VM.Linearize migrates existing state to merkle-ized state
+func TestVMLinearizeStateMigration(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+
+	snowCtx := snowtest.Context(t, snowtest.XChainID)
+	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.Empty)
+
+	configBytes, err := json.Marshal(DefaultConfig)
+	require.NoError(err)
+
+	fxs := []*common.Fx{{ID: secp256k1fx.ID, Fx: &secp256k1fx.Fx{}}}
+
+	config := config.Config{
+		Upgrades: upgradetest.GetConfig(upgradetest.Latest),
+	}
+
+	vm := &VM{
+		Config:         config,
+		StateMigration: state.NoMigration{},
+	}
+
+	genesisData := makeDefaultGenesisData(t)
+	genesis, err := NewGenesis(
+		constants.UnitTestID,
+		genesisData,
+	)
+	require.NoError(err)
+	genesisBytes, err := genesis.Bytes()
+	require.NoError(err)
+
+	// Start the VM and create some initial state that needs to be migrated
+	require.NoError(vm.Initialize(
+		t.Context(),
+		snowCtx,
+		db,
+		genesisBytes,
+		nil,
+		configBytes,
+		fxs,
+		&enginetest.Sender{},
+	))
+	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
+
+	genesisTx := getCreateTxFromGenesisTest(t, genesisBytes, genesis.Txs[0].Name)
+
+	txBuilder := txstest.New(
+		vm.parser.Codec(),
+		vm.ctx,
+		&vm.Config,
+		vm.ctx.AVAXAssetID,
+		vm.state,
+	)
+
+	key := keys[0]
+	kc := secp256k1fx.NewKeychain(key)
+
+	firstTx, err := txBuilder.BaseTx(
+		[]*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{key.PublicKey().Address()},
+					},
+				},
+			},
+		},
+		nil,
+		kc,
+		key.Address(),
+	)
+	require.NoError(err)
+
+	stopVtx, err := vm.ParseTx(t.Context(), firstTx.Bytes())
+	require.NoError(err)
+	require.NoError(stopVtx.Verify(t.Context()))
+	require.NoError(stopVtx.Accept(t.Context()))
+
+	require.NoError(vm.Linearize(t.Context(), stopVtx.ID()))
+	require.NoError(vm.SetState(t.Context(), snow.NormalOp))
+
+	genesisBlkID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+
+	var (
+		wantBlkIDs        = []ids.ID{genesisBlkID}
+		wantTxIDs         []ids.ID
+		wantConsumedUTXOs []*avax.UTXO
+		wantProducedUTXOs []*avax.UTXO
+	)
+
+	// Create an asset and export it into shared memory
+	tx, err := txBuilder.CreateAssetTx(
+		"FOO",
+		"BAR",
+		0,
+		map[uint32][]verify.State{
+			0: {
+				&secp256k1fx.TransferOutput{
+					Amt: 100,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].Address()},
+					},
+				},
+			},
+		},
+		kc,
+		keys[0].Address(),
+	)
+	require.NoError(err)
+	blkID := issueAndAccept(require, vm, tx)
+
+	wantTxIDs = append(wantTxIDs, tx.ID())
+	wantConsumedUTXOs = append(wantConsumedUTXOs, tx.UTXOs()...)
+
+	wantBlkIDs = append(wantBlkIDs, blkID)
+
+	atomicTx, err := txBuilder.ExportTx(
+		snowtest.PChainID,
+		ids.GenerateTestShortID(),
+		tx.ID(),
+		1,
+		kc,
+		keys[0].Address(),
+	)
+	require.NoError(err)
+	blkID = issueAndAccept(require, vm, atomicTx)
+
+	wantTxIDs = append(wantTxIDs, atomicTx.ID())
+	wantProducedUTXOs = append(wantProducedUTXOs, atomicTx.UTXOs()...)
+
+	wantBlkIDs = append(wantBlkIDs, blkID)
+
+	// Genesis block + 2 blocks that were built
+	require.Len(wantBlkIDs, 3)
+
+	db, err = memdb.Copy(db)
+	require.NoError(err)
+	require.NoError(vm.Shutdown(t.Context()))
+
+	// Restart the VM with the migration enabled and verify that all state is
+	// migrated into the new database format
+	snowCtx = snowtest.Context(t, snowtest.XChainID)
+	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.Empty)
+
+	vm = &VM{
+		Config:         config,
+		StateMigration: &state.FirewoodMigration{CommitFrequency: 1},
+	}
+
+	require.NoError(vm.Initialize(
+		t.Context(),
+		snowCtx,
+		db,
+		genesisBytes,
+		nil,
+		configBytes,
+		fxs,
+		&enginetest.Sender{},
+	))
+	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
+	require.NoError(vm.Linearize(t.Context(), stopVtx.ID()))
+	require.NoError(vm.SetState(t.Context(), snow.NormalOp))
+
+	// Check that all previous state still exists
+	for height, wantBlkID := range wantBlkIDs {
+		gotBlkID, err := vm.GetBlockIDAtHeight(t.Context(), uint64(height))
+		require.NoError(err)
+		require.Equal(wantBlkID, gotBlkID)
+
+		gotBlk, err := vm.GetBlock(t.Context(), wantBlkID)
+		require.NoError(err)
+		require.Equal(wantBlkID, gotBlk.ID())
+	}
+
+	for _, txID := range wantTxIDs {
+		gotTx, err := vm.GetTx(txID)
+		require.NoError(err)
+		require.Equal(txID, gotTx.ID())
+	}
+
+	for _, utxo := range wantConsumedUTXOs {
+		_, err := vm.GetUTXO(utxo.InputID())
+		// Consumed UTXOs should be removed from state
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	for _, utxo := range wantProducedUTXOs {
+		gotUTXO, err := vm.GetUTXO(utxo.InputID())
+		require.NoError(err)
+		require.Equal(utxo.InputID(), gotUTXO.InputID())
+	}
+
+	wantLastAcceptedBlkID := wantBlkIDs[len(wantBlkIDs)-1]
+	gotLastAcceptedBlkID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	require.Equal(wantLastAcceptedBlkID, gotLastAcceptedBlkID)
+
+	db, err = memdb.Copy(db)
+	require.NoError(err)
+	require.NoError(vm.Shutdown(t.Context()))
+
+	// Restart the VM using the old state format and verify that all the previous
+	// data was deleted
+	snowCtx = snowtest.Context(t, snowtest.XChainID)
+	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.Empty)
+
+	vm = &VM{
+		Config:         config,
+		StateMigration: state.NoMigration{},
+	}
+	require.NoError(vm.Initialize(
+		t.Context(),
+		snowCtx,
+		db,
+		genesisBytes,
+		nil,
+		configBytes,
+		fxs,
+		&enginetest.Sender{},
+	))
+	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
+	require.NoError(vm.Linearize(t.Context(), stopVtx.ID()))
+	require.NoError(vm.SetState(t.Context(), snow.NormalOp))
+
+	// The genesis block should always be present because it is initialized as
+	// part of the VM initial state.
+	_, err = vm.GetBlock(t.Context(), genesisBlkID)
+	require.NoError(err)
+	_, err = vm.GetBlockIDAtHeight(t.Context(), 0)
+	require.NoError(err)
+
+	// Any blocks after genesis should be deleted because they exist in the new
+	// state format.
+	for height, wantBlkID := range wantBlkIDs {
+		if height == 0 {
+			continue
+		}
+
+		_, err := vm.GetBlock(t.Context(), wantBlkID)
+		require.ErrorIs(err, database.ErrNotFound)
+
+		_, err = vm.GetBlockIDAtHeight(t.Context(), uint64(height))
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	for _, txID := range wantTxIDs {
+		_, err := vm.GetTx(txID)
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	for _, utxo := range wantConsumedUTXOs {
+		_, err := vm.GetUTXO(utxo.InputID())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	for _, utxo := range wantProducedUTXOs {
+		_, err := vm.GetUTXO(utxo.InputID())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
 }

@@ -10,6 +10,7 @@
 package statemock
 
 import (
+	context "context"
 	reflect "reflect"
 	time "time"
 
@@ -94,31 +95,32 @@ func (mr *StateMockRecorder) AddUTXO(utxo any) *gomock.Call {
 }
 
 // Checksum mocks base method.
-func (m *State) Checksum() ids.ID {
+func (m *State) Checksum(ctx context.Context) (ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Checksum")
+	ret := m.ctrl.Call(m, "Checksum", ctx)
 	ret0, _ := ret[0].(ids.ID)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Checksum indicates an expected call of Checksum.
-func (mr *StateMockRecorder) Checksum() *gomock.Call {
+func (mr *StateMockRecorder) Checksum(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksum", reflect.TypeOf((*State)(nil).Checksum))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksum", reflect.TypeOf((*State)(nil).Checksum), ctx)
 }
 
 // Close mocks base method.
-func (m *State) Close() error {
+func (m *State) Close(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Close")
+	ret := m.ctrl.Call(m, "Close", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Close indicates an expected call of Close.
-func (mr *StateMockRecorder) Close() *gomock.Call {
+func (mr *StateMockRecorder) Close(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*State)(nil).Close))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*State)(nil).Close), ctx)
 }
 
 // Commit mocks base method.
@@ -294,15 +296,15 @@ func (mr *StateMockRecorder) SetInitialized() *gomock.Call {
 }
 
 // SetLastAccepted mocks base method.
-func (m *State) SetLastAccepted(blkID ids.ID) {
+func (m *State) SetLastAccepted(blkID ids.ID, height uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastAccepted", blkID)
+	m.ctrl.Call(m, "SetLastAccepted", blkID, height)
 }
 
 // SetLastAccepted indicates an expected call of SetLastAccepted.
-func (mr *StateMockRecorder) SetLastAccepted(blkID any) *gomock.Call {
+func (mr *StateMockRecorder) SetLastAccepted(blkID, height any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*State)(nil).SetLastAccepted), blkID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*State)(nil).SetLastAccepted), blkID, height)
 }
 
 // SetTimestamp mocks base method.
