@@ -19,7 +19,8 @@ set -euo pipefail
 : "${START_BLOCK:?START_BLOCK must be set}"
 : "${END_BLOCK:?END_BLOCK must be set}"
 
-cmd="go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ github.com/ava-labs/avalanchego/tests/reexecute/c \
+cmd="go run github.com/ava-labs/avalanchego/tests/reexecute/c \
+  --benchmark-output-file=\"${BENCHMARK_OUTPUT_FILE}\" \
   --block-dir=\"${BLOCK_DIR}\" \
   --current-state-dir=\"${CURRENT_STATE_DIR}\" \
   ${RUNNER_NAME:+--runner=\"${RUNNER_NAME}\"} \
@@ -31,8 +32,4 @@ cmd="go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ 
   ${METRICS_SERVER_PORT:+--metrics-server-port=\"${METRICS_SERVER_PORT}\"} \
   ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled=\"${METRICS_COLLECTOR_ENABLED}\"}"
 
-if [ -n "${BENCHMARK_OUTPUT_FILE:-}" ]; then
-  eval "$cmd" | tee "${BENCHMARK_OUTPUT_FILE}"
-else
-  eval "$cmd"
-fi
+eval "$cmd"
