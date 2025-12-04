@@ -665,7 +665,6 @@ func getTopLevelMetrics(tc tests.TestContext, tool *benchmarkTool, registry prom
 	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
 
 	tool.addResult(mgasPerSecond, "mgas/s")
-	tc.Log().Info("block processing", zap.Float64("mgas/s", mgasPerSecond))
 }
 
 func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
