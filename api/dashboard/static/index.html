@@ -77,6 +77,8 @@
         <!-- Tabs -->
         <div class="tabs">
             <button class="tab active" onclick="showTab('overview', event)">Overview</button>
+            <button class="tab" onclick="showTab('metrics', event)">Metrics</button>
+            <button class="tab" onclick="showTab('l1validators', event)">L1 Validators</button>
             <button class="tab" onclick="showTab('network', event)">Network</button>
             <button class="tab" onclick="showTab('chains', event)">Chains</button>
             <button class="tab" onclick="showTab('health', event)">Health</button>
@@ -156,6 +158,133 @@
                     </div>
                     <div class="card-body compact" id="healthCard">
                         <div class="loading" style="height: 80px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Tab -->
+        <div id="tab-metrics" class="tab-content">
+            <div class="grid">
+                <div class="card span-3">
+                    <div class="card-header">
+                        <span class="card-title">Polls (Success/Failed)</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="metric-big-value" id="metricPolls">—</div>
+                    </div>
+                </div>
+                <div class="card span-3">
+                    <div class="card-header">
+                        <span class="card-title">Avg Accept Latency</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="metric-big-value" id="metricLatency">—</div>
+                    </div>
+                </div>
+                <div class="card span-3">
+                    <div class="card-header">
+                        <span class="card-title">Last Accepted Height</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="metric-big-value" id="metricHeight">—</div>
+                    </div>
+                </div>
+                <div class="card span-3">
+                    <div class="card-header">
+                        <span class="card-title">Processing Blocks</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="metric-big-value" id="metricProcessing">—</div>
+                    </div>
+                </div>
+                
+                <div class="card span-6">
+                    <div class="card-header">
+                        <span class="card-title">Block Height Over Time</span>
+                    </div>
+                    <div class="card-body compact">
+                        <div class="chart-container">
+                            <canvas id="blockHeightChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card span-6">
+                    <div class="card-header">
+                        <span class="card-title">Polls Per Second</span>
+                    </div>
+                    <div class="card-body compact">
+                        <div class="chart-container">
+                            <canvas id="pollsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card span-6">
+                    <div class="card-header">
+                        <span class="card-title">Block Accept Latency (ms)</span>
+                    </div>
+                    <div class="card-body compact">
+                        <div class="chart-container">
+                            <canvas id="latencyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card span-6">
+                    <div class="card-header">
+                        <span class="card-title">Processing Blocks Over Time</span>
+                    </div>
+                    <div class="card-body compact">
+                        <div class="chart-container">
+                            <canvas id="processingChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card span-12">
+                    <div class="card-body compact">
+                        <div class="metrics-info">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; flex-shrink: 0;">
+                                <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                            <span>Metrics are refreshed every 2 seconds while viewing this tab. Data shows the last 60 samples (~2 minutes).</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- L1 Validators Tab -->
+        <div id="tab-l1validators" class="tab-content">
+            <div class="grid">
+                <div class="card span-12">
+                    <div class="card-header">
+                        <span class="card-title">L1 Validator Balances</span>
+                        <button class="section-refresh-btn" onclick="refreshSection(this, fetchL1ValidatorsOverview)" aria-label="Refresh L1 validators">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+                        </button>
+                    </div>
+                    <div class="card-body" id="l1ValidatorsCard">
+                        <div class="empty-state">
+                            <div style="margin-bottom: 0.5rem;">Loading L1 validator data...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card span-12">
+                    <div class="card-body compact">
+                        <div class="metrics-info">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; flex-shrink: 0;">
+                                <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                            <span>
+                                L1 validators pay a continuous fee from their balance to remain active. 
+                                When the balance reaches zero, the validator becomes inactive.
+                                The "Est. Days Left" is a rough estimate based on current weight and fee rates.
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -332,6 +461,7 @@
                                 <button class="api-btn" onclick="callApi('/ext/P', 'platform.getStakingAssetID')">platform.getStakingAssetID</button>
                                 <button class="api-btn" onclick="callApi('/ext/P', 'platform.getTimestamp')">platform.getTimestamp</button>
                                 <button class="api-btn" onclick="callApi('/ext/P', 'platform.getTotalStake')">platform.getTotalStake</button>
+                                <button class="api-btn" onclick="callApi('/ext/P', 'platform.getFeeState')">platform.getFeeState</button>
                             </div>
                         </div>
                         <div style="margin-bottom: 0.75rem;">

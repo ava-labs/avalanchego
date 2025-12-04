@@ -811,3 +811,146 @@ footer a:hover { text-decoration: underline; }
     color: var(--color-error);
 }
 
+/* Metrics Charts */
+.chart-container {
+    height: 200px;
+    position: relative;
+    width: 100%;
+}
+
+.chart-container canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.metric-big-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--avax-red);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    padding: 0.5rem 0;
+}
+
+.metrics-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+/* L1 Validators */
+.l1-subnet-section {
+    margin-bottom: 1.5rem;
+}
+
+.l1-subnet-section:last-child {
+    margin-bottom: 0;
+}
+
+.l1-subnet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.l1-subnet-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.subnet-id-short {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.l1-subnet-stats {
+    display: flex;
+    gap: 1rem;
+}
+
+.l1-stat {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.l1-stat strong {
+    color: var(--text-primary);
+}
+
+.l1-validators-table {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.balance-value {
+    font-weight: 600;
+    color: var(--avax-red);
+}
+
+.chain-status.warning {
+    background: var(--color-warning-glow);
+    color: var(--color-warning);
+}
+
+/* Fee State Banner */
+.fee-state-banner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 1.25rem;
+}
+
+.fee-state-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.fee-state-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.fee-state-value {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Responsive adjustments for metrics */
+@media (max-width: 1200px) {
+    .chart-container {
+        height: 180px;
+    }
+}
+
+@media (max-width: 900px) {
+    .l1-subnet-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .l1-subnet-stats {
+        flex-wrap: wrap;
+    }
+}
+

@@ -7,8 +7,24 @@ function setTheme(theme) {
     localStorage.setItem('avago-theme', theme);
     document.getElementById('lightBtn').classList.toggle('active', theme === 'light');
     document.getElementById('darkBtn').classList.toggle('active', theme === 'dark');
+    // Redraw charts with new theme colors
+    if (metricsHistory.polls.length > 0) {
+        drawAllCharts();
+    }
 }
 setTheme(currentTheme);
+
+// Metrics history for charts
+const metricsHistory = {
+    polls: [],
+    latency: [],
+    blocks: [],
+    processing: [],
+    timestamps: [],
+    maxDataPoints: 60
+};
+
+let metricsInterval = null;
 
 const tabLoaded = {};
 function showTab(tabId, event) {
@@ -37,7 +53,19 @@ function showTab(tabId, event) {
             fetchPChainHeight();
             fetchCChainInfo();
             fetchValidators();
+        } else if (tabId === 'metrics') {
+            startMetricsPolling();
+            fetchMetricsOnce();
+        } else if (tabId === 'l1validators') {
+            fetchL1ValidatorsOverview();
         }
+    }
+    
+    // Handle metrics polling based on tab visibility
+    if (tabId === 'metrics') {
+        startMetricsPolling();
+    } else {
+        stopMetricsPolling();
     }
 }
 
@@ -68,6 +96,569 @@ function esc(str) {
     const div = document.createElement('div');
     div.textContent = String(str);
     return div.innerHTML;
+}
+
+// ============ METRICS & CHARTS ============
+
+// Parse Prometheus metrics text format
+function parsePrometheusMetrics(text) {
+    const metrics = {};
+    const lines = text.split('\n');
+    for (const line of lines) {
+        if (line.startsWith('#') || line.trim() === '') continue;
+        const match = line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*)\{?([^}]*)\}?\s+(.+)$/);
+        if (match) {
+            const [, name, labels, value] = match;
+            if (!metrics[name]) metrics[name] = [];
+            metrics[name].push({ labels: labels || '', value: parseFloat(value) });
+        } else {
+            const simpleMatch = line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*)\s+(.+)$/);
+            if (simpleMatch) {
+                const [, name, value] = simpleMatch;
+                if (!metrics[name]) metrics[name] = [];
+                metrics[name].push({ labels: '', value: parseFloat(value) });
+            }
+        }
+    }
+    return metrics;
+}
+
+// Get metric value by name (exact match)
+function getMetricValue(metrics, name, defaultVal = 0) {
+    if (metrics[name] && metrics[name].length > 0) {
+        return metrics[name][0].value;
+    }
+    return defaultVal;
+}
+
+// Find metrics matching a suffix pattern and return the sum
+// This handles prefixed metrics like avalanche_C_polls_successful, avalanche_P_polls_successful
+function getMetricBySuffix(metrics, suffix, defaultVal = 0) {
+    let total = 0;
+    let found = false;
+    for (const key of Object.keys(metrics)) {
+        if (key === suffix || key.endsWith('_' + suffix)) {
+            for (const m of metrics[key]) {
+                total += m.value;
+                found = true;
+            }
+        }
+    }
+    return found ? total : defaultVal;
+}
+
+// Get the max value of metrics matching a suffix (useful for heights)
+function getMetricMaxBySuffix(metrics, suffix, defaultVal = 0) {
+    let maxVal = defaultVal;
+    for (const key of Object.keys(metrics)) {
+        if (key === suffix || key.endsWith('_' + suffix)) {
+            for (const m of metrics[key]) {
+                maxVal = Math.max(maxVal, m.value);
+            }
+        }
+    }
+    return maxVal;
+}
+
+// Get metric by name and label
+function getMetricByLabel(metrics, name, labelMatch) {
+    if (!metrics[name]) return null;
+    for (const m of metrics[name]) {
+        if (m.labels.includes(labelMatch)) {
+            return m.value;
+        }
+    }
+    return null;
+}
+
+// Simple canvas chart drawing
+function drawLineChart(canvasId, data, options = {}) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    
+    const width = rect.width;
+    const height = rect.height;
+    const padding = { top: 20, right: 20, bottom: 30, left: 50 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+    
+    // Theme colors
+    const isDark = currentTheme === 'dark';
+    const textColor = isDark ? '#a1a1aa' : '#52525b';
+    const gridColor = isDark ? '#27272a' : '#e4e4e7';
+    const lineColor = options.color || '#e84142';
+    const fillColor = options.fillColor || (isDark ? 'rgba(232, 65, 66, 0.15)' : 'rgba(232, 65, 66, 0.1)');
+    
+    ctx.clearRect(0, 0, width, height);
+    
+    if (data.length < 2) {
+        ctx.fillStyle = textColor;
+        ctx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Collecting data...', width / 2, height / 2);
+        return;
+    }
+    
+    // Calculate min/max
+    let minVal = Math.min(...data);
+    let maxVal = Math.max(...data);
+    if (minVal === maxVal) {
+        minVal = minVal - 1;
+        maxVal = maxVal + 1;
+    }
+    const range = maxVal - minVal;
+    minVal = minVal - range * 0.1;
+    maxVal = maxVal + range * 0.1;
+    
+    // Draw grid
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        const y = padding.top + (chartHeight / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(width - padding.right, y);
+        ctx.stroke();
+    }
+    
+    // Draw Y-axis labels
+    ctx.fillStyle = textColor;
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+        const y = padding.top + (chartHeight / 4) * i;
+        const val = maxVal - ((maxVal - minVal) / 4) * i;
+        ctx.fillText(formatNumber(val), padding.left - 8, y + 3);
+    }
+    
+    // Draw line
+    ctx.beginPath();
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    
+    const xStep = chartWidth / (data.length - 1);
+    
+    for (let i = 0; i < data.length; i++) {
+        const x = padding.left + i * xStep;
+        const y = padding.top + chartHeight - ((data[i] - minVal) / (maxVal - minVal)) * chartHeight;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    
+    // Fill area
+    ctx.lineTo(padding.left + (data.length - 1) * xStep, padding.top + chartHeight);
+    ctx.lineTo(padding.left, padding.top + chartHeight);
+    ctx.closePath();
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    
+    // Draw latest value
+    if (options.showLatest !== false && data.length > 0) {
+        const lastVal = data[data.length - 1];
+        ctx.fillStyle = lineColor;
+        ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(formatNumber(lastVal) + (options.unit || ''), width - padding.right, padding.top - 5);
+    }
+    
+    // Draw title
+    if (options.title) {
+        ctx.fillStyle = textColor;
+        ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(options.title, padding.left, padding.top - 5);
+    }
+}
+
+function formatNumber(n) {
+    if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(2) + 'K';
+    if (Number.isInteger(n)) return n.toString();
+    return n.toFixed(2);
+}
+
+function drawBarChart(canvasId, data, labels, options = {}) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    
+    const width = rect.width;
+    const height = rect.height;
+    const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+    
+    const isDark = currentTheme === 'dark';
+    const textColor = isDark ? '#a1a1aa' : '#52525b';
+    const colors = options.colors || ['#e84142', '#22c55e', '#eab308', '#3b82f6'];
+    
+    ctx.clearRect(0, 0, width, height);
+    
+    if (data.length === 0) {
+        ctx.fillStyle = textColor;
+        ctx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No data', width / 2, height / 2);
+        return;
+    }
+    
+    const maxVal = Math.max(...data, 1);
+    const barWidth = (chartWidth / data.length) * 0.7;
+    const barGap = (chartWidth / data.length) * 0.15;
+    
+    for (let i = 0; i < data.length; i++) {
+        const barHeight = (data[i] / maxVal) * chartHeight;
+        const x = padding.left + i * (chartWidth / data.length) + barGap;
+        const y = padding.top + chartHeight - barHeight;
+        
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.beginPath();
+        ctx.roundRect(x, y, barWidth, barHeight, 4);
+        ctx.fill();
+        
+        // Label
+        ctx.fillStyle = textColor;
+        ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(labels[i] || '', x + barWidth / 2, height - 10);
+        
+        // Value
+        ctx.fillText(formatNumber(data[i]), x + barWidth / 2, y - 5);
+    }
+}
+
+async function fetchMetricsOnce() {
+    try {
+        const res = await fetch(baseURL + '/ext/metrics');
+        const text = await res.text();
+        const metrics = parsePrometheusMetrics(text);
+        
+        // Debug: Log available metric keys on first fetch
+        if (metricsHistory.timestamps.length === 0) {
+            const relevantKeys = Object.keys(metrics).filter(k => 
+                k.includes('poll') || k.includes('blk') || k.includes('height') || k.includes('accepted')
+            );
+            console.log('Available metrics:', relevantKeys.slice(0, 30));
+        }
+        
+        // Update history
+        const now = Date.now();
+        metricsHistory.timestamps.push(now);
+        
+        // Polls (successful vs failed) - sum across all chains
+        // Metric names: avalanche_*_polls_successful, avalanche_*_polls_failed
+        const successfulPolls = getMetricBySuffix(metrics, 'polls_successful', 0);
+        const failedPolls = getMetricBySuffix(metrics, 'polls_failed', 0);
+        metricsHistory.polls.push({ successful: successfulPolls, failed: failedPolls });
+        
+        // Block latency (accepted) - sum across all chains then compute avg
+        // Metric names: avalanche_*_blks_accepted_sum, avalanche_*_blks_accepted_count
+        const latAcceptedSum = getMetricBySuffix(metrics, 'blks_accepted_sum', 0);
+        const latAcceptedCount = getMetricBySuffix(metrics, 'blks_accepted_count', 0);
+        const avgLatency = latAcceptedCount > 0 ? latAcceptedSum / latAcceptedCount / 1e6 : 0; // Convert to ms
+        metricsHistory.latency.push(avgLatency);
+        
+        // Last accepted height - get max across all chains
+        // Metric name: avalanche_*_last_accepted_height
+        const height = getMetricMaxBySuffix(metrics, 'last_accepted_height', 0);
+        metricsHistory.blocks.push(height);
+        
+        // Processing blocks - sum across all chains
+        // Metric name: avalanche_*_blks_processing
+        const processing = getMetricBySuffix(metrics, 'blks_processing', 0);
+        metricsHistory.processing.push(processing);
+        
+        // Trim history
+        while (metricsHistory.timestamps.length > metricsHistory.maxDataPoints) {
+            metricsHistory.timestamps.shift();
+            metricsHistory.polls.shift();
+            metricsHistory.latency.shift();
+            metricsHistory.blocks.shift();
+            metricsHistory.processing.shift();
+        }
+        
+        updateMetricsDisplay(metrics);
+        drawAllCharts();
+    } catch (e) {
+        console.error('Failed to fetch metrics:', e);
+        // Show error in UI
+        const pollsEl = document.getElementById('metricPolls');
+        if (pollsEl) pollsEl.innerHTML = '<span style="color: var(--color-error);">Error fetching</span>';
+    }
+}
+
+function updateMetricsDisplay(metrics) {
+    // Update stat cards
+    const pollsEl = document.getElementById('metricPolls');
+    const latencyEl = document.getElementById('metricLatency');
+    const heightEl = document.getElementById('metricHeight');
+    const processingEl = document.getElementById('metricProcessing');
+    
+    if (pollsEl) {
+        const successful = getMetricBySuffix(metrics, 'polls_successful', 0);
+        const failed = getMetricBySuffix(metrics, 'polls_failed', 0);
+        pollsEl.innerHTML = `
+            <span style="color: var(--color-success);">${formatNumber(successful)}</span> / 
+            <span style="color: var(--color-error);">${formatNumber(failed)}</span>
+        `;
+    }
+    
+    if (latencyEl && metricsHistory.latency.length > 0) {
+        const lat = metricsHistory.latency[metricsHistory.latency.length - 1];
+        latencyEl.textContent = lat.toFixed(2) + ' ms';
+    }
+    
+    if (heightEl && metricsHistory.blocks.length > 0) {
+        const height = metricsHistory.blocks[metricsHistory.blocks.length - 1];
+        heightEl.textContent = formatNumber(height);
+    }
+    
+    if (processingEl && metricsHistory.processing.length > 0) {
+        const proc = metricsHistory.processing[metricsHistory.processing.length - 1];
+        processingEl.textContent = formatNumber(proc);
+    }
+}
+
+function drawAllCharts() {
+    // Draw block height chart
+    drawLineChart('blockHeightChart', metricsHistory.blocks, {
+        title: 'Block Height',
+        color: '#3b82f6',
+        fillColor: currentTheme === 'dark' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)'
+    });
+    
+    // Draw latency chart
+    drawLineChart('latencyChart', metricsHistory.latency, {
+        title: 'Avg Accept Latency',
+        color: '#22c55e',
+        fillColor: currentTheme === 'dark' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(34, 197, 94, 0.1)',
+        unit: ' ms'
+    });
+    
+    // Draw processing blocks chart
+    drawLineChart('processingChart', metricsHistory.processing, {
+        title: 'Processing Blocks',
+        color: '#eab308',
+        fillColor: currentTheme === 'dark' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(234, 179, 8, 0.1)'
+    });
+    
+    // Draw polls chart (show rate of change)
+    if (metricsHistory.polls.length > 1) {
+        const pollRates = [];
+        for (let i = 1; i < metricsHistory.polls.length; i++) {
+            const deltaSucc = metricsHistory.polls[i].successful - metricsHistory.polls[i-1].successful;
+            pollRates.push(Math.max(0, deltaSucc));
+        }
+        drawLineChart('pollsChart', pollRates, {
+            title: 'Polls/sec (successful)',
+            color: '#e84142',
+            fillColor: currentTheme === 'dark' ? 'rgba(232, 65, 66, 0.15)' : 'rgba(232, 65, 66, 0.1)',
+            unit: '/s'
+        });
+    }
+}
+
+function startMetricsPolling() {
+    if (metricsInterval) return;
+    metricsInterval = setInterval(fetchMetricsOnce, 2000);
+}
+
+function stopMetricsPolling() {
+    if (metricsInterval) {
+        clearInterval(metricsInterval);
+        metricsInterval = null;
+    }
+}
+
+// ============ L1 VALIDATORS ============
+
+async function fetchL1ValidatorsOverview() {
+    const el = document.getElementById('l1ValidatorsCard');
+    el.innerHTML = '<div class="loading" style="height: 200px;"></div>';
+    
+    // Fetch fee state and config in parallel
+    const [configData, feeStateData] = await Promise.all([
+        rpcCall('/ext/admin', 'admin.getConfig'),
+        rpcCall('/ext/P', 'platform.getFeeState')
+    ]);
+    
+    // Get current fee price (in nAVAX per unit)
+    let feePrice = 1; // default to 1 nAVAX
+    if (feeStateData?.result?.price) {
+        feePrice = parseInt(feeStateData.result.price);
+    }
+    
+    let trackedSubnetIds = [];
+    
+    if (configData?.result?.config) {
+        const config = configData.result.config;
+        const trackSubnets = config['track-subnets'] || config.trackSubnets || '';
+        if (trackSubnets) {
+            trackedSubnetIds = trackSubnets.split(',').map(id => id.trim()).filter(id => id);
+        }
+    }
+    
+    if (trackedSubnetIds.length === 0) {
+        el.innerHTML = `
+            <div class="empty-state">
+                <div style="margin-bottom: 0.5rem;">No tracked L1s/Subnets configured</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">
+                    Configure <code>--track-subnets</code> to track L1 validators
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    // Show fee state info
+    html += `
+        <div class="fee-state-banner">
+            <div class="fee-state-item">
+                <span class="fee-state-label">Current Fee Price</span>
+                <span class="fee-state-value">${feePrice} nAVAX/unit/sec</span>
+            </div>
+            <div class="fee-state-item">
+                <span class="fee-state-label">Fee Capacity</span>
+                <span class="fee-state-value">${formatNumber(parseInt(feeStateData?.result?.capacity || 0))}</span>
+            </div>
+            <div class="fee-state-item">
+                <span class="fee-state-label">Excess</span>
+                <span class="fee-state-value">${formatNumber(parseInt(feeStateData?.result?.excess || 0))}</span>
+            </div>
+        </div>
+    `;
+    
+    for (const subnetID of trackedSubnetIds) {
+        // Get validators for this subnet
+        const validatorsData = await rpcCall('/ext/P', 'platform.getCurrentValidators', { subnetID });
+        
+        if (!validatorsData?.result?.validators) continue;
+        
+        const validators = validatorsData.result.validators;
+        const l1Validators = validators.filter(v => v.balance !== undefined);
+        
+        if (l1Validators.length === 0) continue;
+        
+        // Calculate totals
+        let totalBalance = 0;
+        let totalWeight = 0;
+        
+        l1Validators.forEach(v => {
+            totalBalance += parseInt(v.balance || 0);
+            totalWeight += parseInt(v.weight || 0);
+        });
+        
+        // Calculate subnet total daily cost
+        const totalDailyCost = totalWeight * feePrice * 86400; // nAVAX per day
+        
+        html += `
+            <div class="l1-subnet-section">
+                <div class="l1-subnet-header">
+                    <div class="l1-subnet-title">
+                        <span class="chain-badge">L1</span>
+                        <span class="subnet-id-short" title="${esc(subnetID)}">${esc(subnetID.substring(0, 12))}...</span>
+                    </div>
+                    <div class="l1-subnet-stats">
+                        <span class="l1-stat"><strong>${l1Validators.length}</strong> validators</span>
+                        <span class="l1-stat"><strong>${nanoToAvax(totalBalance)}</strong> AVAX balance</span>
+                        <span class="l1-stat"><strong>${nanoToAvax(totalDailyCost)}</strong> AVAX/day (est.)</span>
+                    </div>
+                </div>
+                <div class="l1-validators-table">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Node ID</th>
+                                <th style="text-align: right;">Weight</th>
+                                <th style="text-align: right;">Balance</th>
+                                <th style="text-align: right;">Daily Cost</th>
+                                <th style="text-align: right;">Days Left</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${l1Validators.slice(0, 50).map(v => {
+                                const balance = parseInt(v.balance || 0);
+                                const weight = parseInt(v.weight || 0);
+                                
+                                // Calculate daily fee based on actual fee price
+                                // Fee = weight * price * seconds_per_day
+                                const dailyFee = weight * feePrice * 86400; // in nAVAX
+                                const daysLeft = dailyFee > 0 ? balance / dailyFee : Infinity;
+                                
+                                let statusClass = 'synced';
+                                let statusText = 'Active';
+                                if (balance === 0) {
+                                    statusClass = 'syncing';
+                                    statusText = 'Inactive';
+                                } else if (daysLeft < 7) {
+                                    statusClass = 'warning';
+                                    statusText = 'Low Balance';
+                                }
+                                
+                                return `
+                                    <tr>
+                                        <td title="${esc(v.nodeID)}">${esc(v.nodeID?.substring(0, 20))}...</td>
+                                        <td style="text-align: right; font-variant-numeric: tabular-nums;">${formatNumber(weight)}</td>
+                                        <td style="text-align: right; font-variant-numeric: tabular-nums;">
+                                            <span class="balance-value">${nanoToAvax(balance)}</span> AVAX
+                                        </td>
+                                        <td style="text-align: right; font-variant-numeric: tabular-nums; color: var(--text-muted);">
+                                            ${nanoToAvax(dailyFee)} AVAX
+                                        </td>
+                                        <td style="text-align: right; font-variant-numeric: tabular-nums;">
+                                            <span class="${daysLeft < 7 ? 'balance-value' : ''}">${daysLeft === Infinity ? '∞' : daysLeft < 1 ? '<1' : Math.floor(daysLeft)}</span>
+                                        </td>
+                                        <td><span class="chain-status ${statusClass}">${statusText}</span></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    ${l1Validators.length > 50 ? `<div class="empty-state" style="padding: 0.5rem;">Showing 50 of ${l1Validators.length} validators</div>` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    if (html === '' || !html.includes('l1-subnet-section')) {
+        html += `
+            <div class="empty-state">
+                <div style="margin-bottom: 0.5rem;">No L1 validators found</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">
+                    The tracked subnets may not be L1s or may not have active validators
+                </div>
+            </div>
+        `;
+    }
+    
+    el.innerHTML = html;
+}
+
+async function fetchL1ValidatorDetails(validationID) {
+    const data = await rpcCall('/ext/P', 'platform.getL1Validator', { validationID });
+    return data?.result || null;
 }
 
 // API Explorer Functions

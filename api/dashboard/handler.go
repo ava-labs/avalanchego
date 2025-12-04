@@ -5,10 +5,11 @@ package dashboard
 
 import (
 	"bytes"
-	_ "embed"
 	"html/template"
 	"net/http"
 	"sync"
+
+	_ "embed"
 )
 
 //go:embed static/index.html
@@ -44,6 +45,9 @@ func compileTemplate() ([]byte, error) {
 		return nil, err
 	}
 
+	// These conversions are safe because the content is embedded at compile time
+	// from our own source files, not from user input.
+	//nolint:gosec // G203: Content is from embedded static files, not user input
 	data := dashboardData{
 		Styles: template.CSS(stylesCSS),
 		Script: template.JS(appJS),
