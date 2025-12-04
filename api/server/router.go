@@ -180,3 +180,15 @@ func (r *router) AddAlias(base string, aliases ...string) error {
 	}
 	return err
 }
+
+func (r *router) AddRootRoute(handler http.Handler) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	route := r.router.Handle("/", handler)
+	if route == nil {
+		return errors.New("failed to create root route")
+	}
+	route.Name("/")
+	return nil
+}

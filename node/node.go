@@ -29,6 +29,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/api/admin"
+	"github.com/ava-labs/avalanchego/api/dashboard"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -267,6 +268,9 @@ func New(
 	}
 	if err := n.initInfoAPI(); err != nil { // Start the Info API
 		return nil, fmt.Errorf("couldn't initialize info API: %w", err)
+	}
+	if err := n.initDashboardAPI(); err != nil { // Start the Dashboard API
+		return nil, fmt.Errorf("couldn't initialize dashboard API: %w", err)
 	}
 	if err := n.initChainAliases(n.Config.GenesisBytes); err != nil {
 		return nil, fmt.Errorf("couldn't initialize chain aliases: %w", err)
@@ -1412,6 +1416,13 @@ func (n *Node) initInfoAPI() error {
 		"info",
 		"",
 	)
+}
+
+// initDashboardAPI initializes the Dashboard API that serves a web UI
+// for monitoring the node. It's available at the root of the HTTP server (/).
+func (n *Node) initDashboardAPI() error {
+	n.Log.Info("initializing dashboard API")
+	return n.APIServer.AddRootRoute(dashboard.NewHandler())
 }
 
 // initHealthAPI initializes the Health API service

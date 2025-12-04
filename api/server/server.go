@@ -66,6 +66,8 @@ type Server interface {
 	// That is, add <route, handler> pairs to server so that API calls can be
 	// made to the VM.
 	RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM)
+	// AddRootRoute registers a handler at the root path "/"
+	AddRootRoute(handler http.Handler) error
 	// Shutdown this server
 	Shutdown() error
 }
@@ -284,6 +286,17 @@ func (s *server) AddAliasesWithReadLock(endpoint string, aliases ...string) erro
 	defer s.router.lock.RLock()
 
 	return s.AddAliases(endpoint, aliases...)
+}
+
+func (s *server) AddRootRoute(handler http.Handler) error {
+	s.log.Info("adding root route")
+
+	if s.tracingEnabled {
+		handler = api.TraceHandler(handler, "/", s.tracer)
+	}
+
+	handler = s.metrics.wrapHandler("root", handler)
+	return s.router.AddRootRoute(handler)
 }
 
 func (s *server) Shutdown() error {
