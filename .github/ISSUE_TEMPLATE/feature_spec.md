@@ -16,4 +16,4 @@ Include a description of the changes to be made to the code along with alternati
 that were considered, including pro/con analysis where relevant.
 
 **Open questions**
-Questions that are still being discussed.
+Questions that are still being discussed

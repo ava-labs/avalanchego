@@ -5,11 +5,11 @@
 [![CodeQL](https://github.com/ava-labs/subnet-evm/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/ava-labs/subnet-evm/actions/workflows/codeql-analysis.yml)
 [![License](https://img.shields.io/github/license/ava-labs/subnet-evm)](https://github.com/ava-labs/subnet-evm/blob/master/LICENSE)
 
-[Avalanche](https://docs.avax.network/avalanche-l1s) is a network composed of multiple blockchains.
+[Avalanche](https://build.avax.network/docs/avalanche-l1s) is a network composed of multiple blockchains.
 Each blockchain is an instance of a Virtual Machine (VM), much like an object in an object-oriented language is an instance of a class.
 That is, the VM defines the behavior of the blockchain.
 
-Subnet EVM is the [Virtual Machine (VM)](https://docs.avax.network/learn/virtual-machines) that defines the Subnet Contract Chains. Subnet EVM is a simplified version of [Coreth VM (C-Chain)](https://github.com/ava-labs/coreth).
+Subnet EVM is the [Virtual Machine (VM)](https://build.avax.network/docs/quick-start/virtual-machines) that defines the Subnet Contract Chains. Subnet EVM is a simplified version of [Coreth VM (C-Chain)](https://github.com/ava-labs/coreth).
 
 This chain implements the Ethereum Virtual Machine and supports Solidity smart contracts as well as most other Ethereum client functionality.
 
@@ -44,11 +44,11 @@ The Subnet EVM supports the following API namespaces:
 
 Only the `eth` namespace is enabled by default.
 Subnet EVM is a simplified version of [Coreth VM (C-Chain)](https://github.com/ava-labs/coreth).
-Full documentation for the C-Chain's API can be found [here](https://build.avax.network/docs/api-reference/c-chain/api).
+Full documentation for the C-Chain's API can be found in the [builder docs](https://build.avax.network/docs/rpcs/c-chain).
 
 ## Compatibility
 
-The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix](https://docs.avax.network/build/dapp/smart-contracts/remix-deploy), [Metamask](https://docs.avax.network/build/dapp/chain-settings), and [Foundry](https://docs.avax.network/build/dapp/smart-contracts/toolchains/foundry).
+Subnet-EVM is compatible with almost all Ethereum tooling, including [Foundry](https://build.avax.network/academy/blockchain/solidity-foundry/03-smart-contracts/03-foundry-quickstart) and [Remix](https://build.avax.network/docs/avalanche-l1s/add-utility/deploy-smart-contract#using-remix).
 
 **Note:** Subnet-EVM and Avalanche C-Chain currently implement the Ethereum Cancun fork and do not yet support newer hardforks (such as Pectra). Since Solidity v0.8.30 switched its default target EVM version to Pectra, contracts compiled with default settings may emit bytecode using instructions/features that Avalanche does not support.
 To avoid this mismatch, explicitly set the Solidity compiler’s `evmVersion` to `cancun` when deploying to Subnet-EVM or the C-Chain.
@@ -73,7 +73,7 @@ To support these changes, there have been a number of changes to the SubnetEVM b
 
 ### Clone Subnet-evm
 
-First install Go 1.24.9 or later. Follow the instructions [here](https://go.dev/doc/install). You can verify by running `go version`.
+First install Go 1.24.9 or later. Follow the instructions on the [go docs](https://go.dev/doc/install). You can verify by running `go version`.
 
 Set `$GOPATH` environment variable properly for Go to look for Go Workspaces. Please read [this](https://go.dev/doc/code) for details. You can verify by running `echo $GOPATH`.
 
@@ -97,8 +97,8 @@ To run a local network, it is recommended to use the [avalanche-cli](https://git
 
 There are two options when using the Avalanche-CLI:
 
-1. Use an official Subnet-EVM release: <https://docs.avax.network/subnets/build-first-subnet>
-2. Build and deploy a locally built (and optionally modified) version of Subnet-EVM: <https://docs.avax.network/subnets/create-custom-subnet>
+1. Use an official Subnet-EVM release: <https://build.avax.network/docs/tooling/avalanche-cli/create-avalanche-l1>
+1. Build and deploy a locally built (and optionally modified) version of Subnet-EVM: <https://build.avax.network/docs/tooling/avalanche-cli/create-deploy-avalanche-l1s/deploy-with-custom-vm>
 
 ## Releasing
 

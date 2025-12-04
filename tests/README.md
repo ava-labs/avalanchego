@@ -43,11 +43,9 @@ test run, require binary dependencies. One way of making these dependencies avai
 to use a nix shell which will give access to the dependencies expected by the test
 tooling:
 
- - Install [nix](https://nixos.org/). The [determinate systems
-   installer](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix)
-   is recommended.
- - Use ./scripts/dev_shell.sh to start a nix shell
- - Execute the dependency-requiring command (e.g. `ginkgo -v ./tests/warp -- --start-collectors`)
+- Install [nix](https://nixos.org/). The [determinate systems installer](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix) is recommended.
+- Use ./scripts/dev_shell.sh to start a nix shell
+- Execute the dependency-requiring command (e.g. `ginkgo -v ./tests/warp -- --start-collectors`)
 
 This repo also defines a `.envrc` file to configure [devenv](https://direnv.net/). With `devenv`
 and `nix` installed, a shell at the root of the repo will automatically start a nix dev

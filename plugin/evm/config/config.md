@@ -55,7 +55,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | `api-max-duration` | duration | Maximum duration for API calls (0 = no limit) | `0` |
 | `api-max-blocks-per-request` | int64 | Maximum number of blocks per getLogs request (0 = no limit) | `0` |
 | `http-body-limit` | uint64 | Maximum size of HTTP request bodies | - |
-| `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call. For no limit, set either this or `batch-response-max-size` to 0 | `1000` | 
+| `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call. For no limit, set either this or `batch-response-max-size` to 0 | `1000` |
 | `batch-response-max-size` | uint64 | Maximum size (in bytes) of response that can be returned from a batched RPC call. For no limit, set either this or `batch-request-limit` to 0. Defaults to `25 MB`| `1000` |
 
 ### WebSocket Settings
@@ -105,6 +105,8 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 ## Pruning and State Management
 
+ > **Note**: If a node is ever run with `pruning-enabled` as `false` (archival mode), setting `pruning-enabled` to `true` will result in a warning and the node will shut down. This is to protect against unintentional misconfigurations of an archival node. To override this and switch to pruning mode, in addition to `pruning-enabled: true`, `allow-missing-tries` should be set to `true` as well.
+
 ### Basic Pruning
 
 | Option | Type | Description | Default |
@@ -122,6 +124,8 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | `populate-missing-tries-parallelism` | int | Concurrent readers for re-populating missing tries | `1024` |
 
 ### Offline Pruning
+
+> **Note**: If offline pruning is enabled it will run on startup and block until it completes (approximately one hour on Mainnet). This will reduce the size of the database by deleting old trie nodes. **While performing offline pruning, your node will not be able to process blocks and will be considered offline.** While ongoing, the pruning process consumes a small amount of additional disk space (for deletion markers and the bloom filter). For more information see the [disk space considerations documentation](https://build.avax.network/docs/nodes/maintain/reduce-disk-usage#disk-space-considerations). Since offline pruning deletes old state data, this should not be run on nodes that need to support archival API requests. This is meant to be run manually, so after running with this flag once, it must be toggled back to false before running the node again. Therefore, you should run with this flag set to true and then set it to false on the subsequent run.
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
@@ -223,6 +227,8 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 ### State Sync
 
+> **Note:** If state-sync is enabled, the peer will download chain state from peers up to a recent block near tip, then proceed with normal bootstrapping. Please note that if you need historical data, state sync isn't the right option. However, it is sufficient if you are just running a validator.
+
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `state-sync-enabled` | bool | Enable state sync | `false` |
@@ -251,7 +257,7 @@ Failing to set these options will result in errors on VM initialization. Additio
 | `database-config-file` | string | Path to database configuration file | - |
 | `use-standalone-database` | bool | Use standalone database instead of shared one | - |
 | `inspect-database` | bool | Inspect database on startup | `false` |
-| `state-scheme` | string |  EXPERIMENTAL: specifies the database scheme to store state data; can be one of `hash` or `firewood` | `hash` | 
+| `state-scheme` | string |  EXPERIMENTAL: specifies the database scheme to store state data; can be one of `hash` or `firewood` | `hash` |
 
 ## Transaction Indexing
 

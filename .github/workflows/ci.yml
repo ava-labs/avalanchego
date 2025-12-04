@@ -35,6 +35,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/run_task.sh check-avalanchego-version
+  links-lint:
+    name: Markdown Links Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 #v1.2.5
+        with:
+          fail_level: any
 
   unit_test:
     name: Golang Unit Tests (${{ matrix.os }})

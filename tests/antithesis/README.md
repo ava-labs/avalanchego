@@ -1,7 +1,7 @@
 # Antithesis Testing
 
 This package supports testing with
-[Antithesis](https://antithesis.com/docs/introduction/introduction.html),
+[Antithesis](https://antithesis.com/docs/),
 a SaaS offering that enables deployment of distributed systems (such
 as Avalanche) to a deterministic and simulated environment that
 enables discovery and reproduction of anomalous behavior.

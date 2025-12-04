@@ -6,7 +6,7 @@ The core package maintains the backend for the blockchain, transaction pool, and
 
 The [BlockChain](./blockchain.go) struct handles the insertion of blocks into the maintained chain. It maintains a "canonical chain", which is essentially the preferred chain (the chain that ends with the block preferred by the AvalancheGo consensus engine).
 
-When the consensus engine verifies blocks as they are ready to be issued into consensus, it calls `Verify()` on the ChainVM Block interface implemented [here](../plugin/evm/block.go). This calls `InsertBlockManual` on the BlockChain struct implemented in this package, which is the first entrypoint of a block into the blockchain.
+When the consensus engine verifies blocks as they are ready to be issued into consensus, it calls `Verify()` on the ChainVM Block interface implemented in [wrapped_block.go](../plugin/evm/wrapped_block.go). This calls `InsertBlockManual` on the BlockChain struct implemented in this package, which is the first entrypoint of a block into the blockchain.
 
 InsertBlockManual verifies the block, inserts it into the state manager to track the merkle trie for the block, and adds it to the canonical chain if it extends the currently preferred chain.
 
@@ -20,7 +20,7 @@ The transaction pool maintains the set of transactions that need to be issued in
 
 ## State Manager
 
-The State Manager manages the [TrieDB](../trie/database.go). The TrieDB tracks a merkle forest of all of the merkle tries for the last accepted block and processing blocks. When a block is processed, the state transition results in a new merkle trie added to the merkle forest. The State Manager can operate in either archival or pruning mode.
+The State Manager manages references to state roots in the TrieDB implementations (see [`triedb`](../triedb/) for hashdb, pathdb, and firewood implementations). The TrieDB stores trie nodes (the individual components of state tries) in memory and on disk. When a block is processed, the state transition results in a new state root, and the TrieDB updates or inserts the trie nodes that compose this state. The State Manager tracks which state roots are referenced by processing blocks and manages when to commit trie nodes to disk or dereference them. The State Manager can operate in either archival or pruning mode.
 
 ### Archival Mode
 

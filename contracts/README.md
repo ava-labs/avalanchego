@@ -21,11 +21,13 @@ This project requires Go 1.21 or later. Install from [golang.org](https://golang
 The Solidity compiler version 0.8.30 is required to compile contracts. In CI, this is installed automatically via the [setup-solc](https://github.com/ARR4N/setup-solc) GitHub Action.
 
 For local development, install solc 0.8.30:
-- **macOS**: `brew install solidity` 
+
+- **macOS**: `brew install solidity`
 - **Linux**: Follow instructions at [solidity docs](https://docs.soliditylang.org/en/latest/installing-solidity.html)
 - **CI**: Automatically installed via GitHub Actions
 
 After installation, create a version-specific alias or symlink:
+
 ```bash
 # Option 1: Symlink (works in all contexts including go generate)
 sudo ln -sf $(which solc) /usr/local/bin/solc-v0.8.30  # Linux
@@ -37,7 +39,7 @@ echo "alias solc-v0.8.30='solc'" >> ~/.bashrc  # or ~/.zshrc
 
 ### Solidity and Avalanche
 
-It is also helpful to have a basic understanding of [Solidity](https://docs.soliditylang.org) and [Avalanche](https://docs.avax.network).
+It is also helpful to have a basic understanding of [Solidity](https://docs.soliditylang.org) and [Avalanche](https://build.avax.network/docs/quick-start).
 
 ## Dependencies
 
@@ -62,8 +64,9 @@ From the repository root, run:
 ```
 
 This will:
+
 1. Compile all Solidity contracts in `contracts/contracts/` to ABIs and bytecode
-2. Generate Go bindings in `contracts/bindings/`
+1. Generate Go bindings in `contracts/bindings/`
 
 The compilation artifacts (`.abi` and `.bin` files) are stored in `contracts/artifacts/` (gitignored).
 The generated Go bindings in `contracts/bindings/` are committed to the repository.
@@ -79,8 +82,9 @@ go generate ./...  # Compile contracts and generate bindings
 ```
 
 All compilation and code generation is configured in `contracts/contracts/compile.go` using `go:generate` directives. The directives execute in order:
+
 1. First, `solc` compiles `.sol` files to `.abi` and `.bin` files in `artifacts/`
-2. Then, `abigen` generates Go bindings from the artifacts to `bindings/*.go`
+1. Then, `abigen` generates Go bindings from the artifacts to `bindings/*.go`
 
 ## Write Contracts
 
@@ -98,7 +102,7 @@ For more information about precompiles see [subnet-evm precompiles](https://gith
 
 ## Hardhat Config
 
-Hardhat uses `hardhat.config.js` as the configuration file. You can define tasks, networks, compilers and more in that file. For more information see [here](https://hardhat.org/config/).
+Hardhat uses `hardhat.config.js` as the configuration file. You can define tasks, networks, compilers and more in that file. For more information see [the hardhat configuration docs](https://hardhat.org/config/).
 
 In Subnet-EVM, we provide a pre-configured file [hardhat.config.ts](https://github.com/ava-labs/subnet-evm/blob/master/contracts/hardhat.config.ts).
 

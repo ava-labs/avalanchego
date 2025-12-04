@@ -2,7 +2,7 @@ There are some must-be-done changes waiting in the generated file. Each area req
 Additionally there are other files you need to edit to activate your precompile.
 These areas are highlighted with comments "ADD YOUR PRECOMPILE HERE".
 For testing take a look at other precompile tests in contract_test.go and config_test.go in other precompile folders.
-See the tutorial in <https://docs.avax.network/subnets/hello-world-precompile-tutorial> for more information about precompile development.
+See the tutorial in <https://build.avax.network/academy/blockchain/solidity-foundry/04-hello-world-part-1/01-intro> for more information about precompile development.
 
 General guidelines for precompile development:
 
