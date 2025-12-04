@@ -55,7 +55,7 @@ The following do not represent an exhaustive list of tasks and are used for exam
 
 ### Refreshing the graft PR
 
-Development on the repository to be grafted may be ongoing while the graft PR (the result of the subtree merge task) is open. To refresh the graft PR, and get new changes from the repository to be grafted, do the following: 
+Development on the repository to be grafted may be ongoing while the graft PR (the result of the subtree merge task) is open. To refresh the graft PR, and get new changes from the repository to be grafted, do the following:
 
 ```bash
 git fetch origin
