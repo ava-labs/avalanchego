@@ -184,11 +184,18 @@ func (r *router) AddAlias(base string, aliases ...string) error {
 func (r *router) AddRootRoute(handler http.Handler) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
+	r.routeLock.Lock()
+	defer r.routeLock.Unlock()
+
+	if r.reservedRoutes.Contains("/") {
+		return fmt.Errorf("%w: /", errAlreadyReserved)
+	}
 
 	route := r.router.Handle("/", handler)
 	if route == nil {
 		return errors.New("failed to create root route")
 	}
 	route.Name("/")
+	r.reservedRoutes.Add("/")
 	return nil
 }

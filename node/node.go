@@ -1421,6 +1421,10 @@ func (n *Node) initInfoAPI() error {
 // initDashboardAPI initializes the Dashboard API that serves a web UI
 // for monitoring the node. It's available at the root of the HTTP server (/).
 func (n *Node) initDashboardAPI() error {
+	if !n.Config.DashboardAPIEnabled {
+		n.Log.Info("skipping dashboard API initialization because it has been disabled")
+		return nil
+	}
 	n.Log.Info("initializing dashboard API")
 	return n.APIServer.AddRootRoute(dashboard.NewHandler())
 }

@@ -238,6 +238,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(InfoAPIEnabledKey, true, "If true, this node exposes the Info API")
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
+	fs.Bool(DashboardAPIEnabledKey, true, "If true, this node exposes the Dashboard UI at the root path")
 
 	// Health Checks
 	fs.Duration(HealthCheckFreqKey, 30*time.Second, "Time between health checks")

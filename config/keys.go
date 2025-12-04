@@ -149,6 +149,7 @@ const (
 	InfoAPIEnabledKey                                  = "api-info-enabled"
 	MetricsAPIEnabledKey                               = "api-metrics-enabled"
 	HealthAPIEnabledKey                                = "api-health-enabled"
+	DashboardAPIEnabledKey                             = "api-dashboard-enabled"
 	MeterVMsEnabledKey                                 = "meter-vms-enabled"
 	ConsensusAppConcurrencyKey                         = "consensus-app-concurrency"
 	ConsensusShutdownTimeoutKey                        = "consensus-shutdown-timeout"
