@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
@@ -16,7 +15,6 @@ import (
 	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
@@ -43,25 +41,6 @@ func TestMain(m *testing.M) {
 	params.RegisterExtras()
 	m.Run()
 }
-
-func newBackendWithNativeMinter(t *testing.T) *sim.Backend {
-	t.Helper()
-	chainCfg := params.Copy(params.TestChainConfig)
-
-	// Enable ContractNativeMinter at genesis with admin set to adminAddress.
-	params.GetExtra(&chainCfg).GenesisPrecompiles = extras.Precompiles{
-		nativeminter.ConfigKey: nativeminter.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil),
-	}
-	return sim.NewBackend(
-		types.GenesisAlloc{
-			adminAddress:        {Balance: big.NewInt(1000000000000000000)},
-			unprivilegedAddress: {Balance: big.NewInt(1000000000000000000)},
-		},
-		sim.WithChainConfig(&chainCfg),
-	)
-}
-
-// Helper functions to reduce test boilerplate
 
 func deployNativeMinterTest(t *testing.T, b *sim.Backend, auth *bind.TransactOpts) (common.Address, *nativeminterbindings.NativeMinterTest) {
 	t.Helper()
@@ -164,9 +143,10 @@ func TestNativeMinter(t *testing.T) {
 		},
 	}
 
+	precompileCfg := nativeminter.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			backend := newBackendWithNativeMinter(t)
+			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, adminAddress, unprivilegedAddress)
 			defer backend.Close()
 
 			nativeMinter, err := nativeminterbindings.NewINativeMinter(nativeminter.ContractAddress, backend.Client())
@@ -183,7 +163,8 @@ func TestINativeMinter_Events(t *testing.T) {
 	testKey, _ := crypto.GenerateKey()
 	testAddress := crypto.PubkeyToAddress(testKey.PublicKey)
 
-	backend := newBackendWithNativeMinter(t)
+	precompileCfg := nativeminter.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil)
+	backend := testutils.NewBackendWithPrecompile(t, precompileCfg, adminAddress, unprivilegedAddress)
 	defer backend.Close()
 
 	nativeMinter, err := nativeminterbindings.NewINativeMinter(nativeminter.ContractAddress, backend.Client())

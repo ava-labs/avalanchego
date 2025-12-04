@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
@@ -69,26 +68,6 @@ func TestMain(m *testing.M) {
 	params.RegisterExtras()
 	m.Run()
 }
-
-func newBackendWithFeeManager(t *testing.T) *sim.Backend {
-	t.Helper()
-	chainCfg := params.Copy(params.TestChainConfig)
-
-	// Enable FeeManager at genesis with admin set to adminAddress and initial fee config.
-	params.GetExtra(&chainCfg).GenesisPrecompiles = extras.Precompiles{
-		feemanager.ConfigKey: feemanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, &genesisFeeConfig),
-	}
-
-	return sim.NewBackend(
-		types.GenesisAlloc{
-			adminAddress:        {Balance: big.NewInt(1000000000000000000)},
-			unprivilegedAddress: {Balance: big.NewInt(1000000000000000000)},
-		},
-		sim.WithChainConfig(&chainCfg),
-	)
-}
-
-// Helper functions to reduce test boilerplate
 
 func deployFeeManagerTest(t *testing.T, b *sim.Backend, auth *bind.TransactOpts) (common.Address, *feemanagerbindings.FeeManagerTest) {
 	t.Helper()
@@ -254,9 +233,10 @@ func TestFeeManager(t *testing.T) {
 		},
 	}
 
+	precompileCfg := feemanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, &genesisFeeConfig)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			backend := newBackendWithFeeManager(t)
+			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, adminAddress, unprivilegedAddress)
 			defer backend.Close()
 
 			feeManager, err := feemanagerbindings.NewIFeeManager(feemanager.ContractAddress, backend.Client())
@@ -271,7 +251,8 @@ func TestIFeeManager_Events(t *testing.T) {
 	chainID := params.TestChainConfig.ChainID
 	admin := testutils.NewAuth(t, adminKey, chainID)
 
-	backend := newBackendWithFeeManager(t)
+	precompileCfg := feemanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, &genesisFeeConfig)
+	backend := testutils.NewBackendWithPrecompile(t, precompileCfg, adminAddress, unprivilegedAddress)
 	defer backend.Close()
 
 	feeManager, err := feemanagerbindings.NewIFeeManager(feemanager.ContractAddress, backend.Client())

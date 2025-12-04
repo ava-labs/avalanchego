@@ -4,11 +4,9 @@
 package deployerallowlist_test
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
@@ -16,7 +14,6 @@ import (
 	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
@@ -43,24 +40,6 @@ func TestMain(m *testing.M) {
 	params.RegisterExtras()
 	m.Run()
 }
-
-func newBackendWithDeployerAllowList(t *testing.T) *sim.Backend {
-	t.Helper()
-	chainCfg := params.Copy(params.TestChainConfig)
-	// Enable ContractDeployerAllowList at genesis with admin set to adminAddress.
-	params.GetExtra(&chainCfg).GenesisPrecompiles = extras.Precompiles{
-		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil),
-	}
-	return sim.NewBackend(
-		types.GenesisAlloc{
-			adminAddress:        {Balance: big.NewInt(1000000000000000000)},
-			unprivilegedAddress: {Balance: big.NewInt(1000000000000000000)},
-		},
-		sim.WithChainConfig(&chainCfg),
-	)
-}
-
-// Helper functions to reduce test boilerplate
 
 func deployAllowListTest(t *testing.T, b *sim.Backend, auth *bind.TransactOpts) (common.Address, *allowlistbindings.AllowListTest) {
 	t.Helper()
@@ -203,9 +182,10 @@ func TestDeployerAllowList(t *testing.T) {
 		},
 	}
 
+	precompileCfg := deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			backend := newBackendWithDeployerAllowList(t)
+			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, adminAddress, unprivilegedAddress)
 			defer backend.Close()
 
 			allowList, err := allowlistbindings.NewIAllowList(deployerallowlist.ContractAddress, backend.Client())
@@ -217,131 +197,7 @@ func TestDeployerAllowList(t *testing.T) {
 }
 
 func TestIAllowList_Events(t *testing.T) {
-	chainID := params.TestChainConfig.ChainID
-	admin := testutils.NewAuth(t, adminKey, chainID)
-	testKey, _ := crypto.GenerateKey()
-	testAddress := crypto.PubkeyToAddress(testKey.PublicKey)
-
-	type testCase struct {
-		name           string
-		testRun        func(*allowlistbindings.IAllowList, *bind.TransactOpts, *sim.Backend, *testing.T, common.Address)
-		expectedEvents []allowlistbindings.IAllowListRoleSet
-	}
-
-	testCases := []testCase{
-		{
-			name: "should emit event after set admin",
-			testRun: func(allowList *allowlistbindings.IAllowList, auth *bind.TransactOpts, backend *sim.Backend, t *testing.T, addr common.Address) {
-				tx, err := allowList.SetAdmin(auth, addr)
-				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
-			},
-			expectedEvents: []allowlistbindings.IAllowListRoleSet{
-				{
-					Role:    allowlist.AdminRole.Big(),
-					Account: testAddress,
-					Sender:  adminAddress,
-					OldRole: allowlist.NoRole.Big(),
-				},
-			},
-		},
-		{
-			name: "should emit event after set manager",
-			testRun: func(allowList *allowlistbindings.IAllowList, auth *bind.TransactOpts, backend *sim.Backend, t *testing.T, addr common.Address) {
-				tx, err := allowList.SetManager(auth, addr)
-				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
-			},
-			expectedEvents: []allowlistbindings.IAllowListRoleSet{
-				{
-					Role:    allowlist.ManagerRole.Big(),
-					Account: testAddress,
-					Sender:  adminAddress,
-					OldRole: allowlist.NoRole.Big(),
-				},
-			},
-		},
-		{
-			name: "should emit event after set enabled",
-			testRun: func(allowList *allowlistbindings.IAllowList, auth *bind.TransactOpts, backend *sim.Backend, t *testing.T, addr common.Address) {
-				tx, err := allowList.SetEnabled(auth, addr)
-				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
-			},
-			expectedEvents: []allowlistbindings.IAllowListRoleSet{
-				{
-					Role:    allowlist.EnabledRole.Big(),
-					Account: testAddress,
-					Sender:  adminAddress,
-					OldRole: allowlist.NoRole.Big(),
-				},
-			},
-		},
-		{
-			name: "should emit event after set none",
-			testRun: func(allowList *allowlistbindings.IAllowList, auth *bind.TransactOpts, backend *sim.Backend, t *testing.T, addr common.Address) {
-				// First set the address to Enabled so we can test setting it to None
-				tx, err := allowList.SetEnabled(auth, addr)
-				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
-
-				tx, err = allowList.SetNone(auth, addr)
-				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
-			},
-			expectedEvents: []allowlistbindings.IAllowListRoleSet{
-				{
-					Role:    allowlist.EnabledRole.Big(),
-					Account: testAddress,
-					Sender:  adminAddress,
-					OldRole: allowlist.NoRole.Big(),
-				},
-				{
-					Role:    allowlist.NoRole.Big(),
-					Account: testAddress,
-					Sender:  adminAddress,
-					OldRole: allowlist.EnabledRole.Big(),
-				},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			require := require.New(t)
-
-			backend := newBackendWithDeployerAllowList(t)
-			defer backend.Close()
-
-			allowList, err := allowlistbindings.NewIAllowList(deployerallowlist.ContractAddress, backend.Client())
-			require.NoError(err)
-
-			tc.testRun(allowList, admin, backend, t, testAddress)
-
-			// Filter for RoleSet events using FilterRoleSet
-			// This will filter for all RoleSet events.
-			iter, err := allowList.FilterRoleSet(
-				nil,
-				nil,
-				nil,
-				nil,
-			)
-			require.NoError(err)
-			defer iter.Close()
-
-			// Verify event fields match expected values
-			for _, expectedEvent := range tc.expectedEvents {
-				require.True(iter.Next(), "expected to find RoleSet event")
-				event := iter.Event
-				require.Zero(expectedEvent.Role.Cmp(event.Role), "role mismatch")
-				require.Equal(expectedEvent.Account, event.Account, "account mismatch")
-				require.Equal(expectedEvent.Sender, event.Sender, "sender mismatch")
-				require.Zero(expectedEvent.OldRole.Cmp(event.OldRole), "oldRole mismatch")
-			}
-
-			// Verify there are no more events
-			require.False(iter.Next(), "expected no more RoleSet events")
-			require.NoError(iter.Error())
-		})
-	}
+	precompileCfg := deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil)
+	admin := testutils.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
+	allowlisttest.RunAllowListEventTests(t, precompileCfg, deployerallowlist.ContractAddress, admin, adminAddress, unprivilegedAddress)
 }
