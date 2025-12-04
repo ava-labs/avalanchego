@@ -211,13 +211,11 @@ func benchmarkReexecuteRange(
 	consensusRegistry := prometheus.NewRegistry()
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
-	log := tc.Log()
-
 	if metricsServerEnabled {
-		serverAddr := startServer(tc, log, prefixGatherer, metricsPort)
+		serverAddr := startServer(tc, prefixGatherer, metricsPort)
 
 		if metricsCollectorEnabled {
-			startCollector(tc, log, "c-chain-reexecution", labels, serverAddr)
+			startCollector(tc, "c-chain-reexecution", labels, serverAddr)
 		}
 	}
 
@@ -226,6 +224,7 @@ func benchmarkReexecuteRange(
 		chainDataDir = filepath.Join(currentStateDir, "chain-data-dir")
 	)
 
+	log := tc.Log()
 	log.Info("re-executing block range with params",
 		zap.String("runner", runnerNameArg),
 		zap.String("config", configNameArg),
@@ -516,7 +515,6 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 // the server address.
 func startServer(
 	tc tests.TestContext,
-	log logging.Logger,
 	gatherer prometheus.Gatherer,
 	port uint64,
 ) string {
@@ -525,7 +523,7 @@ func startServer(
 	server, err := tests.NewPrometheusServerWithPort(gatherer, port)
 	r.NoError(err)
 
-	log.Info("metrics endpoint available",
+	tc.Log().Info("metrics endpoint available",
 		zap.String("url", fmt.Sprintf("http://%s/ext/metrics", server.Address())),
 	)
 
@@ -539,14 +537,11 @@ func startServer(
 // startCollector starts a Prometheus collector configured to scrape the server
 // listening on serverAddr. startCollector also attaches the provided labels +
 // Github labels if available to the collected metrics.
-func startCollector(tc tests.TestContext, log logging.Logger, name string, labels map[string]string, serverAddr string) {
+func startCollector(tc tests.TestContext, name string, labels map[string]string, serverAddr string) {
 	r := require.New(tc)
 
-	startPromCtx, cancel := context.WithTimeout(tc.GetDefaultContextParent(), tests.DefaultTimeout)
-	defer cancel()
-
 	logger := tests.NewDefaultLogger("prometheus")
-	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
+	r.NoError(tmpnet.StartPrometheus(tc.DefaultContext(), logger))
 
 	var sdConfigFilePath string
 	tc.DeferCleanup(func() {
@@ -577,7 +572,7 @@ func startCollector(tc tests.TestContext, log logging.Logger, name string, label
 		startTime     = strconv.FormatInt(time.Now().UnixMilli(), 10)
 	)
 
-	log.Info("metrics available via grafana",
+	tc.Log().Info("metrics available via grafana",
 		zap.String(
 			"url",
 			tmpnet.NewGrafanaURI(networkUUID, startTime, "", grafanaURI),
