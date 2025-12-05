@@ -33,7 +33,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
@@ -59,20 +59,19 @@ type journalGenerator struct {
 // store. If loading the snapshot from disk is successful, this function also
 // returns a boolean indicating whether or not the snapshot is fully generated.
 func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache int, blockHash, root common.Hash, noBuild bool) (snapshot, bool, error) {
-	// Retrieve the block number and hash of the snapshot, failing if no snapshot
-	// is present in the database (or crashed mid-update).
-	baseBlockHash := customrawdb.ReadSnapshotBlockHash(diskdb)
-	if baseBlockHash == (common.Hash{}) {
-		return nil, false, errors.New("missing or corrupted snapshot, no snapshot block hash")
+	// Retrieve the block hash of the snapshot, failing if no snapshot is present.
+	baseBlockHash, err := customrawdb.ReadSnapshotBlockHash(diskdb)
+	if err != nil {
+		return nil, false, fmt.Errorf("missing or corrupted snapshot, no snapshot block hash: %v", err)
 	}
 	if baseBlockHash != blockHash {
 		return nil, false, fmt.Errorf("block hash stored on disk (%#x) does not match last accepted (%#x)", baseBlockHash, blockHash)
 	}
 	baseRoot := rawdb.ReadSnapshotRoot(diskdb)
-	if baseRoot == (common.Hash{}) {
+	switch {
+	case baseRoot == (common.Hash{}):
 		return nil, false, errors.New("missing or corrupted snapshot, no snapshot root")
-	}
-	if baseRoot != root {
+	case baseRoot != root:
 		return nil, false, fmt.Errorf("root stored on disk (%#x) does not match last accepted (%#x)", baseRoot, root)
 	}
 

@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 func TestCodeQueue(t *testing.T) {
@@ -86,7 +86,7 @@ func TestCodeQueue(t *testing.T) {
 				rawdb.WriteCode(db, hash, code)
 			}
 			for hash := range tt.alreadyToFetch {
-				customrawdb.AddCodeToFetch(db, hash)
+				require.NoError(t, customrawdb.WriteCodeToFetch(db, hash))
 			}
 
 			quit := make(chan struct{})

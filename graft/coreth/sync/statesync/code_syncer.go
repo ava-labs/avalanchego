@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
@@ -145,7 +145,9 @@ func (c *CodeSyncer) work(ctx context.Context) error {
 			if rawdb.HasCode(c.db, codeHash) {
 				// Best-effort cleanup of stale marker.
 				batch := c.db.NewBatch()
-				customrawdb.DeleteCodeToFetch(batch, codeHash)
+				if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
+					return fmt.Errorf("failed to delete stale code marker: %w", err)
+				}
 
 				if err := batch.Write(); err != nil {
 					return fmt.Errorf("failed to write batch for stale code marker: %w", err)
@@ -182,7 +184,9 @@ func (c *CodeSyncer) fulfillCodeRequest(ctx context.Context, codeHashes []common
 
 	batch := c.db.NewBatch()
 	for i, codeHash := range codeHashes {
-		customrawdb.DeleteCodeToFetch(batch, codeHash)
+		if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
+			return fmt.Errorf("failed to delete code to fetch marker: %w", err)
+		}
 		rawdb.WriteCode(batch, codeHash, codeByteSlices[i])
 	}
 
