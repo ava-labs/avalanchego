@@ -66,7 +66,7 @@ func Test_Firewood_Sync(t *testing.T) {
 			err = syncer.Wait(ctx)
 			if errors.Is(err, xsync.ErrFinishedWithUnexpectedRoot) {
 				t.Log("syncer reported root mismatch; logging diff between DBs")
-				logDiff(t, db, fullDB)
+				logDiff(t, fullDB, db)
 			}
 			require.NoError(err)
 			t.Logf("synced %d keys in %s", numKeys, time.Since(now))
@@ -155,58 +155,90 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 		require.NoError(t, iter2.Drop())
 	})
 
-	next1 := iter1.Next()
-	next2 := iter2.Next()
-	if !next1 {
-		t.Log("DB1 is empty")
-	}
-	if !next2 {
-		t.Log("DB2 is empty")
-	}
+	var (
+		next1        = iter1.Next()
+		next2        = iter2.Next()
+		count1       int
+		count2       int
+		cmp          int
+		prevKey      []byte
+		missingCount int
+	)
 
 	for next1 && next2 {
 		key1 := iter1.Key()
 		key2 := iter2.Key()
-		cmp := bytes.Compare(key1, key2)
+		prevCmp := cmp
+		cmp = bytes.Compare(key1, key2)
+		// Log any missing keys before this key
+		if cmp != 0 && missingCount > 0 {
+			missingDB := "DB1"
+			if prevCmp == -1 {
+				missingDB = "DB2"
+			}
+			t.Logf("%d keys missing from %s in [%x, %x)", missingCount, missingDB, prevKey, key1)
+			missingCount = 0
+		}
 		switch {
 		case cmp == 0:
-			// expected
-		case cmp == -1:
-			t.Logf("key %x is missing from DB2", key1)
+			val1 := iter1.Value()
+			val2 := iter2.Value()
+			if !bytes.Equal(val1, val2) {
+				t.Logf("key %x has different values:\n DB1: %x\n DB2: %x", key1, val1, val2)
+			}
+
 			next1 = iter1.Next()
-			continue
-		case cmp == 1:
-			t.Logf("key %x is missing from DB1", key2)
 			next2 = iter2.Next()
-			continue
+			count1++
+			count2++
+
+		case cmp == -1:
+			next1 = iter1.Next()
+			count1++
+			if missingCount == 0 {
+				prevKey = key1
+			}
+			missingCount++
+		case cmp == 1:
+			next2 = iter2.Next()
+			count2++
+			if missingCount == 0 {
+				prevKey = key2
+			}
+			missingCount++
 		}
 
-		val1 := iter1.Value()
-		val2 := iter2.Value()
-		if !bytes.Equal(val1, val2) {
-			t.Logf("key %x has different values:\n DB1: %x\n DB2: %x", key1, val1, val2)
-		}
-
-		next1 = iter1.Next()
-		next2 = iter2.Next()
 		require.NoError(t, iter1.Err(), "iter1 error")
 		require.NoError(t, iter2.Err(), "iter2 error")
 	}
 
+	missingCount = 0
 	for next1 {
-		key1 := iter1.Key()
-		t.Logf("key %x is missing from DB2", key1)
+		if missingCount == 0 {
+			prevKey = iter1.Key()
+		}
 		next1 = iter1.Next()
+		count1++
+		missingCount++
 		require.NoError(t, iter1.Err(), "iter1 error")
 	}
+	if missingCount > 0 {
+		t.Logf("%d keys missing from DB2 starting with %x", missingCount, prevKey)
+	}
 
+	missingCount = 0
 	for next2 {
-		key2 := iter2.Key()
-		t.Logf("key %x is missing from DB1", key2)
-		if val, _ := rev1.Get(key2); val != nil {
-			t.Logf("  but DB1 does have this key")
+		if missingCount == 0 {
+			prevKey = iter2.Key()
 		}
 		next2 = iter2.Next()
+		count2++
+		missingCount++
 		require.NoError(t, iter2.Err(), "iter2 error")
 	}
+	if missingCount > 0 {
+		t.Logf("%d keys missing from DB1 starting with %x", missingCount, prevKey)
+	}
+
+	t.Logf("DB1 had %d keys, DB2 had %d keys", count1, count2)
 }
