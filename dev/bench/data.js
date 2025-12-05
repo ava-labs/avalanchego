@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1764938329803,
+  "lastUpdate": 1764947271698,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2938,6 +2938,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd-jp6dz-runner-ncf2m",
             "value": 73.01,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "rodrigo",
+            "username": "RodrigoVillar",
+            "email": "77309055+RodrigoVillar@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "70148edc6ecabb2836b89d890718011b892b7063",
+          "message": "refactor(reexecute/c): export CreateBlockChanFromLevelDB (#4638)",
+          "timestamp": "2025-12-03T21:55:05Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/70148edc6ecabb2836b89d890718011b892b7063"
+        },
+        "date": 1764947269099,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast-79qqw-runner-mtgdj",
+            "value": 44.06,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
