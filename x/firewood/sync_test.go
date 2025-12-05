@@ -4,7 +4,9 @@
 package firewood
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -39,6 +41,7 @@ func Test_Firewood_Sync(t *testing.T) {
 			ctx := t.Context()
 			root, err := fullDB.GetMerkleRoot(ctx)
 			require.NoError(err)
+			t.Log("generated full DB with root", root, "in", time.Since(now))
 
 			syncer, err := xsync.NewManager(
 				db,
@@ -47,7 +50,7 @@ func Test_Firewood_Sync(t *testing.T) {
 					ChangeProofMarshaler:  changeProofMarshaler,
 					RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(fullDB, rangeProofMarshaler)),
 					ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(fullDB, rangeProofMarshaler, changeProofMarshaler)),
-					SimultaneousWorkLimit: 5,
+					SimultaneousWorkLimit: 1,
 					Log:                   logging.NoLog{},
 					TargetRoot:            root,
 					EmptyRoot:             ids.ID(types.EmptyRootHash),
@@ -60,7 +63,12 @@ func Test_Firewood_Sync(t *testing.T) {
 			// Add logging for actual time syncing
 			now = time.Now()
 			require.NoError(syncer.Start(ctx))
-			require.NoError(syncer.Wait(ctx))
+			err = syncer.Wait(ctx)
+			if errors.Is(err, xsync.ErrFinishedWithUnexpectedRoot) {
+				t.Log("syncer reported root mismatch; logging diff between DBs")
+				logDiff(t, db, fullDB)
+			}
+			require.NoError(err)
 			t.Logf("synced %d keys in %s", numKeys, time.Since(now))
 		})
 	}
@@ -75,7 +83,8 @@ func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 	require.NoError(t, err)
 	require.NotNil(t, fw)
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx := context.WithoutCancel(t.Context())
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		require.NoError(t, fw.Close(ctx))
 	})
@@ -115,4 +124,89 @@ func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 	require.NoError(t, err)
 
 	return db
+}
+
+func logDiff(t *testing.T, db1, db2 *syncDB) {
+	rev1, err := db1.fw.LatestRevision()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, rev1.Drop())
+	})
+	rev2, err := db2.fw.LatestRevision()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, rev2.Drop())
+	})
+
+	// check roots manually
+	if rev1.Root() == rev2.Root() {
+		t.Log("both DBs have the same root:", rev1.Root())
+		return
+	}
+
+	iter1, err := rev1.Iter(nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, iter1.Drop())
+	})
+	iter2, err := rev2.Iter(nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, iter2.Drop())
+	})
+
+	next1 := iter1.Next()
+	next2 := iter2.Next()
+	if !next1 {
+		t.Log("DB1 is empty")
+	}
+	if !next2 {
+		t.Log("DB2 is empty")
+	}
+
+	for next1 && next2 {
+		key1 := iter1.Key()
+		key2 := iter2.Key()
+		cmp := bytes.Compare(key1, key2)
+		switch {
+		case cmp == 0:
+			// expected
+		case cmp == -1:
+			t.Logf("key %x is missing from DB2", key1)
+			next1 = iter1.Next()
+			continue
+		case cmp == 1:
+			t.Logf("key %x is missing from DB1", key2)
+			next2 = iter2.Next()
+			continue
+		}
+
+		val1 := iter1.Value()
+		val2 := iter2.Value()
+		if !bytes.Equal(val1, val2) {
+			t.Logf("key %x has different values:\n DB1: %x\n DB2: %x", key1, val1, val2)
+		}
+
+		next1 = iter1.Next()
+		next2 = iter2.Next()
+		require.NoError(t, iter1.Err(), "iter1 error")
+		require.NoError(t, iter2.Err(), "iter2 error")
+	}
+
+	for next1 {
+		key1 := iter1.Key()
+		t.Logf("key %x is missing from DB2", key1)
+		next1 = iter1.Next()
+		require.NoError(t, iter1.Err(), "iter1 error")
+	}
+
+	for next2 {
+		key2 := iter2.Key()
+		t.Logf("key %x is missing from DB1", key2)
+		if val, _ := rev1.Get(key2); val != nil {
+			t.Logf("  but DB1 does have this key")
+		}
+		next2 = iter2.Next()
+		require.NoError(t, iter2.Err(), "iter2 error")
+	}
 }

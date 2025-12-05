@@ -55,11 +55,11 @@ func newRangeProof(proof *ffi.RangeProof) *RangeProof {
 
 type ChangeProofMarshaler struct{}
 
-func (ChangeProofMarshaler) Marshal(r *ChangeProof) ([]byte, error) {
+func (ChangeProofMarshaler) Marshal(*ChangeProof) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (ChangeProofMarshaler) Unmarshal(data []byte) (*ChangeProof, error) {
+func (ChangeProofMarshaler) Unmarshal([]byte) (*ChangeProof, error) {
 	return nil, errors.New("not implemented")
 }
 
