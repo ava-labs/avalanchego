@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-
 REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../../../ && pwd )
+# shellcheck disable=SC1091
 source "$REPO_ROOT"/scripts/constants.sh
 
 # We pass in the arguments to this script directly to enable easily passing parameters such as enabling race detection,
