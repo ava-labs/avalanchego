@@ -458,7 +458,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	if err := n.CreateSubnets(ctx, log, bootstrapNode); err != nil {
+	if err := n.CreateSubnets(ctx, log, bootstrapNode, false /* restartRequired */); err != nil {
 		return stacktrace.Wrap(err)
 	}
 
@@ -617,7 +617,7 @@ func (n *Network) GetSubnet(name string) *Subnet {
 
 // Ensure that each subnet on the network is created. If restartRequired is false, node restart
 // to pick up configuration changes becomes the responsibility of the caller.
-func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node) error {
+func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node, restartRequired bool) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
@@ -684,7 +684,6 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		reconfiguredNodes = append(reconfiguredNodes, node)
 	}
 
-	restartRequired := restartRequired(createdSubnets)
 	if restartRequired {
 		log.Info("restarting node(s) to enable them to track the new subnet(s)")
 
@@ -727,8 +726,6 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 			return stacktrace.Wrap(err)
 		}
 	}
-
-	log.Info("finished adding validators for new subnet(s)")
 
 	// Wait for nodes to become subnet validators
 	pChainClient := platformvm.NewClient(apiNode.GetAccessibleURI())
@@ -782,23 +779,6 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 	}
 
 	return nil
-}
-
-// restartRequired determines whether any of the provided subnets require
-// node restart to pick up configuration changes.
-func restartRequired(subnets []*Subnet) bool {
-	for _, subnet := range subnets {
-		consensusParameters, ok := subnet.Config["consensusParameters"].(map[string]interface{})
-		if !ok {
-			continue
-		}
-		// we need to restart if the subnet specifies simplex consensus, so it can
-		// initialize its chains using a simplex engine
-		if consensusParameters["simplexParameters"] != nil {
-			return true
-		}
-	}
-	return false
 }
 
 func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {
