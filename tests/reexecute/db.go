@@ -6,7 +6,6 @@ package reexecute
 import (
 	"encoding/binary"
 	"fmt"
-	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -28,16 +27,19 @@ type BlockResult struct {
 // It opens the database at sourceDir and iterates through blocks from startBlock to endBlock (inclusive).
 // Blocks are read sequentially and sent to the returned channel as BlockResult values.
 //
+// cleanup is a function that registers cleanup callbacks and is used to ensure
+// that the database being read from is properly closed prior to the test terminating.
+//
 // Any validation errors or iteration errors are sent as BlockResult with Err set, then the channel is closed.
-func CreateBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
-	r := require.New(tb)
+func CreateBlockChanFromLevelDB(t require.TestingT, sourceDir string, startBlock, endBlock uint64, chanSize int, cleanup func(func())) (<-chan BlockResult, error) {
+	r := require.New(t)
 	ch := make(chan BlockResult, chanSize)
 
 	db, err := leveldb.New(sourceDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
 	}
-	tb.Cleanup(func() {
+	cleanup(func() {
 		r.NoError(db.Close())
 	})
 
