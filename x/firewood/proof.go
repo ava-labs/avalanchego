@@ -37,20 +37,15 @@ func (RangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
 	if err := proof.UnmarshalBinary(data); err != nil {
 		return nil, err
 	}
-	return newRangeProof(proof), nil
+	return &RangeProof{
+		ffi: proof,
+	}, nil
 }
 
 type RangeProof struct {
 	ffi       *ffi.RangeProof
 	root      ids.ID
 	maxLength int
-}
-
-// Wrap the ffi proof in our proof type.
-func newRangeProof(proof *ffi.RangeProof) *RangeProof {
-	return &RangeProof{
-		ffi: proof,
-	}
 }
 
 type ChangeProofMarshaler struct{}

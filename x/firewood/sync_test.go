@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -29,55 +30,75 @@ var (
 	changeProofMarshaler = ChangeProofMarshaler{}
 )
 
+// Test_Firewood_Sync tests syncing a Firewood database from empty to a full database.
 func Test_Firewood_Sync(t *testing.T) {
-	tests := []int{0, 1, 1_000, 100_000}
-	for _, numKeys := range tests {
-		t.Run(fmt.Sprintf("numKeys=%d", numKeys), func(t *testing.T) {
-			require := require.New(t)
-			now := time.Now()
-			fullDB := generateDB(t, numKeys, now.UnixNano())
-			db := generateDB(t, 0, 0) // empty DB
-
-			ctx := t.Context()
-			root, err := fullDB.GetMerkleRoot(ctx)
-			require.NoError(err)
-			t.Log("generated full DB with root", root, "in", time.Since(now))
-
-			syncer, err := xsync.NewManager(
-				db,
-				xsync.ManagerConfig[*RangeProof, *ChangeProof]{
-					RangeProofMarshaler:   rangeProofMarshaler,
-					ChangeProofMarshaler:  changeProofMarshaler,
-					RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(fullDB, rangeProofMarshaler)),
-					ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(fullDB, rangeProofMarshaler, changeProofMarshaler)),
-					SimultaneousWorkLimit: 1,
-					Log:                   logging.NoLog{},
-					TargetRoot:            root,
-					EmptyRoot:             ids.ID(types.EmptyRootHash),
-				},
-				prometheus.NewRegistry(),
-			)
-			require.NoError(err)
-			require.NotNil(syncer)
-
-			// Add logging for actual time syncing
-			now = time.Now()
-			require.NoError(syncer.Start(ctx))
-			err = syncer.Wait(ctx)
-			if errors.Is(err, xsync.ErrFinishedWithUnexpectedRoot) {
-				t.Log("syncer reported root mismatch; logging diff between DBs")
-				logDiff(t, fullDB, db)
-			}
-			require.NoError(err)
-			t.Logf("synced %d keys in %s", numKeys, time.Since(now))
+	t.Parallel()
+	dbSizes := []int{1, 1_000, 10_000, 100_000}
+	for _, serverSize := range dbSizes {
+		t.Run(fmt.Sprintf("numKeys=%d", serverSize), func(t *testing.T) {
+			t.Parallel()
+			testSync(t, 0, serverSize)
 		})
 	}
 }
 
+// Test_Firewood_Sync_Overwrite tests syncing when the client already has some data.
+// This data is expected to be overwritten by the server's data.
+func Test_Firewood_Sync_Overwrite(t *testing.T) {
+	t.Parallel()
+	dbSizes := []int{1, 1_000, 10_000, 100_000}
+	initialSize := 500
+	for _, serverSize := range dbSizes {
+		t.Run(fmt.Sprintf("numKeys=%d", serverSize), func(t *testing.T) {
+			t.Parallel()
+			testSync(t, initialSize, serverSize)
+		})
+	}
+}
+
+func testSync(t *testing.T, clientKeys int, serverKeys int) {
+	require := require.New(t)
+	seed := time.Now().UnixNano()
+	t.Log("seed:", seed)
+	fullDB := generateDB(t, serverKeys, seed)
+	db := generateDB(t, clientKeys, seed+1) // guarantee different data
+
+	ctx := t.Context()
+	root, err := fullDB.GetMerkleRoot(ctx)
+	require.NoError(err)
+
+	syncer, err := xsync.NewManager(
+		db,
+		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
+			RangeProofMarshaler:   rangeProofMarshaler,
+			ChangeProofMarshaler:  changeProofMarshaler,
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(fullDB, rangeProofMarshaler)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(fullDB, rangeProofMarshaler, changeProofMarshaler)),
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+			TargetRoot:            root,
+			EmptyRoot:             ids.ID(types.EmptyRootHash),
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+	require.NotNil(syncer)
+
+	require.NoError(syncer.Start(ctx))
+	err = syncer.Wait(ctx)
+	if errors.Is(err, xsync.ErrFinishedWithUnexpectedRoot) {
+		t.Log("syncer reported root mismatch; logging diff between DBs")
+		logDiff(t, fullDB, db)
+	}
+	require.NoError(err)
+}
+
+// generateDB creates a new Firewood database with up to [numKeys] random key/value pairs.
+// The database will be automatically closed when the test ends.
+// Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
 func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 	t.Helper()
-	folder := t.TempDir()
-	path := folder + "/firewood.db"
+	path := filepath.Join(t.TempDir(), "firewood.db")
 
 	fw, err := ffi.New(path, ffi.DefaultConfig())
 	require.NoError(t, err)
@@ -101,7 +122,6 @@ func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 		minLength = 1
 		maxLength = 64
 	)
-	t.Logf("generating %d random keys/values with seed %d", numKeys, seed)
 	for i := 0; i < numKeys; i++ {
 		// Random length between minLength and maxLength inclusive
 		keyLen := r.Intn(maxLength-minLength+1) + minLength
@@ -126,17 +146,19 @@ func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 	return db
 }
 
+// logDiff logs the differences between two Firewood databases.
+// Useful when debugging state mistmatches after sync.
 func logDiff(t *testing.T, db1, db2 *syncDB) {
 	rev1, err := db1.fw.LatestRevision()
 	require.NoError(t, err)
-	t.Cleanup(func() {
+	defer func() {
 		require.NoError(t, rev1.Drop())
-	})
+	}()
 	rev2, err := db2.fw.LatestRevision()
 	require.NoError(t, err)
-	t.Cleanup(func() {
+	defer func() {
 		require.NoError(t, rev2.Drop())
-	})
+	}()
 
 	// check roots manually
 	if rev1.Root() == rev2.Root() {
@@ -146,14 +168,14 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 
 	iter1, err := rev1.Iter(nil)
 	require.NoError(t, err)
-	t.Cleanup(func() {
+	defer func() {
 		require.NoError(t, iter1.Drop())
-	})
+	}()
 	iter2, err := rev2.Iter(nil)
 	require.NoError(t, err)
-	t.Cleanup(func() {
+	defer func() {
 		require.NoError(t, iter2.Drop())
-	})
+	}()
 
 	var (
 		next1        = iter1.Next()
@@ -179,8 +201,8 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 			t.Logf("%d keys missing from %s in [%x, %x)", missingCount, missingDB, prevKey, key1)
 			missingCount = 0
 		}
-		switch {
-		case cmp == 0:
+		switch cmp {
+		case 0:
 			val1 := iter1.Value()
 			val2 := iter2.Value()
 			if !bytes.Equal(val1, val2) {
@@ -192,14 +214,14 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 			count1++
 			count2++
 
-		case cmp == -1:
+		case -1:
 			next1 = iter1.Next()
 			count1++
 			if missingCount == 0 {
 				prevKey = key1
 			}
 			missingCount++
-		case cmp == 1:
+		case 1:
 			next2 = iter2.Next()
 			count2++
 			if missingCount == 0 {

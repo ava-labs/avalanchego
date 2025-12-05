@@ -25,7 +25,7 @@ var (
 
 type syncDB struct {
 	fw   *ffi.Database
-	lock sync.Mutex
+	lock sync.Mutex // TODO: remove this lock once FFI is thread-safe
 }
 
 func New(db *ffi.Database) *syncDB {
@@ -47,7 +47,9 @@ func (db *syncDB) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start ma
 		return nil, err
 	}
 
-	return newRangeProof(proof), nil
+	return &RangeProof{
+		ffi: proof,
+	}, nil
 }
 
 // VerifyRangeProof ensures the range proof matches the expected parameters.
@@ -56,6 +58,8 @@ func (*syncDB) VerifyRangeProof(_ context.Context, proof *RangeProof, start mayb
 		return errNilProof
 	}
 
+	// This needs provided to the FFI at commit time.
+	// TODO: remove this once the FFI no longer requires it.
 	proof.root = expectedEndRootID
 	proof.maxLength = maxLength
 
@@ -67,36 +71,29 @@ func (db *syncDB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]b
 	// Prevent concurrent commits to the database.
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	newRoot, err := db.fw.VerifyAndCommitRangeProof(proof.ffi, start, end, ffi.Hash(proof.root), uint32(proof.maxLength))
+	_, err := db.fw.VerifyAndCommitRangeProof(proof.ffi, start, end, ffi.Hash(proof.root), uint32(proof.maxLength))
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
-	}
-
-	// TODO: This case should be handled by `FindNextKey`.
-	if ids.ID(newRoot) == proof.root {
-		return maybe.Nothing[[]byte](), nil
 	}
 
 	// We can now get the FindNextKey iterator.
 	nextKeyRange, err := proof.ffi.FindNextKey()
 	if err != nil || nextKeyRange == nil {
-		// Indicates the range is complete.
+		// No error indicates the range is complete.
 		return maybe.Nothing[[]byte](), err
 	}
 
+	// It is borrowed from the ffi, so we need to make our own copy.
 	byteSlice := nextKeyRange.StartKey()
 	newSlice := make([]byte, len(byteSlice))
 	copy(newSlice, byteSlice)
-
-	// Done using nextKeyRange
 	if err := nextKeyRange.Free(); err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
 
-	// TODO: Instead of using bytes.Equal, we should ensure that newSlice is greater than (or equal to) start.
-	// if start.HasValue() && bytes.Equal(newSlice, start.Value()) {
-	if start.HasValue() && (bytes.Compare(newSlice, end.Value()) > 0 || bytes.Equal(newSlice, start.Value())) {
-		// There is no next key.
+	// TODO: This will eventually be handled by `FindNextKey`.
+	if (end.HasValue() && bytes.Compare(newSlice, end.Value()) > 0) || (start.HasValue() && bytes.Equal(newSlice, start.Value())) {
+		// There is no next key, the entire range has been committed.
 		return maybe.Nothing[[]byte](), nil
 	}
 
@@ -118,9 +115,7 @@ func (db *syncDB) CommitChangeProof(_ context.Context, end maybe.Maybe[[]byte], 
 	return maybe.Nothing[[]byte](), errors.New("change proofs are not implemented")
 }
 
-// Clear the database.
-//
-//nolint:revive // TODO: implement this method. It is left nil to allow empty DBs to be used in tests.
+//nolint:revive // TODO: implement this method.
 func (db *syncDB) Clear() error {
-	return nil
+	return errors.New("not implemented")
 }
