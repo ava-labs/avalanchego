@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -40,6 +41,7 @@ const (
 var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
 	_ Gossiper = (*PullGossiper[Gossipable])(nil)
+	_ Gossiper = (*PushGossiper[Gossipable])(nil)
 
 	ioTypeLabels   = []string{ioLabel, typeLabel}
 	sentPushLabels = prometheus.Labels{
@@ -74,6 +76,17 @@ var (
 	ErrInvalidTargetGossipSize  = errors.New("target gossip size cannot be negative")
 	ErrInvalidRegossipFrequency = errors.New("re-gossip frequency cannot be negative")
 )
+
+// Gossipable is an item that can be gossiped across the network
+type Gossipable interface {
+	GossipID() ids.ID
+}
+
+// Marshaller handles parsing logic for a concrete Gossipable type
+type Marshaller[T Gossipable] interface {
+	MarshalGossip(T) ([]byte, error)
+	UnmarshalGossip([]byte) (T, error)
+}
 
 // Gossiper gossips Gossipables to other nodes
 type Gossiper interface {
@@ -191,7 +204,7 @@ func (v ValidatorGossiper) Gossip(ctx context.Context) error {
 func NewPullGossiper[T Gossipable](
 	log logging.Logger,
 	marshaller Marshaller[T],
-	set Set[T],
+	set PullGossiperSet[T],
 	client *p2p.Client,
 	metrics Metrics,
 	pollSize int,
@@ -206,17 +219,30 @@ func NewPullGossiper[T Gossipable](
 	}
 }
 
+// PullGossiperSet exposes the current bloom filter and allows adding new items
+// that were not included in the filter.
+//
+// TODO: Consider naming this interface based on what it provides rather than
+// how its used.
+type PullGossiperSet[T Gossipable] interface {
+	// Add adds a value to the set. Returns an error if v was not added.
+	Add(v T) error
+	// BloomFilter returns the bloom filter and its corresponding salt.
+	BloomFilter() (bloom *bloom.Filter, salt ids.ID)
+}
+
 type PullGossiper[T Gossipable] struct {
 	log        logging.Logger
 	marshaller Marshaller[T]
-	set        Set[T]
+	set        PullGossiperSet[T]
 	client     *p2p.Client
 	metrics    Metrics
 	pollSize   int
 }
 
 func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
-	msgBytes, err := MarshalAppRequest(p.set.GetFilter())
+	bf, salt := p.set.BloomFilter()
+	msgBytes, err := MarshalAppRequest(bf.Marshal(), salt[:])
 	if err != nil {
 		return err
 	}
@@ -293,7 +319,7 @@ func (p *PullGossiper[_]) handleResponse(
 // NewPushGossiper returns an instance of PushGossiper
 func NewPushGossiper[T Gossipable](
 	marshaller Marshaller[T],
-	mempool Set[T],
+	set PushGossiperSet,
 	validators p2p.ValidatorSubset,
 	client *p2p.Client,
 	metrics Metrics,
@@ -320,7 +346,7 @@ func NewPushGossiper[T Gossipable](
 
 	return &PushGossiper[T]{
 		marshaller:           marshaller,
-		set:                  mempool,
+		set:                  set,
 		validators:           validators,
 		client:               client,
 		metrics:              metrics,
@@ -336,10 +362,19 @@ func NewPushGossiper[T Gossipable](
 	}, nil
 }
 
+// PushGossiperSet exposes whether hashes are still included in a set.
+//
+// TODO: Consider naming this interface based on what it provides rather than
+// how its used.
+type PushGossiperSet interface {
+	// Has returns true if the hash is in the set.
+	Has(h ids.ID) bool
+}
+
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
 	marshaller Marshaller[T]
-	set        Set[T]
+	set        PushGossiperSet
 	validators p2p.ValidatorSubset
 	client     *p2p.Client
 	metrics    Metrics

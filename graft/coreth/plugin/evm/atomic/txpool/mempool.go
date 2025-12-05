@@ -15,10 +15,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
 var (
-	_ gossip.Set[*atomic.Tx] = (*Mempool)(nil)
+	_ gossip.HandlerSet[*atomic.Tx]      = (*Mempool)(nil)
+	_ gossip.PullGossiperSet[*atomic.Tx] = (*Mempool)(nil)
+	_ gossip.PushGossiperSet             = (*Mempool)(nil)
 
 	ErrAlreadyKnown    = errors.New("already known")
 	ErrConflict        = errors.New("conflict present")
@@ -298,9 +301,9 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	return nil
 }
 
-func (m *Mempool) GetFilter() ([]byte, []byte) {
+func (m *Mempool) BloomFilter() (*bloom.Filter, ids.ID) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	return m.bloom.Marshal()
+	return m.bloom.BloomFilter()
 }

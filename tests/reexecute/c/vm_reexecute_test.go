@@ -5,7 +5,6 @@ package vm
 
 import (
 	"context"
-	"encoding/binary"
 	"flag"
 	"fmt"
 	"maps"
@@ -37,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/reexecute"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -87,6 +87,12 @@ var (
 			"state-scheme": "firewood",
 			"snapshot-cache": 0,
 			"pruning-enabled": true,
+			"state-sync-enabled": false
+		}`,
+		"firewood-archive": `{
+			"state-scheme": "firewood",
+			"snapshot-cache": 0,
+			"pruning-enabled": false,
 			"state-sync-enabled": false
 		}`,
 	}
@@ -212,6 +218,12 @@ func benchmarkReexecuteRange(
 	)
 
 	log.Info("re-executing block range with params",
+		zap.String("runner", runnerNameArg),
+		zap.String("config", configNameArg),
+		zap.String("labels", labelsArg),
+		zap.String("metrics-server-enabled", strconv.FormatBool(metricsServerEnabled)),
+		zap.Uint64("metrics-server-port", metricsPort),
+		zap.String("metrics-collector-enabled", strconv.FormatBool(metricsCollectorEnabled)),
 		zap.String("block-dir", blockDir),
 		zap.String("vm-db-dir", vmDBDir),
 		zap.String("chain-data-dir", chainDataDir),
@@ -220,7 +232,7 @@ func benchmarkReexecuteRange(
 		zap.Int("chan-size", chanSize),
 	)
 
-	blockChan, err := createBlockChanFromLevelDB(b, blockDir, startBlock, endBlock, chanSize)
+	blockChan, err := reexecute.CreateBlockChanFromLevelDB(b, blockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
@@ -345,12 +357,6 @@ func newMainnetCChainVM(
 	return vm, nil
 }
 
-type blockResult struct {
-	BlockBytes []byte
-	Height     uint64
-	Err        error
-}
-
 type vmExecutorConfig struct {
 	Log logging.Logger
 	// Registry is the registry to register the metrics with.
@@ -406,7 +412,7 @@ func (e *vmExecutor) execute(ctx context.Context, blockBytes []byte) error {
 	return nil
 }
 
-func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockResult) error {
+func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan reexecute.BlockResult) error {
 	blkID, err := e.vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get last accepted block: %w", err)
@@ -471,75 +477,13 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 	return nil
 }
 
-func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan blockResult, error) {
-	r := require.New(tb)
-	ch := make(chan blockResult, chanSize)
-
-	db, err := leveldb.New(sourceDir, nil, logging.NoLog{}, prometheus.NewRegistry())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
-	}
-	tb.Cleanup(func() {
-		r.NoError(db.Close())
-	})
-
-	go func() {
-		defer close(ch)
-
-		iter := db.NewIteratorWithStart(blockKey(startBlock))
-		defer iter.Release()
-
-		currentHeight := startBlock
-
-		for iter.Next() {
-			key := iter.Key()
-			if len(key) != database.Uint64Size {
-				ch <- blockResult{
-					BlockBytes: nil,
-					Err:        fmt.Errorf("expected key length %d while looking for block at height %d, got %d", database.Uint64Size, currentHeight, len(key)),
-				}
-				return
-			}
-			height := binary.BigEndian.Uint64(key)
-			if height != currentHeight {
-				ch <- blockResult{
-					BlockBytes: nil,
-					Err:        fmt.Errorf("expected next height %d, got %d", currentHeight, height),
-				}
-				return
-			}
-			ch <- blockResult{
-				BlockBytes: iter.Value(),
-				Height:     height,
-			}
-			currentHeight++
-			if currentHeight > endBlock {
-				break
-			}
-		}
-		if iter.Error() != nil {
-			ch <- blockResult{
-				BlockBytes: nil,
-				Err:        fmt.Errorf("failed to iterate over blocks at height %d: %w", currentHeight, iter.Error()),
-			}
-			return
-		}
-	}()
-
-	return ch, nil
-}
-
-func blockKey(height uint64) []byte {
-	return binary.BigEndian.AppendUint64(nil, height)
-}
-
 func TestExportBlockRange(t *testing.T) {
 	exportBlockRange(t, blockDirSrcArg, blockDirDstArg, startBlockArg, endBlockArg, chanSizeArg)
 }
 
 func exportBlockRange(tb testing.TB, blockDirSrc string, blockDirDst string, startBlock, endBlock uint64, chanSize int) {
 	r := require.New(tb)
-	blockChan, err := createBlockChanFromLevelDB(tb, blockDirSrc, startBlock, endBlock, chanSize)
+	blockChan, err := reexecute.CreateBlockChanFromLevelDB(tb, blockDirSrc, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	db, err := leveldb.New(blockDirDst, nil, logging.NoLog{}, prometheus.NewRegistry())
@@ -550,7 +494,7 @@ func exportBlockRange(tb testing.TB, blockDirSrc string, blockDirDst string, sta
 
 	batch := db.NewBatch()
 	for blkResult := range blockChan {
-		r.NoError(batch.Put(blockKey(blkResult.Height), blkResult.BlockBytes))
+		r.NoError(batch.Put(reexecute.BlockKey(blkResult.Height), blkResult.BlockBytes))
 
 		if batch.Size() > 10*units.MiB {
 			r.NoError(batch.Write())
