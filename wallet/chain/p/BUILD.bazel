@@ -1,0 +1,54 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "p",
+    srcs = [
+        "client.go",
+        "context.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/wallet/chain/p",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/info",
+        "//utils/constants",
+        "//vms/platformvm",
+        "//vms/platformvm/txs",
+        "//wallet/chain/p/builder",
+        "//wallet/chain/p/wallet",
+        "//wallet/subnet/primary/common",
+    ],
+)
+
+go_test(
+    name = "p_test",
+    srcs = ["builder_test.go"],
+    embed = [":p"],
+    deps = [
+        "//ids",
+        "//utils",
+        "//utils/constants",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/crypto/secp256k1",
+        "//utils/set",
+        "//utils/units",
+        "//vms/components/avax",
+        "//vms/components/gas",
+        "//vms/platformvm/fx",
+        "//vms/platformvm/reward",
+        "//vms/platformvm/signer",
+        "//vms/platformvm/stakeable",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/txs/fee",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/message",
+        "//vms/platformvm/warp/payload",
+        "//vms/secp256k1fx",
+        "//vms/types",
+        "//wallet/chain/p/builder",
+        "//wallet/chain/p/wallet",
+        "//wallet/subnet/primary/common",
+        "//wallet/subnet/primary/common/utxotest",
+        "@com_github_stretchr_testify//require",
+    ],
+)

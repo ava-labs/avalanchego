@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "atomicmock",
+    srcs = ["shared_memory.go"],
+    importpath = "github.com/ava-labs/avalanchego/chains/atomic/atomicmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chains/atomic",
+        "//database",
+        "//ids",
+        "@org_uber_go_mock//gomock",
+    ],
+)

@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "setmap",
+    srcs = ["setmap.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/setmap",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "//utils/set",
+    ],
+)
+
+go_test(
+    name = "setmap_test",
+    srcs = ["setmap_test.go"],
+    embed = [":setmap"],
+    deps = [
+        "//utils/set",
+        "@com_github_stretchr_testify//require",
+    ],
+)

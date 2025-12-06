@@ -1,0 +1,8 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "vmerrors",
+    srcs = ["errors.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmerrors",
+    visibility = ["//visibility:public"],
+)

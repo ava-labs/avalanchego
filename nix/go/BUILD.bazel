@@ -1,0 +1,5 @@
+# Make nix files visible to Bazel
+exports_files([
+    "bazel.nix",
+    "default.nix",
+])

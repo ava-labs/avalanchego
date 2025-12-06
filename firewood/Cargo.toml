@@ -1,0 +1,92 @@
+[workspace]
+members = [
+  "benchmark",
+  "ffi",
+  "firewood-macros",
+  "firewood",
+  "fwdctl",
+  "storage",
+  "triehash",
+]
+resolver = "2"
+
+[workspace.package]
+# NOTE: when bumping to 0.1.0, this will be removed and each crate will have its
+# version set independently.
+version = "0.0.15"
+edition = "2024"
+license-file = "LICENSE.md"
+homepage = "https://avalabs.org"
+repository = "https://github.com/ava-labs/firewood"
+readme = "README.md"
+rust-version = "1.91.0"
+
+[profile.release]
+debug = true
+
+[profile.maxperf]
+panic = "abort"
+codegen-units = 1
+lto = "fat"
+debug = false
+inherits = "release"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+indexing_slicing = "warn"
+explicit_deref_methods = "warn"
+missing_const_for_fn = "warn"
+arithmetic_side_effects = "warn"
+undocumented_unsafe_blocks = "deny"
+# lower the priority of pedantic to allow overriding the lints it includes
+pedantic = { level = "warn", priority = -1 }
+# These lints are from pedantic but allowed. They are a bit too pedantic and
+# encourage making backwards incompatible changes.
+needless_pass_by_value = "allow"
+unnecessary_wraps = "allow"
+unused_self = "allow"
+# Ignore interger casts. This is to avoid unnecessary `try_into` calls for usize
+# to u64 and vice versa and should be re-enabled if/when clippy has a separate
+# lint for usize vs non-usize truncation.
+cast_possible_truncation = "allow"
+
+[workspace.dependencies]
+# workspace local packages
+firewood = { path = "firewood", version = "0.0.15" }
+firewood-macros = { path = "firewood-macros", version = "0.0.15" }
+firewood-storage = { path = "storage", version = "0.0.15" }
+firewood-ffi = { path = "ffi", version = "0.0.15" }
+firewood-triehash = { path = "triehash", version = "0.0.15" }
+
+# common dependencies
+aquamarine = "0.6.0"
+bytemuck = "1.24.0"
+bytemuck_derive = "1.10.2"
+clap = { version = "4.5.52", features = ["derive"] }
+coarsetime = "0.1.36"
+env_logger = "0.11.8"
+fastrace = "0.7.14"
+hex = "0.4.3"
+integer-encoding = "4.1.0"
+log = "0.4.28"
+metrics = "0.24.2"
+metrics-util = "0.20.0"
+nonzero_ext = "0.3.0"
+rand_distr = "0.5.1"
+sha2 = "0.10.9"
+smallvec = { version = "1.15.1", features = ["write", "union", "const_new"] }
+test-case = "3.3.1"
+thiserror = "2.0.17"
+parking_lot = "0.12.3"
+
+# common dev dependencies
+criterion = "0.7.0"
+ethereum-types = "0.16.0"
+hex-literal = "1.1.0"
+pprof = "0.15.0"
+rand = "0.9.2"
+tempfile = "3.23.0"

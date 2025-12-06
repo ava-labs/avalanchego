@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "fee",
+    srcs = ["fee.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/math",
+        "//vms/components/gas",
+    ],
+)
+
+go_test(
+    name = "fee_test",
+    srcs = ["fee_test.go"],
+    embed = [":fee"],
+    deps = [
+        "//utils/math",
+        "//vms/components/gas",
+        "@com_github_stretchr_testify//require",
+    ],
+)

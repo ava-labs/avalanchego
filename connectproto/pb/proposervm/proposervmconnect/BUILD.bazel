@@ -1,0 +1,12 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "proposervmconnect",
+    srcs = ["service.connect.go"],
+    importpath = "github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//connectproto/pb/proposervm",
+        "@com_connectrpc_connect//:connect",
+    ],
+)

@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "utxomock",
+    srcs = ["verifier.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/platformvm/txs",
+        "@org_uber_go_mock//gomock",
+    ],
+)

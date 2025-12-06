@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "metrics",
+    srcs = [
+        "block_metrics.go",
+        "metrics.go",
+        "no_op.go",
+        "tx_metrics.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/metrics",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/metric",
+        "//utils/wrappers",
+        "//vms/components/gas",
+        "//vms/platformvm/block",
+        "//vms/platformvm/txs",
+        "@com_github_gorilla_rpc//v2:rpc",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)

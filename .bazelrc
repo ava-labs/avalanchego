@@ -1,0 +1,30 @@
+# Bazel configuration for avalanchego
+
+# Enable bzlmod (default in Bazel 7+, explicit for clarity)
+common --enable_bzlmod
+
+# Build settings
+build --incompatible_enable_cc_toolchain_resolution
+
+# CGO flags for BLST cryptography library
+# Must match scripts/build.sh: CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
+build --action_env=CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
+build --action_env=CGO_ENABLED=1
+
+# Use purego build tag for gnark-crypto to avoid assembly include path issues
+# gnark-crypto's assembly files use cross-package #include which Bazel doesn't support
+build --define gotags=purego
+
+# Test settings
+test --test_output=errors
+
+# Performance
+build --jobs=auto
+
+# Nix integration - allow network for nix-build
+# This may need adjustment based on your Bazel sandbox configuration
+build --sandbox_add_mount_pair=/nix
+
+# Version injection - provides STABLE_GIT_COMMIT for x_defs
+build --workspace_status_command=tools/bazel/workspace_status.sh
+build --stamp

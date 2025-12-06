@@ -1,0 +1,32 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "tests",
+    srcs = [
+        "init.go",
+        "rlp_test_util.go",
+        "state_test_util.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/tests",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/core/extstate",
+        "//graft/coreth/core/state/snapshot",
+        "//graft/coreth/params",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/plugin/evm/customrawdb",
+        "//graft/coreth/triedb/firewood",
+        "//graft/coreth/triedb/hashdb",
+        "//graft/coreth/triedb/pathdb",
+        "//graft/coreth/utils",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)

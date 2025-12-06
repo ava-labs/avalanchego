@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "blocktest",
+    srcs = [
+        "batched_vm.go",
+        "set_preference_vm.go",
+        "state_summary.go",
+        "state_syncable_vm.go",
+        "vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/consensus/snowman",
+        "//snow/engine/enginetest",
+        "//snow/engine/snowman/block",
+        "@com_github_stretchr_testify//require",
+    ],
+)

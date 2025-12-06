@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "atomictest",
+    srcs = [
+        "ops.go",
+        "shared_memories.go",
+        "tx.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/atomictest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chains/atomic",
+        "//codec",
+        "//codec/linearcodec",
+        "//database",
+        "//database/memdb",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/plugin/evm/atomic",
+        "//ids",
+        "//snow",
+        "//snow/snowtest",
+        "//utils",
+        "//utils/set",
+        "//utils/wrappers",
+        "@com_github_stretchr_testify//require",
+    ],
+)

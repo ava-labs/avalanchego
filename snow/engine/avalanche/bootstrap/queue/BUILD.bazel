@@ -1,0 +1,50 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "queue",
+    srcs = [
+        "job.go",
+        "jobs.go",
+        "parser.go",
+        "state.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap/queue",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//cache/metercacher",
+        "//database",
+        "//database/linkeddb",
+        "//database/prefixdb",
+        "//database/versiondb",
+        "//ids",
+        "//snow",
+        "//snow/engine/common",
+        "//utils/metric",
+        "//utils/set",
+        "//utils/timer",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "queue_test",
+    srcs = [
+        "job_test.go",
+        "jobs_test.go",
+        "parser_test.go",
+    ],
+    embed = [":queue"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "//ids",
+        "//snow/engine/common",
+        "//snow/snowtest",
+        "//utils/set",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

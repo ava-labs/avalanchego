@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "tree",
+    srcs = ["tree.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/tree",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/consensus/snowman",
+        "@org_golang_x_exp//maps",
+    ],
+)
+
+go_test(
+    name = "tree_test",
+    srcs = ["tree_test.go"],
+    embed = [":tree"],
+    deps = [
+        "//snow/consensus/snowman/snowmantest",
+        "//snow/snowtest",
+        "@com_github_stretchr_testify//require",
+    ],
+)
