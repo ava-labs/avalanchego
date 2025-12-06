@@ -97,6 +97,13 @@ func (m *txMetrics) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return nil
 }
 
+func (m *txMetrics) RewardContinuousValidatorTx(tx *txs.RewardContinuousValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "reward_continuous_validator",
+	}).Inc()
+	return nil
+}
+
 func (m *txMetrics) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	m.numTxs.With(prometheus.Labels{
 		txLabel: "remove_subnet_validator",
@@ -170,6 +177,20 @@ func (m *txMetrics) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalance
 func (m *txMetrics) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
 	m.numTxs.With(prometheus.Labels{
 		txLabel: "disable_l1_validator",
+	}).Inc()
+	return nil
+}
+
+func (m *txMetrics) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "add_continuous_validator",
+	}).Inc()
+	return nil
+}
+
+func (m *txMetrics) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "stop_continuous_validator",
 	}).Inc()
 	return nil
 }
