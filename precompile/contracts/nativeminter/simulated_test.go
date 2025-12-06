@@ -146,7 +146,7 @@ func TestNativeMinter(t *testing.T) {
 	precompileCfg := nativeminter.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, adminAddress, unprivilegedAddress)
+			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 			defer backend.Close()
 
 			nativeMinter, err := nativeminterbindings.NewINativeMinter(nativeminter.ContractAddress, backend.Client())
@@ -164,7 +164,7 @@ func TestINativeMinter_Events(t *testing.T) {
 	testAddress := crypto.PubkeyToAddress(testKey.PublicKey)
 
 	precompileCfg := nativeminter.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil)
-	backend := testutils.NewBackendWithPrecompile(t, precompileCfg, adminAddress, unprivilegedAddress)
+	backend := testutils.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 	defer backend.Close()
 
 	nativeMinter, err := nativeminterbindings.NewINativeMinter(nativeminter.ContractAddress, backend.Client())

@@ -121,7 +121,7 @@ func RunAllowListEventTests(
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
 
-			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, fundedAddrs...)
+			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, fundedAddrs)
 			defer backend.Close()
 
 			allowList, err := allowlistbindings.NewIAllowList(contractAddress, backend.Client())

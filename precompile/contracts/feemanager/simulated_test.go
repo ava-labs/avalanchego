@@ -236,7 +236,7 @@ func TestFeeManager(t *testing.T) {
 	precompileCfg := feemanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, &genesisFeeConfig)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, adminAddress, unprivilegedAddress)
+			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 			defer backend.Close()
 
 			feeManager, err := feemanagerbindings.NewIFeeManager(feemanager.ContractAddress, backend.Client())
@@ -252,7 +252,7 @@ func TestIFeeManager_Events(t *testing.T) {
 	admin := testutils.NewAuth(t, adminKey, chainID)
 
 	precompileCfg := feemanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, &genesisFeeConfig)
-	backend := testutils.NewBackendWithPrecompile(t, precompileCfg, adminAddress, unprivilegedAddress)
+	backend := testutils.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 	defer backend.Close()
 
 	feeManager, err := feemanagerbindings.NewIFeeManager(feemanager.ContractAddress, backend.Client())

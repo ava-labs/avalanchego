@@ -30,6 +30,7 @@ package simulated
 import (
 	"math/big"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/subnet-evm/eth/ethconfig"
 	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/params"
@@ -56,5 +57,14 @@ func WithCallGasLimit(gaslimit uint64) func(nodeConf *node.Config, ethConf *ethc
 func WithChainConfig(chainConfig *params.ChainConfig) func(nodeConf *node.Config, ethConf *ethconfig.Config) {
 	return func(nodeConf *node.Config, ethConf *ethconfig.Config) {
 		ethConf.Genesis.Config = chainConfig
+	}
+}
+
+// WithEtherbase configures the simulated backend to use a specific etherbase/coinbase address
+// for block production. This is the address that receives block rewards and transaction fees
+// when allowFeeRecipients is enabled.
+func WithEtherbase(etherbase common.Address) func(nodeConf *node.Config, ethConf *ethconfig.Config) {
+	return func(nodeConf *node.Config, ethConf *ethconfig.Config) {
+		ethConf.Miner.Etherbase = etherbase
 	}
 }
