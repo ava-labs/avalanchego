@@ -151,7 +151,7 @@ func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 }
 
 // logDiff logs the differences between two Firewood databases.
-// Useful when debugging state mistmatches after sync.
+// Useful when debugging state mismatches after sync.
 func logDiff(t *testing.T, db1, db2 *syncDB) {
 	t.Helper()
 	require := require.New(t)
