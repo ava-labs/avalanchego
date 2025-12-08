@@ -87,6 +87,7 @@ import (
 	coreth "github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/utils/ulimit"
 )
 
 const (
@@ -124,12 +125,148 @@ var (
 	errUpgradeWithinTheHour = errors.New("imminent network upgrade detected - update immediately")
 )
 
+// TODO caller should specify 9650 for http port and 9651 for staking port
+// specify sybil protection enalbled = true
+func initConfig(config *node.Config, dir string) {
+	if config.PluginDir == "" {
+		config.PluginDir = filepath.Join(dir, "plugins")
+	}
+
+	if config.ConsensusShutdownTimeout == 0 {
+		config.ConsensusShutdownTimeout = time.Minute
+	}
+
+	if config.FrontierPollFrequency == 0 {
+		config.FrontierPollFrequency = 100 * time.Millisecond
+	}
+
+	if config.ConsensusAppConcurrency == 0 {
+		config.ConsensusAppConcurrency = 2
+	}
+
+	if config.HealthCheckFreq == 0 {
+		config.HealthCheckFreq = 30 * time.Second
+	}
+
+	if config.LoggingConfig.Directory == "" {
+		config.LoggingConfig.Directory = filepath.Join(dir, "logs")
+	}
+
+	if config.LoggingConfig.LogLevel == 0 {
+		config.LoggingConfig.LogLevel = logging.Info
+	}
+
+	if config.LoggingConfig.DisplayLevel == 0 {
+		config.LoggingConfig.DisplayLevel = logging.Info
+	}
+
+	if config.LoggingConfig.MaxSize == 0 {
+		config.LoggingConfig.MaxSize = 8
+	}
+
+	if config.LoggingConfig.MaxFiles == 0 {
+		config.LoggingConfig.MaxFiles = 7
+	}
+
+	if config.NetworkID == 0 {
+		config.NetworkID = constants.MainnetID
+	}
+
+	// TODO getDatabaseConfig
+	if config.DatabaseConfig.Name == "" {
+		config.DatabaseConfig.Name = leveldb.Name
+	}
+
+	if config.DatabaseConfig.Path == "" {
+		config.DatabaseConfig.Path = filepath.Join(
+			dir,
+			"db",
+			constants.NetworkName(config.NetworkID),
+		)
+	}
+
+	if config.IPConfig.PublicIPResolutionFreq == 0 {
+		config.IPConfig.PublicIPResolutionFreq = 5 * time.Minute
+	}
+
+	if config.SybilProtectionDisabledWeight == 0 {
+		config.SybilProtectionDisabledWeight = 100
+	}
+
+	defaultStakingPath := filepath.Join(dir, "staking")
+
+	if config.StakingTLSKeyPath == "" {
+		config.StakingTLSKeyPath = filepath.Join(defaultStakingPath, "staker.key")
+	}
+
+	if config.StakingTLSCertPath == "" {
+		config.StakingTLSKeyPath = filepath.Join(defaultStakingPath, "staker.crt")
+	}
+
+	if config.StakingTLSCertPath == "" {
+		config.StakingTLSKeyPath = filepath.Join(defaultStakingPath, "staker.crt")
+	}
+
+	if config.StakingTLSCert
+
+	// TODO validate for config needs to move? (see getIPConfig)
+
+	if config.FdLimit == 0 {
+		config.FdLimit = ulimit.DefaultFDLimit
+	}
+
+	if config.HTTPHost == "" {
+		config.HTTPHost = "127.0.0.1"
+	}
+
+	if len(config.HTTPAllowedHosts) == 0 {
+		config.HTTPAllowedHosts = []string{"localhost"}
+	}
+	if config.ShutdownTimeout == 0 {
+		config.ShutdownTimeout = 10 * time.Second
+	}
+	if config.HTTPConfig.ReadTimeout == 0 {
+		config.HTTPConfig.ReadTimeout = 30 * time.Second
+	}
+	if config.HTTPConfig.ReadHeaderTimeout == 0 {
+		config.HTTPConfig.ReadHeaderTimeout = 30 * time.Second
+	}
+	if config.HTTPConfig.WriteTimeout == 0 {
+		config.HTTPConfig.WriteTimeout = 30 * time.Second
+	}
+	if config.HTTPConfig.IdleTimeout == 0 {
+		config.HTTPConfig.IdleTimeout = 120 * time.Second
+	}
+
+	if !config.AdminAPIEnabled && !config.InfoAPIEnabled && !config.MetricsAPIEnabled && !config.HealthAPIEnabled {
+		config.InfoAPIEnabled = true
+		config.MetricsAPIEnabled = true
+		config.HealthAPIEnabled = true
+	}
+
+	if config.ListenPort == 0 {
+		config.ListenPort = 9651
+	}
+	if config.PublicIPResolutionFreq == 0 {
+		config.PublicIPResolutionFreq = 5 * time.Minute
+	}
+
+	if config.SybilProtectionDisabledWeight == 0 {
+		config.SybilProtectionDisabledWeight = 100
+	}
+
+	if config.DatabaseConfig.Name == "" {
+		config.DatabaseConfig.Name = leveldb.Name
+	}
+}
+
 // New returns an instance of Node
 func New(
 	config *node.Config,
 	logFactory logging.Factory,
 	logger logging.Logger,
 ) (*Node, error) {
+
 	tlsCert := config.StakingTLSCert.Leaf
 	stakingCert, err := staking.ParseCertificate(tlsCert.Raw)
 	if err != nil {
