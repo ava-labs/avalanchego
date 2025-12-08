@@ -111,7 +111,11 @@ func (db *syncDB) CommitChangeProof(_ context.Context, end maybe.Maybe[[]byte], 
 	return maybe.Nothing[[]byte](), errors.New("change proofs are not implemented")
 }
 
-//nolint:revive // TODO: implement this method.
+// Clear removes all data from the database.
 func (db *syncDB) Clear() error {
-	return errors.New("not implemented")
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	// Prefixe delete key of length 0.
+	_, err := db.fw.Update([][]byte{[]byte{}}, [][]byte{nil})
+	return err
 }

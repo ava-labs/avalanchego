@@ -33,7 +33,7 @@ var (
 // Test_Firewood_Sync tests syncing a Firewood database from empty to a full database.
 func Test_Firewood_Sync(t *testing.T) {
 	t.Parallel()
-	dbSizes := []int{1, 1_000, 10_000, 100_000}
+	dbSizes := []int{0, 1, 1_000, 10_000, 100_000}
 	for _, serverSize := range dbSizes {
 		t.Run(fmt.Sprintf("numKeys=%d", serverSize), func(t *testing.T) {
 			t.Parallel()
@@ -46,7 +46,7 @@ func Test_Firewood_Sync(t *testing.T) {
 // This data is expected to be overwritten by the server's data.
 func Test_Firewood_Sync_Overwrite(t *testing.T) {
 	t.Parallel()
-	dbSizes := []int{1, 1_000, 10_000, 100_000}
+	dbSizes := []int{0, 1, 1_000, 10_000, 100_000}
 	initialSize := 500
 	for _, serverSize := range dbSizes {
 		t.Run(fmt.Sprintf("numKeys=%d", serverSize), func(t *testing.T) {
@@ -153,32 +153,34 @@ func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 // logDiff logs the differences between two Firewood databases.
 // Useful when debugging state mistmatches after sync.
 func logDiff(t *testing.T, db1, db2 *syncDB) {
+	t.Helper()
+	require := require.New(t)
+
 	rev1, err := db1.fw.LatestRevision()
-	require.NoError(t, err)
+	require.NoError(err)
 	defer func() {
-		require.NoError(t, rev1.Drop())
+		require.NoError(rev1.Drop())
 	}()
 	rev2, err := db2.fw.LatestRevision()
-	require.NoError(t, err)
+	require.NoError(err)
 	defer func() {
-		require.NoError(t, rev2.Drop())
+		require.NoError(rev2.Drop())
 	}()
 
-	// check roots manually
 	if rev1.Root() == rev2.Root() {
 		t.Log("both DBs have the same root:", rev1.Root())
 		return
 	}
 
 	iter1, err := rev1.Iter(nil)
-	require.NoError(t, err)
+	require.NoError(err)
 	defer func() {
-		require.NoError(t, iter1.Drop())
+		require.NoError(iter1.Drop())
 	}()
 	iter2, err := rev2.Iter(nil)
-	require.NoError(t, err)
+	require.NoError(err)
 	defer func() {
-		require.NoError(t, iter2.Drop())
+		require.NoError(iter2.Drop())
 	}()
 
 	var (
@@ -190,7 +192,6 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 		prevKey      []byte
 		missingCount int
 	)
-
 	for next1 && next2 {
 		key1 := iter1.Key()
 		key2 := iter2.Key()
@@ -202,7 +203,7 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 			if prevCmp == -1 {
 				missingDB = "DB2"
 			}
-			t.Logf("%d keys missing from %s in [%x, %x)", missingCount, missingDB, prevKey, key1)
+			t.Logf("%d key(s) missing from %s in [%x, %x)", missingCount, missingDB, prevKey, key1)
 			missingCount = 0
 		}
 		switch cmp {
@@ -234,8 +235,8 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 			missingCount++
 		}
 
-		require.NoError(t, iter1.Err(), "iter1 error")
-		require.NoError(t, iter2.Err(), "iter2 error")
+		require.NoError(iter1.Err(), "iter1 error")
+		require.NoError(iter2.Err(), "iter2 error")
 	}
 	if missingCount > 0 {
 		t.Logf("%d final key(s) mismatched, starting at %x", missingCount, prevKey)
@@ -249,7 +250,7 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 		next1 = iter1.Next()
 		count1++
 		missingCount++
-		require.NoError(t, iter1.Err(), "iter1 error")
+		require.NoError(iter1.Err(), "iter1 error")
 	}
 	if missingCount > 0 {
 		t.Logf("%d keys missing from DB2 starting with %x", missingCount, prevKey)
@@ -263,7 +264,7 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 		next2 = iter2.Next()
 		count2++
 		missingCount++
-		require.NoError(t, iter2.Err(), "iter2 error")
+		require.NoError(iter2.Err(), "iter2 error")
 	}
 	if missingCount > 0 {
 		t.Logf("%d keys missing from DB1 starting with %x", missingCount, prevKey)
