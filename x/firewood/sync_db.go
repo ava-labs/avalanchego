@@ -19,16 +19,15 @@ import (
 
 var (
 	_ xsync.DB[*RangeProof, *ChangeProof] = (*syncDB)(nil)
-
-	errNilProof = errors.New("nil proof")
 )
 
+// syncDB wraps a Firewood FFI database to implement the xsync.DB interface.
 type syncDB struct {
 	fw   *ffi.Database
 	lock sync.Mutex // TODO: remove this lock once FFI is thread-safe
 }
 
-func New(db *ffi.Database) *syncDB {
+func wrapSyncDB(db *ffi.Database) *syncDB {
 	return &syncDB{fw: db}
 }
 
@@ -40,7 +39,7 @@ func (db *syncDB) GetMerkleRoot(context.Context) (ids.ID, error) {
 	return ids.ID(root), nil
 }
 
-// GetRangeProof returns a range proof for x/sync between [start, end].
+// GetRangeProofAtRoot returns a range proof for x/sync between [start, end].
 func (db *syncDB) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error) {
 	proof, err := db.fw.RangeProof(ffi.Hash(rootID), start, end, uint32(maxLength))
 	if err != nil {
@@ -53,12 +52,9 @@ func (db *syncDB) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start ma
 }
 
 // VerifyRangeProof ensures the range proof matches the expected parameters.
+// This does not require database state.
 func (*syncDB) VerifyRangeProof(_ context.Context, proof *RangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
-	if proof.ffi == nil {
-		return errNilProof
-	}
-
-	// This needs provided to the FFI at commit time.
+	// Extra data must be provided at commit time.
 	// TODO: remove this once the FFI no longer requires it.
 	proof.root = expectedEndRootID
 	proof.maxLength = maxLength

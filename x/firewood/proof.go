@@ -21,9 +21,6 @@ var (
 type RangeProofMarshaler struct{}
 
 func (RangeProofMarshaler) Marshal(r *RangeProof) ([]byte, error) {
-	if r == nil {
-		return nil, errNilProof
-	}
 	if r.ffi == nil {
 		return nil, nil
 	}

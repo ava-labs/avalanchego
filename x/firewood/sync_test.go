@@ -105,12 +105,12 @@ func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 	require.NotNil(t, fw)
 	t.Cleanup(func() {
 		ctx := context.WithoutCancel(t.Context())
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second) // allow some time for garbage collection
 		defer cancel()
 		require.NoError(t, fw.Close(ctx))
 	})
 
-	db := New(fw)
+	db := wrapSyncDB(fw)
 	if numKeys == 0 {
 		return db
 	}
@@ -123,8 +123,12 @@ func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 		maxLength = 64
 	)
 	for i := 0; i < numKeys; i++ {
+		// Key length must match geth structure
+		keyLen := 32
+		if r.Intn(2) == 0 {
+			keyLen = 64
+		}
 		// Random length between minLength and maxLength inclusive
-		keyLen := r.Intn(maxLength-minLength+1) + minLength
 		valLen := r.Intn(maxLength-minLength+1) + minLength
 
 		key := make([]byte, keyLen)
@@ -193,7 +197,7 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 		prevCmp := cmp
 		cmp = bytes.Compare(key1, key2)
 		// Log any missing keys before this key
-		if cmp != 0 && missingCount > 0 {
+		if cmp != prevCmp && missingCount > 0 {
 			missingDB := "DB1"
 			if prevCmp == -1 {
 				missingDB = "DB2"
@@ -232,6 +236,9 @@ func logDiff(t *testing.T, db1, db2 *syncDB) {
 
 		require.NoError(t, iter1.Err(), "iter1 error")
 		require.NoError(t, iter2.Err(), "iter2 error")
+	}
+	if missingCount > 0 {
+		t.Logf("%d final key(s) mismatched, starting at %x", missingCount, prevKey)
 	}
 
 	missingCount = 0
