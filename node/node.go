@@ -408,6 +408,9 @@ type Node struct {
 
 	// Closed when a sufficient amount of bootstrap nodes are connected to
 	onSufficientlyConnected chan struct{}
+
+	httpAddress netip.AddrPort
+	pop         *signer.ProofOfPossession
 }
 
 /*
@@ -415,6 +418,18 @@ type Node struct {
  *************************** P2P Networking Section ***************************
  ******************************************************************************
  */
+
+func (n *Node) StakingAddress() netip.AddrPort {
+	return n.stakingAddress
+}
+
+func (n *Node) HTTPAddress() netip.AddrPort {
+	return n.httpAddress
+}
+
+func (n *Node) HandleMessage(ctx context.Context, msg *message.InboundMessage) {
+	n.chainRouter.HandleInbound(ctx, msg)
+}
 
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
@@ -984,7 +999,7 @@ func (n *Node) initAPIServer() error {
 	}
 
 	addrStr := listener.Addr().String()
-	addrPort, err := ips.ParseAddrPort(addrStr)
+	n.httpAddress, err = ips.ParseAddrPort(addrStr)
 	if err != nil {
 		return err
 	}
@@ -997,8 +1012,8 @@ func (n *Node) initAPIServer() error {
 		)
 
 		n.portMapper.Map(
-			addrPort.Port(),
-			addrPort.Port(),
+			n.httpAddress.Port(),
+			n.httpAddress.Port(),
 			httpPortName,
 			nil,
 			n.Config.PublicIPResolutionFreq,
@@ -1384,6 +1399,8 @@ func (n *Node) initInfoAPI() error {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
+	n.pop = pop
+
 	service, err := info.NewService(
 		info.Parameters{
 			Version:   version.Current,
@@ -1412,6 +1429,10 @@ func (n *Node) initInfoAPI() error {
 		"info",
 		"",
 	)
+}
+
+func (n *Node) ProofOfPossession() *signer.ProofOfPossession {
+	return n.pop
 }
 
 // initHealthAPI initializes the Health API service
