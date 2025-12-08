@@ -17,9 +17,7 @@ import (
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
-var (
-	_ xsync.DB[*RangeProof, *ChangeProof] = (*syncDB)(nil)
-)
+var _ xsync.DB[*RangeProof, *ChangeProof] = (*syncDB)(nil)
 
 // syncDB wraps a Firewood FFI database to implement the xsync.DB interface.
 type syncDB struct {
@@ -115,7 +113,7 @@ func (db *syncDB) CommitChangeProof(_ context.Context, end maybe.Maybe[[]byte], 
 func (db *syncDB) Clear() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	// Prefixe delete key of length 0.
-	_, err := db.fw.Update([][]byte{[]byte{}}, [][]byte{nil})
+	// Prefix delete key of length 0.
+	_, err := db.fw.Update([][]byte{{}}, [][]byte{nil})
 	return err
 }
