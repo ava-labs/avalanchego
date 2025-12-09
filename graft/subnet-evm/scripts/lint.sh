@@ -27,7 +27,7 @@ source ./scripts/lint_setup.sh
 TESTS=${TESTS:-"golangci_lint avalanche_golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
-  go tool -modfile=tools/go.mod golangci-lint run --config .golangci.yml
+  go tool -modfile=../../tools/go.mod golangci-lint run --config .golangci.yml
 }
 
 function test_avalanche_golangci_lint {
@@ -35,7 +35,7 @@ function test_avalanche_golangci_lint {
     return 0
   fi
 
-  go tool -modfile=tools/go.mod golangci-lint run \
+  go tool -modfile=../../tools/go.mod golangci-lint run \
   --config "$AVALANCHE_LINT_FILE" \
   || return 1
 }
@@ -49,8 +49,8 @@ function test_license_header {
   if [[ ${#UPSTREAM_FILES[@]} -gt 0 ]]; then
     echo "Running license tool on upstream files with header for upstream..."
     # shellcheck disable=SC2086
-    go tool -modfile=tools/go.mod go-license \
-      --config=./license_header_for_upstream.yml \
+    go tool -modfile=../../tools/go.mod go-license \
+      --config=../../header_upstream.yml \
       ${_addlicense_flags} \
       "${UPSTREAM_FILES[@]}" \
       || return 1
@@ -59,8 +59,8 @@ function test_license_header {
   if [[ ${#AVALANCHE_FILES[@]} -gt 0 ]]; then
     echo "Running license tool on remaining files with default header..."
     # shellcheck disable=SC2086
-    go tool -modfile=tools/go.mod go-license \
-      --config=./license_header.yml \
+    go tool -modfile=../../tools/go.mod go-license \
+      --config=../../header.yml \
       ${_addlicense_flags} \
       "${AVALANCHE_FILES[@]}" \
       || return 1
@@ -110,9 +110,8 @@ function test_interface_compliance_nil {
 }
 
 function test_import_testing_only_in_tests {
-  local files=("$@")
   NON_TEST_GO_FILES=$(
-    echo "${files[@]}" | tr ' ' '\n' |
+    echo "${AVALANCHE_FILES[@]}" | tr ' ' '\n' |
       grep -i '\.go$' |
       grep -vi '_test\.go$' |
       grep -v '^./tests/'
@@ -147,21 +146,7 @@ function run {
   local test="${1}"
   shift 1
   echo "START: '${test}' at $(date)"
-
-  # Filter out files that have skiplint comments for this specific test
-  local filtered_files=()
-  for file in "${UPSTREAM_FILES[@]}"; do
-    # Check if file has skiplint comment for this test
-    if ! grep -q "// #skiplint: ${test}" "$file" 2>/dev/null; then
-      filtered_files+=("$file")
-    fi
-  done
-
-  if [ ${#filtered_files[@]} -eq 0 ]; then
-    echo "SKIPPED: '${test}' - No files remain after filtering at $(date)"
-    return 0
-  fi
-  if "test_${test}" "${filtered_files[@]}"; then
+  if "test_${test}" "$@"; then
     echo "SUCCESS: '${test}' completed at $(date)"
   else
     echo "FAIL: '${test}' failed at $(date)"
