@@ -104,3 +104,4 @@ function setup_lint {
     echo "      - \"${f:2}\$\"" >> "$AVALANCHE_LINT_FILE"
   done
 }
+
