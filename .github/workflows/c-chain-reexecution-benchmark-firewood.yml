@@ -3,9 +3,9 @@
 # This workflow runs C-Chain reexecution benchmarks with custom Firewood builds.
 # It's designed to be triggered by the Firewood repository to track performance.
 #
-# Firewood input modes:
-#   - Versioned (v0.0.15): Uses `go get` to fetch published version (fast)
-#   - Branch/commit (main, abc123): Builds from source using Nix (slower)
+# Firewood resolution strategy:
+#   1. Try to fetch the requested ref via `go get` (works for tags, branches, commits)
+#   2. If that fails, build from source using Nix
 #
 # Results are uploaded as artifacts for Firewood to download and publish
 # to their own GitHub Pages dashboard.
@@ -41,25 +41,7 @@ on:
         default: ''
 
 jobs:
-  determine-build-type:
-    runs-on: ubuntu-latest
-    outputs:
-      from-source: ${{ steps.check.outputs.from-source }}
-    steps:
-      - name: Check Firewood input
-        id: check
-        run: |
-          # Semantic versions (vX.Y.Z) are published to Go module registry
-          # Branches/commits need to be built from source using Nix
-          if [[ "${{ inputs.firewood }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "from-source=false" >> "$GITHUB_OUTPUT"
-            echo "Firewood version detected: ${{ inputs.firewood }}"
-          else
-            echo "from-source=true" >> "$GITHUB_OUTPUT"
-            echo "Firewood branch/commit detected: ${{ inputs.firewood }}"
-          fi
   c-chain-reexecution:
-    needs: determine-build-type
     permissions:
       id-token: write
       contents: write
@@ -75,11 +57,6 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
-      - name: Install Nix
-        if: needs.determine-build-type.outputs.from-source == 'true'
-        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Update libevm
         if: inputs.libevm != ''
         shell: bash
@@ -88,15 +65,26 @@ jobs:
           go get github.com/ava-labs/libevm@${{ inputs.libevm }}
           cd graft/coreth
           go get github.com/ava-labs/libevm@${{ inputs.libevm }}
-      - name: Fetch Firewood (versioned)
-        if: needs.determine-build-type.outputs.from-source == 'false'
+      - name: Fetch Firewood via Go modules
+        id: fetch-firewood
         shell: bash
         run: |
           cd graft/coreth
-          echo "Fetching published Firewood: ${{ inputs.firewood }}"
-          go get github.com/ava-labs/firewood-go-ethhash/ffi@${{ inputs.firewood }}
+          echo "Attempting to fetch Firewood via Go modules: ${{ inputs.firewood }}"
+          if go get github.com/ava-labs/firewood-go-ethhash/ffi@${{ inputs.firewood }}; then
+            echo "success=true" >> "$GITHUB_OUTPUT"
+            echo "Firewood fetched successfully via Go modules."
+          else
+            echo "success=false" >> "$GITHUB_OUTPUT"
+            echo "Go module fetch failed; will build from source with Nix."
+          fi
+      - name: Install Nix
+        if: steps.fetch-firewood.outputs.success == 'false'
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Firewood (from source)
-        if: needs.determine-build-type.outputs.from-source == 'true'
+        if: steps.fetch-firewood.outputs.success == 'false'
         shell: bash
         run: ./scripts/run_task.sh build-firewood FIREWOOD_REF="${{ inputs.firewood }}" DIRTY=true
         env:
