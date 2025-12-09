@@ -671,16 +671,17 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 	}
 
 	// Track the set of nodes that will need to be restarted after subnet creation
-	nodesToRestart := set.Set[ids.NodeID]{}
+	reconfiguredNodes := set.Set[ids.NodeID]{}
 
 	// Update node configuration to track the new subnets
 	for _, node := range n.Nodes {
 		existingTrackedSubnets := node.Flags[config.TrackSubnetsKey]
 		trackedSubnets := n.TrackedSubnetsForNode(node.NodeID)
-		if existingTrackedSubnets != trackedSubnets {
-			node.Flags[config.TrackSubnetsKey] = trackedSubnets
-			nodesToRestart.Add(node.NodeID)
+		if existingTrackedSubnets == trackedSubnets {
+			continue
 		}
+		node.Flags[config.TrackSubnetsKey] = trackedSubnets
+		reconfiguredNodes.Add(node.NodeID)
 	}
 
 	// Add validators for the subnet
@@ -729,11 +730,11 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		// subnet's validator nodes will need to be restarted for those nodes to read
 		// the newly written chain configuration and apply it to the chain(s).
 		if subnet.HasChainConfig() {
-			nodesToRestart.Add(subnet.ValidatorIDs...)
+			reconfiguredNodes.Add(subnet.ValidatorIDs...)
 		}
 	}
 
-	return nodesToRestart, nil
+	return reconfiguredNodes, nil
 }
 
 func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {
