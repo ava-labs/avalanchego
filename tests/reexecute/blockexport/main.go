@@ -44,7 +44,7 @@ func main() {
 		blockDirSrcArg,
 		startBlockArg,
 		endBlockArg,
-		chanSizeArg,
+		chanSize,
 	)
 	r.NoError(err)
 
