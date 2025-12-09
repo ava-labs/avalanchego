@@ -10,10 +10,6 @@ env:
 tasks:
   default: ./scripts/run_task.sh --list
 
-  actionlint:
-    desc: Validate GitHub Actions workflows and ensure scripts use run_task.sh for reproducibility
-    cmd: ./scripts/actionlint.sh # ci.yml
-
   build:
     desc: Compile Subnet EVM binary with git commit and static linking flags
     cmd: ./scripts/build.sh # ci.yml
@@ -33,12 +29,6 @@ tasks:
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
     cmd: ./scripts/build_test.sh # ci.yml
-
-  check-avalanchego-version:
-    desc: Ensure consistent avalanchego version by updating and checking for changes
-    cmds:
-      - task: update-avalanchego-version
-      - cmd: git diff --exit-code
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
@@ -123,7 +113,6 @@ tasks:
     desc: Runs all lint checks in parallel
     deps:
       - lint
-      - actionlint
       - shellcheck
       - check-generate-codec
       - check-generate-mocks
@@ -134,7 +123,6 @@ tasks:
     desc: Runs all lint checks one-by-one
     cmds:
       - task: lint
-      - task: actionlint
       - task: shellcheck
       - task: check-generate-codec
       - task: check-generate-mocks
@@ -178,15 +166,19 @@ tasks:
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
-    cmd: bash -x ./scripts/run_ginkgo_warp.sh # ci.yml
+    dir: ../../
+    env:
+      E2E_TARGET: ./graft/coreth/tests/warp
+    cmds:
+      - cmd: ./scripts/run_task.sh build
+      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
 
   test-e2e-warp-ci: # consolidated test-e2e-warp
     desc: Run E2E warp tests with CI setup
+    dir: ../../
+    env:
+      E2E_TARGET: ./graft/coreth/tests/warp
+      E2E_SERIAL: 1
     cmds:
-      - task: install-avalanchego-release
-      - task: build
-      - task: test-e2e-warp
-
-  update-avalanchego-version:
-    desc: Update AvalancheGo version in go.mod and sync GitHub Actions workflow custom action version
-    cmd: bash -x ./scripts/update_avalanchego_version.sh # ci.yml
+      - cmd: ./scripts/run_task.sh build-race
+      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
