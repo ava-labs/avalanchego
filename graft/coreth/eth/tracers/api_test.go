@@ -34,6 +34,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -630,7 +631,9 @@ func TestTracingWithOverrides(t *testing.T) {
 
 func testTracingWithOverrides(t *testing.T, scheme string) {
 	// Initialize test accounts
-	accounts := newAccounts(3)
+	// This test requires deterministic block hashes, since it will fail 1/256 times,
+	// when the final block hash starts with 0xef.
+	accounts := newAccountsWithSeed(3, 0)
 	storageAccount := common.Address{0x13, 37}
 	genesis := &core.Genesis{
 		Config: params.TestChainConfig,
@@ -989,6 +992,18 @@ type Account struct {
 func newAccounts(n int) (accounts []Account) {
 	for i := 0; i < n; i++ {
 		key, _ := crypto.GenerateKey()
+		addr := crypto.PubkeyToAddress(key.PublicKey)
+		accounts = append(accounts, Account{key: key, addr: addr})
+	}
+	slices.SortFunc(accounts, func(a, b Account) int { return a.addr.Cmp(b.addr) })
+	return accounts
+}
+
+// WARNING: only use for tests that require deterministic accounts
+func newAccountsWithSeed(n int, seed int64) (accounts []Account) {
+	rand := rand.New(rand.NewSource(seed))
+	for i := 0; i < n; i++ {
+		key, _ := ecdsa.GenerateKey(crypto.S256(), rand)
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 		accounts = append(accounts, Account{key: key, addr: addr})
 	}
