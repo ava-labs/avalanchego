@@ -1,4 +1,4 @@
-module github.com/ava-labs/subnet-evm
+module github.com/ava-labs/avalanchego/graft/subnet-evm
 
 // CLI tools intended for invocation with `go tool` should be added to
 // tools/go.mod to avoid polluting the main module's dependencies. See
@@ -205,3 +205,5 @@ tool (
 	github.com/ava-labs/libevm/rlp/rlpgen
 	github.com/onsi/ginkgo/v2/ginkgo
 )
+
+replace github.com/ava-labs/avalanchego => ../../

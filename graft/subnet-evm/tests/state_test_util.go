@@ -37,6 +37,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/firewood"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/hashdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/pathdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
@@ -50,14 +58,6 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/firewood"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/hashdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/pathdb"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )
@@ -98,7 +98,7 @@ type stPostState struct {
 	}
 }
 
-//go:generate go tool -modfile=../tools/go.mod gencodec -type stEnv -field-override stEnvMarshaling -out gen_stenv.go
+//go:generate go tool -modfile=../../../tools/go.mod gencodec -type stEnv -field-override stEnvMarshaling -out gen_stenv.go
 type stEnv struct {
 	Coinbase      common.Address `json:"currentCoinbase"   gencodec:"required"`
 	Difficulty    *big.Int       `json:"currentDifficulty" gencodec:"optional"`
@@ -121,7 +121,7 @@ type stEnvMarshaling struct {
 	ExcessBlobGas *math.HexOrDecimal64
 }
 
-//go:generate go tool -modfile=../tools/go.mod gencodec -type stTransaction -field-override stTransactionMarshaling -out gen_sttransaction.go
+//go:generate go tool -modfile=../../../tools/go.mod gencodec -type stTransaction -field-override stTransactionMarshaling -out gen_sttransaction.go
 type stTransaction struct {
 	GasPrice             *big.Int            `json:"gasPrice"`
 	MaxFeePerGas         *big.Int            `json:"maxFeePerGas"`
