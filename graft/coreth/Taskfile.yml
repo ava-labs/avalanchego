@@ -92,7 +92,7 @@ tasks:
 
   lint-fix:
     desc: Run golangci-lint with auto-fix where possible
-    cmd: ./scripts/lint_fix.sh
+    cmd: ../evm-shared/scripts/lint_fix.sh
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
