@@ -11,7 +11,7 @@ fi
 # default on macos. Since `-o errexit` is ignored in an if
 # conditional, triggering the problem here ensures script failure when
 # using an unsupported version of grep.
-grep -P 'lint.sh' scripts/lint.sh &>/dev/null || (
+grep -P 'lint.sh' ../evm-shared/scripts/lint.sh &>/dev/null || (
   echo >&2 "error: This script requires a recent version of gnu grep."
   echo >&2 "       On macos, gnu grep can be installed with 'brew install grep'."
   echo >&2 "       It will also be necessary to ensure that gnu grep is available in the path."
