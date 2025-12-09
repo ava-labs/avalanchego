@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/internal/stacktrace"
+	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/internal/logging"
 )
 
 // UpdateAvalanchego updates the avalanchego dependency version in go.mod.

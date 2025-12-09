@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/internal/logging"
 )
 
 // TestStatus_FromAvalanchego tests Status() when running from avalanchego directory

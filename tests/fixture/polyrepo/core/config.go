@@ -3,7 +3,7 @@
 
 package core
 
-import "github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
+import "github.com/ava-labs/avalanchego/tests/fixture/polyrepo/internal/stacktrace"
 
 // RepoConfig contains the configuration for a repository
 type RepoConfig struct {

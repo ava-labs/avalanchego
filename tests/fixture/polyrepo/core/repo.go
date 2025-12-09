@@ -17,8 +17,8 @@ import (
 	"github.com/google/go-github/v68/github"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/internal/stacktrace"
+	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/internal/logging"
 )
 
 // ParseRepoAndVersion parses a string like "repo@version" and returns the repo name and version

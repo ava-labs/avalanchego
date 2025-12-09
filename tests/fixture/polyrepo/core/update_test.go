@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/internal/logging"
 )
 
 func TestUpdateAvalanchego_NoGoMod_Error(t *testing.T) {

@@ -11,8 +11,8 @@ import (
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/internal/stacktrace"
+	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/internal/logging"
 )
 
 // ReadGoMod reads and parses a go.mod file

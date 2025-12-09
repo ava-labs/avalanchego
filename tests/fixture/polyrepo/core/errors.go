@@ -6,7 +6,7 @@ package core
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
+	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/internal/stacktrace"
 )
 
 var (
