@@ -19,7 +19,7 @@ grep -P 'lint.sh' scripts/lint.sh &>/dev/null || (
 )
 
 # Library for file list generation.
-source ./scripts/lint_setup.sh
+source ../evm-shared/scripts/lint_setup.sh
 
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
@@ -117,10 +117,18 @@ function test_import_testing_only_in_tests {
       grep -v '^./tests/'
   )
 
+  # Detect which repo we're in based on pwd
+  REPO_NAME="avalanchego"
+  if [[ "$PWD" == */coreth ]]; then
+    REPO_NAME="coreth"
+  elif [[ "$PWD" == */subnet-evm ]]; then
+    REPO_NAME="subnet-evm"
+  fi
+
   IMPORT_TESTING=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"')
   IMPORT_TESTIFY=$(echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/stretchr/testify')
-  IMPORT_FROM_TESTS=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP '"github.com/ava-labs/(?:avalanchego|coreth)/tests/')
-  IMPORT_TEST_PKG=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP '"github.com/ava-labs/(?:avalanchego|coreth)/.*?test"')
+  IMPORT_FROM_TESTS=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP "\"github.com/ava-labs/(?:avalanchego|${REPO_NAME})/tests/\"")
+  IMPORT_TEST_PKG=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP "\"github.com/ava-labs/(?:avalanchego|${REPO_NAME})/.*?test\"")
 
   # TODO(arr4n): send a PR to add support for build tags in `mockgen` and then enable this.
   # IMPORT_GOMOCK=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"go.uber.org/mock');
@@ -146,7 +154,22 @@ function run {
   local test="${1}"
   shift 1
   echo "START: '${test}' at $(date)"
-  if "test_${test}" "$@"; then
+  
+  # Filter out files that have skiplint comments for this specific test
+  local filtered_files=()
+  for file in "$@"; do
+    # Check if file has skiplint comment for this test
+    if ! grep -q "// #skiplint: ${test}" "$file" 2>/dev/null; then
+      filtered_files+=("$file")
+    fi
+  done
+
+  if [ ${#filtered_files[@]} -eq 0 ]; then
+    echo "SKIPPED: '${test}' - No files remain after filtering at $(date)"
+    return 0
+  fi
+  
+  if "test_${test}" "${filtered_files[@]}"; then
     echo "SUCCESS: '${test}' completed at $(date)"
   else
     echo "FAIL: '${test}' failed at $(date)"
@@ -161,3 +184,4 @@ for test in $TESTS; do
 done
 
 echo "ALL SUCCESS!"
+

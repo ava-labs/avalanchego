@@ -82,7 +82,7 @@ function setup_lint {
   trap 'rm -rf -- "$TMP_DIR"' EXIT
 
   AVALANCHE_LINT_FILE="${TMP_DIR}/.avalanche-golangci.yml"
-  cp .avalanche-golangci.yml "$AVALANCHE_LINT_FILE"
+  cp ../../.golangci.yml "$AVALANCHE_LINT_FILE"
 
   # Exclude all upstream files dynamically
   echo "    paths-except:" >> "$AVALANCHE_LINT_FILE"
@@ -91,3 +91,4 @@ function setup_lint {
     echo "      - \"${f:2}\$\"" >> "$AVALANCHE_LINT_FILE"
   done
 }
+
