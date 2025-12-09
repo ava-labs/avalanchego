@@ -331,10 +331,7 @@ tasks:
   build-firewood:
     desc: Build Firewood FFI from source for testing with Coreth
     dir: graft/coreth
-    vars:
-      FIREWOOD_REF: '{{.FIREWOOD_REF | default "main"}}'
-      DIRTY_FLAG: '{{if eq .DIRTY "true"}}--dirty{{end}}'
-    cmd: ./scripts/build_firewood.sh {{.FIREWOOD_REF}} {{.DIRTY_FLAG}}
+    cmd: ./scripts/build_firewood.sh {{.FIREWOOD_REF}} {{if eq .DIRTY "true"}}--dirty{{end}}
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests

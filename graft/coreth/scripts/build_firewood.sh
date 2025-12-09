@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     *)
-      FIREWOOD_COMMIT="$1"
+      [[ -n "$1" ]] && FIREWOOD_COMMIT="$1"
       shift
       ;;
   esac
