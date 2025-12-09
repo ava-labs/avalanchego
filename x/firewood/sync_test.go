@@ -123,12 +123,8 @@ func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 		maxLength = 64
 	)
 	for i := 0; i < numKeys; i++ {
-		// Key length must match geth structure
-		keyLen := 32
-		if r.Intn(2) == 0 {
-			keyLen = 64
-		}
 		// Random length between minLength and maxLength inclusive
+		keyLen := r.Intn(maxLength-minLength+1) + minLength
 		valLen := r.Intn(maxLength-minLength+1) + minLength
 
 		key := make([]byte, keyLen)

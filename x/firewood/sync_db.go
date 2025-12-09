@@ -62,7 +62,6 @@ func (*syncDB) VerifyRangeProof(_ context.Context, proof *RangeProof, start mayb
 
 // Commit the range proof to the database.
 func (db *syncDB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
-	// Prevent concurrent commits to the database.
 	db.lock.Lock()
 	defer db.lock.Unlock()
 	_, err := db.fw.VerifyAndCommitRangeProof(proof.ffi, start, end, ffi.Hash(proof.root), uint32(proof.maxLength))
@@ -77,21 +76,18 @@ func (db *syncDB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]b
 		return maybe.Nothing[[]byte](), err
 	}
 
-	// It is borrowed from the ffi, so we need to make our own copy.
-	byteSlice := nextKeyRange.StartKey()
-	newSlice := make([]byte, len(byteSlice))
-	copy(newSlice, byteSlice)
+	nextKey := nextKeyRange.StartKey()
 	if err := nextKeyRange.Free(); err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
 
 	// TODO: This will eventually be handled by `FindNextKey`.
-	if (end.HasValue() && bytes.Compare(newSlice, end.Value()) > 0) || (start.HasValue() && bytes.Equal(newSlice, start.Value())) {
+	if (end.HasValue() && bytes.Compare(nextKey, end.Value()) > 0) || (start.HasValue() && bytes.Equal(nextKey, start.Value())) {
 		// There is no next key, the entire range has been committed.
 		return maybe.Nothing[[]byte](), nil
 	}
 
-	return maybe.Some(newSlice), nil
+	return maybe.Some(nextKey), nil
 }
 
 //nolint:revive // TODO: implement this method.
