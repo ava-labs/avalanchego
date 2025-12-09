@@ -21,15 +21,13 @@ var (
 	blockDirDstArg string
 	startBlockArg  uint64
 	endBlockArg    uint64
-	chanSizeArg    int
 )
 
 func init() {
-	flag.StringVar(&blockDirSrcArg, "block-dir-src", blockDirSrcArg, "Source block directory to copy from when running TestExportBlockRange.")
-	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination block directory to write blocks into when executing TestExportBlockRange.")
+	flag.StringVar(&blockDirSrcArg, "block-dir-src", blockDirSrcArg, "Source block directory to copy from.")
+	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination block directory to write blocks into.")
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
-	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 
 	flag.Parse()
 }
@@ -39,6 +37,8 @@ func main() {
 	defer tc.RecoverAndExit()
 
 	r := require.New(tc)
+
+	chanSize := 100
 	blockChan, err := reexecute.CreateBlockChanFromLevelDB(
 		tc,
 		blockDirSrcArg,
@@ -56,6 +56,7 @@ func main() {
 
 	batch := db.NewBatch()
 	for blkResult := range blockChan {
+		r.NoError(blkResult.Err)
 		r.NoError(batch.Put(reexecute.BlockKey(blkResult.Height), blkResult.BlockBytes))
 
 		if batch.Size() > 10*units.MiB {
