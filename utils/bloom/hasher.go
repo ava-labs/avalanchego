@@ -8,8 +8,8 @@ import (
 	"encoding/binary"
 )
 
-func Add(f *Filter, key, salt []byte) {
-	f.Add(Hash(key, salt))
+func Add(f *Filter, key, salt []byte) bool {
+	return f.Add(Hash(key, salt))
 }
 
 func Contains(c Checker, key, salt []byte) bool {

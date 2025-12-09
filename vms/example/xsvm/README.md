@@ -285,7 +285,7 @@ You can do this by following the [subnet tutorial] or by using the [subnet-cli].
 
 [interchain messaging]: https://github.com/ava-labs/avalanchego/tree/master/vms/platformvm/warp/README.md
 [subnet tutorial]: https://build.avax.network/docs/tooling/create-avalanche-l1
-[Coreth]: https://github.com/ava-labs/coreth
+[Coreth]: https://github.com/ava-labs/avalanchego/tree/master/graft/coreth
 [C-Chain]: https://build.avax.network/docs/quick-start/primary-network#c-chain
 [Subnet]: https://build.avax.network/docs/avalanche-l1s
 

@@ -10,10 +10,6 @@ env:
 tasks:
   default: ./scripts/run_task.sh --list
 
-  build:
-    desc: Compile Coreth binary with git commit and static linking flags
-    cmd: ./scripts/build.sh # ci.yml
-
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
     cmd: ./scripts/build_test.sh # ci.yml
@@ -100,7 +96,7 @@ tasks:
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
-    cmd: ./scripts/shellcheck.sh # ci.yml
+    cmd: ./scripts/shellcheck.sh 
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
