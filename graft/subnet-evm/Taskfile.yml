@@ -67,8 +67,6 @@ tasks:
     cmds:
       - cmd: go mod tidy
       - task: check-clean-branch
-      - cmd: cd tools && go mod tidy
-      - task: check-clean-branch
 
   coverage:
     desc: Display test coverage statistics from coverage.out file
