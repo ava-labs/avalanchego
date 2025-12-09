@@ -72,12 +72,12 @@ git fetch origin
 
 # The target branch might be master, or a tooling PR 
 git reset --hard origin/[TARGET BRANCH]
-git push --force
 
 cd graft
 
 # Do the graft again
 task [REPOSITORY NAME]-subtree-merge
+git push --force
 ```
 
 ### Rebasing Inflight PRs
