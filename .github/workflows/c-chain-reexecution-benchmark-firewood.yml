@@ -44,7 +44,7 @@ jobs:
   c-chain-reexecution:
     permissions:
       id-token: write
-      contents: write
+      contents: read
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -90,15 +90,6 @@ jobs:
         env:
           TMPDIR: /tmp
           NIX_BUILD_TOP: /tmp
-      # Commit go.mod changes locally to keep working tree clean
-      # (required for github-action-benchmark branch switching)
-      - name: Commit go.mod changes
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add go.mod go.sum graft/coreth/go.mod graft/coreth/go.sum
-          git diff --staged --quiet || git commit -m "temp: Firewood/libevm for benchmark"
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
