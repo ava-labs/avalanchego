@@ -42,8 +42,8 @@ func NewSyncer(fw *ffi.Database, config Config, register prometheus.Registerer) 
 	return xsync.NewSyncer(
 		&db{db: fw},
 		xsync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   RangeProofMarshaler{},
-			ChangeProofMarshaler:  ChangeProofMarshaler{},
+			RangeProofMarshaler:   rangeProofMarshaler{},
+			ChangeProofMarshaler:  changeProofMarshaler{},
 			EmptyRoot:             ids.ID(types.EmptyRootHash),
 			RangeProofClient:      config.RangeProofClient,
 			ChangeProofClient:     config.ChangeProofClient,

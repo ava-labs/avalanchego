@@ -13,17 +13,17 @@ import (
 )
 
 var (
-	_ sync.Marshaler[*RangeProof]  = RangeProofMarshaler{}
-	_ sync.Marshaler[*ChangeProof] = ChangeProofMarshaler{}
+	_ sync.Marshaler[*RangeProof]  = rangeProofMarshaler{}
+	_ sync.Marshaler[*ChangeProof] = changeProofMarshaler{}
 )
 
-type RangeProofMarshaler struct{}
+type rangeProofMarshaler struct{}
 
-func (RangeProofMarshaler) Marshal(r *RangeProof) ([]byte, error) {
+func (rangeProofMarshaler) Marshal(r *RangeProof) ([]byte, error) {
 	return r.rp.MarshalBinary()
 }
 
-func (RangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
+func (rangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
 	proof := new(ffi.RangeProof)
 	if err := proof.UnmarshalBinary(data); err != nil {
 		return nil, err
@@ -39,13 +39,13 @@ type RangeProof struct {
 	maxLength int
 }
 
-type ChangeProofMarshaler struct{}
+type changeProofMarshaler struct{}
 
-func (ChangeProofMarshaler) Marshal(*ChangeProof) ([]byte, error) {
+func (changeProofMarshaler) Marshal(*ChangeProof) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (ChangeProofMarshaler) Unmarshal([]byte) (*ChangeProof, error) {
+func (changeProofMarshaler) Unmarshal([]byte) (*ChangeProof, error) {
 	return nil, errors.New("not implemented")
 }
 

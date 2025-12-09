@@ -23,11 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/x/sync"
 )
 
-var (
-	rangeProofMarshaler  = RangeProofMarshaler{}
-	changeProofMarshaler = ChangeProofMarshaler{}
-)
-
 func Test_Firewood_Sync(t *testing.T) {
 	for _, serverSize := range []int{0, 1, 1_000, 10_000, 100_000} {
 		for _, clientSize := range []int{0, 1_000} {
@@ -50,8 +45,8 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 	syncer, err := NewSyncer(
 		clientDB,
 		Config{
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(serverDB, rangeProofMarshaler)),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(serverDB, rangeProofMarshaler, changeProofMarshaler)),
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(serverDB, rangeProofMarshaler{})),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(serverDB, rangeProofMarshaler{}, changeProofMarshaler{})),
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
 			TargetRoot:            root,
