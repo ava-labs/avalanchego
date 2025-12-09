@@ -607,7 +607,7 @@ func newBenchmarkTool(name string) *benchmarkTool {
 }
 
 // addResult adds a new benchmark result with the given value and unit.
-// The result name is constructed by appending the unit to the benchmark name
+// The result name is constructed by appending the unit to the benchmark name.
 // Calling `addResult` is analogous to calling `b.ReportMetric()`.
 func (b *benchmarkTool) addResult(value float64, unit string) {
 	result := benchmarkResult{
