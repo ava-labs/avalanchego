@@ -4,13 +4,7 @@ module github.com/ava-labs/avalanchego/graft/coreth
 // tools/go.mod to avoid polluting the main module's dependencies. See
 // CONTRIBUTING.md for more details.
 
-// - Changes to the minimum golang version must also be replicated in:
-//   - go.mod (here)
-//   - tools/go.mod
-//   - RELEASES.md
-//
-// - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
-//   - Consider updating the version of golangci-lint (see tools/go.mod)
+// See ../../go.mod for guidelines on updating the Go version.
 go 1.24.9
 
 require (

@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -150,9 +151,9 @@ func (g *gossipMempool) Has(txID ids.ID) bool {
 	return ok
 }
 
-func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
+func (g *gossipMempool) BloomFilter() (*bloom.Filter, ids.ID) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	return g.bloom.Marshal()
+	return g.bloom.BloomFilter()
 }
