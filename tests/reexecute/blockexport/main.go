@@ -57,6 +57,7 @@ func main() {
 
 	batch := db.NewBatch()
 	for blkResult := range blockChan {
+		r.NoError(blkResult.Err)
 		r.NoError(batch.Put(reexecute.BlockKey(blkResult.Height), blkResult.BlockBytes))
 
 		if batch.Size() > 10*units.MiB {
