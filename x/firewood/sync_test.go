@@ -67,9 +67,9 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 	root, err := fullDB.GetMerkleRoot(ctx)
 	require.NoError(err)
 
-	syncer, err := xsync.NewManager(
+	syncer, err := xsync.NewSyncer(
 		db,
-		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
+		xsync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(fullDB, rangeProofMarshaler)),
