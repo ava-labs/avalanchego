@@ -632,11 +632,9 @@ func (b *benchmarkTool) saveToFile(path string) error {
 
 // logResults logs all collected benchmark results using the provided logger.
 func (b *benchmarkTool) logResults(log logging.Logger) {
-	for _, result := range b.results {
-		log.Info(b.name,
-			zap.String("value", result.Value),
-			zap.String("unit", result.Unit),
-		)
+	for _, r := range b.results {
+		result := fmt.Sprintf("%s %s", r.Value, r.Unit)
+		log.Info(b.name, zap.String("result", result))
 	}
 }
 
