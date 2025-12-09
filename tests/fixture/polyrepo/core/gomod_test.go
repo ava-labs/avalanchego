@@ -24,7 +24,7 @@ go 1.21
 
 require (
 	github.com/ava-labs/avalanchego v1.11.11
-	github.com/ava-labs/coreth v0.13.8
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.2.0
 )
 `
 	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
@@ -40,20 +40,20 @@ require (
 
 	// Check that we can find dependencies
 	foundAvalanchego := false
-	foundCoreth := false
+	foundFirewood := false
 	for _, req := range modFile.Require {
 		if req.Mod.Path == "github.com/ava-labs/avalanchego" {
 			foundAvalanchego = true
 			require.Equal(t, "v1.11.11", req.Mod.Version, "avalanchego version")
 		}
-		if req.Mod.Path == "github.com/ava-labs/coreth" {
-			foundCoreth = true
-			require.Equal(t, "v0.13.8", req.Mod.Version, "coreth version")
+		if req.Mod.Path == "github.com/ava-labs/firewood-go-ethhash/ffi" {
+			foundFirewood = true
+			require.Equal(t, "v0.2.0", req.Mod.Version, "firewood version")
 		}
 	}
 
 	require.True(t, foundAvalanchego, "did not find avalanchego requirement")
-	require.True(t, foundCoreth, "did not find coreth requirement")
+	require.True(t, foundFirewood, "did not find firewood requirement")
 }
 
 func TestGetModulePath(t *testing.T) {
@@ -155,7 +155,7 @@ go 1.21
 
 require (
 	github.com/ava-labs/avalanchego v1.11.11
-	github.com/ava-labs/coreth v0.13.8
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.2.0
 )
 `
 	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
@@ -188,7 +188,7 @@ go 1.21
 // Production dependencies
 require (
 	github.com/ava-labs/avalanchego v1.11.11 // Main dependency
-	github.com/ava-labs/coreth v0.13.8
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.2.0
 )
 
 // Development tools

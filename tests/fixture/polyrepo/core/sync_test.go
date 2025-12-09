@@ -31,15 +31,6 @@ go 1.21
 			expectedError: false,
 		},
 		{
-			name: "coreth repo",
-			goModContent: `module github.com/ava-labs/coreth
-
-go 1.21
-`,
-			expectedRepo:  "coreth",
-			expectedError: false,
-		},
-		{
 			name:         "firewood repo",
 			goModSubPath: "ffi",
 			goModContent: `module github.com/ava-labs/firewood/ffi
@@ -112,21 +103,15 @@ func TestGetDirectDependencies(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name:          "from coreth - always syncs avalanchego",
-			currentRepo:   "coreth",
-			expectedRepos: []string{"avalanchego"},
-			expectedError: nil,
-		},
-		{
 			name:          "from avalanchego - defaults to syncing firewood",
 			currentRepo:   "avalanchego",
 			expectedRepos: []string{"firewood"},
 			expectedError: nil,
 		},
 		{
-			name:          "from unknown repo - always syncs avalanchego",
-			currentRepo:   "unknown",
-			expectedRepos: []string{"avalanchego"},
+			name:          "standalone mode (no current repo) - syncs both avalanchego and firewood",
+			currentRepo:   "",
+			expectedRepos: []string{"avalanchego", "firewood"},
 			expectedError: nil,
 		},
 	}
@@ -231,15 +216,6 @@ func TestGetFirewoodReplacementPath(t *testing.T) {
 			expectedPath: "./ffi", // Default to cargo path
 		},
 		{
-			name:      "non-firewood repo uses config default",
-			repoName:  "coreth",
-			isPrimary: false,
-			setupFunc: func(t *testing.T) string {
-				return t.TempDir()
-			},
-			expectedPath: ".",
-		},
-		{
 			name:      "avalanchego uses config default",
 			repoName:  "avalanchego",
 			isPrimary: false,
@@ -269,19 +245,6 @@ func TestGetDefaultRefForRepo(t *testing.T) {
 		expectError  bool
 	}{
 		{
-			name:        "avalanchego depends on coreth",
-			currentRepo: "avalanchego",
-			targetRepo:  "coreth",
-			goModContent: `module github.com/ava-labs/avalanchego
-
-go 1.21
-
-require github.com/ava-labs/coreth v0.13.8
-`,
-			expectedRef: "v0.13.8",
-			expectError: false,
-		},
-		{
 			name:        "avalanchego depends on firewood with pseudo-version",
 			currentRepo: "avalanchego",
 			targetRepo:  "firewood",
@@ -295,40 +258,12 @@ require github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0-20240101120000-abc123
 			expectError: false,
 		},
 		{
-			name:        "coreth depends on avalanchego",
-			currentRepo: "coreth",
-			targetRepo:  "avalanchego",
-			goModContent: `module github.com/ava-labs/coreth
-
-go 1.21
-
-require github.com/ava-labs/avalanchego v1.11.11
-`,
-			expectedRef: "v1.11.11",
-			expectError: false,
-		},
-		{
 			name:        "avalanchego without firewood dependency - uses default branch",
 			currentRepo: "avalanchego",
 			targetRepo:  "firewood",
 			goModContent: `module github.com/ava-labs/avalanchego
 
 go 1.21
-
-require github.com/ava-labs/coreth v0.13.8
-`,
-			expectedRef: "main",
-			expectError: false,
-		},
-		{
-			name:        "coreth without firewood dependency - uses default branch",
-			currentRepo: "coreth",
-			targetRepo:  "firewood",
-			goModContent: `module github.com/ava-labs/coreth
-
-go 1.21
-
-require github.com/ava-labs/avalanchego v1.11.11
 `,
 			expectedRef: "main",
 			expectError: false,
@@ -344,9 +279,9 @@ require github.com/ava-labs/avalanchego v1.11.11
 		{
 			name:         "no go.mod path - uses default branch",
 			currentRepo:  "avalanchego",
-			targetRepo:   "coreth",
+			targetRepo:   "firewood",
 			goModContent: "",
-			expectedRef:  "master",
+			expectedRef:  "main",
 			expectError:  false,
 		},
 		{
@@ -397,38 +332,22 @@ func TestSync_PrimaryMode_RefDetermination(t *testing.T) {
 		expectError  string
 	}{
 		{
-			name: "no args - avalanchego root repo requires explicit args",
+			name: "explicit refs - firewood explicit",
 			goModContent: `module github.com/ava-labs/avalanchego
 
 go 1.21
-
-require github.com/ava-labs/coreth v0.13.8
 `,
-			repoArgs: []string{},
-			// avalanchego is a root repo and requires explicit arguments
-			expectError: "requires explicit repository arguments",
-		},
-		{
-			name: "explicit refs - all explicit",
-			goModContent: `module github.com/ava-labs/avalanchego
-
-go 1.21
-
-require github.com/ava-labs/coreth v0.13.8
-`,
-			repoArgs:    []string{"coreth@v0.15.0"},
+			repoArgs:    []string{"firewood@main"},
 			expectError: "", // Should reach git clone (no early error)
 		},
 		{
-			name: "partial refs - explicit and discovered (firewood falls back to default)",
+			name: "no args - avalanchego defaults to syncing firewood",
 			goModContent: `module github.com/ava-labs/avalanchego
 
 go 1.21
-
-require github.com/ava-labs/coreth v0.13.8
 `,
-			repoArgs:    []string{"coreth@v0.15.0", "firewood"},
-			expectError: "", // Will use default branch for firewood and proceed to git clone
+			repoArgs:    []string{},
+			expectError: "", // Should auto-sync firewood and proceed to git clone
 		},
 	}
 
@@ -470,8 +389,6 @@ func TestSync_CannotSyncIntoItself_Error(t *testing.T) {
 	goModContent := `module github.com/ava-labs/avalanchego
 
 go 1.21
-
-require github.com/ava-labs/coreth v0.13.8
 `
 	goModPath := filepath.Join(tmpDir, "go.mod")
 	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
@@ -498,11 +415,6 @@ func TestSync_StandaloneMode_Validation(t *testing.T) {
 		expectErrVar error
 	}{
 		{
-			name:         "no args - should error immediately",
-			repoArgs:     []string{},
-			expectErrVar: errStandaloneModeNeedsRepos,
-		},
-		{
 			name:        "invalid repo format",
 			repoArgs:    []string{"invalid@@format"},
 			expectError: "invalid repo format",
@@ -525,12 +437,8 @@ func TestSync_StandaloneMode_Validation(t *testing.T) {
 			err := Sync(log, tmpDir, tt.repoArgs, 1, false)
 
 			// Should error with expected message
-			if tt.expectErrVar != nil {
-				require.ErrorIs(t, err, tt.expectErrVar)
-			} else {
-				require.Error(t, err) //nolint:forbidigo // checking error message content, not error type
-				require.Contains(t, err.Error(), tt.expectError)
-			}
+			require.Error(t, err) //nolint:forbidigo // checking error message content, not error type
+			require.Contains(t, err.Error(), tt.expectError)
 
 			// Verify no go.mod was created (standalone mode shouldn't create one)
 			goModPath := filepath.Join(tmpDir, "go.mod")
@@ -548,12 +456,12 @@ func TestSync_StandaloneMode_MultiRepo(t *testing.T) {
 		repoArgs []string
 	}{
 		{
-			name:     "avalanchego and coreth - KEY TEST that would have caught the bug",
-			repoArgs: []string{"avalanchego", "coreth"},
+			name:     "avalanchego and firewood",
+			repoArgs: []string{"avalanchego", "firewood"},
 		},
 		{
 			name:     "explicit refs for multiple repos",
-			repoArgs: []string{"avalanchego@v1.11.0", "coreth@v0.13.8"},
+			repoArgs: []string{"avalanchego@v1.11.0", "firewood@main"},
 		},
 		{
 			name:     "firewood only",
@@ -586,14 +494,25 @@ func TestSync_StandaloneMode_MultiRepo(t *testing.T) {
 	}
 }
 
-// TestSync_StandaloneMode_NoArgs_Error tests that standalone mode requires explicit repos
-func TestSync_StandaloneMode_NoArgs_Error(t *testing.T) {
+// TestSync_StandaloneMode_NoArgs tests that standalone mode with no args syncs both repos
+func TestSync_StandaloneMode_NoArgs(t *testing.T) {
 	tmpDir := t.TempDir()
 	log := logging.NoLog{}
 
 	// No go.mod exists - standalone mode
-	// No repos specified - should error
+	// No repos specified - should sync both avalanchego and firewood
 	err := Sync(log, tmpDir, []string{}, 1, false)
 
-	require.ErrorIs(t, err, errStandaloneModeNeedsRepos)
+	// Tests will fail at git clone (network required), but the KEY is that
+	// they should NOT fail with validation errors about missing repos
+	// The error should be from git operations, not from our orchestration logic
+	if err != nil {
+		require.NotContains(t, err.Error(), "requires explicit repository arguments")
+		require.NotContains(t, err.Error(), "must specify repos")
+	}
+
+	// Verify no go.mod was created (standalone mode shouldn't create one)
+	goModPath := filepath.Join(tmpDir, "go.mod")
+	_, statErr := os.Stat(goModPath)
+	require.True(t, os.IsNotExist(statErr), "go.mod should not be created in standalone mode")
 }

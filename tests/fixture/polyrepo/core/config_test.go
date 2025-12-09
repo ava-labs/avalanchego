@@ -21,17 +21,6 @@ func TestGetRepoConfig_Avalanchego(t *testing.T) {
 	require.False(t, config.RequiresNixBuild)
 }
 
-// Test that we can get config for coreth
-func TestGetRepoConfig_Coreth(t *testing.T) {
-	config, err := GetRepoConfig("coreth")
-	require.NoError(t, err)
-
-	require.Equal(t, "coreth", config.Name)
-	require.Equal(t, "github.com/ava-labs/coreth", config.GoModule)
-	require.Equal(t, "master", config.DefaultBranch)
-	require.False(t, config.RequiresNixBuild)
-}
-
 // Test that we can get config for firewood
 func TestGetRepoConfig_Firewood(t *testing.T) {
 	config, err := GetRepoConfig("firewood")
@@ -56,15 +45,14 @@ func TestGetRepoConfig_Unknown(t *testing.T) {
 // Test that we can get all repo configs
 func TestGetAllRepoConfigs(t *testing.T) {
 	configs := GetAllRepoConfigs()
-	require.Len(t, configs, 3)
+	require.Len(t, configs, 2)
 
-	// Verify we have all three repos
+	// Verify we have both repos
 	names := make(map[string]bool)
 	for _, config := range configs {
 		names[config.Name] = true
 	}
 
 	require.True(t, names["avalanchego"], "missing avalanchego config")
-	require.True(t, names["coreth"], "missing coreth config")
 	require.True(t, names["firewood"], "missing firewood config")
 }

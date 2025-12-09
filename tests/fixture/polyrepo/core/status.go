@@ -215,7 +215,7 @@ func Status(
 
 	// Display other repositories section
 	fmt.Fprintln(writer, "Other Repositories:")
-	repos := []string{"avalanchego", "coreth", "firewood"}
+	repos := []string{"avalanchego", "firewood"}
 	for _, repoName := range repos {
 		// Skip the primary repo since we already displayed it
 		if repoName == primaryRepo {

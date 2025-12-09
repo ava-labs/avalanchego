@@ -25,17 +25,17 @@ func TestParseRepoAndVersion(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:          "repo with commit SHA",
-			input:         "coreth@abc123def",
-			expectedRepo:  "coreth",
-			expectedVer:   "abc123def",
-			expectedError: false,
-		},
-		{
 			name:          "repo with branch",
 			input:         "firewood@main",
 			expectedRepo:  "firewood",
 			expectedVer:   "main",
+			expectedError: false,
+		},
+		{
+			name:          "repo with commit SHA",
+			input:         "firewood@abc123def",
+			expectedRepo:  "firewood",
+			expectedVer:   "abc123def",
 			expectedError: false,
 		},
 		{
@@ -93,10 +93,10 @@ func TestGetRepoClonePath(t *testing.T) {
 			expectedPath: "avalanchego",
 		},
 		{
-			name:         "coreth in custom dir",
-			repoName:     "coreth",
+			name:         "firewood in custom dir",
+			repoName:     "firewood",
 			baseDir:      "/tmp/test",
-			expectedPath: "/tmp/test/coreth",
+			expectedPath: "/tmp/test/firewood",
 		},
 	}
 

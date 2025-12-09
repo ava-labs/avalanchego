@@ -41,12 +41,10 @@ func TestReset_AllRepos(t *testing.T) {
 go 1.24
 
 require (
-	github.com/ava-labs/coreth v0.13.8
 	github.com/ava-labs/firewood/ffi v0.2.0
 )
 
 replace (
-	github.com/ava-labs/coreth => ./coreth
 	github.com/ava-labs/firewood/ffi => ./firewood/ffi/result/ffi
 )
 `
@@ -59,8 +57,7 @@ replace (
 	content, err := os.ReadFile(goModPath)
 	require.NoError(err)
 
-	// Should not contain replace directives for coreth or firewood
-	require.NotContains(string(content), "github.com/ava-labs/coreth =>")
+	// Should not contain replace directives for firewood
 	require.NotContains(string(content), "github.com/ava-labs/firewood/ffi =>")
 }
 
@@ -73,34 +70,30 @@ func TestReset_SpecificRepos(t *testing.T) {
 	tmpDir := t.TempDir()
 	goModPath := filepath.Join(tmpDir, "go.mod")
 
-	// Create a go.mod with replace directives for both coreth and firewood
+	// Create a go.mod with replace directive for firewood
 	goModContent := `module github.com/ava-labs/avalanchego
 
 go 1.24
 
 require (
-	github.com/ava-labs/coreth v0.13.8
 	github.com/ava-labs/firewood/ffi v0.2.0
 )
 
 replace (
-	github.com/ava-labs/coreth => ./coreth
 	github.com/ava-labs/firewood/ffi => ./firewood/ffi/result/ffi
 )
 `
 	require.NoError(os.WriteFile(goModPath, []byte(goModContent), 0o600))
 
-	// Call Reset with only coreth
-	require.NoError(Reset(log, tmpDir, []string{"coreth"}))
+	// Call Reset with only firewood
+	require.NoError(Reset(log, tmpDir, []string{"firewood"}))
 
-	// Verify only coreth replace directive was removed
+	// Verify firewood replace directive was removed
 	content, err := os.ReadFile(goModPath)
 	require.NoError(err)
 
-	// Should not contain coreth replace
-	require.NotContains(string(content), "github.com/ava-labs/coreth => ./coreth")
-	// Should still contain firewood replace
-	require.Contains(string(content), "github.com/ava-labs/firewood/ffi => ./firewood")
+	// Should not contain firewood replace
+	require.NotContains(string(content), "github.com/ava-labs/firewood/ffi => ./firewood")
 }
 
 // TestReset_EmptyRepoList tests that Reset handles empty repo list correctly by resetting all
@@ -112,17 +105,17 @@ func TestReset_EmptyRepoList(t *testing.T) {
 	tmpDir := t.TempDir()
 	goModPath := filepath.Join(tmpDir, "go.mod")
 
-	// Create a go.mod with replace directive for avalanchego (to ensure all three repos are tested)
-	goModContent := `module github.com/ava-labs/coreth
+	// Create a go.mod with replace directives for both repos
+	goModContent := `module github.com/ava-labs/avalanchego
 
 go 1.24
 
 require (
-	github.com/ava-labs/avalanchego v1.11.0
+	github.com/ava-labs/firewood/ffi v0.2.0
 )
 
 replace (
-	github.com/ava-labs/avalanchego => ../avalanchego
+	github.com/ava-labs/firewood/ffi => ./firewood/ffi/result/ffi
 )
 `
 	require.NoError(os.WriteFile(goModPath, []byte(goModContent), 0o600))
@@ -133,5 +126,5 @@ replace (
 	// Verify replace directive was removed
 	content, err := os.ReadFile(goModPath)
 	require.NoError(err)
-	require.NotContains(string(content), "github.com/ava-labs/avalanchego =>")
+	require.NotContains(string(content), "github.com/ava-labs/firewood/ffi =>")
 }

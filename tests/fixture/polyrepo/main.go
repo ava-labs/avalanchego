@@ -40,10 +40,12 @@ func getLogger(cmd *cobra.Command) logging.Logger {
 
 var rootCmd = &cobra.Command{
 	Use:   "polyrepo",
-	Short: "Manage local development across avalanchego, coreth, and firewood repositories",
+	Short: "Manage local development across avalanchego and firewood repositories",
 	Long: `Polyrepo is a tool for managing local development across multiple interdependent
-repositories (avalanchego, coreth, firewood) by managing replace directives in go.mod files
-and coordinating git operations.`,
+repositories (avalanchego, firewood) by managing replace directives in go.mod files
+and coordinating git operations.
+
+Note: coreth is now part of avalanchego (grafted at graft/coreth/) and is not managed separately.`,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 		// Change to target directory if specified
 		if targetDir != "" {
@@ -134,16 +136,17 @@ var syncCmd = &cobra.Command{
 
 Repositories can be specified with an optional ref (branch, tag, or commit):
   sync firewood@main
-  sync coreth@v0.13.8
   sync avalanchego@57a74c3a7fd7dcdda24f49a237bfa9fa69f26a85
 
 If no repositories are specified, syncs based on the current directory and go.mod:
-- From avalanchego: syncs firewood at version specified in go.mod
-- From coreth: syncs avalanchego at version specified in go.mod
+- From avalanchego: syncs firewood at version specified in graft/coreth/go.mod
 - From firewood: syncs avalanchego at default branch (master)
-- From unknown location: must specify repositories explicitly
+- From unknown location: syncs both avalanchego and firewood
 
-Repositories will be cloned into the current directory with their repository names.`,
+Repositories will be cloned into the current directory with their repository names.
+
+Note: coreth is now part of avalanchego (grafted at graft/coreth/) and is not synced separately.
+When syncing firewood from avalanchego, the replace directive is also added to graft/coreth/go.mod.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		log := getLogger(cmd)
 		depth, _ := cmd.Flags().GetInt("depth")
@@ -164,7 +167,7 @@ var resetCmd = &cobra.Command{
 	Long: `Remove replace directives from go.mod for the specified repositories.
 
 If no repositories are specified, removes replace directives for all polyrepo-managed
-repositories (avalanchego, coreth, firewood).`,
+repositories (avalanchego, firewood).`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		log := getLogger(cmd)
 

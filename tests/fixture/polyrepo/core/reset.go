@@ -39,7 +39,7 @@ func Reset(log logging.Logger, baseDir string, repoNames []string) error {
 	// If no repos specified, remove all polyrepo-related replaces
 	if len(repoNames) == 0 {
 		log.Debug("no repos specified, resetting all known repositories")
-		repoNames = []string{"avalanchego", "coreth", "firewood"}
+		repoNames = []string{"avalanchego", "firewood"}
 	}
 
 	log.Debug("removing replace directives",

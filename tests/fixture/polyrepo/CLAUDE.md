@@ -2,21 +2,28 @@
 
 ## Overview
 
-The polyrepo tool manages local development across three interdependent repositories:
+The polyrepo tool manages local development across two interdependent repositories:
 - **avalanchego** - Main repository (github.com/ava-labs/avalanchego)
-- **coreth** - EVM implementation (github.com/ava-labs/coreth)
 - **firewood** - Storage layer (github.com/ava-labs/firewood)
+
+**Note**: Coreth has been grafted into avalanchego at `graft/coreth/` and is no longer managed as a separate repository. The grafted coreth's go.mod at `graft/coreth/go.mod` is still updated with firewood replace directives when syncing.
 
 ### Dependency Graph
 
 ```
-avalanchego ←→ coreth
-    ↓           ↓
-  firewood ← firewood
+avalanchego (contains graft/coreth)
+    |
+    v
+ firewood
+
+graft/coreth (inside avalanchego)
+    |
+    v
+ firewood
 ```
 
-- avalanchego and coreth have bidirectional dependencies
-- Both avalanchego and coreth depend on firewood
+- avalanchego depends on firewood
+- Grafted coreth (at graft/coreth/) also depends on firewood
 - Firewood has no dependencies on the other repos
 
 ## Development Principles
@@ -554,10 +561,9 @@ The tool manages `replace` directives in go.mod files to point to local clones i
 
 Example directory structure after syncing from avalanchego:
 ```
-avalanchego/              # Primary repo
-├── go.mod                # Has replace directives for coreth and firewood
-├── coreth/               # Synced repo
-│   └── go.mod            # Has replace directives for avalanchego and firewood
+avalanchego/              # Primary repo (contains grafted coreth at graft/coreth/)
+├── go.mod                # Has replace directives for firewood
+├── graft/coreth/go.mod   # Grafted coreth's go.mod also gets firewood replace directives
 └── firewood/             # Synced repo
     └── ffi/
         └── go.mod        # No replace directives (no deps on other repos)
@@ -581,65 +587,30 @@ When running polyrepo from within a repository that contains:
 **Example:**
 ```bash
 cd avalanchego/
-./scripts/run_polyrepo.sh sync coreth firewood
-# Clones coreth/ and firewood/ as subdirectories
-# Uses versions from avalanchego/go.mod if not explicitly specified
+./scripts/run_polyrepo.sh sync firewood
+# Clones firewood/ as subdirectory
+# Uses version from avalanchego/go.mod if not explicitly specified
+# Grafted coreth at graft/coreth/ also gets firewood replace directives
 ```
 
-**Special Case: Version Discovery Without Primary Repo Dependencies**
+**Special Case: Version Discovery in Standalone Mode**
 
-When there is no primary repo with go.mod dependencies to guide version selection, version discovery follows the dependency chain:
-
-**Avalanchego ↔ Coreth Discovery:**
-
-When neither avalanchego nor coreth can be discovered from a primary repo's go.mod (firewood is primary, or no primary repo):
-
-- **Both requested without versions**: Clone avalanchego at master, discover coreth from avalanchego/go.mod:
-  ```bash
-  cd firewood/  # or any directory without go.mod
-  ./scripts/run_polyrepo.sh sync avalanchego coreth
-  # Clones avalanchego at master
-  # Discovers coreth from avalanchego/go.mod
-  ```
-
-- **One version specified, other not**: Clone the specified repo first, discover the other:
-  ```bash
-  cd firewood/
-  ./scripts/run_polyrepo.sh sync avalanchego@v1.11.0 coreth
-  # Clones avalanchego at v1.11.0
-  # Discovers coreth from avalanchego/go.mod
-  ```
-
-- **One already cloned**: Discover the other from the cloned repo's go.mod:
-  ```bash
-  cd firewood/
-  # avalanchego/ already exists
-  ./scripts/run_polyrepo.sh sync coreth
-  # Discovers coreth from avalanchego/go.mod
-  ```
+When running in standalone mode (no primary repo with go.mod), version discovery works as follows:
 
 **Firewood Discovery:**
 
-Firewood version is discovered through the dependency chain (coreth → firewood direct, avalanchego → firewood indirect):
+Firewood version is discovered from avalanchego's go.mod when available:
 
 - **Explicit version**: Use it
   ```bash
-  ./scripts/run_polyrepo.sh sync avalanchego coreth firewood@v0.2.0
+  ./scripts/run_polyrepo.sh sync avalanchego firewood@v0.2.0
   ```
 
-- **Coreth involved (cloned or being synced)**: Discover from coreth/go.mod (direct dependency)
-  ```bash
-  ./scripts/run_polyrepo.sh sync avalanchego coreth firewood
-  # Clones avalanchego at master
-  # Discovers coreth from avalanchego/go.mod
-  # Discovers firewood from coreth/go.mod (direct dependency)
-  ```
-
-- **Only avalanchego involved**: Discover from avalanchego/go.mod (indirect dependency)
+- **Avalanchego involved (cloned or being synced)**: Discover from avalanchego/go.mod (via grafted coreth dependency)
   ```bash
   ./scripts/run_polyrepo.sh sync avalanchego firewood
   # Clones avalanchego at master
-  # Discovers firewood from avalanchego/go.mod (indirect via coreth)
+  # Discovers firewood from avalanchego/go.mod (indirect via grafted coreth)
   ```
 
 - **Firewood alone, no primary repo**: Use default branch (main)
@@ -649,15 +620,15 @@ Firewood version is discovered through the dependency chain (coreth → firewood
   # Clones firewood at main (no way to discover version)
   ```
 
-**Key Principle**: Follow the dependency chain: avalanchego ↔ coreth (bidirectional), coreth → firewood (direct), avalanchego → firewood (indirect). Only repos explicitly listed are synced.
+**Key Principle**: Avalanchego depends on firewood (via grafted coreth). Only repos explicitly listed are synced. Coreth is NOT synced as a standalone repository.
 
 #### 2. Standalone Mode (No Primary Repo)
 When running polyrepo from a directory that does NOT contain a go.mod file:
 
 **Behavior:**
 - No primary repo is detected
-- For avalanchego and coreth: version discovery follows the same logic as described in "Version Discovery Without Primary Repo Dependencies" above
-- For firewood: discovered from coreth or avalanchego (if involved), or uses default branch (main) if synced alone
+- For avalanchego: uses explicit ref or defaults to master
+- For firewood: discovered from avalanchego (if involved), or uses default branch (main) if synced alone
 - If explicit refs are provided (e.g., `avalanchego@v1.11.0`), those are used
 - No replace directives are configured (since there's no go.mod to update)
 - Useful for setting up a fresh workspace or cloning repos for inspection
@@ -666,9 +637,9 @@ When running polyrepo from a directory that does NOT contain a go.mod file:
 ```bash
 mkdir /tmp/test-workspace
 cd /tmp/test-workspace
-./scripts/run_polyrepo.sh sync avalanchego coreth
+./scripts/run_polyrepo.sh sync avalanchego firewood
 # Clones avalanchego at master
-# Discovers coreth from avalanchego/go.mod (ensures compatibility)
+# Discovers firewood from avalanchego/go.mod (via grafted coreth dependency)
 # No replace directives (no go.mod files to update)
 ```
 
@@ -772,13 +743,13 @@ All commands support these flags:
 Clone/update repositories and configure replace directives:
 
 ```bash
-# Primary repo mode: Sync specific repos with explicit refs
+# Primary repo mode: Sync specific repo with explicit ref
 cd avalanchego/
-polyrepo sync firewood@7cd05ccda8baba48617de19684db7da9ba73f8ba coreth --force
+polyrepo sync firewood@7cd05ccda8baba48617de19684db7da9ba73f8ba --force
 
-# Primary repo mode: Sync without explicit refs (uses versions from go.mod)
+# Primary repo mode: Sync without explicit ref (uses version from go.mod)
 cd avalanchego/
-polyrepo sync coreth firewood
+polyrepo sync firewood
 
 # Primary repo mode: Auto-sync based on current repo (syncs firewood when in avalanchego)
 cd avalanchego/
@@ -786,7 +757,7 @@ polyrepo sync
 
 # Standalone mode: Clone repos into empty directory
 mkdir /tmp/workspace
-polyrepo sync avalanchego@v1.11.0 coreth@main --target-dir /tmp/workspace
+polyrepo sync avalanchego@v1.11.0 firewood --target-dir /tmp/workspace
 ```
 
 **How sync works:**
@@ -795,8 +766,8 @@ polyrepo sync avalanchego@v1.11.0 coreth@main --target-dir /tmp/workspace
 1. Detects current repository as primary repo
 2. Clones each specified repo at the given ref (or determines ref from go.mod if not specified)
 3. Runs nix build for repos that require it (firewood)
-4. Calls `UpdateAllReplaceDirectives()` to update go.mod files for ALL repos (primary + synced)
-5. This ensures the complete dependency graph has replace directives
+4. Calls `UpdateAllReplaceDirectives()` to update go.mod files for primary repo and grafted coreth
+5. This ensures avalanchego and grafted coreth have correct firewood replace directives
 
 **In Standalone Mode (no go.mod):**
 1. Clones each specified repo at the given ref (or uses default branch if not specified)
@@ -827,8 +798,16 @@ Primary Repository: avalanchego
   avalanchego: /path/to/avalanchego
 
 Other Repositories:
-  coreth: not cloned
   firewood: not cloned
+```
+
+**Output from firewood:**
+```
+Primary Repository: firewood
+  firewood: /path/to/firewood
+
+Other Repositories:
+  avalanchego: not cloned
 ```
 
 **Output from unknown location:**
@@ -837,7 +816,6 @@ Primary Repository: none (not in a known repository)
 
 Other Repositories:
   avalanchego: not cloned
-  coreth: not cloned
   firewood: not cloned
 ```
 
@@ -855,16 +833,16 @@ Remove replace directives from go.mod:
 # Reset all repos
 polyrepo reset
 
-# Reset specific repos
-polyrepo reset coreth firewood
+# Reset specific repo
+polyrepo reset firewood
 ```
 
 ### Update Command
 
-Update avalanchego dependency version (for coreth repo):
+Update avalanchego dependency version (note: currently not used since coreth is no longer a standalone syncable repo):
 
 ```bash
-# Update to specific version
+# Update to specific version (for future use if needed)
 polyrepo update-avalanchego v1.13.6
 
 # Update to version from go.mod
@@ -914,16 +892,16 @@ This is the critical function that ensures all repos have correct replace direct
 
 **Algorithm:**
 1. Build set of all repos (primary + synced)
-2. For each repo:
+2. For each repo (including grafted coreth at graft/coreth/):
    - Locate its go.mod file
    - For each OTHER repo in the set:
      - Check if this repo depends on the other repo
      - If yes, calculate relative path and add replace directive
 
 **Path Calculation:**
-- Primary → synced: `./coreth`, `./firewood/ffi/result/ffi`
-- Synced → primary: `..`
-- Synced → synced: `../coreth`, `../firewood/ffi/result/ffi`
+- Primary (avalanchego) → firewood: `./firewood/ffi/result/ffi`
+- Grafted coreth → firewood: `../../firewood/ffi/result/ffi` (relative from graft/coreth/)
+- Synced firewood → primary: `..`
 
 #### `CloneOrUpdateRepo(log, url, path, ref, depth, force)`
 **Location**: core/repo.go:238-371
@@ -1030,69 +1008,36 @@ Other Repositories:
 Detects which repository we're currently in by examining go.mod files.
 
 **Detection logic:**
-- Checks for `go.mod` in current directory for avalanchego and coreth
+- Checks for `go.mod` in current directory for avalanchego
 - Checks for `ffi/go.mod` for firewood (special case)
 - Returns the repo name or empty string if not in a known repo
-
-#### `DiscoverAvalanchegoCorethVersions(log, baseDir, requestedRepos, explicitRefs)`
-**Location**: core/sync.go (to be implemented)
-
-Handles version discovery for avalanchego and coreth when they cannot be discovered from a primary repo's go.mod (firewood as primary, or no primary repo).
-
-**Algorithm:**
-1. For each requested repo (avalanchego/coreth):
-   - If explicit ref provided: use it
-   - If no explicit ref: attempt discovery
-2. Discovery logic:
-   - If avalanchego is cloned: read coreth version from avalanchego/go.mod
-   - If coreth is cloned: read avalanchego version from coreth/go.mod
-   - If one has explicit ref but not cloned: clone it first, read other from its go.mod
-   - If avalanchego has no ref and isn't cloned: use master; if coreth also requested, discover from avalanchego after cloning
-   - If coreth has no ref and isn't cloned and avalanchego not requested: use main
-
-**Cloning Strategy for Compatibility:**
-When syncing both without explicit versions:
-- Clone avalanchego at master (default branch)
-- Discover coreth's version from avalanchego/go.mod
-- This ensures a compatible pair rather than two potentially incompatible tips
-
-**Returns:** Map of repo names to refs for avalanchego/coreth
+- Note: Does not detect grafted coreth at graft/coreth/ as a primary repo (coreth is not standalone)
 
 #### `DiscoverFirewoodVersion(log, baseDir, explicitRef, requestedRepos, discoveredVersions)`
-**Location**: core/sync.go (to be implemented)
+**Location**: core/sync.go
 
-Handles version discovery for firewood following the dependency chain.
+Handles version discovery for firewood from avalanchego's go.mod (via grafted coreth dependency).
 
 **Algorithm:**
 1. If explicit ref provided: use it
-2. If coreth is cloned OR being synced (in requestedRepos): read from coreth/go.mod (direct dependency)
-3. If coreth not involved but avalanchego is cloned OR being synced: read from avalanchego/go.mod (indirect dependency)
-4. If no primary repo and firewood is only requested repo: use default branch (main)
+2. If avalanchego is cloned OR being synced (in requestedRepos): read from avalanchego/go.mod (indirect via grafted coreth)
+3. If no primary repo and firewood is only requested repo: use default branch (main)
 
 **Priority order:**
 - Explicit ref (highest)
-- Coreth's go.mod (direct dependency)
-- Avalanchego's go.mod (indirect dependency)
+- Avalanchego's go.mod (indirect via grafted coreth dependency)
 - Default branch (lowest - only when standalone)
 
 **Example Scenarios:**
 ```go
-// Scenario 1: All three repos, no versions
-// avalanchego → master, coreth discovered, firewood from coreth
-DiscoverFirewoodVersion(log, baseDir, "",
-    []string{"avalanchego", "coreth", "firewood"},
-    map[string]string{"avalanchego": "master", "coreth": "v0.13.8"})
-// Reads firewood version from coreth/go.mod
-// Returns: "v0.2.0"
-
-// Scenario 2: avalanchego and firewood only
+// Scenario 1: avalanchego and firewood
 DiscoverFirewoodVersion(log, baseDir, "",
     []string{"avalanchego", "firewood"},
     map[string]string{"avalanchego": "master"})
-// Reads firewood version from avalanchego/go.mod (indirect)
+// Reads firewood version from avalanchego/go.mod (indirect via grafted coreth)
 // Returns: "v0.2.0"
 
-// Scenario 3: firewood alone, no primary repo
+// Scenario 2: firewood alone, no primary repo
 DiscoverFirewoodVersion(log, baseDir, "",
     []string{"firewood"},
     map[string]string{})
@@ -1127,6 +1072,8 @@ firewoodConfig = &RepoConfig{
 }
 ```
 
+Note: Coreth is no longer a standalone syncable repository. It has been grafted into avalanchego at `graft/coreth/`. The grafted coreth's go.mod at `graft/coreth/go.mod` is still updated with firewood replace directives when syncing.
+
 ## Testing
 
 ### Unit Tests
@@ -1144,30 +1091,19 @@ go test ./tests/fixture/polyrepo/core/... -v -tags=integration
 ```
 
 **Key integration tests:**
-- `TestUpdateAllReplaceDirectives_FromAvalanchego`: Validates complete dependency graph updates
+- `TestUpdateAllReplaceDirectives_FromAvalanchego`: Validates complete dependency graph updates including grafted coreth
 - `TestUpdateAllReplaceDirectives_MultipleRepos`: Tests all sync combinations
 - `TestCloneOrUpdateRepo_ShallowToSHAWithForce`: Tests shallow clone → SHA update
 - `TestGetDefaultRefForRepo_WithPseudoVersion`: Tests pseudo-version extraction
 - `TestDetectCurrentRepo_FromAvalanchego`: Tests repo detection from avalanchego
-- `TestDetectCurrentRepo_FromCoreth`: Tests repo detection from coreth
 - `TestDetectCurrentRepo_FromFirewood`: Tests repo detection from firewood (ffi/go.mod)
 - `TestDetectCurrentRepo_FromUnknownLocation`: Tests repo detection from unknown location
 - `TestGetRepoStatus_*`: Tests status reporting for primary and synced repos
 - `TestTargetDir_*`: Tests --target-dir flag functionality with various paths and validation
-- `TestDiscoverAvalanchegoCorethVersions_BothExplicit`: Both versions specified explicitly
-- `TestDiscoverAvalanchegoCorethVersions_AvalanchegoExplicit_CorethDiscovered`: Avalanchego explicit, coreth discovered
-- `TestDiscoverAvalanchegoCorethVersions_CorethExplicit_AvalanchegoDiscovered`: Coreth explicit, avalanchego discovered
-- `TestDiscoverAvalanchegoCorethVersions_AvalanchegoCloned_DiscoverCoreth`: Avalanchego exists locally, discover coreth
-- `TestDiscoverAvalanchegoCorethVersions_CorethCloned_DiscoverAvalanchego`: Coreth exists locally, discover avalanchego
-- `TestDiscoverAvalanchegoCorethVersions_NeitherExplicit_DefaultAvalanchego`: Default avalanchego to master, discover coreth
-- `TestDiscoverAvalanchegoCorethVersions_FromStandaloneMode`: From directory with no primary repo
-- `TestDiscoverAvalanchegoCorethVersions_FromFirewoodPrimary`: From firewood as primary repo
 - `TestDiscoverFirewoodVersion_Explicit`: Explicit version provided
-- `TestDiscoverFirewoodVersion_FromCoreth`: Coreth being synced, discover from coreth/go.mod
-- `TestDiscoverFirewoodVersion_FromAvalanchego`: Only avalanchego involved, discover from avalanchego/go.mod
+- `TestDiscoverFirewoodVersion_FromAvalanchego`: Avalanchego involved, discover from avalanchego/go.mod
 - `TestDiscoverFirewoodVersion_StandaloneDefaultBranch`: Firewood alone, no primary repo, use main
-- `TestDiscoverFirewoodVersion_CorethAlreadyCloned`: Coreth exists locally, discover firewood from it
-- `TestDiscoverFirewoodVersion_AvalanchegoAlreadyCloned`: Avalanchego exists locally (no coreth), discover firewood from it
+- `TestDiscoverFirewoodVersion_AvalanchegoAlreadyCloned`: Avalanchego exists locally, discover firewood from it
 
 ### Corner Cases and Test Coverage
 
@@ -1206,9 +1142,9 @@ The status command must handle all combinations of these factors:
 
 **Repository Detection:**
 - Running from avalanchego root
-- Running from coreth root
 - Running from firewood root (special case: `ffi/go.mod`)
 - Running from unknown directory
+- Note: Running from grafted coreth (graft/coreth/) is not a primary repo scenario
 
 **Test Coverage Goals:**
 ```bash
@@ -1234,7 +1170,6 @@ TestGetRepoStatus_NoReplaces
 
 # Repository detection
 TestDetectCurrentRepo_FromAvalanchego
-TestDetectCurrentRepo_FromCoreth
 TestDetectCurrentRepo_FromFirewood  # Special ffi/go.mod case
 TestDetectCurrentRepo_FromWorktree
 TestDetectCurrentRepo_FromUnknownLocation
@@ -1245,33 +1180,20 @@ TestGetRepoStatus_InvalidGoMod
 TestGetRepoStatus_MissingCommondir
 ```
 
-#### Version Discovery Without Primary Repo Dependencies
-
-**Avalanchego ↔ Coreth Discovery:**
-
-When neither can be discovered from a primary repo's go.mod (firewood as primary, or no primary repo):
-- Both versions specified explicitly
-- One explicit, other discovered from its go.mod
-- One already cloned, discover the other
-- Neither explicit: default avalanchego to master, discover coreth
-- Only avalanchego requested without version: use master
-- Only coreth requested without version: use main
-- Error: go.mod doesn't contain the dependency
+#### Version Discovery in Standalone Mode
 
 **Firewood Discovery:**
 
-Following the dependency chain (coreth direct, avalanchego indirect):
+Following the dependency chain (avalanchego → firewood via grafted coreth):
 - Explicit version provided
-- Coreth being synced: discover from coreth/go.mod (direct dependency)
-- Coreth already cloned: discover from coreth/go.mod (direct dependency)
-- Only avalanchego involved (synced or cloned): discover from avalanchego/go.mod (indirect dependency)
+- Avalanchego involved (synced or cloned): discover from avalanchego/go.mod (indirect via grafted coreth)
 - Firewood alone, no primary repo: use default branch (main)
 - Error: go.mod doesn't contain firewood dependency
 
 **Key Principles:**
 - Only sync repos explicitly requested in the command (never auto-sync dependencies)
-- Follow dependency chain: avalanchego ↔ coreth (bidirectional), coreth → firewood (direct), avalanchego → firewood (indirect)
-- Prioritize compatibility: when both avalanchego and coreth requested without versions, default avalanchego to master and discover coreth
+- Follow dependency chain: avalanchego → firewood (indirect via grafted coreth)
+- Coreth is NOT synced as a standalone repository (it's grafted into avalanchego)
 
 #### Git Worktree Implementation Notes
 
@@ -1342,15 +1264,15 @@ git worktree remove ../test-worktree
 ./scripts/run_task.sh lint
 ```
 
-1. **From avalanchego, sync coreth and firewood:**
+1. **From avalanchego, sync firewood:**
    ```bash
    cd avalanchego
    ./scripts/run_polyrepo.sh sync
    ```
 
    Verify:
-   - `avalanchego/go.mod` has replace directives for coreth and firewood
-   - `avalanchego/coreth/go.mod` has replace directives for avalanchego and firewood
+   - `avalanchego/go.mod` has replace directive for firewood
+   - `avalanchego/graft/coreth/go.mod` has replace directive for firewood
    - `go build ./...` succeeds
 
 2. **Sync specific commit:**
@@ -1392,6 +1314,40 @@ git worktree remove ../test-worktree
    - Error message when path is a file, not a directory
 
 ## Recent Fixes
+
+### Coreth Grafted into Avalanchego (2025-12)
+
+**Change**: Coreth has been grafted into avalanchego at `graft/coreth/` and is no longer managed as a standalone syncable repository.
+
+**Impact on Polyrepo Tool**:
+- The polyrepo tool now only manages two repositories: **avalanchego** and **firewood**
+- Coreth is NOT synced as a separate repository
+- The grafted coreth's go.mod at `graft/coreth/go.mod` is still updated with firewood replace directives when syncing
+- Version discovery for coreth is no longer needed (it's part of avalanchego)
+- `DiscoverAvalanchegoCorethVersions()` function is no longer used
+
+**Dependency Graph Change**:
+```
+Before:
+avalanchego ↔ coreth → firewood
+
+After:
+avalanchego (contains graft/coreth/) → firewood
+```
+
+**Behavior Changes**:
+- `polyrepo sync` from avalanchego: syncs only firewood (not coreth)
+- `polyrepo sync coreth`: no longer valid (coreth is not a standalone repo)
+- `UpdateAllReplaceDirectives()`: now updates avalanchego/go.mod and graft/coreth/go.mod with firewood replace directives
+- Status command: no longer shows coreth as a syncable repository
+
+**Files Updated**:
+- All documentation sections updated to remove coreth as standalone repo
+- Examples updated to show only avalanchego and firewood syncing
+- Test references updated to remove coreth-specific tests
+- Implementation details updated to reflect grafted coreth handling
+
+**Key Message**: Coreth still exists and its go.mod is still managed by the polyrepo tool, but it's no longer synced as a separate repository. It's now an integral part of avalanchego at `graft/coreth/`.
 
 ### Avalanchego Default Sync Behavior: Auto-Sync Firewood (2025-11)
 
@@ -1869,6 +1825,10 @@ RunE: func(cmd *cobra.Command, args []string) error {
 
 ### Adding a New Repository
 
+**Note**: Currently the polyrepo tool manages only avalanchego and firewood. Coreth is grafted into avalanchego and not managed as a standalone repository.
+
+If you need to add a new syncable repository:
+
 1. Add config to core/config.go:
    ```go
    newRepoConfig = &RepoConfig{
@@ -1883,7 +1843,11 @@ RunE: func(cmd *cobra.Command, args []string) error {
 
 2. Add to `allRepos` map in config.go
 
-3. Add integration tests
+3. Update dependency graph documentation in Overview section
+
+4. Add integration tests
+
+5. Update CLAUDE.md with the new repository in all relevant sections
 
 ### Debugging
 
@@ -1992,5 +1956,7 @@ When you replace a function like `GetReposToSync()` with `GetDirectDependencies(
 - Replace directives must always use relative paths starting with `./` or `../`
 - `filepath.Join()` normalizes away `./` prefix, so construct paths carefully
 - Firewood has a special structure: go.mod is in `ffi/` subdir, replace points to `ffi/result/ffi` (nix output)
-- The dependency graph is bidirectional between avalanchego and coreth
-- Always test with all three repo combinations when modifying sync logic
+- The dependency graph is now: avalanchego (contains grafted coreth) → firewood
+- Coreth is NOT a standalone syncable repository (it's grafted into avalanchego at graft/coreth/)
+- Grafted coreth's go.mod at graft/coreth/go.mod is still updated with firewood replace directives
+- Always test with both avalanchego and firewood when modifying sync logic

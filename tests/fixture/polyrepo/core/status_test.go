@@ -35,7 +35,6 @@ go 1.24
 	output := buf.String()
 	require.Contains(output, "Primary Repository: avalanchego")
 	require.Contains(output, "Other Repositories:")
-	require.Contains(output, "coreth: not cloned")
 	require.Contains(output, "firewood: not cloned")
 
 	// The primary repo section should show avalanchego status (may be "not cloned" without .git)
@@ -51,6 +50,9 @@ go 1.24
 			require.Fail("avalanchego should not appear in Other Repositories section")
 		}
 	}
+
+	// Verify coreth does not appear anywhere (no longer a managed repo)
+	require.NotContains(output, "coreth:")
 }
 
 // TestStatus_FromUnknownLocation tests Status() when not in a known repository
@@ -70,7 +72,6 @@ func TestStatus_FromUnknownLocation(t *testing.T) {
 	require.Contains(output, "Primary Repository: none (not in a known repository)")
 	require.Contains(output, "Other Repositories:")
 	require.Contains(output, "avalanchego: not cloned")
-	require.Contains(output, "coreth: not cloned")
 	require.Contains(output, "firewood: not cloned")
 }
 
@@ -88,22 +89,21 @@ func TestStatus_WithClonedRepos(t *testing.T) {
 go 1.24
 `), 0o600))
 
-	// Create a fake coreth directory (just the directory structure, no git)
+	// Create a fake firewood directory (just the directory structure, no git)
 	// This tests that Status() attempts to check synced repo directories
-	corethPath := filepath.Join(tmpDir, "coreth")
-	require.NoError(os.MkdirAll(corethPath, 0o755))
+	firewoodPath := filepath.Join(tmpDir, "firewood")
+	require.NoError(os.MkdirAll(firewoodPath, 0o755))
 
 	// Call Status()
 	var buf bytes.Buffer
 	require.NoError(Status(log, tmpDir, &buf))
 
-	// Verify output structure - coreth directory exists but not a git repo
+	// Verify output structure - firewood directory exists but not a git repo
 	output := buf.String()
 	require.Contains(output, "Primary Repository: avalanchego")
 	require.Contains(output, "Other Repositories:")
-	// coreth directory exists but won't show as cloned without .git
-	require.Contains(output, "coreth:")
-	require.Contains(output, "firewood: not cloned")
+	// firewood directory exists but won't show as cloned without .git
+	require.Contains(output, "firewood:")
 }
 
 // TestStatus_OutputFormat tests that Status() produces correct output structure
@@ -111,10 +111,10 @@ func TestStatus_OutputFormat(t *testing.T) {
 	require := require.New(t)
 	log := logging.NoLog{}
 
-	// Create temp directory with coreth go.mod
+	// Create temp directory with avalanchego go.mod
 	tmpDir := t.TempDir()
 	goModPath := filepath.Join(tmpDir, "go.mod")
-	require.NoError(os.WriteFile(goModPath, []byte(`module github.com/ava-labs/coreth
+	require.NoError(os.WriteFile(goModPath, []byte(`module github.com/ava-labs/avalanchego
 go 1.24
 `), 0o600))
 
@@ -138,43 +138,6 @@ go 1.24
 		}
 	}
 	require.True(foundOthers, "Output should contain 'Other Repositories:' section")
-}
-
-// TestStatus_FromCoreth tests Status() when running from coreth directory
-func TestStatus_FromCoreth(t *testing.T) {
-	require := require.New(t)
-	log := logging.NoLog{}
-
-	// Create temp directory with coreth go.mod
-	tmpDir := t.TempDir()
-	goModPath := filepath.Join(tmpDir, "go.mod")
-	require.NoError(os.WriteFile(goModPath, []byte(`module github.com/ava-labs/coreth
-go 1.24
-`), 0o600))
-
-	// Call Status()
-	var buf bytes.Buffer
-	require.NoError(Status(log, tmpDir, &buf))
-
-	// Verify output
-	output := buf.String()
-	require.Contains(output, "Primary Repository: coreth")
-	require.Contains(output, "Other Repositories:")
-	require.Contains(output, "avalanchego: not cloned")
-	require.Contains(output, "firewood: not cloned")
-
-	// Coreth should NOT appear in the "Other Repositories" section
-	lines := strings.Split(output, "\n")
-	inOtherRepos := false
-	for _, line := range lines {
-		if strings.Contains(line, "Other Repositories:") {
-			inOtherRepos = true
-			continue
-		}
-		if inOtherRepos && strings.Contains(line, "coreth:") {
-			require.Fail("coreth should not appear in Other Repositories section")
-		}
-	}
 }
 
 // TestStatus_FromFirewood tests Status() when running from firewood directory
@@ -201,7 +164,6 @@ go 1.24
 	require.Contains(output, "Primary Repository: firewood")
 	require.Contains(output, "Other Repositories:")
 	require.Contains(output, "avalanchego: not cloned")
-	require.Contains(output, "coreth: not cloned")
 
 	// Firewood should NOT appear in the "Other Repositories" section
 	lines := strings.Split(output, "\n")

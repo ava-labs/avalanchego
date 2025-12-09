@@ -30,17 +30,6 @@ var (
 		NixBuildPath:          "",
 	}
 
-	corethConfig = &RepoConfig{
-		Name:                  "coreth",
-		GoModule:              "github.com/ava-labs/coreth",
-		ModuleReplacementPath: ".",
-		GitRepo:               "https://github.com/ava-labs/coreth",
-		DefaultBranch:         "master",
-		GoModPath:             "go.mod",
-		RequiresNixBuild:      false,
-		NixBuildPath:          "",
-	}
-
 	firewoodConfig = &RepoConfig{
 		Name:                  "firewood",
 		GoModule:              "github.com/ava-labs/firewood-go-ethhash/ffi", // Module name used by importers
@@ -55,7 +44,6 @@ var (
 
 	allRepos = map[string]*RepoConfig{
 		"avalanchego": avalanchegoConfig,
-		"coreth":      corethConfig,
 		"firewood":    firewoodConfig,
 	}
 )
@@ -71,5 +59,5 @@ func GetRepoConfig(name string) (*RepoConfig, error) {
 
 // GetAllRepoConfigs returns all repository configurations
 func GetAllRepoConfigs() []*RepoConfig {
-	return []*RepoConfig{avalanchegoConfig, corethConfig, firewoodConfig}
+	return []*RepoConfig{avalanchegoConfig, firewoodConfig}
 }
