@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if ! [[ "$0" =~ scripts/lint.sh ]]; then
-  echo "must be run from repository root"
+  echo "must be run from coreth root"
   exit 255
 fi
 

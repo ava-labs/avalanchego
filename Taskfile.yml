@@ -203,6 +203,7 @@ tasks:
   reexecute-cchain-range:
     desc: Re-execute a range of C-Chain blocks.
     vars:
+      TASK_NAME: '{{.TASK_NAME | default .TASK}}'
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
       BLOCK_DIR: '{{.BLOCK_DIR}}'
       CONFIG: '{{.CONFIG | default ""}}'
