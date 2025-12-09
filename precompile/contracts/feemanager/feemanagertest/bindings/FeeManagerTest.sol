@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "./IFeeManager.sol";
+import "precompile/contracts/feemanager/IFeeManager.sol";
 
 contract FeeManagerTest {
   IFeeManager private feeManager;

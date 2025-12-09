@@ -4,7 +4,7 @@
 package bindings
 
 // Step 1: Compile Solidity contracts to generate ABI and bin files
-//go:generate solc-v0.8.30 -o artifacts --overwrite --abi --bin --base-path . precompile/=../../ --evm-version cancun AllowListTest.sol
+//go:generate solc-v0.8.30 -o artifacts --overwrite --abi --bin --base-path . precompile/=../../../ --evm-version cancun AllowListTest.sol
 // Step 2: Generate Go bindings from the compiled artifacts
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type IAllowList --abi artifacts/IAllowList.abi --bin artifacts/IAllowList.bin --out gen_allowlist_binding.go
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type AllowListTest --abi artifacts/AllowListTest.abi --bin artifacts/AllowListTest.bin --out gen_allowlisttest_binding.go

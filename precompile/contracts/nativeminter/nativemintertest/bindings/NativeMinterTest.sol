@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "./INativeMinter.sol";
+import "precompile/contracts/nativeminter/INativeMinter.sol";
 
 contract NativeMinterTest {
   INativeMinter private nativeMinter;

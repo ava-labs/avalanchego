@@ -4,7 +4,7 @@
 package bindings
 
 // Step 1: Compile Solidity contracts to generate ABI and bin files
-//go:generate solc-v0.8.30 -o artifacts --overwrite --abi --bin --base-path ../../../../.. precompile/=precompile/ --evm-version cancun RewardManagerTest.sol IRewardManager.sol
+//go:generate solc-v0.8.30 -o artifacts --overwrite --abi --bin --base-path ../../../../.. precompile/=precompile/ --evm-version cancun RewardManagerTest.sol
 // Step 2: Generate Go bindings from the compiled artifacts
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type IRewardManager --abi artifacts/IRewardManager.abi --bin artifacts/IRewardManager.bin --out gen_irewardmanager_binding.go
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type RewardManagerTest --abi artifacts/RewardManagerTest.abi --bin artifacts/RewardManagerTest.bin --out gen_rewardmanagertest_binding.go

@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-import "precompile/allowlist/allowlisttest/bindings/IAllowList.sol";
+import "precompile/allowlist/IAllowList.sol";
 
 interface IRewardManager is IAllowList {
     // RewardAddressChanged is the event logged whenever reward address is modified

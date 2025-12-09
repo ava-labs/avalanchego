@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-import "precompile/allowlist/allowlisttest/bindings/IAllowList.sol";
+import "precompile/allowlist/IAllowList.sol";
 
 interface INativeMinter is IAllowList {
   event NativeCoinMinted(address indexed sender, address indexed recipient, uint256 amount);
