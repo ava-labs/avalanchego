@@ -146,7 +146,20 @@ function run {
   local test="${1}"
   shift 1
   echo "START: '${test}' at $(date)"
-  if "test_${test}" "$@"; then
+  # Filter out files that have skiplint comments for this specific test
+  local filtered_files=()
+  for file in "${UPSTREAM_FILES[@]}"; do
+    # Check if file has skiplint comment for this test
+    if ! grep -q "// #skiplint: ${test}" "$file" 2>/dev/null; then
+      filtered_files+=("$file")
+    fi
+  done
+
+  if [ ${#filtered_files[@]} -eq 0 ]; then
+    echo "SKIPPED: '${test}' - No files remain after filtering at $(date)"
+    return 0
+  fi
+  if "test_${test}" "${filtered_files[@]}"; then
     echo "SUCCESS: '${test}' completed at $(date)"
   else
     echo "FAIL: '${test}' failed at $(date)"
