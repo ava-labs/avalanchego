@@ -1,0 +1,93 @@
+name: Firewood Differential Fuzz
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'firewood/**'
+      - '.github/workflows/firewood-fuzz.yml'
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: 'Fuzz duration (e.g., 1m, 10m, 1h)'
+        required: false
+        default: '1m'
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ethhash-fuzz:
+    name: Ethhash differential fuzz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-nix
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel
+          key: bazel-firewood-fuzz-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock') }}
+          restore-keys: |
+            bazel-firewood-fuzz-${{ runner.os }}-${{ runner.arch }}-
+      - name: Set memlock for io-uring
+        run: |
+          ulimit -Sa
+          ulimit -Ha
+          sudo prlimit --pid $$ --memlock=-1:-1 || echo "prlimit not available, locking kernel memory may fail when setting up io-uring"
+          ulimit -Sa
+          ulimit -Ha
+      - name: Run ethhash differential fuzz
+        shell: nix develop --command bash {0}
+        env:
+          FIREWOOD_FUZZTIME: ${{ github.event.inputs.fuzztime || '1m' }}
+        run: ./scripts/run_task.sh firewood:fuzz-ethhash
+      - name: Upload Fuzz testdata
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethhash-differential-fuzz-testdata
+          path: firewood/ffi/tests/eth/testdata
+          retention-days: 30
+
+  merkle-fuzz:
+    name: Merkle differential fuzz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-nix
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel
+          key: bazel-firewood-fuzz-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock') }}
+          restore-keys: |
+            bazel-firewood-fuzz-${{ runner.os }}-${{ runner.arch }}-
+      - name: Set memlock for io-uring
+        run: |
+          ulimit -Sa
+          ulimit -Ha
+          sudo prlimit --pid $$ --memlock=-1:-1 || echo "prlimit not available, locking kernel memory may fail when setting up io-uring"
+          ulimit -Sa
+          ulimit -Ha
+      - name: Run merkle differential fuzz
+        shell: nix develop --command bash {0}
+        env:
+          FIREWOOD_FUZZTIME: ${{ github.event.inputs.fuzztime || '1m' }}
+        run: ./scripts/run_task.sh firewood:fuzz-merkle
+      - name: Upload Fuzz testdata
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merkle-differential-fuzz-testdata
+          path: firewood/ffi/tests/firewood/testdata
+          retention-days: 30
