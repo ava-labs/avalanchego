@@ -12,8 +12,9 @@ ARG BUILDER_WORKDIR
 
 WORKDIR $BUILDER_WORKDIR
 
-# Build the VM (run from root to use root module context)
-RUN cd graft/subnet-evm && ./scripts/build.sh /build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
+# Build the VM using the package path from root module
+RUN go build -race -o /build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy \
+    ./graft/subnet-evm/plugin
 
 # ============= Cleanup Stage ================
 FROM $AVALANCHEGO_NODE_IMAGE AS execution

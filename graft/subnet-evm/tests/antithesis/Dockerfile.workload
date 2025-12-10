@@ -12,8 +12,9 @@ ARG BUILDER_WORKDIR
 
 WORKDIR $BUILDER_WORKDIR
 
-# Build the workload (run from root to use root module context)
-RUN cd graft/subnet-evm && ./scripts/build_antithesis_workload.sh
+# Build the workload using the package path from root module
+RUN go build -o ./graft/subnet-evm/build/workload \
+    ./graft/subnet-evm/tests/antithesis
 
 # ============= Cleanup Stage ================
 # Base the workflow on the node image to support bootstrap testing

@@ -47,7 +47,4 @@ RUN /opt/antithesis/bin/goinstrumentor \
 WORKDIR /instrumented/customer
 # Run go mod tidy to add instrumentation packages to go.sum
 RUN go mod tidy
-# Also tidy submodules to add instrumentation packages to their go.sum
-RUN if [ -d graft/subnet-evm ]; then cd graft/subnet-evm && go mod tidy; fi
-RUN if [ -d graft/coreth ]; then cd graft/coreth && go mod tidy; fi
 RUN ln -s /opt/tmp/.git .git
