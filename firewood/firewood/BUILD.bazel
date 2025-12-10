@@ -2,34 +2,54 @@ load("@rules_rust//rust:defs.bzl", "rust_library")
 
 exports_files(["Cargo.toml"])
 
+# Common dependencies shared between both feature variants
+_FIREWOOD_SRCS = glob(["src/**/*.rs"])
+
+_FIREWOOD_PROC_MACRO_DEPS = [
+    "//firewood/firewood-macros",
+    "@firewood_crates//:bytemuck_derive",
+    "@firewood_crates//:derive-where",
+]
+
+_FIREWOOD_DEPS_COMMON = [
+    "@firewood_crates//:bytemuck",
+    "@firewood_crates//:coarsetime",
+    "@firewood_crates//:fastrace",
+    "@firewood_crates//:fjall",
+    "@firewood_crates//:hex",
+    "@firewood_crates//:integer-encoding",
+    "@firewood_crates//:metrics",
+    "@firewood_crates//:parking_lot",
+    "@firewood_crates//:rayon",
+    "@firewood_crates//:thiserror",
+    "@firewood_crates//:typed-builder",
+    "@firewood_crates//:weak-table",
+]
+
+# Default mode (SHA-256/MerkleDB compatibility)
 rust_library(
     name = "firewood",
-    srcs = glob(["src/**/*.rs"]),
+    srcs = _FIREWOOD_SRCS,
+    crate_features = [],
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    proc_macro_deps = _FIREWOOD_PROC_MACRO_DEPS,
+    visibility = ["//firewood:__subpackages__"],
+    deps = ["//firewood/storage:firewood-storage"] + _FIREWOOD_DEPS_COMMON,
+)
+
+# Ethhash mode (Keccak-256/Ethereum compatibility)
+rust_library(
+    name = "firewood_ethhash",
+    srcs = _FIREWOOD_SRCS,
     crate_features = [
         "ethhash",
         "logger",
     ],
+    crate_name = "firewood",
     crate_root = "src/lib.rs",
     edition = "2024",
-    proc_macro_deps = [
-        "//firewood/firewood-macros",
-        "@firewood_crates//:bytemuck_derive",
-        "@firewood_crates//:derive-where",
-    ],
+    proc_macro_deps = _FIREWOOD_PROC_MACRO_DEPS,
     visibility = ["//firewood:__subpackages__"],
-    deps = [
-        "//firewood/storage:firewood-storage",
-        "@firewood_crates//:bytemuck",
-        "@firewood_crates//:coarsetime",
-        "@firewood_crates//:fastrace",
-        "@firewood_crates//:fjall",
-        "@firewood_crates//:hex",
-        "@firewood_crates//:integer-encoding",
-        "@firewood_crates//:metrics",
-        "@firewood_crates//:parking_lot",
-        "@firewood_crates//:rayon",
-        "@firewood_crates//:thiserror",
-        "@firewood_crates//:typed-builder",
-        "@firewood_crates//:weak-table",
-    ],
+    deps = ["//firewood/storage:firewood-storage_ethhash"] + _FIREWOOD_DEPS_COMMON,
 )
