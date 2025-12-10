@@ -1001,9 +1001,9 @@ func newAccounts(n int) (accounts []Account) {
 
 // WARNING: only use for tests that require deterministic accounts
 func newAccountsWithSeed(n int, seed int64) (accounts []Account) {
-	rand := rand.New(rand.NewSource(seed))
+	rng := rand.New(rand.NewSource(seed))
 	for i := 0; i < n; i++ {
-		key, _ := ecdsa.GenerateKey(crypto.S256(), rand)
+		key, _ := ecdsa.GenerateKey(crypto.S256(), rng)
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 		accounts = append(accounts, Account{key: key, addr: addr})
 	}
