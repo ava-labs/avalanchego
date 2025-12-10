@@ -38,7 +38,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/huin/goupnp v1.3.0
-	github.com/jackpal/gateway v1.0.6
+	github.com/jackpal/gateway v1.1.1
 	github.com/jackpal/go-nat-pmp v1.0.2
 	github.com/leanovate/gopter v0.2.11
 	github.com/mitchellh/mapstructure v1.5.0
@@ -86,6 +86,8 @@ require (
 	k8s.io/client-go v0.29.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
+
+require github.com/stretchr/objx v0.5.2 // indirect
 
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
