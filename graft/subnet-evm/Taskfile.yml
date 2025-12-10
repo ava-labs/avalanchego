@@ -137,9 +137,8 @@ tasks:
   test-build-antithesis-images-ci: # consolidated test-build-antithesis-images
     desc: Test antithesis images build with CI setup
     cmds:
-      - dir: ../../
-        task: build # build avalanchego
-      - task: build
+      - cmd: ../../scripts/build.sh # build avalanchego
+      - task: build # build subnet-evm
       - cmd: go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --duration=60s
       - task: test-build-antithesis-images
 
@@ -154,9 +153,8 @@ tasks:
   test-e2e-load-ci: # consolidated test-e2e-load
     desc: Run E2E load tests with CI setup
     cmds:
-      - dir: ../../
-        task: build # build avalanchego
-      - task: build
+      - cmd: ../../scripts/build.sh # build avalanchego
+      - task: build # build subnet-evm
       - env:
           AVALANCHEGO_BUILD_PATH: ../../build
         task: test-e2e-load
