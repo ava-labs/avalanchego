@@ -46,4 +46,7 @@ RUN /opt/antithesis/bin/goinstrumentor \
 
 WORKDIR /instrumented/customer
 RUN go mod download
+# Also download dependencies for instrumented submodules
+RUN if [ -d graft/subnet-evm ]; then cd graft/subnet-evm && go mod download; fi
+RUN if [ -d graft/coreth ]; then cd graft/coreth && go mod download; fi
 RUN ln -s /opt/tmp/.git .git
