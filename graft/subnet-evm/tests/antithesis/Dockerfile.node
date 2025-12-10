@@ -12,9 +12,9 @@ ARG BUILDER_WORKDIR
 
 WORKDIR $BUILDER_WORKDIR
 
-# Build the VM using the package path from root module
-RUN go build -race -o /build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy \
-    ./graft/subnet-evm/plugin
+# Build the VM from the submodule directory
+# Use -mod=mod to allow missing go.sum entries for antithesis instrumentation packages
+RUN cd graft/subnet-evm && GOFLAGS=-mod=mod ./scripts/build.sh /build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
 
 # ============= Cleanup Stage ================
 FROM $AVALANCHEGO_NODE_IMAGE AS execution

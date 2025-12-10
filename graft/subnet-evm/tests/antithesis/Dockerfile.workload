@@ -12,9 +12,9 @@ ARG BUILDER_WORKDIR
 
 WORKDIR $BUILDER_WORKDIR
 
-# Build the workload using the package path from root module
-RUN go build -o ./graft/subnet-evm/build/workload \
-    ./graft/subnet-evm/tests/antithesis
+# Build the workload from the submodule directory
+# Use -mod=mod to allow missing go.sum entries for antithesis instrumentation packages
+RUN cd graft/subnet-evm && GOFLAGS=-mod=mod ./scripts/build_antithesis_workload.sh
 
 # ============= Cleanup Stage ================
 # Base the workflow on the node image to support bootstrap testing
