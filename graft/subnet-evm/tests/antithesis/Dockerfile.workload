@@ -10,7 +10,8 @@ FROM antithesis-subnet-evm-builder:$BUILDER_IMAGE_TAG AS builder
 # The builder workdir will vary between instrumented and non-instrumented builders
 ARG BUILDER_WORKDIR
 
-WORKDIR $BUILDER_WORKDIR
+# Change to subnet-evm directory within the builder
+WORKDIR $BUILDER_WORKDIR/graft/subnet-evm
 
 # Build the workload
 RUN ./scripts/build_antithesis_workload.sh
@@ -23,6 +24,6 @@ FROM $AVALANCHEGO_NODE_IMAGE AS execution
 ARG BUILDER_WORKDIR
 
 # Copy the executable into the container
-COPY --from=builder $BUILDER_WORKDIR/build/workload ./workload
+COPY --from=builder $BUILDER_WORKDIR/graft/subnet-evm/build/workload ./workload
 
 CMD [ "./workload" ]

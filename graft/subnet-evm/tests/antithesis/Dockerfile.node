@@ -10,7 +10,8 @@ FROM antithesis-subnet-evm-builder:$BUILDER_IMAGE_TAG AS builder
 # The builder workdir will vary between instrumented and non-instrumented builders
 ARG BUILDER_WORKDIR
 
-WORKDIR $BUILDER_WORKDIR
+# Change to subnet-evm directory within the builder
+WORKDIR $BUILDER_WORKDIR/graft/subnet-evm
 
 # Build the VM
 RUN ./scripts/build.sh /build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
@@ -29,7 +30,7 @@ COPY --from=builder /instrumented/symbols /symbols
 ENV AVAGO_PLUGIN_DIR=/avalanchego/build/plugins
 
 # Copy the executable into the container
-COPY --from=builder $BUILDER_WORKDIR/build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy\
+COPY --from=builder $BUILDER_WORKDIR/graft/subnet-evm/build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy\
   $AVAGO_PLUGIN_DIR/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
 
 # The node image's entrypoint will be reused.

@@ -20,7 +20,8 @@ IMAGE_NAME=${IMAGE_NAME:-"subnet-evm_avalanchego"}
 AVALANCHEGO_IMAGE_NAME="${AVALANCHEGO_IMAGE_NAME:-avaplatform/avalanchego}"
 
 # if this isn't a git repository (say building from a release), don't set our git constants.
-if [ ! -d .git ]; then
+# Check if we're in a git repo (works even if .git is in a parent directory)
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
     CURRENT_BRANCH=""
     SUBNET_EVM_COMMIT=""
 else
@@ -31,7 +32,7 @@ else
     #
     # Use an abbreviated version of the full commit to tag the image.
     # WARNING: this will use the most recent commit even if there are un-committed changes present
-    SUBNET_EVM_COMMIT="$(git rev-parse HEAD || :)"
+    SUBNET_EVM_COMMIT="$(git rev-parse HEAD)"
 fi
 
 # Don't export them as they're used in the context of other calls
