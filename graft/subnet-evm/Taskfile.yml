@@ -5,7 +5,7 @@
 version: '3'
 
 env:
-  AVALANCHEGO_BUILD_PATH: '{{.AVALANCHEGO_BUILD_PATH | default "/tmp/e2e-test/avalanchego"}}'
+  AVALANCHEGO_BUILD_PATH: '{{.AVALANCHEGO_BUILD_PATH | default (printf "%s/../../build" .TASKFILE_DIR) }}'
 
 tasks:
   default: ./scripts/run_task.sh --list
@@ -155,9 +155,7 @@ tasks:
     cmds:
       - cmd: cd ../../ && ./scripts/build.sh # build avalanchego from root
       - task: build # build subnet-evm
-      - env:
-          AVALANCHEGO_BUILD_PATH: ../../build
-        task: test-e2e-load
+      - task: test-e2e-load
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
