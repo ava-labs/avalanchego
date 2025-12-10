@@ -92,10 +92,56 @@ type Engine struct {
 	// number of times build block needs to be called once the number of
 	// processing blocks has gone below the optimal number.
 	pendingBuildBlocks int
+
+	// PoM Lifecycle Controls
+	epochTicker   *time.Ticker
+	stopEpoch     chan struct{}
+	epochDuration time.Duration
 }
 
 func New(config Config) (*Engine, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
+
+	// TO-DO: Remove later, Manage via Configuration
+	// Internal Configuration Tuning
+	// We enforce PoM parameters to ensure the consensus behaves
+	// deterministically (Majority Vote) rather than probabilistically.
+
+	// 1. Beta = 1: We want immediate finalization. If a block gets a majority
+	//    vote in the Epoch, it should be accepted immediately.
+	config.Params.Beta = 1
+
+	// 2. ConcurrentRepolls = 1: PoM is a lock-step protocol. We do not want
+	//    background threads repolling old transactions.
+	config.Params.ConcurrentRepolls = 1
+
+	// 3. Majority Rule: K = Total Network, Alpha > 50%
+	//    We capture the current validator set size to set the static parameters.
+	//    Note: In a fully dynamic PoM implementation, these should be updated
+	//    per Epoch, but for this structural phase, we set them at startup.
+	currentValCount := config.Validators.NumValidators(config.Ctx.SubnetID)
+
+	if currentValCount > 0 {
+		// Set K to the total network size (we query everyone)
+		config.Params.K = int(currentValCount)
+
+		// Set Alpha to strict majority (> 50%)
+		config.Params.AlphaPreference = int(currentValCount/2) + 1
+		config.Params.AlphaConfidence = config.Params.AlphaPreference
+
+		config.Ctx.Log.Info("PoM: Enforced consensus parameters",
+			zap.Int("K", config.Params.K),
+			zap.Int("Alpha", config.Params.AlphaPreference),
+			zap.Int("Beta", config.Params.Beta),
+		)
+	} else {
+		// Fallback for bootstrapping/testing if no validators are present yet
+		config.Params.K = 1
+		config.Params.AlphaPreference = 1
+		config.Params.AlphaConfidence = 1
+		config.Ctx.Log.Warn("PoM: No validators found at startup, using fallback params")
+	}
+	// ===========================================================================
 
 	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
 		"non_verified_cache",
@@ -433,7 +479,12 @@ func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID u
 
 func (e *Engine) Shutdown(ctx context.Context) error {
 	e.Ctx.Log.Info("shutting down consensus engine")
-
+	if e.stopEpoch != nil {
+		close(e.stopEpoch)
+	}
+	if e.epochTicker != nil {
+		e.epochTicker.Stop()
+	}
 	e.Ctx.Lock.Lock()
 	defer e.Ctx.Lock.Unlock()
 
@@ -443,9 +494,14 @@ func (e *Engine) Shutdown(ctx context.Context) error {
 func (e *Engine) Notify(ctx context.Context, msg common.Message) error {
 	switch msg {
 	case common.PendingTxs:
-		// the pending txs message means we should attempt to build a block.
-		e.pendingBuildBlocks++
-		return e.executeDeferredWork(ctx)
+		// // the pending txs message means we should attempt to build a block.
+		// e.pendingBuildBlocks++
+		// return e.executeDeferredWork(ctx)
+
+		// e.pendingBuildBlocks++
+		// return e.executeDeferredWork(ctx)
+		e.Ctx.Log.Verbo("PoM: Received PendingTxs, waiting for next Epoch")
+		return nil
 	case common.StateSyncDone:
 		e.Ctx.StateSyncing.Set(false)
 		return nil
@@ -522,6 +578,7 @@ func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
 			err)
 	}
+	e.StartPoMLifecycle()
 	return e.executeDeferredWork(ctx)
 }
 
@@ -1199,4 +1256,133 @@ func (e *Engine) isDecided(blk snowman.Block) bool {
 	parentHeight := height - 1
 	parentID := blk.Parent()
 	return parentHeight == lastAcceptedHeight && parentID != lastAcceptedID // the parent was rejected
+}
+
+// StartPoMLifecycle initializes the Proof of Majority heartbeat
+func (e *Engine) StartPoMLifecycle() {
+	e.Ctx.Log.Info("PoM: Starting Consensus Lifecycle")
+
+	// PoM Paper Section 7.12: Network Epochs
+	// We set a fixed duration (e.g., 2 seconds).
+	e.epochDuration = 2 * time.Second
+	e.epochTicker = time.NewTicker(e.epochDuration)
+	e.stopEpoch = make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-e.stopEpoch:
+				return
+			case <-e.epochTicker.C:
+				e.runEpoch()
+			}
+		}
+	}()
+}
+
+// runEpoch executes one full PoM cycle (Section 7)
+// It acquires the lock, performs the phase, and releases it.
+func (e *Engine) runEpoch() {
+	ctx := context.Background()
+
+	// =================================================================
+	// PHASE 0: Epoch Initialization & Propagation
+	// =================================================================
+	e.Ctx.Lock.Lock()
+
+	// Get current state to determine Epoch Number
+	_, lastHeight := e.Consensus.LastAccepted()
+	currentEpoch := lastHeight + 1
+
+	e.Ctx.Log.Info("PoM: Starting Epoch", zap.Uint64("epoch", currentEpoch))
+
+	// 1. Peer Sampling
+	if e.Validators.NumValidators(e.Ctx.SubnetID) == 0 {
+		e.Ctx.Log.Debug("PoM: No peers, skipping epoch", zap.Uint64("epoch", currentEpoch))
+		e.Ctx.Lock.Unlock()
+		return
+	}
+
+	// 2. Propagation
+	// Trigger Gossip to sync mempools (Simulates Transaction Propagation)
+	if err := e.Gossip(ctx); err != nil {
+		e.Ctx.Log.Warn("PoM: Gossip failed", zap.Error(err))
+	}
+	e.Ctx.Lock.Unlock()
+
+	// 3. Balloting Simulation
+	// Real PoM has an interactive ballot exchange here.
+	// We simulate the "Cycle" time by waiting for gossip to permeate.
+	time.Sleep(500 * time.Millisecond)
+
+	// =================================================================
+	// PHASE 2: Block Creation
+	// =================================================================
+	e.Ctx.Lock.Lock()
+
+	// 1. Build Block
+	// We bypass "shouldIssueBlock" checks and force a build attempt.
+	blk, err := e.VM.BuildBlock(ctx)
+	if err != nil {
+		e.Ctx.Log.Verbo("PoM: No pending transactions", zap.Uint64("epoch", currentEpoch))
+		e.Ctx.Lock.Unlock()
+		return
+	}
+
+	// Verify Block Height matches Epoch
+	if blk.Height() != currentEpoch {
+		e.Ctx.Log.Warn("PoM: Block height mismatch",
+			zap.Uint64("expected", currentEpoch),
+			zap.Uint64("actual", blk.Height()))
+		// We proceed, assuming the VM knows best, but log the warning.
+	}
+
+	// 2. Add to Consensus
+	// We must verify and add it locally to vote on it
+	added, err := e.addUnverifiedBlockToConsensus(ctx, e.Ctx.NodeID, blk, e.metrics.issued.WithLabelValues("pom_built"))
+	if err != nil {
+		e.Ctx.Log.Error("PoM: Failed to add local block", zap.Error(err))
+		e.Ctx.Lock.Unlock()
+		return
+	}
+	if !added {
+		e.Ctx.Log.Warn("PoM: Local block rejected")
+		e.Ctx.Lock.Unlock()
+		return
+	}
+	e.Ctx.Lock.Unlock()
+
+	// =================================================================
+	// PHASE 3: Network Wide Voting
+	// =================================================================
+	e.Ctx.Lock.Lock()
+	defer e.Ctx.Lock.Unlock()
+
+	// 1. Sample Network
+	totalValidators := e.Validators.NumValidators(e.Ctx.SubnetID)
+	if totalValidators == 0 {
+		return
+	}
+
+	// PoM requires majority of TOTAL, so we sample everyone we know.
+	// In a massive network, we might cap this, but for PoM strictness we try all.
+	sampleSize := int(totalValidators)
+	validators, err := e.Validators.Sample(e.Ctx.SubnetID, sampleSize)
+	if err != nil {
+		e.Ctx.Log.Warn("PoM: Failed to sample validators", zap.Error(err))
+		return
+	}
+
+	// 2. Send Vote
+	// We increment requestID safely under the lock
+	e.requestID++
+
+	// SendPushQuery sends the block to peers. They will verify and respond with Chits (Votes).
+	// Arguments: ctx, validatorSet, requestID, blockBytes, requestedHeight
+	e.Sender.SendPushQuery(ctx, set.Of(validators...), e.requestID, blk.Bytes(), 0)
+
+	e.Ctx.Log.Info("PoM: Proposed block",
+		zap.Uint64("epoch", currentEpoch),
+		zap.Stringer("blkID", blk.ID()),
+		zap.Int("validators", len(validators)))
 }
