@@ -1,0 +1,81 @@
+name: Firewood Lint
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+    paths:
+      - 'firewood/**'
+      - '.github/workflows/firewood-lint.yml'
+  pull_request:
+    paths:
+      - 'firewood/**'
+      - '.github/workflows/firewood-lint.yml'
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  license-headers:
+    name: Check license headers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check license headers
+        uses: viperproject/check-license-header@v2
+        with:
+          path: firewood
+          config: firewood/.github/check-license-headers.yaml
+          strict: true
+
+  rust-fmt:
+    name: Check Rust formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        working-directory: firewood
+        run: cargo fmt -- --check
+
+  clippy:
+    name: Clippy (${{ matrix.features }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            features: "default"
+            cargo-args: ""
+          - os: ubuntu-latest
+            features: "ethhash,logger"
+            cargo-args: "--features ethhash,logger"
+          - os: macos-14
+            features: "default"
+            cargo-args: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: firewood
+          shared-key: clippy-${{ matrix.features }}
+      - name: Clippy
+        working-directory: firewood
+        run: cargo clippy --locked ${{ matrix.cargo-args }} --workspace --all-targets -- -D warnings
