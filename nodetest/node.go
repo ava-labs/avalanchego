@@ -7,26 +7,32 @@ import (
 	"context"
 	"github.com/ava-labs/avalanchego/config"
 	nodeconfig "github.com/ava-labs/avalanchego/config/node"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
-	"path/filepath"
 	"testing"
+	"net/netip"
+	"strings"
+	"fmt"
+	"path/filepath"
 )
 
-func setFlagDefaults(t *testing.T, v *viper.Viper) {
+func setFlagDefaults(v *viper.Viper, dir string) {
 	v.Set("network-id", "local")
 	v.Set("http-port", "0")
-	v.Set("staking-port-port", "0")
-	v.Set("data-dir", filepath.Join(t.TempDir(), "avalanchego.test"))
+	v.Set("staking-port", "0")
+	v.Set("data-dir", dir)
+	// TODO register nodes as validators
+	v.Set("sybil-protection-enabled", "false")
+	v.Set("log-display-level", "off")
+	v.Set("log-disable-display-plugin-logs", true)
 }
 
 func newConfig(t *testing.T, v *viper.Viper) nodeconfig.Config {
-	// TODO sybil protection enabled + run as a valdiator
-
 	cfg, err := config.GetNodeConfig(v)
 	if err != nil {
 		require.NoError(t, err)
@@ -35,31 +41,53 @@ func newConfig(t *testing.T, v *viper.Viper) nodeconfig.Config {
 	return cfg
 }
 
+type Config struct {
+	Name            string
+	BootstrapperIPs []netip.AddrPort
+	BootstrapperIDs []ids.NodeID
+}
+
 type Node struct {
 	n *node.Node
 }
 
-func New(t *testing.T) Node {
+func New(t *testing.T, c Config) Node {
 	fs := config.BuildFlagSet()
 
 	// TODO this should not respect env vars
 	v, err := config.BuildViper(fs, nil)
 	require.NoError(t, err)
 
-	setFlagDefaults(t, v)
+	dir := filepath.Join(t.TempDir(), "main")
+	t.Logf("initializing node at %s", dir)
 
-	cfg := newConfig(t, v)
+	setFlagDefaults(v, dir)
+
+	v.Set("bootstrap-ips", strings.Join(stringify(c.BootstrapperIPs...), ","))
+	v.Set("bootstrap-ids", strings.Join(stringify(c.BootstrapperIDs...), ","))
+
+	nodeConfig := newConfig(t, v)
 
 	// TODO close logs
-	logFactory := logging.NewFactory(cfg.LoggingConfig)
+	logFactory := logging.NewFactory(nodeConfig.LoggingConfig)
 	// TODO log filtering
 	log, err := logFactory.Make("nodetest")
 	require.NoError(t, err)
 
-	n, err := node.New(&cfg, logFactory, log)
+	n, err := node.New(&nodeConfig, logFactory, log)
 	require.NoError(t, err)
 
 	return Node{n: n}
+}
+
+func stringify[T fmt.Stringer](ts ...T) []string {
+	s := make([]string, 0, len(ts))
+
+	for _, t := range ts {
+		s = append(s, t.String())
+	}
+
+	return s
 }
 
 //	func NewWithBootstrapper(t *testing.T, bootstrapper Node) Node {
@@ -78,6 +106,18 @@ func (n *Node) Start(ctx context.Context) error {
 	return eg.Wait()
 }
 
-func (n *Node) AddVM(vm block.ChainVM) {
+func (n *Node) AddVM(
+	ctx context.Context,
+	id ids.ID,
+	factory vms.Factory,
+) error {
+	return n.n.VMManager.RegisterFactory(ctx, id, factory)
+}
 
+func (n *Node) IP() netip.AddrPort {
+	return n.n.GetIP()
+}
+
+func (n *Node) ID() ids.NodeID {
+	return n.n.ID
 }

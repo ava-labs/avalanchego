@@ -408,6 +408,9 @@ type Node struct {
 
 	// Closed when a sufficient amount of bootstrap nodes are connected to
 	onSufficientlyConnected chan struct{}
+
+	// This node's IP is not guaranteed to be the same due to dynamic IP updates
+	atomicIP *utils.Atomic[netip.AddrPort]
 }
 
 /*
@@ -415,6 +418,10 @@ type Node struct {
  *************************** P2P Networking Section ***************************
  ******************************************************************************
  */
+
+func (n *Node) GetIP() netip.AddrPort {
+	return n.atomicIP.Get()
+}
 
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
@@ -453,7 +460,6 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	var (
 		stakingPort = n.stakingAddress.Port()
 		publicAddr  netip.Addr
-		atomicIP    *utils.Atomic[netip.AddrPort]
 	)
 	switch {
 	case n.Config.PublicIP != "":
@@ -462,7 +468,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		if err != nil {
 			return fmt.Errorf("invalid public IP address %q: %w", n.Config.PublicIP, err)
 		}
-		atomicIP = utils.NewAtomic(netip.AddrPortFrom(
+		n.atomicIP = utils.NewAtomic(netip.AddrPortFrom(
 			publicAddr,
 			stakingPort,
 		))
@@ -481,17 +487,21 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		if err != nil {
 			return fmt.Errorf("couldn't resolve public IP: %w", err)
 		}
-		atomicIP = utils.NewAtomic(netip.AddrPortFrom(
+		n.atomicIP = utils.NewAtomic(netip.AddrPortFrom(
 			publicAddr,
 			stakingPort,
 		))
-		n.ipUpdater = dynamicip.NewUpdater(atomicIP, resolver, n.Config.PublicIPResolutionFreq)
+		n.ipUpdater = dynamicip.NewUpdater(
+			n.atomicIP,
+			resolver,
+			n.Config.PublicIPResolutionFreq,
+		)
 	default:
 		publicAddr, err = n.router.ExternalIP()
 		if err != nil {
 			return fmt.Errorf("public IP / IP resolution service not given and failed to resolve IP with NAT: %w", err)
 		}
-		atomicIP = utils.NewAtomic(netip.AddrPortFrom(
+		n.atomicIP = utils.NewAtomic(netip.AddrPortFrom(
 			publicAddr,
 			stakingPort,
 		))
@@ -509,13 +519,13 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		stakingPort,
 		stakingPort,
 		stakingPortName,
-		atomicIP,
+		n.atomicIP,
 		n.Config.PublicIPResolutionFreq,
 	)
 	go n.ipUpdater.Dispatch(n.Log)
 
 	n.Log.Info("initializing networking",
-		zap.Stringer("ip", atomicIP.Get()),
+		zap.Stringer("ip", n.atomicIP.Get()),
 	)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
@@ -621,7 +631,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	// add node configs to network config
 	n.Config.NetworkConfig.MyNodeID = n.ID
-	n.Config.NetworkConfig.MyIPPort = atomicIP
+	n.Config.NetworkConfig.MyIPPort = n.atomicIP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
 	n.Config.NetworkConfig.Validators = n.vdrs
 	n.Config.NetworkConfig.Beacons = n.bootstrappers
