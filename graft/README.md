@@ -63,6 +63,23 @@ the current branch before beginning a subsequent step.
  - [ ] Migrate CI jobs (unit test, e2e, linting, etc)
  - [ ] Get CI jobs passing
 
+### Refreshing the graft PR
+
+Development on the repository to be grafted may be ongoing while the graft PR (the result of the subtree merge task) is open. To refresh the graft PR, and get new changes from the repository to be grafted, do the following:
+
+```bash
+git fetch origin
+
+# The target branch might be master, or a tooling PR 
+git reset --hard origin/[TARGET BRANCH]
+
+cd graft
+
+# Do the graft again
+task [REPOSITORY NAME]-subtree-merge
+git push --force
+```
+
 ### Rebasing Inflight PRs
 
 Provided a subtree merge was used to perform the graft, a common merge
