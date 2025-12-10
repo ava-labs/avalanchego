@@ -137,15 +137,12 @@ tasks:
 
   test-build-antithesis-images-ci: # consolidated test-build-antithesis-images
     desc: Test antithesis images build with CI setup
-    dir: ../../
     cmds:
+      - dir: ../../
+        task: build # build avalanchego
       - task: build
-      - dir: graft/subnet-evm
-        task: build
-      - dir: graft/subnet-evm
-        cmd: go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --duration=60s
-      - dir: graft/subnet-evm
-        task: test-build-antithesis-images
+      - cmd: go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --duration=60s
+      - task: test-build-antithesis-images
 
   test-build-image:
     desc: Test docker image build
@@ -157,13 +154,11 @@ tasks:
 
   test-e2e-load-ci: # consolidated test-e2e-load
     desc: Run E2E load tests with CI setup
-    dir: ../../
     cmds:
+      - dir: ../../
+        task: build # build avalanchego
       - task: build
-      - dir: graft/subnet-evm
-        task: build
-      - dir: graft/subnet-evm
-        env:
+      - env:
           AVALANCHEGO_BUILD_PATH: ../../build
         task: test-e2e-load
 
