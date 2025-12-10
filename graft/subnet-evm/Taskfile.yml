@@ -99,10 +99,6 @@ tasks:
       - cmd: go generate ./precompile/...
 
 
-  install-avalanchego-release:
-    desc: Download and install AvalancheGo release binary for testing, with fallback to building from source
-    cmd: ./scripts/install_avalanchego_release.sh # ci.yml
-
   lint:
     desc: Run golangci-lint and check for allowed Ethereum imports in Go code
     cmd: ../evm-shared/scripts/lint.sh
@@ -141,11 +137,15 @@ tasks:
 
   test-build-antithesis-images-ci: # consolidated test-build-antithesis-images
     desc: Test antithesis images build with CI setup
+    dir: ../../
     cmds:
-      - task: install-avalanchego-release
       - task: build
-      - cmd: go run ./tests/antithesis --avalanchego-path=/tmp/e2e-test/avalanchego/avalanchego --duration=60s
-      - task: test-build-antithesis-images
+      - dir: graft/subnet-evm
+        task: build
+      - dir: graft/subnet-evm
+        cmd: go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --duration=60s
+      - dir: graft/subnet-evm
+        task: test-build-antithesis-images
 
   test-build-image:
     desc: Test docker image build
@@ -157,10 +157,15 @@ tasks:
 
   test-e2e-load-ci: # consolidated test-e2e-load
     desc: Run E2E load tests with CI setup
+    dir: ../../
     cmds:
-      - task: install-avalanchego-release
       - task: build
-      - task: test-e2e-load
+      - dir: graft/subnet-evm
+        task: build
+      - dir: graft/subnet-evm
+        env:
+          AVALANCHEGO_BUILD_PATH: ../../build
+        task: test-e2e-load
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
