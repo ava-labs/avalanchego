@@ -48,26 +48,17 @@ tasks:
   # ============================================================================
 
   test:
-    desc: Run all firewood tests (both feature variants)
+    desc: Run all firewood FFI tests (both feature variants)
     cmds:
-      - task: test-default
-      - task: test-ethhash
+      - task: test-ffi
 
   test-default:
-    desc: Run firewood tests with default features
-    cmd: |
-      bazel test //firewood/firewood:firewood_test \
-                 //firewood/storage:firewood-storage_test \
-                 //firewood/triehash:triehash_test \
-                 //firewood/firewood-macros:firewood-macros_test \
-                 //firewood/ffi:ffi_test
+    desc: Run firewood FFI tests with default features
+    cmd: bazel test //firewood/ffi:ffi_test
 
   test-ethhash:
-    desc: Run firewood tests with ethhash features
-    cmd: |
-      bazel test //firewood/firewood:firewood_ethhash_test \
-                 //firewood/storage:firewood-storage_ethhash_test \
-                 //firewood/ffi:ffi_ethhash_test
+    desc: Run firewood FFI tests with ethhash features
+    cmd: bazel test //firewood/ffi:ffi_ethhash_test
 
   # ============================================================================
   # FFI tasks
