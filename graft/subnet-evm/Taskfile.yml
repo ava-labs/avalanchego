@@ -98,7 +98,6 @@ tasks:
           find ./precompile -type f -name 'gen_*binding.go' -exec grep -l '^// Code generated - DO NOT EDIT\.$' {} \; | xargs -r rm
       - cmd: go generate ./precompile/...
 
-
   lint:
     desc: Run golangci-lint and check for allowed Ethereum imports in Go code
     cmd: ../evm-shared/scripts/lint.sh
