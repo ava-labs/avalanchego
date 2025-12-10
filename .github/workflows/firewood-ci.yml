@@ -1,0 +1,88 @@
+name: Firewood CI
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+    paths:
+      - 'firewood/**'
+      - '.github/workflows/firewood-ci.yml'
+  pull_request:
+    paths:
+      - 'firewood/**'
+      - '.github/workflows/firewood-ci.yml'
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firewood-build:
+    name: Build firewood
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-nix
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel
+          key: bazel-firewood-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock') }}
+          restore-keys: |
+            bazel-firewood-${{ runner.os }}-${{ runner.arch }}-
+      - name: Build firewood (all targets, both feature variants)
+        shell: nix develop --command bash {0}
+        run: ./scripts/run_task.sh firewood:build
+
+  firewood-test-default:
+    name: Test firewood (default)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-nix
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel
+          key: bazel-firewood-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock') }}
+          restore-keys: |
+            bazel-firewood-${{ runner.os }}-${{ runner.arch }}-
+      - name: Test firewood (default/SHA-256 mode)
+        shell: nix develop --command bash {0}
+        run: ./scripts/run_task.sh firewood:test-default
+
+  firewood-test-ethhash:
+    name: Test firewood (ethhash)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-nix
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel
+          key: bazel-firewood-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock') }}
+          restore-keys: |
+            bazel-firewood-${{ runner.os }}-${{ runner.arch }}-
+      - name: Test firewood (ethhash/Keccak-256 mode)
+        shell: nix develop --command bash {0}
+        run: ./scripts/run_task.sh firewood:test-ethhash
