@@ -19,6 +19,7 @@ grep -P 'lint.sh' ../evm-shared/scripts/lint.sh &>/dev/null || (
 )
 
 # Library for file list generation.
+# shellcheck source=/dev/null
 source ../evm-shared/scripts/lint_setup.sh
 
 # by default, "./scripts/lint.sh" runs all lint tests
