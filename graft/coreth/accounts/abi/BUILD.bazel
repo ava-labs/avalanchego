@@ -1,0 +1,52 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "abi",
+    srcs = [
+        "abi.go",
+        "argument.go",
+        "doc.go",
+        "error.go",
+        "error_handling.go",
+        "event.go",
+        "method.go",
+        "pack.go",
+        "reflect.go",
+        "topics.go",
+        "type.go",
+        "unpack.go",
+        "utils.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/accounts/abi",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//crypto",
+    ],
+)
+
+go_test(
+    name = "abi_test",
+    srcs = [
+        "abi_extra_test.go",
+        "abi_test.go",
+        "event_test.go",
+        "method_test.go",
+        "pack_test.go",
+        "packing_test.go",
+        "reflect_test.go",
+        "topics_test.go",
+        "type_test.go",
+        "unpack_test.go",
+    ],
+    embed = [":abi"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_davecgh_go_spew//spew",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

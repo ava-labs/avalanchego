@@ -1,0 +1,63 @@
+name: gh-pages
+
+on:
+  push:
+    branches:
+      - "main"
+      - "rkuris/gh-pages"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # caution: this is the same restore as in ci.yaml
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+      - name: Build
+        run: cargo doc --document-private-items --no-deps
+      - name: Set up _site redirect to firewood
+        run: |
+          rm -fr _site
+          mkdir _site
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=firewood\">" > _site/index.html
+      - name: Copy doc files to _site
+        run: |
+          cp -rv target/doc/* ./_site
+          cp -rv docs/assets ./_site
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pages
+          path: _site
+          if-no-files-found: error
+          overwrite: true
+          include-hidden-files: true
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download pages artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pages
+          path: .
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: Deploy to GitHub pages
+        id: deployment
+        uses: actions/deploy-pages@v4

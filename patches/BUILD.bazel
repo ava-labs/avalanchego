@@ -1,0 +1,6 @@
+# Patch files for external dependencies
+exports_files([
+    "libevm_secp256k1.patch",
+    "blst_build.patch",
+    "firewood_ffi.patch",
+])

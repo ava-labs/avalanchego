@@ -65,3 +65,6 @@ vendor
 
 # debug files
 __debug_*
+
+# Bazel symlinks
+/bazel-*

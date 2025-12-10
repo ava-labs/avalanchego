@@ -1,0 +1,37 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "customrawdb",
+    srcs = [
+        "accessors_metadata_ext.go",
+        "accessors_snapshot_ext.go",
+        "accessors_state_sync.go",
+        "database_ext.go",
+        "schema_ext.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/wrappers",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//rlp",
+    ],
+)
+
+go_test(
+    name = "customrawdb_test",
+    srcs = [
+        "accessors_state_sync_test.go",
+        "database_ext_test.go",
+    ],
+    embed = [":customrawdb"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

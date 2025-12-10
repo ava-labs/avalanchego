@@ -1,0 +1,64 @@
+[package]
+name = "firewood-benchmark"
+version.workspace = true
+edition.workspace = true
+authors = [
+     "Aaron Buchwald <aaron.buchwald56@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+]
+description = "Benchmarking tool for Firewood, an embedded key-value store optimized for blockchain state."
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["opentelemetry-proto"]
+
+[[bin]]
+name = "benchmark"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+clap = { workspace = true, features = ['string'] }
+env_logger.workspace = true
+fastrace = { workspace = true, features = ["enable"] }
+firewood.workspace = true
+firewood-storage = { workspace = true, features = ["test_utils"] }
+hex.workspace = true
+log.workspace = true
+metrics.workspace = true
+metrics-util = { workspace = true, optional = true }
+rand.workspace = true
+rand_distr.workspace = true
+sha2.workspace = true
+# Regular dependencies
+fastrace-opentelemetry = { version = "=0.14.0" }
+metrics-exporter-prometheus = { version = "0.17.2", optional = true }
+opentelemetry = "=0.31.0"
+opentelemetry-otlp = { version = "=0.31.0", features = ["grpc-tonic"] }
+opentelemetry-proto = "=0.31.0"
+opentelemetry_sdk = "=0.31.0"
+pretty-duration = "0.1.1"
+
+[dependencies.tokio]
+optional = true
+version = "1.48.0"
+features = ["mio", "net", "parking_lot", "rt", "time"]
+
+[target.'cfg(unix)'.dependencies]
+tikv-jemallocator = "0.6.1"
+
+[features]
+default = ["prometheus"]
+logger = ["firewood/logger"]
+prometheus = [
+     "dep:metrics-exporter-prometheus",
+     "dep:metrics-util",
+     "dep:tokio",
+]
+
+[lints]
+workspace = true

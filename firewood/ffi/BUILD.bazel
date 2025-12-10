@@ -1,0 +1,94 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+load("@rules_rust//rust:defs.bzl", "rust_static_library")
+
+# Rust static library for firewood FFI
+# Note: We use the committed firewood.h header rather than running cbindgen
+# at build time. The header should be kept in sync via cargo build locally.
+rust_static_library(
+    name = "firewood_ffi_rust",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = ["README.md"],
+    crate_features = [
+        "ethhash",
+        "logger",
+    ],
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    proc_macro_deps = [
+        "@firewood_crates//:derive-where",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//firewood/firewood",
+        "//firewood/storage:firewood-storage",
+        "@firewood_crates//:chrono",
+        "@firewood_crates//:coarsetime",
+        "@firewood_crates//:env_logger",
+        "@firewood_crates//:metrics",
+        "@firewood_crates//:metrics-util",
+        "@firewood_crates//:oxhttp",
+        "@firewood_crates//:parking_lot",
+    ] + select({
+        "@platforms//os:linux": ["@firewood_crates//:tikv-jemallocator"],
+        "@platforms//os:macos": ["@firewood_crates//:tikv-jemallocator"],
+        "//conditions:default": [],
+    }),
+)
+
+# C library wrapper for CGO
+cc_library(
+    name = "firewood_ffi",
+    hdrs = ["firewood.h"],
+    linkopts = select({
+        "@platforms//os:linux": [
+            "-lm",
+            "-ldl",
+            "-lpthread",
+        ],
+        "@platforms//os:macos": ["-lm"],
+        "//conditions:default": ["-lm"],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [":firewood_ffi_rust"],
+)
+
+# Go library with CGO bindings
+# gazelle:ignore
+go_library(
+    name = "ffi",
+    srcs = [
+        "firewood.go",
+        "firewood.h",
+        "iterator.go",
+        "keepalive.go",
+        "maybe.go",
+        "memory.go",
+        "metrics.go",
+        "proofs.go",
+        "proposal.go",
+        "revision.go",
+    ],
+    cdeps = [":firewood_ffi"],
+    cgo = True,
+    importpath = "github.com/ava-labs/firewood-go-ethhash/ffi",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_model//go",
+        "@com_github_prometheus_common//expfmt",
+    ],
+)
+
+go_test(
+    name = "ffi_test",
+    srcs = [
+        "firewood_test.go",
+        "metrics_test.go",
+        "proofs_test.go",
+    ],
+    embed = [":ffi"],
+    deps = [
+        "@com_github_prometheus_client_model//go",
+        "@com_github_stretchr_testify//require",
+    ],
+)
