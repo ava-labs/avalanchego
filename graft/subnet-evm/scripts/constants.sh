@@ -31,7 +31,7 @@ else
     #
     # Use an abbreviated version of the full commit to tag the image.
     # WARNING: this will use the most recent commit even if there are un-committed changes present
-    SUBNET_EVM_COMMIT="$(git --git-dir="$SUBNET_EVM_PATH/.git" rev-parse HEAD || :)"
+    SUBNET_EVM_COMMIT="$(git rev-parse HEAD || :)"
 fi
 
 # Don't export them as they're used in the context of other calls
