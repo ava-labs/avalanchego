@@ -12,7 +12,7 @@ tasks:
 
   build:
     desc: Compile Subnet EVM binary with git commit and static linking flags
-    cmd: ./scripts/build.sh # ci.yml
+    cmd: ./scripts/build.sh {{.CLI_ARGS}} # ci.yml
 
   build-antithesis-images:
     desc: Build Docker images for antithesis testing including avalanchego node and subnet-evm builder images

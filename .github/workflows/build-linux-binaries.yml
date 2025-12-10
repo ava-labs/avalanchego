@@ -27,6 +27,10 @@ jobs:
       - name: Build the avalanchego binaries
         run: ./scripts/run_task.sh build
 
+      - name: Build subnet-evm plugin
+        working-directory: ./graft/subnet-evm
+        run: ./scripts/run_task.sh build "${GITHUB_WORKSPACE}/build/subnet-evm"
+
       - name: Install aws cli
         run: sudo snap install aws-cli --classic
 
@@ -60,11 +64,17 @@ jobs:
           ARCH: "amd64"
           RELEASE: "jammy"
 
-      - name: Save as Github artifact
+      - name: Save avalanchego as Github artifact
         uses: actions/upload-artifact@v4
         with:
-          name: amd64
+          name: avalanchego-amd64
           path: /tmp/avalanchego/avalanchego-linux-amd64-${{ env.TAG }}.tar.gz
+
+      - name: Save subnet-evm as Github artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: subnet-evm-amd64
+          path: /tmp/avalanchego/subnet-evm-linux-amd64-${{ env.TAG }}.tar.gz
 
       - name: Cleanup
         run: |
@@ -86,6 +96,10 @@ jobs:
 
       - name: Build the avalanchego binaries
         run: ./scripts/run_task.sh build
+
+      - name: Build subnet-evm plugin
+        working-directory: ./graft/subnet-evm
+        run: ./scripts/run_task.sh build "${GITHUB_WORKSPACE}/build/subnet-evm"
 
       - name: Install aws cli
         run: sudo snap install aws-cli --classic
@@ -120,11 +134,17 @@ jobs:
           ARCH: "arm64"
           RELEASE: "jammy"
 
-      - name: Save as Github artifact
+      - name: Save avalanchego as Github artifact
         uses: actions/upload-artifact@v4
         with:
-          name: arm64
+          name: avalanchego-arm64
           path: /tmp/avalanchego/avalanchego-linux-arm64-${{ env.TAG }}.tar.gz
+
+      - name: Save subnet-evm as Github artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: subnet-evm-arm64
+          path: /tmp/avalanchego/subnet-evm-linux-arm64-${{ env.TAG }}.tar.gz
 
       - name: Cleanup
         run: |

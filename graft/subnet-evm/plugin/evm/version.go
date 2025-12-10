@@ -8,8 +8,8 @@ import "fmt"
 var (
 	// GitCommit is set by the build script
 	GitCommit string
-	// Version is the version of Subnet EVM
-	Version string = "v0.8.0"
+	// Version is the version of AvalancheGo/Subnet-EVM
+	Version string = "v1.14.0"
 )
 
 func init() {
