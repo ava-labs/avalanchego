@@ -1,0 +1,244 @@
+# https://taskfile.dev
+# To run on a system without task installed, `./scripts/run_task.sh` will execute it with `go run`.
+# If in the nix dev shell, `task` is available.
+
+version: '3'
+
+# ============================================================================
+# IMPORTANT: Variable Shadowing in go-task Includes
+# ============================================================================
+# Variables declared in this file take PRECEDENCE over variables with the same
+# name in the parent Taskfile (the opposite of what you might expect).
+#
+# To avoid conflicts:
+# 1. Prefix all variables with FIREWOOD_ (e.g., FIREWOOD_FUZZTIME, not FUZZTIME)
+# 2. Use the default function for overridable vars: '{{.VAR | default "value"}}'
+# 3. Avoid common names like TIMEOUT, OUTPUT, BUILD_DIR
+#
+# See: https://taskfile.dev/usage/
+#      https://github.com/go-task/task/issues/696
+# ============================================================================
+
+vars:
+  # Example: FIREWOOD_FUZZTIME can be overridden via CLI or parent Taskfile
+  FIREWOOD_FUZZTIME: '{{.FIREWOOD_FUZZTIME | default "1m"}}'
+
+tasks:
+  default:
+    cmd: task --list
+
+  # ============================================================================
+  # Build tasks
+  # ============================================================================
+
+  build:
+    desc: Build all firewood targets (both feature variants)
+    cmd: bazel build //firewood/...
+
+  build-default:
+    desc: Build firewood with default features (SHA-256/MerkleDB mode)
+    cmd: bazel build //firewood/firewood:firewood //firewood/storage:firewood-storage //firewood/ffi:ffi
+
+  build-ethhash:
+    desc: Build firewood with ethhash features (Keccak-256/Ethereum mode)
+    cmd: bazel build //firewood/firewood:firewood_ethhash //firewood/storage:firewood-storage_ethhash //firewood/ffi:ffi_ethhash
+
+  # ============================================================================
+  # Test tasks
+  # ============================================================================
+
+  test:
+    desc: Run all firewood tests (both feature variants)
+    cmds:
+      - task: test-default
+      - task: test-ethhash
+
+  test-default:
+    desc: Run firewood tests with default features
+    cmd: |
+      bazel test //firewood/firewood:firewood_test \
+                 //firewood/storage:firewood-storage_test \
+                 //firewood/triehash:triehash_test \
+                 //firewood/firewood-macros:firewood-macros_test \
+                 //firewood/ffi:ffi_test
+
+  test-ethhash:
+    desc: Run firewood tests with ethhash features
+    cmd: |
+      bazel test //firewood/firewood:firewood_ethhash_test \
+                 //firewood/storage:firewood-storage_ethhash_test \
+                 //firewood/ffi:ffi_ethhash_test
+
+  # ============================================================================
+  # FFI tasks
+  # ============================================================================
+
+  test-ffi:
+    desc: Run FFI tests (both modes)
+    cmds:
+      - task: test-ffi-default
+      - task: test-ffi-ethhash
+
+  test-ffi-default:
+    desc: Run FFI tests with default features
+    cmd: bazel test //firewood/ffi:ffi_test
+
+  test-ffi-ethhash:
+    desc: Run FFI tests with ethhash features
+    cmd: bazel test //firewood/ffi:ffi_ethhash_test
+
+  # ============================================================================
+  # Lint tasks
+  # ============================================================================
+
+  lint:
+    desc: Run all lint checks
+    cmds:
+      - task: lint-fmt
+      - task: lint-clippy
+
+  lint-fmt:
+    desc: Check Rust formatting
+    cmd: cargo fmt -- --check
+
+  lint-clippy:
+    desc: Run clippy on all targets
+    cmd: bazel build //firewood/... --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect --output_groups=clippy_checks
+
+  # ============================================================================
+  # Fuzz tasks
+  # ============================================================================
+
+  fuzz-ethhash:
+    desc: Run ethhash differential fuzz tests
+    cmd: |
+      bazel test //firewood/ffi/tests/eth:eth_test \
+        --test_env=TEST_FIREWOOD_HASH_MODE=ethhash \
+        --test_arg=-test.fuzz=. \
+        --test_arg=-test.fuzztime={{.FIREWOOD_FUZZTIME}}
+
+  fuzz-merkle:
+    desc: Run merkle differential fuzz tests
+    cmd: |
+      bazel test //firewood/ffi/tests/firewood:firewood_test \
+        --test_arg=-test.fuzz=. \
+        --test_arg=-test.fuzztime={{.FIREWOOD_FUZZTIME}}
+
+  # ============================================================================
+  # Nix-based tasks (migrated from justfile)
+  # ============================================================================
+
+  build-ffi-nix:
+    desc: Build ffi with nix
+    deps: [check-nix]
+    cmd: cd ffi && nix build
+
+  test-ffi-nix:
+    desc: Run all checks of ffi built with nix
+    cmds:
+      - task: test-ffi-nix-build-equivalency
+      - task: test-ffi-nix-go-bindings
+
+  test-ffi-nix-build-equivalency:
+    desc: Test ffi build equivalency between nix and cargo
+    deps: [check-nix]
+    cmd: bash -x ./ffi/test-build-equivalency.sh
+
+  test-ffi-nix-go-bindings:
+    desc: Test golang ffi bindings using the nix-built artifacts
+    deps: [build-ffi-nix]
+    cmd: |
+      echo "running ffi tests against bindings built by nix..."
+      cd ffi
+      FLAKE_PATH="$PWD"
+      GO="nix run $FLAKE_PATH#go"
+      cd result/ffi
+      GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash ${GO} test ./...
+
+  # ============================================================================
+  # Utility tasks (migrated from justfile)
+  # ============================================================================
+
+  check-clean-branch:
+    desc: Check if git branch is clean
+    cmd: |
+      git add --all
+      git update-index --really-refresh >> /dev/null
+      git status --short
+      git diff-index --quiet HEAD
+
+  check-nix:
+    desc: Check if nix is installed
+    cmd: |
+      if ! command -v nix &> /dev/null; then
+          echo "Error: 'nix' is not installed." >&2
+          echo "" >&2
+          echo "To install nix:" >&2
+          echo "  - Visit: https://github.com/DeterminateSystems/nix-installer" >&2
+          echo "  - Or run: curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install" >&2
+          exit 1
+      fi
+
+  check-ffi-flake:
+    desc: Check if the FFI flake is up-to-date (requires clean git tree)
+    deps: [check-nix]
+    cmds:
+      - task: update-ffi-flake
+      - task: check-clean-branch
+
+  check-golang-version:
+    desc: Check if the golang version is set consistently (requires clean git tree)
+    deps: [check-nix]
+    cmd: |
+      FAILED=
+      cd ffi
+
+      TOOLCHAIN_VERSION=$(nix develop --command bash -c "go mod edit -json | jq -r '.Toolchain'")
+      echo "toolchain version in ffi/go.mod is ${TOOLCHAIN_VERSION}"
+
+      ETH_TESTS_VERSION=$(nix develop --command bash -c "cd tests/eth && go mod edit -json | jq -r '.Toolchain'")
+      echo "toolchain version in ffi/tests/eth/go.mod is ${ETH_TESTS_VERSION}"
+
+      if [[ "${TOOLCHAIN_VERSION}" != "${ETH_TESTS_VERSION}" ]]; then
+          echo "toolchain version in ffi/tests/eth/go.mod should be ${TOOLCHAIN_VERSION}"
+          FAILED=1
+      fi
+
+      FIREWOOD_TESTS_VERSION=$(nix develop --command bash -c "cd tests/firewood && go mod edit -json | jq -r '.Toolchain'")
+      echo "toolchain version in ffi/tests/firewood/go.mod is ${FIREWOOD_TESTS_VERSION}"
+
+      if [[ "${TOOLCHAIN_VERSION}" != "${FIREWOOD_TESTS_VERSION}" ]]; then
+          echo "toolchain version in ffi/tests/firewood/go.mod should be ${TOOLCHAIN_VERSION}"
+          FAILED=1
+      fi
+
+      NIX_VERSION=$(nix run .#go -- version | awk '{print $3}')
+      echo "golang provided by ffi/flake.nix is ${NIX_VERSION}"
+
+      if [[ "${TOOLCHAIN_VERSION}" != "${NIX_VERSION}" ]]; then
+          echo "golang provided by ffi/flake/nix should be ${TOOLCHAIN_VERSION}"
+          echo "It will be necessary to update the golang.url in ffi/flake.nix to point to a SHA of" \
+               "AvalancheGo whose nix/go/flake.nix provides ${TOOLCHAIN_VERSION}."
+      fi
+
+      if [[ -n "${FAILED}" ]]; then
+          exit 1
+      fi
+
+  update-ffi-flake:
+    desc: Ensure the FFI flake is up-to-date
+    deps: [check-nix]
+    cmd: |
+      cd ffi
+      echo "ensuring flake lock file is current for golang"
+      nix flake update golang
+      echo "checking for a consistent golang verion"
+      task check-golang-version
+
+  setup-go-workspace:
+    desc: Adds go workspace for user experience consistency
+    cmd: |
+      if [ -f "go.work" ]; then
+          rm go.work go.work.sum
+      fi
+      go work init ./ffi ./ffi/tests/eth ./ffi/tests/firewood

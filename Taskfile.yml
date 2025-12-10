@@ -4,6 +4,11 @@
 
 version: '3'
 
+includes:
+  firewood:
+    taskfile: ./firewood/Taskfile.yml
+    dir: ./firewood
+
 env:
   S3_BOOTSTRAP_BUCKET: 's3://avalanchego-bootstrap-testing'
 
