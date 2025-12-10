@@ -10,11 +10,10 @@ FROM antithesis-subnet-evm-builder:$BUILDER_IMAGE_TAG AS builder
 # The builder workdir will vary between instrumented and non-instrumented builders
 ARG BUILDER_WORKDIR
 
-# Change to subnet-evm directory within the builder
-WORKDIR $BUILDER_WORKDIR/graft/subnet-evm
+WORKDIR $BUILDER_WORKDIR
 
-# Build the VM
-RUN ./scripts/build.sh /build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
+# Build the VM (run from root to use root module context)
+RUN cd graft/subnet-evm && ./scripts/build.sh /build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
 
 # ============= Cleanup Stage ================
 FROM $AVALANCHEGO_NODE_IMAGE AS execution

@@ -10,11 +10,10 @@ FROM antithesis-subnet-evm-builder:$BUILDER_IMAGE_TAG AS builder
 # The builder workdir will vary between instrumented and non-instrumented builders
 ARG BUILDER_WORKDIR
 
-# Change to subnet-evm directory within the builder
-WORKDIR $BUILDER_WORKDIR/graft/subnet-evm
+WORKDIR $BUILDER_WORKDIR
 
-# Build the workload
-RUN ./scripts/build_antithesis_workload.sh
+# Build the workload (run from root to use root module context)
+RUN cd graft/subnet-evm && ./scripts/build_antithesis_workload.sh
 
 # ============= Cleanup Stage ================
 # Base the workflow on the node image to support bootstrap testing
