@@ -7,7 +7,6 @@ if ! [[ "$0" =~ scripts/lint_fix.sh ]]; then
   exit 255
 fi
 
-# shellcheck source=/dev/null
 source ./scripts/lint_setup.sh
 setup_lint
 go tool -modfile=../../tools/go.mod golangci-lint run --config .golangci.yml --fix
