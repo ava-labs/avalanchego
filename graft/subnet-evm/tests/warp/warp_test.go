@@ -41,11 +41,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests/utils"
 
+	warptestbindings "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp/warptest/bindings"
+	warpBackend "github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	warpPayload "github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	ethereum "github.com/ava-labs/libevm"
-	warptestbindings "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp/warptest/bindings"
-	warpBackend "github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
