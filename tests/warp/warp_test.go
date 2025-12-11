@@ -7,12 +7,9 @@ package warp
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
 	"math/big"
-	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -32,6 +29,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/load"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/metrics"
@@ -39,11 +37,14 @@ import (
 	"github.com/ava-labs/subnet-evm/ethclient"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/warp"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/warp/warpbindings"
 	"github.com/ava-labs/subnet-evm/tests"
 	"github.com/ava-labs/subnet-evm/tests/utils"
 
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	warpPayload "github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	ethereum "github.com/ava-labs/libevm"
+	warptestbindings "github.com/ava-labs/subnet-evm/precompile/contracts/warp/warptest/bindings"
 	warpBackend "github.com/ava-labs/subnet-evm/warp"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
@@ -171,8 +172,8 @@ var _ = ginkgo.Describe("[Warp]", func() {
 		log.Info("Delivering block hash payload to receiving subnet")
 		w.deliverBlockHashPayload()
 
-		log.Info("Executing HardHat test")
-		w.executeHardHatTest()
+		log.Info("bindings test: verifying warp message and blockchain ID")
+		w.warpBindingsTest()
 
 		log.Info("Executing warp load test")
 		w.warpLoad()
@@ -292,62 +293,16 @@ func (w *warpTest) sendMessageFromSendingSubnet() {
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
 	require := require.New(ginkgo.GinkgoT())
-
 	client := w.sendingSubnetClients[0]
-	log.Info("Subscribing to new heads")
-	newHeads := make(chan *types.Header, 10)
-	sub, err := client.SubscribeNewHead(ctx, newHeads)
-	require.NoError(err)
-	defer sub.Unsubscribe()
 
-	startingNonce, err := client.NonceAt(ctx, w.sendingSubnetFundedAddress, nil)
-	require.NoError(err)
+	blockHash, blockNumber := w.sendWarpMessageTx(ctx, client)
+	w.blockID = ids.ID(blockHash)
 
-	packedInput, err := warp.PackSendWarpMessage(testPayload)
-	require.NoError(err)
-	tx := types.NewTx(&types.DynamicFeeTx{
-		ChainID:   w.sendingSubnetChainID,
-		Nonce:     startingNonce,
-		To:        &warp.Module.Address,
-		Gas:       200_000,
-		GasFeeCap: big.NewInt(225 * params.GWei),
-		GasTipCap: big.NewInt(params.GWei),
-		Value:     common.Big0,
-		Data:      packedInput,
-	})
-	signedTx, err := types.SignTx(tx, w.sendingSubnetSigner, w.sendingSubnetFundedKey)
-	require.NoError(err)
-	log.Info("Sending sendWarpMessage transaction", "txHash", signedTx.Hash())
-	require.NoError(client.SendTransaction(ctx, signedTx))
-
-	log.Info("Waiting for new block confirmation")
-	<-newHeads
-	receiptCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	blockHash, blockNumber := w.getBlockHashAndNumberFromTxReceipt(receiptCtx, client, signedTx)
-
-	log.Info("Constructing warp block hash unsigned message", "blockHash", blockHash)
-	w.blockID = ids.ID(blockHash) // Set blockID to construct a warp message containing a block hash payload later
-	require.NoError(err)
-
-	log.Info("Fetching relevant warp logs from the newly produced block")
-	logs, err := client.FilterLogs(ctx, ethereum.FilterQuery{
-		BlockHash: &blockHash,
-		Addresses: []common.Address{warp.Module.Address},
-	})
-	require.NoError(err)
-	require.Len(logs, 1)
-
-	// Check for relevant warp log from subscription and ensure that it matches
-	// the log extracted from the last block.
-	txLog := logs[0]
-	log.Info("Parsing logData as unsigned warp message")
-	unsignedMsg, err := warp.UnpackSendWarpEventDataToMessage(txLog.Data)
-	require.NoError(err)
-
-	// Set local variables for the duration of the test
-	w.addressedCallUnsignedMessage = unsignedMsg
-	log.Info("Parsed unsignedWarpMsg", "unsignedWarpMessageID", w.addressedCallUnsignedMessage.ID(), "unsignedWarpMessage", w.addressedCallUnsignedMessage)
+	w.addressedCallUnsignedMessage = verifyAndExtractWarpMessage(ctx, client, blockNumber, w.sendingSubnetFundedAddress)
+	log.Info("Parsed unsignedWarpMsg",
+		"unsignedWarpMessageID", w.addressedCallUnsignedMessage.ID(),
+		"unsignedWarpMessage", w.addressedCallUnsignedMessage,
+	)
 
 	// Loop over each client on chain A to ensure they all have time to accept the block.
 	// Note: if we did not confirm this here, the next stage could be racy since it assumes every node
@@ -363,6 +318,96 @@ func (w *warpTest) sendMessageFromSendingSubnet() {
 			}
 		}
 	}
+}
+
+// sendWarpMessageTx sends a warp message and returns the block hash and number
+func (w *warpTest) sendWarpMessageTx(ctx context.Context, client ethclient.Client) (common.Hash, uint64) {
+	require := require.New(ginkgo.GinkgoT())
+
+	log.Info("Subscribing to new heads")
+	newHeads := make(chan *types.Header, 10)
+	sub, err := client.SubscribeNewHead(ctx, newHeads)
+	require.NoError(err)
+	defer sub.Unsubscribe()
+
+	startingNonce, err := client.NonceAt(ctx, w.sendingSubnetFundedAddress, nil)
+	require.NoError(err)
+
+	packedInput, err := warp.PackSendWarpMessage(testPayload)
+	require.NoError(err)
+
+	tx := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   w.sendingSubnetChainID,
+		Nonce:     startingNonce,
+		To:        &warp.Module.Address,
+		Gas:       200_000,
+		GasFeeCap: big.NewInt(225 * params.GWei),
+		GasTipCap: big.NewInt(params.GWei),
+		Value:     common.Big0,
+		Data:      packedInput,
+	})
+
+	signedTx, err := types.SignTx(tx, w.sendingSubnetSigner, w.sendingSubnetFundedKey)
+	require.NoError(err)
+
+	log.Info("Sending sendWarpMessage transaction", "txHash", signedTx.Hash())
+	require.NoError(client.SendTransaction(ctx, signedTx))
+	log.Info("Waiting for new block confirmation")
+	<-newHeads
+	receiptCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	blockHash, blockNumber := w.getBlockHashAndNumberFromTxReceipt(receiptCtx, client, signedTx)
+	log.Info("Warp message included in block", "blockHash", blockHash, "blockNumber", blockNumber)
+
+	return blockHash, blockNumber
+}
+
+// verifyAndExtractWarpMessage queries the given block for SendWarpMessage events
+// emitted by the specified sender using the IWarpMessengerFilterer binding. It
+// asserts that exactly one such event exists and returns the parsed unsigned
+// warp message.
+func verifyAndExtractWarpMessage(
+	ctx context.Context,
+	client ethclient.Client,
+	blockNumber uint64,
+	sender common.Address,
+) *avalancheWarp.UnsignedMessage {
+	require := require.New(ginkgo.GinkgoT())
+
+	log.Info("Filtering SendWarpMessage events using binding")
+	warpFilterer, err := warpbindings.NewIWarpMessengerFilterer(warp.Module.Address, client)
+	require.NoError(err)
+
+	iter, err := warpFilterer.FilterSendWarpMessage(
+		&bind.FilterOpts{
+			Start:   blockNumber,
+			End:     &blockNumber,
+			Context: ctx,
+		},
+		[]common.Address{sender},
+		nil, // messageID filter: any
+	)
+	require.NoError(err)
+	defer iter.Close()
+
+	require.True(iter.Next(), "expected a SendWarpMessage event")
+	event := iter.Event
+
+	log.Info("Found SendWarpMessage event",
+		"sender", event.Sender.Hex(),
+		"messageID", common.Bytes2Hex(event.MessageID[:]),
+	)
+
+	require.Equal(sender, event.Sender)
+
+	unsignedMessage, err := avalancheWarp.ParseUnsignedMessage(event.Message)
+	require.NoError(err)
+
+	require.False(iter.Next(), "expected exactly one SendWarpMessage event")
+	require.NoError(iter.Error())
+
+	return unsignedMessage
 }
 
 func (w *warpTest) aggregateSignaturesViaAPI() {
@@ -549,33 +594,54 @@ func (w *warpTest) deliverBlockHashPayload() {
 	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 }
 
-func (w *warpTest) executeHardHatTest() {
+func (w *warpTest) warpBindingsTest() {
 	require := require.New(ginkgo.GinkgoT())
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
 
 	client := w.sendingSubnetClients[0]
-	log.Info("Subscribing to new heads")
-	newHeads := make(chan *types.Header, 10)
-	sub, err := client.SubscribeNewHead(ctx, newHeads)
+
+	log.Info("Deploying WarpTest proxy contract")
+	auth, err := bind.NewKeyedTransactorWithChainID(w.sendingSubnetFundedKey, w.sendingSubnetChainID)
 	require.NoError(err)
-	defer sub.Unsubscribe()
+	auth.Context = ctx
 
-	chainID, err := client.ChainID(ctx)
+	proxyAddr, deployTx, warpTestContract, err := warptestbindings.DeployWarpTest(auth, client, warp.Module.Address)
 	require.NoError(err)
 
-	rpcURI := toRPCURI(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
+	log.Info("Waiting for WarpTest deployment", "txHash", deployTx.Hash(), "proxyAddr", proxyAddr)
+	deployReceipt, err := bind.WaitMined(ctx, client, deployTx)
+	require.NoError(err)
+	require.Equal(types.ReceiptStatusSuccessful, deployReceipt.Status)
 
-	os.Setenv("SENDER_ADDRESS", crypto.PubkeyToAddress(w.sendingSubnetFundedKey.PublicKey).Hex())
-	os.Setenv("SOURCE_CHAIN_ID", "0x"+w.sendingSubnet.BlockchainID.Hex())
-	os.Setenv("PAYLOAD", "0x"+common.Bytes2Hex(testPayload))
-	os.Setenv("EXPECTED_UNSIGNED_MESSAGE", "0x"+hex.EncodeToString(w.addressedCallUnsignedMessage.Bytes()))
-	os.Setenv("CHAIN_ID", strconv.FormatUint(chainID.Uint64(), 10))
+	log.Info("Calling getBlockchainID via proxy contract")
+	returnedBlockchainID, err := warpTestContract.GetBlockchainID(&bind.CallOpts{Context: ctx})
+	require.NoError(err)
+	require.Equal(w.sendingSubnet.BlockchainID, ids.ID(returnedBlockchainID))
+	log.Info("getBlockchainID returned correct value", "blockchainID", ids.ID(returnedBlockchainID))
 
-	cmdPath := filepath.Join(repoRootPath, "contracts")
-	// test path is relative to the cmd path
-	testPath := "./test/warp.ts"
-	utils.RunHardhatTestsCustomURI(ctx, rpcURI, cmdPath, testPath)
+	log.Info("Sending warp message via proxy contract", "payload", common.Bytes2Hex(testPayload))
+
+	sendTx, err := warpTestContract.SendWarpMessage(auth, testPayload)
+	require.NoError(err)
+
+	log.Info("Waiting for sendWarpMessage transaction", "txHash", sendTx.Hash())
+	sendReceipt, err := bind.WaitMined(ctx, client, sendTx)
+	require.NoError(err)
+	require.Equal(types.ReceiptStatusSuccessful, sendReceipt.Status)
+
+	unsignedMsg := verifyAndExtractWarpMessage(ctx, client, sendReceipt.BlockNumber.Uint64(), proxyAddr)
+
+	addressedCall, err := warpPayload.ParseAddressedCall(unsignedMsg.Payload)
+	require.NoError(err)
+
+	require.Equal(testPayload, addressedCall.Payload, "payload mismatch in warp message")
+	require.Equal(proxyAddr.Bytes(), addressedCall.SourceAddress, "source address should be proxy contract")
+
+	log.Info("warp bindings test complete",
+		"proxyAddr", proxyAddr.Hex(),
+		"blockchainID", ids.ID(returnedBlockchainID),
+	)
 }
 
 func (w *warpTest) warpLoad() {
@@ -721,8 +787,4 @@ func generateKeys(preFundedKey *ecdsa.PrivateKey, numWorkers int) ([]*key.Key, [
 
 func toWebsocketURI(uri string, blockchainID string) string {
 	return fmt.Sprintf("ws://%s/ext/bc/%s/ws", strings.TrimPrefix(uri, "http://"), blockchainID)
-}
-
-func toRPCURI(uri string, blockchainID string) string {
-	return fmt.Sprintf("%s/ext/bc/%s/rpc", uri, blockchainID)
 }
