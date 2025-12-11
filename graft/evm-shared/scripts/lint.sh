@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if ! [[ "$0" =~ scripts/lint.sh ]]; then
-  echo "must be run from coreth root"
+  echo "must be run from repository root"
   exit 255
 fi
 
@@ -19,8 +19,8 @@ grep -P 'lint.sh' ../evm-shared/scripts/lint.sh &>/dev/null || (
 )
 
 # Library for file list generation.
-# shellcheck source=/dev/null
-source ../evm-shared/scripts/lint_setup.sh
+
+source ./scripts/lint_setup.sh
 
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
