@@ -45,6 +45,5 @@ RUN /opt/antithesis/bin/goinstrumentor \
     /instrumented
 
 WORKDIR /instrumented/customer
-# Run go mod tidy to add instrumentation packages to go.sum
-RUN go mod tidy
+RUN go mod download
 RUN ln -s /opt/tmp/.git .git
