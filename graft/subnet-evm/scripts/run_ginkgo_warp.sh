@@ -21,4 +21,3 @@ if [[ -n "${AVALANCHEGO_BUILD_PATH}" ]]; then
 fi
 
 "${SUBNET_EVM_PATH}"/bin/ginkgo -vv --label-filter="${GINKGO_LABEL_FILTER:-}" ./tests/warp -- "${EXTRA_ARGS[@]}"
-
