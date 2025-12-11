@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/testutils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
@@ -45,14 +45,14 @@ func deployAllowListTest(t *testing.T, b *sim.Backend, auth *bind.TransactOpts) 
 	t.Helper()
 	addr, tx, contract, err := allowlistbindings.DeployAllowListTest(auth, b.Client(), deployerallowlist.ContractAddress)
 	require.NoError(t, err)
-	testutils.WaitReceiptSuccessful(t, b, tx)
+	utilstest.WaitReceiptSuccessful(t, b, tx)
 	return addr, contract
 }
 
 func TestDeployerAllowList(t *testing.T) {
 	chainID := params.TestChainConfig.ChainID
-	admin := testutils.NewAuth(t, adminKey, chainID)
-	unprivileged := testutils.NewAuth(t, unprivilegedKey, chainID)
+	admin := utilstest.NewAuth(t, adminKey, chainID)
+	unprivileged := utilstest.NewAuth(t, unprivilegedKey, chainID)
 
 	type testCase struct {
 		name string
@@ -128,7 +128,7 @@ func TestDeployerAllowList(t *testing.T) {
 
 				tx, err := allowListTest.SetEnabled(admin, otherContractAddr)
 				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
+				utilstest.WaitReceipt(t, backend, tx)
 
 				isEnabled, err := allowListTest.IsEnabled(nil, otherContractAddr)
 				require.NoError(t, err)
@@ -146,7 +146,7 @@ func TestDeployerAllowList(t *testing.T) {
 
 				tx, err := allowListTest.SetEnabled(admin, deployerContractAddr)
 				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
+				utilstest.WaitReceipt(t, backend, tx)
 
 				isEnabled, err := allowListTest.IsEnabled(nil, deployerContractAddr)
 				require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestDeployerAllowList(t *testing.T) {
 
 				tx, err = deployerContract.DeployContract(admin)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 			},
 		},
 		{
@@ -167,7 +167,7 @@ func TestDeployerAllowList(t *testing.T) {
 
 				tx, err := allowListTest.SetEnabled(admin, deployerContractAddr)
 				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
+				utilstest.WaitReceipt(t, backend, tx)
 
 				isEnabled, err := allowListTest.IsEnabled(nil, deployerContractAddr)
 				require.NoError(t, err)
@@ -175,7 +175,7 @@ func TestDeployerAllowList(t *testing.T) {
 
 				tx, err = allowListTest.Revoke(admin, deployerContractAddr)
 				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
+				utilstest.WaitReceipt(t, backend, tx)
 
 				allowlisttest.VerifyRole(t, allowList, deployerContractAddr, allowlist.NoRole)
 			},
@@ -185,7 +185,7 @@ func TestDeployerAllowList(t *testing.T) {
 	precompileCfg := deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
+			backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 			defer backend.Close()
 
 			allowList, err := allowlistbindings.NewIAllowList(deployerallowlist.ContractAddress, backend.Client())
@@ -198,6 +198,6 @@ func TestDeployerAllowList(t *testing.T) {
 
 func TestIAllowList_Events(t *testing.T) {
 	precompileCfg := deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil)
-	admin := testutils.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
+	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
 	allowlisttest.RunAllowListEventTests(t, precompileCfg, deployerallowlist.ContractAddress, admin, adminAddress, unprivilegedAddress)
 }

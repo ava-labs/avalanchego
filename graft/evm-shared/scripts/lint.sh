@@ -108,8 +108,11 @@ function test_interface_compliance_nil {
 }
 
 function test_import_testing_only_in_tests {
+  # Use the filtered files passed as arguments to allow #skiplint 
+  # directives to work correctly
+  local files=("$@")
   NON_TEST_GO_FILES=$(
-    echo "${AVALANCHE_FILES[@]}" | tr ' ' '\n' |
+    printf "%s\n" "${files[@]}" |
       grep -i '\.go$' |
       grep -vi '_test\.go$' |
       grep -v '^./tests/'

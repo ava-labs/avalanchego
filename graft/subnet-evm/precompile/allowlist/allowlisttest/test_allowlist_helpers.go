@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/testutils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
 )
@@ -42,7 +42,7 @@ func SetAsEnabled(t *testing.T, b *sim.Backend, contract AllowListContract, auth
 	t.Helper()
 	tx, err := contract.SetEnabled(auth, address)
 	require.NoError(t, err)
-	testutils.WaitReceiptSuccessful(t, b, tx)
+	utilstest.WaitReceiptSuccessful(t, b, tx)
 }
 
 // SetAsAdmin sets the given address as Admin in the allow list.
@@ -50,7 +50,7 @@ func SetAsAdmin(t *testing.T, b *sim.Backend, contract AllowListContract, auth *
 	t.Helper()
 	tx, err := contract.SetAdmin(auth, address)
 	require.NoError(t, err)
-	testutils.WaitReceiptSuccessful(t, b, tx)
+	utilstest.WaitReceiptSuccessful(t, b, tx)
 }
 
 // SetAsManager sets the given address as Manager in the allow list.
@@ -58,7 +58,7 @@ func SetAsManager(t *testing.T, b *sim.Backend, contract AllowListContract, auth
 	t.Helper()
 	tx, err := contract.SetManager(auth, address)
 	require.NoError(t, err)
-	testutils.WaitReceiptSuccessful(t, b, tx)
+	utilstest.WaitReceiptSuccessful(t, b, tx)
 }
 
 // SetAsNone revokes the role of the given address in the allow list.
@@ -66,5 +66,5 @@ func SetAsNone(t *testing.T, b *sim.Backend, contract AllowListContract, auth *b
 	t.Helper()
 	tx, err := contract.SetNone(auth, address)
 	require.NoError(t, err)
-	testutils.WaitReceiptSuccessful(t, b, tx)
+	utilstest.WaitReceiptSuccessful(t, b, tx)
 }
