@@ -115,18 +115,10 @@ function test_import_testing_only_in_tests {
       grep -v '^./tests/'
   )
 
-  # Detect which repo we're in based on pwd
-  REPO_NAME="avalanchego"
-  if [[ "$PWD" == */coreth ]]; then
-    REPO_NAME="coreth"
-  elif [[ "$PWD" == */subnet-evm ]]; then
-    REPO_NAME="subnet-evm"
-  fi
-
   IMPORT_TESTING=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"')
   IMPORT_TESTIFY=$(echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/stretchr/testify')
-  IMPORT_FROM_TESTS=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP "\"github.com/ava-labs/(?:avalanchego|${REPO_NAME})/tests/\"")
-  IMPORT_TEST_PKG=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP "\"github.com/ava-labs/(?:avalanchego|${REPO_NAME})/.*?test\"")
+  IMPORT_FROM_TESTS=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP "\"github.com/ava-labs/(?:avalanchego|coreth|subnet-evm)/tests/\"")
+  IMPORT_TEST_PKG=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP "\"github.com/ava-labs/(?:avalanchego|coreth|subnet-evm)/.*?test\"")
 
   # TODO(arr4n): send a PR to add support for build tags in `mockgen` and then enable this.
   # IMPORT_GOMOCK=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"go.uber.org/mock');
