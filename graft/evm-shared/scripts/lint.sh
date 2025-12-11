@@ -18,7 +18,6 @@ grep -P 'lint.sh' "$0" &>/dev/null || (
   exit 255
 )
 
-# Get the directory where this script is located
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # Library for file list generation.
