@@ -109,6 +109,16 @@ type Database struct {
 // Any error during creation will cause the program to exit.
 func New(config Config) (*Database, error) {
 	firewoodDir := filepath.Join(config.ChainDataDir, firewoodDir)
+
+	loggerConfig := ffi.LogConfig{
+		Path:        filepath.Join(firewoodDir, "firewood.log"),
+		FilterLevel: "debug",
+	}
+	if err := ffi.StartLogs(&loggerConfig); err != nil {
+		// fails if firewood was not built with logging support or if logs were already started
+		log.Warn("firewood: unable to start logs", "error", err)
+	}
+
 	filePath := filepath.Join(firewoodDir, firewoodFileName)
 	if err := validatePath(filePath); err != nil {
 		return nil, err
