@@ -21,6 +21,7 @@ grep -P 'lint.sh' "$0" &>/dev/null || (
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # Library for file list generation.
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lint_setup.sh"
 
 # by default, "./scripts/lint.sh" runs all lint tests
