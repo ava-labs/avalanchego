@@ -11,7 +11,7 @@ fi
 # default on macos. Since `-o errexit` is ignored in an if
 # conditional, triggering the problem here ensures script failure when
 # using an unsupported version of grep.
-grep -P 'lint.sh' ../evm-shared/scripts/lint.sh &>/dev/null || (
+grep -P 'lint.sh' ./scripts/lint.sh &>/dev/null || (
   echo >&2 "error: This script requires a recent version of gnu grep."
   echo >&2 "       On macos, gnu grep can be installed with 'brew install grep'."
   echo >&2 "       It will also be necessary to ensure that gnu grep is available in the path."
@@ -19,7 +19,6 @@ grep -P 'lint.sh' ../evm-shared/scripts/lint.sh &>/dev/null || (
 )
 
 # Library for file list generation.
-
 source ./scripts/lint_setup.sh
 
 # by default, "./scripts/lint.sh" runs all lint tests
@@ -155,22 +154,7 @@ function run {
   local test="${1}"
   shift 1
   echo "START: '${test}' at $(date)"
-  
-  # Filter out files that have skiplint comments for this specific test
-  local filtered_files=()
-  for file in "$@"; do
-    # Check if file has skiplint comment for this test
-    if ! grep -q "// #skiplint: ${test}" "$file" 2>/dev/null; then
-      filtered_files+=("$file")
-    fi
-  done
-
-  if [ ${#filtered_files[@]} -eq 0 ]; then
-    echo "SKIPPED: '${test}' - No files remain after filtering at $(date)"
-    return 0
-  fi
-  
-  if "test_${test}" "${filtered_files[@]}"; then
+  if "test_${test}" "$@"; then
     echo "SUCCESS: '${test}' completed at $(date)"
   else
     echo "FAIL: '${test}' failed at $(date)"
