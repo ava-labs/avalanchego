@@ -7,11 +7,11 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
+	params0 "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
 var _ = (*genesisSpecMarshaling)(nil)
@@ -19,7 +19,7 @@ var _ = (*genesisSpecMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (g Genesis) MarshalJSON() ([]byte, error) {
 	type Genesis struct {
-		Config        *params.ChainConfig                        `json:"config"`
+		Config        *params0.ChainConfig                       `json:"config"`
 		Nonce         math.HexOrDecimal64                        `json:"nonce"`
 		Timestamp     math.HexOrDecimal64                        `json:"timestamp"`
 		ExtraData     hexutil.Bytes                              `json:"extraData"`
@@ -68,7 +68,7 @@ func (g Genesis) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals from JSON.
 func (g *Genesis) UnmarshalJSON(input []byte) error {
 	type Genesis struct {
-		Config        *params.ChainConfig                        `json:"config"`
+		Config        *params0.ChainConfig                       `json:"config"`
 		Nonce         *math.HexOrDecimal64                       `json:"nonce"`
 		Timestamp     *math.HexOrDecimal64                       `json:"timestamp"`
 		ExtraData     *hexutil.Bytes                             `json:"extraData"`

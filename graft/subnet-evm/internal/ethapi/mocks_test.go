@@ -15,11 +15,6 @@ import (
 	reflect "reflect"
 	time "time"
 
-	commontype "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
-	consensus "github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
-	core "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
-	params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	rpc "github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 	accounts "github.com/ava-labs/libevm/accounts"
 	common "github.com/ava-labs/libevm/common"
 	bloombits "github.com/ava-labs/libevm/core/bloombits"
@@ -28,6 +23,11 @@ import (
 	vm "github.com/ava-labs/libevm/core/vm"
 	ethdb "github.com/ava-labs/libevm/ethdb"
 	event "github.com/ava-labs/libevm/event"
+	commontype "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
+	consensus "github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
+	core "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	rpc "github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 	gomock "go.uber.org/mock/gomock"
 )
 
