@@ -27,9 +27,9 @@ triedb/*
 !accounts/abi/abi_extra_test.go
 !accounts/abi/bind/bind_extra.go
 !accounts/abi/bind/precompilebind/precompile_config_template.go
-!accounts/abi/bind/precompilebind/precompile_config_test_template.go
+!accounts/abi/bind/precompilebind/templatetest/precompile_config_test_template.go
 !accounts/abi/bind/precompilebind/precompile_contract_template.go
-!accounts/abi/bind/precompilebind/precompile_contract_test_template.go
+!accounts/abi/bind/precompilebind/templatetest/precompile_contract_test_template.go
 !accounts/abi/bind/precompilebind/precompile_event_template.go
 !accounts/abi/bind/precompilebind/precompile_module_template.go
 !cmd/simulator/*
