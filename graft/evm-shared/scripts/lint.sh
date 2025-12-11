@@ -2,11 +2,6 @@
 
 set -euo pipefail
 
-if ! [[ "$0" =~ scripts/lint.sh ]]; then
-  echo "must be run from repository root"
-  exit 255
-fi
-
 # The -P option is not supported by the grep version installed by
 # default on macos. Since `-o errexit` is ignored in an if
 # conditional, triggering the problem here ensures script failure when
