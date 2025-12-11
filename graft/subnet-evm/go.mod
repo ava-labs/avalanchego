@@ -17,7 +17,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego v1.14.1-antithesis-docker-image-fix
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.15
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.16
 	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
