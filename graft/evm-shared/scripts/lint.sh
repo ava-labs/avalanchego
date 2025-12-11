@@ -1,6 +1,33 @@
 #!/usr/bin/env bash
+#
+# lint.sh - Comprehensive linting script for modules using evm-shared
+#
+# Usage:
+#   This script must be run from the root of a module that uses evm-shared
+#   (e.g., coreth/ or subnet-evm/), NOT from evm-shared itself.
+#
+#   From the module root:
+#     ./scripts/lint.sh
+#     TESTS='license_header' ./scripts/lint.sh  # Run specific test only
+#
+# Requirements:
+#   - The module must have a .golangci.yml file at its root
+#   - The module must have a scripts/upstream_files.txt file
+#   - GNU grep with -P flag support (on macOS: brew install grep)
+#
+# References:
+#   - .golangci.yml: The module's own lint config (in current directory)
+#   - ../../tools/go.mod: The avalanchego tools module (two levels up from module)
+#   - ../../.golangci.yml: The avalanchego lint config (used via lint_setup.sh)
+#   - ../../header.yml: Default license header configuration
+#   - ../../header_upstream.yml: Upstream license header configuration
 
 set -euo pipefail
+
+if ! [[ "$0" =~ scripts/lint.sh ]]; then
+  echo "must be run from module root"
+  exit 255
+fi
 
 # The -P option is not supported by the grep version installed by
 # default on macos. Since `-o errexit` is ignored in an if
