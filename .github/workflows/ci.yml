@@ -70,34 +70,6 @@ jobs:
           TIMEOUT: ${{ env.TIMEOUT }}
       - run: ./scripts/run_task.sh coverage
 
-  e2e_precompile:
-    name: e2e precompile tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-      - name: Set up solc
-        uses: ARR4N/setup-solc@v0.2.0
-        with:
-          versions: "0.8.30"
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20.13"
-      - name: Setup Contracts
-        run: ./scripts/run_task.sh setup-contracts
-      - name: Run E2E Precompile Tests
-        run: ./scripts/run_task.sh test-e2e-precompile-ci
-      - name: Upload Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: subnet-evm-e2e-logs-precompile
-          path: /tmp/e2e-test/precompile-data
-          retention-days: 5
 
   e2e_warp:
     name: e2e warp tests
@@ -107,17 +79,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
-      - name: Set up solc
-        uses: ARR4N/setup-solc@v0.2.0
-        with:
-          versions: "0.8.30"
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20.13"
-      - name: Setup Contracts
-        run: ./scripts/run_task.sh setup-contracts
       - name: Run Warp E2E Tests
         uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@70148edc6ecabb2836b89d890718011b892b7063
         with:

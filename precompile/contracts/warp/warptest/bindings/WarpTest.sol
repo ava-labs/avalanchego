@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import "precompile/contracts/warp/warpbindings/IWarpMessenger.sol";
 
-
 // This test contract exists to ensure that `IWarpPrecomile.sol` is properly covered by precompile tests.
 // By invoking the precompile via a proxy contract that leverages the `IWarpPrecompile.sol` interface,
 // we ensure the interface definition matches the precompile implementation regardless of how the proxy 

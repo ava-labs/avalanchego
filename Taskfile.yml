@@ -108,9 +108,7 @@ tasks:
       - cmd: |
           # Find and remove generated binding files in precompile directories only
           find ./precompile -type f -name 'gen_*binding.go' -exec grep -l '^// Code generated - DO NOT EDIT\.$' {} \; | xargs -r rm
-      - cmd: |
-          # Generate bindings for precompile packages (contracts/ bindings are handled by setup-contracts separately)
-          go generate ./precompile/...
+      - cmd: go generate ./precompile/...
 
 
   install-avalanchego-release:
@@ -147,15 +145,6 @@ tasks:
     desc: Run golangci-lint with auto-fix where possible
     cmd: ./scripts/lint_fix.sh
 
-  # todo(JonathanOppenheimer): remove this task once we have migrated to the new contract testing framework
-  setup-contracts:
-    desc: Set up contracts by compiling Solidity contracts and generating Go bindings
-    dir: ./contracts
-    cmds:
-      - cmd: npm ci
-      - cmd: npx hardhat clean
-      - cmd: npx hardhat compile
-
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
     cmd: ./scripts/shellcheck.sh # ci.yml
@@ -186,17 +175,6 @@ tasks:
       - task: install-avalanchego-release
       - task: build
       - task: test-e2e-load
-
-  test-e2e-precompile:
-    desc: Run end-to-end precompile tests using Ginkgo with parallel execution
-    cmd: bash -x ./scripts/run_ginkgo_precompile.sh # ci.yml
-
-  test-e2e-precompile-ci: # consolidated test-e2e-precompile
-    desc: Run E2E precompile tests with CI setup
-    cmds:
-      - task: install-avalanchego-release
-      - task: build
-      - task: test-e2e-precompile
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
