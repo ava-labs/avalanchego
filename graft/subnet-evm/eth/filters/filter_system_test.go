@@ -38,12 +38,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm-shared/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/bloombits"

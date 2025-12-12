@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/common/hexutil"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm-shared/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 )
 

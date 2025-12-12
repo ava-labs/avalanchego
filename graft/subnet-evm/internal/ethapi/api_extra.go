@@ -14,11 +14,11 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 
+	"github.com/ava-labs/avalanchego/graft/evm-shared/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 )
 
 func (s *BlockChainAPI) GetChainConfig(context.Context) *params.ChainConfigWithUpgradesJSON {

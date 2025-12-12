@@ -32,6 +32,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm-shared/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
@@ -41,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/interfaces"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/node"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"

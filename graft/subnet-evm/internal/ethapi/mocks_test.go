@@ -15,11 +15,11 @@ import (
 	reflect "reflect"
 	time "time"
 
+	rpc "github.com/ava-labs/avalanchego/graft/evm-shared/rpc"
 	commontype "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	consensus "github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	core "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	rpc "github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 	accounts "github.com/ava-labs/libevm/accounts"
 	common "github.com/ava-labs/libevm/common"
 	bloombits "github.com/ava-labs/libevm/core/bloombits"

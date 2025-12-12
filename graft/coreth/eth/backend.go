@@ -50,7 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm-shared/rpc"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
