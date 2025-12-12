@@ -5,18 +5,21 @@ package firewood
 
 import (
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/trie/trienode"
 )
 
-type StorageTrie struct {
-	*AccountTrie
+var _ state.Trie = (*storageTrie)(nil)
+
+type storageTrie struct {
+	*accountTrie
 }
 
-// `NewStorageTrie` returns a wrapper around an `AccountTrie` since Firewood
+// `newStorageTrie` returns a wrapper around an `accountTrie` since Firewood
 // does not require a separate storage trie. All changes are managed by the account trie.
-func NewStorageTrie(accountTrie *AccountTrie) (*StorageTrie, error) {
-	return &StorageTrie{
-		AccountTrie: accountTrie,
+func newStorageTrie(accountTrie *accountTrie) (*storageTrie, error) {
+	return &storageTrie{
+		accountTrie: accountTrie,
 	}, nil
 }
 
@@ -24,18 +27,18 @@ func NewStorageTrie(accountTrie *AccountTrie) (*StorageTrie, error) {
 // Return the old storage root as if there was no change since Firewood
 // will manage the hash calculations without it.
 // All changes are managed by the account trie.
-func (*StorageTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
+func (*storageTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 	return common.Hash{}, nil, nil
 }
 
 // Firewood doesn't require tracking storage roots inside of an account.
 // They will be updated in place when hashing of the proposal takes place.
-func (*StorageTrie) Hash() common.Hash {
+func (*storageTrie) Hash() common.Hash {
 	return common.Hash{}
 }
 
 // Copy should never be called on a storage trie, as it is just a wrapper around the account trie.
 // Each storage trie should be re-opened with the account trie separately.
-func (*StorageTrie) Copy() *StorageTrie {
+func (*storageTrie) Copy() *storageTrie {
 	return nil
 }

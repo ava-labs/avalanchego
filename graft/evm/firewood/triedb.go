@@ -93,7 +93,7 @@ func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
 	return db
 }
 
-type Database struct {
+type TrieDB struct {
 	fwDisk       *ffi.Database // The underlying Firewood database, used for storing proposals and revisions.
 	proposalLock sync.RWMutex
 	// proposalMap provides O(1) access by state root to all proposals stored in the proposalTree
@@ -107,7 +107,7 @@ type Database struct {
 
 // New creates a new Firewood database with the given disk database and configuration.
 // Any error during creation will cause the program to exit.
-func New(config Config) (*Database, error) {
+func New(config Config) (*TrieDB, error) {
 	firewoodDir := filepath.Join(config.ChainDataDir, firewoodDir)
 	filePath := filepath.Join(firewoodDir, firewoodFileName)
 	if err := validatePath(filePath); err != nil {
@@ -135,7 +135,7 @@ func New(config Config) (*Database, error) {
 		return nil, err
 	}
 
-	return &Database{
+	return &TrieDB{
 		fwDisk:      fw,
 		proposalMap: make(map[common.Hash][]*ProposalContext),
 		proposalTree: &ProposalContext{
@@ -174,12 +174,12 @@ func validatePath(path string) error {
 // it must be overwritten to use something like:
 // `_, ok := db.(*Database); if !ok { return "" }`
 // to recognize the Firewood database.
-func (*Database) Scheme() string {
+func (*TrieDB) Scheme() string {
 	return rawdb.HashScheme
 }
 
 // Initialized checks whether a non-empty genesis block has been written.
-func (db *Database) Initialized(common.Hash) bool {
+func (db *TrieDB) Initialized(common.Hash) bool {
 	root, err := db.fwDisk.Root()
 	if err != nil {
 		log.Error("firewood: error getting current root", "error", err)
@@ -193,7 +193,7 @@ func (db *Database) Initialized(common.Hash) bool {
 // Update takes a root and a set of keys-values and creates a new proposal.
 // It will not be committed until the Commit method is called.
 // This function should be called even if there are no changes to the state to ensure proper tracking of block hashes.
-func (db *Database) Update(root common.Hash, parentRoot common.Hash, block uint64, nodes *trienode.MergedNodeSet, _ *triestate.Set, opts ...stateconf.TrieDBUpdateOption) error {
+func (db *TrieDB) Update(root common.Hash, parentRoot common.Hash, block uint64, nodes *trienode.MergedNodeSet, _ *triestate.Set, opts ...stateconf.TrieDBUpdateOption) error {
 	// We require block hashes to be provided for all blocks in production.
 	// However, many tests cannot reasonably provide a block hash for genesis, so we allow it to be omitted.
 	parentHash, hash, ok := stateconf.ExtractTrieDBUpdatePayload(opts...)
@@ -237,7 +237,7 @@ func (db *Database) Update(root common.Hash, parentRoot common.Hash, block uint6
 // must be created and tracked.
 //
 // Should only be accessed with the proposal lock held.
-func (db *Database) propose(root common.Hash, parentRoot common.Hash, hash common.Hash, parentHash common.Hash, block uint64, keys [][]byte, values [][]byte) error {
+func (db *TrieDB) propose(root common.Hash, parentRoot common.Hash, hash common.Hash, parentHash common.Hash, block uint64, keys [][]byte, values [][]byte) error {
 	// Find the parent proposal with the correct hash.
 	// We assume the number of proposals at a given root is small, so we can iterate through them.
 	for _, parentProposal := range db.proposalMap[parentRoot] {
@@ -302,7 +302,7 @@ func (db *Database) propose(root common.Hash, parentRoot common.Hash, hash commo
 //
 // Afterward, we know that no other proposal at this height can be committed, so we can dereference all
 // children in the the other branches of the proposal tree.
-func (db *Database) Commit(root common.Hash, report bool) error {
+func (db *TrieDB) Commit(root common.Hash, report bool) error {
 	// We need to lock the proposal tree to prevent concurrent writes.
 	db.proposalLock.Lock()
 	defer db.proposalLock.Unlock()
@@ -359,22 +359,22 @@ func (db *Database) Commit(root common.Hash, report bool) error {
 // Only used for metrics and Commit intervals in APIs.
 // This will be implemented in the firewood database eventually.
 // Currently, Firewood stores all revisions in disk and proposals in memory.
-func (*Database) Size() (common.StorageSize, common.StorageSize) {
+func (*TrieDB) Size() (common.StorageSize, common.StorageSize) {
 	return 0, 0
 }
 
 // Reference is a no-op.
-func (*Database) Reference(common.Hash, common.Hash) {}
+func (*TrieDB) Reference(common.Hash, common.Hash) {}
 
 // Dereference is a no-op since Firewood handles unused state roots internally.
-func (*Database) Dereference(common.Hash) {}
+func (*TrieDB) Dereference(common.Hash) {}
 
 // Firewood does not support this.
-func (*Database) Cap(common.StorageSize) error {
+func (*TrieDB) Cap(common.StorageSize) error {
 	return nil
 }
 
-func (db *Database) Close() error {
+func (db *TrieDB) Close() error {
 	db.proposalLock.Lock()
 	defer db.proposalLock.Unlock()
 
@@ -434,7 +434,7 @@ func createProposal(layer proposable, root common.Hash, keys, values [][]byte) (
 
 // cleanupCommittedProposal dereferences the proposal and removes it from the proposal map.
 // It also recursively dereferences all children of the proposal.
-func (db *Database) cleanupCommittedProposal(pCtx *ProposalContext) {
+func (db *TrieDB) cleanupCommittedProposal(pCtx *ProposalContext) {
 	start := time.Now()
 	oldChildren := db.proposalTree.Children
 	db.proposalTree = pCtx
@@ -454,7 +454,7 @@ func (db *Database) cleanupCommittedProposal(pCtx *ProposalContext) {
 // Internally removes all references of the proposal from the database.
 // Should only be accessed with the proposal lock held.
 // Consumer must not be iterating the proposal map at this root.
-func (db *Database) dereference(pCtx *ProposalContext) {
+func (db *TrieDB) dereference(pCtx *ProposalContext) {
 	// Base case: if there are children, we need to dereference them as well.
 	for _, child := range pCtx.Children {
 		db.dereference(child)
@@ -473,7 +473,7 @@ func (db *Database) dereference(pCtx *ProposalContext) {
 
 // removeProposalFromMap removes the proposal from the proposal map.
 // The proposal lock must be held when calling this function.
-func (db *Database) removeProposalFromMap(pCtx *ProposalContext) {
+func (db *TrieDB) removeProposalFromMap(pCtx *ProposalContext) {
 	rootList := db.proposalMap[pCtx.Root]
 	for i, p := range rootList {
 		if p == pCtx { // pointer comparison - guaranteed to be unique
@@ -492,7 +492,7 @@ func (db *Database) removeProposalFromMap(pCtx *ProposalContext) {
 
 // Reader retrieves a node reader belonging to the given state root.
 // An error will be returned if the requested state is not available.
-func (db *Database) Reader(root common.Hash) (database.Reader, error) {
+func (db *TrieDB) Reader(root common.Hash) (database.Reader, error) {
 	if _, err := db.fwDisk.GetFromRoot(ffi.Hash(root), []byte{}); err != nil {
 		return nil, fmt.Errorf("firewood: unable to retrieve from root %s: %w", root.Hex(), err)
 	}
@@ -501,7 +501,7 @@ func (db *Database) Reader(root common.Hash) (database.Reader, error) {
 
 // reader is a state reader of Database which implements the Reader interface.
 type reader struct {
-	db   *Database
+	db   *TrieDB
 	root ffi.Hash // The root of the state this reader is reading.
 }
 
@@ -521,7 +521,7 @@ func (reader *reader) Node(_ common.Hash, path []byte, _ common.Hash) ([]byte, e
 
 // getProposalHash calculates the hash if the set of keys and values are
 // proposed from the given parent root.
-func (db *Database) getProposalHash(parentRoot common.Hash, keys, values [][]byte) (common.Hash, error) {
+func (db *TrieDB) getProposalHash(parentRoot common.Hash, keys, values [][]byte) (common.Hash, error) {
 	// This function only reads from existing tracked proposals, so we can use a read lock.
 	db.proposalLock.RLock()
 	defer db.proposalLock.RUnlock()
