@@ -7,7 +7,7 @@
 #   (e.g., coreth/ or subnet-evm/).
 #
 #   From the module root:
-#     ./scripts/lint.sh
+#     ../evm-shared/scripts/lint.sh
 #     TESTS='license_header' ./scripts/lint.sh  # Run specific test only
 #
 # Requirements:
