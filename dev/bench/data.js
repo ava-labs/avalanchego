@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1765551819872,
+  "lastUpdate": 1765552045869,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -3360,6 +3360,34 @@ window.BENCHMARK_DATA = {
             "value": 42.62,
             "unit": "mgas/s",
             "extra": "1 times\n64 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonathan Oppenheimer",
+            "username": "JonathanOppenheimer",
+            "email": "jonathan.oppenheimer@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "e52ad206562c65b3724333cacfb908774a5dd195",
+          "message": "[migrate-subnet-evm][1] Add tooling enabling repo migration (#4653)",
+          "timestamp": "2025-12-09T19:34:12Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/e52ad206562c65b3724333cacfb908774a5dd195"
+        },
+        "date": 1765552045379,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[10000001,10100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd-jp6dz-runner-468g5",
+            "value": 53.29,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
           }
         ]
       }
