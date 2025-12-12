@@ -35,6 +35,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	ethsnapshot "github.com/ava-labs/libevm/core/state/snapshot"
@@ -43,7 +44,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 )
 
 const (

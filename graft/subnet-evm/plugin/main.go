@@ -6,10 +6,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/version"
-
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/runner"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 func main() {

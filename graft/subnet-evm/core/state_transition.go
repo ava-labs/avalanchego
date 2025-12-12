@@ -32,6 +32,9 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	cmath "github.com/ava-labs/libevm/common/math"
@@ -40,9 +43,6 @@ import (
 	"github.com/ava-labs/libevm/crypto/kzg4844"
 	"github.com/ava-labs/libevm/log"
 	ethparams "github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/holiman/uint256"
 )
 

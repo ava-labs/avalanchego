@@ -31,12 +31,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and

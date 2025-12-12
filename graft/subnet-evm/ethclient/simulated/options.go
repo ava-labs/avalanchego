@@ -30,10 +30,10 @@ package simulated
 import (
 	"math/big"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/ethconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/node"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/libevm/common"
 )
 
 // WithBlockGasLimit configures the simulated backend to target a specific gas limit

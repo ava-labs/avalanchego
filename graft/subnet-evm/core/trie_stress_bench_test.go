@@ -32,11 +32,11 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/stretchr/testify/require"
 )
 

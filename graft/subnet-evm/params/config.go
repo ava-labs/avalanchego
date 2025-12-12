@@ -30,10 +30,10 @@ package params
 import (
 	"math/big"
 
-	"github.com/ava-labs/libevm/libevm"
-	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/libevm/libevm"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func init() {

@@ -8,8 +8,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
@@ -18,11 +16,13 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/syncutils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 var _ LeafRequestHandler = (*leafsRequestHandler)(nil)

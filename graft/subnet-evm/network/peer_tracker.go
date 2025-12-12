@@ -7,13 +7,13 @@ import (
 	"math"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/rand"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )

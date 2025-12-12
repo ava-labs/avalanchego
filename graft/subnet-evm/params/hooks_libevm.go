@@ -9,9 +9,6 @@ import (
 	"math/big"
 	"slices"
 
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
@@ -23,6 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

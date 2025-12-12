@@ -33,6 +33,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -43,7 +44,6 @@ import (
 	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/database"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
 const (

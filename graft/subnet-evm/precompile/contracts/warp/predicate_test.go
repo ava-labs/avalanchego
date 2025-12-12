@@ -9,6 +9,15 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras/extrastest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -21,15 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras/extrastest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 
 	agoUtils "github.com/ava-labs/avalanchego/utils"
 	safemath "github.com/ava-labs/avalanchego/utils/math"

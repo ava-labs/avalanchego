@@ -11,7 +11,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -26,10 +25,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/ids"
 
-	ethparams "github.com/ava-labs/libevm/params"
 	clientstats "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client/stats"
 	handlerstats "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestMain(m *testing.M) {

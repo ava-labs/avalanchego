@@ -6,16 +6,16 @@ package warp
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/warptest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/warptest"
 
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )

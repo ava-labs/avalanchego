@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	syncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 )

@@ -6,12 +6,12 @@ package extras
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestNetworkUpgradesEqual(t *testing.T) {

@@ -29,15 +29,15 @@
 package miner
 
 import (
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/event"
 )
 
 // Backend wraps all methods required for mining.

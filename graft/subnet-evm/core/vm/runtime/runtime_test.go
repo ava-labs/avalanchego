@@ -34,6 +34,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/asm"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -41,11 +46,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 
 	// force-load js tracers to trigger registration
 	_ "github.com/ava-labs/libevm/eth/tracers/js"

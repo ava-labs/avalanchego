@@ -8,10 +8,9 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )

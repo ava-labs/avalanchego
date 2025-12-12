@@ -34,13 +34,13 @@ import (
 	mrand "math/rand"
 	"sync/atomic"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/lru"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
 const (

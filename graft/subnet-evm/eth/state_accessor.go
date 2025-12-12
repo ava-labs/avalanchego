@@ -33,6 +33,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -41,10 +45,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 )
 
 // noopReleaser is returned in case there is no operation expected

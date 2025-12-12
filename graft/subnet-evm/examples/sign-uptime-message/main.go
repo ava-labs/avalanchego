@@ -9,7 +9,11 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/peer"
@@ -19,10 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
-	"github.com/prometheus/client_golang/prometheus"
-	"google.golang.org/protobuf/proto"
-
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 
 	p2pmessage "github.com/ava-labs/avalanchego/message"
 )

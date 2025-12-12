@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats/statstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {

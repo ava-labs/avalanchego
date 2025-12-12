@@ -35,16 +35,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/libevm/accounts"
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/bloombits"
-	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/event"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/pruner"
@@ -61,6 +51,16 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/libevm/accounts"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/bloombits"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/event"
+	"github.com/ava-labs/libevm/log"
 )
 
 // Config contains the configuration options of the ETH protocol.

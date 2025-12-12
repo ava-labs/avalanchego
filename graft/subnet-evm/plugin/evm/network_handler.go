@@ -6,13 +6,13 @@ package evm
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/triedb"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/ids"
 
 	syncHandlers "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
 	syncStats "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats"
