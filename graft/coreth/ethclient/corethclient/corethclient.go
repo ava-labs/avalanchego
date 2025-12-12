@@ -35,7 +35,7 @@ import (
 	"runtime/debug"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
-	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm-shared/rpc"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"

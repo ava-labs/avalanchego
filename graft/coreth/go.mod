@@ -9,15 +9,14 @@ go 1.24.9
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
-	github.com/ava-labs/avalanchego v1.14.1-0.20251120155522-df4a8e531761
+	github.com/ava-labs/avalanchego v1.14.1-antithesis-docker-image-fix
+	github.com/ava-labs/avalanchego/graft/evm-shared v0.0.0-00010101000000-000000000000
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.16
 	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
-	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/go-cmd/cmd v1.4.3
 	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/rpc v1.2.0
-	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-bexpr v0.1.10
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/holiman/billy v0.0.0-20240216141850-2abb0c79d3c4
@@ -39,7 +38,6 @@ require (
 	golang.org/x/crypto v0.45.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
 	golang.org/x/sync v0.18.0
-	golang.org/x/time v0.12.0
 	google.golang.org/protobuf v1.36.8
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
@@ -68,6 +66,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233 // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.1.0 // indirect
+	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/dlclark/regexp2 v1.7.0 // indirect
 	github.com/dop251/goja v0.0.0-20230806174421-c933cf95e127 // indirect
@@ -97,6 +96,7 @@ require (
 	github.com/google/renameio/v2 v2.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
@@ -157,6 +157,7 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/term v0.37.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.38.0 // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
@@ -184,3 +185,7 @@ tool (
 )
 
 replace github.com/ava-labs/avalanchego => ../../
+
+replace github.com/ava-labs/avalanchego/graft/evm-shared => ../evm-shared
+
+replace github.com/ava-labs/avalanchego/graft/subnet-evm => ../subnet-evm/

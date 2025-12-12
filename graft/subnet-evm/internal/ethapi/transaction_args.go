@@ -35,9 +35,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/graft/evm-shared/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"

@@ -8,7 +8,7 @@ env:
   AVALANCHEGO_BUILD_PATH: '{{.AVALANCHEGO_BUILD_PATH | default (printf "%s/avalanchego/build" .TASKFILE_DIR) }}'
 
 tasks:
-  default: ./scripts/run_task.sh --list
+  default: ../../scripts/run_task.sh --list
 
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
