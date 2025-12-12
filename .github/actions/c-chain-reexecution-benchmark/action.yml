@@ -190,6 +190,9 @@ runs:
         GH_RUN_NUMBER: ${{ inputs.run_number }}
         GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
+        # Required for Nix builds in CI self-hosted runners (e.g., building Firewood via polyrepo)
+        TMPDIR: /tmp
+        NIX_BUILD_TOP: /tmp
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
       with:
