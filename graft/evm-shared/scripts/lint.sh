@@ -15,12 +15,12 @@
 #   - The module must have a scripts/upstream_files.txt file
 #   - GNU grep with -P flag support (on macOS: brew install grep)
 #
-# References:
-#   - .golangci.yml: The module's own lint config (in current directory)
-#   - ../../tools/go.mod: The avalanchego tools module (two levels up from module)
-#   - ../../.golangci.yml: The avalanchego lint config (used via lint_setup.sh)
-#   - ../../header.yml: Default license header configuration
-#   - ../../header_upstream.yml: Upstream license header configuration
+# References (from avalanchego/ root):
+#   - avalanchego/graft/{module}/.golangci.yml: Module's own lint config
+#   - avalanchego/tools/go.mod: Avalanchego tools module
+#   - avalanchego/.golangci.yml: Avalanchego lint config
+#   - avalanchego/header.yml: Default license header
+#   - avalanchego/header_upstream.yml: Upstream license header
 
 set -euo pipefail
 

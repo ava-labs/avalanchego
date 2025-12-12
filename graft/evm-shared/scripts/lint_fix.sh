@@ -18,10 +18,10 @@
 #   - The module must have a .golangci.yml file at its root
 #   - The module must have a scripts/upstream_files.txt file
 #
-# References:
-#   - .golangci.yml: The repository's own lint config (in current directory)
-#   - ../../tools/go.mod: The avalanchego tools module (two levels up from repo)
-#   - ../../.golangci.yml: The avalanchego lint config (used in lint_setup.sh)
+# References (from avalanchego/ root):
+#   - avalanchego/graft/{module}/.golangci.yml: Module's own lint config
+#   - avalanchego/tools/go.mod: Avalanchego tools module
+#   - avalanchego/.golangci.yml: Avalanchego lint config
 
 set -euo pipefail
 
