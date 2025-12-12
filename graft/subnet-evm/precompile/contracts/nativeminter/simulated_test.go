@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/testutils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
@@ -46,14 +46,14 @@ func deployNativeMinterTest(t *testing.T, b *sim.Backend, auth *bind.TransactOpt
 	t.Helper()
 	addr, tx, contract, err := nativeminterbindings.DeployNativeMinterTest(auth, b.Client(), nativeminter.ContractAddress)
 	require.NoError(t, err)
-	testutils.WaitReceiptSuccessful(t, b, tx)
+	utilstest.WaitReceiptSuccessful(t, b, tx)
 	return addr, contract
 }
 
 func TestNativeMinter(t *testing.T) {
 	chainID := params.TestChainConfig.ChainID
-	admin := testutils.NewAuth(t, adminKey, chainID)
-	unprivileged := testutils.NewAuth(t, unprivilegedKey, chainID)
+	admin := utilstest.NewAuth(t, adminKey, chainID)
+	unprivileged := utilstest.NewAuth(t, unprivilegedKey, chainID)
 	amount := big.NewInt(100)
 
 	type testCase struct {
@@ -73,7 +73,7 @@ func TestNativeMinter(t *testing.T) {
 				// Admin mints native coins directly to testAddr
 				tx, err := nativeMinter.MintNativeCoin(admin, testAddr, amount)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				// Verify balance increased
 				finalBalance, err := backend.Client().BalanceAt(t.Context(), testAddr, nil)
@@ -132,7 +132,7 @@ func TestNativeMinter(t *testing.T) {
 				// Enabled contract mints native coins
 				tx, err := testContract.MintNativeCoin(admin, testAddr, amount)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				// Verify balance increased
 				finalBalance, err := backend.Client().BalanceAt(t.Context(), testAddr, nil)
@@ -146,7 +146,7 @@ func TestNativeMinter(t *testing.T) {
 	precompileCfg := nativeminter.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
+			backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 			defer backend.Close()
 
 			nativeMinter, err := nativeminterbindings.NewINativeMinter(nativeminter.ContractAddress, backend.Client())
@@ -159,12 +159,12 @@ func TestNativeMinter(t *testing.T) {
 
 func TestINativeMinter_Events(t *testing.T) {
 	chainID := params.TestChainConfig.ChainID
-	admin := testutils.NewAuth(t, adminKey, chainID)
+	admin := utilstest.NewAuth(t, adminKey, chainID)
 	testKey, _ := crypto.GenerateKey()
 	testAddress := crypto.PubkeyToAddress(testKey.PublicKey)
 
 	precompileCfg := nativeminter.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil)
-	backend := testutils.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
+	backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 	defer backend.Close()
 
 	nativeMinter, err := nativeminterbindings.NewINativeMinter(nativeminter.ContractAddress, backend.Client())
@@ -177,7 +177,7 @@ func TestINativeMinter_Events(t *testing.T) {
 
 		tx, err := nativeMinter.MintNativeCoin(admin, testAddress, amount)
 		require.NoError(err)
-		testutils.WaitReceiptSuccessful(t, backend, tx)
+		utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 		// Filter for NativeCoinMinted events
 		iter, err := nativeMinter.FilterNativeCoinMinted(

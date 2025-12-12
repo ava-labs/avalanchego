@@ -1,11 +1,9 @@
-name: CI
+name: Subnet-EVM
 
 on:
   push:
     branches:
       - master
-    tags:
-      - "*"
   pull_request:
   merge_group:
     types: [checks_requested]
@@ -14,15 +12,12 @@ jobs:
   lint_test:
     name: Lint
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: "go.mod"
-          cache-dependency-path: |
-            go.sum
-            tools/go.sum
-            tools/legacy-golangci-lint.sum
+      - uses: ./.github/actions/setup-go-for-project
       - name: Set up solc
         uses: ARR4N/setup-solc@v0.2.0
         with:
@@ -31,45 +26,22 @@ jobs:
         run: ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
         run: ./scripts/run_task.sh check-go-mod-tidy
-      - name: Ensure consistent avalanchego version
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./scripts/run_task.sh check-avalanchego-version
-  links-lint:
-    name: Markdown Links Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 #v1.2.5
-        with:
-          fail_level: any
 
   unit_test:
-    name: Golang Unit Tests (${{ matrix.os }})
+    name: Unit Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-22.04, ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: "go.mod"
-          cache-dependency-path: |
-            go.sum
-            tools/go.sum
-      - run: go mod download
-      - name: Check generated codec files are up to date
-        run: ./scripts/run_task.sh check-generate-codec
-      - name: Check generated mocks are up to date
-        run: ./scripts/run_task.sh check-generate-mocks
-      - run: ./scripts/run_task.sh build
+      - uses: ./.github/actions/setup-go-for-project
       - run: ./scripts/run_task.sh build-test
-        env:
-          TIMEOUT: ${{ env.TIMEOUT }}
       - run: ./scripts/run_task.sh coverage
-
 
   e2e_warp:
     name: e2e warp tests
@@ -83,6 +55,7 @@ jobs:
         uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@70148edc6ecabb2836b89d890718011b892b7063
         with:
           run: ./scripts/run_task.sh test-e2e-warp-ci
+          working_directory: ./graft/subnet-evm
           artifact_prefix: warp
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
@@ -105,6 +78,7 @@ jobs:
         uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@70148edc6ecabb2836b89d890718011b892b7063
         with:
           run: ./scripts/run_task.sh test-e2e-load-ci
+          working_directory: ./graft/subnet-evm
           artifact_prefix: load
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
@@ -118,6 +92,9 @@ jobs:
   test_build_image:
     name: Image build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v4
       - name: Install qemu (required for cross-platform builds)
@@ -130,10 +107,13 @@ jobs:
   test_build_antithesis_images:
     name: Build Antithesis images
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: "go.mod"
+          go-version-file: "graft/subnet-evm/go.mod"
       - name: Check antithesis image build
         run: ./scripts/run_task.sh test-build-antithesis-images-ci

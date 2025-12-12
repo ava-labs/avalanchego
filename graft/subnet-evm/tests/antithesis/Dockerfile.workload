@@ -12,8 +12,10 @@ ARG BUILDER_WORKDIR
 
 WORKDIR $BUILDER_WORKDIR
 
-# Build the workload
-RUN ./scripts/build_antithesis_workload.sh
+# Build the workload using module import path (root go.mod has replacement for subnet-evm)
+# -mod=mod allows downloading dependencies that aren't in root go.sum (from submodule)
+RUN go build -mod=mod -o ./graft/subnet-evm/build/workload \
+    github.com/ava-labs/avalanchego/graft/subnet-evm/tests/antithesis
 
 # ============= Cleanup Stage ================
 # Base the workflow on the node image to support bootstrap testing
@@ -23,6 +25,6 @@ FROM $AVALANCHEGO_NODE_IMAGE AS execution
 ARG BUILDER_WORKDIR
 
 # Copy the executable into the container
-COPY --from=builder $BUILDER_WORKDIR/build/workload ./workload
+COPY --from=builder $BUILDER_WORKDIR/graft/subnet-evm/build/workload ./workload
 
 CMD [ "./workload" ]

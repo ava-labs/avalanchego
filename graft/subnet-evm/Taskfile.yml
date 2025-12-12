@@ -5,14 +5,10 @@
 version: '3'
 
 env:
-  AVALANCHEGO_BUILD_PATH: '{{.AVALANCHEGO_BUILD_PATH | default "/tmp/e2e-test/avalanchego"}}'
+  AVALANCHEGO_BUILD_PATH: '{{.AVALANCHEGO_BUILD_PATH | default (printf "%s/../../build" .TASKFILE_DIR) }}'
 
 tasks:
   default: ./scripts/run_task.sh --list
-
-  actionlint:
-    desc: Validate GitHub Actions workflows and ensure scripts use run_task.sh for reproducibility
-    cmd: ./scripts/actionlint.sh # ci.yml
 
   build:
     desc: Compile Subnet EVM binary with git commit and static linking flags
@@ -33,12 +29,6 @@ tasks:
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
     cmd: ./scripts/build_test.sh # ci.yml
-
-  check-avalanchego-version:
-    desc: Ensure consistent avalanchego version by updating and checking for changes
-    cmds:
-      - task: update-avalanchego-version
-      - cmd: git diff --exit-code
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
@@ -77,8 +67,6 @@ tasks:
     cmds:
       - cmd: go mod tidy
       - task: check-clean-branch
-      - cmd: cd tools && go mod tidy
-      - task: check-clean-branch
 
   coverage:
     desc: Display test coverage statistics from coverage.out file
@@ -110,20 +98,14 @@ tasks:
           find ./precompile -type f -name 'gen_*binding.go' -exec grep -l '^// Code generated - DO NOT EDIT\.$' {} \; | xargs -r rm
       - cmd: go generate ./precompile/...
 
-
-  install-avalanchego-release:
-    desc: Download and install AvalancheGo release binary for testing, with fallback to building from source
-    cmd: ./scripts/install_avalanchego_release.sh # ci.yml
-
   lint:
     desc: Run golangci-lint and check for allowed Ethereum imports in Go code
-    cmd: ./scripts/lint.sh
+    cmd: ../evm-shared/scripts/lint.sh
 
   lint-all:
     desc: Runs all lint checks in parallel
     deps:
       - lint
-      - actionlint
       - shellcheck
       - check-generate-codec
       - check-generate-mocks
@@ -134,7 +116,6 @@ tasks:
     desc: Runs all lint checks one-by-one
     cmds:
       - task: lint
-      - task: actionlint
       - task: shellcheck
       - task: check-generate-codec
       - task: check-generate-mocks
@@ -143,7 +124,7 @@ tasks:
   
   lint-fix:
     desc: Run golangci-lint with auto-fix where possible
-    cmd: ./scripts/lint_fix.sh
+    cmd: ../evm-shared/scripts/lint_fix.sh
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
@@ -156,9 +137,9 @@ tasks:
   test-build-antithesis-images-ci: # consolidated test-build-antithesis-images
     desc: Test antithesis images build with CI setup
     cmds:
-      - task: install-avalanchego-release
-      - task: build
-      - cmd: go run ./tests/antithesis --avalanchego-path=/tmp/e2e-test/avalanchego/avalanchego --duration=60s
+      - cmd: cd ../../ && ./scripts/build.sh # build avalanchego from root
+      - task: build # build subnet-evm
+      - cmd: go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --duration=60s
       - task: test-build-antithesis-images
 
   test-build-image:
@@ -172,21 +153,17 @@ tasks:
   test-e2e-load-ci: # consolidated test-e2e-load
     desc: Run E2E load tests with CI setup
     cmds:
-      - task: install-avalanchego-release
-      - task: build
+      - cmd: cd ../../ && ./scripts/build.sh # build avalanchego from root
+      - task: build # build subnet-evm
       - task: test-e2e-load
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
-    cmd: bash -x ./scripts/run_ginkgo_warp.sh # ci.yml
+    cmd: bash -x ./scripts/run_ginkgo_warp.sh
 
   test-e2e-warp-ci: # consolidated test-e2e-warp
     desc: Run E2E warp tests with CI setup
     cmds:
-      - task: install-avalanchego-release
-      - task: build
+      - cmd: cd ../../ && ./scripts/build.sh # build avalanchego from root
+      - task: build # build subnet-evm
       - task: test-e2e-warp
-
-  update-avalanchego-version:
-    desc: Update AvalancheGo version in go.mod and sync GitHub Actions workflow custom action version
-    cmd: bash -x ./scripts/update_avalanchego_version.sh # ci.yml

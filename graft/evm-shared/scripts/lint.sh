@@ -1,9 +1,31 @@
 #!/usr/bin/env bash
+#
+# lint.sh - Comprehensive linting script for modules using evm-shared
+#
+# Usage:
+#   This script must be run from the root of a module that uses evm-shared
+#   (e.g., coreth/ or subnet-evm/).
+#
+#   From the module root:
+#     ../evm-shared/scripts/lint.sh
+#     TESTS='license_header' ./scripts/lint.sh  # Run specific test only
+#
+# Requirements:
+#   - The module must have a .golangci.yml file at its root
+#   - The module must have a scripts/upstream_files.txt file
+#   - GNU grep with -P flag support (on macOS: brew install grep)
+#
+# References (from avalanchego/ root):
+#   - avalanchego/graft/{module}/.golangci.yml: Module's own lint config
+#   - avalanchego/tools/go.mod: Avalanchego tools module
+#   - avalanchego/.golangci.yml: Avalanchego lint config
+#   - avalanchego/header.yml: Default license header
+#   - avalanchego/header_upstream.yml: Upstream license header
 
 set -euo pipefail
 
 if ! [[ "$0" =~ scripts/lint.sh ]]; then
-  echo "must be run from coreth root"
+  echo "must be run from module root"
   exit 255
 fi
 
@@ -11,15 +33,18 @@ fi
 # default on macos. Since `-o errexit` is ignored in an if
 # conditional, triggering the problem here ensures script failure when
 # using an unsupported version of grep.
-grep -P 'lint.sh' scripts/lint.sh &>/dev/null || (
+grep -P 'lint.sh' "$0" &>/dev/null || (
   echo >&2 "error: This script requires a recent version of gnu grep."
   echo >&2 "       On macos, gnu grep can be installed with 'brew install grep'."
   echo >&2 "       It will also be necessary to ensure that gnu grep is available in the path."
   exit 255
 )
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 # Library for file list generation.
-source ./scripts/lint_setup.sh
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lint_setup.sh"
 
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
@@ -110,8 +135,11 @@ function test_interface_compliance_nil {
 }
 
 function test_import_testing_only_in_tests {
+  # Use the filtered files passed as arguments to allow #skiplint 
+  # directives to work correctly
+  local files=("$@")
   NON_TEST_GO_FILES=$(
-    echo "${AVALANCHE_FILES[@]}" | tr ' ' '\n' |
+    printf "%s\n" "${files[@]}" |
       grep -i '\.go$' |
       grep -vi '_test\.go$' |
       grep -v '^./tests/'
@@ -119,8 +147,8 @@ function test_import_testing_only_in_tests {
 
   IMPORT_TESTING=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"')
   IMPORT_TESTIFY=$(echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/stretchr/testify')
-  IMPORT_FROM_TESTS=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP '"github.com/ava-labs/(?:avalanchego|coreth)/tests/')
-  IMPORT_TEST_PKG=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP '"github.com/ava-labs/(?:avalanchego|coreth)/.*?test"')
+  IMPORT_FROM_TESTS=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP "\"github.com/ava-labs/(?:avalanchego|coreth|subnet-evm)/tests/\"")
+  IMPORT_TEST_PKG=$(echo "${NON_TEST_GO_FILES}" | xargs grep -lP "\"github.com/ava-labs/(?:avalanchego|coreth|subnet-evm)/.*?test\"")
 
   # TODO(arr4n): send a PR to add support for build tags in `mockgen` and then enable this.
   # IMPORT_GOMOCK=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"go.uber.org/mock');

@@ -24,9 +24,9 @@ export IMAGE_TAG="${DOCKERHUB_TAG}"
 bash -x "${SUBNET_EVM_PATH}"/scripts/build_antithesis_images.sh
 
 # Test the images
-AVALANCHEGO_CLONE_PATH="${AVALANCHEGO_CLONE_PATH:-${SUBNET_EVM_PATH}/avalanchego}"
+AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
 export IMAGE_NAME="antithesis-subnet-evm-config"
 export DEBUG="${DEBUG:-}"
 set -x
 # shellcheck source=/dev/null
-. "${AVALANCHEGO_CLONE_PATH}"/scripts/lib_test_antithesis_images.sh
+. "${AVALANCHE_PATH}"/scripts/lib_test_antithesis_images.sh

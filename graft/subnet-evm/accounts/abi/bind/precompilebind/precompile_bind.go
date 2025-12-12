@@ -39,6 +39,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind/precompilebind/templatetest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 )
 
@@ -78,8 +79,8 @@ func PrecompileBind(types []string, abiData string, bytecodes []string, fsigs []
 	contractHook := createPrecompileHook(abifilename, tmplSourcePrecompileContractGo)
 	moduleHook := createPrecompileHook(abifilename, tmplSourcePrecompileModuleGo)
 	eventHook := createPrecompileHook(abifilename, tmplSourcePrecompileEventGo)
-	configTestHook := createPrecompileHook(abifilename, tmplSourcePrecompileConfigTestGo)
-	contractTestHook := createPrecompileHook(abifilename, tmplSourcePrecompileContractTestGo)
+	configTestHook := createPrecompileHook(abifilename, templatetest.TmplSourcePrecompileConfigTestGo)
+	contractTestHook := createPrecompileHook(abifilename, templatetest.TmplSourcePrecompileContractTestGo)
 
 	if err := verifyABI(abiData); err != nil {
 		return nil, err

@@ -9,12 +9,13 @@ FROM --platform=$BUILDPLATFORM golang:1.24.9-bookworm AS builder
 WORKDIR /build
 
 # Copy avalanche dependencies first (intermediate docker image caching)
-# Copy avalanchego directory if present (for manual CI case, which uses local dependency)
-COPY go.mod go.sum avalanchego* ./
+# Note: Context is now the repo root, so we copy from there
+COPY go.mod go.sum ./
+COPY graft ./graft
 # Download avalanche dependencies using go mod
 RUN go mod download && go mod tidy
 
-# Copy the code into the container
+# Copy the entire repo to preserve module structure
 COPY . .
 
 # Ensure pre-existing builds are not available for inclusion in the final image
@@ -28,7 +29,8 @@ ARG BUILDPLATFORM
 #
 # build_env.sh is used to capture the environmental changes required by the build step since RUN
 # environment state is not otherwise persistent.
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] && [ "$BUILDPLATFORM" != "linux/arm64" ]; then \
+RUN cd graft/subnet-evm && \
+  if [ "$TARGETPLATFORM" = "linux/arm64" ] && [ "$BUILDPLATFORM" != "linux/arm64" ]; then \
   apt-get update && apt-get install -y gcc-aarch64-linux-gnu && \
   echo "export CC=aarch64-linux-gnu-gcc" > ./build_env.sh \
   ; elif [ "$TARGETPLATFORM" = "linux/amd64" ] && [ "$BUILDPLATFORM" != "linux/amd64" ]; then \
@@ -42,7 +44,8 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] && [ "$BUILDPLATFORM" != "linux/arm
 ARG SUBNET_EVM_COMMIT
 ARG CURRENT_BRANCH
 
-RUN . ./build_env.sh && \
+RUN cd graft/subnet-evm && \
+  . ./build_env.sh && \
   echo "{CC=$CC, TARGETPLATFORM=$TARGETPLATFORM, BUILDPLATFORM=$BUILDPLATFORM}" && \
   export GOARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) && \
   export CURRENT_BRANCH=$CURRENT_BRANCH && \
@@ -55,4 +58,4 @@ FROM $AVALANCHEGO_NODE_IMAGE AS execution
 # Copy the evm binary into the correct location in the container
 ARG VM_ID=srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
 ENV AVAGO_PLUGIN_DIR="/avalanchego/build/plugins"
-COPY --from=builder /build/build/subnet-evm $AVAGO_PLUGIN_DIR/$VM_ID
+COPY --from=builder /build/graft/subnet-evm/build/subnet-evm $AVAGO_PLUGIN_DIR/$VM_ID

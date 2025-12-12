@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/testutils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
@@ -73,7 +73,7 @@ func deployFeeManagerTest(t *testing.T, b *sim.Backend, auth *bind.TransactOpts)
 	t.Helper()
 	addr, tx, contract, err := feemanagerbindings.DeployFeeManagerTest(auth, b.Client(), feemanager.ContractAddress)
 	require.NoError(t, err)
-	testutils.WaitReceiptSuccessful(t, b, tx)
+	utilstest.WaitReceiptSuccessful(t, b, tx)
 	return addr, contract
 }
 
@@ -105,7 +105,7 @@ func setFeeConfig(t *testing.T, b *sim.Backend, contract feeConfigSetter, auth *
 	t.Helper()
 	tx, err := trySetFeeConfig(contract, auth, config)
 	require.NoError(t, err)
-	receipt := testutils.WaitReceiptSuccessful(t, b, tx)
+	receipt := utilstest.WaitReceiptSuccessful(t, b, tx)
 	return receipt.BlockNumber.Uint64()
 }
 
@@ -138,7 +138,7 @@ func verifyFeeConfigsMatch(t *testing.T, expected, actual commontype.FeeConfig) 
 
 func TestFeeManager(t *testing.T) {
 	chainID := params.TestChainConfig.ChainID
-	admin := testutils.NewAuth(t, adminKey, chainID)
+	admin := utilstest.NewAuth(t, adminKey, chainID)
 
 	type testCase struct {
 		name string
@@ -220,7 +220,7 @@ func TestFeeManager(t *testing.T) {
 				_ = setFeeConfig(t, backend, testContract, admin, raisedConfig)
 
 				// Try to send a transaction with the old (now too low) fee - should fail
-				lowFeeAuth := testutils.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
+				lowFeeAuth := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
 				lowFeeAuth.GasLimit = 100000
 				lowFeeAuth.GasFeeCap = originalMinBaseFee
 				lowFeeAuth.GasTipCap = big.NewInt(1)
@@ -236,7 +236,7 @@ func TestFeeManager(t *testing.T) {
 	precompileCfg := feemanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, &genesisFeeConfig)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
+			backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 			defer backend.Close()
 
 			feeManager, err := feemanagerbindings.NewIFeeManager(feemanager.ContractAddress, backend.Client())
@@ -249,10 +249,10 @@ func TestFeeManager(t *testing.T) {
 
 func TestIFeeManager_Events(t *testing.T) {
 	chainID := params.TestChainConfig.ChainID
-	admin := testutils.NewAuth(t, adminKey, chainID)
+	admin := utilstest.NewAuth(t, adminKey, chainID)
 
 	precompileCfg := feemanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, &genesisFeeConfig)
-	backend := testutils.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
+	backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 	defer backend.Close()
 
 	feeManager, err := feemanagerbindings.NewIFeeManager(feemanager.ContractAddress, backend.Client())

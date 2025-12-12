@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/testutils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
@@ -51,7 +51,7 @@ func deployRewardManagerTest(t *testing.T, b *sim.Backend, auth *bind.TransactOp
 	t.Helper()
 	addr, tx, contract, err := rewardmanagerbindings.DeployRewardManagerTest(auth, b.Client(), rewardmanager.ContractAddress)
 	require.NoError(t, err)
-	testutils.WaitReceiptSuccessful(t, b, tx)
+	utilstest.WaitReceiptSuccessful(t, b, tx)
 	return addr, contract
 }
 
@@ -95,7 +95,7 @@ func sendSimpleTx(t *testing.T, b *sim.Backend, key *ecdsa.PrivateKey) *types.Tr
 
 func TestRewardManager(t *testing.T) {
 	chainID := params.TestChainConfig.ChainID
-	admin := testutils.NewAuth(t, adminKey, chainID)
+	admin := utilstest.NewAuth(t, adminKey, chainID)
 
 	type testCase struct {
 		name                string
@@ -148,7 +148,7 @@ func TestRewardManager(t *testing.T) {
 
 				tx, err := testContract.SetRewardAddress(admin, testContractAddr)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				currentAddr, err := testContract.CurrentRewardAddress(nil)
 				require.NoError(t, err)
@@ -174,7 +174,7 @@ func TestRewardManager(t *testing.T) {
 
 				tx, err := testContract.AllowFeeRecipients(admin)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				isAllowed, err := testContract.AreFeeRecipientsAllowed(nil)
 				require.NoError(t, err)
@@ -189,7 +189,7 @@ func TestRewardManager(t *testing.T) {
 
 				tx, err := testContract.SetRewardAddress(admin, testContractAddr)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				currentAddr, err := testContract.CurrentRewardAddress(nil)
 				require.NoError(t, err)
@@ -197,7 +197,7 @@ func TestRewardManager(t *testing.T) {
 
 				tx, err = testContract.DisableRewards(admin)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				currentAddr, err = testContract.CurrentRewardAddress(nil)
 				require.NoError(t, err)
@@ -221,7 +221,7 @@ func TestRewardManager(t *testing.T) {
 				require.NoError(t, err)
 
 				tx := sendSimpleTx(t, backend, adminKey)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				newBlackholeBalance, err := client.BalanceAt(t.Context(), constants.BlackholeAddr, nil)
 				require.NoError(t, err)
@@ -246,7 +246,7 @@ func TestRewardManager(t *testing.T) {
 
 				tx, err := testContract.SetRewardAddress(admin, rewardRecipientAddr)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				currentAddr, err := testContract.CurrentRewardAddress(nil)
 				require.NoError(t, err)
@@ -254,7 +254,7 @@ func TestRewardManager(t *testing.T) {
 
 				// The fees from this transaction should go to the reward address
 				tx = sendSimpleTx(t, backend, adminKey)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				newRecipientBalance, err := client.BalanceAt(t.Context(), rewardRecipientAddr, nil)
 				require.NoError(t, err)
@@ -284,7 +284,7 @@ func TestRewardManager(t *testing.T) {
 
 				// The fees from this transaction should go to the coinbase address
 				tx := sendSimpleTx(t, backend, adminKey)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				newCoinbaseBalance, err := client.BalanceAt(t.Context(), coinbaseAddr, nil)
 				require.NoError(t, err)
@@ -298,7 +298,7 @@ func TestRewardManager(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := rewardmanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, tc.initialRewardConfig)
-			backend := testutils.NewBackendWithPrecompile(t, cfg, []common.Address{adminAddress, unprivilegedAddress}, tc.backendOpts...)
+			backend := utilstest.NewBackendWithPrecompile(t, cfg, []common.Address{adminAddress, unprivilegedAddress}, tc.backendOpts...)
 			defer backend.Close()
 
 			rewardManager, err := rewardmanagerbindings.NewIRewardManager(rewardmanager.ContractAddress, backend.Client())
@@ -311,7 +311,7 @@ func TestRewardManager(t *testing.T) {
 
 func TestIRewardManager_Events(t *testing.T) {
 	chainID := params.TestChainConfig.ChainID
-	admin := testutils.NewAuth(t, adminKey, chainID)
+	admin := utilstest.NewAuth(t, adminKey, chainID)
 
 	type testCase struct {
 		name string
@@ -330,7 +330,7 @@ func TestIRewardManager_Events(t *testing.T) {
 
 				tx, err := testContract.SetRewardAddress(admin, rewardRecipientAddr)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				iter, err := rewardManager.FilterRewardAddressChanged(nil, nil, nil, nil)
 				require.NoError(t, err)
@@ -354,7 +354,7 @@ func TestIRewardManager_Events(t *testing.T) {
 
 				tx, err := testContract.AllowFeeRecipients(admin)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				iter, err := rewardManager.FilterFeeRecipientsAllowed(nil, nil)
 				require.NoError(t, err)
@@ -375,7 +375,7 @@ func TestIRewardManager_Events(t *testing.T) {
 
 				tx, err := testContract.DisableRewards(admin)
 				require.NoError(t, err)
-				testutils.WaitReceiptSuccessful(t, backend, tx)
+				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
 				iter, err := rewardManager.FilterRewardsDisabled(nil, nil)
 				require.NoError(t, err)
@@ -392,7 +392,7 @@ func TestIRewardManager_Events(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			backend := testutils.NewBackendWithPrecompile(t, rewardmanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil), []common.Address{adminAddress, unprivilegedAddress})
+			backend := utilstest.NewBackendWithPrecompile(t, rewardmanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil), []common.Address{adminAddress, unprivilegedAddress})
 			defer backend.Close()
 
 			rewardManager, err := rewardmanagerbindings.NewIRewardManager(rewardmanager.ContractAddress, backend.Client())
@@ -405,6 +405,6 @@ func TestIRewardManager_Events(t *testing.T) {
 
 func TestIAllowList_Events(t *testing.T) {
 	precompileCfg := rewardmanager.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil)
-	admin := testutils.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
+	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
 	allowlisttest.RunAllowListEventTests(t, precompileCfg, rewardmanager.ContractAddress, admin, adminAddress)
 }

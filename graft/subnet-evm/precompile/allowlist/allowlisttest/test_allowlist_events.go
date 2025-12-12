@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/testutils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
@@ -45,7 +45,7 @@ func RunAllowListEventTests(
 			testRun: func(allowList *allowlistbindings.IAllowList, auth *bind.TransactOpts, backend *sim.Backend, t *testing.T, addr common.Address) {
 				tx, err := allowList.SetAdmin(auth, addr)
 				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
+				utilstest.WaitReceipt(t, backend, tx)
 			},
 			expectedEvents: []allowlistbindings.IAllowListRoleSet{
 				{
@@ -61,7 +61,7 @@ func RunAllowListEventTests(
 			testRun: func(allowList *allowlistbindings.IAllowList, auth *bind.TransactOpts, backend *sim.Backend, t *testing.T, addr common.Address) {
 				tx, err := allowList.SetManager(auth, addr)
 				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
+				utilstest.WaitReceipt(t, backend, tx)
 			},
 			expectedEvents: []allowlistbindings.IAllowListRoleSet{
 				{
@@ -77,7 +77,7 @@ func RunAllowListEventTests(
 			testRun: func(allowList *allowlistbindings.IAllowList, auth *bind.TransactOpts, backend *sim.Backend, t *testing.T, addr common.Address) {
 				tx, err := allowList.SetEnabled(auth, addr)
 				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
+				utilstest.WaitReceipt(t, backend, tx)
 			},
 			expectedEvents: []allowlistbindings.IAllowListRoleSet{
 				{
@@ -94,11 +94,11 @@ func RunAllowListEventTests(
 				// First set the address to Enabled so we can test setting it to None
 				tx, err := allowList.SetEnabled(auth, addr)
 				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
+				utilstest.WaitReceipt(t, backend, tx)
 
 				tx, err = allowList.SetNone(auth, addr)
 				require.NoError(t, err)
-				testutils.WaitReceipt(t, backend, tx)
+				utilstest.WaitReceipt(t, backend, tx)
 			},
 			expectedEvents: []allowlistbindings.IAllowListRoleSet{
 				{
@@ -121,7 +121,7 @@ func RunAllowListEventTests(
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
 
-			backend := testutils.NewBackendWithPrecompile(t, precompileCfg, fundedAddrs)
+			backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, fundedAddrs)
 			defer backend.Close()
 
 			allowList, err := allowlistbindings.NewIAllowList(contractAddress, backend.Client())

@@ -92,17 +92,18 @@ if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
   AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}:${AVALANCHE_VERSION}"
   echo "Building ${AVALANCHEGO_NODE_IMAGE} locally"
 
-  source "${SUBNET_EVM_PATH}"/scripts/lib_avalanchego_clone.sh
-  clone_avalanchego "${AVALANCHE_VERSION}"
+  AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
   SKIP_BUILD_RACE=1 \
     DOCKER_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}" \
     BUILD_MULTI_ARCH="${BUILD_MULTI_ARCH}" \
-    "${AVALANCHEGO_CLONE_PATH}"/scripts/build_image.sh
+    "${AVALANCHE_PATH}"/scripts/build_image.sh
 fi
 
 echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based of AvalancheGo@$AVALANCHE_VERSION"
+# Use repo root as context so Dockerfile can access graft/ directory
+AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
 ${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${DOCKERHUB_TAG}" \
-  "$SUBNET_EVM_PATH" -f "$SUBNET_EVM_PATH/Dockerfile" \
+  "$AVALANCHE_PATH" -f "$SUBNET_EVM_PATH/Dockerfile" \
   --build-arg AVALANCHEGO_NODE_IMAGE="$AVALANCHEGO_NODE_IMAGE" \
   --build-arg SUBNET_EVM_COMMIT="$SUBNET_EVM_COMMIT" \
   --build-arg CURRENT_BRANCH="$CURRENT_BRANCH" \

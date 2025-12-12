@@ -2,15 +2,28 @@
 
 # lint_setup.sh - Shared linting configuration setup
 #
-# Exports:
-#   AVALANCHE_FILES - Array of Go files created by Avalanche to be linted
-#   UPSTREAM_FILES - Array of Go files adapted from go-ethereum to be linted
-#   AVALANCHE_LINT_FILE - Path to temporary avalanche-specific lint config
+# Purpose:
+#   This script separates module Go files into two categories:
+#   1. Upstream files: Code adapted from go-ethereum (with LGPL-3.0 license)
+#   2. Avalanche files: Code written by Avalanche (with BSD-3-Clause license)
+#
+#   This separation allows different lint rules and license headers to be applied
+#   to each category of files.
 #
 # Usage:
-#   source ./scripts/lint_setup.sh
-#   setup_lint
-# This script function must be run from the repository root.
+#   This script must be sourced from the root of a module that uses evm-shared:
+#
+#     source ./scripts/lint_setup.sh
+#     setup_lint
+#
+#   After calling setup_lint, the following variables are available:
+#     AVALANCHE_FILES - Array of Go files created by Avalanche
+#     UPSTREAM_FILES - Array of Go files adapted from go-ethereum
+#     AVALANCHE_LINT_FILE - Path to temporary avalanchego lint config with upstream exclusions
+#
+# Requirements:
+#   - Must be run from module root
+#   - Must have scripts/upstream_files.txt defining upstream file patterns
 
 set -euo pipefail
 
@@ -82,7 +95,7 @@ function setup_lint {
   trap 'rm -rf -- "$TMP_DIR"' EXIT
 
   AVALANCHE_LINT_FILE="${TMP_DIR}/.avalanche-golangci.yml"
-  cp .avalanche-golangci.yml "$AVALANCHE_LINT_FILE"
+  cp ../../.golangci.yml "$AVALANCHE_LINT_FILE"
 
   # Exclude all upstream files dynamically
   echo "    paths-except:" >> "$AVALANCHE_LINT_FILE"

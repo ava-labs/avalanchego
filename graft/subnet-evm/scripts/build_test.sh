@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-# TODO(marun) Ensure the working directory is the repository root or a non-canonical set of tests may be executed
 
-# Root directory
-SUBNET_EVM_PATH=$(
-    cd "$(dirname "${BASH_SOURCE[0]}")"
-    cd .. && pwd
-)
 
-# Load the constants
-source "$SUBNET_EVM_PATH"/scripts/constants.sh
+REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../../../ && pwd )
+source "$REPO_ROOT"/scripts/constants.sh
 
 # We pass in the arguments to this script directly to enable easily passing parameters such as enabling race detection,
 # parallelism, and test coverage.
@@ -20,5 +14,6 @@ if [[ -n "${NO_RACE:-}" ]]; then
     race=""
 fi
 
+cd "$REPO_ROOT/graft/subnet-evm"
 # shellcheck disable=SC2046
-go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-600s}" -coverprofile=coverage.out -covermode=atomic "$@" $(go list ./... | grep -v github.com/ava-labs/subnet-evm/tests) 
+go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-600s}" -coverprofile=coverage.out -covermode=atomic "$@" $(go list .//... | grep -v github.com/ava-labs/avalanchego/graft/subnet-evm/tests)

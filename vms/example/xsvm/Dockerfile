@@ -14,6 +14,7 @@ WORKDIR /build
 COPY go.mod .
 COPY go.sum .
 COPY graft/coreth ./graft/coreth
+COPY graft/subnet-evm ./graft/subnet-evm
 RUN go mod download
 
 # Copy the code into the container

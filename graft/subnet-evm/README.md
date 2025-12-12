@@ -100,6 +100,6 @@ There are two options when using the Avalanche-CLI:
 1. Use an official Subnet-EVM release: <https://build.avax.network/docs/tooling/avalanche-cli/create-avalanche-l1>
 1. Build and deploy a locally built (and optionally modified) version of Subnet-EVM: <https://build.avax.network/docs/tooling/avalanche-cli/create-deploy-avalanche-l1s/deploy-with-custom-vm>
 
-## Releasing
+## Licensing
 
-You can refer to the [`docs/releasing/README.md`](docs/releasing/README.md) file for the release process.
+As opposed to `avalanchego` (see the project's [README](../../README.md)), this module is licensed under LGPL, unless otherwise stated in each file header.
