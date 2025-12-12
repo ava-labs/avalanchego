@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/subnet-evm/utils"
-	"github.com/ava-labs/subnet-evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 )
 
 func TestVerifyStateUpgrades(t *testing.T) {

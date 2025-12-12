@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/libevm/log"
 
-	"github.com/ava-labs/subnet-evm/plugin/evm/client"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/client"
 )
 
 // Admin is the API service for admin API calls

@@ -42,8 +42,8 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/subnet-evm/triedb/hashdb"
-	"github.com/ava-labs/subnet-evm/triedb/pathdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/hashdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/pathdb"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )

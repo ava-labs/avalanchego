@@ -22,7 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/subnet-evm/warp/messages"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 
 	p2pmessage "github.com/ava-labs/avalanchego/message"
 )

@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
 
-	"github.com/ava-labs/subnet-evm/ethclient"
-	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

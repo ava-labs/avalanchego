@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"golang.org/x/exp/slog"
 
-	"github.com/ava-labs/subnet-evm/plugin/evm/config"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 )
 
 // Interface compliance

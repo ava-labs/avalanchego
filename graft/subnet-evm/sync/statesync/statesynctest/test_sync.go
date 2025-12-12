@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
-	"github.com/ava-labs/subnet-evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 )
 
 // AssertDBConsistency checks [serverTrieDB] and [clientTrieDB] have the same EVM state trie at [root],

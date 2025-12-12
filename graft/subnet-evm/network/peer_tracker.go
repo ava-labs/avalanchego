@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
 
-	"github.com/ava-labs/subnet-evm/utils/rand"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/rand"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )

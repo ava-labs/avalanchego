@@ -25,9 +25,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/subnet-evm/utils/utilstest"
-	"github.com/ava-labs/subnet-evm/warp/messages"
-	"github.com/ava-labs/subnet-evm/warp/warptest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/warptest"
 
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )

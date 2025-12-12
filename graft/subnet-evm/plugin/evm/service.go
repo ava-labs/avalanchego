@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 
-	"github.com/ava-labs/subnet-evm/plugin/evm/client"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/client"
 )
 
 type ValidatorsAPI struct {

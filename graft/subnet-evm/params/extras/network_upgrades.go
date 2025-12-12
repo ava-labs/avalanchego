@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/upgrade"
 
-	"github.com/ava-labs/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

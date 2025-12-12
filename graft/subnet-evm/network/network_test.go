@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/subnet-evm/network/peertest"
-	"github.com/ava-labs/subnet-evm/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/network/peertest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 )
 
 var (

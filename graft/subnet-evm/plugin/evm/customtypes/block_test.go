@@ -40,13 +40,13 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
 
-	"github.com/ava-labs/subnet-evm/internal/blocktest"
-	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 
 	// This test file has to be in package types_test to avoid a circular
 	// dependency when importing `params`. We dot-import the package to mimic
 	// regular same-package behaviour.
-	. "github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
+	. "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 )
 
 func TestBlockEncoding(t *testing.T) {

@@ -9,11 +9,11 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"go.uber.org/mock/gomock"
 
-	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
-	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
-	"github.com/ava-labs/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 )
 
 func TestVerify(t *testing.T) {

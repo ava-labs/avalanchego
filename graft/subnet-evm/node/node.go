@@ -29,7 +29,7 @@ package node
 
 import (
 	"github.com/ava-labs/libevm/accounts"
-	"github.com/ava-labs/subnet-evm/rpc"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 )
 
 // Node is a container on which services can be registered.

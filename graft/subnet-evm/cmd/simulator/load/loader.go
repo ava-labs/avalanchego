@@ -19,12 +19,12 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/subnet-evm/cmd/simulator/config"
-	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
-	"github.com/ava-labs/subnet-evm/cmd/simulator/metrics"
-	"github.com/ava-labs/subnet-evm/cmd/simulator/txs"
-	"github.com/ava-labs/subnet-evm/ethclient"
-	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/config"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/key"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/metrics"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/txs"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 	ethparams "github.com/ava-labs/libevm/params"

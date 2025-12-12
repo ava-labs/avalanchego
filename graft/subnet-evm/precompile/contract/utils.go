@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 
-	"github.com/ava-labs/subnet-evm/accounts/abi"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
 )
 
 // Gas costs for stateful precompiles

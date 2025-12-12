@@ -38,7 +38,7 @@ import (
 	"runtime"
 
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/internal/flags"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/flags"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v2"

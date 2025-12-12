@@ -18,10 +18,10 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ava-labs/subnet-evm/core/txpool"
-	"github.com/ava-labs/subnet-evm/eth"
-	"github.com/ava-labs/subnet-evm/plugin/evm/config"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 
 	ethcommon "github.com/ava-labs/libevm/common"
 )
