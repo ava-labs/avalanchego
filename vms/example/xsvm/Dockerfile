@@ -15,6 +15,7 @@ COPY go.mod .
 COPY go.sum .
 COPY graft/coreth ./graft/coreth
 COPY graft/subnet-evm ./graft/subnet-evm
+COPY graft/evm-shared ./graft/evm-shared
 RUN go mod download
 
 # Copy the code into the container
