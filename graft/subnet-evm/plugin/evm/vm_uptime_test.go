@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -15,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
-	"github.com/stretchr/testify/require"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avagovalidators "github.com/ava-labs/avalanchego/snow/validators"

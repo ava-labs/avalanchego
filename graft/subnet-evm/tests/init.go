@@ -34,10 +34,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/libevm/libevm"
 )
 
 // Forks table defines supported forks and their chain config.

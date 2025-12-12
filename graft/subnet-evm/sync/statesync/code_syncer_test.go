@@ -7,7 +7,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
@@ -17,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/utils"
 
 	statesyncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats"

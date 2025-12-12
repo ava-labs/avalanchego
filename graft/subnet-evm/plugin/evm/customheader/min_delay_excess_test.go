@@ -6,7 +6,6 @@ package customheader
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
 func TestMinDelayExcess(t *testing.T) {

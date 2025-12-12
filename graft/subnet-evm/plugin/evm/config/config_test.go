@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestUnmarshalConfig(t *testing.T) {

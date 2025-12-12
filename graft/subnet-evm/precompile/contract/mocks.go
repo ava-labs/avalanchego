@@ -13,13 +13,13 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	precompileconfig "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	snow "github.com/ava-labs/avalanchego/snow"
 	set "github.com/ava-labs/avalanchego/utils/set"
 	predicate "github.com/ava-labs/avalanchego/vms/evm/predicate"
 	common "github.com/ava-labs/libevm/common"
 	types "github.com/ava-labs/libevm/core/types"
 	stateconf "github.com/ava-labs/libevm/libevm/stateconf"
-	precompileconfig "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	uint256 "github.com/holiman/uint256"
 	gomock "go.uber.org/mock/gomock"
 )

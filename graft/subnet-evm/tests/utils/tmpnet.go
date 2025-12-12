@@ -8,10 +8,9 @@ import (
 	"os"
 
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 )
 
 var DefaultChainConfig = map[string]any{

@@ -12,9 +12,9 @@ package precompileconfig
 import (
 	reflect "reflect"
 
+	commontype "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	predicate "github.com/ava-labs/avalanchego/vms/evm/predicate"
 	common "github.com/ava-labs/libevm/common"
-	commontype "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	gomock "go.uber.org/mock/gomock"
 )
 

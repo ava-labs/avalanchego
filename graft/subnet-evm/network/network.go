@@ -10,7 +10,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/libevm/log"
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/semaphore"
+
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/network/stats"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -19,12 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/libevm/log"
-	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/sync/semaphore"
-
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/network/stats"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 )
 
 // Minimum amount of time to handle a request

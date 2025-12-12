@@ -34,12 +34,12 @@ import (
 	"runtime"
 	"runtime/debug"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 )
 
 // Client is a wrapper around rpc.Client that implements geth-specific functionality.

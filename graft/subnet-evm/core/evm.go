@@ -31,6 +31,10 @@ import (
 	"bytes"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
 	"github.com/ava-labs/libevm/core/state"
@@ -38,10 +42,6 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/holiman/uint256"

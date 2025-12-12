@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/version"
 )
 
 type rpcChainCompatibility struct {

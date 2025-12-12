@@ -30,12 +30,12 @@ package backends
 import (
 	"context"
 
-	ethereum "github.com/ava-labs/libevm"
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/interfaces"
+	ethereum "github.com/ava-labs/libevm"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 // Verify that SimulatedBackend implements required interfaces

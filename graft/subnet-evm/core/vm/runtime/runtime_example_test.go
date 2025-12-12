@@ -30,8 +30,8 @@ package runtime_test
 import (
 	"fmt"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/vm/runtime"
+	"github.com/ava-labs/libevm/common"
 )
 
 func ExampleExecute() {
