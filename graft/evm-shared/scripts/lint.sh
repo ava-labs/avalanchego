@@ -4,7 +4,7 @@
 #
 # Usage:
 #   This script must be run from the root of a module that uses evm-shared
-#   (e.g., coreth/ or subnet-evm/), NOT from evm-shared itself.
+#   (e.g., coreth/ or subnet-evm/).
 #
 #   From the module root:
 #     ./scripts/lint.sh
