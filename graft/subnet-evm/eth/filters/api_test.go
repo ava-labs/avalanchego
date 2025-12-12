@@ -34,7 +34,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/subnet-evm/rpc"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 )
 
 func TestUnmarshalJSONNewFilterArgs(t *testing.T) {

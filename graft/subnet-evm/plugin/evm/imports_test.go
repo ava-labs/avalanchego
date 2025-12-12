@@ -46,7 +46,7 @@ func getDependencies(packageName string) (map[string]struct{}, error) {
 
 func TestMustNotImport(t *testing.T) {
 	withRepo := func(pkg string) string {
-		const repo = "github.com/ava-labs/subnet-evm"
+		const repo = "github.com/ava-labs/avalanchego/graft/subnet-evm"
 		return fmt.Sprintf("%s/%s", repo, pkg)
 	}
 	mustNotImport := map[string][]string{

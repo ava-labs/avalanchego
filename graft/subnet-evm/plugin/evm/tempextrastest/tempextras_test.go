@@ -16,9 +16,9 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/subnet-evm/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 
-	cparams "github.com/ava-labs/subnet-evm/params"
+	cparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
 func TestWithTempRegisteredLibEVMExtras(t *testing.T) {

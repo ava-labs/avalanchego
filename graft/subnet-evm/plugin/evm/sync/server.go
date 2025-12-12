@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
 
-	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 )
 
 var errProviderNotSet = errors.New("provider not set")

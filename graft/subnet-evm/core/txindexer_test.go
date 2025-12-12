@@ -38,9 +38,9 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	ethparams "github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/subnet-evm/consensus/dummy"
-	"github.com/ava-labs/subnet-evm/core/coretest"
-	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/coretest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/stretchr/testify/require"
 )
 

@@ -36,7 +36,7 @@ import (
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/core/types"
 	ethparams "github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 )
 
 // Tests that the simulator starts with the initial gas limit in the genesis block,

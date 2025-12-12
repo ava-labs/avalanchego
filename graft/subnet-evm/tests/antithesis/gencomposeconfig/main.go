@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/antithesis"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 
-	"github.com/ava-labs/subnet-evm/tests/utils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests/utils"
 )
 
 const baseImageName = "antithesis-subnet-evm"

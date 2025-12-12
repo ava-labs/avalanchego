@@ -41,7 +41,7 @@ import (
 	"unicode"
 
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/accounts/abi"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
 )
 
 // Lang is a target programming language selector to generate bindings for.

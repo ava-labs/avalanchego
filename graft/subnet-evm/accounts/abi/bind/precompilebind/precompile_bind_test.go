@@ -39,7 +39,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 )
 
 var bindTests = []struct {
@@ -456,8 +456,8 @@ var bindTests = []struct {
 		 "github.com/ava-labs/libevm/common"
 		 "github.com/ava-labs/libevm/core/rawdb"
 		 "github.com/ava-labs/libevm/core/state"
-		 "github.com/ava-labs/subnet-evm/core/extstate"
-		 "github.com/ava-labs/subnet-evm/precompile/allowlist"
+		 "github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
+		 "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 		`,
 		`
 			testGreeting := "test"
@@ -523,7 +523,7 @@ var bindTests = []struct {
 		`[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"addressTest","type":"address"},{"indexed":true,"internalType":"uint8","name":"intTest","type":"uint8"},{"indexed":false,"internalType":"bytes","name":"bytesTest","type":"bytes"}],"name":"test","type":"event"},{"inputs":[],"name":"eventTest","outputs":[{"internalType":"string","name":"result","type":"string"}],"stateMutability":"view","type":"function"},{"type":"event","name":"empty","inputs":[]},{"type":"event","name":"indexed","inputs":[{"name":"addr","type":"address","indexed":true},{"name":"num","type":"int8","indexed":true}]},{"type":"event","name":"mixed","inputs":[{"name":"addr","type":"address","indexed":true},{"name":"num","type":"int8"}]},{"type":"event","name":"dynamic","inputs":[{"name":"idxStr","type":"string","indexed":true},{"name":"idxDat","type":"bytes","indexed":true},{"name":"str","type":"string"},{"name":"dat","type":"bytes"}]},{"type":"event","name":"unnamed","inputs":[{"name":"","type":"uint8","indexed":true},{"name":"","type":"uint8","indexed":true}]}]`,
 		`"github.com/stretchr/testify/require"
 		"github.com/ava-labs/libevm/common"
-		"github.com/ava-labs/subnet-evm/precompile/contract"
+		"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 		`,
 		`
 			testAddr := common.Address{1}
@@ -684,7 +684,7 @@ func TestPrecompileBind(t *testing.T) {
 	require.NoError(t, err, "failed to convert binding test to modules: %v\n%s", err, out)
 
 	pwd, _ := os.Getwd()
-	replacer := exec.Command(gocmd, "mod", "edit", "-x", "-require", "github.com/ava-labs/subnet-evm@v0.0.0", "-replace", "github.com/ava-labs/subnet-evm="+filepath.Join(pwd, "..", "..", "..", "..")) // Repo root
+	replacer := exec.Command(gocmd, "mod", "edit", "-x", "-require", "github.com/ava-labs/avalanchego/graft/subnet-evm@v0.0.0", "-replace", "github.com/ava-labs/avalanchego/graft/subnet-evm="+filepath.Join(pwd, "..", "..", "..", "..")) // Repo root
 	replacer.Dir = pkg
 	out, err = replacer.CombinedOutput()
 	require.NoError(t, err, "failed to replace binding test dependency to current source tree: %v\n%s", err, out)

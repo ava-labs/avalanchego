@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/log"
 
-	warpprecompile "github.com/ava-labs/subnet-evm/precompile/contracts/warp"
+	warpprecompile "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 )
 
 var errNoValidators = errors.New("cannot aggregate signatures from subnet with no validators")

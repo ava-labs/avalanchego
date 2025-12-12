@@ -43,7 +43,7 @@ import (
 	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/database"
-	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
 const (

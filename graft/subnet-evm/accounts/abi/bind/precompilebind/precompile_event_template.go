@@ -13,7 +13,7 @@ package {{.Package}}
 import (
 	"math/big"
 
-	"github.com/ava-labs/subnet-evm/precompile/contract"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/libevm/common"
 )
 

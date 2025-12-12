@@ -12,14 +12,14 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
-	"github.com/ava-labs/subnet-evm/eth/ethconfig"
-	"github.com/ava-labs/subnet-evm/node"
-	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/params/extras"
-	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/ethconfig"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/node"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 
-	sim "github.com/ava-labs/subnet-evm/ethclient/simulated"
+	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
 )
 
 // NewAuth creates a new transactor with the given private key and chain ID.

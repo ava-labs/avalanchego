@@ -20,8 +20,8 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/subnet-evm/triedb/firewood"
-	"github.com/ava-labs/subnet-evm/triedb/hashdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/firewood"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/hashdb"
 )
 
 const (

@@ -10,8 +10,8 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"go.uber.org/goleak"
 
-	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 )
 
 // TestMain uses goleak to verify tests in this package do not leak unexpected
@@ -27,7 +27,7 @@ func TestMain(m *testing.M) {
 
 	opts := []goleak.Option{
 		// No good way to shut down these goroutines:
-		goleak.IgnoreTopFunction("github.com/ava-labs/subnet-evm/core/state/snapshot.(*diskLayer).generate"),
+		goleak.IgnoreTopFunction("github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot.(*diskLayer).generate"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core.(*txSenderCacher).cache"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/metrics.(*meterArbiter).tick"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/avalanchego/vms/evm/metrics.(*meterArbiter).tick"),

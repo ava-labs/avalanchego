@@ -45,7 +45,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/rlp"
-	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"golang.org/x/exp/slices"
 )
 

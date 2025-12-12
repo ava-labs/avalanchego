@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/subnet-evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 )
 
 // StatefulPrecompileConfig defines the interface for a stateful precompile to

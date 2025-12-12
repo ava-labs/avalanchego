@@ -39,7 +39,7 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
-	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 )
 
 var (
