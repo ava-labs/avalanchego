@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to checkout & release"
+        required: true
+  release:
+    types:
+      - released
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: subnet-evm
+          ref: ${{ github.event.inputs.tag }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./subnet-evm/go.mod"
+      - name: Set up arm64 cross compiler
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install gcc-aarch64-linux-gnu
+      - name: Checkout osxcross
+        uses: actions/checkout@v4
+        with:
+          repository: tpoechtrager/osxcross
+          path: osxcross
+      - name: Build osxcross
+        run: |
+          sudo apt-get -y install clang llvm-dev libxml2-dev uuid-dev libssl-dev bash patch make tar xz-utils bzip2 gzip sed cpio libbz2-dev
+          cd osxcross
+          wget https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX11.3.sdk.tar.xz -O tarballs/MacOSX11.3.sdk.tar.xz
+          echo cd4f08a75577145b8f05245a2975f7c81401d75e9535dcffbb879ee1deefcbf4 tarballs/MacOSX11.3.sdk.tar.xz | sha256sum -c -
+          UNATTENDED=1 ./build.sh
+          echo "$PWD/target/bin" >> "$GITHUB_PATH"
+      - name: Git checkout workflow event ref for .goreleaser.yml only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: goreleaser
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 #v6.3.0
+        with:
+          distribution: goreleaser
+          version: v2.5.1
+          args: release --clean --config ../goreleaser/.goreleaser.yml
+          workdir: ./subnet-evm/
+        env:
+          # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#about-the-github_token-secret
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
