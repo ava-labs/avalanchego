@@ -233,6 +233,19 @@ tasks:
 
   reexecute-cchain-range-with-copied-data:
     desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
+    summary: |
+      Optionally accepts LIBEVM_REF and FIREWOOD_REF to test with custom versions.
+      If not provided, uses versions from go.mod.
+      
+      Examples:
+        # Use go.mod versions
+        task c-chain-reexecution-firewood-101-250k
+        
+        # Use custom firewood
+        task c-chain-reexecution-firewood-101-250k FIREWOOD_REF=abc123
+        
+        # Use custom both
+        task c-chain-reexecution-firewood-101-250k FIREWOOD_REF=abc123 LIBEVM_REF=v1.2.3
     vars:
       TASK_NAME: '{{.TASK_NAME}}'
       BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
@@ -243,6 +256,17 @@ tasks:
       TIMESTAMP: '{{.TIMESTAMP | default (now | date "20060102-150405")}}'
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/%s-%s" .TASK_NAME .TIMESTAMP)}}'
     cmds:
+      - cmd: |
+          if [[ -n "{{.LIBEVM_REF}}" ]]; then
+            echo "Updating libevm to: {{.LIBEVM_REF}}"
+            go get github.com/ava-labs/libevm@{{.LIBEVM_REF}}
+            cd graft/coreth && go get github.com/ava-labs/libevm@{{.LIBEVM_REF}}
+          fi
+      - cmd: |
+          if [[ -n "{{.FIREWOOD_REF}}" && "{{.CONFIG}}" == "firewood" ]]; then
+            echo "Setting up firewood at: {{.FIREWOOD_REF}}"
+            ./scripts/run_polyrepo.sh sync firewood@{{.FIREWOOD_REF}} --force
+          fi
       - task: import-cchain-reexecute-range
         vars:
           BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.BLOCK_DIR_SRC}}/**'
@@ -327,11 +351,6 @@ tasks:
           BLOCK_DIR_SRC: 'cchain-mainnet-blocks-1m-ldb'
           CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-100'
           CONFIG: firewood
-
-  build-firewood:
-    desc: Build Firewood FFI from source for testing with Coreth
-    dir: graft/coreth
-    cmd: ./scripts/build_firewood.sh {{.FIREWOOD_REF}} {{if eq .DIRTY "true"}}--dirty{{end}}
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests

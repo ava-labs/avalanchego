@@ -63,6 +63,12 @@ inputs:
   push-post-state:
     description: 'S3 destination to copy the current-state directory after completing re-execution. If empty, this will be skipped.'
     default: ''
+  libevm:
+    description: 'libevm commit/branch/tag (optional). If provided, updates libevm dependency before benchmark.'
+    default: ''
+  firewood:
+    description: 'Firewood commit/branch/tag (optional). If provided, builds custom firewood before benchmark.'
+    default: ''
   # The following inputs need never be provided by the caller. They
   # default to context values that the action's steps are unable to
   # access directly.
@@ -154,11 +160,15 @@ runs:
         if [[ -n "${{ inputs.task }}" ]]; then
           # Task-based approach
           ./scripts/run_task.sh ${{ inputs.task }} \
+            LIBEVM_REF="${{ inputs.libevm }}" \
+            FIREWOOD_REF="${{ inputs.firewood }}" \
             BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}" \
             EXECUTION_DATA_DIR="${{ env.EXECUTION_DATA_DIR }}"
         else
           # Granular approach
           ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
+            LIBEVM_REF="${{ inputs.libevm }}" \
+            FIREWOOD_REF="${{ inputs.firewood }}" \
             CONFIG=${{ inputs.config }} \
             EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
             BLOCK_DIR_SRC=${{ inputs.block-dir-src }} \
