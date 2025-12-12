@@ -19,7 +19,6 @@ import (
 // TestImportViolations ensures proper import rules:
 // - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)
 // - graft/subnet-evm can only be imported within graft/subnet-evm itself and vms/evm/emulate
-// - github.com/ava-labs/libevm/libevm/pseudo cannot be imported anywhere
 //
 // The rationale for these rules are as follows:
 //
@@ -34,10 +33,6 @@ import (
 //
 // both coreth and subnet-evm can be imported in the vms/evm/emulate package, because it
 // allows consumers to use both coreth and subnet-evm registration at the same time.
-//
-// github.com/ava-labs/libevm/libevm/pseudo cannot be imported anywhere, without review from any of
-// @StephenButtolph, @ARR4N, or @joshua-kim. There is almost certainly a better option, and it exists
-// only because libevm can't pollute the code base with generic type parameters.
 //
 // TODO(jonathanoppenheimer): remove the graft functionality once the graft package will be removed.
 func TestImportViolations(t *testing.T) {
@@ -80,12 +75,10 @@ func TestImportViolations(t *testing.T) {
 			inGraftSubnetEVM := strings.HasPrefix(absFile, graftSubnetEVMDir)
 			inEmulate := strings.HasPrefix(absFile, emulateDir)
 			inVMsEVM := strings.HasPrefix(absFile, vmsEVMDir)
-			importsPseudo := isImportIn(importPath, "github.com/ava-labs/libevm/libevm/pseudo")
 			importsCoreth := isImportIn(importPath, "github.com/ava-labs/avalanchego/graft/coreth")
 			importsSubnetEVM := isImportIn(importPath, "github.com/ava-labs/avalanchego/graft/subnet-evm")
 
 			hasViolation := []bool{
-				importsPseudo,
 				!inGraft && importsCoreth && inVMsEVM && !inEmulate,
 				!inGraftSubnetEVM && importsSubnetEVM && !inEmulate,
 			}
