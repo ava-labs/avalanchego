@@ -5,6 +5,7 @@ excludedFiles:
 ignorePatterns:
   - pattern: '^http://localhost.*$'              # Localhost links are used during tutorials
   - pattern: "^https://.+\\.avax-dev\\.network$" # This check doesn't have the correct credentials
+  - pattern: "^https://github\\.com/ava-labs/devops-argocd/.*$" # Private repository requiring authentication
   - pattern: "^https://github\\.com/ava-labs/eng-resources.*$" # Private repository requiring authentication
   - pattern: "^https://github\\.com/ava-labs/external-plugins-builder.*$" # Private repository requiring authentication
 useGitIgnore: true
