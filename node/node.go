@@ -409,7 +409,7 @@ type Node struct {
 	// Closed when a sufficient amount of bootstrap nodes are connected to
 	onSufficientlyConnected chan struct{}
 
-	// This node's IP is not guaranteed to be the same due to dynamic IP updates
+	addrPort netip.AddrPort
 	atomicIP *utils.Atomic[netip.AddrPort]
 }
 
@@ -419,8 +419,16 @@ type Node struct {
  ******************************************************************************
  */
 
-func (n *Node) GetIP() netip.AddrPort {
-	return n.atomicIP.Get()
+func (n *Node) StakingAddress() netip.AddrPort {
+	return n.stakingAddress
+}
+
+func (n *Node) HTTPAddress() netip.AddrPort {
+	return n.addrPort
+}
+
+func (n *Node) Handle(ctx context.Context, msg message.InboundMessage) {
+	n.chainRouter.HandleInbound(ctx, msg)
 }
 
 // Initialize the networking layer.
@@ -994,7 +1002,7 @@ func (n *Node) initAPIServer() error {
 	}
 
 	addrStr := listener.Addr().String()
-	addrPort, err := ips.ParseAddrPort(addrStr)
+	n.addrPort, err = ips.ParseAddrPort(addrStr)
 	if err != nil {
 		return err
 	}
@@ -1007,8 +1015,8 @@ func (n *Node) initAPIServer() error {
 		)
 
 		n.portMapper.Map(
-			addrPort.Port(),
-			addrPort.Port(),
+			n.addrPort.Port(),
+			n.addrPort.Port(),
 			httpPortName,
 			nil,
 			n.Config.PublicIPResolutionFreq,

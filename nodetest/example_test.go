@@ -4,29 +4,104 @@
 package nodetest
 
 import (
-	"testing"
-	"github.com/stretchr/testify/require"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"net/netip"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
+	xsvmgenesis "github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
+	"time"
+	"bytes"
 )
 
-func TestFoo(t *testing.T) {
-	evm.RegisterAllLibEVMExtras()
+func TestExample(t *testing.T) {
+	sk, err := secp256k1.NewPrivateKey()
+	require.NoError(t, err)
 
-	bootstrapper := New(t, Config{})
-	go func() {
-		require.NoError(t, bootstrapper.Start(t.Context()))
-	}()
-
-	n := New(t, Config{
-		BootstrapperIPs: []netip.AddrPort{bootstrapper.IP()},
-		BootstrapperIDs: []ids.NodeID{bootstrapper.ID()},
+	bootstrapper := Start(t.Context(), t, Config{
+		GenesisFundedKeys: []*secp256k1.PrivateKey{sk},
 	})
 
-	// ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	// defer cancel()
+	node := Start(t.Context(), t, Config{
+		BootstrapperIPs:   []netip.AddrPort{bootstrapper.StakingAddress()},
+		BootstrapperIDs:   []ids.NodeID{bootstrapper.ID()},
+		GenesisFundedKeys: []*secp256k1.PrivateKey{sk},
+	})
 
-	// require.NoError(t, n.Start(ctx))
-	require.NoError(t, n.Start(t.Context()))
+	vmID := ids.GenerateTestID()
+
+	genesis := xsvmgenesis.Genesis{
+		Timestamp: 0,
+		Allocations: []xsvmgenesis.Allocation{
+			{
+				Address: sk.Address(),
+				Balance: 1_000_000_000,
+			},
+		},
+	}
+
+	genesisBytes, err := tx.Codec.Marshal(tx.CodecVersion, &genesis)
+	require.NoError(t, err)
+
+	_, chainID, vm := CreateChain[*xsvm.VM](
+		t,
+		node,
+		vmID,
+		&xsvm.Factory{},
+		sk,
+		genesisBytes,
+	)
+
+	// You interact with the VM api directly!
+	blkID, err := vm.LastAccepted(t.Context())
+	require.NoError(t, err)
+
+	genesisBlk, err := vm.GetBlock(t.Context(), blkID)
+	require.NoError(t, err)
+	require.Equal(t, 0, genesisBlk.Height())
+
+	exportTx := &tx.Export{
+		ChainID:     chainID,
+		Nonce:       0,
+		MaxFee:      1_000,
+		PeerChainID: ids.GenerateTestID(),
+		IsReturn:    false,
+		Amount:      123,
+		To:          ids.GenerateTestShortID(),
+	}
+
+	signedTx, err := tx.Sign(exportTx, sk)
+	require.NoError(t, err)
+
+	peerBlk := &block.Stateless{
+		ParentID:  genesisBlk.ID(),
+		Timestamp: genesisBlk.Timestamp().Unix() + 1,
+		Height:    genesisBlk.Height() + 1,
+		Txs:       []*tx.Tx{signedTx},
+	}
+
+	blkBytes, err := tx.Codec.Marshal(tx.CodecVersion, peerBlk)
+	require.NoError(t, err)
+
+	Accept(t, chainID, Block{Bytes: blkBytes, Height: peerBlk.Height}, node)
+
+	require.Eventually(
+		t,
+		func() bool {
+			got, err := vm.LastAccepted(t.Context())
+			require.NoError(t, err)
+
+			want, err := peerBlk.ID()
+			require.NoError(t, err)
+
+			return bytes.Equal(got[:], want[:])
+		},
+		10*time.Second,
+		time.Second,
+	)
 }
