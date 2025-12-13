@@ -14,7 +14,8 @@ import (
 
 func TestBLSVerifier(t *testing.T) {
 	config := newEngineConfig(t, 1)
-	signer, verifier := NewBLSAuth(config)
+	signer, verifier, err := NewBLSAuth(config)
+	require.NoError(t, err)
 	otherNodeID := ids.GenerateTestNodeID()
 
 	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
