@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1765562614992,
+  "lastUpdate": 1765631253133,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -3442,6 +3442,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[10000001,10100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd-jp6dz-runner-t4kfc",
             "value": 70.87,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonathan Oppenheimer",
+            "username": "JonathanOppenheimer",
+            "email": "jonathan.oppenheimer@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "99a29c05315fbcd71a90f6075b61f46eb5b3249a",
+          "message": "docs: fix broken links and ignore private ones (#4686)",
+          "timestamp": "2025-12-12T20:30:27Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/99a29c05315fbcd71a90f6075b61f46eb5b3249a"
+        },
+        "date": 1765631252500,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd-jp6dz-runner-6hk2g",
+            "value": 64.03,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
