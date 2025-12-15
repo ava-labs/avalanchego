@@ -12,14 +12,12 @@ if [[ $OK -ne 0 ]]; then
 fi
 
 
-# Build avalanchego tgzpackage
 echo "Build avalanchego tgz package..."
 cd "$PKG_ROOT"
 echo "Tag: $TAG"
 tar -czvf "avalanchego-linux-$ARCH-$TAG.tar.gz" "avalanchego-$TAG"
 aws s3 cp "avalanchego-linux-$ARCH-$TAG.tar.gz" "s3://$BUCKET/linux/binaries/ubuntu/$RELEASE/$ARCH/"
 
-# Build subnet-evm tgzpackage
 echo "Build subnet-evm tgz package..."
 SUBNET_EVM_ROOT=$PKG_ROOT/subnet-evm-$TAG
 mkdir -p "$SUBNET_EVM_ROOT"
