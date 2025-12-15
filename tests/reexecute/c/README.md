@@ -256,14 +256,11 @@ The benchmarks support testing with custom versions of `libevm` and `firewood` d
 
 ### Local Usage
 
-**Prerequisite**: You must be in a nix shell (`nix develop`) for firewood builds.
+**Prerequisite**: You must be in a nix shell (`nix develop`) to run benchmark tasks (`c-chain-reexecution-*`) .
 
 Pass `LIBEVM_REF` and/or `FIREWOOD_REF` to any benchmark task:
 
 ```bash
-# Enter nix shell first
-nix develop
-
 # Test with custom firewood version
 ./scripts/run_task.sh c-chain-reexecution-firewood-101-250k FIREWOOD_REF=abc123def
 
