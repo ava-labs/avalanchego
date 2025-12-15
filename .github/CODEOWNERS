@@ -5,34 +5,6 @@
 # least one code owner of the touched file should approve the PR prior to
 # merging.
 
-* @StephenButtolph
-*.md @meaghanfitzgerald @StephenButtolph
-/.dockerignore @maru-ava
-/.envrc @joshua-kim @maru-ava
-/.github/ @joshua-kim @maru-ava
-/.github/*.md @joshua-kim @maru-ava @meaghanfitzgerald
-/.github/CODEOWNERS @StephenButtolph
-/.github/actions/c-chain-reexecution-benchmark/ @aaronbuchwald
-/.github/workflows/c-chain-reexecution-benchmark* @aaronbuchwald
-/.gitignore @joshua-kim @maru-ava @StephenButtolph
-/.golangci.yml @joshua-kim @maru-ava @StephenButtolph
-/Dockerfile @joshua-kim @maru-ava
-/Taskfile.yml @joshua-kim @maru-ava
-/flake.lock @joshua-kim @maru-ava
-/flake.nix @joshua-kim @maru-ava
+* @ava-labs/platform-avalanchego
 /graft/coreth @ava-labs/platform-evm
-/graft/coreth/triedb/firewood/ @alarso16 @ava-labs/platform-evm
-/network/p2p/ @joshua-kim
-/network/p2p/*.md @joshua-kim @meaghanfitzgerald
-/nix/* @joshua-kim @maru-ava
-/scripts/ @joshua-kim @maru-ava
-/scripts/*.md @joshua-kim @maru-ava @meaghanfitzgerald
-/scripts/benchmark_cchain_range.sh @aaronbuchwald
-/tests/ @joshua-kim @maru-ava
-/tests/*.md @joshua-kim @maru-ava @meaghanfitzgerald
-/tests/reexecute/ @aaronbuchwald
-/tools/* @joshua-kim @maru-ava
-/vms/evm/ @ARR4N @joshua-kim @StephenButtolph
-/x/blockdb @DracoLi
-/x/merkledb @joshua-kim @rrazvan1
-/x/sync @joshua-kim @rrazvan1
+/graft/subnet-evm @ava-labs/platform-evm
