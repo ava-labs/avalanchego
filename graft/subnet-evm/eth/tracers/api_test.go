@@ -30,6 +30,7 @@ package tracers
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -54,6 +55,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/ethtest"
 	ethparams "github.com/ava-labs/libevm/params"
 	"golang.org/x/exp/slices"
 )
@@ -628,7 +630,9 @@ func TestTracingWithOverrides(t *testing.T) {
 
 func testTracingWithOverrides(t *testing.T, scheme string) {
 	// Initialize test accounts
-	accounts := newAccounts(3)
+	// This test requires deterministic block hashes, since it will fail 1/256 times,Expand commentComment on line R635ResolvedCode has comments. Press enter to view.
+	// when the final block hash starts with 0xef.
+	accounts := UNSAFEDeterministicAccounts(t, 3)
 	storageAccount := common.Address{0x13, 37}
 	genesis := &core.Genesis{
 		Config: params.TestChainConfig,
@@ -987,6 +991,19 @@ type Account struct {
 func newAccounts(n int) (accounts []Account) {
 	for i := 0; i < n; i++ {
 		key, _ := crypto.GenerateKey()
+		addr := crypto.PubkeyToAddress(key.PublicKey)
+		accounts = append(accounts, Account{key: key, addr: addr})
+	}
+	slices.SortFunc(accounts, func(a, b Account) int { return a.addr.Cmp(b.addr) })
+	return accounts
+}
+
+// WARNING: only use for tests that require deterministic accounts
+func UNSAFEDeterministicAccounts(t *testing.T, n int) (accounts []Account) {
+	seed := make([]byte, 8) // int64 size
+	for i := 0; i < n; i++ {
+		binary.BigEndian.PutUint64(seed, uint64(i))
+		key := ethtest.UNSAFEDeterministicPrivateKey(t, seed)
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 		accounts = append(accounts, Account{key: key, addr: addr})
 	}
