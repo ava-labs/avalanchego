@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
-
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -77,7 +76,7 @@ type proposals struct {
 }
 
 type unverifiedKey struct {
-	parentBlockHash, root common.Hash
+	parentBlockHash, root common.Hash //nolint:unused // It is used as a map key
 }
 
 // A proposal carries a Firewood FFI proposal (i.e. Rust-owned memory).
@@ -198,11 +197,10 @@ func validateDir(dir string) error {
 	case os.IsNotExist(err):
 		log.Info("Database directory not found, creating", "path", dir)
 		if err := os.MkdirAll(dir, 0o750); err != nil {
-			return fmt.Errorf("creating database directory: %v", err)
+			return fmt.Errorf("creating database directory: %w", err)
 		}
-		return nil
 	case err != nil:
-		return fmt.Errorf("os.Stat() on database directory: %v", err)
+		return fmt.Errorf("os.Stat() on database directory: %w", err)
 	case !info.IsDir():
 		return fmt.Errorf("database directory path is not a directory: %q", dir)
 	}
@@ -385,7 +383,7 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 		return fmt.Errorf("root after commit (%x) does not match expected root %x", newRoot, root)
 	}
 
-	var logFn = log.Debug
+	logFn := log.Debug
 	if report {
 		logFn = log.Info
 	}
