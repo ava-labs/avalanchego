@@ -15,8 +15,8 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/subnet-evm/core/extstate"
-	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 )
 
 func TestUpgradeAccount_BalanceChanges(t *testing.T) {

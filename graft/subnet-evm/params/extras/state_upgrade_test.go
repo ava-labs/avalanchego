@@ -78,7 +78,7 @@ func TestVerifyStateUpgrades(t *testing.T) {
 					},
 				},
 			},
-			expectedError: "exceeds uint256 bit length",
+			expectedError: errBalanceChangeExceedsUint256,
 		},
 		{
 			name: "negative balance change exceeds uint256",
@@ -92,7 +92,7 @@ func TestVerifyStateUpgrades(t *testing.T) {
 					},
 				},
 			},
-			expectedError: "exceeds uint256 bit length",
+			expectedError: errBalanceChangeExceedsUint256,
 		},
 		{
 			name: "max uint256 balance change is valid",

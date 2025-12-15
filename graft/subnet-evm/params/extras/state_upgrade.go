@@ -20,6 +20,7 @@ var (
 	errStateUpgradeNilTimestamp          = errors.New("state upgrade config block timestamp cannot be nil")
 	errStateUpgradeTimestampZero         = errors.New("state upgrade config block timestamp must be greater than 0")
 	errStateUpgradeTimestampNotMonotonic = errors.New("state upgrade config block timestamp must be greater than previous timestamp")
+	errBalanceChangeExceedsUint256       = errors.New("balance change exceeds uint256 bit length")
 )
 
 // StateUpgrade describes the modifications to be made to the state during
@@ -71,8 +72,8 @@ func (c *ChainConfig) verifyStateUpgrades() error {
 				// Check if the absolute value fits in uint256
 				absChange := new(big.Int).Abs(bigChange)
 				if absChange.BitLen() > 256 {
-					return fmt.Errorf("StateUpgrade[%d]: account %s has BalanceChange %s that exceeds uint256 bit length",
-						i, account.Hex(), bigChange.String())
+					return fmt.Errorf("StateUpgrade[%d]: account %s has BalanceChange %s: %w",
+						i, account.Hex(), bigChange.String(), errBalanceChangeExceedsUint256)
 				}
 			}
 		}
