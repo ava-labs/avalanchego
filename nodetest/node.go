@@ -5,8 +5,11 @@ package nodetest
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/netip"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -18,21 +21,18 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 
 	nodeconfig "github.com/ava-labs/avalanchego/config/node"
-	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"encoding/base64"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"encoding/json"
-	"github.com/ava-labs/avalanchego/utils/units"
-	"os"
 )
 
 func init() {
@@ -69,7 +69,6 @@ type Config struct {
 }
 
 type Node struct {
-	t *testing.T
 	n *node.Node
 }
 
@@ -86,7 +85,7 @@ func Start(ctx context.Context, t *testing.T, cfg Config) *Node {
 
 	t.Cleanup(func() {
 		if t.Failed() {
-			t.Logf("dir for debugging failure: %s", dir)
+			t.Logf("dir for debugging: %s", dir)
 			return
 		}
 
@@ -151,7 +150,7 @@ func Start(ctx context.Context, t *testing.T, cfg Config) *Node {
 		return inner.Dispatch()
 	})
 
-	n := &Node{t: t, n: inner}
+	n := &Node{n: inner}
 	t.Logf("initialized node %s {http: %s, dir: %s}", n.ID(), n.HTTPAddress(), dir)
 
 	return n
@@ -209,6 +208,36 @@ func Accept(
 	chainID ids.ID,
 	b Block,
 	n *Node,
+) {
+	mc, err := message.NewCreator(
+		prometheus.NewRegistry(),
+		compression.TypeNone,
+		time.Minute,
+	)
+	require.NoError(t, err)
+
+	outMsg, err := mc.PushQuery(
+		chainID,
+		0,
+		time.Hour,
+		b.Bytes,
+		b.Height-1,
+	)
+	require.NoError(t, err)
+
+	outMsg.Bytes()
+
+	inMsg, err := mc.Parse(outMsg.Bytes(), ids.GenerateTestNodeID(), func() {})
+	require.NoError(t, err)
+
+	n.n.Handle(t.Context(), inMsg)
+}
+func AwaitAcceptance(
+	t *testing.T,
+	n *Node,
+	chainID ids.ID,
+	blkID ids.ID,
+	height uint64,
 ) {
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),

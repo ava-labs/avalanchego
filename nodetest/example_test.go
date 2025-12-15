@@ -4,8 +4,10 @@
 package nodetest
 
 import (
+	"bytes"
 	"net/netip"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -14,9 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
+
 	xsvmgenesis "github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
-	"time"
-	"bytes"
 )
 
 func TestExample(t *testing.T) {

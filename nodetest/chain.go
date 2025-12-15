@@ -70,7 +70,7 @@ func CreateChain[T block.ChainVM](
 		genesis,
 		id,
 		nil,
-		id.String() ,
+		id.String(),
 	)
 	require.NoError(t, err)
 	t.Logf("%s: created chain %s", n.ID(), createChainTx.ID())
