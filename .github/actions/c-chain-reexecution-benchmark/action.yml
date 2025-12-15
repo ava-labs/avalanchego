@@ -193,7 +193,10 @@ runs:
         # Required for Nix builds in CI self-hosted runners (e.g., building Firewood via polyrepo)
         TMPDIR: /tmp
         NIX_BUILD_TOP: /tmp
+    # Skip when using custom firewood - Firewood downloads the artifact and
+    # publishes to their own gh-pages for tracking
     - name: Compare Benchmark Results
+      if: inputs.firewood == ''
       uses: benchmark-action/github-action-benchmark@v1
       with:
         tool: 'go'
