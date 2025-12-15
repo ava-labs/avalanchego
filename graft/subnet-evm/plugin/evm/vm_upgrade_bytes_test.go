@@ -142,7 +142,7 @@ func TestNetworkUpgradesOverridden(t *testing.T) {
 	fork := upgradetest.Granite
 	chainConfig := paramstest.ForkToChainConfig[fork]
 	extraConfig := params.GetExtra(chainConfig)
-	extraConfig.NetworkUpgrades.GraniteTimestamp = utils.NewUint64(uint64(upgrade.InitiallyActiveTime.Unix()))
+	extraConfig.NetworkUpgrades.GraniteTimestamp = utils.PointerTo(uint64(upgrade.InitiallyActiveTime.Unix()))
 	genesis := &core.Genesis{}
 	require.NoError(t, json.Unmarshal([]byte(toGenesisJSON(chainConfig)), genesis))
 	// Set the genesis timestamp to before the Granite activation time
@@ -351,7 +351,7 @@ func TestVMEtnaActivatesCancun(t *testing.T) {
 			upgradeJSON: func() string {
 				upgrade := &extras.UpgradeConfig{
 					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						EtnaTimestamp: utils.NewUint64(defaultEtnaTime + 2),
+						EtnaTimestamp: utils.PointerTo(defaultEtnaTime + 2),
 					},
 				}
 				b, err := json.Marshal(upgrade)

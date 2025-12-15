@@ -47,7 +47,7 @@ func TestExtraPrefix(t *testing.T) {
 		{
 			name: "ap3_first_block",
 			upgrades: extras.NetworkUpgrades{
-				ApricotPhase3BlockTimestamp: utils.NewUint64(1),
+				ApricotPhase3BlockTimestamp: utils.PointerTo[uint64](1),
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -278,7 +278,7 @@ func TestExtraPrefix(t *testing.T) {
 		{
 			name: "fortuna_first_block",
 			upgrades: extras.NetworkUpgrades{
-				FortunaTimestamp: utils.NewUint64(1),
+				FortunaTimestamp: utils.PointerTo[uint64](1),
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -315,7 +315,7 @@ func TestExtraPrefix(t *testing.T) {
 					ExtDataGasUsed: big.NewInt(1),
 				},
 			),
-			desiredTargetExcess: (*gas.Gas)(utils.NewUint64(3)),
+			desiredTargetExcess: (*gas.Gas)(utils.PointerTo[uint64](3)),
 			want: (&acp176.State{
 				Gas: gas.State{
 					Capacity: acp176.MinMaxPerSecond - 3,
@@ -366,7 +366,7 @@ func TestExtraPrefix(t *testing.T) {
 					ExtDataGasUsed: big.NewInt(1),
 				},
 			),
-			desiredTargetExcess: (*gas.Gas)(utils.NewUint64(0)),
+			desiredTargetExcess: (*gas.Gas)(utils.PointerTo[uint64](0)),
 			want: (&acp176.State{
 				Gas: gas.State{
 					Capacity: 10_009_770,    // [acp176.MinMaxCapacity] * e^([acp176.MaxTargetExcessDiff] / [acp176.TargetConversion])

@@ -283,8 +283,8 @@ func TestStateProcessorErrors(t *testing.T) {
 					},
 					&extras.ChainConfig{
 						NetworkUpgrades: extras.NetworkUpgrades{
-							ApricotPhase1BlockTimestamp: utils.NewUint64(0),
-							ApricotPhase2BlockTimestamp: utils.NewUint64(0),
+							ApricotPhase1BlockTimestamp: utils.PointerTo[uint64](0),
+							ApricotPhase2BlockTimestamp: utils.PointerTo[uint64](0),
 						},
 					},
 				),
@@ -391,7 +391,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 	if configExtra.IsGranite(header.Time) {
 		headerExtra := customtypes.GetHeaderExtra(header)
-		headerExtra.TimeMilliseconds = utils.NewUint64(timeMS)
+		headerExtra.TimeMilliseconds = utils.PointerTo(timeMS)
 	}
 	if configExtra.IsApricotPhase4(header.Time) {
 		headerExtra := customtypes.GetHeaderExtra(header)

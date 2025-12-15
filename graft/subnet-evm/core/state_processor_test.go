@@ -385,7 +385,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 	if configExtra.IsGranite(header.Time) {
 		headerExtra := customtypes.GetHeaderExtra(header)
-		headerExtra.TimeMilliseconds = utils.NewUint64(timeMS)
+		headerExtra.TimeMilliseconds = utils.PointerTo(timeMS)
 	}
 
 	if params.GetExtra(config).IsSubnetEVM(header.Time) {

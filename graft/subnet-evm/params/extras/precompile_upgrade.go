@@ -119,7 +119,7 @@ func (c *ChainConfig) verifyPrecompileUpgrades() error {
 			lastTimestamp = nil
 		} else {
 			disabled = lastUpgradeByKey.disabled
-			lastTimestamp = utils.NewUint64(lastUpgradeByKey.blockTimestamp)
+			lastTimestamp = utils.PointerTo(lastUpgradeByKey.blockTimestamp)
 		}
 		upgradeTimestamp := upgrade.Timestamp()
 

@@ -1405,8 +1405,8 @@ func StatefulPrecompiles(t *testing.T, create createFunc) {
 	config := params.Copy(params.TestChainConfig)
 	// Set all of the required config parameters
 	params.GetExtra(&config).GenesisPrecompiles = extras.Precompiles{
-		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{addr1}, nil, nil),
-		feemanager.ConfigKey:        feemanager.NewConfig(utils.NewUint64(0), []common.Address{addr1}, nil, nil, nil),
+		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.PointerTo[uint64](0), []common.Address{addr1}, nil, nil),
+		feemanager.ConfigKey:        feemanager.NewConfig(utils.PointerTo[uint64](0), []common.Address{addr1}, nil, nil, nil),
 	}
 	gspec := &Genesis{
 		Config: &config,

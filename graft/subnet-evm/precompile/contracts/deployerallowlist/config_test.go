@@ -26,7 +26,7 @@ func TestEqual(t *testing.T) {
 	managers := []common.Address{allowlisttest.TestManagerAddr}
 	tests := map[string]precompiletest.ConfigEqualTest{
 		"non-nil config and nil other": {
-			Config:   deployerallowlist.NewConfig(utils.NewUint64(3), admins, enableds, managers),
+			Config:   deployerallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
 			Other:    nil,
 			Expected: false,
 		},
@@ -36,13 +36,13 @@ func TestEqual(t *testing.T) {
 			Expected: false,
 		},
 		"different timestamp": {
-			Config:   deployerallowlist.NewConfig(utils.NewUint64(3), admins, enableds, managers),
-			Other:    deployerallowlist.NewConfig(utils.NewUint64(4), admins, enableds, managers),
+			Config:   deployerallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
+			Other:    deployerallowlist.NewConfig(utils.PointerTo[uint64](4), admins, enableds, managers),
 			Expected: false,
 		},
 		"same config": {
-			Config:   deployerallowlist.NewConfig(utils.NewUint64(3), admins, enableds, managers),
-			Other:    deployerallowlist.NewConfig(utils.NewUint64(3), admins, enableds, managers),
+			Config:   deployerallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
+			Other:    deployerallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
 			Expected: true,
 		},
 	}

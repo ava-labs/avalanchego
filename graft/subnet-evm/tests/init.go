@@ -202,7 +202,7 @@ func initializeForks() {
 			},
 			&extras.ChainConfig{
 				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: utils.NewUint64(0),
+					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
 				},
 			},
 		),
@@ -222,8 +222,8 @@ func initializeForks() {
 			},
 			&extras.ChainConfig{
 				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: utils.NewUint64(0),
-					DurangoTimestamp:   utils.NewUint64(0),
+					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+					DurangoTimestamp:   utils.PointerTo[uint64](0),
 				},
 			},
 		),
@@ -240,13 +240,13 @@ func initializeForks() {
 				IstanbulBlock:       big.NewInt(0),
 				BerlinBlock:         big.NewInt(0),
 				LondonBlock:         big.NewInt(0),
-				ShanghaiTime:        utils.NewUint64(0),
-				CancunTime:          utils.NewUint64(0),
+				ShanghaiTime:        utils.PointerTo[uint64](0),
+				CancunTime:          utils.PointerTo[uint64](0),
 			},
 			&extras.ChainConfig{
 				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: utils.NewUint64(0),
-					DurangoTimestamp:   utils.NewUint64(0),
+					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+					DurangoTimestamp:   utils.PointerTo[uint64](0),
 				},
 			},
 		),

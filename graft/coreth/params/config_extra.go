@@ -80,11 +80,11 @@ func SetEthUpgrades(c *ChainConfig) error {
 	// We only mark Shanghai and Cancun as enabled if we have marked them as
 	// scheduled.
 	if durango := extra.DurangoBlockTimestamp; durango != nil && *durango < unscheduledActivation {
-		c.ShanghaiTime = utils.NewUint64(*durango)
+		c.ShanghaiTime = utils.PointerTo(*durango)
 	}
 
 	if etna := extra.EtnaTimestamp; etna != nil && *etna < unscheduledActivation {
-		c.CancunTime = utils.NewUint64(*etna)
+		c.CancunTime = utils.PointerTo(*etna)
 	}
 	return nil
 }

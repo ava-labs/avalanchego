@@ -105,7 +105,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: []common.Address{TestManagerAddr},
 				EnabledAddresses: nil,
 			}, precompileconfig.Upgrade{
-				BlockTimestamp: utils.NewUint64(1),
+				BlockTimestamp: utils.PointerTo[uint64](1),
 			}),
 			ChainConfig: func() precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))

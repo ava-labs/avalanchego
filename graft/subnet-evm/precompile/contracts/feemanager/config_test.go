@@ -37,11 +37,11 @@ func TestVerify(t *testing.T) {
 	invalidFeeConfig.GasLimit = big.NewInt(0)
 	tests := map[string]precompiletest.ConfigVerifyTest{
 		"invalid initial fee manager config": {
-			Config:        feemanager.NewConfig(utils.NewUint64(3), admins, nil, nil, &invalidFeeConfig),
+			Config:        feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &invalidFeeConfig),
 			ExpectedError: commontype.ErrGasLimitTooLow,
 		},
 		"nil initial fee manager config": {
-			Config:        feemanager.NewConfig(utils.NewUint64(3), admins, nil, nil, &commontype.FeeConfig{}),
+			Config:        feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.FeeConfig{}),
 			ExpectedError: commontype.ErrGasLimitNil,
 		},
 	}
@@ -53,28 +53,28 @@ func TestEqual(t *testing.T) {
 	enableds := []common.Address{allowlisttest.TestEnabledAddr}
 	tests := map[string]precompiletest.ConfigEqualTest{
 		"non-nil config and nil other": {
-			Config:   feemanager.NewConfig(utils.NewUint64(3), admins, enableds, nil, nil),
+			Config:   feemanager.NewConfig(utils.PointerTo[uint64](3), admins, enableds, nil, nil),
 			Other:    nil,
 			Expected: false,
 		},
 		"different type": {
-			Config:   feemanager.NewConfig(utils.NewUint64(3), admins, enableds, nil, nil),
+			Config:   feemanager.NewConfig(utils.PointerTo[uint64](3), admins, enableds, nil, nil),
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
 		"different timestamp": {
-			Config:   feemanager.NewConfig(utils.NewUint64(3), admins, nil, nil, nil),
-			Other:    feemanager.NewConfig(utils.NewUint64(4), admins, nil, nil, nil),
+			Config:   feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
+			Other:    feemanager.NewConfig(utils.PointerTo[uint64](4), admins, nil, nil, nil),
 			Expected: false,
 		},
 		"non-nil initial config and nil initial config": {
-			Config:   feemanager.NewConfig(utils.NewUint64(3), admins, nil, nil, &validFeeConfig),
-			Other:    feemanager.NewConfig(utils.NewUint64(3), admins, nil, nil, nil),
+			Config:   feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
+			Other:    feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 			Expected: false,
 		},
 		"different initial config": {
-			Config: feemanager.NewConfig(utils.NewUint64(3), admins, nil, nil, &validFeeConfig),
-			Other: feemanager.NewConfig(utils.NewUint64(3), admins, nil, nil,
+			Config: feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
+			Other: feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
 				func() *commontype.FeeConfig {
 					c := validFeeConfig
 					c.GasLimit = big.NewInt(123)
@@ -83,8 +83,8 @@ func TestEqual(t *testing.T) {
 			Expected: false,
 		},
 		"same config": {
-			Config:   feemanager.NewConfig(utils.NewUint64(3), admins, nil, nil, &validFeeConfig),
-			Other:    feemanager.NewConfig(utils.NewUint64(3), admins, nil, nil, &validFeeConfig),
+			Config:   feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
+			Other:    feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
 			Expected: true,
 		},
 	}

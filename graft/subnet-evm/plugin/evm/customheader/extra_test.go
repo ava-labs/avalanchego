@@ -46,7 +46,7 @@ func TestExtraPrefix(t *testing.T) {
 		{
 			name: "subnet_evm_first_block",
 			upgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.NewUint64(1),
+				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
