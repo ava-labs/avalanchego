@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/big"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -30,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp/warpbindings"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests/utils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -57,9 +57,10 @@ const (
 var (
 	flagVars *e2e.FlagVars
 
-	repoRootPath = tests.GetRepoRootPath("tests/warp")
-
-	genesisPath = filepath.Join(repoRootPath, "tests/warp/genesis/genesis.json")
+	genesisPath = func() string {
+		_, thisFile, _, _ := runtime.Caller(0)
+		return filepath.Join(filepath.Dir(thisFile), "genesis/genesis.json")
+	}()
 
 	subnetA, subnetB, cChainSubnetDetails *Subnet
 
