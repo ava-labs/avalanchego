@@ -85,7 +85,7 @@ import (
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
-	utilsrpc "github.com/ava-labs/avalanchego/graft/coreth/utils/rpc"
+	utilsrpc "github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"

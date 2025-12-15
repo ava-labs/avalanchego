@@ -5,7 +5,7 @@
 package ap0
 
 import (
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 

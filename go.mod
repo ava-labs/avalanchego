@@ -34,7 +34,7 @@ require (
 	github.com/google/renameio/v2 v2.0.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.0
-	github.com/gorilla/rpc v1.2.0
+	github.com/gorilla/rpc v1.2.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/huin/goupnp v1.3.0
