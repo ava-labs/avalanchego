@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./graft/evm-shared
+        working-directory: ./graft/evm
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -27,7 +27,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: ./graft/evm-shared
+        working-directory: ./graft/evm
     strategy:
       fail-fast: false
       matrix:

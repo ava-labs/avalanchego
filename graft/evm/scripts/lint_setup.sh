@@ -11,7 +11,7 @@
 #   to each category of files.
 #
 # Usage:
-#   This script must be sourced from the root of a module that uses evm-shared:
+#   This script must be sourced from the root of a module that uses evm:
 #
 #     source ./scripts/lint_setup.sh
 #     setup_lint

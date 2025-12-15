@@ -3,8 +3,8 @@
 # lint_fix.sh - Runs golangci-lint with automatic fixes
 #
 # Usage:
-#   This script must be run from the root of a module that uses evm-shared
-#   (e.g., coreth/ or subnet-evm/), NOT from evm-shared itself.
+#   This script must be run from the root of a module that uses evm
+#   (e.g., coreth/ or subnet-evm/), NOT from evm itself.
 #
 #   From the repository root:
 #     ./scripts/lint_fix.sh

@@ -1,4 +1,4 @@
-module github.com/ava-labs/avalanchego/graft/evm-shared
+module github.com/ava-labs/avalanchego/graft/evm
 
 go 1.24.9
 

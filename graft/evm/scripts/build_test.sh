@@ -14,6 +14,6 @@ if [[ -n "${NO_RACE:-}" ]]; then
     race=""
 fi
 
-cd "$REPO_ROOT/graft/evm-shared"
+cd "$REPO_ROOT/graft/evm"
 # shellcheck disable=SC2046
 go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-600s}" -coverprofile=coverage.out -covermode=atomic "$@" ./...

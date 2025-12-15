@@ -22,7 +22,7 @@
 /flake.nix @joshua-kim @maru-ava
 /graft/coreth @ava-labs/platform-evm
 /graft/coreth/triedb/firewood/ @alarso16 @ava-labs/platform-evm
-/graft/evm-shared @ava-labs/platform-evm
+/graft/evm @ava-labs/platform-evm
 /graft/subnet-evm @ava-labs/platform-evm
 /graft/subnet-evm/triedb/firewood/ @alarso16 @ava-labs/platform-evm
 /network/p2p/ @joshua-kim
