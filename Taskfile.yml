@@ -450,16 +450,20 @@ tasks:
       - ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh
 
   test-unit:
-    desc: Runs unit tests
-    # Invoking with bash ensures compatibility with CI execution on Windows
+    desc: Runs unit tests with bazel
+    cmd: bazel test //... --test_tag_filters=-e2e,-load,-upgrade,-fuzz
+
+  test-unit-race:
+    desc: Runs unit tests with bazel and race detection
+    cmd: bazel test //... --test_tag_filters=-e2e,-load,-upgrade,-fuzz --@rules_go//go/config:race
+
+  test-unit-go:
+    desc: Runs unit tests with go test (legacy)
     cmd: bash ./scripts/build_test.sh
 
   test-unit-fast:
-    desc: Runs unit tests
-    env:
-      NO_SHUFFLE: TRUE # Allows caching
-      NO_RACE: TRUE    # Tests are much faster without race detection
-    cmd: bash ./scripts/build_test.sh
+    desc: Runs unit tests with bazel (no race detection)
+    cmd: bazel test //... --test_tag_filters=-e2e,-load,-upgrade,-fuzz
 
   test-upgrade:
     desc: Runs upgrade tests
