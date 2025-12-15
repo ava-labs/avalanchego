@@ -16,7 +16,14 @@ tasks:
   default: ./scripts/run_task.sh --list
 
   build:
-    desc: Builds avalanchego
+    desc: Builds avalanchego with bazel
+    cmds:
+      - ./scripts/run_bazel.sh build --compilation_mode=opt //main:avalanchego
+      - mkdir -p build
+      - cp -f bazel-bin/main/avalanchego_/avalanchego build/avalanchego
+
+  build-go:
+    desc: Builds avalanchego with go (legacy)
     cmd: ./scripts/build.sh
 
   build-antithesis-images-avalanchego:
@@ -45,7 +52,10 @@ tasks:
 
   build-race:
     desc: Builds avalanchego with race detection enabled
-    cmd: ./scripts/build.sh -r
+    cmds:
+      - ./scripts/run_bazel.sh build --compilation_mode=opt --@rules_go//go/config:race //main:avalanchego
+      - mkdir -p build
+      - cp -f bazel-bin/main/avalanchego_/avalanchego build/avalanchego
 
   build-tmpnetctl:
     desc: Builds tmpnetctl
@@ -451,11 +461,11 @@ tasks:
 
   test-unit:
     desc: Runs unit tests with bazel
-    cmd: bazel test //... --test_tag_filters=-e2e,-load,-upgrade,-fuzz
+    cmd: ./scripts/run_bazel.sh test //... --test_tag_filters=-e2e,-load,-upgrade,-fuzz
 
   test-unit-race:
     desc: Runs unit tests with bazel and race detection
-    cmd: bazel test //... --test_tag_filters=-e2e,-load,-upgrade,-fuzz --@rules_go//go/config:race
+    cmd: ./scripts/run_bazel.sh test //... --test_tag_filters=-e2e,-load,-upgrade,-fuzz --@rules_go//go/config:race
 
   test-unit-go:
     desc: Runs unit tests with go test (legacy)
@@ -463,7 +473,7 @@ tasks:
 
   test-unit-fast:
     desc: Runs unit tests with bazel (no race detection)
-    cmd: bazel test //... --test_tag_filters=-e2e,-load,-upgrade,-fuzz
+    cmd: ./scripts/run_bazel.sh test //... --test_tag_filters=-e2e,-load,-upgrade,-fuzz
 
   test-upgrade:
     desc: Runs upgrade tests
@@ -478,32 +488,32 @@ tasks:
   bazel-build:
     desc: Build avalanchego with Bazel
     cmds:
-      - bazel build //main:avalanchego
+      - ./scripts/run_bazel.sh build //main:avalanchego
 
   bazel-build-opt:
     desc: Build avalanchego with Bazel (optimized)
     cmds:
-      - bazel build --compilation_mode=opt //main:avalanchego
+      - ./scripts/run_bazel.sh build --compilation_mode=opt //main:avalanchego
 
   bazel-test:
     desc: Run all tests with Bazel
     cmds:
-      - bazel test //...
+      - ./scripts/run_bazel.sh test //...
 
   bazel-clean:
     desc: Clean Bazel build outputs
     cmds:
-      - bazel clean
+      - ./scripts/run_bazel.sh clean
 
   bazel-clean-all:
     desc: Clean all Bazel caches (full clean)
     cmds:
-      - bazel clean --expunge
+      - ./scripts/run_bazel.sh clean --expunge
 
   bazel-gazelle:
     desc: Run gazelle to update BUILD files
     cmds:
-      - bazel run //:gazelle
+      - ./scripts/run_bazel.sh run //:gazelle
 
   bazel-fmt:
     desc: Format BUILD files with buildifier
@@ -513,4 +523,4 @@ tasks:
   bazel-mod-tidy:
     desc: Tidy MODULE.bazel use_repo calls
     cmds:
-      - bazel mod tidy
+      - ./scripts/run_bazel.sh mod tidy

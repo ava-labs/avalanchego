@@ -27,11 +27,19 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - run: go version
+      - uses: ./.github/actions/install-nix
+
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel
+          key: bazel-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock') }}
+          restore-keys: |
+            bazel-build-${{ runner.os }}-${{ runner.arch }}-
 
       # Runs a single command using the runners shell
       - name: Build the avalanchego binary
+        shell: nix develop --command bash {0}
         run: ./scripts/run_task.sh build
 
       - name: Try to get tag from git

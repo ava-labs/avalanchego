@@ -20,11 +20,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
 
-      - run: go version
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel
+          key: bazel-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock') }}
+          restore-keys: |
+            bazel-build-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Build the avalanchego binaries
+        shell: nix develop --command bash {0}
         run: ./scripts/run_task.sh build
 
       - name: Install aws cli
@@ -80,11 +87,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
 
-      - run: go version
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel
+          key: bazel-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock') }}
+          restore-keys: |
+            bazel-build-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Build the avalanchego binaries
+        shell: nix develop --command bash {0}
         run: ./scripts/run_task.sh build
 
       - name: Install aws cli
