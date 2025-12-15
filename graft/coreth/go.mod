@@ -10,6 +10,7 @@ go 1.24.9
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/ava-labs/avalanchego v1.14.1-0.20251120155522-df4a8e531761
+	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.16
 	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -184,3 +185,5 @@ tool (
 )
 
 replace github.com/ava-labs/avalanchego => ../../
+
+replace github.com/ava-labs/avalanchego/graft/evm => ../evm

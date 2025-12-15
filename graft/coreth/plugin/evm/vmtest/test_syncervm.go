@@ -23,7 +23,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
-	"github.com/ava-labs/avalanchego/graft/coreth/constants"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/coretest"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
@@ -32,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
 	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
