@@ -67,7 +67,7 @@ inputs:
     description: 'libevm commit/branch/tag (optional). If provided, updates libevm dependency before benchmark.'
     default: ''
   firewood-ref:
-    description: 'Firewood commit/branch/tag (optional). If provided, builds custom firewood before benchmark.'
+    description: 'Firewood commit/branch/tag (optional). If provided, builds custom firewood and skips benchmark comparison (Firewood tracks separately).'
     default: ''
   # The following inputs need never be provided by the caller. They
   # default to context values that the action's steps are unable to

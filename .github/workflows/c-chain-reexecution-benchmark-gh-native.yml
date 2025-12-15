@@ -29,7 +29,7 @@ on:
         description: 'Timeout in minutes for the job.'
         default: 30
       firewood-ref:
-        description: 'Firewood commit/branch/tag to build and test (optional). If provided, builds custom firewood and uploads benchmark artifact.'
+        description: 'Firewood commit/branch/tag (optional). Builds custom firewood and skips benchmark comparison (Firewood tracks separately).'
         default: ''
       libevm-ref:
         description: 'libevm commit/branch/tag (optional). If provided, updates libevm dependency.'
@@ -109,8 +109,8 @@ jobs:
           push-post-state: ${{ matrix.push-post-state || '' }}
           runner_name: ${{ matrix.runner }}
       - name: Upload benchmark results
-        # Skip when using custom firewood - Firewood downloads the artifact and
-        # publishes to their own gh-pages for tracking
+        # Only upload when using custom firewood - Firewood downloads the artifact
+        # and publishes to their own gh-pages for tracking
         if: inputs.firewood-ref != ''
         uses: actions/upload-artifact@v4
         with:

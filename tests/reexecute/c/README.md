@@ -359,15 +359,15 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
 # Test with custom firewood commit
 gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
   -f task=c-chain-reexecution-firewood-101-250k \
-  -f firewood=abc123def \
+  -f firewood-ref=abc123def \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f timeout-minutes=60
 
 # Test with custom libevm and firewood
 gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
   -f task=c-chain-reexecution-firewood-101-250k \
-  -f libevm=v1.2.3 \
-  -f firewood=abc123def \
+  -f libevm-ref=v1.2.3 \
+  -f firewood-ref=abc123def \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f timeout-minutes=60
 ```
