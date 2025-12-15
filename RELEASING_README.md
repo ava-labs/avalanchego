@@ -349,13 +349,34 @@ The tag push triggers these workflows automatically:
 
 Artifacts produced:
 
+**Binaries:**
+
 - `avalanchego-linux-amd64-$VERSION.tar.gz`
 - `avalanchego-linux-arm64-$VERSION.tar.gz`
 - `avalanchego-macos-$VERSION.zip`
 - `subnet-evm-linux-amd64-$VERSION.tar.gz`
 - `subnet-evm-linux-arm64-$VERSION.tar.gz`
 - `subnet-evm-macos-$VERSION.zip`
-- Docker: `avaplatform/avalanchego:$VERSION`
+  
+**Docker Images:**
+
+- `avaplatform/avalanchego:$VERSION` (multi-arch: linux/amd64, linux/arm64)
+- `avaplatform/subnet-evm:$VERSION` (multi-arch: linux/amd64, linux/arm64)
+- `avaplatform/bootstrap-monitor:$VERSION` (multi-arch: linux/amd64, linux/arm64)
+
+**Antithesis Images:**
+
+Antithesis test images are built and pushed to Google Artifact Registry on every merge to master via `publish_antithesis_images.yml`:
+
+- `antithesis-avalanchego-{config,node,workload}:latest`
+- `antithesis-xsvm-{config,node,workload}:latest`
+- `antithesis-subnet-evm-{config,node,workload}:latest`
+
+These are triggered daily for testing:
+
+- `trigger-antithesis-avalanchego.yml` - 10PM UTC
+- `trigger-antithesis-xsvm.yml` - 6AM UTC
+- `trigger-antithesis-subnet-evm.yml` - 2PM UTC
 
 ### 10. Post-Release Version Bump
 
