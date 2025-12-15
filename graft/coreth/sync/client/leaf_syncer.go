@@ -158,9 +158,5 @@ func (c *CallbackLeafSyncer) Sync(ctx context.Context) error {
 		})
 	}
 
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-
-	return nil
+	return eg.Wait()
 }
