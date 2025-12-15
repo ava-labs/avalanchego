@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1765802081407,
+  "lastUpdate": 1765811521606,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -3582,6 +3582,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd-jp6dz-runner-h5dxt",
             "value": 75.89,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Tsvetan Dimitrov",
+            "username": "powerslider",
+            "email": "tsvetan.dimitrov23@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "fec393b84dc0baa8d3e335523eabbd91168936fb",
+          "message": "feat(statesync): introduce Finalizer interface for syncer cleanup (#4623)\n\nSigned-off-by: Tsvetan Dimitrov (tsvetan.dimitrov23@gmail.com)",
+          "timestamp": "2025-12-15T11:52:39Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/fec393b84dc0baa8d3e335523eabbd91168936fb"
+        },
+        "date": 1765811518373,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast-79qqw-runner-bjttv",
+            "value": 43.9,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
