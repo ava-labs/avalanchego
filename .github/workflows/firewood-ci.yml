@@ -42,7 +42,7 @@ jobs:
           restore-keys: |
             bazel-firewood-${{ runner.os }}-${{ runner.arch }}-
       - name: Build firewood (all targets, both feature variants)
-        shell: nix develop --command bash {0}
+        shell: bash
         run: ./scripts/run_task.sh firewood:build
 
   firewood-test-default:
@@ -63,7 +63,7 @@ jobs:
           restore-keys: |
             bazel-firewood-${{ runner.os }}-${{ runner.arch }}-
       - name: Test firewood (default/SHA-256 mode)
-        shell: nix develop --command bash {0}
+        shell: bash
         run: ./scripts/run_task.sh firewood:test-default
 
   firewood-test-ethhash:
@@ -84,5 +84,5 @@ jobs:
           restore-keys: |
             bazel-firewood-${{ runner.os }}-${{ runner.arch }}-
       - name: Test firewood (ethhash/Keccak-256 mode)
-        shell: nix develop --command bash {0}
+        shell: bash
         run: ./scripts/run_task.sh firewood:test-ethhash

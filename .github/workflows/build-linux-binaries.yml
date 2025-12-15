@@ -31,7 +31,7 @@ jobs:
             bazel-build-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Build the avalanchego binaries
-        shell: nix develop --command bash {0}
+        shell: bash
         run: ./scripts/run_task.sh build
 
       - name: Install aws cli
@@ -98,7 +98,7 @@ jobs:
             bazel-build-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Build the avalanchego binaries
-        shell: nix develop --command bash {0}
+        shell: bash
         run: ./scripts/run_task.sh build
 
       - name: Install aws cli

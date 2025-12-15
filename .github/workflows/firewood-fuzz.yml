@@ -47,7 +47,7 @@ jobs:
           ulimit -Sa
           ulimit -Ha
       - name: Run ethhash differential fuzz
-        shell: nix develop --command bash {0}
+        shell: bash
         env:
           FIREWOOD_FUZZTIME: ${{ github.event.inputs.fuzztime || '1m' }}
         run: ./scripts/run_task.sh firewood:fuzz-ethhash
@@ -80,7 +80,7 @@ jobs:
           ulimit -Sa
           ulimit -Ha
       - name: Run merkle differential fuzz
-        shell: nix develop --command bash {0}
+        shell: bash
         env:
           FIREWOOD_FUZZTIME: ${{ github.event.inputs.fuzztime || '1m' }}
         run: ./scripts/run_task.sh firewood:fuzz-merkle

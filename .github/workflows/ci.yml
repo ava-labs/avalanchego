@@ -37,7 +37,7 @@ jobs:
           restore-keys: |
             bazel-unit-${{ runner.os }}-${{ runner.arch }}-
       - name: test-unit
-        shell: nix develop --command bash {0}
+        shell: bash
         run: ./scripts/run_task.sh test-unit
   Fuzz:
     runs-on: ubuntu-latest

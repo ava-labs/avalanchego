@@ -39,7 +39,7 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Build the avalanchego binary
-        shell: nix develop --command bash {0}
+        shell: bash
         run: ./scripts/run_task.sh build
 
       - name: Try to get tag from git

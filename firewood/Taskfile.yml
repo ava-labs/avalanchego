@@ -33,15 +33,15 @@ tasks:
 
   build:
     desc: Build all firewood targets (both feature variants)
-    cmd: bazel build //firewood/...
+    cmd: ../scripts/run_bazel.sh build //firewood/...
 
   build-default:
     desc: Build firewood with default features (SHA-256/MerkleDB mode)
-    cmd: bazel build //firewood/firewood:firewood //firewood/storage:firewood-storage //firewood/ffi:ffi
+    cmd: ../scripts/run_bazel.sh build //firewood/firewood:firewood //firewood/storage:firewood-storage //firewood/ffi:ffi
 
   build-ethhash:
     desc: Build firewood with ethhash features (Keccak-256/Ethereum mode)
-    cmd: bazel build //firewood/firewood:firewood_ethhash //firewood/storage:firewood-storage_ethhash //firewood/ffi:ffi_ethhash
+    cmd: ../scripts/run_bazel.sh build //firewood/firewood:firewood_ethhash //firewood/storage:firewood-storage_ethhash //firewood/ffi:ffi_ethhash
 
   # ============================================================================
   # Test tasks
@@ -54,11 +54,11 @@ tasks:
 
   test-default:
     desc: Run firewood FFI tests with default features
-    cmd: bazel test //firewood/ffi:ffi_test
+    cmd: ../scripts/run_bazel.sh test //firewood/ffi:ffi_test
 
   test-ethhash:
     desc: Run firewood FFI tests with ethhash features
-    cmd: bazel test //firewood/ffi:ffi_ethhash_test
+    cmd: ../scripts/run_bazel.sh test //firewood/ffi:ffi_ethhash_test
 
   # ============================================================================
   # FFI tasks
@@ -72,11 +72,11 @@ tasks:
 
   test-ffi-default:
     desc: Run FFI tests with default features
-    cmd: bazel test //firewood/ffi:ffi_test
+    cmd: ../scripts/run_bazel.sh test //firewood/ffi:ffi_test
 
   test-ffi-ethhash:
     desc: Run FFI tests with ethhash features
-    cmd: bazel test //firewood/ffi:ffi_ethhash_test
+    cmd: ../scripts/run_bazel.sh test //firewood/ffi:ffi_ethhash_test
 
   # ============================================================================
   # Lint tasks
@@ -94,7 +94,7 @@ tasks:
 
   lint-clippy:
     desc: Run clippy on all targets
-    cmd: bazel build //firewood/... --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect --output_groups=clippy_checks
+    cmd: ../scripts/run_bazel.sh build //firewood/... --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect --output_groups=clippy_checks
 
   # ============================================================================
   # Fuzz tasks
@@ -103,7 +103,7 @@ tasks:
   fuzz-ethhash:
     desc: Run ethhash differential fuzz tests
     cmd: |
-      bazel test //firewood/ffi/tests/eth:eth_test \
+      ../scripts/run_bazel.sh test //firewood/ffi/tests/eth:eth_test \
         --test_env=TEST_FIREWOOD_HASH_MODE=ethhash \
         --test_arg=-test.fuzz=. \
         --test_arg=-test.fuzztime={{.FIREWOOD_FUZZTIME}}
@@ -111,7 +111,7 @@ tasks:
   fuzz-merkle:
     desc: Run merkle differential fuzz tests
     cmd: |
-      bazel test //firewood/ffi/tests/firewood:firewood_test \
+      ../scripts/run_bazel.sh test //firewood/ffi/tests/firewood:firewood_test \
         --test_arg=-test.fuzz=. \
         --test_arg=-test.fuzztime={{.FIREWOOD_FUZZTIME}}
 
