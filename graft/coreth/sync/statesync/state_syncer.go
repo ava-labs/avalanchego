@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -59,6 +60,10 @@ type stateSync struct {
 	storageTriesDone   chan struct{}
 	triesInProgressSem chan struct{}
 	stats              *trieSyncStats
+
+	// syncCompleted is set to true when the sync completes successfully.
+	// This provides an explicit success signal for Finalize().
+	syncCompleted atomic.Bool
 }
 
 // SyncerOption configures the state syncer via functional options.
@@ -106,7 +111,6 @@ func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, co
 	ss.syncer = syncclient.NewCallbackLeafSyncer(client, ss.segments, &syncclient.LeafSyncerConfig{
 		RequestSize: leafsRequestSize,
 		NumWorkers:  defaultNumWorkers,
-		OnFailure:   ss.onSyncFailure,
 	})
 
 	if codeQueue == nil {
@@ -214,7 +218,11 @@ func (t *stateSync) onMainTrieFinished() error {
 // [mainTrie]'s batch last to avoid persisting the state
 // root before all storage tries are done syncing.
 func (t *stateSync) onSyncComplete() error {
-	return t.mainTrie.batch.Write()
+	if err := t.mainTrie.batch.Write(); err != nil {
+		return err
+	}
+	t.syncCompleted.Store(true)
+	return nil
 }
 
 // storageTrieProducer waits for the main trie to finish
@@ -301,19 +309,22 @@ func (t *stateSync) removeTrieInProgress(root common.Hash) (int, error) {
 	return len(t.triesInProgress), nil
 }
 
-// onSyncFailure is called if the sync fails, this writes all
-// batches of in-progress trie segments to disk to have maximum
-// progress to restore.
-func (t *stateSync) onSyncFailure() {
+// Finalize flushes in-progress trie batches to disk to preserve progress on failure.
+func (t *stateSync) Finalize() error {
+	if t.syncCompleted.Load() {
+		return nil
+	}
+
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
 	for _, trie := range t.triesInProgress {
 		for _, segment := range trie.segments {
 			if err := segment.batch.Write(); err != nil {
-				log.Error("failed to write segment batch on sync failure", "err", err)
-				return
+				log.Error("failed to write segment batch on finalize", "err", err)
+				return err
 			}
 		}
 	}
+	return nil
 }
