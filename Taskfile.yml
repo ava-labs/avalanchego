@@ -117,6 +117,45 @@ tasks:
     cmds:
       - cmd: bash -x ./scripts/copy_dir.sh {{.SRC}} {{.DST}}
 
+  firewood-chaos-test:
+    desc: Chaos test during reexecution test with Firewood
+    vars:
+      START_BLOCK: '{{.START_BLOCK}}'
+      END_BLOCK: '{{.END_BLOCK}}'
+      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
+      BLOCK_DIR: '{{.BLOCK_DIR}}'
+      MIN_WAIT_TIME: '{{.MIN_WAIT_TIME}}'
+      MAX_WAIT_TIME: '{{.MAX_WAIT_TIME}}'
+    cmd: go run ./tests/reexecute/chaos --start-block={{.START_BLOCK}} 
+      --end-block={{.END_BLOCK}} --current-state-dir={{.CURRENT_STATE_DIR}} 
+      --block-dir={{.BLOCK_DIR}} --min-wait-time={{.MIN_WAIT_TIME}} 
+      --max-wait-time={{.MAX_WAIT_TIME}}
+
+  firewood-chaos-test-with-copied-data:
+    desc: Combines import-cchain-reexecute-range and firewood-chaos-test
+    vars:
+      START_BLOCK: '{{.START_BLOCK}}'
+      END_BLOCK: '{{.END_BLOCK}}'
+      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC}}'
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+      MIN_WAIT_TIME: '{{.MIN_WAIT_TIME}}'
+      MAX_WAIT_TIME: '{{.MAX_WAIT_TIME}}'
+    cmds:
+      - task: import-cchain-reexecute-range
+        vars:
+          BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.BLOCK_DIR_SRC}}/**'
+          CURRENT_STATE_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.CURRENT_STATE_DIR_SRC}}/**'
+          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+      - task: firewood-chaos-test
+        vars:
+          START_BLOCK: '{{.START_BLOCK}}'
+          END_BLOCK: '{{.END_BLOCK}}'
+          CURRENT_STATE_DIR: '{{.EXECUTION_DATA_DIR}}/current-state'
+          BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
+          MIN_WAIT_TIME: '{{.MIN_WAIT_TIME}}'
+          MAX_WAIT_TIME: '{{.MAX_WAIT_TIME}}'
+
   generate-mocks:
     desc: Generates testing mocks
     cmds:

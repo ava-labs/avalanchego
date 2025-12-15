@@ -1,0 +1,108 @@
+name: Firewood Chaos Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      start-block:
+        description: 'The start block for the chaos test.'
+        default: ''
+      end-block:
+        description: 'The end block for the chaos test.'
+        default: ''
+      block-dir-src:
+        description: 'The source block directory. Supports S3 directory/zip and local directories.'
+        default: ''
+      current-state-dir-src:
+        description: 'The current state directory. Supports S3 directory/zip and local directories.'
+        default: ''
+      min-wait-time:
+        description: 'Minimum wait time before killing the process (e.g., 120s, 2m).'
+        default: '120s'
+      max-wait-time:
+        description: 'Maximum wait time before killing the process (e.g., 150s, 3m).'
+        default: '150s'
+      runner:
+        description: 'Runner to execute the chaos test. Input to the runs-on field of the job.'
+        required: true
+      timeout-minutes:
+        description: 'Timeout in minutes for the job.'
+        default: '60'
+  # XXX: remove this before merging
+  pull_request:
+  schedule:
+    - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
+
+jobs:
+  define-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.define-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Define Matrix
+        id: define-matrix
+        shell: bash -x {0}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            {
+              echo "matrix<<EOF"
+              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "min-wait-time": "%s", "max-wait-time": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+                "${{ github.event.inputs.start-block }}" \
+                "${{ github.event.inputs.end-block }}" \
+                "${{ github.event.inputs.block-dir-src }}" \
+                "${{ github.event.inputs.current-state-dir-src }}" \
+                "${{ github.event.inputs.min-wait-time }}" \
+                "${{ github.event.inputs.max-wait-time }}" \
+                "${{ github.event.inputs.runner }}" \
+                "${{ github.event.inputs.timeout-minutes }}"
+              echo EOF
+            } >> "$GITHUB_OUTPUT"
+          else
+            json_string=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/chaos-test.json)
+            {
+              echo "matrix<<EOF"
+              echo "$json_string"
+              echo EOF
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+  firewood-chaos-test:
+    needs: define-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
+    timeout-minutes: ${{ matrix.timeout-minutes }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          role-duration-seconds: '43200'
+      - uses: actions/checkout@v4
+      - name: Set task env
+        shell: bash
+        run: |
+          TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
+          echo "EXECUTION_DATA_DIR=/tmp/reexecution-data-${TIMESTAMP}" >> "$GITHUB_ENV"
+      - name: Run chaos test with Firewood
+        shell: nix develop --impure --command bash -x {0}
+        run: |
+          TIMESTAMP=$(date +%s)
+          EXECUTION_DATA_DIR="/tmp/reexecution-data-${TIMESTAMP}"
+          ./scripts/run_task.sh firewood-chaos-test-with-copied-data \
+            START_BLOCK=${{ matrix.start-block }} \
+            END_BLOCK=${{ matrix.end-block }} \
+            BLOCK_DIR_SRC=${{ matrix.block-dir-src }} \
+            EXECUTION_DATA_DIR=$EXECUTION_DATA_DIR \
+            CURRENT_STATE_DIR_SRC=${{ matrix.current-state-dir-src }} \
+            MIN_WAIT_TIME=${{ matrix.min-wait-time }} \
+            MAX_WAIT_TIME=${{ matrix.max-wait-time }}
+
