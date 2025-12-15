@@ -28,10 +28,10 @@ on:
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
         default: 30
-      firewood:
+      firewood-ref:
         description: 'Firewood commit/branch/tag to build and test (optional). If provided, builds custom firewood and uploads benchmark artifact.'
         default: ''
-      libevm:
+      libevm-ref:
         description: 'libevm commit/branch/tag (optional). If provided, updates libevm dependency.'
         default: ''
 
@@ -96,8 +96,8 @@ jobs:
           end-block: ${{ matrix.end-block }}
           block-dir-src: ${{ matrix.block-dir-src }}
           current-state-dir-src: ${{ matrix.current-state-dir-src }}
-          libevm: ${{ inputs.libevm }}
-          firewood: ${{ inputs.firewood }}
+          libevm-ref: ${{ inputs.libevm-ref }}
+          firewood-ref: ${{ inputs.firewood-ref }}
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
@@ -109,7 +109,7 @@ jobs:
           push-post-state: ${{ matrix.push-post-state || '' }}
           runner_name: ${{ matrix.runner }}
       - name: Upload benchmark results
-        if: inputs.firewood != ''
+        if: inputs.firewood-ref != ''
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-output
