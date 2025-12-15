@@ -4,19 +4,13 @@ module github.com/ava-labs/avalanchego/graft/coreth
 // tools/go.mod to avoid polluting the main module's dependencies. See
 // CONTRIBUTING.md for more details.
 
-// - Changes to the minimum golang version must also be replicated in:
-//   - go.mod (here)
-//   - tools/go.mod
-//   - RELEASES.md
-//
-// - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
-//   - Consider updating the version of golangci-lint (see tools/go.mod)
+// See ../../go.mod for guidelines on updating the Go version.
 go 1.24.9
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/ava-labs/avalanchego v1.14.1-0.20251120155522-df4a8e531761
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.15
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.16
 	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
