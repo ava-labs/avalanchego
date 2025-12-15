@@ -1,0 +1,291 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "gasLimit",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "targetBlockRate",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minBaseFee",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "targetGas",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "baseFeeChangeDenominator",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minBlockGasCost",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxBlockGasCost",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "blockGasCostStep",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IFeeManager.FeeConfig",
+        "name": "oldFeeConfig",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "gasLimit",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "targetBlockRate",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minBaseFee",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "targetGas",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "baseFeeChangeDenominator",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minBlockGasCost",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxBlockGasCost",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "blockGasCostStep",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IFeeManager.FeeConfig",
+        "name": "newFeeConfig",
+        "type": "tuple"
+      }
+    ],
+    "name": "FeeConfigChanged",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "getFeeConfig",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "gasLimit",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "targetBlockRate",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minBaseFee",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "targetGas",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "baseFeeChangeDenominator",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minBlockGasCost",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxBlockGasCost",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "blockGasCostStep",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getFeeConfigLastChangedAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "blockNumber",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "readAllowList",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "role",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setAdmin",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setEnabled",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "gasLimit",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "targetBlockRate",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minBaseFee",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "targetGas",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "baseFeeChangeDenominator",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minBlockGasCost",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxBlockGasCost",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "blockGasCostStep",
+        "type": "uint256"
+      }
+    ],
+    "name": "setFeeConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setManager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setNone",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

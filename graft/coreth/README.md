@@ -1,45 +1,17 @@
 # Coreth and the C-Chain
 
 [Avalanche](https://www.avax.network/) is a network composed of multiple blockchains.
-Each blockchain is an instance of a Virtual Machine (VM), much like an object in an object-oriented language is an instance of a class.
-That is, the VM defines the behavior of the blockchain.
-Coreth (from core Ethereum) is the [Virtual Machine (VM)](https://docs.avax.network/learn/virtual-machines) that defines the Contract Chain (C-Chain).
-This chain implements the Ethereum Virtual Machine and supports Solidity smart contracts as well as most other Ethereum client functionality.
+Each blockchain is an instance of a Virtual Machine (VM), much like an object in an object-oriented language is an instance of a class.  That is, the VM defines the behavior of the blockchain.  Coreth (from core Ethereum) is the [Virtual Machine (VM)](https://docs.avax.network/learn/virtual-machines) that defines the Contract Chain (C-Chain).  This chain implements the Ethereum Virtual Machine and supports Solidity smart contracts as well as most other Ethereum client functionality.
 
 ## Building
 
-Coreth is a dependency of AvalancheGo which is used to implement the EVM based Virtual Machine for the Avalanche C-Chain. In order to run with a local version of Coreth, users must update their Coreth dependency within AvalancheGo to point to their local Coreth directory. If Coreth and AvalancheGo are at the standard location within your GOPATH, this will look like the following:
-
-```bash
-cd $GOPATH/src/github.com/ava-labs/avalanchego
-go mod edit -replace github.com/ava-labs/coreth=../coreth
-```
-
-Now that AvalancheGo depends on the local version of Coreth, we can build with the normal build script:
-
-```bash
-./scripts/build.sh
-./build/avalanchego
-```
-
-Note: the C-Chain originally ran in a separate process from the main AvalancheGo process and communicated with it over a local gRPC connection. When this was the case, AvalancheGo's build script would download Coreth, compile it, and place the binary into the `avalanchego/build/plugins` directory.
+Coreth is a dependency of AvalancheGo which is used to implement the EVM based Virtual Machine for the Avalanche C-Chain. In order to run with a local version of Coreth, users can simply build AvalancheGo from source.
 
 ### Optional Dev Shell
 
-Some activities, such as collecting metrics and logs from the nodes targeted by an e2e
-test run, require binary dependencies. One way of making these dependencies available is
-to use a nix shell which will give access to the dependencies expected by the test
-tooling:
+Some activities, such as collecting metrics and logs from the nodes targeted by an e2e test run, require binary dependencies. One way of making these dependencies available is to use a nix shell which will give access to the dependencies expected by the test tooling. See [flake.nix](../../flake.nix) for how to start.
 
-- Install [nix](https://nixos.org/). The [determinate systems
-  installer](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix)
-  is recommended.
-- Use `./scripts/dev_shell.sh` to start a nix shell
-- Execute the dependency-requiring command (e.g. `./scripts/tests.e2e.sh --start-collectors`)
-
-This repo also defines a `.envrc` file to configure [devenv](https://direnv.net/). With
-`devenv` and `nix` installed, a shell at the root of the repo will automatically start a nix
-dev shell.
+This repo also defines a `.envrc` file to configure [devenv](https://direnv.net/). With `devenv` and `nix` installed, a shell at the root of the repo will automatically start a nix dev shell.
 
 ## API
 
@@ -57,6 +29,9 @@ Full documentation for the C-Chain's API can be found in the [C-Chain API docume
 ## Compatibility
 
 The C-Chain is compatible with almost all Ethereum tooling, including [Core,](https://docs.avax.network/build/dapp/launch-dapp#through-core) [Metamask,](https://docs.avax.network/build/dapp/launch-dapp#through-metamask) and [Remix](https://docs.avax.network/dapps/smart-contract-dev/deploy-with-remix-ide).
+
+**Note:** Avalanche C-Chain and Subnet-EVM currently implement the Ethereum Cancun fork and do not yet support newer hardforks (such as Pectra). Since Solidity v0.8.30 switched its default target EVM version to Pectra, contracts compiled with default settings may emit bytecode using instructions/features that Avalanche does not support.
+To avoid this mismatch, explicitly set the Solidity compiler’s `evmVersion` to `cancun` when deploying to the C-Chain or Subnet-EVM.
 
 ## Differences Between Avalanche C-Chain and Ethereum
 

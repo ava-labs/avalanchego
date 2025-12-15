@@ -59,19 +59,29 @@ func New(numHashes, numEntries int) (*Filter, error) {
 	}, nil
 }
 
-func (f *Filter) Add(hash uint64) {
+// Add adds the provided hash to the bloom filter. It returns true if the hash
+// was not already present in the bloom filter.
+func (f *Filter) Add(hash uint64) bool {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	_ = 1 % f.numBits // hint to the compiler that numBits is not 0
+	var (
+		_                = 1 % f.numBits // hint to the compiler that numBits is not 0
+		accumulator byte = 1
+	)
 	for _, seed := range f.hashSeeds {
 		hash = bits.RotateLeft64(hash, hashRotation) ^ seed
 		index := hash % f.numBits
 		byteIndex := index / bitsPerByte
 		bitIndex := index % bitsPerByte
+		accumulator &= f.entries[byteIndex] >> bitIndex
 		f.entries[byteIndex] |= 1 << bitIndex
 	}
-	f.count++
+	added := accumulator == 0
+	if added {
+		f.count++
+	}
+	return added
 }
 
 // Count returns the number of elements that have been added to the bloom
