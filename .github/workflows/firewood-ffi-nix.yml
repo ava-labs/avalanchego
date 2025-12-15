@@ -1,0 +1,39 @@
+name: Firewood FFI Nix
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+    paths:
+      - 'firewood/ffi/**'
+      - 'firewood/flake.*'
+      - '.github/workflows/firewood-ffi-nix.yml'
+  pull_request:
+    paths:
+      - 'firewood/ffi/**'
+      - 'firewood/flake.*'
+      - '.github/workflows/firewood-ffi-nix.yml'
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ffi-nix:
+    name: FFI Nix validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@786fff0690178f1234e4e1fe9b536e94f5433196 #v20
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 #v13
+      - name: Check that FFI flake is up-to-date
+        working-directory: firewood
+        run: task check-ffi-flake
+      - name: Test nix build of Golang FFI bindings
+        working-directory: firewood
+        run: task test-ffi-nix
