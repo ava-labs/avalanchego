@@ -161,7 +161,7 @@ Key dependencies are centrally managed in workspace `Cargo.toml`:
 - `README.docker.md` - Docker setup
 - `CHANGELOG.md` - Version history
 - `clippy.toml` - Linting configuration
-- `justfile` - Just command runner recipes
+- `Taskfile.yml` - Task runner recipes
 - `cliff.toml` - Changelog generation config
 
 ## Notes for AI Assistants

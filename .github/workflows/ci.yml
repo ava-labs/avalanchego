@@ -43,7 +43,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel
+          key: bazel-fuzz-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock') }}
+          restore-keys: |
+            bazel-fuzz-${{ runner.os }}-${{ runner.arch }}-
       - name: test-fuzz
         shell: bash
         run: ./scripts/run_task.sh test-fuzz

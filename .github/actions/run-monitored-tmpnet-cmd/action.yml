@@ -69,6 +69,13 @@ runs:
         github_access_token: ${{ inputs.github_token }}
     - run: $GITHUB_ACTION_PATH/nix-develop.sh --command echo "dependencies installed"
       shell: bash
+    # Cache Bazel build results
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/bazel
+        key: bazel-e2e-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock') }}
+        restore-keys: |
+          bazel-e2e-${{ runner.os }}-${{ runner.arch }}-
     # Cache Go modules (architecture-independent)
     - uses: actions/cache@v4
       id: go-mod-cache

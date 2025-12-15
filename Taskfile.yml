@@ -62,7 +62,22 @@ tasks:
     cmd: ./scripts/build_tmpnetctl.sh
 
   build-xsvm:
-    desc: Builds xsvm plugin
+    desc: Builds xsvm plugin with bazel
+    vars:
+      # xsvm plugin ID from scripts/build_xsvm.sh
+      XSVM_ID: v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
+    cmds:
+      - ./scripts/run_bazel.sh build //vms/example/xsvm/cmd/xsvm
+      - mkdir -p build
+      - cp -f bazel-bin/vms/example/xsvm/cmd/xsvm/xsvm_/xsvm build/xsvm
+      # Create symlinks for plugin discovery
+      - mkdir -p build/plugins
+      - ln -sf "${PWD}/build/xsvm" "build/plugins/{{.XSVM_ID}}"
+      - mkdir -p "${HOME}/.avalanchego/plugins"
+      - ln -sf "${PWD}/build/xsvm" "${HOME}/.avalanchego/plugins/{{.XSVM_ID}}"
+
+  build-xsvm-go:
+    desc: Builds xsvm plugin with go (legacy)
     cmd: ./scripts/build_xsvm.sh
 
   build-xsvm-image:
@@ -409,19 +424,25 @@ tasks:
     cmds:
       - cmd: bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}
 
-  # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
-  # A value of `-1` will run until it encounters a failing output.
+  # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value]`.
+  # Value format: 10s, 1m, etc. A value of `0` will run until it encounters a failing output.
 
   test-fuzz:
-    desc: Runs each fuzz test for 10 seconds
+    desc: Runs fuzz tests with bazel for 10 seconds each
     vars:
-      FUZZTIME: '{{.FUZZTIME| default "10"}}'
-    cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}}
+      FUZZTIME: '{{.FUZZTIME | default "10s"}}'
+    cmd: ./scripts/run_bazel.sh test //... --test_tag_filters=fuzz --test_arg=-test.fuzz=Fuzz --test_arg=-test.fuzztime={{.FUZZTIME}}
 
   test-fuzz-long:
-    desc: Runs each fuzz test for 180 seconds
+    desc: Runs fuzz tests with bazel for 180 seconds each
     vars:
-      FUZZTIME: '{{.FUZZTIME| default "180"}}'
+      FUZZTIME: '{{.FUZZTIME | default "180s"}}'
+    cmd: ./scripts/run_bazel.sh test //... --test_tag_filters=fuzz --test_arg=-test.fuzz=Fuzz --test_arg=-test.fuzztime={{.FUZZTIME}}
+
+  test-fuzz-go:
+    desc: Runs each fuzz test with go test (legacy)
+    vars:
+      FUZZTIME: '{{.FUZZTIME | default "10"}}'
     cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}}
 
   test-fuzz-merkledb:
