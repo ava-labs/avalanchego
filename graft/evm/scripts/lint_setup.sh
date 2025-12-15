@@ -38,8 +38,14 @@ function setup_lint {
   fi
 
   local upstream_folders_file="./scripts/upstream_files.txt"
-  # Read the upstream_folders file into an array
-  mapfile -t upstream_folders <"$upstream_folders_file"
+  # check that the file exists
+  if [[ ! -f "$upstream_folders_file" ]]; then
+    echo "upstream_folders_file not found: $upstream_folders_file"
+    upstream_folders=()
+  else
+    # Read the upstream_folders file into an array
+    mapfile -t upstream_folders <"$upstream_folders_file"
+  fi
 
   # Shared find filters
   local -a find_filters=(
@@ -69,7 +75,9 @@ function setup_lint {
     fi
   done
   # Remove the last '-o' from the arrays
-  unset 'upstream_find_args[${#upstream_find_args[@]}-1]'
+  if [ ${#upstream_find_args[@]} -ne 0 ]; then
+    unset 'upstream_find_args[${#upstream_find_args[@]}-1]'
+  fi
 
   # Find upstream files
   # shellcheck disable=SC2034  # used by external scripts after sourcing
