@@ -25,21 +25,15 @@ on:
       runner:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
         required: true
-      push-post-state:
-        description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
-        default: ''
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
         default: 30
       firewood:
-        description: 'Firewood commit/branch/tag to build and test (optional). If provided, builds custom firewood.'
+        description: 'Firewood commit/branch/tag to build and test (optional). If provided, builds custom firewood and uploads benchmark artifact.'
         default: ''
       libevm:
         description: 'libevm commit/branch/tag (optional). If provided, updates libevm dependency.'
         default: ''
-      upload-benchmark-artifact:
-        description: 'Upload benchmark output as artifact for external consumers (e.g., Firewood repo).'
-        default: 'false'
 
   # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
   # entry in the corresponding JSON file.
@@ -117,13 +111,13 @@ jobs:
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
-          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-role: ${{ matrix.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          push-post-state: ${{ github.event.inputs.push-post-state }}
+          push-post-state: ${{ matrix.push-post-state || '' }}
           runner_name: ${{ matrix.runner }}
       - name: Upload benchmark results
-        if: inputs.upload-benchmark-artifact == 'true'
+        if: inputs.firewood != ''
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-output
