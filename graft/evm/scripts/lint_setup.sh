@@ -38,9 +38,8 @@ function setup_lint {
   fi
 
   local upstream_folders_file="./scripts/upstream_files.txt"
-  # check that the file exists
   if [[ ! -f "$upstream_folders_file" ]]; then
-    echo "upstream_folders_file not found: $upstream_folders_file"
+    # if the file doesn't exist, assume no upstream files
     upstream_folders=()
   else
     # Read the upstream_folders file into an array
