@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/blocksync"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync"
@@ -32,9 +34,22 @@ import (
 const BlocksToFetch = 256
 
 var (
-	errSkipSync         = errors.New("skip sync")
-	stateSyncSummaryKey = []byte("stateSyncSummary")
+	errSkipSync            = errors.New("skip sync")
+	errBlockNotFound       = errors.New("block not found in state")
+	errInvalidBlockType    = errors.New("invalid block wrapper type")
+	errBlockHashMismatch   = errors.New("block hash mismatch")
+	errBlockHeightMismatch = errors.New("block height mismatch")
+	errCommitCancelled     = errors.New("commit cancelled")
+	errCommitMarkers       = errors.New("failed to commit VM markers")
+	stateSyncSummaryKey    = []byte("stateSyncSummary")
 )
+
+// EthBlockWrapper can be implemented by a concrete block wrapper type to
+// return *types.Block, which is needed to update chain pointers at the
+// end of the sync operation.
+type EthBlockWrapper interface {
+	GetEthBlock() *types.Block
+}
 
 // BlockAcceptor provides a mechanism to update the last accepted block ID during state synchronization.
 // This interface is used by the state sync process to ensure the blockchain state
@@ -43,12 +58,19 @@ type BlockAcceptor interface {
 	PutLastAcceptedID(ids.ID) error
 }
 
+// Committer commits sync results to the VM, preparing it for bootstrapping.
+type Committer interface {
+	Commit(ctx context.Context, summary message.Syncable) error
+}
+
 // SyncStrategy defines how state sync is executed.
 // Implementations handle the sync lifecycle differently based on sync mode.
 type SyncStrategy interface {
 	// Start begins the sync process and blocks until completion or error.
 	Start(ctx context.Context, summary message.Syncable) error
 }
+
+var _ Committer = (*client)(nil)
 
 type ClientConfig struct {
 	Chain      *eth.Ethereum
@@ -160,17 +182,7 @@ func (c *client) acceptSyncSummary(summary message.Syncable) (block.StateSyncMod
 		return block.StateSyncSkipped, fmt.Errorf("failed to create syncer registry: %w", err)
 	}
 
-	finalizer := newFinalizer(
-		c.config.Chain,
-		c.config.State,
-		c.config.Acceptor,
-		c.config.VerDB,
-		c.config.MetadataDB,
-		c.config.Extender,
-		c.config.LastAcceptedHeight,
-	)
-
-	strategy := newStaticStrategy(registry, finalizer)
+	strategy := newStaticStrategy(registry, c)
 
 	return c.startAsync(strategy, summary), nil
 }
@@ -252,6 +264,89 @@ func (c *client) Shutdown() error {
 
 // Error returns a non-nil error if one occurred during the sync.
 func (c *client) Error() error { return c.err }
+
+// Commit implements Committer. It updates disk and memory pointers so the VM
+// is prepared for bootstrapping. Executes any shared memory operations from
+// the atomic trie to shared memory.
+func (c *client) Commit(ctx context.Context, summary message.Syncable) error {
+	stateBlock, err := c.config.State.GetBlock(ctx, ids.ID(summary.GetBlockHash()))
+	if err != nil {
+		return fmt.Errorf("%w: hash=%s", errBlockNotFound, summary.GetBlockHash())
+	}
+
+	wrapper, ok := stateBlock.(*chain.BlockWrapper)
+	if !ok {
+		return fmt.Errorf("%w: got %T, want *chain.BlockWrapper", errInvalidBlockType, stateBlock)
+	}
+	wrappedBlock := wrapper.Block
+
+	evmBlockGetter, ok := wrappedBlock.(EthBlockWrapper)
+	if !ok {
+		return fmt.Errorf("%w: got %T, want EthBlockWrapper", errInvalidBlockType, wrappedBlock)
+	}
+
+	block := evmBlockGetter.GetEthBlock()
+
+	if block.Hash() != summary.GetBlockHash() {
+		return fmt.Errorf("%w: got %s, want %s", errBlockHashMismatch, block.Hash(), summary.GetBlockHash())
+	}
+	if block.NumberU64() != summary.Height() {
+		return fmt.Errorf("%w: got %d, want %d", errBlockHeightMismatch, block.NumberU64(), summary.Height())
+	}
+
+	// BloomIndexer needs to know that some parts of the chain are not available
+	// and cannot be indexed. This is done by calling [AddCheckpoint] here.
+	// Since the indexer uses sections of size [params.BloomBitsBlocks] (= 4096),
+	// each block is indexed in section number [blockNumber/params.BloomBitsBlocks].
+	// To allow the indexer to start with the block we just synced to,
+	// we create a checkpoint for its parent.
+	// Note: This requires assuming the synced block height is divisible
+	// by [params.BloomBitsBlocks].
+	parentHeight := block.NumberU64() - 1
+	parentHash := block.ParentHash()
+	c.config.Chain.BloomIndexer().AddCheckpoint(parentHeight/params.BloomBitsBlocks, parentHash)
+
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("%w: %w", errCommitCancelled, err)
+	}
+	if err := c.config.Chain.BlockChain().ResetToStateSyncedBlock(block); err != nil {
+		return err
+	}
+
+	if c.config.Extender != nil {
+		if err := c.config.Extender.OnFinishBeforeCommit(c.config.LastAcceptedHeight, summary); err != nil {
+			return err
+		}
+	}
+
+	if err := c.commitMarkers(summary); err != nil {
+		return fmt.Errorf("%w: height=%d, hash=%s: %w", errCommitMarkers, block.NumberU64(), block.Hash(), err)
+	}
+
+	if err := c.config.State.SetLastAcceptedBlock(wrappedBlock); err != nil {
+		return err
+	}
+
+	if c.config.Extender != nil {
+		if err := c.config.Extender.OnFinishAfterCommit(block.NumberU64()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// commitMarkers updates VM database markers atomically.
+func (c *client) commitMarkers(summary message.Syncable) error {
+	id := ids.ID(summary.GetBlockHash())
+	if err := c.config.Acceptor.PutLastAcceptedID(id); err != nil {
+		return err
+	}
+	if err := c.config.MetadataDB.Delete(stateSyncSummaryKey); err != nil {
+		return err
+	}
+	return c.config.VerDB.Commit()
+}
 
 // newSyncerRegistry creates a registry with all required syncers for the given summary.
 func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, error) {

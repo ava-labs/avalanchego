@@ -13,24 +13,24 @@ var _ SyncStrategy = (*staticStrategy)(nil)
 
 // staticStrategy runs syncers sequentially without block queueing.
 // This is the default sync mode where all syncers complete before
-// finalization, with no concurrent block processing.
+// committing results, with no concurrent block processing.
 type staticStrategy struct {
 	registry  *SyncerRegistry
-	finalizer *finalizer
+	committer Committer
 }
 
-func newStaticStrategy(registry *SyncerRegistry, finalizer *finalizer) *staticStrategy {
+func newStaticStrategy(registry *SyncerRegistry, committer Committer) *staticStrategy {
 	return &staticStrategy{
 		registry:  registry,
-		finalizer: finalizer,
+		committer: committer,
 	}
 }
 
 // Start begins the sync process and blocks until completion or error.
-// For static sync, this runs all syncers and then finalizes the VM state.
+// For static sync, this runs all syncers and then commits the results to the VM.
 func (s *staticStrategy) Start(ctx context.Context, summary message.Syncable) error {
 	if err := s.registry.RunSyncerTasks(ctx, summary); err != nil {
 		return err
 	}
-	return s.finalizer.finalize(ctx, summary)
+	return s.committer.Commit(ctx, summary)
 }
