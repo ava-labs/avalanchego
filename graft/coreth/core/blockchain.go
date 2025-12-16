@@ -1403,6 +1403,10 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	vstart := time.Now()
 	if err := bc.validator.ValidateState(block, statedb, receipts, usedGas); err != nil {
 		bc.reportBlock(block, receipts, err)
+		if fw, ok := bc.triedb.Backend().(*firewood.TrieDB); ok {
+			log.Error("found error, writing anyway", "block", block.Number(), "hash", block.Hash(), "error", err)
+			fw.DumpAll(statedb, block.NumberU64(), parent.Hash(), block.Hash(), parent.Root, block.Root())
+		}
 		return err
 	}
 	vtime := time.Since(vstart)

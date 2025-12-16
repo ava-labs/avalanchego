@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/stateconf"
@@ -98,6 +99,8 @@ type TrieDB struct {
 	// in the case of duplicate state roots.
 	// The root of the tree is stored here, and represents the top-most layer on disk.
 	proposalTree *ProposalContext
+
+	folderName string
 }
 
 // New creates a new Firewood database with the given disk database and configuration.
@@ -134,6 +137,7 @@ func New(config Config) (*TrieDB, error) {
 		proposalTree: &ProposalContext{
 			Root: common.Hash(currentRoot),
 		},
+		folderName: path,
 	}, nil
 }
 
@@ -299,7 +303,10 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	// We need to lock the proposal tree to prevent concurrent writes.
 	t.proposalLock.Lock()
 	defer t.proposalLock.Unlock()
+	return t.commit(root, report)
+}
 
+func (t *TrieDB) commit(root common.Hash, report bool) error {
 	// Find the proposal with the given root.
 	var pCtx *ProposalContext
 	for _, possible := range t.proposalMap[root] {
@@ -591,4 +598,78 @@ func arrangeKeyValuePairs(nodes *trienode.MergedNodeSet) ([][]byte, [][]byte) {
 
 	// We need to do all storage operations first, so prefix-deletion works for accounts.
 	return append(storageKeys, acctKeys...), append(storageValues, acctValues...)
+}
+
+// DumpAll writes all nodes in the given state database to Firewood.
+func (t *TrieDB) DumpAll(statedb *state.StateDB, height uint64, parentHash, blockHash, parentRoot, expectedRoot common.Hash) error {
+	triedbOpt := stateconf.WithTrieDBUpdatePayload(parentHash, blockHash)
+	statedbOpt := stateconf.WithTrieDBUpdateOpts(triedbOpt)
+	wrongRoot, err := statedb.Commit(height, false, statedbOpt)
+	if err != nil {
+		return fmt.Errorf("firewood: error committing state db for dump: %w", err)
+	}
+	if wrongRoot == expectedRoot {
+		return fmt.Errorf("firewood: unexpected matching root when dumping all nodes, got %s", expectedRoot.Hex())
+	}
+
+	t.proposalLock.Lock()
+	defer t.proposalLock.Unlock()
+
+	root, err := t.fwDisk.Root()
+	if err != nil {
+		return fmt.Errorf("firewood: error getting current root for dump: %w", err)
+	}
+	if common.Hash(root) != parentRoot {
+		log.Error("parent state not yet committed, dumping last committed state")
+		// Dump persisted state
+		if err := t.dumpState(height - 2); err != nil {
+			return fmt.Errorf("firewood: error dumping state db: %w", err)
+		}
+		if err := t.commit(parentRoot, true); err != nil {
+			return fmt.Errorf("firewood: error committing parent root during dump: %w", err)
+		}
+	}
+
+	// Dump parent state
+	if err := t.dumpState(height - 1); err != nil {
+		return fmt.Errorf("firewood: error dumping state db: %w", err)
+	}
+
+	// Commit current state
+	if err := t.commit(expectedRoot, true); err != nil {
+		return fmt.Errorf("firewood: error committing expected root during dump: %w", err)
+	}
+
+	// Dump current state
+	if err := t.dumpState(height); err != nil {
+		return fmt.Errorf("firewood: error dumping state db: %w", err)
+	}
+	log.Error("firewood: dumped all state at height", "height", height, "expectedRoot", expectedRoot.Hex())
+	return nil
+}
+
+// dumpState writes all nodes in the given state database to Firewood.
+// File name is derived from height, in the folder specified in the database.
+func (t *TrieDB) dumpState(height uint64) error {
+	graph, err := t.fwDisk.Dump()
+	if err != nil {
+		return fmt.Errorf("firewood: error dumping state at height %d: %w", height, err)
+	}
+
+	// Open file for writing
+	filename := fmt.Sprintf("dump-%d.graph", height)
+	path := filepath.Join(t.folderName, filename)
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("firewood: error creating dump file %s: %w", path, err)
+	}
+	defer file.Close()
+
+	// Write graph to file
+	if _, err := file.WriteString(graph); err != nil {
+		return fmt.Errorf("firewood: error writing dump to file %s: %w", path, err)
+	}
+
+	log.Info("Firewood: dumped state graph to file", "height", height, "file", path)
+	return nil
 }
