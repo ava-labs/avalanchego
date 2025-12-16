@@ -1,11 +1,29 @@
-# THIS README IS WHOLLY OUT OF DATE AND WILL BE UPDATED! 
+# AvalancheGo Release Guide
 
-# Releasing
+This document covers the complete release process for AvalancheGo and its integrated components (Coreth and Subnet-EVM).
 
-## When to release
+## Overview
 
-- When [AvalancheGo](https://github.com/ava-labs/avalanchego/releases) increases its RPC chain VM protocol version, which you can also check in [its `version/compatibility.json`](https://github.com/ava-labs/avalanchego/blob/master/version/compatibility.json)
-- When Subnet-EVM needs to release a new feature or bug fix.
+AvalancheGo is a monorepo which contains:
+
+- **AvalancheGo** - The main Avalanche node implementation
+- **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain EVM implementation, compiled into AvalancheGo
+- **Subnet-EVM** (in [graft/subnet-evm/](graft/subnet-evm/)) - Subnet-EVM plugin, released as a separate binary
+
+### Versioning Strategy
+
+All components follow aligned versioning:
+
+- Same version number - When AvalancheGo releases v1.14.0, Subnet-EVM is also v1.14.0
+- Single tag - One git tag (e.g., `v1.14.0`) releases everything together
+
+### Component Release Notes
+
+| Component | Release Artifact | Notes |
+|-----------|-----------------|-------|
+| AvalancheGo | `avalanchego` binary | Main node binary |
+| Coreth | None (compiled into AvalancheGo) | No separate release; version in `version.go` is informational only |
+| Subnet-EVM | `subnet-evm` binary | Separate plugin binary for L1s |
 
 ## Procedure
 
