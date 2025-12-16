@@ -66,10 +66,6 @@ var (
 func init() {
 	// Configures flags used to configure tmpnet (via SynchronizedBeforeSuite)
 	flagVars = e2e.RegisterFlags()
-	genesisPath = func() string {
-		_, thisFile, _, _ := runtime.Caller(0)
-		return filepath.Join(filepath.Dir(thisFile), "genesis/genesis.json")
-	}()
 }
 
 // Subnet provides the basic details of a created subnet
@@ -93,6 +89,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	tc := e2e.NewTestContext()
 	nodes := utils.NewTmpnetNodes(tmpnet.DefaultNodeCount)
+	_, thisFile, _, _ := runtime.Caller(0)
+	genesisPath = filepath.Join(filepath.Dir(thisFile), "genesis/genesis.json")
 
 	env := e2e.NewTestEnvironment(
 		tc,

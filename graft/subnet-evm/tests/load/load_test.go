@@ -39,10 +39,6 @@ var (
 func init() {
 	// Configures flags used to configure tmpnet
 	flagVars = e2e.RegisterFlags()
-	testDir = func() string {
-		_, thisFile, _, _ := runtime.Caller(0)
-		return filepath.Dir(thisFile)
-	}()
 }
 
 func TestE2E(t *testing.T) {
@@ -53,6 +49,8 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	var env *e2e.TestEnvironment
+	_, thisFile, _, _ := runtime.Caller(0)
+	testDir = filepath.Dir(thisFile)
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
