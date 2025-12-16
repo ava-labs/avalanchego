@@ -150,7 +150,7 @@ func (service *AvaxAPI) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, reply 
 func (service *AvaxAPI) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
 	service.Context.Log.Debug("API called",
 		zap.String("service", "avax"),
-		zap.String("method", "getUTXOs"),
+		zap.String("method", "issueTx"),
 		logging.UserString("tx", args.Tx),
 		zap.Stringer("encoding", args.Encoding),
 	)
