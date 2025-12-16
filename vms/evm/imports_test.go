@@ -45,10 +45,10 @@ func TestImportViolations(t *testing.T) {
 	require.NoError(t, err)
 
 	graftDir := filepath.Join(repoRoot, "graft")
-	graftEVMDir := filepath.Join(repoRoot, "graft", "evm")
-	graftSubnetEVMDir := filepath.Join(repoRoot, "graft", "subnet-evm")
-	emulateDir := filepath.Join(repoRoot, "vms", "evm", "emulate")
+	graftEVMDir := filepath.Join(graftDir, "evm")
+	graftSubnetEVMDir := filepath.Join(graftDir, "subnet-evm")
 	vmsEVMDir := filepath.Join(repoRoot, "vms", "evm")
+	emulateDir := filepath.Join(vmsEVMDir "emulate")
 
 	var violations []string
 
