@@ -410,6 +410,7 @@ func createProposal(layer proposable, root common.Hash, keys, values [][]byte) (
 		return nil, fmt.Errorf("firewood: keys and values must have the same length, got %d keys and %d values", len(keys), len(values))
 	}
 
+	log.Info("firewood: calling Propose", "root", root.Hex(), "numKeys", len(keys), "keys", keys, "values", values)
 	start := time.Now()
 	p, err = layer.Propose(keys, values)
 	if err != nil {
@@ -493,7 +494,9 @@ func (db *Database) removeProposalFromMap(pCtx *ProposalContext) {
 // Reader retrieves a node reader belonging to the given state root.
 // An error will be returned if the requested state is not available.
 func (db *Database) Reader(root common.Hash) (database.Reader, error) {
-	if _, err := db.fwDisk.GetFromRoot(ffi.Hash(root), []byte{}); err != nil {
+	result, err := db.fwDisk.GetFromRoot(ffi.Hash(root), []byte{})
+	log.Info("firewood: GetFromRoot", "root", root.Hex(), "key", []byte{}, "result", result, "err", err)
+	if err != nil {
 		return nil, fmt.Errorf("firewood: unable to retrieve from root %s: %w", root.Hex(), err)
 	}
 	return &reader{db: db, root: ffi.Hash(root)}, nil
@@ -512,6 +515,7 @@ func (reader *reader) Node(_ common.Hash, path []byte, _ common.Hash) ([]byte, e
 	// This is safe even if a proposal is being committed concurrently.
 	start := time.Now()
 	result, err := reader.db.fwDisk.GetFromRoot(reader.root, path)
+	log.Info("firewood: GetFromRoot", "root", common.Hash(reader.root).Hex(), "key", path, "result", result, "err", err)
 	if metrics.EnabledExpensive {
 		ffiReadCount.Inc(1)
 		ffiReadTimer.Inc(time.Since(start).Milliseconds())
@@ -533,6 +537,7 @@ func (db *Database) getProposalHash(parentRoot common.Hash, keys, values [][]byt
 	start := time.Now()
 	if db.proposalTree.Root == parentRoot {
 		// Propose from the database root.
+		log.Info("firewood: calling Propose from database root", "parentRoot", parentRoot.Hex(), "numKeys", len(keys), "keys", keys, "values", values)
 		p, err = db.fwDisk.Propose(keys, values)
 		if err != nil {
 			return common.Hash{}, fmt.Errorf("firewood: error proposing from root %s: %w", parentRoot.Hex(), err)
@@ -547,6 +552,7 @@ func (db *Database) getProposalHash(parentRoot common.Hash, keys, values [][]byt
 		}
 		rootProposal := proposals[0].Proposal
 
+		log.Info("firewood: calling Propose from root proposal", "parentRoot", parentRoot.Hex(), "numKeys", len(keys), "keys", keys, "values", values)
 		p, err = rootProposal.Propose(keys, values)
 		if err != nil {
 			return common.Hash{}, fmt.Errorf("firewood: error proposing from parent proposal %s: %w", parentRoot.Hex(), err)
