@@ -97,10 +97,11 @@ func getTopLevelMetrics(tc tests.TestContext, tool *benchmarkTool, registry prom
 	tool.addResult(msPerGGas, "ms/ggas")
 
 	for _, metric := range meterVMMetrics {
-		metricVal, err := getMetricValue(registry, metric)
+		// MeterVM counters are in terms of nanoseconds
+		metricValNanoseconds, err := getMetricValue(registry, metric)
 		r.NoError(err)
 
-		metricValMS := (metricVal / nanosecondsPerMillisecond) / totalGGas
-		tool.addResult(metricValMS, metric.name+"_ms/ggas")
+		msPerGGas := (metricValNanoseconds / nanosecondsPerMillisecond) / totalGGas
+		tool.addResult(msPerGGas, metric.name+"_ms/ggas")
 	}
 }
