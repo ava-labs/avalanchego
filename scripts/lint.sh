@@ -51,14 +51,36 @@ function test_warn_testify_assert {
   )
 
   if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
-    # In a PR: only check new code compared to base branch
+    # In a PR: fetch base branch and only check new code
+    git fetch origin "${GITHUB_BASE_REF}" --depth=1 2>/dev/null || true
     args+=(--new-from-rev="origin/${GITHUB_BASE_REF}")
   elif [[ -z "${WARN_TESTIFY_ASSERT:-}" ]]; then
     echo "Skipping (only runs on CI PRs or with WARN_TESTIFY_ASSERT=1)"
     return 0
   fi
 
-  ./scripts/run_tool.sh golangci-lint run "${args[@]}"
+  # Run golangci-lint and transform output to GitHub warning annotations
+  local output
+  output=$(./scripts/run_tool.sh golangci-lint run "${args[@]}" 2>&1) || true
+
+  if [[ -z "$output" ]]; then
+    return 0
+  fi
+
+  echo "$output"
+
+  # In GitHub Actions, also emit ::warning annotations
+  if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "$output" | grep -E '^[^:]+:[0-9]+:[0-9]+:' | while IFS= read -r line; do
+      # Parse "file:line:col: message"
+      local file line_num col msg
+      file=$(echo "$line" | cut -d: -f1)
+      line_num=$(echo "$line" | cut -d: -f2)
+      col=$(echo "$line" | cut -d: -f3)
+      msg=$(echo "$line" | cut -d: -f4- | sed 's/^ *//')
+      echo "::warning file=${file},line=${line_num},col=${col}::${msg}"
+    done
+  fi
 }
 
 # automatically checks license headers
