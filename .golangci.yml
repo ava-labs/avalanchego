@@ -109,11 +109,15 @@ linters:
     forbidigo:
       # Forbid the following identifiers (list of regexp).
       forbid:
+        - pattern: assert\.Error$(# ErrorIs should be used instead)?
+        - pattern: assert\.ErrorContains$(# ErrorIs should be used instead)?
+        - pattern: assert\.EqualValues$(# Equal should be used instead)?
+        - pattern: assert\.NotEqualValues$(# NotEqual should be used instead)?
         - pattern: require\.Error$(# ErrorIs should be used instead)?
         - pattern: require\.ErrorContains$(# ErrorIs should be used instead)?
         - pattern: require\.EqualValues$(# Equal should be used instead)?
         - pattern: require\.NotEqualValues$(# NotEqual should be used instead)?
-        - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?
+        - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the assert and require libraries should be used instead)?
         - pattern: ^sort\.(Slice|Strings)$(# the slices package should be used instead)?
       # Exclude godoc examples from forbidigo checks.
       exclude-godoc-examples: false
