@@ -84,23 +84,23 @@ func getTopLevelMetrics(tc tests.TestContext, tool *benchmarkTool, registry prom
 	r.NotZero(totalGas, "denominator metric %q has value 0", gasMetric.name)
 
 	var (
-		mgas    float64 = 1_000_000
-		ggas    float64 = 1_000_000_000
-		nsPerMs float64 = 1_000_000
+		mgas                      float64 = 1_000_000
+		ggas                      float64 = 1_000_000_000
+		nanosecondsPerMillisecond float64 = 1_000_000
 	)
 
 	mgasPerSecond := (totalGas / mgas) / elapsed.Seconds()
 	tool.addResult(mgasPerSecond, "mgas/s")
 
 	totalGGas := totalGas / ggas
-	msPerGGas := (float64(elapsed) / nsPerMs) / totalGGas
+	msPerGGas := (float64(elapsed) / nanosecondsPerMillisecond) / totalGGas
 	tool.addResult(msPerGGas, "ms/ggas")
 
 	for _, metric := range meterVMMetrics {
 		metricVal, err := getMetricValue(registry, metric)
 		r.NoError(err)
 
-		metricValMS := (metricVal / nsPerMs) / totalGGas
+		metricValMS := (metricVal / nanosecondsPerMillisecond) / totalGGas
 		tool.addResult(metricValMS, metric.name+"_ms/ggas")
 	}
 }
