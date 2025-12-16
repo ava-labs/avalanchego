@@ -26,10 +26,7 @@ import (
 	"github.com/ava-labs/libevm/triedb/database"
 )
 
-const (
-	// Directory where all Firewood state lives.
-	firewoodDir = "firewood"
-)
+const firewoodDir = "firewood"
 
 var (
 	_ proposable = (*ffi.Database)(nil)
