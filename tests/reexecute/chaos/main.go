@@ -92,7 +92,6 @@ func run(
 	endBlock uint64,
 ) {
 	r := require.New(tc)
-	ctx := tc.GetDefaultContextParent()
 	log := tc.Log()
 
 	cmd := createReexecutionCmd(blockDir, currentStateDir, startBlock, endBlock)
@@ -125,8 +124,15 @@ func run(
 
 		r.NoError(syscall.Kill(-pgid, syscall.SIGKILL))
 
-		waitErr := <-done
-		r.Error(waitErr)
+		waitCtx := tc.DefaultContext()
+
+		var waitErr error
+		select {
+		case err := <-done:
+			waitErr = err
+		case <-waitCtx.Done():
+			r.FailNow("timed out waiting for killed process to terminate")
+		}
 
 		exitErr, ok := waitErr.(*exec.ExitError)
 		r.True(ok)
@@ -144,6 +150,7 @@ func run(
 	db, err := openDB(vmDBDir, 10)
 	r.NoError(err)
 
+	ctx := tc.GetDefaultContextParent()
 	vm, err := newMainnetCChainVM(
 		ctx,
 		db,
