@@ -70,7 +70,6 @@ func init() {
 		_, thisFile, _, _ := runtime.Caller(0)
 		return filepath.Join(filepath.Dir(thisFile), "genesis/genesis.json")
 	}()
-
 }
 
 // Subnet provides the basic details of a created subnet
