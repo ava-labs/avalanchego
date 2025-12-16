@@ -87,6 +87,8 @@ require (
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
+require github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000 // indirect
+
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
@@ -209,3 +211,5 @@ tool (
 replace github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
 
 replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
+
+replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
