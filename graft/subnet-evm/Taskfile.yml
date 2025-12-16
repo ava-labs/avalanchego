@@ -100,7 +100,7 @@ tasks:
 
   lint:
     desc: Run golangci-lint and check for allowed Ethereum imports in Go code
-    cmd: ../evm-shared/scripts/lint.sh
+    cmd: ../evm/scripts/lint.sh
 
   lint-all:
     desc: Runs all lint checks in parallel
@@ -124,7 +124,7 @@ tasks:
   
   lint-fix:
     desc: Run golangci-lint with auto-fix where possible
-    cmd: ../evm-shared/scripts/lint_fix.sh
+    cmd: ../evm/scripts/lint_fix.sh
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management

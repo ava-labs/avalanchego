@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# lint.sh - Comprehensive linting script for modules using evm-shared
+# lint.sh - Comprehensive linting script for modules using evm
 #
 # Usage:
-#   This script must be run from the root of a module that uses evm-shared
+#   This script must be run from the root of a module that uses evm
 #   (e.g., coreth/ or subnet-evm/).
 #
 #   From the module root:
-#     ../evm-shared/scripts/lint.sh
+#     ../evm/scripts/lint.sh
 #     TESTS='license_header' ./scripts/lint.sh  # Run specific test only
 #
 # Requirements:
