@@ -32,10 +32,33 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
+TESTS=${TESTS:-"golangci_lint warn_testify_assert license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
   ./scripts/run_tool.sh golangci-lint run --config .golangci.yml
+}
+
+# Advisory check for testify/assert usage - warns but doesn't fail.
+# Only runs on CI PRs, checking new code only.
+# assert continues execution after failure, require fails fast.
+# Developers should consciously choose when assert is appropriate.
+#
+# To run locally: WARN_TESTIFY_ASSERT=1 TESTS='warn_testify_assert' ./scripts/lint.sh
+function test_warn_testify_assert {
+  local args=(
+    --config .golangci-warn-assert.yml
+    --issues-exit-code=0
+  )
+
+  if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+    # In a PR: only check new code compared to base branch
+    args+=(--new-from-rev="origin/${GITHUB_BASE_REF}")
+  elif [[ -z "${WARN_TESTIFY_ASSERT:-}" ]]; then
+    echo "Skipping (only runs on CI PRs or with WARN_TESTIFY_ASSERT=1)"
+    return 0
+  fi
+
+  ./scripts/run_tool.sh golangci-lint run "${args[@]}"
 }
 
 # automatically checks license headers

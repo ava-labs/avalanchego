@@ -7,6 +7,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -27,7 +28,7 @@ func TestOverriddenManager(t *testing.T) {
 
 	om := newOverriddenManager(subnetID0, m)
 	_, ok := om.GetValidator(subnetID0, nodeID0)
-	require.True(ok)
+	assert.True(t, ok)
 	_, ok = om.GetValidator(subnetID0, nodeID1)
 	require.False(ok)
 	_, ok = om.GetValidator(subnetID1, nodeID0)
