@@ -51,6 +51,7 @@ var (
 type proposable interface {
 	// Propose creates a new proposal from the current state with the given keys and values.
 	Propose(keys, values [][]byte) (*ffi.Proposal, error)
+	Dump() (string, error)
 }
 
 // ProposalContext represents a proposal in the Firewood database.
@@ -303,10 +304,7 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	// We need to lock the proposal tree to prevent concurrent writes.
 	t.proposalLock.Lock()
 	defer t.proposalLock.Unlock()
-	return t.commit(root, report)
-}
 
-func (t *TrieDB) commit(root common.Hash, report bool) error {
 	// Find the proposal with the given root.
 	var pCtx *ProposalContext
 	for _, possible := range t.proposalMap[root] {
@@ -619,39 +617,42 @@ func (t *TrieDB) DumpAll(statedb *state.StateDB, height uint64, parentHash, bloc
 	if err != nil {
 		return fmt.Errorf("firewood: error getting current root for dump: %w", err)
 	}
+
+	var parentP proposable
 	if common.Hash(root) != parentRoot {
 		log.Error("parent state not yet committed, dumping last committed state")
-		// Dump persisted state
-		if err := t.dumpState(height - 2); err != nil {
-			return fmt.Errorf("firewood: error dumping state db: %w", err)
+		if err := t.dumpState(t.fwDisk, height-2); err != nil {
+			log.Error("dumping height - 2", "error", err)
 		}
-		if err := t.commit(parentRoot, true); err != nil {
-			return fmt.Errorf("firewood: error committing parent root during dump: %w", err)
+		log.Info("firewood: dumping parent state", "height", height-1, "expectedRoot", parentRoot.Hex())
+		parents, _ := t.proposalMap[parentRoot]
+		if len(parents) != 1 {
+			return fmt.Errorf("firewood: %d proposals found for parent root %s during dump", len(parents), parentRoot.Hex())
 		}
-	}
-
-	// Dump parent state
-	if err := t.dumpState(height - 1); err != nil {
-		return fmt.Errorf("firewood: error dumping state db: %w", err)
-	}
-
-	// Commit current state
-	if err := t.commit(expectedRoot, true); err != nil {
-		return fmt.Errorf("firewood: error committing expected root during dump: %w", err)
+		log.Info("firewood: found proposal for parent root during dump", "height", height-1, "expectedRoot", parentRoot.Hex())
+		parentP = parents[0].Proposal
+		if err := t.dumpState(parentP, height-1); err != nil {
+			log.Error("dumping parent proposal", "error", err)
+		}
+	} else {
+		log.Info("firewood: dumping parent state from disk", "height", height-1, "expectedRoot", parentRoot.Hex())
+		if err := t.dumpState(t.fwDisk, height-1); err != nil {
+			log.Error("dumping parent from disk", "error", err)
+		}
+		parentP = t.fwDisk
 	}
 
 	// Dump current state
-	if err := t.dumpState(height); err != nil {
-		return fmt.Errorf("firewood: error dumping state db: %w", err)
+	if err := t.dumpState(parentP, height); err != nil {
+		log.Error("dumping current proposal", "error", err)
 	}
-	log.Error("firewood: dumped all state at height", "height", height, "expectedRoot", expectedRoot.Hex())
 	return nil
 }
 
 // dumpState writes all nodes in the given state database to Firewood.
 // File name is derived from height, in the folder specified in the database.
-func (t *TrieDB) dumpState(height uint64) error {
-	graph, err := t.fwDisk.Dump()
+func (t *TrieDB) dumpState(d proposable, height uint64) error {
+	graph, err := d.Dump()
 	if err != nil {
 		return fmt.Errorf("firewood: error dumping state at height %d: %w", height, err)
 	}
