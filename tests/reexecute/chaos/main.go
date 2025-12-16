@@ -171,7 +171,7 @@ func run(
 	r.NoError(cmd.Run())
 }
 
-// openDB attempts to open a LevelDB database with retry logic and exponential backoff.
+// openDB attempts to open a LevelDB database with retry logic and linear backoff.
 // This is necessary after killing a process that held the database open, as the OS may
 // need time to release file locks even after the process terminates.
 //
