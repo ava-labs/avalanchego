@@ -9,7 +9,6 @@ import (
 	"go/token"
 	"io/fs"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -33,12 +32,12 @@ import (
 // because it must not become a direct dependency of AvalancheGo or mix directly with coreth.
 //
 // graft/evm is the shared code that both coreth and subnet-evm will depend on, so it must not
-// import from either of them to maintain a one-way dependency direction.
+// import from either of them to avoid a circular dependency.
 //
 // both coreth and subnet-evm can be imported in the vms/evm/emulate package, because it
 // allows consumers to use both coreth and subnet-evm registration at the same time.
 //
-// TODO(jonathanoppenheimer): remove the graft functionality once the graft package will be removed.
+// TODO(jonathanoppenheimer): remove the graft functionality once the graft package is removed.
 func TestImportViolations(t *testing.T) {
 	const root = "../.."
 	repoRoot, err := filepath.Abs(root)
@@ -48,7 +47,7 @@ func TestImportViolations(t *testing.T) {
 	graftEVMDir := filepath.Join(graftDir, "evm")
 	graftSubnetEVMDir := filepath.Join(graftDir, "subnet-evm")
 	vmsEVMDir := filepath.Join(repoRoot, "vms", "evm")
-	emulateDir := filepath.Join(vmsEVMDir "emulate")
+	emulateDir := filepath.Join(vmsEVMDir, "emulate")
 
 	var violations []string
 
@@ -76,7 +75,6 @@ func TestImportViolations(t *testing.T) {
 			}
 			importPath := strings.Trim(spec.Path.Value, `"`)
 
-			inGraft := strings.HasPrefix(absFile, graftDir)
 			inGraftEVM := strings.HasPrefix(absFile, graftEVMDir)
 			inGraftSubnetEVM := strings.HasPrefix(absFile, graftSubnetEVMDir)
 			inEmulate := strings.HasPrefix(absFile, emulateDir)
@@ -84,12 +82,10 @@ func TestImportViolations(t *testing.T) {
 			importsCoreth := isImportIn(importPath, "github.com/ava-labs/avalanchego/graft/coreth")
 			importsSubnetEVM := isImportIn(importPath, "github.com/ava-labs/avalanchego/graft/subnet-evm")
 
-			hasViolation := []bool{
-				!inGraft && importsCoreth && inVMsEVM && !inEmulate,
-				!inGraftSubnetEVM && importsSubnetEVM && !inEmulate,
-				inGraftEVM && (importsCoreth || importsSubnetEVM),
-			}
-			if slices.Contains(hasViolation, true) {
+			hasViolation := (importsCoreth && inVMsEVM && !inEmulate || // vm/evm can't import coreth
+				importsSubnetEVM && !(inGraftSubnetEVM || inEmulate) || // vm/evm can't import subnet-evm
+				(importsCoreth || importsSubnetEVM) && inGraftEVM) // graft/evm can't import coreth or subnet-evm
+			if hasViolation {
 				violations = append(violations, fmt.Sprintf("File %q imports %q", file, importPath))
 			}
 		}
