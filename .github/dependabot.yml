@@ -8,7 +8,7 @@ updates:
   - package-ecosystem: "gomod" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
-      interval: "daily" 
+      interval: "daily"
     open-pull-requests-limit: 0 # Disable non-security version updates
   - package-ecosystem: "gomod" 
     directory: "/graft/coreth"
