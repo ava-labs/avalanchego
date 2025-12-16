@@ -22,9 +22,9 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.3
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251201173339-98b2978e465a
+	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca
+	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
 	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
-	github.com/ava-labs/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -86,6 +86,8 @@ require (
 	k8s.io/client-go v0.29.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
+
+require github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000 // indirect
 
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
@@ -207,3 +209,7 @@ tool (
 )
 
 replace github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
+
+replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
+
+replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm

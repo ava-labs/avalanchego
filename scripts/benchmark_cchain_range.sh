@@ -19,17 +19,15 @@ set -euo pipefail
 : "${START_BLOCK:?START_BLOCK must be set}"
 : "${END_BLOCK:?END_BLOCK must be set}"
 
-cmd="go run github.com/ava-labs/avalanchego/tests/reexecute/c \
-  --benchmark-output-file=\"${BENCHMARK_OUTPUT_FILE}\" \
-  --block-dir=\"${BLOCK_DIR}\" \
-  --current-state-dir=\"${CURRENT_STATE_DIR}\" \
-  ${RUNNER_NAME:+--runner=\"${RUNNER_NAME}\"} \
-  ${CONFIG:+--config=\"${CONFIG}\"} \
-  --start-block=\"${START_BLOCK}\" \
-  --end-block=\"${END_BLOCK}\" \
-  ${LABELS:+--labels=\"${LABELS}\"} \
-  ${METRICS_SERVER_ENABLED:+--metrics-server-enabled=\"${METRICS_SERVER_ENABLED}\"} \
-  ${METRICS_SERVER_PORT:+--metrics-server-port=\"${METRICS_SERVER_PORT}\"} \
-  ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled=\"${METRICS_COLLECTOR_ENABLED}\"}"
-
-eval "$cmd"
+go run github.com/ava-labs/avalanchego/tests/reexecute/c \
+  --block-dir="${BLOCK_DIR}" \
+  --current-state-dir="${CURRENT_STATE_DIR}" \
+  ${RUNNER_NAME:+--runner="${RUNNER_NAME}"} \
+  ${CONFIG:+--config="${CONFIG}"} \
+  --start-block="${START_BLOCK}" \
+  --end-block="${END_BLOCK}" \
+  ${LABELS:+--labels="${LABELS}"} \
+  ${BENCHMARK_OUTPUT_FILE:+--benchmark-output-file="${BENCHMARK_OUTPUT_FILE}"} \
+  ${METRICS_SERVER_ENABLED:+--metrics-server-enabled="${METRICS_SERVER_ENABLED}"} \
+  ${METRICS_SERVER_PORT:+--metrics-server-port="${METRICS_SERVER_PORT}"} \
+  ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled="${METRICS_COLLECTOR_ENABLED}"}
