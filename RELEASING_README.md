@@ -409,4 +409,45 @@ export NEXT_VERSION=v1.14.2
    gh pr merge "prep-$NEXT_VERSION-release" --squash --subject "chore: prep next release $NEXT_VERSION"
    ```
 
-1. Pat yourself on the back for a job well done 
+1. Pat yourself on the back for a job well done
+
+## Version Files Reference
+
+| Component | Version File | Other Files | Notes |
+|-----------|-------------|-------------|-------|
+| AvalancheGo | [`version/constants.go`](version/constants.go) | [`RELEASES.md`](RELEASES.md), [`version/compatibility.json`](version/compatibility.json) | Primary version |
+| Coreth | [`graft/coreth/plugin/evm/version.go`](graft/coreth/plugin/evm/version.go) | [`graft/coreth/RELEASES.md`](graft/coreth/RELEASES.md) | Informational only (no separate release) |
+| Subnet-EVM | [`graft/subnet-evm/plugin/evm/version.go`](graft/subnet-evm/plugin/evm/version.go) | [`graft/subnet-evm/RELEASES.md`](graft/subnet-evm/RELEASES.md), [`graft/subnet-evm/compatibility.json`](graft/subnet-evm/compatibility.json) | Aligned with AvalancheGo |
+
+## RPC Chain VM Protocol Version
+
+When the protocol version changes:
+
+1. Update [`version/constants.go`](version/constants.go):
+
+   ```go
+   RPCChainVMProtocol uint = 45
+   ```
+
+2. Update [`version/compatibility.json`](version/compatibility.json):
+
+   ```json
+   "45": ["v1.14.1"]
+   ```
+
+3. Update [`graft/subnet-evm/compatibility.json`](graft/subnet-evm/compatibility.json):
+
+   ```json
+   "v1.14.1": 45,
+   ```
+
+To verify compatibility:
+
+```bash
+go test -run ^TestCompatibility$ github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm
+```
+
+## Historical Notes
+
+- Prior to v1.14.0, Subnet-EVM had independent versioning (v0.8.x and earlier)
+- Coreth has its own version string (v0.x.x) but is compiled into AvalancheGo with no separate release artifact
