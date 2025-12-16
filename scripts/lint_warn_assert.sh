@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 #
 # lint_warn_assert.sh - Shared helper for testify/assert advisory warnings
 #
