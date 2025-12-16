@@ -26,12 +26,7 @@ import (
 	"github.com/ava-labs/libevm/triedb/database"
 )
 
-const (
-	// Directory where all Firewood state lives.
-	firewoodDir          = "firewood"
-	firewoodFileName     = "firewood.db"
-	firewoodRootStoreDir = "root_store"
-)
+const firewoodDir = "firewood"
 
 var (
 	_ proposable = (*ffi.Database)(nil)
@@ -108,24 +103,22 @@ type TrieDB struct {
 // New creates a new Firewood database with the given disk database and configuration.
 // Any error during creation will cause the program to exit.
 func New(config Config) (*TrieDB, error) {
-	firewoodDir := filepath.Join(config.ChainDataDir, firewoodDir)
-	filePath := filepath.Join(firewoodDir, firewoodFileName)
-	if err := validatePath(filePath); err != nil {
+	path := filepath.Join(config.ChainDataDir, firewoodDir)
+	if err := validatePath(path); err != nil {
 		return nil, err
 	}
 
-	var rootStoreDir string
+	options := []ffi.Option{
+		ffi.WithNodeCacheEntries(uint(config.CleanCacheSize / 256)), // TODO(#4750): is 256 bytes per node a good estimate?
+		ffi.WithFreeListCacheEntries(config.FreeListCacheEntries),
+		ffi.WithRevisions(config.Revisions),
+		ffi.WithReadCacheStrategy(config.ReadCacheStrategy),
+	}
 	if config.ArchiveMode {
-		rootStoreDir = filepath.Join(firewoodDir, firewoodRootStoreDir)
+		options = append(options, ffi.WithRootStore())
 	}
 
-	fw, err := ffi.New(filePath, &ffi.Config{
-		NodeCacheEntries:     uint(config.CleanCacheSize) / 256, // TODO: estimate 256 bytes per node
-		FreeListCacheEntries: config.FreeListCacheEntries,
-		Revisions:            config.Revisions,
-		ReadCacheStrategy:    config.ReadCacheStrategy,
-		RootStoreDir:         rootStoreDir,
-	})
+	fw, err := ffi.New(path, options...)
 	if err != nil {
 		return nil, err
 	}
