@@ -77,8 +77,8 @@ function test_warn_testify_assert {
       file=$(echo "$line" | cut -d: -f1)
       line_num=$(echo "$line" | cut -d: -f2)
       col=$(echo "$line" | cut -d: -f3)
-      # Clean up forbidigo's "forbidden because" phrasing
-      msg=$(echo "$line" | cut -d: -f4- | sed 's/^ *//' | sed 's/forbidden because/- note:/')
+      # Clean up forbidigo's phrasing to be advisory rather than prohibitive
+      msg=$(echo "$line" | cut -d: -f4- | sed 's/^ *//' | sed 's/^use of //' | sed 's/ forbidden because "/ /' | sed 's/" (forbidigo)/ (forbidigo)/')
       echo "::warning file=${file},line=${line_num},col=${col}::${msg}"
     done
   fi

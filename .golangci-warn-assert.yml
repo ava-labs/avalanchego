@@ -9,7 +9,7 @@ linters:
   settings:
     forbidigo:
       forbid:
-        - pattern: ^assert\.(# assert continues after failure; require fails fast - is assert intentional here?)?
+        - pattern: ^assert\.(# will fail the test but allow execution to continue; use testify/require if fail-fast behavior is needed)?
   exclusions:
     rules:
       # Exclude antithesis tests which use a different assert package
