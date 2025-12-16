@@ -14,19 +14,19 @@ var _ state.Database = (*firewoodState)(nil)
 
 type firewoodState struct {
 	state.Database
-	fw *TrieDB
+	triedb *TrieDB
 }
 
 func NewStateWrapper(db state.Database, fw *TrieDB) state.Database {
 	return &firewoodState{
 		Database: db,
-		fw:       fw,
+		triedb:   fw,
 	}
 }
 
 // OpenTrie opens the main account trie.
-func (db *firewoodState) OpenTrie(root common.Hash) (state.Trie, error) {
-	return newAccountTrie(root, db.fw)
+func (f *firewoodState) OpenTrie(root common.Hash) (state.Trie, error) {
+	return newAccountTrie(root, f.triedb)
 }
 
 // OpenStorageTrie opens a wrapped version of the account trie.
