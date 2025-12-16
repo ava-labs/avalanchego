@@ -41,9 +41,8 @@ function test_warn_testify_assert {
     return 0
   fi
 
-  echo "$output"
-
-  # In GitHub Actions, also emit ::warning annotations
+  # In GitHub Actions, emit ::warning annotations (not raw output which shows confusing "Error:" lines)
+  # For local runs, show the raw output
   if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
     echo "$output" | grep -E '^[^:]+:[0-9]+:[0-9]+:' | while IFS= read -r line; do
       # Parse "file:line:col: message"
@@ -55,5 +54,7 @@ function test_warn_testify_assert {
       msg=$(echo "$line" | cut -d: -f4- | sed 's/^ *//' | sed 's/^use of //' | sed 's/ forbidden because "/ /' | sed 's/" (forbidigo)/ (forbidigo)/')
       echo "::warning file=${file},line=${line_num},col=${col}::${msg}"
     done || true  # grep returns 1 when no matches, which is fine
+  else
+    echo "$output"
   fi
 }
