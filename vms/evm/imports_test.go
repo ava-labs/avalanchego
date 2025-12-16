@@ -15,6 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	CORETH_IMPORT     = "github.com/ava-labs/avalanchego/graft/coreth"
+	SUBNET_EVM_IMPORT = "github.com/ava-labs/avalanchego/graft/subnet-evm"
+)
+
 // TestImportViolations ensures proper import rules:
 // - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)
 // - graft/subnet-evm can only be imported within graft/subnet-evm itself and vms/evm/emulate
@@ -79,8 +84,8 @@ func TestImportViolations(t *testing.T) {
 			inGraftSubnetEVM := strings.HasPrefix(absFile, graftSubnetEVMDir)
 			inEmulate := strings.HasPrefix(absFile, emulateDir)
 			inVMsEVM := strings.HasPrefix(absFile, vmsEVMDir)
-			importsCoreth := isImportIn(importPath, "github.com/ava-labs/avalanchego/graft/coreth")
-			importsSubnetEVM := isImportIn(importPath, "github.com/ava-labs/avalanchego/graft/subnet-evm")
+			importsCoreth := isImportIn(importPath, CORETH_IMPORT)
+			importsSubnetEVM := isImportIn(importPath, SUBNET_EVM_IMPORT)
 
 			hasViolation := (importsCoreth && inVMsEVM && !inEmulate || // vm/evm can't import coreth
 				importsSubnetEVM && !(inGraftSubnetEVM || inEmulate) || // vm/evm can't import subnet-evm
