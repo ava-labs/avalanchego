@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	CORETH_IMPORT     = "github.com/ava-labs/avalanchego/graft/coreth"
-	SUBNET_EVM_IMPORT = "github.com/ava-labs/avalanchego/graft/subnet-evm"
+	corethImport    = "github.com/ava-labs/avalanchego/graft/coreth"
+	subnetEVMImport = "github.com/ava-labs/avalanchego/graft/subnet-evm"
 )
 
 // TestImportViolations ensures proper import rules:
@@ -74,21 +74,22 @@ func TestImportViolations(t *testing.T) {
 			return fmt.Errorf("parser.ParseFile(..., %q, ...): %w", file, err)
 		}
 
+		inGraftEVM := strings.HasPrefix(absFile, graftEVMDir)
+		inGraftSubnetEVM := strings.HasPrefix(absFile, graftSubnetEVMDir)
+		inEmulate := strings.HasPrefix(absFile, emulateDir)
+		inVMsEVM := strings.HasPrefix(absFile, vmsEVMDir)
+
 		for _, spec := range node.Imports {
 			if spec.Path == nil {
 				continue
 			}
 			importPath := strings.Trim(spec.Path.Value, `"`)
 
-			inGraftEVM := strings.HasPrefix(absFile, graftEVMDir)
-			inGraftSubnetEVM := strings.HasPrefix(absFile, graftSubnetEVMDir)
-			inEmulate := strings.HasPrefix(absFile, emulateDir)
-			inVMsEVM := strings.HasPrefix(absFile, vmsEVMDir)
-			importsCoreth := isImportIn(importPath, CORETH_IMPORT)
-			importsSubnetEVM := isImportIn(importPath, SUBNET_EVM_IMPORT)
+			importsCoreth := isImportIn(importPath, corethImport)
+			importsSubnetEVM := isImportIn(importPath, subnetEVMImport)
 
 			hasViolation := (importsCoreth && inVMsEVM && !inEmulate || // vm/evm can't import coreth
-				importsSubnetEVM && !(inGraftSubnetEVM || inEmulate) || // vm/evm can't import subnet-evm
+				importsSubnetEVM && !inGraftSubnetEVM && !inEmulate || // vm/evm can't import subnet-evm
 				(importsCoreth || importsSubnetEVM) && inGraftEVM) // graft/evm can't import coreth or subnet-evm
 			if hasViolation {
 				violations = append(violations, fmt.Sprintf("File %q imports %q", file, importPath))
