@@ -380,68 +380,33 @@ These are triggered daily for testing:
 - `trigger-antithesis-xsvm.yml` - 6AM UTC
 - `trigger-antithesis-subnet-evm.yml` - 2PM UTC
 
-### Post-release
+### 10. Post-Release Version Bump
 
-After you have successfully released a new subnet-evm version, you need to bump all of the versions again in preperation for the next release. Note that the release here is not final, and will be reassessed, and possibly changer prior to release. Some releases require a major version update, but this will usually be `$VERSION` + `0.0.1`. For example:
+Prepare for the next release:
 
 ```bash
-export P_VERSION=v0.7.4
+export NEXT_VERSION=v1.14.2
 ```
 
-1. Create a branch, from the tip of the `master` branch after the release PR has been merged:
+1. Create branch:
 
-    ```bash
-    git fetch origin master
-    git checkout master
-    git checkout -b "prep-$P_VERSION-release"
-    ```
+   ```bash
+   git fetch origin master
+   git checkout master
+   git checkout -b "prep-$NEXT_VERSION-release"
+   ```
 
-1. Bump the version number to the next pending release version, `$P_VERSION`
-    - Update the [RELEASES.md](../../RELEASES.md) file with `$P_VERSION`, creating a space for maintainers to place their changes as they make them.
-    - Modify the [plugin/evm/version.go](../../plugin/evm/version.go) `Version` global string variable and set it to `$P_VERSION`.
-    - Add an entry in the object in [compatibility.json](../../compatibility.json), adding the next pending release versionas key and the AvalancheGo RPC chain VM protocol version as value, to the `"rpcChainVMProtocolVersion"` JSON object. For example, we would add:
+1. Update all version files (as in step 3) to the next version.
 
-    ```json
-    "v0.7.4": 39,
-    ```
+1. Create PR and merge:
 
-    💁 If you are unsure about the RPC chain VM protocol version, set the version to `0`, for example `"v0.7.4": 0`, and then run:
+   ```bash
+   git add .
+   git commit -S -m "chore: prep release $NEXT_VERSION"
+   git push -u origin "prep-$NEXT_VERSION-release"
+   gh pr create --repo github.com/ava-labs/avalanchego --base master --title "chore: prep next release $NEXT_VERSION"
+   gh pr checks --watch
+   gh pr merge "prep-$NEXT_VERSION-release" --squash --subject "chore: prep next release $NEXT_VERSION"
+   ```
 
-    ```bash
-    go test -run ^TestCompatibility$ github.com/ava-labs/subnet-evm/plugin/evm
-    ```
-
-    This will fail with an error similar to:
-
-    ```text
-    compatibility.json has subnet-evm version v0.7.4 stated as compatible with RPC chain VM protocol version 0 but AvalancheGo protocol version is 39
-    ```
-
-    This message can help you figure out what the correct RPC chain VM protocol version (here `39`) has to be in compatibility.json for your current release. Alternatively, you can refer to the [Avalanchego repository `version/compatibility.json` file](https://github.com/ava-labs/avalanchego/blob/master/version/compatibility.json) to find the RPC chain VM protocol version matching the AvalancheGo version we use here.
-1. Commit your changes and push the branch
-
-    ```bash
-    git add .
-    git commit -S -m "chore: prep release $P_VERSION"
-    git push -u origin "prep-$P_VERSION-release"
-    ```
-
-1. Create a pull request (PR) from your branch targeting master, for example using [`gh`](https://cli.github.com/):
-
-    ```bash
-    gh pr create --repo github.com/ava-labs/subnet-evm --base master --title "chore: prep next release $P_VERSION"
-    ```
-
-1. Wait for the PR checks to pass with
-
-    ```bash
-    gh pr checks --watch
-    ```
-
-1. Squash and merge your branch into `master`, for example:
-
-    ```bash
-    gh pr merge "prep-$P_VERSION-release" --squash --subject "chore: prep next release $P_VERSION"
-    ```
-
-1. Pat yourself on the back for a job well done.
+1. Pat yourself on the back for a job well done 
