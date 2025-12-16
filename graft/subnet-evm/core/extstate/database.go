@@ -26,5 +26,5 @@ func wrapIfFirewood(db state.Database) state.Database {
 	if !ok {
 		return db
 	}
-	return firewood.NewStateWrapper(db, fw)
+	return firewood.NewStateAccessor(db, fw)
 }

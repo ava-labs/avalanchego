@@ -10,29 +10,29 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 )
 
-var _ state.Database = (*firewoodState)(nil)
+var _ state.Database = (*stateAccessor)(nil)
 
-type firewoodState struct {
+type stateAccessor struct {
 	state.Database
 	triedb *TrieDB
 }
 
-func NewStateWrapper(db state.Database, fw *TrieDB) state.Database {
-	return &firewoodState{
+func NewStateAccessor(db state.Database, fw *TrieDB) state.Database {
+	return &stateAccessor{
 		Database: db,
 		triedb:   fw,
 	}
 }
 
 // OpenTrie opens the main account trie.
-func (f *firewoodState) OpenTrie(root common.Hash) (state.Trie, error) {
-	return newAccountTrie(root, f.triedb)
+func (s *stateAccessor) OpenTrie(root common.Hash) (state.Trie, error) {
+	return newAccountTrie(root, s.triedb)
 }
 
 // OpenStorageTrie opens a wrapped version of the account trie.
 //
 //nolint:revive // removing names loses context.
-func (*firewoodState) OpenStorageTrie(stateRoot common.Hash, addr common.Address, accountRoot common.Hash, self state.Trie) (state.Trie, error) {
+func (*stateAccessor) OpenStorageTrie(stateRoot common.Hash, addr common.Address, accountRoot common.Hash, self state.Trie) (state.Trie, error) {
 	accountTrie, ok := self.(*accountTrie)
 	if !ok {
 		return nil, fmt.Errorf("invalid account trie type: %T", self)
@@ -42,7 +42,7 @@ func (*firewoodState) OpenStorageTrie(stateRoot common.Hash, addr common.Address
 
 // CopyTrie returns a deep copy of the given trie.
 // It can be altered by the caller.
-func (*firewoodState) CopyTrie(t state.Trie) state.Trie {
+func (*stateAccessor) CopyTrie(t state.Trie) state.Trie {
 	switch t := t.(type) {
 	case *accountTrie:
 		return t.Copy()
