@@ -304,7 +304,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		config.TxGossipRequestsPerPeer,
 		vm.InnerVM.P2PValidators(),
 		vm.MetricRegistry(),
-		"atomic_tx_gossip",
+		atomicTxGossipNamespace,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize atomic tx gossip handler: %w", err)
@@ -363,7 +363,13 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	if err != nil {
 		return nil, err
 	}
-	avaxAPI, err := rpc.NewHandler("avax", &AvaxAPI{vm})
+	avaxAPI, err := rpc.NewHandler("avax", &AvaxAPI{
+		bc:           vm.InnerVM.Ethereum().BlockChain(),
+		Context:      vm.Ctx,
+		Mempool:      vm.AtomicMempool,
+		PushGossiper: vm.AtomicTxPushGossiper,
+		AcceptedTxs:  vm.AtomicTxRepository,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
 	}
@@ -763,25 +769,4 @@ func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
 func (vm *VM) CurrentRules() extras.Rules {
 	header := vm.InnerVM.Ethereum().BlockChain().CurrentHeader()
 	return vm.rules(header.Number, header.Time)
-}
-
-// TODO: these should be unexported after test refactor is done
-
-// getAtomicTx returns the requested transaction, status, and height.
-// If the status is Unknown, then the returned transaction will be nil.
-func (vm *VM) GetAtomicTx(txID ids.ID) (*atomic.Tx, atomic.Status, uint64, error) {
-	if tx, height, err := vm.AtomicTxRepository.GetByTxID(txID); err == nil {
-		return tx, atomic.Accepted, height, nil
-	} else if err != avalanchedatabase.ErrNotFound {
-		return nil, atomic.Unknown, 0, err
-	}
-	tx, dropped, found := vm.AtomicMempool.GetTx(txID)
-	switch {
-	case found && dropped:
-		return tx, atomic.Dropped, 0, nil
-	case found:
-		return tx, atomic.Processing, 0, nil
-	default:
-		return nil, atomic.Unknown, 0, nil
-	}
 }
