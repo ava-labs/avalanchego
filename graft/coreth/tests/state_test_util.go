@@ -45,9 +45,6 @@ import (
 	"github.com/holiman/uint256"
 )
 
-// TODO(JonathanOppenheimer): this can all fairly easily be libevm-ified, allowing us to
-// delete this file and replace it with the libevm-ified version via import.
-
 // StateTestState groups all the state database objects together for use in tests.
 type StateTestState struct {
 	StateDB   *state.StateDB

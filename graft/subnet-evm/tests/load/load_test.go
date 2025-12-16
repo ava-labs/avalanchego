@@ -33,15 +33,16 @@ const (
 
 var (
 	flagVars *e2e.FlagVars
-	testDir  = func() string {
-		_, thisFile, _, _ := runtime.Caller(0)
-		return filepath.Dir(thisFile)
-	}()
+	testDir  string
 )
 
 func init() {
 	// Configures flags used to configure tmpnet
 	flagVars = e2e.RegisterFlags()
+	testDir = func() string {
+		_, thisFile, _, _ := runtime.Caller(0)
+		return filepath.Dir(thisFile)
+	}()
 }
 
 func TestE2E(t *testing.T) {

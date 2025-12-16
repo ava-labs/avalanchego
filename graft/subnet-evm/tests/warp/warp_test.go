@@ -55,12 +55,8 @@ const (
 )
 
 var (
-	flagVars *e2e.FlagVars
-
-	genesisPath = func() string {
-		_, thisFile, _, _ := runtime.Caller(0)
-		return filepath.Join(filepath.Dir(thisFile), "genesis/genesis.json")
-	}()
+	flagVars    *e2e.FlagVars
+	genesisPath string
 
 	subnetA, subnetB, cChainSubnetDetails *Subnet
 
@@ -70,6 +66,11 @@ var (
 func init() {
 	// Configures flags used to configure tmpnet (via SynchronizedBeforeSuite)
 	flagVars = e2e.RegisterFlags()
+	genesisPath = func() string {
+		_, thisFile, _, _ := runtime.Caller(0)
+		return filepath.Join(filepath.Dir(thisFile), "genesis/genesis.json")
+	}()
+
 }
 
 // Subnet provides the basic details of a created subnet
