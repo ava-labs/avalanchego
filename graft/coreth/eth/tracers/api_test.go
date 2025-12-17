@@ -1001,11 +1001,11 @@ func newAccounts(n int) (accounts []Account) {
 }
 
 // WARNING: only use for tests that require deterministic accounts
-func UNSAFEDeterministicAccounts(t *testing.T, n int) []Account {
-	seed := make([]byte, 8) // int64 size
+func UNSAFEDeterministicAccounts(t *testing.T, n uint64) []Account {
+	seed := make([]byte, 8) // uint64 size
 	accounts := make([]Account, 0, n)
 	for i := range n {
-		binary.BigEndian.PutUint64(seed, uint64(i))
+		binary.BigEndian.PutUint64(seed, i)
 		key := ethtest.UNSAFEDeterministicPrivateKey(t, seed)
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 		accounts = append(accounts, Account{key: key, addr: addr})
