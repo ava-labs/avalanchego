@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/reexecute"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -152,7 +153,7 @@ func run(
 	r.NoError(err)
 
 	ctx := tc.GetDefaultContextParent()
-	vm, err := newMainnetCChainVM(
+	vm, err := reexecute.NewMainnetCChainVM(
 		ctx,
 		db,
 		chainDataDir,
