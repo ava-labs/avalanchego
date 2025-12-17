@@ -630,7 +630,7 @@ func TestTracingWithOverrides(t *testing.T) {
 
 func testTracingWithOverrides(t *testing.T, scheme string) {
 	// Initialize test accounts
-	// This test requires deterministic block hashes, since it will fail 1/256 times,Expand commentComment on line R635ResolvedCode has comments. Press enter to view.
+	// This test requires deterministic block hashes, since it will fail 1/256 times,
 	// when the final block hash starts with 0xef.
 	accounts := UNSAFEDeterministicAccounts(t, 3)
 	storageAccount := common.Address{0x13, 37}
@@ -999,15 +999,15 @@ func newAccounts(n int) (accounts []Account) {
 }
 
 // WARNING: only use for tests that require deterministic accounts
-func UNSAFEDeterministicAccounts(t *testing.T, n int) (accounts []Account) {
+func UNSAFEDeterministicAccounts(t *testing.T, n int) []Account {
 	seed := make([]byte, 8) // int64 size
-	for i := 0; i < n; i++ {
+	accounts := make([]Account, 0, n)
+	for i := range n {
 		binary.BigEndian.PutUint64(seed, uint64(i))
 		key := ethtest.UNSAFEDeterministicPrivateKey(t, seed)
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 		accounts = append(accounts, Account{key: key, addr: addr})
 	}
-	slices.SortFunc(accounts, func(a, b Account) int { return a.addr.Cmp(b.addr) })
 	return accounts
 }
 
