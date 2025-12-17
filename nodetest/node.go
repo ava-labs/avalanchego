@@ -4,7 +4,6 @@
 package nodetest
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -17,15 +16,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/node"
+	avalanchenode "github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -33,6 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 
 	nodeconfig "github.com/ava-labs/avalanchego/config/node"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"context"
 )
 
 func init() {
@@ -42,15 +41,17 @@ func init() {
 func setFlagDefaults(v *viper.Viper, dir string) {
 	// TODO this can conflict with other local networks
 	v.Set("network-id", "testing")
+	v.Set("public-ip", "127.0.0.1")
+
+	// Choose arbitrary unassigned ports
 	v.Set("http-port", "0")
 	v.Set("staking-port", "0")
+
 	v.Set("data-dir", dir)
-	// TODO register nodes as validators
 	v.Set("sybil-protection-enabled", "false")
 	v.Set("log-level", "debug")
 	v.Set("log-display-level", "off")
 	v.Set("log-disable-display-plugin-logs", true)
-	v.Set("sybil-protection-enabled", false)
 }
 
 func newConfig(t *testing.T, v *viper.Viper) nodeconfig.Config {
@@ -62,18 +63,20 @@ func newConfig(t *testing.T, v *viper.Viper) nodeconfig.Config {
 	return cfg
 }
 
-type Config struct {
+type nodeConfig struct {
 	BootstrapperIPs []netip.AddrPort
 	BootstrapperIDs   []ids.NodeID
 	GenesisFundedKeys []*secp256k1.PrivateKey
 }
 
 type Node struct {
-	n *node.Node
+	t *testing.T
+
+	n   *avalanchenode.Node
+	dir string
 }
 
-// TODO shutdown
-func Start(ctx context.Context, t *testing.T, cfg Config) *Node {
+func newNode(t *testing.T, cfg nodeConfig) *Node {
 	fs := config.BuildFlagSet()
 
 	// TODO this should not respect env vars
@@ -83,26 +86,10 @@ func Start(ctx context.Context, t *testing.T, cfg Config) *Node {
 	dir, err := os.MkdirTemp("", "nodetest-*")
 	require.NoError(t, err)
 
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Logf("dir for debugging: %s", dir)
-			return
-		}
-
-		_ = os.RemoveAll(dir)
-	})
-
 	setFlagDefaults(v, dir)
-
-	// TODO default prefunded keys
-	if len(cfg.GenesisFundedKeys) > 0 {
-	}
 
 	g := genesis.LocalConfig
 	g.NetworkID = constants.UnitTestID
-	// g.Allocations = []genesis.Allocation{}
-	// g.InitialStakedFunds = []ids.ShortID{}
-	// g.InitialStakers = []genesis.Staker{}
 
 	for _, k := range cfg.GenesisFundedKeys {
 		g.Allocations = append(g.Allocations, genesis.Allocation{
@@ -115,9 +102,6 @@ func Start(ctx context.Context, t *testing.T, cfg Config) *Node {
 				},
 			},
 		})
-
-		// g.InitialStakedFunds = append(g.InitialStakedFunds, k.Address())
-		// g.InitialStakers = []genesis.Staker{}
 	}
 
 	require.NoError(t, err)
@@ -141,19 +125,23 @@ func Start(ctx context.Context, t *testing.T, cfg Config) *Node {
 	log, err := logFactory.Make("main")
 	require.NoError(t, err)
 
-	inner, err := node.New(&nodeConfig, logFactory, log)
+	n, err := avalanchenode.New(&nodeConfig, logFactory, log)
 	require.NoError(t, err)
 
-	eg, _ := errgroup.WithContext(ctx)
+	t.Cleanup(func() {
+		if t.Failed() {
+			// Do not delete node directories if the test fails for easier debugging
+			return
+		}
 
-	eg.Go(func() error {
-		return inner.Dispatch()
+		_ = os.RemoveAll(dir)
 	})
 
-	n := &Node{n: inner}
-	t.Logf("initialized node %s {http: %s, dir: %s}", n.ID(), n.HTTPAddress(), dir)
-
-	return n
+	return &Node{
+		t:   t,
+		n:   n,
+		dir: dir,
+	}
 }
 
 func stringify[T fmt.Stringer](ts ...T) []string {
@@ -164,6 +152,28 @@ func stringify[T fmt.Stringer](ts ...T) []string {
 	}
 
 	return s
+}
+
+// Run returns after the node hits an error or the provided context is canceled.
+func (n *Node) Run(ctx context.Context) error {
+	n.t.Log("starting node:", n.ID(), n.HTTPAddress(), n.dir)
+
+	done := make(chan error)
+	go func() {
+		done <- n.n.Dispatch()
+	}()
+
+	select {
+	case <-ctx.Done():
+		n.n.Shutdown(0)
+		return nil
+	case err := <-done:
+		if err != nil {
+			n.t.Log("error during node shutdown", n.ID(), err)
+		}
+
+		return err
+	}
 }
 
 func (n *Node) StakingAddress() netip.AddrPort {
@@ -178,29 +188,33 @@ func (n *Node) ID() ids.NodeID {
 	return n.n.ID
 }
 
-// TDOO cleanup
+// TODO avoid rpc call?
 func newHealthClient(n *Node) *health.Client {
 	return health.NewClient(fmt.Sprintf("http://%s", n.HTTPAddress()))
 }
 
-func awaitReady(t *testing.T, n *Node) {
+func awaitReady(t *testing.T, n *Node, tags ...string) {
 	hc := newHealthClient(n)
 
-	_, err := health.AwaitReady(t.Context(), hc, 50*time.Millisecond, []string{})
+	_, err := health.AwaitReady(t.Context(), hc, time.Second, tags)
 	require.NoError(t, err)
 }
 
-func awaitHealthy(t *testing.T, n *Node) {
+func awaitHealthy(t *testing.T, n *Node, tags ...string) {
 	hc := newHealthClient(n)
 
-	_, err := health.AwaitHealthy(t.Context(), hc, 50*time.Millisecond,
-		[]string{})
+	_, err := health.AwaitHealthy(t.Context(), hc, time.Second, tags)
 	require.NoError(t, err)
 }
 
 type Block struct {
 	Bytes  []byte
 	Height uint64
+}
+
+type Validator[T block.ChainVM] struct {
+	*Node
+	VM T
 }
 
 func Accept(
@@ -232,33 +246,37 @@ func Accept(
 
 	n.n.Handle(t.Context(), inMsg)
 }
-func AwaitAcceptance(
+
+func AwaitAcceptance[T block.ChainVM](
 	t *testing.T,
-	n *Node,
-	chainID ids.ID,
+	n *Validator[T],
 	blkID ids.ID,
 	height uint64,
 ) {
-	mc, err := message.NewCreator(
-		prometheus.NewRegistry(),
-		compression.TypeNone,
-		time.Minute,
-	)
-	require.NoError(t, err)
+	await(func() bool {
+		tip, err := n.VM.LastAccepted(t.Context())
+		require.NoError(t, err)
 
-	outMsg, err := mc.PushQuery(
-		chainID,
-		0,
-		time.Hour,
-		b.Bytes,
-		b.Height-1,
-	)
-	require.NoError(t, err)
+		if tip == blkID {
+			gotTip, err := n.VM.GetBlockIDAtHeight(t.Context(), height)
+			require.NoError(t, err)
 
-	outMsg.Bytes()
+			require.Equal(t, tip, gotTip)
+			return true
+		}
 
-	inMsg, err := mc.Parse(outMsg.Bytes(), ids.GenerateTestNodeID(), func() {})
-	require.NoError(t, err)
-
-	n.n.Handle(t.Context(), inMsg)
+		return false
+	})
 }
+
+func await(doneF func() bool) {
+	for {
+		if doneF() {
+			return
+		}
+
+		time.Sleep(time.Second)
+	}
+}
+
+// func p2p helpers for apprequest and appgossip
