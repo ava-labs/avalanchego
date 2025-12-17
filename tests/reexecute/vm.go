@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -103,7 +104,7 @@ func NewMainnetCChainVM(
 			},
 			ChainDataDir: chainDataDir,
 		},
-		prefixdb.New([]byte("vm"), vmAndSharedMemoryDB),
+		prefixdb.New(chains.VMDBPrefix, vmAndSharedMemoryDB),
 		[]byte(genesisConfig.CChainGenesis),
 		nil,
 		configBytes,

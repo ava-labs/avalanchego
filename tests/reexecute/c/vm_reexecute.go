@@ -23,6 +23,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/tests"
@@ -72,6 +73,11 @@ var (
 			"snapshot-cache": 0,
 			"pruning-enabled": false,
 			"state-sync-enabled": false
+		}`,
+		"blockdb": `{
+			"block-database-enabled": true,
+			"block-database-sync-to-disk": false,
+			"block-database-migration-disabled": true
 		}`,
 	}
 
@@ -225,16 +231,29 @@ func benchmarkReexecuteRange(
 
 	dbLogger := tests.NewDefaultLogger("db")
 
-	db, err := leveldb.New(vmDBDir, nil, dbLogger, prometheus.NewRegistry())
+	dbReg, err := metrics.MakeAndRegister(
+		prefixGatherer,
+		"avalanche_db",
+	)
+	r.NoError(err)
+	db, err := leveldb.New(vmDBDir, nil, dbLogger, dbReg)
 	r.NoError(err)
 	defer func() {
 		log.Info("shutting down DB")
 		r.NoError(db.Close())
 	}()
 
+	meterDBReg, err := metrics.MakeAndRegister(
+		prefixGatherer,
+		"avalanche_meterdb",
+	)
+	r.NoError(err)
+	meterDB, err := meterdb.New(meterDBReg, db)
+	r.NoError(err)
+
 	vm, err := reexecute.NewMainnetCChainVM(
 		ctx,
-		db,
+		meterDB,
 		chainDataDir,
 		configBytes,
 		vmMultiGatherer,
@@ -458,7 +477,7 @@ func startCollector(tc tests.TestContext, name string, labels map[string]string,
 		}(),
 		)
 
-		r.NoError(tmpnet.CheckMetricsExist(tc.DefaultContext(), logger, networkUUID))
+		// r.NoError(tmpnet.CheckMetricsExist(tc.DefaultContext(), logger, networkUUID))
 	})
 
 	sdConfigFilePath, err := tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{

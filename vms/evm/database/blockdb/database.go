@@ -101,7 +101,7 @@ func (db *Database) newMeteredHeightDB(
 ) (database.HeightIndex, error) {
 	path := filepath.Join(db.dbPath, namespace)
 	config := db.config.WithDir(path).WithMinimumHeight(minHeight)
-	ndb, err := heightindexdb.New(config, db.logger)
+	ndb, err := heightindexdb.New(config, logging.NoLog{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create %s database at %s: %w", namespace, path, err)
 	}
