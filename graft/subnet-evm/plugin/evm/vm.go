@@ -78,6 +78,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
+	"github.com/ava-labs/avalanchego/vms/evm/warp"
 
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
 	vmsync "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync"
@@ -88,7 +89,6 @@ import (
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	avalanchegoprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
-	"github.com/ava-labs/avalanchego/vms/evm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 	avalancheRPC "github.com/gorilla/rpc/v2"
 )
