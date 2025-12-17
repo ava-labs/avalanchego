@@ -262,15 +262,6 @@ func benchmarkReexecuteRange(
 
 	benchmarkTool := newBenchmarkTool(benchmarkName)
 	getTopLevelMetrics(tc, benchmarkTool, prefixGatherer, elapsed) // Report the desired top-level metrics
-<<<<<<< HEAD
-=======
-
-	benchmarkTool.logResults(log)
-	if len(benchmarkOutputFile) != 0 {
-		r.NoError(benchmarkTool.saveToFile(benchmarkOutputFile))
-	}
-}
->>>>>>> e1cf68fed2 (test(reexecute): add firewood chaos test)
 
 	benchmarkTool.logResults(log)
 	if len(benchmarkOutputFile) != 0 {
