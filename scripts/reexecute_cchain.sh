@@ -28,7 +28,7 @@ if [[ $# -lt 1 ]]; then
     echo "Usage: $0 <test-name>"
     echo ""
     echo "Available tests:"
-    echo "  test                         - Quick test run (blocks 101-200, hashdb)"
+    echo "  default                      - Quick test run (blocks 101-200, hashdb)"
     echo "  hashdb-101-250k              - Blocks 101-250k with hashdb"
     echo "  hashdb-archive-101-250k      - Blocks 101-250k with hashdb archive"
     echo "  hashdb-33m-33m500k           - Blocks 33m-33.5m with hashdb"
@@ -44,7 +44,7 @@ TEST_NAME="$1"
 
 # Set defaults based on test name. Env vars can override any value.
 case "$TEST_NAME" in
-    test)
+    default)
         S3_BLOCK_DIR="${S3_BLOCK_DIR:-cchain-mainnet-blocks-200-ldb}"
         S3_STATE_DIR="${S3_STATE_DIR:-cchain-current-state-hashdb-full-100}"
         START_BLOCK="${START_BLOCK:-101}"
