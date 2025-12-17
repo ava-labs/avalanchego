@@ -29,7 +29,7 @@ var _ acp118.Verifier = (*acp118Adapter)(nil)
 
 // BlockStore provides access to accepted blocks.
 type BlockStore interface {
-	GetBlock(ctx context.Context, blockID ids.ID) error
+	HasBlock(ctx context.Context, blockID ids.ID) error
 }
 
 // DB stores and retrieves warp messages from the underlying database.
@@ -143,7 +143,7 @@ func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 // of an accepted block indicating it should be signed by the VM.
 func (v *Verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *payload.Hash) *common.AppError {
 	blockID := blockHashPayload.Hash
-	if err := v.blockClient.GetBlock(ctx, blockID); err != nil {
+	if err := v.blockClient.HasBlock(ctx, blockID); err != nil {
 		v.blockValidationFail.Inc(1)
 		return &common.AppError{
 			Code:    VerifyErrCode,

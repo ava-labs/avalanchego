@@ -36,6 +36,7 @@ import (
 	_ "github.com/ava-labs/libevm/eth/tracers/js"
 	_ "github.com/ava-labs/libevm/eth/tracers/native"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/codec"
@@ -63,7 +64,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client/stats"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/hashdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -88,6 +88,7 @@ import (
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	avalanchegoprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
+	"github.com/ava-labs/avalanchego/vms/evm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 	avalancheRPC "github.com/gorilla/rpc/v2"
 )
@@ -253,9 +254,13 @@ type VM struct {
 	vmsync.Server
 	vmsync.Client
 
-	// Avalanche Warp Messaging backend
+	// Avalanche Warp Messaging components
 	// Used to serve BLS signatures of warp messages over RPC
-	warpBackend warp.Backend
+	warpMsgDB            *warp.DB
+	warpVerifier         *warp.Verifier
+	warpSignatureCache   cache.Cacher[ids.ID, []byte]
+	offchainWarpMessages [][]byte
+	warpAPI              *warp.API
 
 	// Initialize only sets these if nil so they can be overridden in tests
 	ethTxGossipHandler p2p.Handler
@@ -460,15 +465,16 @@ func (vm *VM) Initialize(
 	}
 
 	// Initialize warp backend
-	offchainWarpMessages := make([][]byte, len(vm.config.WarpOffChainMessages))
+	vm.offchainWarpMessages = make([][]byte, len(vm.config.WarpOffChainMessages))
 	for i, hexMsg := range vm.config.WarpOffChainMessages {
-		offchainWarpMessages[i] = []byte(hexMsg)
+		vm.offchainWarpMessages[i] = []byte(hexMsg)
 	}
 	warpSignatureCache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
 	meteredCache, err := metercacher.New("warp_signature_cache", vm.sdkMetrics, warpSignatureCache)
 	if err != nil {
 		return fmt.Errorf("failed to create warp signature cache: %w", err)
 	}
+	vm.warpSignatureCache = meteredCache
 
 	// clear warpdb on initialization if config enabled
 	if vm.config.PruneWarpDB {
@@ -477,15 +483,18 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	vm.warpBackend, err = warp.NewBackend(
-		vm.ctx.NetworkID,
-		vm.ctx.ChainID,
+	vm.warpMsgDB = warp.NewDB(vm.warpDB)
+	vm.warpVerifier = warp.NewVerifier(vm.warpMsgDB, vm, vm.uptimeTracker)
+
+	// Create warp API (signatureAggregator will be nil until createAPIs)
+	vm.warpAPI, err = warp.NewAPI(
+		vm.ctx,
+		vm.warpMsgDB,
 		vm.ctx.WarpSigner,
-		vm,
-		vm.uptimeTracker,
-		vm.warpDB,
-		meteredCache,
-		offchainWarpMessages,
+		vm.warpVerifier,
+		vm.warpSignatureCache,
+		nil, // signatureAggregator is set later in createAPIs
+		vm.offchainWarpMessages,
 	)
 	if err != nil {
 		return err
@@ -497,7 +506,7 @@ func (vm *VM) Initialize(
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
 	// Add p2p warp message warpHandler
-	warpHandler := acp118.NewCachedHandler(meteredCache, vm.warpBackend, vm.ctx.WarpSigner)
+	warpHandler := warp.NewHandler(vm.warpSignatureCache, vm.warpVerifier, vm.ctx.WarpSigner)
 	if err = vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
 		return err
 	}
@@ -1100,25 +1109,23 @@ func (vm *VM) getBlock(_ context.Context, id ids.ID) (snowman.Block, error) {
 	return wrapBlock(ethBlock, vm)
 }
 
-// GetAcceptedBlock attempts to retrieve block [blkID] from the VM. This method
-// only returns accepted blocks.
-func (vm *VM) GetAcceptedBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+// HasBlock returns nil if the block is accepted, or an error otherwise.
+// Implements warp.BlockStore.
+func (vm *VM) HasBlock(ctx context.Context, blkID ids.ID) error {
 	blk, err := vm.GetBlock(ctx, blkID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	height := blk.Height()
-	acceptedBlkID, err := vm.GetBlockIDAtHeight(ctx, height)
+	acceptedBlkID, err := vm.GetBlockIDAtHeight(ctx, blk.Height())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if acceptedBlkID != blkID {
-		// The provided block is not accepted.
-		return nil, database.ErrNotFound
+		return database.ErrNotFound
 	}
-	return blk, nil
+	return nil
 }
 
 // SetPreference sets what the current tail of the chain is
@@ -1211,7 +1218,19 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		warpSDKClient := vm.Network.NewClient(p2p.SignatureRequestHandlerID)
 		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)
 
-		if err := handler.RegisterName("warp", warp.NewAPI(vm.ctx, vm.warpBackend, signatureAggregator)); err != nil {
+		warpAPI, err := warp.NewAPI(
+			vm.ctx,
+			vm.warpMsgDB,
+			vm.ctx.WarpSigner,
+			vm.warpVerifier,
+			vm.warpSignatureCache,
+			signatureAggregator,
+			vm.offchainWarpMessages,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if err := handler.RegisterName("warp", warpAPI); err != nil {
 			return nil, err
 		}
 		enabledAPIs = append(enabledAPIs, "warp")

@@ -21,7 +21,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
-var errNoValidators = errors.New("cannot aggregate signatures from subnet with no validators")
+var (
+	errNoValidators    = errors.New("cannot aggregate signatures from subnet with no validators")
+	ErrMessageNotFound = errors.New("message not found")
+	ErrBlockNotFound   = errors.New("block not found")
+)
 
 // API introduces snowman specific functionality to the evm.
 // It provides caching and orchestration over the core warp primitives.
@@ -113,7 +117,7 @@ func (a *API) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
 func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
 	unsignedMessage, err := a.getMessage(messageID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get message %s: %w", messageID, err)
+		return nil, fmt.Errorf("%w %s: %w", ErrMessageNotFound, messageID, err)
 	}
 	return a.signMessage(ctx, unsignedMessage)
 }
@@ -221,6 +225,9 @@ func (a *API) signMessage(ctx context.Context, unsignedMessage *warp.UnsignedMes
 	}
 
 	if err := a.verifier.Verify(ctx, unsignedMessage); err != nil {
+		if err.Code == VerifyErrCode {
+			return nil, fmt.Errorf("%w: %w", ErrBlockNotFound, err)
+		}
 		return nil, fmt.Errorf("failed to verify message %s: %w", msgID, err)
 	}
 

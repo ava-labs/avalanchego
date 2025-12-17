@@ -60,7 +60,7 @@ func init() {
 // testBlockStore implements BlockStore for testing
 type testBlockStore func(ctx context.Context, blockID ids.ID) error
 
-func (t testBlockStore) GetBlock(ctx context.Context, blockID ids.ID) error {
+func (t testBlockStore) HasBlock(ctx context.Context, blockID ids.ID) error {
 	return t(ctx, blockID)
 }
 

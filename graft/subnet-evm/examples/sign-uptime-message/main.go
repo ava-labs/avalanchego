@@ -13,13 +13,13 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/vms/evm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -44,7 +44,7 @@ func main() {
 		log.Fatalf("failed to fetch network ID: %s\n", err)
 	}
 
-	validatorUptime, err := messages.NewValidatorUptime(validationID, reqUptime)
+	validatorUptime, err := message.NewValidatorUptime(validationID, reqUptime)
 	if err != nil {
 		log.Fatalf("failed to create validatorUptime message: %s\n", err)
 	}
