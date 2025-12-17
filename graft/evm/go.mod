@@ -1,6 +1,6 @@
 module github.com/ava-labs/avalanchego/graft/evm
 
-go 1.24.9
+go 1.24.11
 
 require (
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18
