@@ -517,8 +517,8 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 	if err := s.db.VerifyRangeProof(
 		ctx,
 		rangeProof,
-		work.start,
-		work.end,
+		protoutils.ProtoToMaybe(request.StartKey),
+		protoutils.ProtoToMaybe(request.EndKey),
 		root,
 		int(request.KeyLimit),
 	); err != nil {

@@ -7,35 +7,43 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"math/rand"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/sync"
 )
 
 func Test_Firewood_Sync(t *testing.T) {
-	for _, serverSize := range []int{0, 1, 1_000, 10_000, 100_000} {
-		for _, clientSize := range []int{0, 1_000} {
-			t.Run(fmt.Sprintf("numKeys=%d_clientKeys=%d", serverSize, clientSize), func(t *testing.T) {
-				t.Parallel()
-				testSync(t, 0, clientSize, serverSize)
-			})
-		}
+	tests := []struct {
+		name       string
+		clientSize int
+		serverSize int
+	}{
+		{name: "both empty", clientSize: 0, serverSize: 0},
+		{name: "one request from empty", clientSize: 0, serverSize: 1000},
+		{name: "server empty", clientSize: 1000, serverSize: 0},
+		{name: "one request replace all", clientSize: 1000, serverSize: 1000},
+		{name: "10,000 keys from empty", clientSize: 0, serverSize: 10_000},
+		{name: "100,000 keys from empty", clientSize: 0, serverSize: 100_000},
+		{name: "10,000 keys replace all", clientSize: 10_000, serverSize: 10_000},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testSync(t, 0, tt.clientSize, tt.serverSize)
+		})
 	}
 }
 
 func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
-	serverDB := &db{db: generateDB(t, serverKeys, seed)}
+	serverDB := &database{db: generateDB(t, serverKeys, seed)}
 	clientDB := generateDB(t, clientKeys, seed+1) // guarantee different data
 
 	ctx := t.Context()
@@ -43,15 +51,11 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 	require.NoError(t, err)
 
 	syncer, err := NewSyncer(
+		Config{},
 		clientDB,
-		Config{
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(serverDB, rangeProofMarshaler{})),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(serverDB, rangeProofMarshaler{}, changeProofMarshaler{})),
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-			TargetRoot:            root,
-		},
-		prometheus.NewRegistry(),
+		root,
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(serverDB, rangeProofMarshaler{})),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(serverDB, rangeProofMarshaler{}, dummyMarshaler{})),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, syncer)
@@ -118,122 +122,119 @@ func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
 
 // logDiff logs the differences between two Firewood databases.
 // Useful when debugging state mismatches after sync.
-func logDiff(t *testing.T, db1, db2 *ffi.Database) {
+func logDiff(t *testing.T, wantDB, gotDB *ffi.Database) {
 	t.Helper()
 
-	rev1, err := db1.LatestRevision()
+	wantRev, err := wantDB.LatestRevision()
 	require.NoError(t, err)
 	defer func() {
-		require.NoError(t, rev1.Drop())
+		require.NoError(t, wantRev.Drop())
 	}()
-	rev2, err := db2.LatestRevision()
+	gotRev, err := gotDB.LatestRevision()
 	require.NoError(t, err)
 	defer func() {
-		require.NoError(t, rev2.Drop())
+		require.NoError(t, gotRev.Drop())
 	}()
 
-	if rev1.Root() == rev2.Root() {
-		t.Log("both DBs have the same root:", rev1.Root())
+	if wantRev.Root() == gotRev.Root() {
+		t.Log("both DBs have the same root:", wantRev.Root())
 		return
 	}
 
-	iter1, err := rev1.Iter(nil)
+	wantIter, err := wantRev.Iter(nil)
 	require.NoError(t, err)
 	defer func() {
-		require.NoError(t, iter1.Drop())
+		require.NoError(t, wantIter.Drop())
 	}()
-	iter2, err := rev2.Iter(nil)
+	gotIter, err := gotRev.Iter(nil)
 	require.NoError(t, err)
 	defer func() {
-		require.NoError(t, iter2.Drop())
+		require.NoError(t, gotIter.Drop())
 	}()
 
 	var (
-		next1        = iter1.Next()
-		next2        = iter2.Next()
-		count1       int
-		count2       int
+		wantNext     = wantIter.Next()
+		gotNext      = gotIter.Next()
+		wantCount    int
+		gotCount     int
 		cmp          int
 		prevKey      []byte
 		missingCount int
 	)
-	for next1 && next2 {
-		key1 := iter1.Key()
-		key2 := iter2.Key()
+	for wantNext && gotNext {
+		wantKey := wantIter.Key()
+		gotKey := gotIter.Key()
 		prevCmp := cmp
-		cmp = bytes.Compare(key1, key2)
+		cmp = bytes.Compare(wantKey, gotKey)
 		// Log any missing keys before this key
 		if cmp != prevCmp && missingCount > 0 {
-			missingDB := "DB1"
+			missingDB := "want db"
 			if prevCmp == -1 {
-				missingDB = "DB2"
+				missingDB = "got db"
 			}
-			t.Logf("%d key(s) missing from %s in [%x, %x)", missingCount, missingDB, prevKey, key1)
+			t.Logf("%d key(s) missing from %s in [%x, %x)", missingCount, missingDB, prevKey, wantKey)
 			missingCount = 0
 		}
 		switch cmp {
 		case 0:
-			val1 := iter1.Value()
-			val2 := iter2.Value()
-			if !bytes.Equal(val1, val2) {
-				t.Logf("key %x has different values:\n DB1: %x\n DB2: %x", key1, val1, val2)
+			wantVal := wantIter.Value()
+			gotVal := gotIter.Value()
+			if !bytes.Equal(wantVal, gotVal) {
+				t.Logf("key %x has different values:\n want db: %x\n got db: %x", wantKey, wantVal, gotVal)
 			}
 
-			next1 = iter1.Next()
-			next2 = iter2.Next()
-			count1++
-			count2++
+			wantNext = wantIter.Next()
+			gotNext = gotIter.Next()
+			wantCount++
+			gotCount++
 
 		case -1:
-			next1 = iter1.Next()
-			count1++
+			wantNext = wantIter.Next()
+			wantCount++
 			if missingCount == 0 {
-				prevKey = key1
+				prevKey = wantKey
 			}
 			missingCount++
 		case 1:
-			next2 = iter2.Next()
-			count2++
+			gotNext = gotIter.Next()
+			gotCount++
 			if missingCount == 0 {
-				prevKey = key2
+				prevKey = gotKey
 			}
 			missingCount++
 		}
-
-		require.NoError(t, iter1.Err(), "iter1 error")
-		require.NoError(t, iter2.Err(), "iter2 error")
 	}
 	if missingCount > 0 {
 		t.Logf("%d final key(s) mismatched, starting at %x", missingCount, prevKey)
 	}
 
 	missingCount = 0
-	for next1 {
+	for wantNext {
 		if missingCount == 0 {
-			prevKey = iter1.Key()
+			prevKey = wantIter.Key()
 		}
-		next1 = iter1.Next()
-		count1++
+		wantNext = wantIter.Next()
+		wantCount++
 		missingCount++
-		require.NoError(t, iter1.Err(), "iter1 error")
 	}
 	if missingCount > 0 {
-		t.Logf("%d keys missing from DB2 starting with %x", missingCount, prevKey)
+		t.Logf("%d keys missing from got db starting with %x", missingCount, prevKey)
 	}
 
 	missingCount = 0
-	for next2 {
+	for gotNext {
 		if missingCount == 0 {
-			prevKey = iter2.Key()
+			prevKey = gotIter.Key()
 		}
-		next2 = iter2.Next()
-		count2++
+		gotNext = gotIter.Next()
+		gotCount++
 		missingCount++
-		require.NoError(t, iter2.Err(), "iter2 error")
 	}
 	if missingCount > 0 {
-		t.Logf("%d keys missing from DB1 starting with %x", missingCount, prevKey)
+		t.Logf("%d keys missing from want db starting with %x", missingCount, prevKey)
 	}
 
-	t.Logf("DB1 had %d keys, DB2 had %d keys", count1, count2)
+	t.Logf("want db had %d keys, got db had %d keys", wantCount, gotCount)
+	assert.NoError(t, wantIter.Err())
+	assert.NoError(t, gotIter.Err())
 }
