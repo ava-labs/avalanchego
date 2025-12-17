@@ -56,10 +56,10 @@ type proposals struct {
 	tree *proposal
 	// possible temporarily holds proposals created during a trie update.
 	// This is cleared after the update is complete and the proposals have been sent to the database.
-	possible map[unverifiedKey]*proposal
+	possible map[possibleKey]*proposal
 }
 
-type unverifiedKey struct {
+type possibleKey struct {
 	parentBlockHash, root common.Hash //nolint:unused // It is used as a map key
 }
 
@@ -167,7 +167,7 @@ func New(config Config, disk ethdb.Database) (*TrieDB, error) {
 					height:      height,
 				},
 			},
-			possible: make(map[unverifiedKey]*proposal),
+			possible: make(map[possibleKey]*proposal),
 		},
 	}, nil
 }
@@ -282,11 +282,11 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 		return nil
 	}
 
-	p, ok := t.possible[unverifiedKey{parentBlockHash: parentBlockHash, root: root}]
+	p, ok := t.possible[possibleKey{parentBlockHash: parentBlockHash, root: root}]
 	// Now, all unused proposals have no other references, since we didn't store them
 	// in the proposal map or tree, so they will be garbage collected.
 	// Any proposals with a different root were mistakenly created, so they can be freed as well.
-	t.proposals.possible = make(map[unverifiedKey]*proposal)
+	t.proposals.possible = make(map[possibleKey]*proposal)
 	if !ok {
 		return fmt.Errorf("no proposal found for block %d, root %s, hash %s", height, root.Hex(), blockHash.Hex())
 	}
@@ -520,7 +520,7 @@ func (t *TrieDB) getProposalHash(parentRoot common.Hash, keys, values [][]byte) 
 			return common.Hash{}, fmt.Errorf("proposing from root %s: %w", parentRoot.Hex(), err)
 		}
 		for parentHash := range t.proposals.tree.blockHashes {
-			t.possible[unverifiedKey{parentBlockHash: parentHash, root: p.root}] = p
+			t.possible[possibleKey{parentBlockHash: parentHash, root: root}] = p
 		}
 		count++
 	}
@@ -538,7 +538,7 @@ func (t *TrieDB) getProposalHash(parentRoot common.Hash, keys, values [][]byte) 
 		}
 		root = p.root
 		for parentHash := range parent.blockHashes {
-			t.possible[unverifiedKey{parentBlockHash: parentHash, root: root}] = p
+			t.possible[possibleKey{parentBlockHash: parentHash, root: root}] = p
 		}
 		count++
 	}
