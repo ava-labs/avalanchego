@@ -97,7 +97,7 @@ jobs:
         run: |
           TIMESTAMP=$(date +%s)
           EXECUTION_DATA_DIR="/tmp/reexecution-data-${TIMESTAMP}"
-          ./scripts/run_task.sh firewood-chaos-test-with-copied-data \
+          ./scripts/run_task.sh test-firewood-chaos-with-copied-data \
             START_BLOCK=${{ matrix.start-block }} \
             END_BLOCK=${{ matrix.end-block }} \
             BLOCK_DIR_SRC=${{ matrix.block-dir-src }} \
