@@ -2206,6 +2206,6 @@ func TestInspectDatabases(t *testing.T) {
 		db = memdb.New()
 	)
 
-	vm.initializeDBs(db)
+	require.NoError(t, vm.initializeDBs(db))
 	require.NoError(t, vm.inspectDatabases())
 }
