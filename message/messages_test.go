@@ -658,14 +658,14 @@ func TestMessage(t *testing.T) {
 			encodedMsg, err := mb.createOutbound(tv.msg, tv.compressionType, tv.bypassThrottling)
 			require.NoError(err)
 
-			require.Equal(tv.bypassThrottling, encodedMsg.BypassThrottling())
-			require.Equal(tv.op, encodedMsg.Op())
+			require.Equal(tv.bypassThrottling, encodedMsg.BypassThrottling)
+			require.Equal(tv.op, encodedMsg.Op)
 
-			if bytesSaved := encodedMsg.BytesSavedCompression(); tv.bytesSaved {
+			if bytesSaved := encodedMsg.BytesSavedCompression; tv.bytesSaved {
 				require.Positive(bytesSaved)
 			}
 
-			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes(), ids.EmptyNodeID, func() {})
+			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes, ids.EmptyNodeID, func() {})
 			require.NoError(err)
 			require.Equal(tv.op, parsedMsg.Op())
 		})
