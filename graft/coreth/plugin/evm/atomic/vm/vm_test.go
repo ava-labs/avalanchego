@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -240,17 +241,24 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	require.NoError(err)
 	require.Equal(lastAcceptedID, blk2.ID())
 
+	s := AvaxAPI{
+		Context:      vm.Ctx,
+		Mempool:      vm.AtomicMempool,
+		PushGossiper: vm.AtomicTxPushGossiper,
+		AcceptedTxs:  vm.AtomicTxRepository,
+	}
+
 	// Check that both atomic transactions were indexed as expected.
-	indexedImportTx, status, height, err := vm.GetAtomicTx(importTx.ID())
+	indexedImportTx, status, height, err := s.getAtomicTx(importTx.ID())
 	require.NoError(err)
 	require.Equal(atomic.Accepted, status)
-	require.Equal(uint64(1), height, "expected height of indexed import tx to be 1")
+	require.Equal(common.PointerTo[json.Uint64](1), height, "expected height of indexed import tx to be 1")
 	require.Equal(indexedImportTx.ID(), importTx.ID(), "expected ID of indexed import tx to match original txID")
 
-	indexedExportTx, status, height, err := vm.GetAtomicTx(exportTx.ID())
+	indexedExportTx, status, height, err := s.getAtomicTx(exportTx.ID())
 	require.NoError(err)
 	require.Equal(atomic.Accepted, status)
-	require.Equal(uint64(2), height, "expected height of indexed export tx to be 2")
+	require.Equal(common.PointerTo[json.Uint64](2), height, "expected height of indexed export tx to be 2")
 	require.Equal(indexedExportTx.ID(), exportTx.ID(), "expected ID of indexed import tx to match original txID")
 }
 
