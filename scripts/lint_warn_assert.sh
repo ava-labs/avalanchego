@@ -44,7 +44,7 @@ function test_warn_testify_assert {
   # In GitHub Actions, emit ::warning annotations (not raw output which shows confusing "Error:" lines)
   # For local runs, show the raw output
   #
-  # Note: GitHub annotations don't support multiline messages, so we use a short message to avoid an ugly wrap.
+  # Note: GitHub annotations don't support multiline messages, so we use a short message to avoid a horizontal scroll.
   # See: https://github.com/actions/toolkit/issues/193
   #      https://github.com/orgs/community/discussions/122594
   if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
