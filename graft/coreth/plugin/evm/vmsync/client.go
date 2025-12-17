@@ -63,11 +63,11 @@ type Committer interface {
 	Commit(ctx context.Context, summary message.Syncable) error
 }
 
-// SyncStrategy defines how state sync is executed.
+// Executor defines how state sync is executed.
 // Implementations handle the sync lifecycle differently based on sync mode.
-type SyncStrategy interface {
-	// Start begins the sync process and blocks until completion or error.
-	Start(ctx context.Context, summary message.Syncable) error
+type Executor interface {
+	// Execute runs the sync process and blocks until completion or error.
+	Execute(ctx context.Context, summary message.Syncable) error
 }
 
 var _ Committer = (*client)(nil)
@@ -182,9 +182,9 @@ func (c *client) acceptSyncSummary(summary message.Syncable) (block.StateSyncMod
 		return block.StateSyncSkipped, fmt.Errorf("failed to create syncer registry: %w", err)
 	}
 
-	strategy := newStaticStrategy(registry, c)
+	executor := newStaticExecutor(registry, c)
 
-	return c.startAsync(strategy, summary), nil
+	return c.startAsync(executor, summary), nil
 }
 
 // prepareForSync handles resume check and snapshot wipe before sync starts.
@@ -230,8 +230,8 @@ func (c *client) prepareForSync(summary message.Syncable) error {
 	return nil
 }
 
-// startAsync launches the sync strategy in a background goroutine.
-func (c *client) startAsync(strategy SyncStrategy, summary message.Syncable) block.StateSyncMode {
+// startAsync launches the sync executor in a background goroutine.
+func (c *client) startAsync(executor Executor, summary message.Syncable) block.StateSyncMode {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
 
@@ -240,7 +240,7 @@ func (c *client) startAsync(strategy SyncStrategy, summary message.Syncable) blo
 		defer c.wg.Done()
 		defer cancel()
 
-		if err := strategy.Start(ctx, summary); err != nil {
+		if err := executor.Execute(ctx, summary); err != nil {
 			c.err = err
 		}
 		// notify engine regardless of whether err == nil,
@@ -265,8 +265,9 @@ func (c *client) Shutdown() error {
 // Error returns a non-nil error if one occurred during the sync.
 func (c *client) Error() error { return c.err }
 
-// Commit implements Committer. It updates disk and memory pointers so the VM
-// is prepared for bootstrapping. Executes any shared memory operations from
+// Commit implements Committer. It resets the blockchain to the synced block,
+// preparing it for execution, and updates disk and memory pointers so the VM
+// is ready for bootstrapping. Also executes any shared memory operations from
 // the atomic trie to shared memory.
 func (c *client) Commit(ctx context.Context, summary message.Syncable) error {
 	stateBlock, err := c.config.State.GetBlock(ctx, ids.ID(summary.GetBlockHash()))

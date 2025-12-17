@@ -9,28 +9,28 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 )
 
-var _ SyncStrategy = (*staticStrategy)(nil)
+var _ Executor = (*staticExecutor)(nil)
 
-// staticStrategy runs syncers sequentially without block queueing.
+// staticExecutor runs syncers sequentially without block queueing.
 // This is the default sync mode where all syncers complete before
 // committing results, with no concurrent block processing.
-type staticStrategy struct {
+type staticExecutor struct {
 	registry  *SyncerRegistry
 	committer Committer
 }
 
-func newStaticStrategy(registry *SyncerRegistry, committer Committer) *staticStrategy {
-	return &staticStrategy{
+func newStaticExecutor(registry *SyncerRegistry, committer Committer) *staticExecutor {
+	return &staticExecutor{
 		registry:  registry,
 		committer: committer,
 	}
 }
 
-// Start begins the sync process and blocks until completion or error.
+// Execute runs the sync process and blocks until completion or error.
 // For static sync, this runs all syncers and then commits the results to the VM.
-func (s *staticStrategy) Start(ctx context.Context, summary message.Syncable) error {
-	if err := s.registry.RunSyncerTasks(ctx, summary); err != nil {
+func (e *staticExecutor) Execute(ctx context.Context, summary message.Syncable) error {
+	if err := e.registry.RunSyncerTasks(ctx, summary); err != nil {
 		return err
 	}
-	return s.committer.Commit(ctx, summary)
+	return e.committer.Commit(ctx, summary)
 }
