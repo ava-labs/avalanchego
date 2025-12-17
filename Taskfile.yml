@@ -425,7 +425,7 @@ tasks:
           BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.BLOCK_DIR_SRC}}/**'
           CURRENT_STATE_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.CURRENT_STATE_DIR_SRC}}/**'
           EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      - task: firewood-chaos-test
+      - task: test-firewood-chaos 
         vars:
           START_BLOCK: '{{.START_BLOCK}}'
           END_BLOCK: '{{.END_BLOCK}}'
