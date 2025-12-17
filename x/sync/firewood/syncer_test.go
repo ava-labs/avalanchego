@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"math/rand"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -74,9 +73,7 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 // Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
 func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "firewood.db")
-
-	db, err := ffi.New(path, ffi.DefaultConfig())
+	db, err := ffi.New(t.TempDir())
 	require.NoError(t, err)
 	require.NotNil(t, db)
 	t.Cleanup(func() {
