@@ -18,7 +18,7 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego v1.14.1-antithesis-docker-image-fix
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.17
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18
 	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
