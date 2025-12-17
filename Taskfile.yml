@@ -5,9 +5,6 @@
 
 version: '3'
 
-env:
-  S3_BOOTSTRAP_BUCKET: 's3://avalanchego-bootstrap-testing'
-
 tasks:
   default: ./scripts/run_task.sh --list
 
@@ -102,21 +99,7 @@ tasks:
 
   export-cchain-block-range:
     desc: Export range of C-Chain blocks from source to target directory.
-    vars:
-      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
-      BLOCK_DIR_DST: '{{.BLOCK_DIR_DST}}'
-      START_BLOCK: '{{.START_BLOCK}}'
-      END_BLOCK: '{{.END_BLOCK}}'
-    cmds:
-      - cmd: go run github.com/ava-labs/avalanchego/tests/reexecute/blockexport --block-dir-src={{.BLOCK_DIR_SRC}} --block-dir-dst={{.BLOCK_DIR_DST}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
-
-  export-dir-to-s3:
-    desc: Copies a directory to s3
-    vars:
-      SRC: '{{.SRC}}'
-      DST: '{{.DST}}'
-    cmds:
-      - cmd: bash -x ./scripts/copy_dir.sh {{.SRC}} {{.DST}}
+    cmd: go run github.com/ava-labs/avalanchego/tests/reexecute/blockexport {{.CLI_ARGS}}
 
   generate-mocks:
     desc: Generates testing mocks
@@ -142,30 +125,6 @@ tasks:
   ginkgo-build:
     desc: Runs ginkgo against the current working directory
     cmd: ./bin/ginkgo build {{.USER_WORKING_DIR}}
-
-  import-cchain-reexecute-range:
-    desc: Imports the C-Chain block and state data to re-execute. Defaults to import the first 200 and the current state created with the default config of the C-Chain (hashdb).
-    vars:
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default (printf "%s/cchain-mainnet-blocks-200-ldb/**" .S3_BOOTSTRAP_BUCKET)}}'
-      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default (printf "%s/cchain-current-state-hashdb-full-100/**" .S3_BOOTSTRAP_BUCKET)}}'
-    cmds:
-      - task: import-s3-to-dir
-        vars:
-          SRC: '{{.BLOCK_DIR_SRC}}'
-          DST: '{{.EXECUTION_DATA_DIR}}/blocks'
-      - task: import-s3-to-dir
-        vars:
-          SRC: '{{.CURRENT_STATE_DIR_SRC}}'
-          DST: '{{.EXECUTION_DATA_DIR}}/current-state'
-
-  import-s3-to-dir:
-    desc: Imports an S3 path to a local directory.
-    vars:
-      SRC: '{{.SRC}}'
-      DST: '{{.DST}}'
-    cmds:
-      - cmd: bash -x ./scripts/copy_dir.sh {{.SRC}} {{.DST}}
 
   install-nix:
     desc: Installs nix with an OS-appropriate installer
@@ -201,134 +160,6 @@ tasks:
     desc: Runs shellcheck to check sanity of shell scripts
     cmd: ./scripts/shellcheck.sh
 
-  reexecute-cchain-range:
-    desc: Re-execute a range of C-Chain blocks.
-    vars:
-      TASK_NAME: '{{.TASK_NAME | default .TASK}}'
-      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
-      BLOCK_DIR: '{{.BLOCK_DIR}}'
-      CONFIG: '{{.CONFIG | default ""}}'
-      START_BLOCK: '{{.START_BLOCK}}'
-      END_BLOCK: '{{.END_BLOCK}}'
-      LABELS: '{{.LABELS | default ""}}'
-      BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      TIMESTAMP: '{{.TIMESTAMP | default (now | date "20060102-150405")}}'
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/%s-%s" .TASK_NAME .TIMESTAMP)}}'
-    cmd: |
-      CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
-      BLOCK_DIR={{.BLOCK_DIR}} \
-      CONFIG={{.CONFIG}} \
-      START_BLOCK={{.START_BLOCK}} \
-      END_BLOCK={{.END_BLOCK}} \
-      LABELS={{.LABELS}} \
-      BENCHMARK_OUTPUT_FILE={{.BENCHMARK_OUTPUT_FILE}} \
-      EXECUTION_DATA_DIR={{.EXECUTION_DATA_DIR}} \
-      bash -x ./scripts/benchmark_cchain_range.sh
-    # Runtime context variables are read from environment by the script:
-    # - RUNNER_TYPE (execution environment)
-    # - METRICS_SERVER_PORT (monitoring config)
-    # - METRICS_SERVER_ENABLED (runtime monitoring decision)
-    # - METRICS_COLLECTOR_ENABLED (runtime monitoring decision)
-    # - PROMETHEUS_URL, PROMETHEUS_USERNAME, PROMETHEUS_PASSWORD (monitoring config)
-    # - GH_REPO, GH_WORKFLOW, GH_RUN_ID, etc. (GitHub context)
-
-  reexecute-cchain-range-with-copied-data:
-    desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
-    vars:
-      TASK_NAME: '{{.TASK_NAME}}'
-      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
-      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC}}'
-      CONFIG: '{{.CONFIG}}'
-      START_BLOCK: '{{.START_BLOCK}}'
-      END_BLOCK: '{{.END_BLOCK}}'
-      TIMESTAMP: '{{.TIMESTAMP | default (now | date "20060102-150405")}}'
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/%s-%s" .TASK_NAME .TIMESTAMP)}}'
-    cmds:
-      - task: import-cchain-reexecute-range
-        vars:
-          BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.BLOCK_DIR_SRC}}/**'
-          CURRENT_STATE_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.CURRENT_STATE_DIR_SRC}}/**'
-          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      - task: reexecute-cchain-range
-        vars:
-          TASK_NAME: '{{.TASK_NAME}}'
-          BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
-          CURRENT_STATE_DIR: '{{.EXECUTION_DATA_DIR}}/current-state'
-          CONFIG: '{{.CONFIG}}'
-          START_BLOCK: '{{.START_BLOCK}}'
-          END_BLOCK: '{{.END_BLOCK}}'
-          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-
-  c-chain-reexecution-hashdb-101-250k:
-    desc: C-Chain re-execution from block 101 to 250k with hashdb
-    cmds:
-      - task: reexecute-cchain-range-with-copied-data
-        vars:
-          TASK_NAME: '{{.TASK}}'
-          START_BLOCK: 101
-          END_BLOCK: 250000
-          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-1m-ldb'
-          CURRENT_STATE_DIR_SRC: 'cchain-current-state-hashdb-full-100'
-
-  c-chain-reexecution-hashdb-archive-101-250k:
-    desc: C-Chain re-execution from block 101 to 250k with hashdb archive
-    cmds:
-      - task: reexecute-cchain-range-with-copied-data
-        vars:
-          TASK_NAME: '{{.TASK}}'
-          START_BLOCK: 101
-          END_BLOCK: 250000
-          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-1m-ldb'
-          CURRENT_STATE_DIR_SRC: 'cchain-current-state-hashdb-archive-100'
-          CONFIG: archive
-
-  c-chain-reexecution-hashdb-33m-33m500k:
-    desc: C-Chain re-execution from block 33m to 33.5m with hashdb
-    cmds:
-      - task: reexecute-cchain-range-with-copied-data
-        vars:
-          TASK_NAME: '{{.TASK}}'
-          START_BLOCK: 33000001
-          END_BLOCK: 33500000
-          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-30m-40m-ldb'
-          CURRENT_STATE_DIR_SRC: 'cchain-current-state-hashdb-full-33m'
-
-  c-chain-reexecution-firewood-33m-33m500k:
-    desc: C-Chain re-execution from block 33m to 33.5m with firewood
-    cmds:
-      - task: reexecute-cchain-range-with-copied-data
-        vars:
-          TASK_NAME: '{{.TASK}}'
-          START_BLOCK: 33000001
-          END_BLOCK: 33500000
-          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-30m-40m-ldb'
-          CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-33m'
-          CONFIG: firewood
-
-  c-chain-reexecution-firewood-33m-40m:
-    desc: C-Chain re-execution from block 33m to 40m with firewood
-    cmds:
-      - task: reexecute-cchain-range-with-copied-data
-        vars:
-          TASK_NAME: '{{.TASK}}'
-          START_BLOCK: 33000001
-          END_BLOCK: 40000000
-          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-30m-40m-ldb'
-          CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-33m'
-          CONFIG: firewood
-
-  c-chain-reexecution-firewood-101-250k:
-    desc: C-Chain re-execution from block 101 to 250k with firewood
-    cmds:
-      - task: reexecute-cchain-range-with-copied-data
-        vars:
-          TASK_NAME: '{{.TASK}}'
-          START_BLOCK: 101
-          END_BLOCK: 250000
-          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-1m-ldb'
-          CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-100'
-          CONFIG: firewood
-
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
     cmd: bash -x ./scripts/tests.e2e.bootstrap_monitor.sh
@@ -357,6 +188,10 @@ tasks:
     # On linux, requires qemu (e.g. apt -y install qemu-system qemu-user-static).
     desc: Runs test of cross-platform docker image build
     cmd: bash -x scripts/tests.build_image.sh
+
+  test-c-chain-reexecution:
+    desc: Runs C-Chain re-execution test. Run without args to see available tests.
+    cmd: ./scripts/reexecute_cchain.sh {{.CLI_ARGS}}
 
   test-e2e:
     desc: Runs e2e tests
