@@ -846,7 +846,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 func wrapWarpSignatureRequest(
 	msg *warp.UnsignedMessage,
 	justification []byte,
-) (p2pmessage.OutboundMessage, error) {
+) (*p2pmessage.OutboundMessage, error) {
 	p2pMessageFactory, err := p2pmessage.NewCreator(
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
