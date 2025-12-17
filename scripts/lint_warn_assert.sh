@@ -51,7 +51,12 @@ function test_warn_testify_assert {
       line_num=$(echo "$line" | cut -d: -f2)
       col=$(echo "$line" | cut -d: -f3)
       # Clean up forbidigo's phrasing to be advisory rather than prohibitive
-      msg=$(echo "$line" | cut -d: -f4- | sed 's/^ *//' | sed 's/^use of //' | sed 's/ forbidden because "/ /' | sed 's/" (forbidigo)/ (forbidigo)/')
+      msg=$(echo "$line" | cut -d: -f4- \
+        | sed 's/^ *//' \
+        | sed 's/^use of //' \
+        | sed 's/ forbidden because "/ /' \
+        | sed 's/" (forbidigo)/ (forbidigo)/' \
+        | sed 's/; use testify/;%0Ause testify/')
       echo "::warning file=${file},line=${line_num},col=${col}::${msg}"
     done || true  # grep returns 1 when no matches, which is fine
   else
