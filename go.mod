@@ -12,8 +12,6 @@ module github.com/ava-labs/avalanchego
 //   - graft/evm/go.mod
 //   - graft/coreth/go.mod
 //   - graft/subnet-evm/go.mod
-//   - CONTRIBUTING.md
-//   - README.md
 //
 // and
 //   - CONTRIBUTING.md
