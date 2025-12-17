@@ -43,6 +43,10 @@ function test_warn_testify_assert {
 
   # In GitHub Actions, emit ::warning annotations (not raw output which shows confusing "Error:" lines)
   # For local runs, show the raw output
+  #
+  # Note: GitHub annotations don't support multiline messages, so we use a short message to avoid an ugly wrap.
+  # See: https://github.com/actions/toolkit/issues/193
+  #      https://github.com/orgs/community/discussions/122594
   if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
     echo "$output" | grep -E '^[^:]+:[0-9]+:[0-9]+:' | while IFS= read -r line; do
       # Parse "file:line:col: message"
@@ -50,13 +54,12 @@ function test_warn_testify_assert {
       file=$(echo "$line" | cut -d: -f1)
       line_num=$(echo "$line" | cut -d: -f2)
       col=$(echo "$line" | cut -d: -f3)
-      # Clean up forbidigo's phrasing to be advisory rather than prohibitive
+      # Clean up forbidigo's boilerplate phrasing
       msg=$(echo "$line" | cut -d: -f4- \
         | sed 's/^ *//' \
         | sed 's/^use of //' \
-        | sed 's/ forbidden because "/ /' \
-        | sed 's/" (forbidigo)/ (forbidigo)/' \
-        | sed 's/; use testify/;%0Ause testify/')
+        | sed 's/ forbidden because "/" /' \
+        | sed 's/" (forbidigo)$//')
       echo "::warning file=${file},line=${line_num},col=${col}::${msg}"
     done || true  # grep returns 1 when no matches, which is fine
   else
