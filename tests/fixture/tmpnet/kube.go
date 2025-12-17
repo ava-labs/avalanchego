@@ -43,19 +43,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-// DefaultPodFlags defines common flags for avalanchego nodes running in a pod.
-func DefaultPodFlags(networkName string, dataDir string) map[string]string {
-	return map[string]string{
-		config.DataDirKey:                dataDir,
-		config.NetworkNameKey:            networkName,
-		config.SybilProtectionEnabledKey: "false",
-		config.HealthCheckFreqKey:        "500ms", // Ensure rapid detection of a healthy state
-		config.LogDisplayLevelKey:        logging.Debug.String(),
-		config.LogLevelKey:               logging.Debug.String(),
-		config.HTTPHostKey:               "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for the readiness check
-	}
-}
-
 // NewNodeStatefulSet returns a statefulset for an avalanchego node.
 func NewNodeStatefulSet(
 	name string,

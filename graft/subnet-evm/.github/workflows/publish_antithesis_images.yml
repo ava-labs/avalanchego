@@ -1,0 +1,32 @@
+name: Publish Antithesis Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+env:
+  REGISTRY: us-central1-docker.pkg.dev
+  REPOSITORY: molten-verve-216720/avalanche-repository
+
+jobs:
+  antithesis:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Login to GAR
+      uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 #v3.4.0
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: _json_key
+        password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
+
+    - name: Build and publish images
+      run: ./scripts/run_task.sh build-antithesis-images
+      env:
+        IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
+        IMAGE_TAG: latest

@@ -84,9 +84,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
+	coreth "github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	coreth "github.com/ava-labs/coreth/plugin/factory"
 )
 
 const (
@@ -1457,20 +1457,31 @@ func (n *Node) initHealthAPI() error {
 		// if there is too little disk space remaining, first report unhealthy and then shutdown the node
 
 		availableDiskBytes := n.resourceTracker.DiskTracker().AvailableDiskBytes()
+		availableDiskPercentage := n.resourceTracker.DiskTracker().AvailableDiskPercentage()
 
-		var err error
+		var diskSpaceErrors []error
 		if availableDiskBytes < n.Config.RequiredAvailableDiskSpace {
 			n.Log.Fatal("low on disk space. Shutting down...",
 				zap.Uint64("remainingDiskBytes", availableDiskBytes),
 			)
 			go n.Shutdown(1)
-			err = fmt.Errorf("remaining available disk space (%d) is below minimum required available space (%d)", availableDiskBytes, n.Config.RequiredAvailableDiskSpace)
+			err := fmt.Errorf("remaining available disk space (%d) is below minimum required available space (%d)", availableDiskBytes, n.Config.RequiredAvailableDiskSpace)
+			diskSpaceErrors = append(diskSpaceErrors, err)
 		} else if availableDiskBytes < n.Config.WarningThresholdAvailableDiskSpace {
-			err = fmt.Errorf("remaining available disk space (%d) is below the warning threshold of disk space (%d)", availableDiskBytes, n.Config.WarningThresholdAvailableDiskSpace)
+			err := fmt.Errorf("remaining available disk space (%d) is below the warning threshold of disk space (%d)", availableDiskBytes, n.Config.WarningThresholdAvailableDiskSpace)
+			diskSpaceErrors = append(diskSpaceErrors, err)
 		}
 
+		if availableDiskPercentage < n.Config.WarningThresholdAvailableDiskSpacePercentage {
+			err := fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningThresholdAvailableDiskSpacePercentage)
+			diskSpaceErrors = append(diskSpaceErrors, err)
+		}
+
+		err = errors.Join(diskSpaceErrors...)
+
 		return map[string]interface{}{
-			"availableDiskBytes": availableDiskBytes,
+			"availableDiskBytes":      availableDiskBytes,
+			"availableDiskPercentage": availableDiskPercentage,
 		}, err
 	})
 
