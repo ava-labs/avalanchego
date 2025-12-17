@@ -28,8 +28,7 @@ const (
 )
 
 var (
-	_ InboundMessage  = (*inboundMessage)(nil)
-	_ OutboundMessage = (*outboundMessage)(nil)
+	_ InboundMessage = (*inboundMessage)(nil)
 
 	metricLabels = []string{typeLabel, opLabel, directionLabel}
 
@@ -97,41 +96,16 @@ func (m *inboundMessage) String() string {
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can
-// be serialized into a byte stream
-type OutboundMessage interface {
-	// BypassThrottling returns true if we should send this message, regardless
-	// of any outbound message throttling
-	BypassThrottling() bool
-	// Op returns the op that describes this message type
-	Op() Op
-	// Bytes returns the bytes that will be sent
-	Bytes() []byte
-	// BytesSavedCompression returns the number of bytes that this message saved
+// be sent over the wire
+type OutboundMessage struct {
+	// BypassThrottling is true if we should send this message, regardless of
+	// any outbound message throttling
+	BypassThrottling bool
+	Op               Op
+	Bytes            []byte
+	// BytesSavedCompression stores the amount of bytes that this message saved
 	// due to being compressed
-	BytesSavedCompression() int
-}
-
-type outboundMessage struct {
-	bypassThrottling      bool
-	op                    Op
-	bytes                 []byte
-	bytesSavedCompression int
-}
-
-func (m *outboundMessage) BypassThrottling() bool {
-	return m.bypassThrottling
-}
-
-func (m *outboundMessage) Op() Op {
-	return m.op
-}
-
-func (m *outboundMessage) Bytes() []byte {
-	return m.bytes
-}
-
-func (m *outboundMessage) BytesSavedCompression() int {
-	return m.bytesSavedCompression
+	BytesSavedCompression int
 }
 
 // TODO: add other compression algorithms with extended interface
@@ -288,17 +262,17 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 	return m, bytesSavedCompression, op, nil
 }
 
-func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression.Type, bypassThrottling bool) (*outboundMessage, error) {
+func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression.Type, bypassThrottling bool) (*OutboundMessage, error) {
 	b, saved, op, err := mb.marshal(m, compressionType)
 	if err != nil {
 		return nil, err
 	}
 
-	return &outboundMessage{
-		bypassThrottling:      bypassThrottling,
-		op:                    op,
-		bytes:                 b,
-		bytesSavedCompression: saved,
+	return &OutboundMessage{
+		BypassThrottling:      bypassThrottling,
+		Op:                    op,
+		Bytes:                 b,
+		BytesSavedCompression: saved,
 	}, nil
 }
 
