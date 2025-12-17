@@ -19,6 +19,8 @@ import (
 // SubnetEVMTestChainID is a subnet-evm specific chain ID for testing
 var SubnetEVMTestChainID = ids.GenerateTestID()
 
+// @TODO: This should eventually be replaced by a more robust solution, or alternatively, the presence of nil
+// validator states shouldn't be depended upon by tests
 func NewTestValidatorState() *validatorstest.State {
 	return &validatorstest.State{
 		GetCurrentHeightF: func(context.Context) (uint64, error) {
@@ -36,17 +38,17 @@ func NewTestValidatorState() *validatorstest.State {
 			}
 			return subnetID, nil
 		},
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
-		},
-		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-			return map[ids.ID]*validators.GetCurrentValidatorOutput{}, 0, nil
-		},
 		GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
 			return nil, nil
 		},
 		GetWarpValidatorSetF: func(context.Context, uint64, ids.ID) (validators.WarpSet, error) {
 			return validators.WarpSet{}, nil
+		},
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
+		},
+		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+			return map[ids.ID]*validators.GetCurrentValidatorOutput{}, 0, nil
 		},
 	}
 }
