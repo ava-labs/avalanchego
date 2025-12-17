@@ -107,7 +107,7 @@ tasks:
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
     cmds:
-      - cmd: go test -timeout=0 -run=TestExportBlockRange github.com/ava-labs/avalanchego/tests/reexecute/c --block-dir-src={{.BLOCK_DIR_SRC}} --block-dir-dst={{.BLOCK_DIR_DST}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
+      - cmd: go run github.com/ava-labs/avalanchego/tests/reexecute/blockexport --block-dir-src={{.BLOCK_DIR_SRC}} --block-dir-dst={{.BLOCK_DIR_DST}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
 
   export-dir-to-s3:
     desc: Copies a directory to s3
@@ -203,6 +203,7 @@ tasks:
   reexecute-cchain-range:
     desc: Re-execute a range of C-Chain blocks.
     vars:
+      TASK_NAME: '{{.TASK_NAME | default .TASK}}'
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
       BLOCK_DIR: '{{.BLOCK_DIR}}'
       CONFIG: '{{.CONFIG | default ""}}'

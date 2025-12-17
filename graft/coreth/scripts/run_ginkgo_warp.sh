@@ -7,7 +7,8 @@ CORETH_PATH=$(
   cd .. && pwd
 )
 
-source "$CORETH_PATH"/scripts/constants.sh
+# shellcheck disable=SC1091
+source "$CORETH_PATH"/../../scripts/constants.sh
 
 EXTRA_ARGS=()
 AVALANCHEGO_BUILD_PATH="${AVALANCHEGO_BUILD_PATH:-}"
