@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -57,7 +58,7 @@ func init() {
 
 func main() {
 	tc := tests.NewTestContext(tests.NewDefaultLogger("chaos-test"))
-	tc.SetDefaultContextParent(tests.DefaultNotifyContext(0, tc.DeferCleanup))
+	tc.SetDefaultContextParent(context.Background())
 	tc.RecoverAndExit()
 
 	run(
