@@ -6,7 +6,7 @@ module github.com/ava-labs/avalanchego
 
 // - Changes to the minimum golang version must also be replicated in:
 //
-// The following go.mod files: 
+// The following go.mod files:
 //   - go.mod (here)
 //   - tools/go.mod
 //   - graft/evm/go.mod
@@ -15,7 +15,7 @@ module github.com/ava-labs/avalanchego
 //   - CONTRIBUTING.md
 //   - README.md
 //
-// and 
+// and
 //   - CONTRIBUTING.md
 //   - README.md
 //   - RELEASES.md
