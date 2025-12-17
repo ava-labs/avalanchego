@@ -3,7 +3,7 @@ module github.com/ava-labs/avalanchego/graft/evm
 go 1.24.9
 
 require (
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.17
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18
 	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
 	github.com/holiman/uint256 v1.2.4
 	github.com/stretchr/testify v1.10.0
