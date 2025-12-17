@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package extstate
+package firewood
 
 import (
 	"encoding/binary"
@@ -19,9 +19,6 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/triedb/firewood"
-	"github.com/ava-labs/avalanchego/graft/coreth/triedb/hashdb"
 )
 
 const (
@@ -68,11 +65,10 @@ type merkleTrie struct {
 func newFuzzState(t *testing.T) *fuzzState {
 	r := require.New(t)
 
-	hashState := NewDatabaseWithConfig(
+	hashState := state.NewDatabaseWithConfig(
 		rawdb.NewMemoryDatabase(),
-		&triedb.Config{
-			DBOverride: hashdb.Defaults.BackendConstructor,
-		})
+		&triedb.Config{},
+	)
 	ethRoot := types.EmptyRootHash
 	hashTr, err := hashState.OpenTrie(ethRoot)
 	r.NoError(err)
@@ -81,9 +77,9 @@ func newFuzzState(t *testing.T) *fuzzState {
 	})
 
 	firewoodMemdb := rawdb.NewMemoryDatabase()
-	fwCfg := firewood.Defaults       // copy the defaults
+	fwCfg := Defaults                // copy the defaults
 	fwCfg.ChainDataDir = t.TempDir() // Use a temporary directory for the Firewood
-	firewoodState := NewDatabaseWithConfig(
+	firewoodState := state.NewDatabaseWithConfig(
 		firewoodMemdb,
 		&triedb.Config{
 			DBOverride: fwCfg.BackendConstructor,
@@ -148,7 +144,7 @@ func (fs *fuzzState) commit() {
 		}
 
 		// HashDB/PathDB only allows updating the triedb if there have been changes.
-		if _, ok := tr.ethDatabase.TrieDB().Backend().(*firewood.Database); ok {
+		if _, ok := tr.ethDatabase.TrieDB().Backend().(*TrieDB); ok {
 			triedbopt := stateconf.WithTrieDBUpdatePayload(common.Hash{byte(int64(fs.blockNumber - 1))}, common.Hash{byte(int64(fs.blockNumber))})
 			fs.require.NoError(tr.ethDatabase.TrieDB().Update(updatedRoot, tr.lastRoot, fs.blockNumber, mergedNodeSet, nil, triedbopt), "failed to update triedb in %s", tr.name)
 			tr.lastRoot = updatedRoot

@@ -1,22 +1,21 @@
 #!/usr/bin/env bash
 #
-# lint.sh - Comprehensive linting script for modules using evm-shared
+# lint.sh - Comprehensive linting script for modules using evm
 #
 # Usage:
-#   This script must be run from the root of a module that uses evm-shared
+#   This script must be run from the root of a module that uses evm
 #   (e.g., coreth/ or subnet-evm/).
 #
 #   From the module root:
-#     ../evm-shared/scripts/lint.sh
+#     ../evm/scripts/lint.sh
 #     TESTS='license_header' ./scripts/lint.sh  # Run specific test only
 #
 # Requirements:
-#   - The module must have a .golangci.yml file at its root
 #   - The module must have a scripts/upstream_files.txt file
 #   - GNU grep with -P flag support (on macOS: brew install grep)
 #
 # References (from avalanchego/ root):
-#   - avalanchego/graft/{module}/.golangci.yml: Module's own lint config
+#   - avalanchego/graft/.golangci.yml: Shared lint config for graft modules
 #   - avalanchego/tools/go.mod: Avalanchego tools module
 #   - avalanchego/.golangci.yml: Avalanchego lint config
 #   - avalanchego/header.yml: Default license header
@@ -52,7 +51,7 @@ source "$SCRIPT_DIR/lint_setup.sh"
 TESTS=${TESTS:-"golangci_lint avalanche_golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
-  go tool -modfile=../../tools/go.mod golangci-lint run --config .golangci.yml
+  go tool -modfile=../../tools/go.mod golangci-lint run --config ../.golangci.yml
 }
 
 function test_avalanche_golangci_lint {

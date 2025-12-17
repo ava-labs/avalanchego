@@ -689,6 +689,11 @@ func TestPrecompileBind(t *testing.T) {
 	out, err = replacer.CombinedOutput()
 	require.NoError(t, err, "failed to replace binding test dependency to current source tree: %v\n%s", err, out)
 
+	replacer = exec.Command(gocmd, "mod", "edit", "-x", "-require", "github.com/ava-labs/avalanchego/graft/evm@v0.0.0", "-replace", "github.com/ava-labs/avalanchego/graft/evm="+filepath.Join(pwd, "..", "..", "..", "..", "..", "evm"))
+	replacer.Dir = pkg
+	out, err = replacer.CombinedOutput()
+	require.NoError(t, err, "failed to replace binding test dependency to current source tree: %v\n%s", err, out)
+
 	tidier := exec.Command(gocmd, "mod", "tidy", "-compat=1.24")
 	tidier.Dir = pkg
 	out, err = tidier.CombinedOutput()
