@@ -7,6 +7,7 @@
   - Also removes blockHook extension in `ethclient` package.
 - Enables Firewood to run with pruning disabled.
   - This change modifies the filepath of Firewood and any nodes using Firewood will need to resync.
+- Update go version to 1.24.11
 
 ## [v0.16.0](https://github.com/ava-labs/coreth/releases/tag/v0.16.0)
 
