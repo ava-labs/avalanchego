@@ -4,30 +4,22 @@
 package blockdb
 
 import (
-	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 	heightindexdb "github.com/ava-labs/avalanchego/x/blockdb"
 )
-
-func TestMain(m *testing.M) {
-	customtypes.Register()
-	params.RegisterExtras()
-	os.Exit(m.Run())
-}
 
 func TestDatabaseWriteAndReadBlock(t *testing.T) {
 	dataDir := t.TempDir()

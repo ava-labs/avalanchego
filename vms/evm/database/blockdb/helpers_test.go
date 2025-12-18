@@ -5,7 +5,6 @@ package blockdb
 
 import (
 	"math/big"
-	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -14,13 +13,11 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
@@ -53,39 +50,29 @@ func addrFromTest(t *testing.T, salt string) common.Address {
 	return common.BytesToAddress(h.Bytes()[12:])
 }
 
-// createBlocksToAddr generates blocks with a single funded sender and a tx to the provided recipient.
+// createBlocksToAddr generates blocks with receipts containing a log to the provided address.
 func createBlocksToAddr(t *testing.T, numBlocks int, to common.Address) ([]*types.Block, []types.Receipts) {
 	t.Helper()
 
-	key1, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-	addr1 := crypto.PubkeyToAddress(key1.PublicKey)
-	gspec := &core.Genesis{
-		Config: params.TestChainConfig,
-		Alloc:  types.GenesisAlloc{addr1: {Balance: big.NewInt(params.Ether)}},
-	}
-	engine := dummy.NewFaker()
-	signer := types.LatestSigner(params.TestChainConfig)
-	gap := uint64(10)
-	db, blocks, receipts, err := core.GenerateChainWithGenesis(
-		gspec, engine, numBlocks-1, gap, func(_ int, gen *core.BlockGen) {
-			tx, _ := types.SignTx(types.NewTx(&types.DynamicFeeTx{
-				ChainID:   params.TestChainConfig.ChainID,
-				Nonce:     gen.TxNonce(addr1),
-				To:        &to,
-				Gas:       500_000,
-				GasTipCap: big.NewInt(1),
-				GasFeeCap: big.NewInt(1),
-			}), signer, key1)
-			gen.AddTx(tx)
-		})
-	require.NoError(t, err)
+	blocks := make([]*types.Block, numBlocks)
+	receipts := make([]types.Receipts, numBlocks)
+	parentHash := common.Hash{}
 
-	// add genesis block since generated blocks and receipts don't include it
-	genHash := rawdb.ReadCanonicalHash(db, 0)
-	genBlock := rawdb.ReadBlock(db, genHash, 0)
-	genReceipts := rawdb.ReadReceipts(db, genHash, 0, 0, params.TestChainConfig)
-	blocks = slices.Concat([]*types.Block{genBlock}, blocks)
-	receipts = slices.Concat([]types.Receipts{genReceipts}, receipts)
+	for i := range numBlocks {
+		header := &types.Header{
+			ParentHash: parentHash,
+			Number:     big.NewInt(int64(i)),
+			Extra:      crypto.Keccak256(to.Bytes(), []byte{byte(i)}), // unique hash per block/recipient
+		}
+		tx := types.NewTx(&types.LegacyTx{Nonce: uint64(i), To: &to})
+		block := types.NewBlock(header, []*types.Transaction{tx}, nil, nil, trie.NewStackTrie(nil))
+		blocks[i] = block
+		parentHash = block.Hash()
+
+		receipt := &types.Receipt{TxHash: tx.Hash(), Logs: []*types.Log{{Address: to}}}
+		receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
+		receipts[i] = types.Receipts{receipt}
+	}
 
 	return blocks, receipts
 }
