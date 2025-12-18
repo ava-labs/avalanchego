@@ -51,9 +51,7 @@ func DefaultTmpnetFlags() FlagsMap {
 // Flags suggested for e2e testing
 func DefaultE2EFlags() FlagsMap {
 	return FlagsMap{
-		config.SystemTrackerRequiredAvailableDiskSpacePercentageKey: "1",
-		config.SystemTrackerWarningAvailableDiskSpacePercentageKey:  "1",
-		config.ProposerVMUseCurrentHeightKey:                        "true",
+		config.ProposerVMUseCurrentHeightKey: "true",
 		// Reducing this from the 1s default speeds up tx acceptance
 		config.ProposerVMMinBlockDelayKey: "0s",
 		config.LogLevelKey:                logging.Debug.String(),
