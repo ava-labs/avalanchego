@@ -33,6 +33,7 @@ require (
 	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca
 	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
 	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
+	github.com/ava-labs/strevm v0.0.0-20251114203810-ee4dcf3ef268
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -95,11 +96,11 @@ require (
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
-require github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000 // indirect
-
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
+	github.com/arr4n/sink v0.0.0-20250610120507-bd1b0fbb19fa // indirect
+	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000 // indirect
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18 // indirect
 	github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -122,6 +123,7 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dop251/goja v0.0.0-20230806174421-c933cf95e127 // indirect
+	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
@@ -143,6 +145,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
@@ -216,8 +219,8 @@ tool (
 	go.uber.org/mock/mockgen
 )
 
-replace github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
-
-replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
-
-replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
+replace (
+	github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
+	github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
+	github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
+)

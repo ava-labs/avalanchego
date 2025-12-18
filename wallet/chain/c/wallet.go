@@ -8,13 +8,13 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+	"github.com/ava-labs/libevm/ethclient"
 
 	ethcommon "github.com/ava-labs/libevm/common"
 )
@@ -195,7 +195,7 @@ func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
 	}
 
 	ctx := ops.Context()
-	return w.ethClient.EstimateBaseFee(ctx)
+	return w.ethClient.SuggestGasPrice(ctx)
 }
 
 // TODO: Upstream this function into coreth.
