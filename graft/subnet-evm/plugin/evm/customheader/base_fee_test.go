@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/subnetevm"
 
-	"github.com/ava-labs/avalanchego/utils"
+	avalancheutils "github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -50,7 +50,7 @@ func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 		{
 			name: "subnet_evm_first_block",
 			upgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),

@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 
-	"github.com/ava-labs/avalanchego/utils"
+	avalancheutils "github.com/ava-labs/avalanchego/utils"
 )
 
 func TestNetworkUpgradesEqual(t *testing.T) {
@@ -26,32 +26,32 @@ func TestNetworkUpgradesEqual(t *testing.T) {
 		{
 			name: "EqualNetworkUpgrades",
 			upgrades1: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			upgrades2: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			expected: true,
 		},
 		{
 			name: "NotEqualNetworkUpgrades",
 			upgrades1: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			upgrades2: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](3),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](3),
 			},
 			expected: false,
 		},
 		{
 			name: "NilNetworkUpgrades",
 			upgrades1: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			upgrades2: nil,
 			expected:  false,
@@ -59,11 +59,11 @@ func TestNetworkUpgradesEqual(t *testing.T) {
 		{
 			name: "NilNetworkUpgrade",
 			upgrades1: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			upgrades2: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
 				DurangoTimestamp:   nil,
 			},
 			expected: false,
@@ -87,12 +87,12 @@ func TestCheckNetworkUpgradesCompatible(t *testing.T) {
 		{
 			name: "Compatible_same_NetworkUpgrades",
 			upgrades1: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			upgrades2: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			time:  1,
 			valid: true,
@@ -100,12 +100,12 @@ func TestCheckNetworkUpgradesCompatible(t *testing.T) {
 		{
 			name: "Compatible_different_NetworkUpgrades",
 			upgrades1: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			upgrades2: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](3),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](3),
 			},
 			time:  1,
 			valid: true,
@@ -113,11 +113,11 @@ func TestCheckNetworkUpgradesCompatible(t *testing.T) {
 		{
 			name: "Compatible_nil_NetworkUpgrades",
 			upgrades1: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			upgrades2: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
 				DurangoTimestamp:   nil,
 			},
 			time:  1,
@@ -126,12 +126,12 @@ func TestCheckNetworkUpgradesCompatible(t *testing.T) {
 		{
 			name: "Incompatible_rewinded_NetworkUpgrades",
 			upgrades1: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			upgrades2: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](1),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](1),
 			},
 			time:  1,
 			valid: false,
@@ -139,12 +139,12 @@ func TestCheckNetworkUpgradesCompatible(t *testing.T) {
 		{
 			name: "Incompatible_fastforward_NetworkUpgrades",
 			upgrades1: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			upgrades2: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](3),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](3),
 			},
 			time:  4,
 			valid: false,
@@ -152,11 +152,11 @@ func TestCheckNetworkUpgradesCompatible(t *testing.T) {
 		{
 			name: "Incompatible_nil_NetworkUpgrades",
 			upgrades1: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			upgrades2: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
 				DurangoTimestamp:   nil,
 			},
 			time:  2,
@@ -213,7 +213,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		{
 			name: "Invalid_Durango_nil_upgrade",
 			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
 				DurangoTimestamp:   nil,
 			},
 			avagoUpgrades: upgrade.Mainnet,
@@ -222,8 +222,8 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		{
 			name: "Invalid_Subnet-EVM_non-zero",
 			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			avagoUpgrades: upgrade.Mainnet,
 			wantError:     errTimestampTooEarly,
@@ -231,8 +231,8 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		{
 			name: "Invalid_Durango_before_default_upgrade",
 			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
-				DurangoTimestamp:   utils.PointerTo[uint64](1),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](1),
 			},
 			avagoUpgrades: upgrade.Mainnet,
 			wantError:     errTimestampTooEarly,
@@ -240,7 +240,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		{
 			name: "Invalid_Mainnet_Durango_reconfigured_to_Fuji",
 			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.GetConfig(constants.FujiID).DurangoTime),
 			},
 			avagoUpgrades: upgrade.Mainnet,
@@ -249,7 +249,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		{
 			name: "Valid_Fuji_Durango_reconfigured_to_Mainnet",
 			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.GetConfig(constants.MainnetID).DurangoTime),
 			},
 			avagoUpgrades: upgrade.Fuji,
@@ -258,7 +258,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		{
 			name: "Invalid_Etna_nil",
 			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.Mainnet.DurangoTime),
 				EtnaTimestamp:      nil,
 			},
@@ -268,7 +268,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		{
 			name: "Invalid_Etna_before_Durango",
 			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.Mainnet.DurangoTime),
 				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.Mainnet.DurangoTime.Add(-1)),
 			},
@@ -278,7 +278,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		{
 			name: "Valid_Granite_After_nil_Fortuna",
 			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.Fuji.DurangoTime),
 				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.Fuji.EtnaTime),
 				FortunaTimestamp:   nil,
@@ -305,16 +305,16 @@ func TestForkOrder(t *testing.T) {
 		{
 			name: "ValidNetworkUpgrades",
 			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](2),
 			},
 			wantError: nil,
 		},
 		{
 			name: "Invalid order",
 			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](0),
+				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				DurangoTimestamp:   avalancheutils.PointerTo[uint64](0),
 			},
 			wantError: errUnsupportedForkOrdering,
 		},
@@ -329,12 +329,12 @@ func TestForkOrder(t *testing.T) {
 
 func TestSetDefaultsTreatsZeroAsUnset(t *testing.T) {
 	upgrades := &NetworkUpgrades{
-		SubnetEVMTimestamp: utils.PointerTo[uint64](0),
-		DurangoTimestamp:   utils.PointerTo[uint64](0),
+		SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
+		DurangoTimestamp:   avalancheutils.PointerTo[uint64](0),
 		EtnaTimestamp:      nil,
-		FortunaTimestamp:   utils.PointerTo[uint64](0),
-		GraniteTimestamp:   utils.PointerTo[uint64](0),
-		HeliconTimestamp:   utils.PointerTo[uint64](0),
+		FortunaTimestamp:   avalancheutils.PointerTo[uint64](0),
+		GraniteTimestamp:   avalancheutils.PointerTo[uint64](0),
+		HeliconTimestamp:   avalancheutils.PointerTo[uint64](0),
 	}
 	agoUpgrades := upgradetest.GetConfig(upgradetest.Latest)
 	upgrades.SetDefaults(agoUpgrades)

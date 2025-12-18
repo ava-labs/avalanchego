@@ -27,7 +27,7 @@ import (
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils"
+	avalancheutils "github.com/ava-labs/avalanchego/utils"
 )
 
 // createExportTxOptions adds funds to shared memory, imports them, and returns a list of export transactions
@@ -466,7 +466,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			},
 		},
 	}
-	utils.Sort(validExportTx.Ins)
+	avalancheutils.Sort(validExportTx.Ins)
 
 	validAVAXExportTx := &atomic.UnsignedExportTx{
 		NetworkID:        vm.Ctx.NetworkID,
