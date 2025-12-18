@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

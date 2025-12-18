@@ -35,7 +35,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
