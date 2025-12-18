@@ -11,6 +11,7 @@ This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/av
 ### Fixes
 
 - Update go version to 1.24.11
+- Deprecate `RequiredAvailableDiskSpace` and `WarningThresholdAvailableDiskSpace` config options.
 
 ### EVM
 
