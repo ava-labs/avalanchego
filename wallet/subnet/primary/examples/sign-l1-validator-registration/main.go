@@ -69,8 +69,8 @@ func main() {
 			9651,
 		),
 		networkID,
-		router.InboundHandlerFunc(func(_ context.Context, msg p2pmessage.InboundMessage) {
-			log.Printf("received %s: %s", msg.Op(), msg.Message())
+		router.InboundHandlerFunc(func(_ context.Context, msg *p2pmessage.InboundMessage) {
+			log.Printf("received %s: %s", msg.Op, msg.Message)
 		}),
 	)
 	if err != nil {

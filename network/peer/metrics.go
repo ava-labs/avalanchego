@@ -141,9 +141,9 @@ func (m *Metrics) SendFailed(msg *message.OutboundMessage) {
 	}).Inc()
 }
 
-func (m *Metrics) Received(msg message.InboundMessage, msgLen uint32) {
-	op := msg.Op().String()
-	saved := msg.BytesSavedCompression()
+func (m *Metrics) Received(msg *message.InboundMessage, msgLen uint32) {
+	op := msg.Op.String()
+	saved := msg.BytesSavedCompression
 	compressed := saved != 0 // assume that if [saved] == 0, [msg] wasn't compressed
 	compressedStr := strconv.FormatBool(compressed)
 

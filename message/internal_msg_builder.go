@@ -75,15 +75,15 @@ func InternalGetStateSummaryFrontierFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     GetStateSummaryFrontierFailedOp,
-		message: &GetStateSummaryFrontierFailed{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     GetStateSummaryFrontierFailedOp,
+		Message: &GetStateSummaryFrontierFailed{
 			ChainID:   chainID,
 			RequestID: requestID,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -111,15 +111,15 @@ func InternalGetAcceptedStateSummaryFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     GetAcceptedStateSummaryFailedOp,
-		message: &GetAcceptedStateSummaryFailed{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     GetAcceptedStateSummaryFailedOp,
+		Message: &GetAcceptedStateSummaryFailed{
 			ChainID:   chainID,
 			RequestID: requestID,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -147,15 +147,15 @@ func InternalGetAcceptedFrontierFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     GetAcceptedFrontierFailedOp,
-		message: &GetAcceptedFrontierFailed{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     GetAcceptedFrontierFailedOp,
+		Message: &GetAcceptedFrontierFailed{
 			ChainID:   chainID,
 			RequestID: requestID,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -183,15 +183,15 @@ func InternalGetAcceptedFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     GetAcceptedFailedOp,
-		message: &GetAcceptedFailed{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     GetAcceptedFailedOp,
+		Message: &GetAcceptedFailed{
 			ChainID:   chainID,
 			RequestID: requestID,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -225,16 +225,16 @@ func InternalGetAncestorsFailed(
 	chainID ids.ID,
 	requestID uint32,
 	engineType p2p.EngineType,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     GetAncestorsFailedOp,
-		message: &GetAncestorsFailed{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     GetAncestorsFailedOp,
+		Message: &GetAncestorsFailed{
 			ChainID:    chainID,
 			RequestID:  requestID,
 			EngineType: engineType,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -262,15 +262,15 @@ func InternalGetFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     GetFailedOp,
-		message: &GetFailed{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     GetFailedOp,
+		Message: &GetFailed{
 			ChainID:   chainID,
 			RequestID: requestID,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -298,15 +298,15 @@ func InternalQueryFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     QueryFailedOp,
-		message: &QueryFailed{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     QueryFailedOp,
+		Message: &QueryFailed{
 			ChainID:   chainID,
 			RequestID: requestID,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -321,14 +321,14 @@ func (m *Connected) String() string {
 	)
 }
 
-func InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     ConnectedOp,
-		message: &Connected{
+func InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     ConnectedOp,
+		Message: &Connected{
 			NodeVersion: nodeVersion,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -338,12 +338,12 @@ func (Disconnected) String() string {
 	return ""
 }
 
-func InternalDisconnected(nodeID ids.NodeID) InboundMessage {
-	return &inboundMessage{
-		nodeID:     nodeID,
-		op:         DisconnectedOp,
-		message:    disconnected,
-		expiration: mockable.MaxTime,
+func InternalDisconnected(nodeID ids.NodeID) *InboundMessage {
+	return &InboundMessage{
+		NodeID:     nodeID,
+		Op:         DisconnectedOp,
+		Message:    disconnected,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -361,14 +361,14 @@ func (m *VMMessage) String() string {
 func InternalVMMessage(
 	nodeID ids.NodeID,
 	notification uint32,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     NotifyOp,
-		message: &VMMessage{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     NotifyOp,
+		Message: &VMMessage{
 			Notification: notification,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -380,11 +380,11 @@ func (GossipRequest) String() string {
 
 func InternalGossipRequest(
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID:     nodeID,
-		op:         GossipRequestOp,
-		message:    gossipRequest,
-		expiration: mockable.MaxTime,
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID:     nodeID,
+		Op:         GossipRequestOp,
+		Message:    gossipRequest,
+		Expiration: mockable.MaxTime,
 	}
 }
