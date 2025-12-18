@@ -412,7 +412,7 @@ func TestAppError(t *testing.T) {
 	outMsg, err := mb.createOutbound(want, compression.TypeNone, false)
 	require.NoError(err)
 
-	got, err := mb.parseInbound(outMsg.Bytes(), nodeID, func() {})
+	got, err := mb.parseInbound(outMsg.Bytes, nodeID, func() {})
 	require.NoError(err)
 
 	require.Equal(nodeID, got.NodeID())

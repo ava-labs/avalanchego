@@ -319,14 +319,14 @@ func NewNetwork(
 }
 
 func (n *network) Send(
-	msg message.OutboundMessage,
+	msg *message.OutboundMessage,
 	config common.SendConfig,
 	subnetID ids.ID,
 	allower subnets.Allower,
 ) set.Set[ids.NodeID] {
 	namedPeers := n.getPeers(config.NodeIDs, subnetID, allower)
 	n.peerConfig.Metrics.MultipleSendsFailed(
-		msg.Op(),
+		msg.Op,
 		config.NodeIDs.Len()-len(namedPeers),
 	)
 

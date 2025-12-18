@@ -102,7 +102,7 @@ type Peer interface {
 	// Send attempts to send [msg] to the peer. The peer takes ownership of
 	// [msg] for reference counting. This returns false if the message is
 	// guaranteed not to be delivered to the peer.
-	Send(ctx context.Context, msg message.OutboundMessage) bool
+	Send(ctx context.Context, msg *message.OutboundMessage) bool
 
 	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
 	// on this peer's gossip routine. It is not guaranteed that a GetPeerList
@@ -317,7 +317,7 @@ func (p *peer) ObservedUptime() uint32 {
 	return p.observedUptime.Get()
 }
 
-func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
+func (p *peer) Send(ctx context.Context, msg *message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
 }
 
@@ -594,10 +594,10 @@ func (p *peer) writeMessages() {
 	}
 }
 
-func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
-	msgBytes := msg.Bytes()
+func (p *peer) writeMessage(writer io.Writer, msg *message.OutboundMessage) {
+	msgBytes := msg.Bytes
 	p.Log.Verbo("sending message",
-		zap.Stringer("op", msg.Op()),
+		zap.Stringer("op", msg.Op),
 		zap.Stringer("nodeID", p.id),
 		zap.Binary("messageBytes", msgBytes),
 	)
@@ -621,7 +621,7 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 		return
 	}
 
-	if msg.Op() == message.PingOp {
+	if msg.Op == message.PingOp {
 		atomic.StoreInt64(&p.lastPingSent, p.Clock.Time().UnixMilli())
 	}
 
