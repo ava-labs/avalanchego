@@ -205,9 +205,7 @@ type Config struct {
 
 	DiskTargeterConfig tracker.TargeterConfig `json:"diskTargeterConfig"`
 
-	RequiredAvailableDiskSpace           uint64 `json:"requiredAvailableDiskSpace"`
 	RequiredAvailableDiskSpacePercentage uint64 `json:"requiredAvailableDiskSpacePercentage"`
-	WarningThresholdAvailableDiskSpace   uint64 `json:"warningThresholdAvailableDiskSpace"`
 	WarningAvailableDiskSpacePercentage  uint64 `json:"warningAvailableDiskSpacePercentage"`
 
 	TraceConfig trace.Config `json:"traceConfig"`

@@ -1459,7 +1459,7 @@ func (n *Node) initHealthAPI() error {
 		availableDiskBytes := n.resourceTracker.DiskTracker().AvailableDiskBytes()
 		availableDiskPercentage := n.resourceTracker.DiskTracker().AvailableDiskPercentage()
 
-		var diskSpaceErrors []error
+		var err error
 
 		if availableDiskPercentage < n.Config.RequiredAvailableDiskSpacePercentage {
 			n.Log.Fatal("low on disk space. Shutting down...",
@@ -1468,14 +1468,10 @@ func (n *Node) initHealthAPI() error {
 				zap.Uint64("requiredDiskPercentage", n.Config.RequiredAvailableDiskSpacePercentage),
 			)
 			go n.Shutdown(1)
-			err := fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.RequiredAvailableDiskSpacePercentage)
-			diskSpaceErrors = append(diskSpaceErrors, err)
+			err = fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.RequiredAvailableDiskSpacePercentage)
 		} else if availableDiskPercentage < n.Config.WarningAvailableDiskSpacePercentage {
-			err := fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningAvailableDiskSpacePercentage)
-			diskSpaceErrors = append(diskSpaceErrors, err)
+			err = fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningAvailableDiskSpacePercentage)
 		}
-
-		err = errors.Join(diskSpaceErrors...)
 
 		return map[string]interface{}{
 			"availableDiskBytes":      availableDiskBytes,
