@@ -101,7 +101,7 @@ func (c *Comm) Broadcast(msg *simplex.Message) {
 	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: c.broadcastNodes}, c.subnetID, subnets.NoOpAllower)
 }
 
-func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.OutboundMessage, error) {
+func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (*message.OutboundMessage, error) {
 	var simplexMsg *p2p.Simplex
 	switch {
 	case msg.VerifiedBlockMessage != nil:
