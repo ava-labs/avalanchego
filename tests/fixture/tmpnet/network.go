@@ -619,7 +619,6 @@ func (n *Network) GetSubnet(name string) *Subnet {
 // to pick up configuration changes becomes the responsibility of the caller.
 func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node, restartRequired bool) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
-	apiURI := apiNode.GetAccessibleURI()
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
 			return stacktrace.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
@@ -644,7 +643,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		// Create the subnet on the network
-		if err := subnet.Create(ctx, apiURI); err != nil {
+		if err := subnet.Create(ctx, apiNode.GetAccessibleURI()); err != nil {
 			return stacktrace.Wrap(err)
 		}
 
@@ -685,8 +684,6 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		reconfiguredNodes = append(reconfiguredNodes, node)
 	}
 
-	// TODO(samliok): remove the restart required parameter, and check if subnet configuration requires
-	// a restart instead.
 	if restartRequired {
 		log.Info("restarting node(s) to enable them to track the new subnet(s)")
 
@@ -706,7 +703,6 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		// since we have restarted nodes, refetch the api uri in case it changed
-		apiURI = apiNode.GetAccessibleURI()
 	}
 
 	// Add validators for the subnet
@@ -726,13 +722,13 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 			validatorNodes = append(validatorNodes, node)
 		}
 
-		if err := subnet.AddValidators(ctx, log, apiURI, validatorNodes...); err != nil {
+		if err := subnet.AddValidators(ctx, log, apiNode.GetAccessibleURI(), validatorNodes...); err != nil {
 			return stacktrace.Wrap(err)
 		}
 	}
 
 	// Wait for nodes to become subnet validators
-	pChainClient := platformvm.NewClient(apiURI)
+	pChainClient := platformvm.NewClient(apiNode.GetAccessibleURI())
 	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
 		if err := WaitForActiveValidators(ctx, log, pChainClient, subnet); err != nil {
@@ -740,7 +736,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		// It should now be safe to create chains for the subnet
-		if err := subnet.CreateChains(ctx, log, apiURI); err != nil {
+		if err := subnet.CreateChains(ctx, log, apiNode.GetAccessibleURI()); err != nil {
 			return stacktrace.Wrap(err)
 		}
 
