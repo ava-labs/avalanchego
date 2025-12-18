@@ -42,7 +42,7 @@
             go-task
 
             # Local Go package from nested flake
-            go-flake.packages.${pkgs.system}.default
+            go-flake.packages.${pkgs.stdenv.hostPlatform.system}.default
 
             # Monitoring tools
             promtail                                   # Loki log shipper
