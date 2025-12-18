@@ -60,8 +60,8 @@ var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
 	deprecatedKeys = map[string]string{
-		"requiredAvailableDiskSpace":         "Use requiredAvailableDiskSpacePercentage instead",
-		"warningThresholdAvailableDiskSpace": "Use warningThresholdAvailableDiskSpacePercentage instead",
+		SystemTrackerRequiredAvailableDiskSpaceKey:         fmt.Sprintf("Use %s instead", SystemTrackerRequiredAvailableDiskSpacePercentageKey),
+		SystemTrackerWarningThresholdAvailableDiskSpaceKey: fmt.Sprintf("Use %s instead", SystemTrackerWarnThreshAvailDiskSpacePercentageKey),
 	}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
