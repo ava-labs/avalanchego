@@ -48,6 +48,7 @@ show_usage() {
 Usage: $0 [test-name]
 
 Available tests:
+  help                         - Show this help message
   default                      - Quick test run (blocks 101-200, hashdb)
   hashdb-101-250k              - Blocks 101-250k with hashdb
   hashdb-archive-101-250k      - Blocks 101-250k with hashdb archive
@@ -69,6 +70,10 @@ if [[ $# -ge 1 ]]; then
 
     # Set defaults based on test name. Env vars can override any value.
     case "$TEST_NAME" in
+        help)
+            show_usage
+            exit 0
+            ;;
         default)
             BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-200-ldb}"
             CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-full-100}"

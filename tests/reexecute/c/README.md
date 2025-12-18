@@ -56,6 +56,12 @@ Let's run the default benchmark to get started. Make sure that you have complete
 
 ### Using Predefined Tests
 
+Run the script with `help` as the test name to see available tests:
+
+```bash
+./scripts/benchmark_cchain_range.sh help
+```
+
 To run a predefined test:
 ```bash
 ./scripts/benchmark_cchain_range.sh hashdb-101-250k
@@ -253,9 +259,9 @@ export METRICS_COLLECTOR_ENABLED=true
 ./scripts/benchmark_cchain_range.sh hashdb-101-250k
 ```
 
-You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).  
+You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
 
-**NOTE: Prometheus credentials are required for collection**  
+**NOTE: Prometheus credentials are required for collection**
 
 ---
 
