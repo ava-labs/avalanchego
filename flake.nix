@@ -8,7 +8,7 @@
 
   # Flake inputs
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2505.*.tar.gz";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     go-flake.url = "path:./nix/go";
     go-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
