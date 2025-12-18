@@ -45,6 +45,12 @@ var (
 	}
 )
 
+type topLevelMetric struct {
+	name  string
+	query string
+	kind  metricKind
+}
+
 func getMetricValue(registry prometheus.Gatherer, metric topLevelMetric) (float64, error) {
 	metricFamilies, err := registry.Gather()
 	if err != nil {
@@ -68,12 +74,6 @@ func getMetricValue(registry prometheus.Gatherer, metric topLevelMetric) (float6
 	}
 
 	return 0, fmt.Errorf("metric %s not found", query)
-}
-
-type topLevelMetric struct {
-	name  string
-	query string
-	kind  metricKind
 }
 
 func getTopLevelMetrics(tc tests.TestContext, tool *benchmarkTool, registry prometheus.Gatherer, elapsed time.Duration) {
