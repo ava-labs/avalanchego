@@ -462,3 +462,71 @@ tasks:
     cmds:
       - task: build
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
+
+  # ============================================================================
+  # Bazel build tasks
+  # ============================================================================
+  # All bazel commands use scripts/run_bazel.sh to ensure nix shell environment
+
+  bazel-build:
+    desc: Build avalanchego with Bazel
+    cmds:
+      - ./scripts/run_bazel.sh build //main:avalanchego
+
+  bazel-build-opt:
+    desc: Build avalanchego with Bazel (optimized)
+    cmds:
+      - ./scripts/run_bazel.sh build --compilation_mode=opt //main:avalanchego
+
+  bazel-test:
+    desc: Run all tests with Bazel
+    cmds:
+      - ./scripts/run_bazel.sh test //...
+
+  bazel-clean:
+    desc: Clean Bazel build outputs
+    cmds:
+      - ./scripts/run_bazel.sh clean
+
+  bazel-clean-all:
+    desc: Clean all Bazel caches (full clean)
+    cmds:
+      - ./scripts/run_bazel.sh clean --expunge
+
+  bazel-gazelle:
+    desc: Run gazelle to update BUILD files
+    cmds:
+      - ./scripts/run_bazel.sh run //:gazelle
+
+  bazel-fmt:
+    desc: Format BUILD files with buildifier
+    cmds:
+      - buildifier -r .
+
+  bazel-mod-tidy:
+    desc: Tidy MODULE.bazel use_repo calls
+    cmds:
+      - ./scripts/run_bazel.sh mod tidy
+
+  bazel-clean-generated:
+    desc: Remove gazelle-generated BUILD.bazel files (keeps custom ones)
+    cmds:
+      - |
+        # Files with custom content that should NOT be deleted:
+        # - BUILD.bazel (root) - gazelle directives
+        # - main/BUILD.bazel - x_defs for git commit
+        # - graft/coreth/BUILD.bazel - gazelle prefix
+        # - graft/evm/BUILD.bazel - gazelle prefix
+        # - graft/subnet-evm/BUILD.bazel - gazelle prefix
+        # - .bazel/BUILD.bazel - exports
+        # - .bazel/patches/BUILD.bazel - exports
+        find . -name "BUILD.bazel" -type f \
+          ! -path "./BUILD.bazel" \
+          ! -path "./main/BUILD.bazel" \
+          ! -path "./graft/coreth/BUILD.bazel" \
+          ! -path "./graft/evm/BUILD.bazel" \
+          ! -path "./graft/subnet-evm/BUILD.bazel" \
+          ! -path "./.bazel/BUILD.bazel" \
+          ! -path "./.bazel/patches/BUILD.bazel" \
+          -delete
+        echo "Removed generated BUILD.bazel files. Run 'task bazel-gazelle' to regenerate."
