@@ -208,7 +208,7 @@ type Config struct {
 	RequiredAvailableDiskSpace           uint64 `json:"requiredAvailableDiskSpace"`
 	RequiredAvailableDiskSpacePercentage uint64 `json:"requiredAvailableDiskSpacePercentage"`
 	WarningThresholdAvailableDiskSpace   uint64 `json:"warningThresholdAvailableDiskSpace"`
-	WarningAvailableDiskSpacePercentage  uint64 `json:"warningThresholdAvailableDiskSpacePercentage"`
+	WarningAvailableDiskSpacePercentage  uint64 `json:"warningAvailableDiskSpacePercentage"`
 
 	TraceConfig trace.Config `json:"traceConfig"`
 
