@@ -31,9 +31,7 @@ const (
 	subnetAName = "load-subnet-a"
 )
 
-var (
-	flagVars *e2e.FlagVars
-)
+var flagVars *e2e.FlagVars
 
 func init() {
 	// Configures flags used to configure tmpnet
