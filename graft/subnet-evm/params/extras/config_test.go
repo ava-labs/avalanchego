@@ -11,13 +11,12 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 )
-
-func pointer[T any](v T) *T { return &v }
 
 func TestChainConfigDescription(t *testing.T) {
 	t.Parallel()
@@ -40,10 +39,10 @@ $`,
 		"set": {
 			config: &ChainConfig{
 				NetworkUpgrades: NetworkUpgrades{
-					SubnetEVMTimestamp: pointer(uint64(1)),
-					DurangoTimestamp:   pointer(uint64(2)),
-					EtnaTimestamp:      pointer(uint64(3)),
-					FortunaTimestamp:   pointer(uint64(4)),
+					SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+					DurangoTimestamp:   utils.PointerTo[uint64](2),
+					EtnaTimestamp:      utils.PointerTo[uint64](3),
+					FortunaTimestamp:   utils.PointerTo[uint64](4),
 				},
 				FeeConfig: commontype.FeeConfig{
 					GasLimit:                 big.NewInt(5),
@@ -58,11 +57,11 @@ $`,
 				AllowFeeRecipients: true,
 				UpgradeConfig: UpgradeConfig{
 					NetworkUpgradeOverrides: &NetworkUpgrades{
-						SubnetEVMTimestamp: pointer(uint64(13)),
+						SubnetEVMTimestamp: utils.PointerTo[uint64](13),
 					},
 					StateUpgrades: []StateUpgrade{
 						{
-							BlockTimestamp: pointer(uint64(14)),
+							BlockTimestamp: utils.PointerTo[uint64](14),
 							StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
 								{15}: {
 									Code: []byte{16},
@@ -123,8 +122,8 @@ func TestChainConfigVerify(t *testing.T) {
 				UpgradeConfig: UpgradeConfig{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						// same precompile cannot be configured twice for the same timestamp
-						{Config: txallowlist.NewDisableConfig(pointer(uint64(1)))},
-						{Config: txallowlist.NewDisableConfig(pointer(uint64(1)))},
+						{Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](1))},
+						{Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](1))},
 					},
 				},
 			},
@@ -155,10 +154,10 @@ func TestChainConfigVerify(t *testing.T) {
 			config: ChainConfig{
 				FeeConfig: validFeeConfig,
 				NetworkUpgrades: NetworkUpgrades{
-					SubnetEVMTimestamp: pointer(uint64(1)),
-					DurangoTimestamp:   pointer(uint64(2)),
-					EtnaTimestamp:      pointer(uint64(3)),
-					FortunaTimestamp:   pointer(uint64(4)),
+					SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+					DurangoTimestamp:   utils.PointerTo[uint64](2),
+					EtnaTimestamp:      utils.PointerTo[uint64](3),
+					FortunaTimestamp:   utils.PointerTo[uint64](4),
 				},
 				AvalancheContext: AvalancheContext{SnowCtx: &snow.Context{
 					NetworkUpgrades: upgrade.Config{
