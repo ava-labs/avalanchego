@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "convert-subnet-to-l1_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/convert-subnet-to-l1",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//api/info",
+        "//genesis",
+        "//ids",
+        "//utils/units",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/warp/message",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "convert-subnet-to-l1",
+    embed = [":convert-subnet-to-l1_lib"],
+    visibility = ["//visibility:public"],
+)

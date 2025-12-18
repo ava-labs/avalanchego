@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "checkpoints_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/genesis/generate/checkpoints",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//ids",
+        "//indexer",
+        "//utils/constants",
+        "//utils/perms",
+        "//utils/set",
+    ],
+)
+
+go_binary(
+    name = "checkpoints",
+    embed = [":checkpoints_lib"],
+    visibility = ["//visibility:public"],
+)

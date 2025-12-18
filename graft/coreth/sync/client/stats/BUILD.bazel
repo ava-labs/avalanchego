@@ -1,0 +1,12 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "stats",
+    srcs = ["stats.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/plugin/evm/message",
+        "@com_github_ava_labs_libevm//metrics",
+    ],
+)

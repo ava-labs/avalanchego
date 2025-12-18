@@ -1,0 +1,32 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "config",
+    srcs = [
+        "config.go",
+        "constants.go",
+        "default_config.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/utils",
+        "//utils/constants",
+        "//utils/units",
+        "//vms/components/gas",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_spf13_cast//:cast",
+    ],
+)
+
+go_test(
+    name = "config_test",
+    srcs = ["config_test.go"],
+    embed = [":config"],
+    deps = [
+        "//utils/constants",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+    ],
+)

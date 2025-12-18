@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "factory",
+    srcs = ["factory.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/factory",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/plugin/evm",
+        "//graft/coreth/plugin/evm/atomic/vm",
+        "//ids",
+        "//snow/engine/snowman/block",
+        "//utils/logging",
+        "//vms",
+    ],
+)
