@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766061945559,
+  "lastUpdate": 1766071073631,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -134,6 +134,33 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd-jp6dz-runner-v2vcq - mgas/s",
             "value": 71.66159373072061,
+            "unit": "mgas/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Austin Larson",
+            "username": "alarso16",
+            "email": "78000745+alarso16@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "85439fcbb1d2ed35b340ccbd965b709c8aa66b2f",
+          "message": "refactor: Firewood Revisions (#4669)",
+          "timestamp": "2025-12-18T13:34:37Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/85439fcbb1d2ed35b340ccbd965b709c8aa66b2f"
+        },
+        "date": 1766071070390,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast-79qqw-runner-7vrt6 - mgas/s",
+            "value": 43.157790201878974,
             "unit": "mgas/s"
           }
         ]
