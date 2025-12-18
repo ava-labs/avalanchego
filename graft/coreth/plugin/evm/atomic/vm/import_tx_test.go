@@ -28,7 +28,7 @@ import (
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // createImportTxOptions adds a UTXO to shared memory and generates a list of import transactions sending this UTXO
@@ -99,8 +99,8 @@ func TestImportTxVerify(t *testing.T) {
 	}
 
 	// Sort the inputs and outputs to ensure the transaction is canonical
-	avalancheutils.Sort(importTx.ImportedInputs)
-	avalancheutils.Sort(importTx.Outs)
+	utils.Sort(importTx.ImportedInputs)
+	utils.Sort(importTx.Outs)
 
 	tests := map[string]atomicTxVerifyTest{
 		"nil tx": {
