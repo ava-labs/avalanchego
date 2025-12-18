@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/ethconfig"
@@ -26,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
+	"github.com/ava-labs/avalanchego/utils"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
 	rewardmanagerbindings "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager/rewardmanagertest/bindings"

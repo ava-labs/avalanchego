@@ -6,13 +6,12 @@ package utils
 import (
 	"math/big"
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
-func PointerTo[T any](x T) *T { return &x }
-
 func TimeToNewUint64(time time.Time) *uint64 {
-	unix := uint64(time.Unix())
-	return PointerTo(unix)
+	return utils.PointerTo(uint64(time.Unix()))
 }
 
 func Uint64ToTime(val *uint64) time.Time {

@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/libevm/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/utils"
 
 	dto "github.com/prometheus/client_model/go"
 )

@@ -10,12 +10,12 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"go.uber.org/mock/gomock"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var validFeeConfig = commontype.FeeConfig{

@@ -14,12 +14,12 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

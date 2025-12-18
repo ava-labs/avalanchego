@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
@@ -20,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestVerifyWithChainConfig(t *testing.T) {

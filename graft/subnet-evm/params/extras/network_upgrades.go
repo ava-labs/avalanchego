@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
 
+	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -237,7 +238,7 @@ func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
 // Nil values are used to indicate optional upgrades.
 func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 	return NetworkUpgrades{
-		SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+		SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
 		DurangoTimestamp:   utils.TimeToNewUint64(agoUpgrade.DurangoTime),
 		EtnaTimestamp:      utils.TimeToNewUint64(agoUpgrade.EtnaTime),
 		FortunaTimestamp:   nil, // Fortuna is optional and has no effect on Subnet-EVM

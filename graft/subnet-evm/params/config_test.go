@@ -35,11 +35,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
