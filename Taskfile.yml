@@ -3,6 +3,10 @@
 # If in the nix dev shell, `task` is available.
 # To install nix, `./scripts/run_task.sh install-nix`
 
+# - Tasks should be simple entrypoints to functionality exposed by scripts or code.
+# - Avoid the temptation to use task vars to define an API surface. Prefer configuring the
+#   underlying script or code via CLI args and/or env vars.
+
 version: '3'
 
 tasks:
@@ -126,6 +130,10 @@ tasks:
     desc: Runs ginkgo against the current working directory
     cmd: ./bin/ginkgo build {{.USER_WORKING_DIR}}
 
+  import-chain-data:
+    desc: Imports the C-Chain block and state data to re-execute.
+    cmd: ./scripts/import_cchain_data.sh
+
   install-nix:
     desc: Installs nix with an OS-appropriate installer
     cmd: ./scripts/install_nix.sh
@@ -189,9 +197,9 @@ tasks:
     desc: Runs test of cross-platform docker image build
     cmd: bash -x scripts/tests.build_image.sh
 
-  test-c-chain-reexecution:
+  test-cchain-reexecution:
     desc: Runs C-Chain re-execution test. Run without args to see available tests.
-    cmd: ./scripts/reexecute_cchain.sh {{.CLI_ARGS}}
+    cmd: ./scripts/benchmark_cchain_range.sh {{.CLI_ARGS}}
 
   test-e2e:
     desc: Runs e2e tests
