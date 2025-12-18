@@ -33,7 +33,6 @@ const (
 
 var (
 	flagVars *e2e.FlagVars
-	testDir  string
 )
 
 func init() {
@@ -50,7 +49,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 
 	var env *e2e.TestEnvironment
 	_, thisFile, _, _ := runtime.Caller(0)
-	testDir = filepath.Dir(thisFile)
+	testDir := filepath.Dir(thisFile)
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
