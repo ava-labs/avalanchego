@@ -24,7 +24,7 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca
 	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
-	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
+	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -92,7 +92,7 @@ require github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-00000000
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.16 // indirect
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18 // indirect
 	github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
@@ -173,7 +173,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sagikazarmark/locafero v0.9.0 // indirect
 	github.com/sanity-io/litter v1.5.1 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.14.0 // indirect
 	github.com/status-im/keycard-go v0.2.0 // indirect

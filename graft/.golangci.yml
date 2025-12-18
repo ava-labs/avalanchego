@@ -1,4 +1,9 @@
-version: "2"
+# Shared golangci-lint config for graft modules (coreth, subnet-evm, evm).
+#
+# This is a relaxed config that runs on all files, including legacy geth code.
+# A second pass using avalanchego's stricter config (../../.golangci.yml) runs
+# only on Avalanche-authored files (excluding upstream files in upstream_files.txt).
+version: "2" 
 run:
   tests: true
 
@@ -29,8 +34,8 @@ linters:
 
         # There's a lot of legacy code that triggers these warnings after upgrading golangci-lint.
         # These checks are removed.
-        - -QF1001  # Apply De Morgan’s law
-        - -QF1002  # Convert an untagged switch comparing the same variable into a “tagged” switch
+        - -QF1001  # Apply De Morgan's law
+        - -QF1002  # Convert an untagged switch comparing the same variable into a "tagged" switch
         - -QF1003  # Convert if / else-if chains comparing the same variable into a tagged switch
         - -QF1006  # Lift if + break into loop condition
         - -QF1008  # Omit embedded fields from selector expression
@@ -39,7 +44,7 @@ linters:
         - -SA4009  # A function argument is overwritten before its first use. 
         - -SA9003  # Empty body in an if or else branch.
         - -ST1003  # Poorly chosen identifier.
-        - -ST1008  # A function’s error value should be its last return value.
+        - -ST1008  # A function's error value should be its last return value.
         - -ST1016  # Use consistent method receiver names (e.g. avoid mixing `s *S`, `s S`, `t *T` in same type).
 
   exclusions:
