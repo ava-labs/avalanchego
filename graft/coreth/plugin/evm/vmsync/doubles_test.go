@@ -52,7 +52,6 @@ func (f FuncSyncer) Sync(ctx context.Context) error { return f.fn(ctx) }
 func (FuncSyncer) Name() string                          { return "Test Name" }
 func (FuncSyncer) ID() string                            { return "test_id" }
 func (FuncSyncer) UpdateTarget(_ message.Syncable) error { return nil }
-func (FuncSyncer) Finalize(_ context.Context) error      { return nil }
 
 var _ syncpkg.Syncer = FuncSyncer{}
 

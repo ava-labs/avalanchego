@@ -53,6 +53,10 @@ func (r *SyncerRegistry) Register(syncer syncpkg.Syncer) error {
 
 // RunSyncerTasks executes all registered syncers synchronously.
 func (r *SyncerRegistry) RunSyncerTasks(ctx context.Context, summary message.Syncable) error {
+	// Ensure finalization runs regardless of how this function exits.
+	// This guarantees cleanup even on early returns or panics.
+	defer r.FinalizeAll(summary)
+
 	// Early return if context is already canceled (e.g., during shutdown).
 	if err := ctx.Err(); err != nil {
 		return err
@@ -116,16 +120,14 @@ func (r *SyncerRegistry) UpdateSyncTarget(newTarget message.Syncable) error {
 	return nil
 }
 
-// FinalizeAll calls Finalize on all registered syncers.
-// This should be called after all syncers have completed their Sync() operations
-// and before finalizing the VM state.
-func (r *SyncerRegistry) FinalizeAll(ctx context.Context) error {
+// FinalizeAll iterates over all registered syncers and calls Finalize on those that implement the Finalizer interface.
+// Errors are logged but not returned to ensure best-effort cleanup of all syncers.
+func (r *SyncerRegistry) FinalizeAll(summary message.Syncable) {
 	for _, task := range r.syncers {
-		if err := task.syncer.Finalize(ctx); err != nil {
-			log.Error("failed finalizing syncer", "name", task.name, "err", err)
-			return fmt.Errorf("%s finalize failed: %w", task.name, err)
+		if f, ok := task.syncer.(syncpkg.Finalizer); ok {
+			if err := f.Finalize(); err != nil {
+				log.Error("failed to finalize syncer", "syncer", task.name, "err", err, "summary", summary.GetBlockHash().Hex(), "height", summary.Height())
+			}
 		}
-		log.Info("finalized syncer", "name", task.name)
 	}
-	return nil
 }

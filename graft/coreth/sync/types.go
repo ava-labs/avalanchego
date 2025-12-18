@@ -22,6 +22,9 @@ type Syncer interface {
 	// The sync will respect context cancellation.
 	Sync(ctx context.Context) error
 
+	// UpdateTarget updates the syncer's target while running to support dynamic state sync.
+	UpdateTarget(newTarget message.Syncable) error
+
 	// Name returns a human-readable name for this syncer implementation.
 	Name() string
 
@@ -29,12 +32,13 @@ type Syncer interface {
 	// "state_evm_state_sync", "state_atomic_sync"). Implementations should ensure this is unique and
 	// stable across renames for logging/metrics/deduplication.
 	ID() string
+}
 
-	// UpdateTarget updates the syncer's target while running to support dynamic state sync.
-	UpdateTarget(newTarget message.Syncable) error
-
-	// Finalize is called when the syncer is finished.
-	Finalize(ctx context.Context) error
+// Finalizer provides a mechanism to perform cleanup operations after a sync operation.
+// This is useful for handling inflight requests, flushing to disk, or other cleanup tasks.
+type Finalizer interface {
+	// Finalize performs any necessary cleanup operations.
+	Finalize() error
 }
 
 // SummaryProvider is an interface for providing state summaries.

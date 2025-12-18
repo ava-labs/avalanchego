@@ -5,6 +5,7 @@ package vmsync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/blocksync"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync"
@@ -31,23 +33,17 @@ import (
 // The last 256 block hashes are necessary to support the BLOCKHASH opcode.
 const BlocksToFetch = 256
 
-var stateSyncSummaryKey = []byte("stateSyncSummary")
+var (
+	stateSyncSummaryKey = []byte("stateSyncSummary")
 
-// SyncStrategy defines how state sync is executed.
-// Implementations handle syncer orchestration and block processing during sync.
-type SyncStrategy interface {
-	// Start begins sync and blocks until completion or error.
-	Start(ctx context.Context, summary message.Syncable) error
-
-	// OnBlockAccepted handles a block accepted during sync.
-	OnBlockAccepted(EthBlockWrapper) (bool, error)
-
-	// OnBlockRejected handles a block rejected during sync.
-	OnBlockRejected(EthBlockWrapper) (bool, error)
-
-	// OnBlockVerified handles a block verified during sync.
-	OnBlockVerified(EthBlockWrapper) (bool, error)
-}
+	errSkipSync            = errors.New("skip sync")
+	errBlockNotFound       = errors.New("block not found in state")
+	errInvalidBlockType    = errors.New("invalid block wrapper type")
+	errBlockHashMismatch   = errors.New("block hash mismatch")
+	errBlockHeightMismatch = errors.New("block height mismatch")
+	errCommitCancelled     = errors.New("commit cancelled")
+	errCommitMarkers       = errors.New("failed to commit VM markers")
+)
 
 // BlockAcceptor provides a mechanism to update the last accepted block ID during state synchronization.
 type BlockAcceptor interface {
@@ -64,6 +60,29 @@ type EthBlockWrapper interface {
 	Reject(context.Context) error
 	Verify(context.Context) error
 }
+
+// Committer commits sync results to the VM, preparing it for bootstrapping.
+type Committer interface {
+	Commit(ctx context.Context, summary message.Syncable) error
+}
+
+// Executor defines how state sync is executed.
+// Implementations handle the sync lifecycle differently based on sync mode.
+type Executor interface {
+	// Execute runs the sync process and blocks until completion or error.
+	Execute(ctx context.Context, summary message.Syncable) error
+
+	// OnBlockAccepted handles a block accepted during sync.
+	OnBlockAccepted(EthBlockWrapper) (bool, error)
+
+	// OnBlockRejected handles a block rejected during sync.
+	OnBlockRejected(EthBlockWrapper) (bool, error)
+
+	// OnBlockVerified handles a block verified during sync.
+	OnBlockVerified(EthBlockWrapper) (bool, error)
+}
+
+var _ Committer = (*client)(nil)
 
 type ClientConfig struct {
 	Chain      *eth.Ethereum
@@ -102,8 +121,8 @@ type client struct {
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
 	err              error
-	stateSyncOnce    sync.Once    // ensures only one state sync can be in progress at a time
-	strategy         SyncStrategy // strategy manages sync execution (static or dynamic)
+	stateSyncOnce    sync.Once  // ensures only one state sync can be in progress at a time
+	executor         Executor   // executor manages sync execution (static or dynamic)
 }
 
 func NewClient(config *ClientConfig) Client {
@@ -174,28 +193,28 @@ func (c *client) ParseStateSummary(_ context.Context, summaryBytes []byte) (bloc
 	return c.config.Parser.Parse(summaryBytes, c.acceptSyncSummary)
 }
 
-// OnEngineAccept delegates to the strategy if active.
+// OnEngineAccept delegates to the executor if active.
 func (c *client) OnEngineAccept(b EthBlockWrapper) (bool, error) {
-	if c.strategy == nil {
+	if c.executor == nil {
 		return false, nil
 	}
-	return c.strategy.OnBlockAccepted(b)
+	return c.executor.OnBlockAccepted(b)
 }
 
-// OnEngineReject delegates to the strategy if active.
+// OnEngineReject delegates to the executor if active.
 func (c *client) OnEngineReject(b EthBlockWrapper) (bool, error) {
-	if c.strategy == nil {
+	if c.executor == nil {
 		return false, nil
 	}
-	return c.strategy.OnBlockRejected(b)
+	return c.executor.OnBlockRejected(b)
 }
 
-// OnEngineVerify delegates to the strategy if active.
+// OnEngineVerify delegates to the executor if active.
 func (c *client) OnEngineVerify(b EthBlockWrapper) (bool, error) {
-	if c.strategy == nil {
+	if c.executor == nil {
 		return false, nil
 	}
-	return c.strategy.OnBlockVerified(b)
+	return c.executor.OnBlockVerified(b)
 }
 
 func (c *client) Shutdown() error {
@@ -213,7 +232,7 @@ func (c *client) Error() error {
 // in a goroutine.
 func (c *client) acceptSyncSummary(proposedSummary message.Syncable) (block.StateSyncMode, error) {
 	// If dynamic sync is already running, treat new summaries as target updates.
-	if ds, ok := c.strategy.(*dynamicStrategy); ok && ds.CurrentState() == StateRunning {
+	if ds, ok := c.executor.(*dynamicExecutor); ok && ds.CurrentState() == StateRunning {
 		if err := ds.UpdateSyncTarget(proposedSummary); err != nil {
 			return block.StateSyncSkipped, err
 		}
@@ -264,33 +283,23 @@ func (c *client) acceptSyncSummary(proposedSummary message.Syncable) (block.Stat
 		return block.StateSyncSkipped, err
 	}
 
-	finalizer := newFinalizer(
-		c.config.Chain,
-		c.config.State,
-		c.config.Acceptor,
-		c.config.VerDB,
-		c.config.MetadataDB,
-		c.config.Extender,
-		c.config.LastAcceptedHeight,
-	)
-
 	var (
-		strategy SyncStrategy
+		executor Executor
 		mode     block.StateSyncMode
 	)
 	if c.config.DynamicStateSyncEnabled {
-		strategy = newDynamicStrategy(registry, finalizer, c.config.PivotInterval)
+		executor = newDynamicExecutor(registry, c, c.config.PivotInterval)
 		mode = block.StateSyncDynamic
 	} else {
-		strategy = newStaticStrategy(registry, finalizer)
+		executor = newStaticExecutor(registry, c)
 		mode = block.StateSyncStatic
 	}
 
-	c.strategy = strategy
+	c.executor = executor
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		err := strategy.Start(ctx, proposedSummary)
+		err := executor.Execute(ctx, proposedSummary)
 		c.signalDone(err)
 	}()
 
@@ -307,6 +316,90 @@ func (c *client) signalDone(err error) {
 		}
 		close(c.config.StateSyncDone)
 	})
+}
+
+// Commit implements Committer. It resets the blockchain to the synced block,
+// preparing it for execution, and updates disk and memory pointers so the VM
+// is ready for bootstrapping. Also executes any shared memory operations from
+// the atomic trie to shared memory.
+func (c *client) Commit(ctx context.Context, summary message.Syncable) error {
+	stateBlock, err := c.config.State.GetBlock(ctx, ids.ID(summary.GetBlockHash()))
+	if err != nil {
+		return fmt.Errorf("%w: hash=%s", errBlockNotFound, summary.GetBlockHash())
+	}
+
+	wrapper, ok := stateBlock.(*chain.BlockWrapper)
+	if !ok {
+		return fmt.Errorf("%w: got %T, want *chain.BlockWrapper", errInvalidBlockType, stateBlock)
+	}
+	wrappedBlock := wrapper.Block
+
+	evmBlockGetter, ok := wrappedBlock.(EthBlockWrapper)
+	if !ok {
+		return fmt.Errorf("%w: got %T, want EthBlockWrapper", errInvalidBlockType, wrappedBlock)
+	}
+
+	block := evmBlockGetter.GetEthBlock()
+
+	if block.Hash() != summary.GetBlockHash() {
+		return fmt.Errorf("%w: got %s, want %s", errBlockHashMismatch, block.Hash(), summary.GetBlockHash())
+	}
+	if block.NumberU64() != summary.Height() {
+		return fmt.Errorf("%w: got %d, want %d", errBlockHeightMismatch, block.NumberU64(), summary.Height())
+	}
+
+	// BloomIndexer needs to know that some parts of the chain are not available
+	// and cannot be indexed. This is done by calling [AddCheckpoint] here.
+	// Since the indexer uses sections of size [params.BloomBitsBlocks] (= 4096),
+	// each block is indexed in section number [blockNumber/params.BloomBitsBlocks].
+	// To allow the indexer to start with the block we just synced to,
+	// we create a checkpoint for its parent.
+	// Note: This requires assuming the synced block height is divisible
+	// by [params.BloomBitsBlocks].
+	parentHeight := block.NumberU64() - 1
+	parentHash := block.ParentHash()
+	c.config.Chain.BloomIndexer().AddCheckpoint(parentHeight/params.BloomBitsBlocks, parentHash)
+
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("%w: %w", errCommitCancelled, err)
+	}
+	if err := c.config.Chain.BlockChain().ResetToStateSyncedBlock(block); err != nil {
+		return err
+	}
+
+	if c.config.Extender != nil {
+		if err := c.config.Extender.OnFinishBeforeCommit(c.config.LastAcceptedHeight, summary); err != nil {
+			return err
+		}
+	}
+
+	if err := c.commitMarkers(summary); err != nil {
+		return fmt.Errorf("%w: height=%d, hash=%s: %w", errCommitMarkers, block.NumberU64(), block.Hash(), err)
+	}
+
+	if err := c.config.State.SetLastAcceptedBlock(wrappedBlock); err != nil {
+		return err
+	}
+
+	if c.config.Extender != nil {
+		if err := c.config.Extender.OnFinishAfterCommit(block.NumberU64()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// commitMarkers updates VM database markers atomically.
+func (c *client) commitMarkers(summary message.Syncable) error {
+	id := ids.ID(summary.GetBlockHash())
+	if err := c.config.Acceptor.PutLastAcceptedID(id); err != nil {
+		return err
+	}
+	if err := c.config.MetadataDB.Delete(stateSyncSummaryKey); err != nil {
+		return err
+	}
+	return c.config.VerDB.Commit()
 }
 
 // newSyncerRegistry creates a registry with all required syncers for the given summary.

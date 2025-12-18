@@ -33,6 +33,7 @@ const (
 var (
 	_ sync.Syncer             = (*Syncer)(nil)
 	_ syncclient.LeafSyncTask = (*syncerLeafTask)(nil)
+	_ sync.Finalizer          = (*Syncer)(nil)
 
 	errTargetHeightRequired = errors.New("target height must be > 0")
 )
@@ -125,7 +126,6 @@ func NewSyncer(client syncclient.LeafClient, db *versiondb.Database, atomicTrie 
 	syncer.syncer = syncclient.NewCallbackLeafSyncer(client, tasks, &syncclient.LeafSyncerConfig{
 		RequestSize: cfg.requestSize,
 		NumWorkers:  cfg.numWorkers,
-		OnFailure:   func() {}, // No-op since we flush progress to disk at the regular commit interval.
 	})
 
 	return syncer, nil
@@ -150,8 +150,11 @@ func (*Syncer) UpdateTarget(_ message.Syncable) error {
 	return nil
 }
 
-func (*Syncer) Finalize(_ context.Context) error {
-	return nil
+// Finalize commits any pending database changes to disk.
+// This ensures that even if the sync is cancelled or fails, we preserve
+// the progress up to the last fully synced height.
+func (s *Syncer) Finalize() error {
+	return s.db.Commit()
 }
 
 // addZeroes returns the big-endian representation of `height`, prefixed with [common.HashLength] zeroes.

@@ -101,11 +101,7 @@ func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 			co.finish(cancel, err)
 			return
 		}
-		// All syncers finished successfully: finalize syncers, then finalize VM and execute the queued batch.
-		if err := co.syncerRegistry.FinalizeAll(cctx); err != nil {
-			co.finish(cancel, err)
-			return
-		}
+
 		if err := co.ProcessQueuedBlockOperations(cctx); err != nil {
 			co.finish(cancel, err)
 			return
