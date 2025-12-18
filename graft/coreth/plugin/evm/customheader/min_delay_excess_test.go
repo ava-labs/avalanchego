@@ -64,7 +64,7 @@ func TestMinDelayExcess(t *testing.T) {
 				Time: activatingGraniteTimestamp + 1,
 			},
 			desiredMinDelayExcess: nil,
-			expectedDelayExcess:   utils.PointerTo(acp226.DelayExcess(acp226.InitialDelayExcess)),
+			expectedDelayExcess:   utils.PointerTo(acp226.InitialDelayExcess),
 		},
 		{
 			name:   "granite_no_parent_min_delay_error",
