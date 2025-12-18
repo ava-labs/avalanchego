@@ -38,8 +38,8 @@ const (
 // Flags suggested for temporary networks. Applied by default.
 func DefaultTmpnetFlags() FlagsMap {
 	return FlagsMap{
-		config.SystemTrackerRequiredAvailableDiskSpacePercentageKey: "1",
-		config.SystemTrackerWarningAvailableDiskSpacePercentageKey:  "1",
+		config.SystemTrackerRequiredAvailableDiskSpacePercentageKey: "0",
+		config.SystemTrackerWarningAvailableDiskSpacePercentageKey:  "0",
 		config.NetworkPeerListPullGossipFreqKey:                     "250ms",
 		config.NetworkMaxReconnectDelayKey:                          "1s",
 		config.HealthCheckFreqKey:                                   "2s",
