@@ -24,8 +24,6 @@ import (
 )
 
 var (
-	errUnexpectedKey        = errors.New("unexpected database key")
-	errNotInitialized       = errors.New("database not initialized")
 	errAlreadyInitialized   = errors.New("database already initialized")
 	errInvalidEncodedLength = errors.New("invalid encoded length")
 )
@@ -49,7 +47,6 @@ type Database struct {
 	dbPath    string
 	minHeight uint64
 
-	migrator       *migrator
 	heightDBsReady bool
 
 	reg    prometheus.Registerer
@@ -62,6 +59,18 @@ func encodeBlockNumber(number uint64) []byte {
 	enc := make([]byte, blockNumberSize)
 	binary.BigEndian.PutUint64(enc, number)
 	return enc
+}
+
+func blockHeaderKey(num uint64, hash common.Hash) []byte {
+	return slices.Concat([]byte{evmHeaderPrefix}, encodeBlockNumber(num), hash.Bytes())
+}
+
+func blockBodyKey(num uint64, hash common.Hash) []byte {
+	return slices.Concat([]byte{evmBlockBodyPrefix}, encodeBlockNumber(num), hash.Bytes())
+}
+
+func receiptsKey(num uint64, hash common.Hash) []byte {
+	return slices.Concat([]byte{evmReceiptsPrefix}, encodeBlockNumber(num), hash.Bytes())
 }
 
 // blockDBMinHeightKey stores the minimum block height of the
@@ -149,10 +158,6 @@ func New(
 			return databaseMinHeight(db.metaDB)
 		},
 		func() (uint64, bool, error) {
-			// Use the minimum block height of existing blocks to migrate.
-			return minBlockHeightToMigrate(evmDB)
-		},
-		func() (uint64, bool, error) {
 			// Use min height 1 unless deferring initialization.
 			return 1, !allowDeferredInit, nil
 		},
@@ -207,15 +212,6 @@ func (db *Database) InitBlockDBs(minHeight uint64) error {
 	db.bodyDB = bodyDB
 	db.receiptsDB = receiptsDB
 
-	if err := db.initMigrator(); err != nil {
-		return errors.Join(
-			fmt.Errorf("failed to initialize migrator: %w", err),
-			headerDB.Close(),
-			bodyDB.Close(),
-			receiptsDB.Close(),
-		)
-	}
-
 	db.heightDBsReady = true
 	db.minHeight = minHeight
 
@@ -254,7 +250,6 @@ func parseBlockKey(key []byte) (num uint64, hash common.Hash, ok bool) {
 }
 
 type parsedBlockKey struct {
-	key  []byte
 	db   database.HeightIndex
 	num  uint64
 	hash common.Hash
@@ -306,21 +301,15 @@ func (db *Database) parseKey(key []byte) (*parsedBlockKey, bool) {
 	}
 
 	return &parsedBlockKey{
-		key:  key,
 		db:   hdb,
 		num:  num,
 		hash: hash,
 	}, true
 }
 
-// readBlock reads data from [database.HeightIndex] and falls back
-// to the [ethdb.Database] if the data is not found and migration is not complete.
-func (db *Database) readBlock(p *parsedBlockKey) ([]byte, error) {
+func (*Database) readBlock(p *parsedBlockKey) ([]byte, error) {
 	data, err := p.db.Get(p.num)
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) && !db.migrator.isCompleted() {
-			return db.Database.Get(p.key)
-		}
 		return nil, err
 	}
 
@@ -387,7 +376,6 @@ func (db *Database) Delete(key []byte) error {
 }
 
 func (db *Database) Close() error {
-	db.migrator.stop()
 	if !db.heightDBsReady {
 		return db.Database.Close()
 	}

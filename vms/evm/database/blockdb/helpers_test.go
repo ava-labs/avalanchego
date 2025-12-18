@@ -4,11 +4,9 @@
 package blockdb
 
 import (
-	"fmt"
 	"math/big"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -19,7 +17,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
@@ -29,20 +26,6 @@ import (
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 	heightindexdb "github.com/ava-labs/avalanchego/x/blockdb"
 )
-
-// blockingDatabase wraps a HeightIndex and blocks indefinitely on Put
-// if shouldBlock returns true.
-type blockingDatabase struct {
-	database.HeightIndex
-	shouldBlock func() bool
-}
-
-func (b *blockingDatabase) Put(num uint64, encodedBlock []byte) error {
-	if b.shouldBlock == nil || b.shouldBlock() {
-		<-make(chan struct{})
-	}
-	return b.HeightIndex.Put(num, encodedBlock)
-}
 
 func newDatabasesFromDir(t *testing.T, dataDir string) (*Database, ethdb.Database) {
 	t.Helper()
@@ -138,35 +121,4 @@ func logsFromReceipts(receipts types.Receipts) [][]*types.Log {
 		logs[i] = receipts[i].Logs
 	}
 	return logs
-}
-
-func startPartialMigration(t *testing.T, db *Database, blocksToMigrate uint64) {
-	t.Helper()
-
-	n := uint64(0)
-	db.migrator.headerDB = &blockingDatabase{
-		HeightIndex: db.headerDB,
-		shouldBlock: func() bool {
-			n++
-			return n > blocksToMigrate
-		},
-	}
-	startMigration(t, db, false)
-	require.Eventually(t, func() bool {
-		return db.migrator.processed.Load() >= blocksToMigrate
-	}, 5*time.Second, 100*time.Millisecond)
-}
-
-func startMigration(t *testing.T, db *Database, waitForCompletion bool) {
-	t.Helper()
-
-	db.migrator.completed.Store(false)
-	require.NoError(t, db.StartMigration(t.Context()))
-
-	if waitForCompletion {
-		timeout := 5 * time.Second
-		msg := fmt.Sprintf("Migration did not complete within timeout: %v", timeout)
-		require.True(t, db.migrator.waitMigratorDone(timeout), msg)
-		require.True(t, db.migrator.isCompleted())
-	}
 }

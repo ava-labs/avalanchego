@@ -5,7 +5,6 @@ package blockdb
 
 import (
 	"os"
-	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -276,25 +275,6 @@ func TestDatabaseInitialization(t *testing.T) {
 			name:        "empty evmDB and deferred init",
 			deferInit:   true,
 			wantDBReady: false, // db should not be ready due to deferred init
-		},
-		{
-			name:          "non genesis blocks to migrate",
-			evmDBBlocks:   blocks[5:10],
-			wantDBReady:   true,
-			wantMinHeight: 5,
-		},
-		{
-			name:          "blocks to migrate - including genesis",
-			evmDBBlocks:   slices.Concat([]*types.Block{blocks[0]}, blocks[5:10]),
-			wantDBReady:   true,
-			wantMinHeight: 5,
-		},
-		{
-			name:          "blocks to migrate and deferred init",
-			deferInit:     true,
-			evmDBBlocks:   blocks[5:10],
-			wantDBReady:   true,
-			wantMinHeight: 5,
 		},
 		{
 			name:          "existing db created with min height",
