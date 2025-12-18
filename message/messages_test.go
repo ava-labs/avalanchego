@@ -667,7 +667,7 @@ func TestMessage(t *testing.T) {
 
 			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes, ids.EmptyNodeID, func() {})
 			require.NoError(err)
-			require.Equal(tv.op, parsedMsg.Op())
+			require.Equal(tv.op, parsedMsg.Op)
 		})
 	}
 }
@@ -743,7 +743,7 @@ func TestNilInboundMessage(t *testing.T) {
 	parsedMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.NoError(err)
 
-	require.IsType(&p2p.Ping{}, parsedMsg.message)
-	pingMsg := parsedMsg.message.(*p2p.Ping)
+	require.IsType(&p2p.Ping{}, parsedMsg.Message)
+	pingMsg := parsedMsg.Message.(*p2p.Ping)
 	require.NotNil(pingMsg)
 }
