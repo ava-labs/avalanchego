@@ -10,7 +10,7 @@ This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/av
 
 ### Config
 
-- Added `--system-tracker-disk-required-available-space` and `--system-tracker-disk-warning-available-space-percentage` options.
+- Added `--system-tracker-disk-required-available-space-percentage` and `--system-tracker-disk-warning-available-space-percentage` options.
 - Deprecate `--system-tracker-disk-required-available-space` and `--system-tracker-disk-warning-threshold-available-space` options.
 
 ### Fixes
