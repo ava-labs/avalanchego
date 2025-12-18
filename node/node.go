@@ -1462,14 +1462,16 @@ func (n *Node) initHealthAPI() error {
 		var diskSpaceErrors []error
 
 		if availableDiskPercentage < n.Config.RequiredAvailableDiskSpacePercentage {
-			n.Log.Fatal("low on disk space percentage. Shutting down...",
+			n.Log.Fatal("low on disk space. Shutting down...",
+				zap.Uint64("availableDiskBytes", availableDiskBytes),
 				zap.Uint64("remainingDiskPercentage", availableDiskPercentage),
+				zap.Uint64("requiredDiskPercentage", n.Config.RequiredAvailableDiskSpacePercentage),
 			)
 			go n.Shutdown(1)
 			err := fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.RequiredAvailableDiskSpacePercentage)
 			diskSpaceErrors = append(diskSpaceErrors, err)
-		} else if availableDiskPercentage < n.Config.WarningThresholdAvailableDiskSpacePercentage {
-			err := fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningThresholdAvailableDiskSpacePercentage)
+		} else if availableDiskPercentage < n.Config.WarningAvailableDiskSpacePercentage {
+			err := fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningAvailableDiskSpacePercentage)
 			diskSpaceErrors = append(diskSpaceErrors, err)
 		}
 

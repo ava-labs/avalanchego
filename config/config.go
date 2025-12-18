@@ -61,7 +61,7 @@ var (
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
 	deprecatedKeys = map[string]string{
 		SystemTrackerRequiredAvailableDiskSpaceKey:         fmt.Sprintf("Use %s instead", SystemTrackerRequiredAvailableDiskSpacePercentageKey),
-		SystemTrackerWarningThresholdAvailableDiskSpaceKey: fmt.Sprintf("Use %s instead", SystemTrackerWarnThreshAvailDiskSpacePercentageKey),
+		SystemTrackerWarningThresholdAvailableDiskSpaceKey: fmt.Sprintf("Use %s instead", SystemTrackerWarningAvailableDiskSpacePercentageKey),
 	}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
@@ -1143,18 +1143,23 @@ func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 
 func getDiskSpaceConfig(v *viper.Viper) (
 	requiredAvailableDiskSpacePercentage uint64,
-	warnThresholdAvailableDiskSpacePercentage uint64,
+	warningAvailableDiskSpacePercentage uint64,
 	err error,
 ) {
-	requiredAvailableDiskSpacePercentage = v.GetUint64(SystemTrackerRequiredAvailableDiskSpacePercentageKey)
-	warnThresholdAvailableDiskSpacePercentage = v.GetUint64(SystemTrackerWarnThreshAvailDiskSpacePercentageKey)
+	var (
+		warnKey     = SystemTrackerWarningAvailableDiskSpacePercentageKey
+		requiredKey = SystemTrackerRequiredAvailableDiskSpacePercentageKey
+
+		warn     = v.GetUint64(warnKey)
+		required = v.GetUint64(requiredKey)
+	)
 	switch {
-	case warnThresholdAvailableDiskSpacePercentage > 50:
-		return 0, 0, fmt.Errorf("%q (%d) must be in [0, 50]", SystemTrackerWarnThreshAvailDiskSpacePercentageKey, warnThresholdAvailableDiskSpacePercentage)
-	case warnThresholdAvailableDiskSpacePercentage < requiredAvailableDiskSpacePercentage:
-		return 0, 0, fmt.Errorf("%q (%d) < %q (%d)", SystemTrackerWarnThreshAvailDiskSpacePercentageKey, warnThresholdAvailableDiskSpacePercentage, SystemTrackerRequiredAvailableDiskSpacePercentageKey, requiredAvailableDiskSpacePercentage)
+	case warn > 50:
+		return 0, 0, fmt.Errorf("%q (%d) must be in [0, 50]", warnKey, warn)
+	case warn < required:
+		return 0, 0, fmt.Errorf("%q (%d) < %q (%d)", warnKey, warn, requiredKey, required)
 	default:
-		return requiredAvailableDiskSpacePercentage, warnThresholdAvailableDiskSpacePercentage, nil
+		return required, warn, nil
 	}
 }
 
@@ -1409,7 +1414,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SystemTrackerCPUHalflife = v.GetDuration(SystemTrackerCPUHalflifeKey)
 	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
 
-	nodeConfig.RequiredAvailableDiskSpacePercentage, nodeConfig.WarningThresholdAvailableDiskSpacePercentage, err = getDiskSpaceConfig(v)
+	nodeConfig.RequiredAvailableDiskSpacePercentage, nodeConfig.WarningAvailableDiskSpacePercentage, err = getDiskSpaceConfig(v)
 	if err != nil {
 		return node.Config{}, err
 	}
