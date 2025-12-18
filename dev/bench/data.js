@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1765985292365,
+  "lastUpdate": 1766061945559,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -107,6 +107,33 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast-79qqw-runner-wp44t - mgas/s",
             "value": 41.8399508706141,
+            "unit": "mgas/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "5aede7eaddad7e4f6ecf5c20e22c5b7e6340a44e",
+          "message": "Remove `message.OutboundMessage` interface (#4766)",
+          "timestamp": "2025-12-17T21:12:00Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/5aede7eaddad7e4f6ecf5c20e22c5b7e6340a44e"
+        },
+        "date": 1766061944679,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd-jp6dz-runner-v2vcq - mgas/s",
+            "value": 71.66159373072061,
             "unit": "mgas/s"
           }
         ]
