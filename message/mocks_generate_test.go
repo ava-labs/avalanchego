@@ -3,5 +3,4 @@
 
 package message
 
-//go:generate go tool mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/outbound_message.go -mock_names=OutboundMessage=OutboundMessage . OutboundMessage
 //go:generate go tool mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/outbound_message_builder.go -mock_names=OutboundMsgBuilder=OutboundMsgBuilder . OutboundMsgBuilder
