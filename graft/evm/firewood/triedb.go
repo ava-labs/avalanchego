@@ -325,13 +325,13 @@ func (ps *proposals) exists(root, block, parentBlock common.Hash) bool {
 	for _, p := range proposals {
 		// If the block hash is already tracked, we can skip proposing this again.
 		if _, ok := p.blockHashes[block]; ok {
-			log.Debug("proposal already exists", "root", root.Hex(), "parent", parentBlock.Hex(), "block", block, "hash", block.Hex())
+			log.Debug("proposal already exists", "root", root.Hex(), "parentBlock", parentBlock.Hex(), "block", block.Hex())
 			return true
 		}
 
 		// We have an identical proposal, but should ensure the hash is tracked with this proposal.
 		if _, ok := p.parent.blockHashes[parentBlock]; ok {
-			log.Debug("proposal already exists, updating hash", "root", root.Hex(), "parent", parentBlock.Hex(), "block", block, "hash", block.Hex())
+			log.Debug("proposal already exists, updating hash", "root", root.Hex(), "parentBlock", parentBlock.Hex(), "block", block.Hex())
 			p.blockHashes[block] = struct{}{}
 			return true
 		}

@@ -273,7 +273,7 @@ func (a *accountTrie) Copy() *accountTrie {
 		parentRoot:   a.parentRoot,
 		root:         a.root,
 		reader:       a.reader, // Share the same reader
-		hasChanges:   true,     // Mark as having changes to ensure re-hashing
+		hasChanges:   a.hasChanges,
 		dirtyKeys:    make(map[string][]byte, len(a.dirtyKeys)),
 		updateKeys:   make([][]byte, len(a.updateKeys)),
 		updateValues: make([][]byte, len(a.updateValues)),
