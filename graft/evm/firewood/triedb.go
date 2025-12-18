@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/metrics"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/libevm/triedb"
@@ -30,19 +31,28 @@ const firewoodDir = "firewood"
 var (
 	_ triedb.DBConstructor = Config{}.BackendConstructor
 	_ triedb.DBOverride    = (*TrieDB)(nil)
+
+	hashCount              = metrics.GetOrRegisterCounter("firewood/triedb/hash/count", nil)
+	hashTimer              = metrics.GetOrRegisterCounter("firewood/triedb/hash/time", nil)
+	commitCount            = metrics.GetOrRegisterCounter("firewood/triedb/commit/count", nil)
+	commitTimer            = metrics.GetOrRegisterCounter("firewood/triedb/commit/time", nil)
+	proposeOnDiskCount     = metrics.GetOrRegisterCounter("firewood/triedb/propose/disk/count", nil)
+	proposeOnProposeCount  = metrics.GetOrRegisterCounter("firewood/triedb/propose/proposal/count", nil)
+	explicitlyDroppedCount = metrics.GetOrRegisterCounter("firewood/triedb/drop/count", nil)
 )
 
 // TrieDB is a triedb.DBOverride implementation backed by Firewood.
 // It acts as a HashDB for backwards compatibility with most of the blockchain code.
 type TrieDB struct {
+	proposals
+
 	// The underlying Firewood database, used for storing proposals and revisions.
 	// This is exported as read-only, with knowledge that the consumer will not close it
 	// and the latest state can be modified at any time.
 	Firewood *ffi.Database
 
+	// kvStore is used for storing recovery information.
 	kvStore ethdb.Database
-
-	proposals
 }
 
 type proposals struct {
@@ -206,16 +216,11 @@ func (t *TrieDB) Initialized(common.Hash) bool {
 		return false
 	}
 
-	// If the current root isn't empty, then unless the genesis block is empty,
-	// the database is initialized.
 	return common.Hash(root) != types.EmptyRootHash
 }
 
-// Size returns the storage size of diff layer nodes above the persistent disk
-// layer and the dirty nodes buffered within the disk layer
-// Only used for metrics and Commit intervals in APIs.
-// This will be implemented in the firewood database eventually.
-// Currently, Firewood stores all revisions in disk and proposals in memory.
+// Size is a no-op because Firewood does not track storage size.
+// All memory management is handled internally by Firewood.
 func (*TrieDB) Size() (common.StorageSize, common.StorageSize) {
 	return 0, 0
 }
@@ -271,16 +276,12 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 	// However, many tests cannot reasonably provide a block blockHash for genesis, so we allow it to be omitted.
 	parentBlockHash, blockHash, ok := stateconf.ExtractTrieDBUpdatePayload(opts...)
 	if !ok {
-		return fmt.Errorf("firewood: no block hash provided for block %d", height)
+		return fmt.Errorf("no block hash provided for block %d", height)
 	}
 
 	// The rest of the operations except key-value arranging must occur with a lock
 	t.proposals.Lock()
 	defer t.proposals.Unlock()
-
-	if t.proposals.exists(root, blockHash, parentBlockHash) {
-		return nil
-	}
 
 	p, ok := t.possible[possibleKey{parentBlockHash: parentBlockHash, root: root}]
 	// Now, all unused proposals have no other references, since we didn't store them
@@ -291,6 +292,10 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 		return fmt.Errorf("no proposal found for block %d, root %s, hash %s", height, root.Hex(), blockHash.Hex())
 	}
 
+	// If we have already created an identical proposal, we can skip adding it again.
+	if t.proposals.exists(root, blockHash, parentBlockHash) {
+		return nil
+	}
 	switch {
 	case p.root != root:
 		return fmt.Errorf("proposal root mismatch, expected %x, got %x", root, p.root)
@@ -308,10 +313,10 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 	return nil
 }
 
+// Check if this proposal already exists.
+// During reorgs, we may have already tracked this block hash.
+// Additionally, we may have coincidentally created an identical proposal with a different block hash.
 func (ps *proposals) exists(root, block, parentBlock common.Hash) bool {
-	// Check if this proposal already exists.
-	// During reorgs, we may have already created this proposal.
-	// Additionally, we may have already created this proposal with a different block hash.
 	proposals, ok := ps.byStateRoot[root]
 	if !ok {
 		return false
@@ -324,8 +329,7 @@ func (ps *proposals) exists(root, block, parentBlock common.Hash) bool {
 			return true
 		}
 
-		// We already have this proposal, but should create a new context with the correct hash.
-		// This solves the case of a unique block hash, but the same underlying proposal.
+		// We have an identical proposal, but should ensure the hash is tracked with this proposal.
 		if _, ok := p.parent.blockHashes[parentBlock]; ok {
 			log.Debug("proposal already exists, updating hash", "root", root.Hex(), "parent", parentBlock.Hex(), "block", block, "hash", block.Hex())
 			p.blockHashes[block] = struct{}{}
@@ -346,6 +350,12 @@ func (ps *proposals) exists(root, block, parentBlock common.Hash) bool {
 // Afterward, we know that no other proposal at this height can be committed, so we can dereference all
 // children in the the other branches of the proposal tree.
 func (t *TrieDB) Commit(root common.Hash, report bool) error {
+	start := time.Now()
+	defer func() {
+		commitTimer.Inc(time.Since(start).Milliseconds())
+		commitCount.Inc(1)
+	}()
+
 	t.proposals.Lock()
 	defer t.proposals.Unlock()
 
@@ -373,9 +383,8 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	}
 	logFn("Persisted proposal to firewood database", "root", root)
 
-	// On success, we should dereference all children of the committed proposal.
-	// By removing all uncommittable proposals from the tree and map,
-	// we ensure that there are no more references.
+	// On success, we should remove all children of the committed proposal.
+	// They will never be committed.
 	t.cleanupCommittedProposal(p)
 
 	// Update the committed block hashes and height on disk to enable recovery.
@@ -397,13 +406,13 @@ func (ps *proposals) findProposalToCommitWhenLocked(root common.Hash) (*proposal
 		}
 		if candidate != nil {
 			// This should never happen, as we ensure that we don't create duplicate proposals in `propose`.
-			return nil, fmt.Errorf("firewood: multiple proposals found for root %#x", root)
+			return nil, fmt.Errorf("multiple proposals found for root %#x", root)
 		}
 		candidate = p
 	}
 
 	if candidate == nil {
-		return nil, fmt.Errorf("firewood: committable proposal not found for %d:%#x", ps.tree.height+1, root)
+		return nil, fmt.Errorf("committable proposal not found for %d:%#x", ps.tree.height+1, root)
 	}
 	return candidate, nil
 }
@@ -413,10 +422,13 @@ func (t *TrieDB) createProposal(parent *proposal, keys, values [][]byte) (*propo
 	propose := t.Firewood.Propose
 	if h := parent.handle; h != nil {
 		propose = h.Propose
+		proposeOnProposeCount.Inc(1)
+	} else {
+		proposeOnDiskCount.Inc(1)
 	}
 	handle, err := propose(keys, values)
 	if err != nil {
-		return nil, fmt.Errorf("firewood: create proposal from parent root %s: %w", parent.root.Hex(), err)
+		return nil, fmt.Errorf("create proposal from parent root %s: %w", parent.root.Hex(), err)
 	}
 
 	// Edge case: genesis block
@@ -436,7 +448,7 @@ func (t *TrieDB) createProposal(parent *proposal, keys, values [][]byte) (*propo
 
 	root, err := handle.Root()
 	if err != nil {
-		return nil, fmt.Errorf("firewood: getting root of proposal: %w", err)
+		return nil, fmt.Errorf("getting root of proposal: %w", err)
 	}
 	p.root = common.Hash(root)
 
@@ -451,6 +463,7 @@ func (ps *proposals) cleanupCommittedProposal(p *proposal) {
 	ps.tree.parent = nil
 	ps.tree.handle = nil
 
+	// Since this propose has been committed, it doesn't need dropped.
 	ps.removeProposalFromMap(p.proposalMeta, false)
 
 	for _, child := range oldChildren {
@@ -461,19 +474,18 @@ func (ps *proposals) cleanupCommittedProposal(p *proposal) {
 }
 
 // Internally removes all references of the proposal from the database.
+// Frees the associated Rust memory for the proposal and all its children.
 // Should only be accessed with the proposal lock held.
 func (ps *proposals) removeProposalAndChildren(p *proposalMeta) {
-	// Base case: if there are children, we need to dereference them as well.
 	for _, child := range p.children {
 		ps.removeProposalAndChildren(child)
 	}
-
-	// Remove the proposal from the map.
 	ps.removeProposalFromMap(p, true)
 }
 
-// removeProposalFromMap removes the proposal from the proposal map.
+// removeProposalFromMap removes the proposal from the state root map.
 // The proposal lock must be held when calling this function.
+// The Rust memory is explicitly freed if drop is true.
 func (ps *proposals) removeProposalFromMap(meta *proposalMeta, drop bool) {
 	rootList := ps.byStateRoot[meta.root]
 	for i, p := range rootList {
@@ -483,6 +495,7 @@ func (ps *proposals) removeProposalFromMap(meta *proposalMeta, drop bool) {
 			rootList = rootList[:len(rootList)-1]
 
 			if drop {
+				explicitlyDroppedCount.Inc(1)
 				if err := p.handle.Drop(); err != nil {
 					log.Error("while dropping proposal", "root", meta.root, "height", meta.height, "err", err)
 				}
@@ -497,14 +510,21 @@ func (ps *proposals) removeProposalFromMap(meta *proposalMeta, drop bool) {
 	}
 }
 
-// getProposalHash calculates the hash if the set of keys and values are
+// createProposals calculates the hash if the set of keys and values are
 // proposed from the given parent root.
-func (t *TrieDB) getProposalHash(parentRoot common.Hash, keys, values [][]byte) (common.Hash, error) {
+// All proposals created will be tracked for future use.
+func (t *TrieDB) createProposals(parentRoot common.Hash, keys, values [][]byte) (common.Hash, error) {
+	start := time.Now()
+	defer func() {
+		hashTimer.Inc(time.Since(start).Milliseconds())
+		hashCount.Inc(1)
+	}()
+
 	if len(keys) != len(values) {
 		return common.Hash{}, fmt.Errorf("keys and values must have the same length, got %d keys and %d values", len(keys), len(values))
 	}
 
-	// This function only reads from existing tracked proposals, so we can use a read lock.
+	// Must prevent a simultaneous `Commit`, as it alters the proposal tree/disk state.
 	t.proposals.RLock()
 	defer t.proposals.RUnlock()
 

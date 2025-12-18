@@ -211,7 +211,7 @@ func (a *accountTrie) Hash() common.Hash {
 func (a *accountTrie) hash() (common.Hash, error) {
 	// If we haven't already hashed, we need to do so.
 	if a.hasChanges {
-		root, err := a.fw.getProposalHash(a.parentRoot, a.updateKeys, a.updateValues)
+		root, err := a.fw.createProposals(a.parentRoot, a.updateKeys, a.updateValues)
 		if err != nil {
 			return common.Hash{}, err
 		}
