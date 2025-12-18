@@ -486,16 +486,16 @@ func (t *TrieDB) removeProposalFromMap(pCtx *ProposalContext) {
 // Reader retrieves a node reader belonging to the given state root.
 // An error will be returned if the requested state is not available.
 func (t *TrieDB) Reader(root common.Hash) (database.Reader, error) {
-	if _, err := t.fwDisk.GetFromRoot(ffi.Hash(root), []byte{}); err != nil {
+	revision, err := t.fwDisk.Revision(ffi.Hash(root))
+	if err != nil {
 		return nil, fmt.Errorf("firewood: unable to retrieve from root %s: %w", root.Hex(), err)
 	}
-	return &reader{db: t, root: ffi.Hash(root)}, nil
+	return &reader{revision: revision}, nil
 }
 
 // reader is a state reader of Database which implements the Reader interface.
 type reader struct {
-	db   *TrieDB
-	root ffi.Hash // The root of the state this reader is reading.
+	revision *ffi.Revision
 }
 
 // Node retrieves the trie node with the given node hash. No error will be
@@ -504,7 +504,7 @@ func (reader *reader) Node(_ common.Hash, path []byte, _ common.Hash) ([]byte, e
 	// This function relies on Firewood's internal locking to ensure concurrent reads are safe.
 	// This is safe even if a proposal is being committed concurrently.
 	start := time.Now()
-	result, err := reader.db.fwDisk.GetFromRoot(reader.root, path)
+	result, err := reader.revision.Get(path)
 	if metrics.EnabledExpensive {
 		ffiReadCount.Inc(1)
 		ffiReadTimer.Inc(time.Since(start).Milliseconds())
