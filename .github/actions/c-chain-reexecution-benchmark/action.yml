@@ -127,11 +127,11 @@ runs:
       run: echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.json" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
-      run: ./scripts/reexecute_cchain.sh "${{ inputs.test || 'custom' }}"
+      run: ./scripts/run_task.sh test-c-chain-reexecution -- "${{ inputs.test || 'custom' }}"
       env:
         # Test configuration overrides
-        S3_BLOCK_DIR: ${{ inputs.block-dir-src }}
-        S3_STATE_DIR: ${{ inputs.current-state-dir-src }}
+        BLOCK_DIR_SRC: ${{ inputs.block-dir-src }}
+        CURRENT_STATE_DIR_SRC: ${{ inputs.current-state-dir-src }}
         START_BLOCK: ${{ inputs.start-block }}
         END_BLOCK: ${{ inputs.end-block }}
         CONFIG: ${{ inputs.config }}

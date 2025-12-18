@@ -56,15 +56,9 @@ Let's run the default benchmark to get started. Make sure that you have complete
 
 ### Using Predefined Tests
 
-Run the script without arguments to see available tests:
-
-```bash
-./scripts/reexecute_cchain.sh
-```
-
 To run a predefined test:
 ```bash
-./scripts/reexecute_cchain.sh hashdb-101-250k
+./scripts/benchmark_cchain_range.sh hashdb-101-250k
 ```
 
 These tests automatically download the required data from S3 and run the benchmark with the appropriate configuration.
@@ -76,7 +70,7 @@ For custom benchmark runs, use the `custom` test with environment variables:
 ```bash
 # Export env vars that you want to be available to all future script invocations
 export EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/default
-S3_BLOCK_DIR=cchain-mainnet-blocks-1m-ldb S3_STATE_DIR=cchain-current-state-hashdb-full-100 START_BLOCK=101 END_BLOCK=250000 ./scripts/reexecute_cchain.sh custom
+BLOCK_DIR_SRC=cchain-mainnet-blocks-1m-ldb CURRENT_STATE_DIR_SRC=cchain-current-state-hashdb-full-100 START_BLOCK=101 END_BLOCK=250000 ./scripts/benchmark_cchain_range.sh custom
 ```
 
 This performs the following steps:
@@ -220,7 +214,7 @@ Note: if you attempt to re-execute a second time on the same data set, it will f
 
 ### Re-Execute C-Chain Range with Copied Data
 
-Next, we can re-execute the same range using the `CURRENT_STATE_DIR` that we exported to S3 using `reexecute-cchain-with-copied-data`.
+Next, we can re-execute the same range using the `CURRENT_STATE_DIR` that we exported to S3.
 
 This time we will copy the same block directory from S3 and copy the state snapshot that we just exported into S3 to pick up re-execution from where we left off.
 
@@ -235,7 +229,7 @@ Specify the following parameters:
 We'll use a new `EXECUTION_DATA_DIR` for this run to avoid conflicts with previous runs from this walkthrough:
 
 ```bash
-S3_BLOCK_DIR=cchain-mainnet-blocks-10k-ldb S3_STATE_DIR=cchain-current-state-test START_BLOCK=101 END_BLOCK=10000 EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/reexecute-with-copied-data ./scripts/reexecute_cchain.sh custom
+BLOCK_DIR_SRC=cchain-mainnet-blocks-10k-ldb CURRENT_STATE_DIR_SRC=cchain-current-state-test START_BLOCK=101 END_BLOCK=10000 EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/reexecute-with-copied-data ./scripts/benchmark_cchain_range.sh custom
 ```
 
 ## Predefined Configs
@@ -256,7 +250,7 @@ To export metrics for a local run, set the environment variables `METRICS_COLLEC
 
 ```bash
 export METRICS_COLLECTOR_ENABLED=true
-./scripts/reexecute_cchain.sh hashdb-101-250k
+./scripts/benchmark_cchain_range.sh hashdb-101-250k
 ```
 
 You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).  
