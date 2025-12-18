@@ -54,6 +54,8 @@ const (
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
+
+	maxDiskSpaceThreshold = 50
 )
 
 var (
@@ -84,6 +86,8 @@ var (
 	errUnmarshalling                          = errors.New("unmarshalling failed")
 	errFileDoesNotExist                       = errors.New("file does not exist")
 	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
+	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
+	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
@@ -1154,10 +1158,10 @@ func getDiskSpaceConfig(v *viper.Viper) (
 		required = v.GetUint64(requiredKey)
 	)
 	switch {
-	case warn > 50:
-		return 0, 0, fmt.Errorf("%q (%d) must be in [0, 50]", warnKey, warn)
+	case warn > maxDiskSpaceThreshold:
+		return 0, 0, fmt.Errorf("%w: %q (%d)", errDiskSpaceOutOfRange, warnKey, warn)
 	case warn < required:
-		return 0, 0, fmt.Errorf("%q (%d) < %q (%d)", warnKey, warn, requiredKey, required)
+		return 0, 0, fmt.Errorf("%w: %d < %d", errDiskWarnAfterFatal, warn, required)
 	default:
 		return required, warn, nil
 	}
