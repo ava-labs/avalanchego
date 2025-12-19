@@ -15,7 +15,7 @@ import (
 // Right now this is implemented in the networking package
 type ExternalSender interface {
 	Send(
-		msg message.OutboundMessage,
+		msg *message.OutboundMessage,
 		config common.SendConfig,
 		subnetID ids.ID,
 		allower subnets.Allower,
