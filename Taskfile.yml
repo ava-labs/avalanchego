@@ -224,7 +224,7 @@ tasks:
       EXECUTION_DATA_DIR={{.EXECUTION_DATA_DIR}} \
       bash -x ./scripts/benchmark_cchain_range.sh
     # Runtime context variables are read from environment by the script:
-    # - RUNNER_NAME (execution environment)
+    # - BENCHMARK_RUNNER_NAME (execution environment)
     # - METRICS_SERVER_PORT (monitoring config)
     # - METRICS_SERVER_ENABLED (runtime monitoring decision)
     # - METRICS_COLLECTOR_ENABLED (runtime monitoring decision)

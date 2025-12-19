@@ -168,7 +168,7 @@ runs:
             BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}"
         fi
       env:
-        RUNNER_NAME: ${{ inputs.runner_name }}
+        BENCHMARK_RUNNER_NAME: ${{ inputs.runner_name }}
         METRICS_COLLECTOR_ENABLED: ${{ inputs.prometheus-username != '' }}
         PROMETHEUS_URL: ${{ inputs.prometheus-url }}
         PROMETHEUS_PUSH_URL: ${{ inputs.prometheus-push-url }}
