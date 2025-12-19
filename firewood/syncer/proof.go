@@ -14,7 +14,7 @@ import (
 
 var (
 	_ sync.Marshaler[*RangeProof] = rangeProofMarshaler{}
-	_ sync.Marshaler[struct{}]    = dummyMarshaler{}
+	_ sync.Marshaler[struct{}]    = changeProofMarshaler{}
 )
 
 type rangeProofMarshaler struct{}
@@ -40,12 +40,12 @@ type RangeProof struct {
 }
 
 // TODO: implement an actual ChangeProof marshaler.
-type dummyMarshaler struct{}
+type changeProofMarshaler struct{}
 
-func (dummyMarshaler) Marshal(struct{}) ([]byte, error) {
+func (changeProofMarshaler) Marshal(struct{}) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (dummyMarshaler) Unmarshal([]byte) (struct{}, error) {
+func (changeProofMarshaler) Unmarshal([]byte) (struct{}, error) {
 	return struct{}{}, errors.New("not implemented")
 }

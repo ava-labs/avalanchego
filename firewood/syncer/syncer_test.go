@@ -5,11 +5,9 @@ package firewood
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/stretchr/testify/assert"
@@ -26,13 +24,41 @@ func Test_Firewood_Sync(t *testing.T) {
 		clientSize int
 		serverSize int
 	}{
-		{name: "both empty", clientSize: 0, serverSize: 0},
-		{name: "one request from empty", clientSize: 0, serverSize: 1000},
-		{name: "server empty", clientSize: 1000, serverSize: 0},
-		{name: "one request replace all", clientSize: 1000, serverSize: 1000},
-		{name: "10,000 keys from empty", clientSize: 0, serverSize: 10_000},
-		{name: "100,000 keys from empty", clientSize: 0, serverSize: 100_000},
-		{name: "10,000 keys replace all", clientSize: 10_000, serverSize: 10_000},
+		{
+			name:       "both empty",
+			clientSize: 0,
+			serverSize: 0,
+		},
+		{
+			name:       "one request from empty",
+			clientSize: 0,
+			serverSize: 1000,
+		},
+		{
+			name:       "server empty",
+			clientSize: 1000,
+			serverSize: 0,
+		},
+		{
+			name:       "one request replace all",
+			clientSize: 1000,
+			serverSize: 1000,
+		},
+		{
+			name:       "10,000 keys from empty",
+			clientSize: 0,
+			serverSize: 10_000,
+		},
+		{
+			name:       "100,000 keys from empty",
+			clientSize: 0,
+			serverSize: 100_000,
+		},
+		{
+			name:       "10,000 keys replace all",
+			clientSize: 10_000,
+			serverSize: 10_000,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -54,7 +80,7 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 		clientDB,
 		root,
 		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(serverDB, rangeProofMarshaler{})),
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(serverDB, rangeProofMarshaler{}, dummyMarshaler{})),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(serverDB, rangeProofMarshaler{}, changeProofMarshaler{})),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, syncer)
@@ -69,7 +95,7 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 }
 
 // generateDB creates a new Firewood database with up to [numKeys] random key/value pairs.
-// The database will be automatically closed when the test ends.
+// The database will be automatically closed when the test ends, unless the test context has been canceled.
 // Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
 func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
 	t.Helper()
@@ -77,10 +103,9 @@ func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
 	require.NoError(t, err)
 	require.NotNil(t, db)
 	t.Cleanup(func() {
-		ctx := context.WithoutCancel(t.Context())
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second) // allow some time for garbage collection
-		defer cancel()
-		require.NoError(t, db.Close(ctx))
+		if !t.Failed() {
+			require.NoError(t, db.Close(t.Context()))
+		}
 	})
 
 	if numKeys == 0 {

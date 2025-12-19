@@ -32,39 +32,36 @@ type database struct {
 }
 
 type Config struct {
-	SimultaneousWorkLimit int                   // optional, defaults to 8
-	Log                   logging.Logger        // optional
-	StateSyncNodes        []ids.NodeID          // optional
-	Registerer            prometheus.Registerer // optional
+	SimultaneousWorkLimit int
+	Log                   logging.Logger
+	StateSyncNodes        []ids.NodeID
+	Registerer            prometheus.Registerer
 }
 
 func NewSyncer(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
-	r := config.Registerer
-	if r == nil {
-		r = prometheus.NewRegistry()
+	if config.Registerer == nil {
+		config.Registerer = prometheus.NewRegistry()
 	}
-	logger := config.Log
-	if logger == nil {
-		logger = logging.NoLog{}
+	if config.Log == nil {
+		config.Log = logging.NoLog{}
 	}
-	workLimit := config.SimultaneousWorkLimit
-	if workLimit <= 0 {
-		workLimit = defaultSimultaneousWorkLimit
+	if config.SimultaneousWorkLimit == 0 {
+		config.SimultaneousWorkLimit = defaultSimultaneousWorkLimit
 	}
 	return xsync.NewSyncer(
 		&database{db: db},
 		xsync.Config[*RangeProof, struct{}]{
 			RangeProofMarshaler:   rangeProofMarshaler{},
-			ChangeProofMarshaler:  dummyMarshaler{},
+			ChangeProofMarshaler:  changeProofMarshaler{},
 			EmptyRoot:             ids.ID(types.EmptyRootHash),
 			RangeProofClient:      rangeProofClient,
 			ChangeProofClient:     changeProofClient,
-			SimultaneousWorkLimit: workLimit,
-			Log:                   logger,
+			SimultaneousWorkLimit: config.SimultaneousWorkLimit,
+			Log:                   config.Log,
 			TargetRoot:            targetRoot,
 			StateSyncNodes:        config.StateSyncNodes,
 		},
-		r,
+		config.Registerer,
 	)
 }
 
