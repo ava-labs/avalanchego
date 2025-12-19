@@ -71,12 +71,12 @@ These tests automatically download the required data from S3 and run the benchma
 
 ### Using Custom Parameters
 
-For custom benchmark runs, use the `custom` test with environment variables:
+For custom benchmark runs, provide S3 sources or local paths via environment variables:
 
 ```bash
 # Export env vars that you want to be available to all future script invocations
 export EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/default
-BLOCK_DIR_SRC=cchain-mainnet-blocks-1m-ldb CURRENT_STATE_DIR_SRC=cchain-current-state-hashdb-full-100 START_BLOCK=101 END_BLOCK=250000 ./scripts/benchmark_cchain_range.sh custom
+BLOCK_DIR_SRC=cchain-mainnet-blocks-1m-ldb CURRENT_STATE_DIR_SRC=cchain-current-state-hashdb-full-100 START_BLOCK=101 END_BLOCK=250000 ./scripts/benchmark_cchain_range.sh
 ```
 
 This performs the following steps:
@@ -235,7 +235,7 @@ Specify the following parameters:
 We'll use a new `EXECUTION_DATA_DIR` for this run to avoid conflicts with previous runs from this walkthrough:
 
 ```bash
-BLOCK_DIR_SRC=cchain-mainnet-blocks-10k-ldb CURRENT_STATE_DIR_SRC=cchain-current-state-test START_BLOCK=101 END_BLOCK=10000 EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/reexecute-with-copied-data ./scripts/benchmark_cchain_range.sh custom
+BLOCK_DIR_SRC=cchain-mainnet-blocks-10k-ldb CURRENT_STATE_DIR_SRC=cchain-current-state-test START_BLOCK=101 END_BLOCK=10000 EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/reexecute-with-copied-data ./scripts/benchmark_cchain_range.sh
 ```
 
 ## Predefined Configs
