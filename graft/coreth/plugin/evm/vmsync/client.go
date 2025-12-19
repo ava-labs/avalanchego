@@ -384,11 +384,11 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 	syncers := []syncpkg.Syncer{blockSyncer, codeSyncer, stateSyncer}
 
 	if c.config.Extender != nil {
-		atomicSyncer, err := c.config.Extender.CreateSyncer(c.config.Client, c.config.VerDB, summary)
+		extenderSyncer, err := c.config.Extender.CreateSyncer(c.config.Client, c.config.VerDB, summary)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create atomic syncer: %w", err)
+			return nil, fmt.Errorf("failed to create extender syncer: %w", err)
 		}
-		syncers = append(syncers, atomicSyncer)
+		syncers = append(syncers, extenderSyncer)
 	}
 
 	for _, s := range syncers {
