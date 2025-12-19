@@ -91,7 +91,6 @@ func RunAllowListEventTests(
 		{
 			name: "should emit event after set none",
 			testRun: func(allowList *allowlistbindings.IAllowList, auth *bind.TransactOpts, backend *sim.Backend, t *testing.T, addr common.Address) {
-				// First set the address to Enabled so we can test setting it to None
 				tx, err := allowList.SetEnabled(auth, addr)
 				require.NoError(t, err)
 				utilstest.WaitReceipt(t, backend, tx)
@@ -133,7 +132,6 @@ func RunAllowListEventTests(
 			require.NoError(err)
 			defer iter.Close()
 
-			// Verify event fields match expected values
 			for _, expectedEvent := range tc.expectedEvents {
 				require.True(iter.Next(), "expected to find RoleSet event")
 				event := iter.Event
@@ -143,7 +141,6 @@ func RunAllowListEventTests(
 				require.Zero(expectedEvent.OldRole.Cmp(event.OldRole), "oldRole mismatch")
 			}
 
-			// Verify there are no more events
 			require.False(iter.Next(), "expected no more RoleSet events")
 			require.NoError(iter.Error())
 		})

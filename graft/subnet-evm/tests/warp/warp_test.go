@@ -89,7 +89,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	tc := e2e.NewTestContext()
 	nodes := utils.NewTmpnetNodes(tmpnet.DefaultNodeCount)
 	_, thisFile, _, _ := runtime.Caller(0)
-	genesisPath := filepath.Join(filepath.Dir(thisFile), "genesis/genesis.json")
+	genesisPath := filepath.Join(filepath.Dir(thisFile), "genesis.json")
 
 	env := e2e.NewTestEnvironment(
 		tc,
