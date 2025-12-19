@@ -116,9 +116,10 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 		{}, // Subnet staker didn't exist at genesis
 		{
 			subnetStaker.NodeID: {
-				NodeID:    subnetStaker.NodeID,
-				PublicKey: pk,
-				Weight:    subnetStaker.Weight,
+				NodeID:         subnetStaker.NodeID,
+				PublicKey:      pk,
+				PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+				Weight:         subnetStaker.Weight,
 			},
 		}, // Subnet staker was added at height 1
 		{}, // Subnet staker was removed at height 2
@@ -233,13 +234,11 @@ func TestGetWarpValidatorSets(t *testing.T) {
 	expectedPrimaryNetworkWithAllValidators := validators.WarpSet{
 		Validators: []*validators.Warp{
 			{
-				PublicKey:      pk0,
 				PublicKeyBytes: pk0Bytes,
 				Weight:         1,
 				NodeIDs:        []ids.NodeID{primaryStaker0.NodeID},
 			},
 			{
-				PublicKey:      pk1,
 				PublicKeyBytes: pk1Bytes,
 				Weight:         1,
 				NodeIDs:        []ids.NodeID{primaryStaker1.NodeID},
@@ -258,7 +257,6 @@ func TestGetWarpValidatorSets(t *testing.T) {
 			constants.PrimaryNetworkID: {
 				Validators: []*validators.Warp{
 					{
-						PublicKey:      pk0,
 						PublicKeyBytes: pk0Bytes,
 						Weight:         1,
 						NodeIDs:        []ids.NodeID{primaryStaker0.NodeID},
@@ -269,7 +267,6 @@ func TestGetWarpValidatorSets(t *testing.T) {
 			subnetID: {
 				Validators: []*validators.Warp{
 					{
-						PublicKey:      pk0,
 						PublicKeyBytes: pk0Bytes,
 						Weight:         1,
 						NodeIDs:        []ids.NodeID{subnetStaker0.NodeID},
@@ -286,7 +283,6 @@ func TestGetWarpValidatorSets(t *testing.T) {
 			subnetID: {
 				Validators: []*validators.Warp{
 					{
-						PublicKey:      pk0,
 						PublicKeyBytes: pk0Bytes,
 						Weight:         1,
 						NodeIDs:        []ids.NodeID{subnetStaker0.NodeID},

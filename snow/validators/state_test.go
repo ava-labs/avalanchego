@@ -232,7 +232,16 @@ func TestCachedState_GetWarpValidatorSet_Inactive(t *testing.T) {
 
 			got, err := cached.GetWarpValidatorSet(t.Context(), height, subnetID)
 			require.ErrorIs(err, test.wantErr)
-			require.Equal(test.want, got)
+
+			// Compare only the public fields, not cache fields
+			require.Equal(test.want.TotalWeight, got.TotalWeight)
+			require.Len(got.Validators, len(test.want.Validators))
+			for i, wantVdr := range test.want.Validators {
+				gotVdr := got.Validators[i]
+				require.Equal(wantVdr.PublicKeyBytes, gotVdr.PublicKeyBytes)
+				require.Equal(wantVdr.Weight, gotVdr.Weight)
+				require.Equal(wantVdr.NodeIDs, gotVdr.NodeIDs)
+			}
 		})
 	}
 }

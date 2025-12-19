@@ -107,7 +107,7 @@ func SumWeight(vdrs []*validators.Warp) (uint64, error) {
 func AggregatePublicKeys(vdrs []*validators.Warp) (*bls.PublicKey, error) {
 	pks := make([]*bls.PublicKey, len(vdrs))
 	for i, vdr := range vdrs {
-		pks[i] = vdr.PublicKey
+		pks[i] = vdr.PublicKey()
 	}
 	return bls.AggregatePublicKeys(pks)
 }

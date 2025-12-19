@@ -246,7 +246,7 @@ func (r *responseHandler) HandleResponse(
 		return
 	}
 
-	if !bls.Verify(validator.PublicKey, signature, r.message.UnsignedMessage.Bytes()) {
+	if !bls.Verify(validator.PublicKey(), signature, r.message.UnsignedMessage.Bytes()) {
 		r.results <- result{NodeID: nodeID, Validator: validator, Err: errFailedVerification}
 		return
 	}

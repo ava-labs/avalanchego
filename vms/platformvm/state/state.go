@@ -1671,10 +1671,12 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 		pkBytes := diffIter.Value()
 		if len(pkBytes) == 0 {
 			vdr.PublicKey = nil
+			vdr.PublicKeyBytes = nil
 			continue
 		}
 
 		vdr.PublicKey = bls.PublicKeyFromValidUncompressedBytes(pkBytes)
+		vdr.PublicKeyBytes = pkBytes
 	}
 
 	// Note: this does not fallback to the linkeddb index because the linkeddb
@@ -2621,12 +2623,12 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 				// This validator's active status is changing.
 				err = errors.Join(
 					s.validators.RemoveWeight(l1Validator.SubnetID, priorL1Validator.effectiveNodeID(), priorL1Validator.Weight),
-					addL1ValidatorToValidatorManager(s.validators, l1Validator),
+					addL1ValidatorToValidatorManager(s.validators, &l1Validator),
 				)
 			}
 		case database.ErrNotFound:
 			// Adding a new validator
-			err = addL1ValidatorToValidatorManager(s.validators, l1Validator)
+			err = addL1ValidatorToValidatorManager(s.validators, &l1Validator)
 		}
 		if err != nil {
 			return err

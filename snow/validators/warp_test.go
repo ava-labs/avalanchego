@@ -29,8 +29,7 @@ func TestWarpJSON(t *testing.T) {
 	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
 	require.NoError(t, err)
 
-	w := Warp{
-		PublicKey:      pk,
+	w := &Warp{
 		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 		Weight:         12345,
 		NodeIDs: []ids.NodeID{
@@ -53,7 +52,11 @@ func TestWarpJSON(t *testing.T) {
 
 	var parsedW Warp
 	require.NoError(t, json.Unmarshal(wJSON, &parsedW))
-	require.Equal(t, w, parsedW)
+
+	// Compare only public fields, not cache
+	require.Equal(t, w.PublicKeyBytes, parsedW.PublicKeyBytes)
+	require.Equal(t, w.Weight, parsedW.Weight)
+	require.Equal(t, w.NodeIDs, parsedW.NodeIDs)
 }
 
 func TestWarpSetJSON(t *testing.T) {
@@ -66,7 +69,6 @@ func TestWarpSetJSON(t *testing.T) {
 	ws := WarpSet{
 		Validators: []*Warp{
 			{
-				PublicKey:      pk,
 				PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 				Weight:         12345,
 				NodeIDs: []ids.NodeID{
@@ -97,7 +99,15 @@ func TestWarpSetJSON(t *testing.T) {
 
 	var parsedWS WarpSet
 	require.NoError(t, json.Unmarshal(wsJSON, &parsedWS))
-	require.Equal(t, ws, parsedWS)
+
+	// Compare only public fields, not cache
+	require.Equal(t, ws.TotalWeight, parsedWS.TotalWeight)
+	require.Len(t, parsedWS.Validators, len(ws.Validators))
+	for i := range ws.Validators {
+		require.Equal(t, ws.Validators[i].PublicKeyBytes, parsedWS.Validators[i].PublicKeyBytes)
+		require.Equal(t, ws.Validators[i].Weight, parsedWS.Validators[i].Weight)
+		require.Equal(t, ws.Validators[i].NodeIDs, parsedWS.Validators[i].NodeIDs)
+	}
 }
 
 func TestFlattenValidatorSet(t *testing.T) {
@@ -119,7 +129,7 @@ func TestFlattenValidatorSet(t *testing.T) {
 				nodeID0: validatorstest.WarpToOutput(vdrs.Validators[0]),
 				nodeID1: {
 					NodeID:    nodeID1,
-					PublicKey: vdrs.Validators[1].PublicKey,
+					PublicKey: vdrs.Validators[1].PublicKey(),
 					Weight:    math.MaxUint64,
 				},
 			},
@@ -156,7 +166,16 @@ func TestFlattenValidatorSet(t *testing.T) {
 
 			got, err := FlattenValidatorSet(test.validators)
 			require.ErrorIs(err, test.wantErr)
-			require.Equal(test.want, got)
+
+			// Compare only the public fields, not cache fields
+			require.Equal(test.want.TotalWeight, got.TotalWeight)
+			require.Len(got.Validators, len(test.want.Validators))
+			for i, wantVdr := range test.want.Validators {
+				gotVdr := got.Validators[i]
+				require.Equal(wantVdr.PublicKeyBytes, gotVdr.PublicKeyBytes)
+				require.Equal(wantVdr.Weight, gotVdr.Weight)
+				require.Equal(wantVdr.NodeIDs, gotVdr.NodeIDs)
+			}
 		})
 	}
 }

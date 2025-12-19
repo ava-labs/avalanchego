@@ -6,6 +6,7 @@ package validators
 import (
 	"bytes"
 	"encoding/json"
+	"sync"
 
 	"golang.org/x/exp/maps"
 
@@ -51,11 +52,22 @@ func (w *WarpSet) UnmarshalJSON(b []byte) error {
 }
 
 type Warp struct {
-	PublicKey *bls.PublicKey
 	// PublicKeyBytes is expected to be in the uncompressed form.
 	PublicKeyBytes []byte
 	Weight         uint64
 	NodeIDs        []ids.NodeID
+
+	// Cache for converted public key (lazy initialization)
+	publicKeyCache *bls.PublicKey
+	publicKeyOnce  sync.Once
+}
+
+// PublicKey returns the BLS public key, converting from bytes on first access
+func (w *Warp) PublicKey() *bls.PublicKey {
+	w.publicKeyOnce.Do(func() {
+		w.publicKeyCache = bls.PublicKeyFromValidUncompressedBytes(w.PublicKeyBytes)
+	})
+	return w.publicKeyCache
 }
 
 func (w *Warp) Compare(o *Warp) int {
@@ -68,8 +80,8 @@ type jsonWarp struct {
 	NodeIDs   []ids.NodeID   `json:"nodeIDs"`
 }
 
-func (w Warp) MarshalJSON() ([]byte, error) {
-	pkBytes := bls.PublicKeyToCompressedBytes(w.PublicKey)
+func (w *Warp) MarshalJSON() ([]byte, error) {
+	pkBytes := bls.PublicKeyToCompressedBytes(w.PublicKey())
 	pk, err := formatting.Encode(formatting.HexNC, pkBytes)
 	if err != nil {
 		return nil, err
@@ -96,7 +108,6 @@ func (w *Warp) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	*w = Warp{
-		PublicKey:      pk,
 		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 		Weight:         uint64(j.Weight),
 		NodeIDs:        j.NodeIDs,
@@ -121,11 +132,17 @@ func FlattenValidatorSet(vdrSet map[ids.NodeID]*GetValidatorOutput) (WarpSet, er
 			continue
 		}
 
-		pkBytes := bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
+		// Use PublicKeyBytes if available to avoid conversion, otherwise convert from PublicKey
+		var pkBytes []byte
+		if len(vdr.PublicKeyBytes) > 0 {
+			pkBytes = vdr.PublicKeyBytes
+		} else {
+			pkBytes = bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
+		}
+
 		uniqueVdr, ok := vdrs[string(pkBytes)]
 		if !ok {
 			uniqueVdr = &Warp{
-				PublicKey:      vdr.PublicKey,
 				PublicKeyBytes: pkBytes,
 			}
 			vdrs[string(pkBytes)] = uniqueVdr
