@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766148125716,
+  "lastUpdate": 1766158630583,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -208,6 +208,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd-jp6dz-runner-wg948 - block_accept_ms/ggas",
             "value": 55.83596262867739,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "maru",
+            "username": "maru-ava",
+            "email": "maru.newby@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "f0f737372716e47ca836097d486fcb0bdbc0c36c",
+          "message": "[bootstrapmonitor] Switch from `latest` to `master` tag (#4490)\n\nCo-authored-by: PlatCore <240789909+PlatCore@users.noreply.github.com>",
+          "timestamp": "2025-12-19T06:07:06Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/f0f737372716e47ca836097d486fcb0bdbc0c36c"
+        },
+        "date": 1766158627383,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast-79qqw-runner-2fgdb - mgas/s",
+            "value": 40.61421195544261,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast-79qqw-runner-2fgdb - ms/ggas",
+            "value": 24621.923012985917,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast-79qqw-runner-2fgdb - block_parse_ms/ggas",
+            "value": 78.77645271412126,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast-79qqw-runner-2fgdb - block_verify_ms/ggas",
+            "value": 24476.048998072125,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast-79qqw-runner-2fgdb - block_accept_ms/ggas",
+            "value": 63.697363408871915,
             "unit": "block_accept_ms/ggas"
           }
         ]
