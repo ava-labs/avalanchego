@@ -58,9 +58,9 @@ type BlockAcceptor interface {
 	PutLastAcceptedID(ids.ID) error
 }
 
-// Committer commits sync results to the VM, preparing it for bootstrapping.
-type Committer interface {
-	Commit(ctx context.Context, summary message.Syncable) error
+// Acceptor applies the results of state sync to the VM, preparing it for bootstrapping.
+type Acceptor interface {
+	AcceptSync(ctx context.Context, summary message.Syncable) error
 }
 
 // Executor defines how state sync is executed.
@@ -70,7 +70,7 @@ type Executor interface {
 	Execute(ctx context.Context, summary message.Syncable) error
 }
 
-var _ Committer = (*client)(nil)
+var _ Acceptor = (*client)(nil)
 
 type ClientConfig struct {
 	Chain      *eth.Ethereum
@@ -265,11 +265,11 @@ func (c *client) Shutdown() error {
 // Error returns a non-nil error if one occurred during the sync.
 func (c *client) Error() error { return c.err }
 
-// Commit implements Committer. It resets the blockchain to the synced block,
+// AcceptSync implements Acceptor. It resets the blockchain to the synced block,
 // preparing it for execution, and updates disk and memory pointers so the VM
 // is ready for bootstrapping. Also executes any shared memory operations from
 // the atomic trie to shared memory.
-func (c *client) Commit(ctx context.Context, summary message.Syncable) error {
+func (c *client) AcceptSync(ctx context.Context, summary message.Syncable) error {
 	stateBlock, err := c.config.State.GetBlock(ctx, ids.ID(summary.GetBlockHash()))
 	if err != nil {
 		return fmt.Errorf("%w: hash=%s", errBlockNotFound, summary.GetBlockHash())
