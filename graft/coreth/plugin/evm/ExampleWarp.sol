@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 pragma experimental ABIEncoderV2;
 
-import "./interfaces/IWarpMessenger.sol";
+import "precompile/contracts/warp/warpbindings/IWarpMessenger.sol";
 
 contract ExampleWarp {
   address constant WARP_ADDRESS = 0x0200000000000000000000000000000000000005;
