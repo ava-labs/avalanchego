@@ -427,7 +427,6 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 				res := allowlist.GetAllowListStatus(state, contractAddress, TestNoRoleAddr)
 				require.Equal(t, allowlist.NoRole, res)
 
-				// Check logs are stored in state
 				logs := state.Logs()
 				assertSetRoleEvent(t, logs, allowlist.NoRole, TestEnabledAddr, TestManagerAddr, allowlist.EnabledRole)
 			},
@@ -637,7 +636,6 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
-				// Check no logs are stored in state
 				logs := stateDB.Logs()
 				require.Empty(t, logs)
 			},
@@ -660,7 +658,6 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
-				// Check no logs are stored in state
 				logs := stateDB.Logs()
 				require.Empty(t, logs)
 			},
@@ -683,7 +680,6 @@ func AllowListTests(_ testing.TB, module modules.Module) []precompiletest.Precom
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
-				// Check no logs are stored in state
 				logs := stateDB.Logs()
 				require.Empty(t, logs)
 			},
