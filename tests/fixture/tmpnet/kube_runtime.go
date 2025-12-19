@@ -370,6 +370,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		statefulSetName,
 		false, // generateName
 		runtimeConfig.Image,
+		"", // imagePullPolicy - use default behavior
 		containerName,
 		volumeName,
 		fmt.Sprintf("%dGi", runtimeConfig.VolumeSizeGB),

@@ -37,7 +37,7 @@ func Test_newOutboundBuilder(t *testing.T) {
 				[]uint64{1000, 2000},
 			)
 			require.NoError(t, err)
-			t.Logf("outbound message with compression type %s built message with size %d", compressionType, len(outMsg.Bytes()))
+			t.Logf("outbound message with compression type %s built message with size %d", compressionType, len(outMsg.Bytes))
 		})
 	}
 }

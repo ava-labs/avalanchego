@@ -73,7 +73,7 @@ To support these changes, there have been a number of changes to the SubnetEVM b
 
 ### Clone Subnet-evm
 
-First install Go 1.24.9 or later. Follow the instructions on the [go docs](https://go.dev/doc/install). You can verify by running `go version`.
+First install Go (see [CONTRIBUTING.md](../../CONTRIBUTING.md) for the minimum version). Follow the instructions on the [go docs](https://go.dev/doc/install). You can verify by running `go version`.
 
 Set `$GOPATH` environment variable properly for Go to look for Go Workspaces. Please read [this](https://go.dev/doc/code) for details. You can verify by running `echo $GOPATH`.
 

@@ -5,7 +5,7 @@ module github.com/ava-labs/avalanchego/graft/coreth
 // CONTRIBUTING.md for more details.
 
 // See ../../go.mod for guidelines on updating the Go version.
-go 1.24.9
+go 1.24.11
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1

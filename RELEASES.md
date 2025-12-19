@@ -1,6 +1,29 @@
 # Release Notes
 
-## Pending
+## Pending (v1.14.1)
+
+This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0). It is optional, but encouraged.
+
+### APIs
+
+- ...
+
+### Config
+
+- Added `--system-tracker-disk-required-available-space-percentage` and `--system-tracker-disk-warning-available-space-percentage` options.
+- Deprecate `--system-tracker-disk-required-available-space` and `--system-tracker-disk-warning-threshold-available-space` options.
+
+### Fixes
+
+- Update go version to 1.24.11
+
+### EVM
+
+- Removes `avax.version` API
+- Removes `customethclient` package in favor of `ethclient` package and temporary type registrations (`WithTempRegisteredLibEVMExtras`)
+  - Also removes blockHook extension in `ethclient` package.
+- Enables Firewood to run with pruning disabled.
+  - This change modifies the filepath of Firewood and any nodes using Firewood will need to resync.
 
 ## [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0)
 
@@ -4960,3 +4983,10 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 ### ProposerVM
 
 - Updated block `Delay` in `--staking-enabled=false` networks to be `0`.
+
+## Historical Note
+
+In the past, [subnet-evm](./graft/subnet-evm) and [coreth](./graft/coreth) were their own repositories. Their change logs are preserved for posterity here:
+
+- coreth [RELEASES.MD](https://github.com/ava-labs/coreth/blob/master/RELEASES.md)
+- subnet-evm [RELEASES.MD](https://github.com/ava-labs/subnet-evm/blob/master/RELEASES.md)

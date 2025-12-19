@@ -76,7 +76,7 @@ var (
 	}
 
 	configNameArg  string
-	runnerNameArg  string
+	runnerTypeArg  string
 	configBytesArg []byte
 
 	benchmarkOutputFileArg string
@@ -100,7 +100,7 @@ func init() {
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
 	flag.StringVar(&configNameArg, configKey, defaultConfigKey, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
-	flag.StringVar(&runnerNameArg, "runner", "dev", "Name of the runner executing this test. Added as a metric label and to the sub-benchmark's name to differentiate results on the runner key.")
+	flag.StringVar(&runnerTypeArg, "runner", "dev", "Type/label of the runner executing this test. Added as a metric label and to the benchmark name for grouping results.")
 
 	flag.StringVar(&benchmarkOutputFileArg, "benchmark-output-file", benchmarkOutputFileArg, "Filepath where benchmark results will be written to.")
 
@@ -126,8 +126,8 @@ func init() {
 	labels[configKey] = configNameArg
 	configBytesArg = []byte(predefinedConfigStr)
 
-	// Set the runner name label on the metrics.
-	labels["runner"] = runnerNameArg
+	// Set the runner label on the metrics.
+	labels["runner"] = runnerTypeArg
 }
 
 func main() {
@@ -140,7 +140,7 @@ func main() {
 		startBlockArg,
 		endBlockArg,
 		configNameArg,
-		runnerNameArg,
+		runnerTypeArg,
 	)
 
 	benchmarkReexecuteRange(
@@ -206,7 +206,7 @@ func benchmarkReexecuteRange(
 
 	log := tc.Log()
 	log.Info("re-executing block range with params",
-		zap.String("runner", runnerNameArg),
+		zap.String("runner", runnerTypeArg),
 		zap.String("config", configNameArg),
 		zap.String("labels", labelsArg),
 		zap.String("metrics-server-enabled", strconv.FormatBool(metricsServerEnabled)),
@@ -552,29 +552,4 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 		labels[parts[0]] = parts[1]
 	}
 	return labels, nil
-}
-
-func getTopLevelMetrics(tc tests.TestContext, tool *benchmarkTool, registry prometheus.Gatherer, elapsed time.Duration) {
-	r := require.New(tc)
-
-	gasUsed, err := getCounterMetricValue(registry, "avalanche_evm_eth_chain_block_gas_used_processed")
-	r.NoError(err)
-	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
-
-	tool.addResult(mgasPerSecond, "mgas/s")
-}
-
-func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
-	metricFamilies, err := registry.Gather()
-	if err != nil {
-		return 0, fmt.Errorf("failed to gather metrics: %w", err)
-	}
-
-	for _, mf := range metricFamilies {
-		if mf.GetName() == query {
-			return mf.GetMetric()[0].Counter.GetValue(), nil
-		}
-	}
-
-	return 0, fmt.Errorf("metric %s not found", query)
 }
