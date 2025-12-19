@@ -43,7 +43,11 @@ jobs:
         shell: bash
         run: ./scripts/run_task.sh test-fuzz
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, custom-arm64-noble]
     steps:
       - uses: actions/checkout@v4
       - name: Run e2e tests
