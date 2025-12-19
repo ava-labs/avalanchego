@@ -5,16 +5,24 @@ module github.com/ava-labs/avalanchego
 // tools/go.mod for usage details.
 
 // - Changes to the minimum golang version must also be replicated in:
+//
+// The following go.mod files:
+//   - go.mod (here)
+//   - tools/go.mod
+//   - graft/evm/go.mod
+//   - graft/coreth/go.mod
+//   - graft/subnet-evm/go.mod
+//
+// and
 //   - CONTRIBUTING.md
 //   - README.md
-//   - go.mod (here)
+//   - RELEASES.md
 //   - nix/go/default.nix (update version and sha256 for supported arches)
-//   - tools/go.mod
-//   - graft/**/go.mod (e.g. coreth)
+//   - graft/subnet-evm/Dockerfile // TODO(JonathanOppenheimer): issue #4764
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
 //   - Consider updating the version of golangci-lint (see tools/go.mod)
-go 1.24.9
+go 1.24.11
 
 require (
 	connectrpc.com/connect v1.18.1

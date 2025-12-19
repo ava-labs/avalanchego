@@ -8,13 +8,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/ava-labs/libevm/log"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests/utils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -31,10 +31,7 @@ const (
 	subnetAName = "load-subnet-a"
 )
 
-var (
-	flagVars     *e2e.FlagVars
-	repoRootPath = tests.GetRepoRootPath("tests/load")
-)
+var flagVars *e2e.FlagVars
 
 func init() {
 	// Configures flags used to configure tmpnet
@@ -49,10 +46,12 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	var env *e2e.TestEnvironment
+	_, thisFile, _, _ := runtime.Caller(0)
+	testDir := filepath.Dir(thisFile)
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
-		genesisPath := filepath.Join(repoRootPath, "tests/load/genesis/genesis.json")
+		genesisPath := filepath.Join(testDir, "genesis/genesis.json")
 
 		nodes := utils.NewTmpnetNodes(nodeCount)
 		env = e2e.NewTestEnvironment(
@@ -89,7 +88,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 
 		log.Info("Running load simulator...", "rpcEndpoints", commaSeparatedRPCEndpoints)
 		cmd := exec.Command("./scripts/run_simulator.sh")
-		cmd.Dir = repoRootPath
+		cmd.Dir = filepath.Join(testDir, "../..")
 		log.Info("Running load simulator script", "cmd", cmd.String())
 
 		out, err := cmd.CombinedOutput()
