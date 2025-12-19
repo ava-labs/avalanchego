@@ -5,7 +5,6 @@ package firewood
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"math/rand"
 	"testing"
@@ -69,13 +68,16 @@ func Test_Firewood_Sync(t *testing.T) {
 }
 
 func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
-	ffiServer, close := generateDB(t, serverKeys, seed)
-	defer close(t.Context())
-	serverDB := &database{db: ffiServer}
-	clientDB, close := generateDB(t, clientKeys, seed+1) // guarantee different data
-	defer close(t.Context())
-
 	ctx := t.Context()
+
+	ffiServer := generateDB(t, serverKeys, seed)
+	serverDB := &database{db: ffiServer}
+	clientDB := generateDB(t, clientKeys, seed+1) // guarantee different data
+	defer func() {
+		require.NoError(t, serverDB.db.Close(ctx))
+		require.NoError(t, clientDB.Close(ctx))
+	}()
+
 	root, err := serverDB.GetMerkleRoot(ctx)
 	require.NoError(t, err)
 
@@ -101,20 +103,14 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 // generateDB creates a new Firewood database with up to [numKeys] random key/value pairs.
 // The function returned closes the database, waiting on the provided context, if there were no test failures.
 // Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
-func generateDB(t *testing.T, numKeys int, seed int64) (*ffi.Database, func(context.Context)) {
+func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
 	t.Helper()
 	db, err := ffi.New(t.TempDir())
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
-	close := func(ctx context.Context) {
-		if !t.Failed() {
-			require.NoError(t, db.Close(ctx))
-		}
-	}
-
 	if numKeys == 0 {
-		return db, close
+		return db
 	}
 
 	var (
@@ -144,7 +140,7 @@ func generateDB(t *testing.T, numKeys int, seed int64) (*ffi.Database, func(cont
 	_, err = db.Update(keys, vals)
 	require.NoError(t, err)
 
-	return db, close
+	return db
 }
 
 // logDiff logs the differences between two Firewood databases.
