@@ -153,7 +153,7 @@ runs:
       run: |
         TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
         echo "EXECUTION_DATA_DIR=/tmp/reexecution-data-${TIMESTAMP}" >> "$GITHUB_ENV"
-        echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.txt" >> "$GITHUB_ENV"
+        echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.json" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
       run: |
@@ -199,7 +199,7 @@ runs:
       if: inputs.firewood-ref == ''
       uses: benchmark-action/github-action-benchmark@v1
       with:
-        tool: 'go'
+        tool: 'customBiggerIsBetter'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         summary-always: true
         github-token: ${{ inputs.github-token }}

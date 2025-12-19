@@ -97,8 +97,8 @@ linters:
               desc: github.com/ava-labs/avalanchego/utils/linked should be used instead.
             - pkg: github.com/golang/mock/gomock
               desc: go.uber.org/mock/gomock should be used instead.
-            - pkg: github.com/stretchr/testify/assert
-              desc: github.com/stretchr/testify/require should be used instead.
+            # Note: testify/assert is checked separately by test_warn_testify_assert
+            # in lint.sh to produce warnings instead of errors.
             - pkg: io/ioutil
               desc: io/ioutil is deprecated. Use package io or os instead.
     errorlint:
@@ -109,11 +109,15 @@ linters:
     forbidigo:
       # Forbid the following identifiers (list of regexp).
       forbid:
+        - pattern: assert\.Error$(# ErrorIs should be used instead)?
+        - pattern: assert\.ErrorContains$(# ErrorIs should be used instead)?
+        - pattern: assert\.EqualValues$(# Equal should be used instead)?
+        - pattern: assert\.NotEqualValues$(# NotEqual should be used instead)?
         - pattern: require\.Error$(# ErrorIs should be used instead)?
         - pattern: require\.ErrorContains$(# ErrorIs should be used instead)?
         - pattern: require\.EqualValues$(# Equal should be used instead)?
         - pattern: require\.NotEqualValues$(# NotEqual should be used instead)?
-        - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?
+        - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the assert and require libraries should be used instead)?
         - pattern: ^sort\.(Slice|Strings)$(# the slices package should be used instead)?
       # Exclude godoc examples from forbidigo checks.
       exclude-godoc-examples: false

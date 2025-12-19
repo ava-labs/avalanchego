@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/firewood"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 )
 
 func NewDatabaseWithConfig(db ethdb.Database, config *triedb.Config) state.Database {
@@ -22,12 +22,9 @@ func NewDatabaseWithNodeDB(db ethdb.Database, triedb *triedb.Database) state.Dat
 }
 
 func wrapIfFirewood(db state.Database) state.Database {
-	fw, ok := db.TrieDB().Backend().(*firewood.Database)
+	fw, ok := db.TrieDB().Backend().(*firewood.TrieDB)
 	if !ok {
 		return db
 	}
-	return &firewoodAccessorDB{
-		Database: db,
-		fw:       fw,
-	}
+	return firewood.NewStateAccessor(db, fw)
 }

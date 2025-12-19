@@ -446,6 +446,11 @@ func (pool *LegacyPool) Close() error {
 	if pool.journal != nil {
 		pool.journal.close()
 	}
+
+	// remove all references to state to allow GC to reclaim memory
+	pool.pendingNonces = nil
+	pool.currentState = nil
+
 	log.Info("Transaction pool stopped")
 	return nil
 }
