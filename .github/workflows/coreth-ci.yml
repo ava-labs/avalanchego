@@ -16,15 +16,11 @@ jobs:
         working-directory: ./graft/coreth
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: Set up solc
-        uses: ARR4N/setup-solc@v0.2.0
-        with:
-          versions: "0.8.30"
+      - uses: ./.github/actions/install-nix
       - name: Run all lint checks
-        run: ./scripts/run_task.sh lint-all-ci
+        run: nix develop --command ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
-        run: ./scripts/run_task.sh check-go-mod-tidy
+        run: nix develop --command ./scripts/run_task.sh check-go-mod-tidy
 
   unit_test:
     name: Unit Tests (${{ matrix.os }})
