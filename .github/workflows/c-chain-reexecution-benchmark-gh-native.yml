@@ -28,11 +28,11 @@ on:
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
         default: 30
-      firewood-ref:
-        description: 'Firewood commit/branch/tag (optional). Builds custom firewood and skips benchmark comparison (Firewood tracks separately).'
+      with:
+        description: 'Dependencies to use (e.g., "firewood=abc123" or "firewood=abc,libevm=xyz")'
         default: ''
-      libevm-ref:
-        description: 'libevm commit/branch/tag (optional). If provided, updates libevm dependency.'
+      push-post-state:
+        description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
 
   # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
@@ -52,9 +52,13 @@ jobs:
         shell: bash -x {0}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Parse 'with' input for dependency refs
+            FIREWOOD_REF="" LIBEVM_REF=""
+            [[ "${{ github.event.inputs.with }}" =~ firewood=([^,]+) ]] && FIREWOOD_REF="${BASH_REMATCH[1]}"
+            [[ "${{ github.event.inputs.with }}" =~ libevm=([^,]+) ]] && LIBEVM_REF="${BASH_REMATCH[1]}"
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "task": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+              printf '{ "include": [{ "task": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s, "firewood-ref": "%s", "libevm-ref": "%s" }] }\n' \
                 "${{ github.event.inputs.task }}" \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
@@ -62,7 +66,9 @@ jobs:
                 "${{ github.event.inputs.current-state-dir-src }}" \
                 "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.runner }}" \
-                "${{ github.event.inputs.timeout-minutes }}"
+                "${{ github.event.inputs.timeout-minutes }}" \
+                "$FIREWOOD_REF" \
+                "$LIBEVM_REF"
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
@@ -96,22 +102,22 @@ jobs:
           end-block: ${{ matrix.end-block }}
           block-dir-src: ${{ matrix.block-dir-src }}
           current-state-dir-src: ${{ matrix.current-state-dir-src }}
-          libevm-ref: ${{ inputs.libevm-ref }}
-          firewood-ref: ${{ inputs.firewood-ref }}
+          libevm-ref: ${{ matrix.libevm-ref }}
+          firewood-ref: ${{ matrix.firewood-ref }}
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
-          aws-role: ${{ matrix.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          push-post-state: ${{ matrix.push-post-state || '' }}
+          push-post-state: ${{ github.event.inputs.push-post-state }}
           runner_name: ${{ matrix.runner }}
       - name: Upload benchmark results
         # Only upload when using custom firewood - Firewood downloads the artifact
         # and publishes to their own gh-pages for tracking
-        if: inputs.firewood-ref != ''
+        if: matrix.firewood-ref != ''
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-output

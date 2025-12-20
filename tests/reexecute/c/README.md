@@ -280,6 +280,15 @@ Pass `LIBEVM_REF` and/or `FIREWOOD_REF` to any benchmark task:
 - **`LIBEVM_REF`**: Runs `go get github.com/ava-labs/libevm@<ref>` to update the dependency
 - **`FIREWOOD_REF`**: Uses [polyrepo](../../../scripts/run_polyrepo.sh) to clone, build (via Nix), and configure firewood at the specified ref
 
+### CI Usage
+
+For workflow dispatch, use the `with` input to specify custom dependency versions:
+
+- Single dependency: `-f with=firewood=abc123`
+- Multiple dependencies: `-f with="firewood=abc123,libevm=v1.2.3"`
+
+See [Trigger Workflow Dispatch with GitHub CLI](#trigger-workflow-dispatch-with-github-cli) for complete examples.
+
 ## Metrics
 
 The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
@@ -359,15 +368,14 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
 # Test with custom firewood commit
 gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
   -f task=c-chain-reexecution-firewood-101-250k \
-  -f firewood-ref=abc123def \
+  -f with=firewood=abc123def \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f timeout-minutes=60
 
 # Test with custom libevm and firewood
 gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
   -f task=c-chain-reexecution-firewood-101-250k \
-  -f libevm-ref=v1.2.3 \
-  -f firewood-ref=abc123def \
+  -f with="firewood=abc123def,libevm=v1.2.3" \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f timeout-minutes=60
 ```
@@ -384,4 +392,14 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
   -f config=default \
   -f runner=ubuntu-latest \
   -f timeout-minutes=360
+```
+
+### Pushing Post-Execution State to S3
+
+```bash
+gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+  -f task=c-chain-reexecution-hashdb-101-250k \
+  -f runner=blacksmith-4vcpu-ubuntu-2404 \
+  -f push-post-state=s3://avalanchego-bootstrap-testing/cchain-current-state-new/ \
+  -f timeout-minutes=60
 ```
