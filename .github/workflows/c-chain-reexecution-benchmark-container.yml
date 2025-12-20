@@ -120,7 +120,7 @@ jobs:
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ${{ github.event.inputs.push-post-state }}
-          runner_name: ${{ matrix.runner }}
+          runner_type: ${{ matrix.runner }}
       - name: Upload benchmark results
         # Only upload when using custom firewood - Firewood downloads the artifact
         # and publishes to their own gh-pages for tracking

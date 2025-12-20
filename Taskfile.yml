@@ -1,6 +1,7 @@
 # https://taskfile.dev
 # To run on a system without task installed, `./scripts/run_task.sh` will execute it with `go run`.
 # If in the nix dev shell, `task` is available.
+# To install nix, `./scripts/run_task.sh install-nix`
 
 version: '3'
 
@@ -167,8 +168,8 @@ tasks:
       - cmd: bash -x ./scripts/copy_dir.sh {{.SRC}} {{.DST}}
 
   install-nix:
-    desc: Installs nix with the determinate systems installer
-    cmd: curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+    desc: Installs nix with an OS-appropriate installer
+    cmd: ./scripts/install_nix.sh
 
   lint:
     desc: Runs static analysis tests of golang code
@@ -224,7 +225,7 @@ tasks:
       EXECUTION_DATA_DIR={{.EXECUTION_DATA_DIR}} \
       bash -x ./scripts/benchmark_cchain_range.sh
     # Runtime context variables are read from environment by the script:
-    # - RUNNER_NAME (execution environment)
+    # - RUNNER_TYPE (execution environment)
     # - METRICS_SERVER_PORT (monitoring config)
     # - METRICS_SERVER_ENABLED (runtime monitoring decision)
     # - METRICS_COLLECTOR_ENABLED (runtime monitoring decision)

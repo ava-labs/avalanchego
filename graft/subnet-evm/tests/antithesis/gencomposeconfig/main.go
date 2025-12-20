@@ -23,7 +23,7 @@ func main() {
 		log.Fatalf("failed to get current working directory: %s", err)
 	}
 
-	genesisPath := filepath.Join(cwd, "tests/load/genesis/genesis.json")
+	genesisPath := filepath.Join(cwd, "tests/load/genesis.json")
 
 	// Create a network with a subnet-evm subnet
 	network := tmpnet.LocalNetworkOrPanic()

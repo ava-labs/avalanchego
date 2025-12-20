@@ -52,7 +52,7 @@ func main() {
 		),
 		func(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
 			_, thisFile, _, _ := runtime.Caller(0)
-			genesisPath := filepath.Join(filepath.Dir(thisFile), "..", "load", "genesis", "genesis.json")
+			genesisPath := filepath.Join(filepath.Dir(thisFile), "..", "load", "genesis.json")
 			return []*tmpnet.Subnet{
 				utils.NewTmpnetSubnet("subnet-evm", genesisPath, utils.DefaultChainConfig, nodes...),
 			}

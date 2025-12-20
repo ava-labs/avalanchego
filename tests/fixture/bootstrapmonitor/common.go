@@ -127,7 +127,7 @@ type ImageDetails struct {
 	Versions *version.Versions
 }
 
-// GetMasterImageDetails retrieves the image details for the avalanchego image with tag `master`.
+// getMasterImageDetails retrieves the image details for the avalanchego image with tag `master`.
 func getMasterImageDetails(
 	ctx context.Context,
 	log logging.Logger,
