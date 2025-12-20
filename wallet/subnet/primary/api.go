@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
+	"github.com/ava-labs/libevm/ethclient"
 
 	pbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"

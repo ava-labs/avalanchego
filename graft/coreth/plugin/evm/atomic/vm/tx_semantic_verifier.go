@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 
+	avagoatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -81,86 +83,24 @@ type semanticVerifier struct {
 
 // ImportTx verifies this transaction is valid.
 func (s *semanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
-	backend := s.backend
-	ctx := backend.Ctx
-	rules := backend.Rules
-	stx := s.tx
-	if err := utx.Verify(ctx, rules); err != nil {
+	b := s.backend
+	err := VerifyTx(
+		b.Ctx,
+		b.Rules,
+		b.Fx,
+		b.SecpCache,
+		b.Bootstrapped,
+		s.tx,
+		s.baseFee,
+	)
+	if err != nil {
 		return err
 	}
 
-	// Check the transaction consumes and produces the right amounts
-	fc := avax.NewFlowChecker()
-	switch {
-	// Apply dynamic fees to import transactions as of Apricot Phase 3
-	case rules.IsApricotPhase3:
-		gasUsed, err := stx.GasUsed(rules.IsApricotPhase5)
-		if err != nil {
-			return err
-		}
-		txFee, err := atomic.CalculateDynamicFee(gasUsed, s.baseFee)
-		if err != nil {
-			return err
-		}
-		fc.Produce(ctx.AVAXAssetID, txFee)
-
-	// Apply fees to import transactions as of Apricot Phase 2
-	case rules.IsApricotPhase2:
-		fc.Produce(ctx.AVAXAssetID, ap0.AtomicTxFee)
+	if !b.Bootstrapped {
+		return nil // Allow for force committing during bootstrapping
 	}
-	for _, out := range utx.Outs {
-		fc.Produce(out.AssetID, out.Amount)
-	}
-	for _, in := range utx.ImportedInputs {
-		fc.Consume(in.AssetID(), in.Input().Amount())
-	}
-
-	if err := fc.Verify(); err != nil {
-		return fmt.Errorf("import tx flow check failed due to: %w", err)
-	}
-
-	if len(stx.Creds) != len(utx.ImportedInputs) {
-		return fmt.Errorf("%w: (%d vs. %d)", errIncorrectNumCredentials, len(utx.ImportedInputs), len(stx.Creds))
-	}
-
-	if !backend.Bootstrapped {
-		// Allow for force committing during bootstrapping
-		return nil
-	}
-
-	utxoIDs := make([][]byte, len(utx.ImportedInputs))
-	for i, in := range utx.ImportedInputs {
-		inputID := in.UTXOID.InputID()
-		utxoIDs[i] = inputID[:]
-	}
-	// allUTXOBytes is guaranteed to be the same length as utxoIDs
-	allUTXOBytes, err := ctx.SharedMemory.Get(utx.SourceChain, utxoIDs)
-	if err != nil {
-		return fmt.Errorf("%w from %s due to: %w", errFailedToFetchImportUTXOs, utx.SourceChain, err)
-	}
-
-	for i, in := range utx.ImportedInputs {
-		utxoBytes := allUTXOBytes[i]
-
-		utxo := &avax.UTXO{}
-		if _, err := atomic.Codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return fmt.Errorf("%w: %w", errFailedToUnmarshalUTXO, err)
-		}
-
-		cred := stx.Creds[i]
-
-		utxoAssetID := utxo.AssetID()
-		inAssetID := in.AssetID()
-		if utxoAssetID != inAssetID {
-			return ErrAssetIDMismatch
-		}
-
-		if err := backend.Fx.VerifyTransfer(utx, in.In, cred, utxo.Out); err != nil {
-			return fmt.Errorf("import tx transfer failed verification: %w", err)
-		}
-	}
-
-	return conflicts(backend, utx.InputUTXOs(), s.parent)
+	return conflicts(b, utx.InputUTXOs(), s.parent)
 }
 
 // conflicts returns an error if [inputs] conflicts with any of the atomic inputs contained in [ancestor]
@@ -206,49 +146,183 @@ func conflicts(backend *VerifierBackend, inputs set.Set[ids.ID], ancestor extens
 
 // ExportTx verifies this transaction is valid.
 func (s *semanticVerifier) ExportTx(utx *atomic.UnsignedExportTx) error {
-	backend := s.backend
-	ctx := backend.Ctx
-	rules := backend.Rules
-	stx := s.tx
-	if err := utx.Verify(ctx, rules); err != nil {
+	b := s.backend
+	return VerifyTx(
+		b.Ctx,
+		b.Rules,
+		b.Fx,
+		b.SecpCache,
+		b.Bootstrapped,
+		s.tx,
+		s.baseFee,
+	)
+}
+
+func VerifyTx(
+	ctx *snow.Context,
+	rules extras.Rules,
+	fx *secp256k1fx.Fx,
+	cache *secp256k1.RecoverCache,
+	bootstrapped bool,
+	tx *atomic.Tx,
+	baseFee *big.Int,
+) error {
+	if err := tx.UnsignedAtomicTx.Verify(ctx, rules); err != nil {
+		return err
+	}
+	txFee, err := txFee(rules, tx, baseFee)
+	if err != nil {
+		return err
+	}
+	if err := verifyFlowCheck(tx, ctx.AVAXAssetID, txFee); err != nil {
 		return err
 	}
 
-	// Check the transaction consumes and produces the right amounts
-	fc := avax.NewFlowChecker()
+	if !bootstrapped {
+		return nil // Allow for force committing during bootstrapping
+	}
+	return verifyCredentials(ctx.SharedMemory, fx, cache, tx)
+}
+
+func txFee(
+	rules extras.Rules,
+	tx *atomic.Tx,
+	baseFee *big.Int,
+) (uint64, error) {
 	switch {
 	// Apply dynamic fees to export transactions as of Apricot Phase 3
 	case rules.IsApricotPhase3:
-		gasUsed, err := stx.GasUsed(rules.IsApricotPhase5)
+		gasUsed, err := tx.GasUsed(rules.IsApricotPhase5)
 		if err != nil {
-			return err
+			return 0, err
 		}
-		txFee, err := atomic.CalculateDynamicFee(gasUsed, s.baseFee)
+		txFee, err := atomic.CalculateDynamicFee(gasUsed, baseFee)
 		if err != nil {
-			return err
+			return 0, err
 		}
-		fc.Produce(ctx.AVAXAssetID, txFee)
-	// Apply fees to export transactions before Apricot Phase 3
+		return txFee, nil
+	// Apply fees to import transactions as of Apricot Phase 2
+	case rules.IsApricotPhase2:
+		return ap0.AtomicTxFee, nil
+	// Prior to AP2, only export txs were required to pay a fee. We enforce the
+	// more lax restriction here that neither txs were required to pay a fee
+	// prior to AP2 to avoid maintaining tx specific code. These checks are no
+	// longer really required because processing during these old rules are
+	// restricted to be valid because of how bootstrapping syncs blocks.
 	default:
-		fc.Produce(ctx.AVAXAssetID, ap0.AtomicTxFee)
+		return 0, nil
 	}
-	for _, out := range utx.ExportedOutputs {
-		fc.Produce(out.AssetID(), out.Output().Amount())
-	}
-	for _, in := range utx.Ins {
-		fc.Consume(in.AssetID, in.Amount)
-	}
+}
 
+func verifyFlowCheck(
+	tx *atomic.Tx,
+	avaxAssetID ids.ID,
+	txFee uint64,
+) error {
+	// Check the transaction consumes and produces the right amounts
+	fc := avax.NewFlowChecker()
+	fc.Produce(avaxAssetID, txFee)
+
+	switch utx := tx.UnsignedAtomicTx.(type) {
+	case *atomic.UnsignedImportTx:
+		for _, out := range utx.Outs {
+			fc.Produce(out.AssetID, out.Amount)
+		}
+		for _, in := range utx.ImportedInputs {
+			fc.Consume(in.AssetID(), in.Input().Amount())
+		}
+	case *atomic.UnsignedExportTx:
+		for _, out := range utx.ExportedOutputs {
+			fc.Produce(out.AssetID(), out.Output().Amount())
+		}
+		for _, in := range utx.Ins {
+			fc.Consume(in.AssetID, in.Amount)
+		}
+	default:
+		return fmt.Errorf("unexpected tx type: %T", utx)
+	}
 	if err := fc.Verify(); err != nil {
 		return fmt.Errorf("export tx flow check failed due to: %w", err)
 	}
+	return nil
+}
 
-	if len(utx.Ins) != len(stx.Creds) {
-		return fmt.Errorf("export tx contained %w want %d got %d", errIncorrectNumCredentials, len(utx.Ins), len(stx.Creds))
+func verifyCredentials(
+	sharedMemory avagoatomic.SharedMemory,
+	fx *secp256k1fx.Fx,
+	cache *secp256k1.RecoverCache,
+	tx *atomic.Tx,
+) error {
+	switch utx := tx.UnsignedAtomicTx.(type) {
+	case *atomic.UnsignedImportTx:
+		return verifyCredentialsImportTx(sharedMemory, fx, utx, tx.Creds)
+	case *atomic.UnsignedExportTx:
+		return verifyCredentialsExportTx(cache, utx, tx.Creds)
+	default:
+		return fmt.Errorf("unexpected tx type: %T", utx)
+	}
+}
+
+func verifyCredentialsImportTx(
+	sharedMemory avagoatomic.SharedMemory,
+	fx *secp256k1fx.Fx,
+	utx *atomic.UnsignedImportTx,
+	creds []verify.Verifiable,
+) error {
+	if len(utx.ImportedInputs) != len(creds) {
+		return fmt.Errorf("import tx contained mismatched number of inputs/credentials (%d vs. %d)",
+			len(utx.ImportedInputs),
+			len(creds),
+		)
+	}
+
+	utxoIDs := make([][]byte, len(utx.ImportedInputs))
+	for i, in := range utx.ImportedInputs {
+		inputID := in.UTXOID.InputID()
+		utxoIDs[i] = inputID[:]
+	}
+	// allUTXOBytes is guaranteed to be the same length as utxoIDs
+	allUTXOBytes, err := sharedMemory.Get(utx.SourceChain, utxoIDs)
+	if err != nil {
+		return fmt.Errorf("failed to fetch import UTXOs from %s due to: %w", utx.SourceChain, err)
+	}
+
+	for i, in := range utx.ImportedInputs {
+		utxoBytes := allUTXOBytes[i]
+
+		utxo := &avax.UTXO{}
+		if _, err := atomic.Codec.Unmarshal(utxoBytes, utxo); err != nil {
+			return fmt.Errorf("failed to unmarshal UTXO: %w", err)
+		}
+
+		utxoAssetID := utxo.AssetID()
+		inAssetID := in.AssetID()
+		if utxoAssetID != inAssetID {
+			return ErrAssetIDMismatch
+		}
+
+		cred := creds[i]
+		if err := fx.VerifyTransfer(utx, in.In, cred, utxo.Out); err != nil {
+			return fmt.Errorf("import tx transfer failed verification: %w", err)
+		}
+	}
+	return nil
+}
+
+func verifyCredentialsExportTx(
+	cache *secp256k1.RecoverCache,
+	utx *atomic.UnsignedExportTx,
+	creds []verify.Verifiable,
+) error {
+	if len(utx.Ins) != len(creds) {
+		return fmt.Errorf("export tx contained mismatched number of inputs/credentials (%d vs. %d)",
+			len(utx.Ins),
+			len(creds),
+		)
 	}
 
 	for i, input := range utx.Ins {
-		cred, ok := stx.Creds[i].(*secp256k1fx.Credential)
+		cred, ok := creds[i].(*secp256k1fx.Credential)
 		if !ok {
 			return fmt.Errorf("expected *secp256k1fx.Credential but got %T", cred)
 		}
@@ -259,7 +333,7 @@ func (s *semanticVerifier) ExportTx(utx *atomic.UnsignedExportTx) error {
 		if len(cred.Sigs) != 1 {
 			return fmt.Errorf("%w want 1 signature for EVM Input Credential, but got %d", errIncorrectNumSignatures, len(cred.Sigs))
 		}
-		pubKey, err := s.backend.SecpCache.RecoverPublicKey(utx.Bytes(), cred.Sigs[0][:])
+		pubKey, err := cache.RecoverPublicKey(utx.Bytes(), cred.Sigs[0][:])
 		if err != nil {
 			return err
 		}
@@ -267,6 +341,5 @@ func (s *semanticVerifier) ExportTx(utx *atomic.UnsignedExportTx) error {
 			return errPublicKeySignatureMismatch
 		}
 	}
-
 	return nil
 }

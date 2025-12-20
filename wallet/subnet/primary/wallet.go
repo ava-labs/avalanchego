@@ -5,6 +5,7 @@ package primary
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -88,18 +89,18 @@ func MakeWallet(
 	avaxAddrs := avaxKeychain.Addresses()
 	avaxState, err := FetchState(ctx, uri, avaxAddrs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching avax state: %w", err)
 	}
 
 	ethAddrs := ethKeychain.EthAddresses()
 	ethState, err := FetchEthState(ctx, uri, ethAddrs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching eth state: %w", err)
 	}
 
 	owners, err := platformvm.GetOwners(avaxState.PClient, ctx, config.SubnetIDs, config.ValidationIDs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching p-chain owners: %w", err)
 	}
 
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
