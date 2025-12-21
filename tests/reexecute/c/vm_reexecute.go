@@ -62,17 +62,19 @@ var (
 			"pruning-enabled": false
 		}`,
 		"firewood": `{
-			"state-scheme": "firewood",
-			"snapshot-cache": 0,
-			"pruning-enabled": true,
-			"state-sync-enabled": false
-		}`,
+                        "state-scheme": "firewood",
+                        "metrics-expensive-enabled": true,
+                        "snapshot-cache": 0,
+                        "pruning-enabled": true,
+                        "state-sync-enabled": false
+                }`,
 		"firewood-archive": `{
-			"state-scheme": "firewood",
-			"snapshot-cache": 0,
-			"pruning-enabled": false,
-			"state-sync-enabled": false
-		}`,
+                        "state-scheme": "firewood",
+                        "metrics-expensive-enabled": true,
+                        "snapshot-cache": 0,
+                        "pruning-enabled": false,
+                        "state-sync-enabled": false
+                }`,
 	}
 
 	configNameArg  string
