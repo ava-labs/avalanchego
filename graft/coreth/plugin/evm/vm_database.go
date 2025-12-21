@@ -117,7 +117,7 @@ func (vm *VM) initBlockDB(db avalanchedatabase.Database) error {
 		return err
 	}
 	ssEnabled := vm.stateSyncEnabled(height)
-	cfg := heightindexdb.DefaultConfig().WithSyncToDisk(false)
+	cfg := heightindexdb.DefaultConfig().WithSyncToDisk(vm.config.BlockDatabaseSync)
 	bdb, initialized, err := blockdb.New(
 		metaDB,
 		vm.chaindb,
