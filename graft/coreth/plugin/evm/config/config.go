@@ -144,6 +144,8 @@ type Config struct {
 	// SkipBlockDatabaseAutoMigrate skips auto-migrating block data from key-value
 	// database to the block database. Only new blocks will be stored in the block database.
 	SkipBlockDatabaseAutoMigrate bool `json:"skip-block-database-auto-migrate"`
+	// BlockDatabaseSync determines if fsync is called after each write.
+	BlockDatabaseSync bool `json:"block-database-sync"`
 
 	// SkipUpgradeCheck disables checking that upgrades must take place before the last
 	// accepted block. Skipping this check is useful when a node operator does not update
