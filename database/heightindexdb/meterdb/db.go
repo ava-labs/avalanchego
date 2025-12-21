@@ -27,6 +27,9 @@ var (
 	hasLabel = prometheus.Labels{
 		methodLabel: "has",
 	}
+	syncLabel = prometheus.Labels{
+		methodLabel: "sync",
+	}
 	closeLabel = prometheus.Labels{
 		methodLabel: "close",
 	}
@@ -111,6 +114,16 @@ func (db *Database) Has(height uint64) (bool, error) {
 	db.calls.With(hasLabel).Inc()
 	db.duration.With(hasLabel).Add(float64(duration.Nanoseconds()))
 	return has, err
+}
+
+func (db *Database) Sync(startHeight, endHeight uint64) error {
+	start := time.Now()
+	err := db.heightDB.Sync(startHeight, endHeight)
+	duration := time.Since(start)
+
+	db.calls.With(syncLabel).Inc()
+	db.duration.With(syncLabel).Add(float64(duration.Nanoseconds()))
+	return err
 }
 
 func (db *Database) Close() error {

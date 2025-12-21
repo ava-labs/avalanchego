@@ -116,6 +116,10 @@ type HeightIndex interface {
 	// Returns true even if the stored value is nil or empty.
 	Has(height uint64) (bool, error)
 
+	// Sync flushes underlying writes from the OS buffer cache to disk for
+	// data in the range [start, end].
+	Sync(start, end uint64) error
+
 	// Close closes the database.
 	//
 	// Calling Close after Close returns [ErrClosed].
