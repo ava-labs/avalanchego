@@ -49,7 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/libevm/accounts"

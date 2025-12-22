@@ -18,7 +18,7 @@ import (
 	consensus "github.com/ava-labs/avalanchego/graft/coreth/consensus"
 	core "github.com/ava-labs/avalanchego/graft/coreth/core"
 	params "github.com/ava-labs/avalanchego/graft/coreth/params"
-	rpc "github.com/ava-labs/avalanchego/graft/coreth/rpc"
+	rpc "github.com/ava-labs/avalanchego/graft/evm/rpc"
 	accounts "github.com/ava-labs/libevm/accounts"
 	common "github.com/ava-labs/libevm/common"
 	bloombits "github.com/ava-labs/libevm/core/bloombits"

@@ -30,13 +30,9 @@ package rpc
 import (
 	"os"
 	"testing"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 )
 
 func TestMain(m *testing.M) {
-	customtypes.Register()
-
 	// Since there are so many flaky tests in the RPC package, we run the tests
 	// multiple times to try to get a passing run.
 	var code int

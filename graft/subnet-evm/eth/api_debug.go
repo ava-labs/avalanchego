@@ -45,7 +45,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 )
 
 var errFirewoodNotSupported = errors.New("firewood triedb scheme does not yet support this operation")
