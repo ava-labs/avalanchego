@@ -71,9 +71,6 @@
 
             # s5cmd for rapid s3 interactions
             s5cmd
-          ] ++ lib.optionals stdenv.isDarwin [
-            # macOS-specific frameworks
-            darwin.apple_sdk.frameworks.Security
           ];
 
           # Add scripts/ directory to PATH so kind-with-registry.sh is accessible
