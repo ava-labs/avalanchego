@@ -55,6 +55,7 @@ var (
 	errParentBeaconRootNonEmpty            = errors.New("invalid non-empty parentBeaconRoot")
 	errBlobGasUsedNilInCancun              = errors.New("blob gas used must not be nil in Cancun")
 	errBlobsNotEnabled                     = errors.New("blobs not enabled on avalanche networks")
+	errCouldNotNotifySyncClient            = errors.New("could not notify sync client")
 )
 
 var (
@@ -91,11 +92,21 @@ func wrapBlock(ethBlock *types.Block, vm *VM) (*wrappedBlock, error) {
 func (b *wrappedBlock) ID() ids.ID { return b.id }
 
 // Accept implements the snowman.Block interface
-func (b *wrappedBlock) Accept(context.Context) error {
-	vm := b.vm
-	// Although returning an error from Accept is considered fatal, it is good
-	// practice to cleanup the batch we were modifying in the case of an error.
-	defer vm.versiondb.Abort()
+// TODO(powerslider): Propagate context to the sync client.
+func (b *wrappedBlock) Accept(_ context.Context) error {
+	// Notify sync client that engine accepted a block.
+	// If the block was enqueued for deferred processing, skip immediate execution.
+	if client := b.vm.SyncerClient(); client != nil {
+		deferred, err := client.OnEngineAccept(b)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errCouldNotNotifySyncClient, err)
+		}
+		if deferred {
+			// Block was enqueued for deferred processing during dynamic state sync.
+			// It will be processed later from the queue, so skip immediate execution.
+			return nil
+		}
+	}
 
 	blkID := b.ID()
 	log.Debug("accepting block",
@@ -111,17 +122,17 @@ func (b *wrappedBlock) Accept(context.Context) error {
 	if err := b.handlePrecompileAccept(rules); err != nil {
 		return err
 	}
-	if err := vm.blockChain.Accept(b.ethBlock); err != nil {
+	if err := b.vm.blockChain.Accept(b.ethBlock); err != nil {
 		return fmt.Errorf("chain could not accept %s: %w", blkID, err)
 	}
 
-	if err := vm.PutLastAcceptedID(blkID); err != nil {
+	if err := b.vm.PutLastAcceptedID(blkID); err != nil {
 		return fmt.Errorf("failed to put %s as the last accepted block: %w", blkID, err)
 	}
 
 	// Get pending operations on the vm's versionDB so we can apply them atomically
 	// with the block extension's changes.
-	vdbBatch, err := vm.versiondb.CommitBatch()
+	vdbBatch, err := b.vm.versiondb.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("could not create commit batch processing block[%s]: %w", blkID, err)
 	}
@@ -130,11 +141,17 @@ func (b *wrappedBlock) Accept(context.Context) error {
 		// Apply any changes atomically with other pending changes to
 		// the vm's versionDB.
 		// Accept flushes the changes in the batch to the database.
-		return b.extension.Accept(vdbBatch)
+		if err := b.extension.Accept(vdbBatch); err != nil {
+			return err
+		}
+	} else {
+		// If there is no extension, we still need to apply the changes to the versionDB
+		if err := vdbBatch.Write(); err != nil {
+			return err
+		}
 	}
 
-	// If there is no extension, we still need to apply the changes to the versionDB
-	return vdbBatch.Write()
+	return nil
 }
 
 // handlePrecompileAccept calls Accept on any logs generated with an active precompile address that implements
@@ -173,7 +190,21 @@ func (b *wrappedBlock) handlePrecompileAccept(rules extras.Rules) error {
 
 // Reject implements the snowman.Block interface
 // If [b] contains an atomic transaction, attempt to re-issue it
-func (b *wrappedBlock) Reject(context.Context) error {
+func (b *wrappedBlock) Reject(_ context.Context) error {
+	// Notify sync client that engine rejected a block.
+	// If the block was enqueued for deferred processing, skip immediate execution.
+	if client := b.vm.SyncerClient(); client != nil {
+		deferred, err := client.OnEngineReject(b)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errCouldNotNotifySyncClient, err)
+		}
+		if deferred {
+			// Block was enqueued for deferred processing during dynamic state sync.
+			// It will be processed later from the queue, so skip immediate execution.
+			return nil
+		}
+	}
+
 	blkID := b.ID()
 	log.Debug("rejecting block",
 		"hash", blkID.Hex(),
@@ -205,7 +236,24 @@ func (b *wrappedBlock) Timestamp() time.Time {
 }
 
 // Verify implements the snowman.Block interface
-func (b *wrappedBlock) Verify(context.Context) error {
+// TODO(powerslider): Propagate context to the sync client.
+func (b *wrappedBlock) Verify(_ context.Context) error {
+	// Notify sync client that engine verified a block.
+	// If the block was enqueued for deferred processing, skip immediate execution.
+	if client := b.vm.SyncerClient(); client != nil {
+		deferred, err := client.OnEngineVerify(b)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errCouldNotNotifySyncClient, err)
+		}
+		if deferred {
+			// Block was enqueued for deferred processing during dynamic state sync.
+			// It will be processed later from the queue, so skip immediate execution.
+			// Note: Verify may be called multiple times with different contexts, but
+			// we only enqueue once and process once from the queue.
+			return nil
+		}
+	}
+
 	return b.verify(&precompileconfig.PredicateContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: nil,
@@ -236,8 +284,25 @@ func (b *wrappedBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
 	return false, nil
 }
 
-// VerifyWithContext implements the block.WithVerifyContext interface
+// VerifyWithContext implements the block.WithVerifyContext interface.
+// TODO(powerslider): Propagate context to the sync client.
 func (b *wrappedBlock) VerifyWithContext(_ context.Context, proposerVMBlockCtx *block.Context) error {
+	// Notify sync client that engine verified a block.
+	// If the block was enqueued for deferred processing, skip immediate execution.
+	if client := b.vm.SyncerClient(); client != nil {
+		deferred, err := client.OnEngineVerify(b)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errCouldNotNotifySyncClient, err)
+		}
+		if deferred {
+			// Block was enqueued for deferred processing during dynamic state sync.
+			// It will be processed later from the queue, so skip immediate execution.
+			// Note: VerifyWithContext may be called multiple times with different contexts, but
+			// we only enqueue once and process once from the queue.
+			return nil
+		}
+	}
+
 	return b.verify(&precompileconfig.PredicateContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: proposerVMBlockCtx,

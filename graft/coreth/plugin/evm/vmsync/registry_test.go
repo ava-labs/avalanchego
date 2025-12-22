@@ -38,8 +38,9 @@ func (m *mockSyncer) Sync(context.Context) error {
 	return m.syncError
 }
 
-func (m *mockSyncer) Name() string { return m.name }
-func (m *mockSyncer) ID() string   { return m.name }
+func (m *mockSyncer) Name() string                        { return m.name }
+func (m *mockSyncer) ID() string                          { return m.name }
+func (*mockSyncer) UpdateTarget(_ message.Syncable) error { return nil }
 
 // namedSyncer adapts an existing syncer with a provided name to satisfy Syncer with Name().
 type namedSyncer struct {
@@ -50,6 +51,9 @@ type namedSyncer struct {
 func (n *namedSyncer) Sync(ctx context.Context) error { return n.syncer.Sync(ctx) }
 func (n *namedSyncer) Name() string                   { return n.name }
 func (n *namedSyncer) ID() string                     { return n.name }
+func (n *namedSyncer) UpdateTarget(newTarget message.Syncable) error {
+	return n.syncer.UpdateTarget(newTarget)
+}
 
 // syncerConfig describes a test syncer setup for RunSyncerTasks table tests.
 type syncerConfig struct {
