@@ -62,7 +62,24 @@ type Warp struct {
 	publicKeyOnce  sync.Once
 }
 
+// NewWarp creates a Warp validator with both PublicKeyBytes and the cached
+// PublicKey populated. This avoids redundant conversions when the PublicKey
+// is already available at creation time.
+func NewWarp(publicKey *bls.PublicKey, weight uint64, nodeIDs []ids.NodeID) *Warp {
+	pkBytes := bls.PublicKeyToUncompressedBytes(publicKey)
+	w := &Warp{
+		PublicKeyBytes: pkBytes,
+		Weight:         weight,
+		NodeIDs:        nodeIDs,
+		publicKeyCache: publicKey,
+	}
+	// Mark the sync.Once as done so PublicKey() doesn't reconvert
+	w.publicKeyOnce.Do(func() {})
+	return w
+}
+
 // PublicKey returns the BLS public key, converting from bytes on first access
+// if not already cached (e.g., after JSON unmarshaling).
 func (w *Warp) PublicKey() *bls.PublicKey {
 	w.publicKeyOnce.Do(func() {
 		w.publicKeyCache = bls.PublicKeyFromValidUncompressedBytes(w.PublicKeyBytes)
@@ -135,9 +152,9 @@ func FlattenValidatorSet(vdrSet map[ids.NodeID]*GetValidatorOutput) (WarpSet, er
 		pkBytes := bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
 		uniqueVdr, ok := vdrs[string(pkBytes)]
 		if !ok {
-			uniqueVdr = &Warp{
-				PublicKeyBytes: pkBytes,
-			}
+			// Use NewWarp to populate both PublicKeyBytes and cached PublicKey
+			// This avoids reconverting bytes->PublicKey later for crypto operations
+			uniqueVdr = NewWarp(vdr.PublicKey, 0, nil)
 			vdrs[string(pkBytes)] = uniqueVdr
 		}
 

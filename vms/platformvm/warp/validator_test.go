@@ -165,18 +165,12 @@ func TestFilterValidators(t *testing.T) {
 	sk0, err := localsigner.New()
 	require.NoError(t, err)
 	pk0 := sk0.PublicKey()
-	vdr0 := &validators.Warp{
-		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
-		Weight:         1,
-	}
+	vdr0 := validators.NewWarp(pk0, 1, nil)
 
 	sk1, err := localsigner.New()
 	require.NoError(t, err)
 	pk1 := sk1.PublicKey()
-	vdr1 := &validators.Warp{
-		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
-		Weight:         2,
-	}
+	vdr1 := validators.NewWarp(pk1, 2, nil)
 
 	type test struct {
 		name         string

@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
@@ -23,11 +22,7 @@ func NewWarp(t testing.TB, weight uint64) *validators.Warp {
 
 	nodeID := ids.GenerateTestNodeID()
 	pk := sk.PublicKey()
-	return &validators.Warp{
-		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-		Weight:         weight,
-		NodeIDs:        []ids.NodeID{nodeID},
-	}
+	return validators.NewWarp(pk, weight, []ids.NodeID{nodeID})
 }
 
 func NewWarpSet(t testing.TB, n uint64) validators.WarpSet {

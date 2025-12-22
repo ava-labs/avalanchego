@@ -232,16 +232,8 @@ func TestGetWarpValidatorSets(t *testing.T) {
 
 	expectedPrimaryNetworkWithAllValidators := validators.WarpSet{
 		Validators: []*validators.Warp{
-			{
-				PublicKeyBytes: pk0Bytes,
-				Weight:         1,
-				NodeIDs:        []ids.NodeID{primaryStaker0.NodeID},
-			},
-			{
-				PublicKeyBytes: pk1Bytes,
-				Weight:         1,
-				NodeIDs:        []ids.NodeID{primaryStaker1.NodeID},
-			},
+			validators.NewWarp(pk0, 1, []ids.NodeID{primaryStaker0.NodeID}),
+			validators.NewWarp(pk1, 1, []ids.NodeID{primaryStaker1.NodeID}),
 		},
 		TotalWeight: genesistest.DefaultValidatorWeight*uint64(len(genesistest.DefaultNodeIDs)) + 2,
 	}
@@ -255,21 +247,13 @@ func TestGetWarpValidatorSets(t *testing.T) {
 		{
 			constants.PrimaryNetworkID: {
 				Validators: []*validators.Warp{
-					{
-						PublicKeyBytes: pk0Bytes,
-						Weight:         1,
-						NodeIDs:        []ids.NodeID{primaryStaker0.NodeID},
-					},
+					validators.NewWarp(pk0, 1, []ids.NodeID{primaryStaker0.NodeID}),
 				},
 				TotalWeight: genesistest.DefaultValidatorWeight*uint64(len(genesistest.DefaultNodeIDs)) + 1,
 			},
 			subnetID: {
 				Validators: []*validators.Warp{
-					{
-						PublicKeyBytes: pk0Bytes,
-						Weight:         1,
-						NodeIDs:        []ids.NodeID{subnetStaker0.NodeID},
-					},
+					validators.NewWarp(pk0, 1, []ids.NodeID{subnetStaker0.NodeID}),
 				},
 				TotalWeight: 1,
 			},
@@ -281,11 +265,7 @@ func TestGetWarpValidatorSets(t *testing.T) {
 			constants.PrimaryNetworkID: expectedPrimaryNetworkWithAllValidators,
 			subnetID: {
 				Validators: []*validators.Warp{
-					{
-						PublicKeyBytes: pk0Bytes,
-						Weight:         1,
-						NodeIDs:        []ids.NodeID{subnetStaker0.NodeID},
-					},
+					validators.NewWarp(pk0, 1, []ids.NodeID{subnetStaker0.NodeID}),
 				},
 				TotalWeight: 1,
 			},
