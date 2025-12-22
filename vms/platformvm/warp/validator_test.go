@@ -342,3 +342,27 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 		})
 	}
 }
+
+// BenchmarkAggregatePublicKeys benchmarks the hot path of aggregating public keys
+// from a validator set. This simulates real-world signature verification operations
+// where validator sets are created once but public keys are aggregated many times.
+func BenchmarkAggregatePublicKeys(b *testing.B) {
+	for _, size := range []int{1, 10, 100, 1_000, 10_000} {
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
+			vdrs := make([]*validators.Warp, 0, size)
+			for i := 0; i < size; i++ {
+				sk, err := localsigner.New()
+				require.NoError(b, err)
+				pk := sk.PublicKey()
+				vdrs = append(vdrs, validators.NewWarp(pk, 1, nil))
+			}
+
+			// repeatedly aggregate public keys (the hot path)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := AggregatePublicKeys(vdrs)
+				require.NoError(b, err)
+			}
+		})
+	}
+}
