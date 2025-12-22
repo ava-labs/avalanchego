@@ -1625,8 +1625,10 @@ func (s *state) ApplyAllValidatorPublicKeyDiffs(
 		pkBytes := diffIter.Value()
 		if len(pkBytes) == 0 {
 			vdr.PublicKey = nil
+			vdr.PublicKeyBytes = nil
 		} else {
 			vdr.PublicKey = bls.PublicKeyFromValidUncompressedBytes(pkBytes)
+			vdr.PublicKeyBytes = pkBytes
 		}
 	}
 
