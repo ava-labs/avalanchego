@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -27,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
