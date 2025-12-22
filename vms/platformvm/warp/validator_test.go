@@ -48,12 +48,12 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 					map[ids.NodeID]*validators.GetValidatorOutput{
 						testVdrs[0].nodeID: {
 							NodeID:    testVdrs[0].nodeID,
-							PublicKey: testVdrs[0].vdr.PublicKey,
+							PublicKey: testVdrs[0].vdr.PublicKey(),
 							Weight:    testVdrs[0].vdr.Weight,
 						},
 						testVdrs[1].nodeID: {
 							NodeID:    testVdrs[1].nodeID,
-							PublicKey: testVdrs[1].vdr.PublicKey,
+							PublicKey: testVdrs[1].vdr.PublicKey(),
 							Weight:    testVdrs[1].vdr.Weight,
 						},
 					},
@@ -73,17 +73,17 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 					map[ids.NodeID]*validators.GetValidatorOutput{
 						testVdrs[0].nodeID: {
 							NodeID:    testVdrs[0].nodeID,
-							PublicKey: testVdrs[0].vdr.PublicKey,
+							PublicKey: testVdrs[0].vdr.PublicKey(),
 							Weight:    testVdrs[0].vdr.Weight,
 						},
 						testVdrs[1].nodeID: {
 							NodeID:    testVdrs[1].nodeID,
-							PublicKey: testVdrs[1].vdr.PublicKey,
+							PublicKey: testVdrs[1].vdr.PublicKey(),
 							Weight:    testVdrs[1].vdr.Weight,
 						},
 						testVdrs[2].nodeID: {
 							NodeID:    testVdrs[2].nodeID,
-							PublicKey: testVdrs[0].vdr.PublicKey,
+							PublicKey: testVdrs[0].vdr.PublicKey(),
 							Weight:    testVdrs[0].vdr.Weight,
 						},
 					},
@@ -94,7 +94,6 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			expectedVdrs: []*validators.Warp{
 				{
 					PublicKeyBytes: testVdrs[0].vdr.PublicKeyBytes,
-					PublicKey:      testVdrs[0].vdr.PublicKey,
 					Weight:         testVdrs[0].vdr.Weight * 2,
 					NodeIDs: []ids.NodeID{
 						testVdrs[0].nodeID,
@@ -119,7 +118,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 						},
 						testVdrs[1].nodeID: {
 							NodeID:    testVdrs[1].nodeID,
-							PublicKey: testVdrs[1].vdr.PublicKey,
+							PublicKey: testVdrs[1].vdr.PublicKey(),
 							Weight:    testVdrs[1].vdr.Weight,
 						},
 					},
@@ -151,8 +150,8 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			require.Len(validators.Validators, len(tt.expectedVdrs))
 			for i, expectedVdr := range tt.expectedVdrs {
 				gotVdr := validators.Validators[i]
-				expectedPKBytes := bls.PublicKeyToCompressedBytes(expectedVdr.PublicKey)
-				gotPKBytes := bls.PublicKeyToCompressedBytes(gotVdr.PublicKey)
+				expectedPKBytes := bls.PublicKeyToCompressedBytes(expectedVdr.PublicKey())
+				gotPKBytes := bls.PublicKeyToCompressedBytes(gotVdr.PublicKey())
 				require.Equal(expectedPKBytes, gotPKBytes)
 				require.Equal(expectedVdr.PublicKeyBytes, gotVdr.PublicKeyBytes)
 				require.Equal(expectedVdr.Weight, gotVdr.Weight)
@@ -166,12 +165,18 @@ func TestFilterValidators(t *testing.T) {
 	sk0, err := localsigner.New()
 	require.NoError(t, err)
 	pk0 := sk0.PublicKey()
-	vdr0 := validators.NewWarp(pk0, 1, nil)
+	vdr0 := &validators.Warp{
+		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+		Weight:         1,
+	}
 
 	sk1, err := localsigner.New()
 	require.NoError(t, err)
 	pk1 := sk1.PublicKey()
-	vdr1 := validators.NewWarp(pk1, 2, nil)
+	vdr1 := &validators.Warp{
+		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+		Weight:         2,
+	}
 
 	type test struct {
 		name         string
@@ -337,30 +342,6 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				_, err := GetCanonicalValidatorSetFromSubnetID(b.Context(), validatorState, pChainHeight, subnetID)
-				require.NoError(b, err)
-			}
-		})
-	}
-}
-
-// BenchmarkAggregatePublicKeys benchmarks the hot path of aggregating public keys
-// from a validator set. This simulates real-world signature verification operations
-// where validator sets are created once but public keys are aggregated many times.
-func BenchmarkAggregatePublicKeys(b *testing.B) {
-	for _, size := range []int{1, 10, 100, 1_000, 10_000} {
-		b.Run(strconv.Itoa(size), func(b *testing.B) {
-			vdrs := make([]*validators.Warp, 0, size)
-			for i := 0; i < size; i++ {
-				sk, err := localsigner.New()
-				require.NoError(b, err)
-				pk := sk.PublicKey()
-				vdrs = append(vdrs, validators.NewWarp(pk, 1, nil))
-			}
-
-			// repeatedly aggregate public keys (the hot path)
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				_, err := AggregatePublicKeys(vdrs)
 				require.NoError(b, err)
 			}
 		})

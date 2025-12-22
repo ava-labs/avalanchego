@@ -6,6 +6,7 @@ package validators
 import (
 	"bytes"
 	"encoding/json"
+	"sync"
 
 	"golang.org/x/exp/maps"
 
@@ -53,23 +54,20 @@ func (w *WarpSet) UnmarshalJSON(b []byte) error {
 type Warp struct {
 	// PublicKeyBytes is expected to be in the uncompressed form.
 	PublicKeyBytes []byte
-	// PublicKey is the BLS public key. Both PublicKey and PublicKeyBytes are
-	// populated at creation time to avoid redundant conversions.
-	PublicKey *bls.PublicKey
-	Weight    uint64
-	NodeIDs   []ids.NodeID
+	Weight         uint64
+	NodeIDs        []ids.NodeID
+
+	// Cache for converted public key (lazy initialization)
+	publicKeyCache *bls.PublicKey
+	publicKeyOnce  sync.Once
 }
 
-// NewWarp creates a Warp validator with both PublicKeyBytes and PublicKey
-// populated. This avoids redundant conversions when the PublicKey is already
-// available at creation time.
-func NewWarp(publicKey *bls.PublicKey, weight uint64, nodeIDs []ids.NodeID) *Warp {
-	return &Warp{
-		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(publicKey),
-		PublicKey:      publicKey,
-		Weight:         weight,
-		NodeIDs:        nodeIDs,
-	}
+// PublicKey returns the BLS public key, converting from bytes on first access
+func (w *Warp) PublicKey() *bls.PublicKey {
+	w.publicKeyOnce.Do(func() {
+		w.publicKeyCache = bls.PublicKeyFromValidUncompressedBytes(w.PublicKeyBytes)
+	})
+	return w.publicKeyCache
 }
 
 func (w *Warp) Compare(o *Warp) int {
@@ -83,7 +81,7 @@ type jsonWarp struct {
 }
 
 func (w *Warp) MarshalJSON() ([]byte, error) {
-	pkBytes := bls.PublicKeyToCompressedBytes(w.PublicKey)
+	pkBytes := bls.PublicKeyToCompressedBytes(w.PublicKey())
 	pk, err := formatting.Encode(formatting.HexNC, pkBytes)
 	if err != nil {
 		return nil, err
@@ -111,7 +109,6 @@ func (w *Warp) UnmarshalJSON(b []byte) error {
 	}
 	*w = Warp{
 		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-		PublicKey:      pk,
 		Weight:         uint64(j.Weight),
 		NodeIDs:        j.NodeIDs,
 	}
@@ -138,9 +135,9 @@ func FlattenValidatorSet(vdrSet map[ids.NodeID]*GetValidatorOutput) (WarpSet, er
 		pkBytes := bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
 		uniqueVdr, ok := vdrs[string(pkBytes)]
 		if !ok {
-			// Use NewWarp to populate both PublicKeyBytes and cached PublicKey
-			// This avoids reconverting bytes->PublicKey later for crypto operations
-			uniqueVdr = NewWarp(vdr.PublicKey, 0, nil)
+			uniqueVdr = &Warp{
+				PublicKeyBytes: pkBytes,
+			}
 			vdrs[string(pkBytes)] = uniqueVdr
 		}
 

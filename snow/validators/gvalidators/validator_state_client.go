@@ -228,7 +228,11 @@ func warpValidatorsFromProto(proto []*pb.WarpValidator) ([]*validators.Warp, err
 		if pk == nil {
 			return nil, errFailedPublicKeyDeserialize
 		}
-		vdrs[i] = validators.NewWarp(pk, vdr.GetWeight(), nodeIDs)
+		vdrs[i] = &validators.Warp{
+			PublicKeyBytes: pkBytes,
+			Weight:         vdr.GetWeight(),
+			NodeIDs:        nodeIDs,
+		}
 	}
 	return vdrs, nil
 }
