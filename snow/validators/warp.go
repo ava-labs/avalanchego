@@ -6,7 +6,6 @@ package validators
 import (
 	"bytes"
 	"encoding/json"
-	"sync"
 
 	"golang.org/x/exp/maps"
 
@@ -54,37 +53,23 @@ func (w *WarpSet) UnmarshalJSON(b []byte) error {
 type Warp struct {
 	// PublicKeyBytes is expected to be in the uncompressed form.
 	PublicKeyBytes []byte
-	Weight         uint64
-	NodeIDs        []ids.NodeID
-
-	// Cache for converted public key (lazy initialization)
-	publicKeyCache *bls.PublicKey
-	publicKeyOnce  sync.Once
+	// PublicKey is the BLS public key. Both PublicKey and PublicKeyBytes are
+	// populated at creation time to avoid redundant conversions.
+	PublicKey *bls.PublicKey
+	Weight    uint64
+	NodeIDs   []ids.NodeID
 }
 
-// NewWarp creates a Warp validator with both PublicKeyBytes and the cached
-// PublicKey populated. This avoids redundant conversions when the PublicKey
-// is already available at creation time.
+// NewWarp creates a Warp validator with both PublicKeyBytes and PublicKey
+// populated. This avoids redundant conversions when the PublicKey is already
+// available at creation time.
 func NewWarp(publicKey *bls.PublicKey, weight uint64, nodeIDs []ids.NodeID) *Warp {
-	pkBytes := bls.PublicKeyToUncompressedBytes(publicKey)
-	w := &Warp{
-		PublicKeyBytes: pkBytes,
+	return &Warp{
+		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(publicKey),
+		PublicKey:      publicKey,
 		Weight:         weight,
 		NodeIDs:        nodeIDs,
-		publicKeyCache: publicKey,
 	}
-	// Mark the sync.Once as done so PublicKey() doesn't reconvert
-	w.publicKeyOnce.Do(func() {})
-	return w
-}
-
-// PublicKey returns the BLS public key, converting from bytes on first access
-// if not already cached (e.g., after JSON unmarshaling).
-func (w *Warp) PublicKey() *bls.PublicKey {
-	w.publicKeyOnce.Do(func() {
-		w.publicKeyCache = bls.PublicKeyFromValidUncompressedBytes(w.PublicKeyBytes)
-	})
-	return w.publicKeyCache
 }
 
 func (w *Warp) Compare(o *Warp) int {
@@ -98,7 +83,7 @@ type jsonWarp struct {
 }
 
 func (w *Warp) MarshalJSON() ([]byte, error) {
-	pkBytes := bls.PublicKeyToCompressedBytes(w.PublicKey())
+	pkBytes := bls.PublicKeyToCompressedBytes(w.PublicKey)
 	pk, err := formatting.Encode(formatting.HexNC, pkBytes)
 	if err != nil {
 		return nil, err
@@ -126,6 +111,7 @@ func (w *Warp) UnmarshalJSON(b []byte) error {
 	}
 	*w = Warp{
 		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+		PublicKey:      pk,
 		Weight:         uint64(j.Weight),
 		NodeIDs:        j.NodeIDs,
 	}

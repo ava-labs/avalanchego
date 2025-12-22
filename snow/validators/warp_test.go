@@ -31,6 +31,7 @@ func TestWarpJSON(t *testing.T) {
 
 	w := &Warp{
 		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+		PublicKey:      pk,
 		Weight:         12345,
 		NodeIDs: []ids.NodeID{
 			{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07},
@@ -70,6 +71,7 @@ func TestWarpSetJSON(t *testing.T) {
 		Validators: []*Warp{
 			{
 				PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+				PublicKey:      pk,
 				Weight:         12345,
 				NodeIDs: []ids.NodeID{
 					{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07},
@@ -129,7 +131,7 @@ func TestFlattenValidatorSet(t *testing.T) {
 				nodeID0: validatorstest.WarpToOutput(vdrs.Validators[0]),
 				nodeID1: {
 					NodeID:    nodeID1,
-					PublicKey: vdrs.Validators[1].PublicKey(),
+					PublicKey: vdrs.Validators[1].PublicKey,
 					Weight:    math.MaxUint64,
 				},
 			},

@@ -79,6 +79,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
@@ -109,6 +110,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
@@ -140,6 +142,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
@@ -173,16 +176,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+					PublicKey:      pk1,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk2),
+					PublicKey:      pk2,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID2},
 				},
@@ -216,16 +222,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+					PublicKey:      pk1,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk2),
+					PublicKey:      pk2,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID2},
 				},
@@ -259,16 +268,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+					PublicKey:      pk1,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk2),
+					PublicKey:      pk2,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID2},
 				},
@@ -302,16 +314,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+					PublicKey:      pk1,
 					Weight:         2,
 					NodeIDs:        []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk2),
+					PublicKey:      pk2,
 					Weight:         3,
 					NodeIDs:        []ids.NodeID{nodeID2},
 				},
@@ -345,16 +360,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+					PublicKey:      pk1,
 					Weight:         2,
 					NodeIDs:        []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk2),
+					PublicKey:      pk2,
 					Weight:         3,
 					NodeIDs:        []ids.NodeID{nodeID2},
 				},
@@ -388,16 +406,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+					PublicKey:      pk1,
 					Weight:         2,
 					NodeIDs:        []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk2),
+					PublicKey:      pk2,
 					Weight:         7,
 					NodeIDs:        []ids.NodeID{nodeID2},
 				},
@@ -431,6 +452,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+					PublicKey:      pk1,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0, nodeID1, nodeID2},
 				},
@@ -464,11 +486,13 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+					PublicKey:      pk1,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID1, nodeID2},
 				},
@@ -505,6 +529,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
@@ -542,16 +567,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+					PublicKey:      pk1,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk2),
+					PublicKey:      pk2,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID2},
 				},
@@ -593,16 +621,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			validators: []*validators.Warp{
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
+					PublicKey:      pk0,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID0},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
+					PublicKey:      pk1,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk2),
+					PublicKey:      pk2,
 					Weight:         1,
 					NodeIDs:        []ids.NodeID{nodeID2},
 				},
@@ -654,7 +685,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					continue
 				}
 
-				pks = append(pks, tt.validators[i].PublicKey())
+				pks = append(pks, tt.validators[i].PublicKey)
 				wantAggregatedStake += tt.validators[i].Weight
 			}
 

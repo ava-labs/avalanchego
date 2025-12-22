@@ -48,12 +48,12 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 					map[ids.NodeID]*validators.GetValidatorOutput{
 						testVdrs[0].nodeID: {
 							NodeID:    testVdrs[0].nodeID,
-							PublicKey: testVdrs[0].vdr.PublicKey(),
+							PublicKey: testVdrs[0].vdr.PublicKey,
 							Weight:    testVdrs[0].vdr.Weight,
 						},
 						testVdrs[1].nodeID: {
 							NodeID:    testVdrs[1].nodeID,
-							PublicKey: testVdrs[1].vdr.PublicKey(),
+							PublicKey: testVdrs[1].vdr.PublicKey,
 							Weight:    testVdrs[1].vdr.Weight,
 						},
 					},
@@ -73,17 +73,17 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 					map[ids.NodeID]*validators.GetValidatorOutput{
 						testVdrs[0].nodeID: {
 							NodeID:    testVdrs[0].nodeID,
-							PublicKey: testVdrs[0].vdr.PublicKey(),
+							PublicKey: testVdrs[0].vdr.PublicKey,
 							Weight:    testVdrs[0].vdr.Weight,
 						},
 						testVdrs[1].nodeID: {
 							NodeID:    testVdrs[1].nodeID,
-							PublicKey: testVdrs[1].vdr.PublicKey(),
+							PublicKey: testVdrs[1].vdr.PublicKey,
 							Weight:    testVdrs[1].vdr.Weight,
 						},
 						testVdrs[2].nodeID: {
 							NodeID:    testVdrs[2].nodeID,
-							PublicKey: testVdrs[0].vdr.PublicKey(),
+							PublicKey: testVdrs[0].vdr.PublicKey,
 							Weight:    testVdrs[0].vdr.Weight,
 						},
 					},
@@ -94,6 +94,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			expectedVdrs: []*validators.Warp{
 				{
 					PublicKeyBytes: testVdrs[0].vdr.PublicKeyBytes,
+					PublicKey:      testVdrs[0].vdr.PublicKey,
 					Weight:         testVdrs[0].vdr.Weight * 2,
 					NodeIDs: []ids.NodeID{
 						testVdrs[0].nodeID,
@@ -118,7 +119,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 						},
 						testVdrs[1].nodeID: {
 							NodeID:    testVdrs[1].nodeID,
-							PublicKey: testVdrs[1].vdr.PublicKey(),
+							PublicKey: testVdrs[1].vdr.PublicKey,
 							Weight:    testVdrs[1].vdr.Weight,
 						},
 					},
@@ -150,8 +151,8 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			require.Len(validators.Validators, len(tt.expectedVdrs))
 			for i, expectedVdr := range tt.expectedVdrs {
 				gotVdr := validators.Validators[i]
-				expectedPKBytes := bls.PublicKeyToCompressedBytes(expectedVdr.PublicKey())
-				gotPKBytes := bls.PublicKeyToCompressedBytes(gotVdr.PublicKey())
+				expectedPKBytes := bls.PublicKeyToCompressedBytes(expectedVdr.PublicKey)
+				gotPKBytes := bls.PublicKeyToCompressedBytes(gotVdr.PublicKey)
 				require.Equal(expectedPKBytes, gotPKBytes)
 				require.Equal(expectedVdr.PublicKeyBytes, gotVdr.PublicKeyBytes)
 				require.Equal(expectedVdr.Weight, gotVdr.Weight)
