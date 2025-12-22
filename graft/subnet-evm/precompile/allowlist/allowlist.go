@@ -33,7 +33,7 @@ var (
 	ErrCannotModifyAllowList = errors.New("cannot modify allow list")
 
 	// AllowListRawABI contains the raw ABI of AllowList library interface.
-	//go:embed allowlist.abi
+	//go:embed IAllowList.abi
 	AllowListRawABI string
 
 	AllowListABI = contract.ParseABI(AllowListRawABI)
