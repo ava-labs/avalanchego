@@ -15,24 +15,24 @@ var _ Executor = (*staticExecutor)(nil)
 // This is the default sync mode where all syncers complete before
 // committing results, with no concurrent block processing.
 type staticExecutor struct {
-	registry  *SyncerRegistry
-	committer Committer
+	registry *SyncerRegistry
+	acceptor Acceptor
 }
 
-func newStaticExecutor(registry *SyncerRegistry, committer Committer) *staticExecutor {
+func newStaticExecutor(registry *SyncerRegistry, acceptor Acceptor) *staticExecutor {
 	return &staticExecutor{
-		registry:  registry,
-		committer: committer,
+		registry: registry,
+		acceptor: acceptor,
 	}
 }
 
 // Execute runs the sync process and blocks until completion or error.
-// For static sync, this runs all syncers and then commits the results to the VM.
+// For static sync, this runs all syncers and then accepts the synced state into the VM.
 func (e *staticExecutor) Execute(ctx context.Context, summary message.Syncable) error {
 	if err := e.registry.RunSyncerTasks(ctx, summary); err != nil {
 		return err
 	}
-	return e.committer.Commit(ctx, summary)
+	return e.acceptor.AcceptSync(ctx, summary)
 }
 
 // OnBlockAccepted is a no-op for static sync since blocks are not queued.

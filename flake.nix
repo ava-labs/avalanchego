@@ -8,7 +8,7 @@
 
   # Flake inputs
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2505.*.tar.gz";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     go-flake.url = "path:./nix/go";
     go-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -42,7 +42,7 @@
             go-task
 
             # Local Go package from nested flake
-            go-flake.packages.${pkgs.system}.default
+            go-flake.packages.${pkgs.stdenv.hostPlatform.system}.default
 
             # Monitoring tools
             promtail                                   # Loki log shipper
