@@ -116,8 +116,8 @@ if [[ -z "${SKIP_BUILD_RACE}" ]]; then
                  "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 fi
 
-# Only tag the latest image for the master branch when images are pushed to a registry
-if [[ "${DOCKER_IMAGE}" == *"/"* && $image_tag == "master" ]]; then
+# Tag latest when pushing to a registry and the tag is a release (vMAJOR.MINOR.PATCH)
+if [[ "${DOCKER_IMAGE}" == *"/"* && $image_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Tagging current avalanchego images as $DOCKER_IMAGE:latest"
   docker buildx imagetools create -t "$DOCKER_IMAGE:latest" "$DOCKER_IMAGE:$commit_hash"
 fi
