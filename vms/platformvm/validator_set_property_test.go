@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -238,16 +237,10 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 			blsKey = s.PublicKey
 		}
 
-		var blsKeyBytes []byte
-		if blsKey != nil {
-			blsKeyBytes = bls.PublicKeyToUncompressedBytes(blsKey)
-		}
-
 		validatorsSet[v.NodeID] = &validators.GetValidatorOutput{
-			NodeID:         v.NodeID,
-			PublicKey:      blsKey,
-			PublicKeyBytes: blsKeyBytes,
-			Weight:         v.Weight,
+			NodeID:    v.NodeID,
+			PublicKey: blsKey,
+			Weight:    v.Weight,
 		}
 	}
 	return nil

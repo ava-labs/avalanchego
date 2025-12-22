@@ -143,24 +143,21 @@ func (c *Client) GetValidatorSet(
 			return nil, err
 		}
 		var publicKey *bls.PublicKey
-		var publicKeyBytes []byte
 		if len(validator.PublicKey) > 0 {
 			// PublicKeyFromValidUncompressedBytes is used rather than
 			// PublicKeyFromCompressedBytes because it is significantly faster
 			// due to the avoidance of decompression and key re-verification. We
 			// can safely assume that the BLS Public Keys are verified before
 			// being added to the P-Chain and served by the gRPC server.
-			publicKeyBytes = validator.PublicKey
-			publicKey = bls.PublicKeyFromValidUncompressedBytes(publicKeyBytes)
+			publicKey = bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey)
 			if publicKey == nil {
 				return nil, errFailedPublicKeyDeserialize
 			}
 		}
 		vdrs[nodeID] = &validators.GetValidatorOutput{
-			NodeID:         nodeID,
-			PublicKey:      publicKey,
-			PublicKeyBytes: publicKeyBytes,
-			Weight:         validator.Weight,
+			NodeID:    nodeID,
+			PublicKey: publicKey,
+			Weight:    validator.Weight,
 		}
 	}
 	return vdrs, nil

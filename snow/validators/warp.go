@@ -132,14 +132,7 @@ func FlattenValidatorSet(vdrSet map[ids.NodeID]*GetValidatorOutput) (WarpSet, er
 			continue
 		}
 
-		// Use PublicKeyBytes if available to avoid conversion, otherwise convert from PublicKey
-		var pkBytes []byte
-		if len(vdr.PublicKeyBytes) > 0 {
-			pkBytes = vdr.PublicKeyBytes
-		} else {
-			pkBytes = bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
-		}
-
+		pkBytes := bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
 		uniqueVdr, ok := vdrs[string(pkBytes)]
 		if !ok {
 			uniqueVdr = &Warp{

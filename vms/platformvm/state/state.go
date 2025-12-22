@@ -1625,10 +1625,8 @@ func (s *state) ApplyAllValidatorPublicKeyDiffs(
 		pkBytes := diffIter.Value()
 		if len(pkBytes) == 0 {
 			vdr.PublicKey = nil
-			vdr.PublicKeyBytes = nil
 		} else {
 			vdr.PublicKey = bls.PublicKeyFromValidUncompressedBytes(pkBytes)
-			vdr.PublicKeyBytes = pkBytes
 		}
 	}
 
@@ -1673,12 +1671,10 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 		pkBytes := diffIter.Value()
 		if len(pkBytes) == 0 {
 			vdr.PublicKey = nil
-			vdr.PublicKeyBytes = nil
 			continue
 		}
 
 		vdr.PublicKey = bls.PublicKeyFromValidUncompressedBytes(pkBytes)
-		vdr.PublicKeyBytes = pkBytes
 	}
 
 	// Note: this does not fallback to the linkeddb index because the linkeddb

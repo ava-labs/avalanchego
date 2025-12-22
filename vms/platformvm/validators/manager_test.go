@@ -116,10 +116,9 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 		{}, // Subnet staker didn't exist at genesis
 		{
 			subnetStaker.NodeID: {
-				NodeID:         subnetStaker.NodeID,
-				PublicKey:      pk,
-				PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-				Weight:         subnetStaker.Weight,
+				NodeID:    subnetStaker.NodeID,
+				PublicKey: pk,
+				Weight:    subnetStaker.Weight,
 			},
 		}, // Subnet staker was added at height 1
 		{}, // Subnet staker was removed at height 2

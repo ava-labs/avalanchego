@@ -5,8 +5,8 @@ package warp
 
 import (
 	"context"
-	"fmt"
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -311,26 +311,15 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 	subnetID := ids.GenerateTestID()
 	numNodes := 10_000
 
-	// Create validators with both PublicKey and PublicKeyBytes populated (optimized)
-	getValidatorOutputsOptimized := make([]*validators.GetValidatorOutput, 0, numNodes)
-	// Create validators with only PublicKey populated (unoptimized, for comparison)
-	getValidatorOutputsUnoptimized := make([]*validators.GetValidatorOutput, 0, numNodes)
+	getValidatorOutputs := make([]*validators.GetValidatorOutput, 0, numNodes)
 
 	for i := 0; i < numNodes; i++ {
 		nodeID := ids.GenerateTestNodeID()
 		blsPrivateKey, err := localsigner.New()
 		require.NoError(b, err)
 		blsPublicKey := blsPrivateKey.PublicKey()
-		blsPublicKeyBytes := bls.PublicKeyToUncompressedBytes(blsPublicKey)
 
-		getValidatorOutputsOptimized = append(getValidatorOutputsOptimized, &validators.GetValidatorOutput{
-			NodeID:         nodeID,
-			PublicKey:      blsPublicKey,
-			PublicKeyBytes: blsPublicKeyBytes,
-			Weight:         20,
-		})
-
-		getValidatorOutputsUnoptimized = append(getValidatorOutputsUnoptimized, &validators.GetValidatorOutput{
+		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{
 			NodeID:    nodeID,
 			PublicKey: blsPublicKey,
 			Weight:    20,
@@ -338,31 +327,10 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 	}
 
 	for _, size := range []int{0, 1, 10, 100, 1_000, 10_000} {
-		// Test optimized path (with PublicKeyBytes)
-		b.Run(fmt.Sprintf("optimized/%d", size), func(b *testing.B) {
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
 			for i := 0; i < size; i++ {
-				validator := getValidatorOutputsOptimized[i]
-				getValidatorsOutput[validator.NodeID] = validator
-			}
-			validatorState := &validatorstest.State{
-				GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-					return getValidatorsOutput, nil
-				},
-			}
-
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				_, err := GetCanonicalValidatorSetFromSubnetID(b.Context(), validatorState, pChainHeight, subnetID)
-				require.NoError(b, err)
-			}
-		})
-
-		// Test unoptimized path (without PublicKeyBytes, requires conversion)
-		b.Run(fmt.Sprintf("unoptimized/%d", size), func(b *testing.B) {
-			getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
-			for i := 0; i < size; i++ {
-				validator := getValidatorOutputsUnoptimized[i]
+				validator := getValidatorOutputs[i]
 				getValidatorsOutput[validator.NodeID] = validator
 			}
 			validatorState := &validatorstest.State{

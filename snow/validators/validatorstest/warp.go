@@ -46,9 +46,8 @@ func NewWarpSet(t testing.TB, n uint64) validators.WarpSet {
 
 func WarpToOutput(w *validators.Warp) *validators.GetValidatorOutput {
 	return &validators.GetValidatorOutput{
-		NodeID:         w.NodeIDs[0],
-		PublicKey:      w.PublicKey(),
-		PublicKeyBytes: w.PublicKeyBytes,
-		Weight:         w.Weight,
+		NodeID:    w.NodeIDs[0],
+		PublicKey: w.PublicKey(),
+		Weight:    w.Weight,
 	}
 }

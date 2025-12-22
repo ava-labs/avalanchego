@@ -234,15 +234,10 @@ func (s *vdrSet) Map() map[ids.NodeID]*GetValidatorOutput {
 
 	set := make(map[ids.NodeID]*GetValidatorOutput, len(s.vdrSlice))
 	for _, vdr := range s.vdrSlice {
-		var publicKeyBytes []byte
-		if vdr.PublicKey != nil {
-			publicKeyBytes = bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
-		}
 		set[vdr.NodeID] = &GetValidatorOutput{
-			NodeID:         vdr.NodeID,
-			PublicKey:      vdr.PublicKey,
-			PublicKeyBytes: publicKeyBytes,
-			Weight:         vdr.Weight,
+			NodeID:    vdr.NodeID,
+			PublicKey: vdr.PublicKey,
+			Weight:    vdr.Weight,
 		}
 	}
 	return set
