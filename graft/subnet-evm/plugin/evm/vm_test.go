@@ -2904,65 +2904,56 @@ func restartVM(tvm *testVM, tvmConfig testVMConfig) (*testVM, error) {
 }
 
 func TestWaitForEvent(t *testing.T) {
-	for i := 0; i < 1000; i++ {
-		t.Run(fmt.Sprintf("iteration-%d", i), func(t *testing.T) {
-			t.Parallel()
-			testWaitForEvent(t)
-		})
-	}
-}
-
-func testWaitForEvent(t *testing.T) {
 	type result struct {
 		msg commonEng.Message
 		err error
 	}
 
-	//fortunaFork := upgradetest.Fortuna
+	fortunaFork := upgradetest.Fortuna
 	for _, testCase := range []struct {
 		name     string
 		Fork     *upgradetest.Fork
 		testCase func(*testing.T, *VM)
 	}{
-		/*		{
-				name: "WaitForEvent with context cancelled returns 0",
-				testCase: func(t *testing.T, vm *VM) {
-					t.Parallel()
-					ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
-					defer cancel()
+		{
+			name: "WaitForEvent with context cancelled returns 0",
+			testCase: func(t *testing.T, vm *VM) {
+				t.Parallel()
+				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
+				defer cancel()
 
-					msg, err := vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
-				},
-			},*/
-		/*		{
-				name: "WaitForEvent returns when a transaction is added to the mempool",
-				testCase: func(t *testing.T, vm *VM) {
-					t.Parallel()
+				msg, err := vm.WaitForEvent(ctx)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Zero(t, msg)
+			},
+		},
+		{
+			name: "WaitForEvent returns when a transaction is added to the mempool",
+			testCase: func(t *testing.T, vm *VM) {
+				t.Parallel()
 
-					results := make(chan result)
-					go func() {
-						msg, err := vm.WaitForEvent(t.Context())
-						results <- result{
-							msg: msg,
-							err: err,
-						}
-					}()
-
-					tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-					signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
-					require.NoError(t, err)
-
-					for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-						require.NoError(t, err)
+				results := make(chan result)
+				go func() {
+					msg, err := vm.WaitForEvent(t.Context())
+					results <- result{
+						msg: msg,
+						err: err,
 					}
+				}()
 
-					r := <-results
-					require.NoError(t, r.err)
-					require.Equal(t, commonEng.PendingTxs, r.msg)
-				},
-			},*/
+				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
+
+				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
+					require.NoError(t, err)
+				}
+
+				r := <-results
+				require.NoError(t, r.err)
+				require.Equal(t, commonEng.PendingTxs, r.msg)
+			},
+		},
 		{
 			name: "WaitForEvent build block after re-org",
 			testCase: func(t *testing.T, vm *VM) {
@@ -3013,142 +3004,142 @@ func testWaitForEvent(t *testing.T) {
 				require.NoError(t, blk2.Accept(t.Context()))
 			},
 		},
-		/*	{
-				name: "WaitForEvent doesn't return once a block is built and accepted",
-				testCase: func(t *testing.T, vm *VM) {
-					t.Parallel()
-					ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
-					defer cancel()
+		{
+			name: "WaitForEvent doesn't return once a block is built and accepted",
+			testCase: func(t *testing.T, vm *VM) {
+				t.Parallel()
+				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
+				defer cancel()
 
-					msg, err := vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
+				msg, err := vm.WaitForEvent(ctx)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Zero(t, msg)
 
-					tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-					signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
-					require.NoError(t, err)
+				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
 
-					err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
-					require.NoError(t, err)
+				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
+				require.NoError(t, err)
 
-					blk, err := vm.BuildBlock(t.Context())
-					require.NoError(t, err)
+				blk, err := vm.BuildBlock(t.Context())
+				require.NoError(t, err)
 
-					require.NoError(t, blk.Verify(t.Context()))
+				require.NoError(t, blk.Verify(t.Context()))
 
-					require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
+				require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
 
-					require.NoError(t, blk.Accept(t.Context()))
+				require.NoError(t, blk.Accept(t.Context()))
 
-					ctx, cancel = context.WithTimeout(t.Context(), time.Millisecond*100)
-					defer cancel()
+				ctx, cancel = context.WithTimeout(t.Context(), time.Millisecond*100)
+				defer cancel()
 
-					msg, err = vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
-				},
+				msg, err = vm.WaitForEvent(ctx)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Zero(t, msg)
 			},
-			{
-				name: "WaitForEvent for two accepted blocks in a row",
-				testCase: func(t *testing.T, vm *VM) {
-					t.Parallel()
+		},
+		{
+			name: "WaitForEvent for two accepted blocks in a row",
+			testCase: func(t *testing.T, vm *VM) {
+				t.Parallel()
 
-					tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-					signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
-					require.NoError(t, err)
+				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
 
-					err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
-					require.NoError(t, err)
+				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
+				require.NoError(t, err)
 
-					blk, err := vm.BuildBlock(t.Context())
-					require.NoError(t, err)
+				blk, err := vm.BuildBlock(t.Context())
+				require.NoError(t, err)
 
-					require.NoError(t, blk.Verify(t.Context()))
-					require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
+				require.NoError(t, blk.Verify(t.Context()))
+				require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
 
-					tx = types.NewTransaction(uint64(1), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-					signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
-					require.NoError(t, err)
-					err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
-					require.NoError(t, err)
+				tx = types.NewTransaction(uint64(1), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
+				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
+				require.NoError(t, err)
 
-					time.Sleep(time.Second * 2)
-					blk2, err := vm.BuildBlock(t.Context())
-					require.NoError(t, err)
+				time.Sleep(time.Second * 2)
+				blk2, err := vm.BuildBlock(t.Context())
+				require.NoError(t, err)
 
-					require.NoError(t, blk2.Verify(t.Context()))
+				require.NoError(t, blk2.Verify(t.Context()))
 
-					tx = types.NewTransaction(uint64(2), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-					signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
-					require.NoError(t, err)
-					err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
-					require.NoError(t, err)
+				tx = types.NewTransaction(uint64(2), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
+				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
+				require.NoError(t, err)
 
-					results := make(chan result)
-					// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
-					go func() {
-						msg, err := vm.WaitForEvent(t.Context())
-						results <- result{
-							msg: msg,
-							err: err,
-						}
-					}()
-					err = blk.Accept(t.Context())
-					require.NoError(t, err)
-					err = blk2.Accept(t.Context())
-					require.NoError(t, err)
-					require.NoError(t, vm.SetPreference(t.Context(), blk2.ID()))
-					res := <-results
-					require.NoError(t, res.err)
-					require.Equal(t, commonEng.PendingTxs, res.msg)
-				},
-			},
-			// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
-			{
-				name: "WaitForEvent does not wait for new block to be built in fortuna",
-				Fork: &fortunaFork,
-				testCase: func(t *testing.T, vm *VM) {
-					t.Parallel()
-
-					signedTx := newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 0, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-					blk, err := IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
-					require.NoError(t, err)
-					require.NoError(t, blk.Accept(t.Context()))
-					signedTx = newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 1, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-
-					for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-						require.NoError(t, err)
-					}
-
+				results := make(chan result)
+				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
+				go func() {
 					msg, err := vm.WaitForEvent(t.Context())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
-				},
+					results <- result{
+						msg: msg,
+						err: err,
+					}
+				}()
+				err = blk.Accept(t.Context())
+				require.NoError(t, err)
+				err = blk2.Accept(t.Context())
+				require.NoError(t, err)
+				require.NoError(t, vm.SetPreference(t.Context(), blk2.ID()))
+				res := <-results
+				require.NoError(t, res.err)
+				require.Equal(t, commonEng.PendingTxs, res.msg)
 			},
-			// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
-			{
-				name: "WaitForEvent waits for a delay with a retry in fortuna",
-				Fork: &fortunaFork,
-				testCase: func(t *testing.T, vm *VM) {
-					lastBuildBlockTime := time.Now()
-					signedTx := newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 0, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-					for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-						require.NoError(t, err)
-					}
-					_, err := vm.BuildBlock(t.Context())
-					require.NoError(t, err)
-					// we haven't advanced the tip to include the previous built block, so this is a retry
-					signedTx = newSignedLegacyTx(t, vm.chainConfig, testKeys[1].ToECDSA(), 0, &testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
-					for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-						require.NoError(t, err)
-					}
+		},
+		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
+		{
+			name: "WaitForEvent does not wait for new block to be built in fortuna",
+			Fork: &fortunaFork,
+			testCase: func(t *testing.T, vm *VM) {
+				t.Parallel()
 
-					msg, err := vm.WaitForEvent(t.Context())
+				signedTx := newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 0, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
+				blk, err := IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
+				require.NoError(t, err)
+				require.NoError(t, blk.Accept(t.Context()))
+				signedTx = newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 1, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
+
+				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
 					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
-					require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
-				},
-			},*/
+				}
+
+				msg, err := vm.WaitForEvent(t.Context())
+				require.NoError(t, err)
+				require.Equal(t, commonEng.PendingTxs, msg)
+			},
+		},
+		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
+		{
+			name: "WaitForEvent waits for a delay with a retry in fortuna",
+			Fork: &fortunaFork,
+			testCase: func(t *testing.T, vm *VM) {
+				lastBuildBlockTime := time.Now()
+				signedTx := newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 0, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
+				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
+					require.NoError(t, err)
+				}
+				_, err := vm.BuildBlock(t.Context())
+				require.NoError(t, err)
+				// we haven't advanced the tip to include the previous built block, so this is a retry
+				signedTx = newSignedLegacyTx(t, vm.chainConfig, testKeys[1].ToECDSA(), 0, &testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
+				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
+					require.NoError(t, err)
+				}
+
+				msg, err := vm.WaitForEvent(t.Context())
+				require.NoError(t, err)
+				require.Equal(t, commonEng.PendingTxs, msg)
+				require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
+			},
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			fork := upgradetest.Latest
