@@ -14,13 +14,29 @@ set -euo pipefail
 #   METRICS_SERVER_ENABLED (optional): If set, enables the metrics server.
 #   METRICS_SERVER_PORT (optional): If set, determines the port the metrics server will listen to.
 #   METRICS_COLLECTOR_ENABLED (optional): If set, enables the metrics collector.
+#   PROFILE (optional, bool): If set, build with debug symbols and enable pprof.
 
-: "${BLOCK_DIR:?BLOCK_DIR must be set}"
-: "${CURRENT_STATE_DIR:?CURRENT_STATE_DIR must be set}"
-: "${START_BLOCK:?START_BLOCK must be set}"
-: "${END_BLOCK:?END_BLOCK must be set}"
+BINARY="$(mktemp -d)/vm_reexecute"
 
-go run github.com/ava-labs/avalanchego/tests/reexecute/c \
+if [[ "${PROFILE:-}" == "true" ]]; then
+  # Build with debug symbols for profiling (pprof, perf, samply, Instruments).
+  # -gcflags="all=-N -l":
+  #   -N: Disable optimizations so variable values are preserved in debugger
+  #   -l: Disable inlining so all function calls appear in stack traces
+  # -ldflags="-compressdwarf=false":
+  #   Keep DWARF debug info uncompressed so profilers can read symbols
+  # CGO_CFLAGS="-fno-omit-frame-pointer -g":
+  #   -fno-omit-frame-pointer: Preserve frame pointers for stack unwinding (required for profilers to walk the call stack)
+  #   -g: Include debug symbols in C/FFI code (Rust FFI visibility)
+  CGO_CFLAGS="-fno-omit-frame-pointer -g" \
+  CGO_LDFLAGS="-g" \
+  go build -o "${BINARY}" -gcflags="all=-N -l" -ldflags="-compressdwarf=false" \
+    github.com/ava-labs/avalanchego/tests/reexecute/c
+else
+  go build -o "${BINARY}" github.com/ava-labs/avalanchego/tests/reexecute/c
+fi
+
+"${BINARY}" \
   --block-dir="${BLOCK_DIR}" \
   --current-state-dir="${CURRENT_STATE_DIR}" \
   ${RUNNER_TYPE:+--runner="${RUNNER_TYPE}"} \
@@ -32,3 +48,4 @@ go run github.com/ava-labs/avalanchego/tests/reexecute/c \
   ${METRICS_SERVER_ENABLED:+--metrics-server-enabled="${METRICS_SERVER_ENABLED}"} \
   ${METRICS_SERVER_PORT:+--metrics-server-port="${METRICS_SERVER_PORT}"} \
   ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled="${METRICS_COLLECTOR_ENABLED}"}
+#  ${PROFILE:+--pprof}
