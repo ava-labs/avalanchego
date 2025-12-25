@@ -139,44 +139,7 @@ func main() {
 	defer tc.RecoverAndExit()
 
 	if pprofEnabled {
-		cwd, err := os.Getwd()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to get current working directory: %v\n", err)
-			os.Exit(1)
-		}
-
-		profileDir := filepath.Join(cwd, "pprof")
-		if err := os.MkdirAll(profileDir, perms.ReadWriteExecute); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create pprof directory: %v\n", err)
-			os.Exit(1)
-		}
-
-		cpuFile, err := os.Create(filepath.Join(profileDir, "cpu.prof"))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create CPU profile: %v\n", err)
-			os.Exit(1)
-		}
-		if err := pprof.StartCPUProfile(cpuFile); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to start CPU profile: %v\n", err)
-			os.Exit(1)
-		}
-		defer func() {
-			pprof.StopCPUProfile()
-			cpuFile.Close()
-			fmt.Printf("CPU profile written to: %s\n", cpuFile.Name())
-
-			memFile, err := os.Create(filepath.Join(profileDir, "mem.prof"))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to create memory profile: %v\n", err)
-				return
-			}
-			defer memFile.Close()
-			if err := pprof.WriteHeapProfile(memFile); err != nil {
-				fmt.Fprintf(os.Stderr, "failed to write memory profile: %v\n", err)
-				return
-			}
-			fmt.Printf("Memory profile written to: %s\n", memFile.Name())
-		}()
+		defer setupPprof(tc)()
 	}
 
 	benchmarkName := fmt.Sprintf(
@@ -597,4 +560,38 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 		labels[parts[0]] = parts[1]
 	}
 	return labels, nil
+}
+
+func setupPprof(tc tests.TestContext) func() {
+	r := require.New(tc)
+	logger := tests.NewDefaultLogger("pprof")
+
+	cwd, err := os.Getwd()
+	r.NoError(err, "failed to get current working directory")
+
+	profileDir := filepath.Join(cwd, "pprof")
+	r.NoError(os.MkdirAll(profileDir, perms.ReadWriteExecute), "failed to create profile directory")
+
+	cpuFile, err := os.Create(filepath.Join(profileDir, "cpu.prof"))
+	r.NoError(err, "failed to create CPU profile")
+
+	r.NoError(pprof.StartCPUProfile(cpuFile), "failed to start CPU profile")
+
+	return func() {
+		pprof.StopCPUProfile()
+		cpuFile.Close()
+		logger.Info("CPU profile", zap.String("path", cpuFile.Name()))
+
+		memFile, err := os.Create(filepath.Join(profileDir, "mem.prof"))
+		if err != nil {
+			logger.Error("failed to create memory profile", zap.Error(err))
+			return
+		}
+		defer memFile.Close()
+		if err := pprof.WriteHeapProfile(memFile); err != nil {
+			logger.Error("failed to write memory profile", zap.Error(err))
+			return
+		}
+		logger.Info("memory profile", zap.String("path", memFile.Name()))
+	}
 }
