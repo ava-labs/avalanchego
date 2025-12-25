@@ -139,7 +139,12 @@ func main() {
 	defer tc.RecoverAndExit()
 
 	if pprofEnabled {
-		cwd, _ := os.Getwd()
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to get current working directory: %v\n", err)
+			os.Exit(1)
+		}
+
 		profileDir := filepath.Join(cwd, "pprof")
 		if err := os.MkdirAll(profileDir, perms.ReadWriteExecute); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to create pprof directory: %v\n", err)
@@ -248,16 +253,16 @@ func benchmarkReexecuteRange(
 		zap.String("runner", runnerTypeArg),
 		zap.String("config", configNameArg),
 		zap.String("labels", labelsArg),
-		zap.String("metrics-server-enabled", strconv.FormatBool(metricsServerEnabled)),
+		zap.Bool("metrics-server-enabled", metricsServerEnabled),
 		zap.Uint64("metrics-server-port", metricsPort),
-		zap.String("metrics-collector-enabled", strconv.FormatBool(metricsCollectorEnabled)),
+		zap.Bool("metrics-collector-enabled", metricsCollectorEnabled),
 		zap.String("block-dir", blockDir),
 		zap.String("vm-db-dir", vmDBDir),
 		zap.String("chain-data-dir", chainDataDir),
 		zap.Uint64("start-block", startBlock),
 		zap.Uint64("end-block", endBlock),
 		zap.Int("chan-size", chanSize),
-		zap.String("pprof-enabled", strconv.FormatBool(pprofEnabled)),
+		zap.Bool("pprof-enabled", pprofEnabled),
 	)
 
 	blockChan, err := reexecute.CreateBlockChanFromLevelDB(tc, blockDir, startBlock, endBlock, chanSize)
