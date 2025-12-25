@@ -11,6 +11,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"slices"
 	"strconv"
 	"strings"
@@ -42,6 +43,7 @@ var (
 	executionTimeout   time.Duration
 	labelsArg          string
 
+	pprofEnabled               bool
 	metricsServerEnabledArg    bool
 	metricsServerPortArg       uint64
 	metricsCollectorEnabledArg bool
@@ -92,6 +94,7 @@ func init() {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
+	flag.BoolVar(&pprofEnabled, "pprof", false, "Enable full suite of pprof profiling.")
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
 	flag.Uint64Var(&metricsServerPortArg, "metrics-server-port", 0, "The port the metrics server will listen to.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
@@ -134,6 +137,42 @@ func main() {
 	tc := tests.NewTestContext(tests.NewDefaultLogger("c-chain-reexecution"))
 	tc.SetDefaultContextParent(context.Background())
 	defer tc.RecoverAndExit()
+
+	if pprofEnabled {
+		cwd, _ := os.Getwd()
+		profileDir := filepath.Join(cwd, "pprof")
+		if err := os.MkdirAll(profileDir, perms.ReadWriteExecute); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create pprof directory: %v\n", err)
+			os.Exit(1)
+		}
+
+		cpuFile, err := os.Create(filepath.Join(profileDir, "cpu.prof"))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		if err := pprof.StartCPUProfile(cpuFile); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to start CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		defer func() {
+			pprof.StopCPUProfile()
+			cpuFile.Close()
+			fmt.Printf("CPU profile written to: %s\n", cpuFile.Name())
+
+			memFile, err := os.Create(filepath.Join(profileDir, "mem.prof"))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to create memory profile: %v\n", err)
+				return
+			}
+			defer memFile.Close()
+			if err := pprof.WriteHeapProfile(memFile); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to write memory profile: %v\n", err)
+				return
+			}
+			fmt.Printf("Memory profile written to: %s\n", memFile.Name())
+		}()
+	}
 
 	benchmarkName := fmt.Sprintf(
 		"BenchmarkReexecuteRange/[%d,%d]-Config-%s-Runner-%s",
@@ -218,6 +257,7 @@ func benchmarkReexecuteRange(
 		zap.Uint64("start-block", startBlock),
 		zap.Uint64("end-block", endBlock),
 		zap.Int("chan-size", chanSize),
+		zap.String("pprof-enabled", strconv.FormatBool(pprofEnabled)),
 	)
 
 	blockChan, err := reexecute.CreateBlockChanFromLevelDB(tc, blockDir, startBlock, endBlock, chanSize)
