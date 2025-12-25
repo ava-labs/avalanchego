@@ -16,8 +16,7 @@ set -euo pipefail
 #   METRICS_COLLECTOR_ENABLED (optional): If set, enables the metrics collector.
 #   PROFILE (optional, bool): If set, build with debug symbols and enable pprof.
 
-BINARY="$(mktemp -d)/vm_reexecute"
-
+RUN_ARGS=()
 if [[ "${PROFILE:-}" == "true" ]]; then
   # Build with debug symbols for profiling (pprof, perf, samply, Instruments).
   # -gcflags="all=-N -l":
@@ -25,18 +24,12 @@ if [[ "${PROFILE:-}" == "true" ]]; then
   #   -l: Disable inlining so all function calls appear in stack traces
   # -ldflags="-compressdwarf=false":
   #   Keep DWARF debug info uncompressed so profilers can read symbols
-  # CGO_CFLAGS="-fno-omit-frame-pointer -g":
-  #   -fno-omit-frame-pointer: Preserve frame pointers for stack unwinding (required for profilers to walk the call stack)
-  #   -g: Include debug symbols in C/FFI code (Rust FFI visibility)
-  CGO_CFLAGS="-fno-omit-frame-pointer -g" \
-  CGO_LDFLAGS="-g" \
-  go build -o "${BINARY}" -gcflags="all=-N -l" -ldflags="-compressdwarf=false" \
-    github.com/ava-labs/avalanchego/tests/reexecute/c
-else
-  go build -o "${BINARY}" github.com/ava-labs/avalanchego/tests/reexecute/c
+  RUN_ARGS+=('-gcflags=all=-N -l' '-ldflags=-compressdwarf=false')
 fi
 
-"${BINARY}" \
+# -fno-omit-frame-pointer: Preserve frame pointers for stack unwinding (required for profilers to walk the call stack)
+# -g: Include debug symbols in C/FFI code (Rust FFI visibility)
+CGO_CFLAGS="-fno-omit-frame-pointer -g" go run "${RUN_ARGS[@]}" github.com/ava-labs/avalanchego/tests/reexecute/c \
   --block-dir="${BLOCK_DIR}" \
   --current-state-dir="${CURRENT_STATE_DIR}" \
   ${RUNNER_TYPE:+--runner="${RUNNER_TYPE}"} \
