@@ -54,7 +54,7 @@ func verifyUnbrokenCanonchain(bc *BlockChain) error {
 		if h.Number.Uint64() == 0 {
 			break
 		}
-		h = bc.hc.GetHeader(h.ParentHash, h.Number.Uint64()-1)
+		h = bc.GetHeader(h.ParentHash, h.Number.Uint64()-1)
 	}
 	return nil
 }
