@@ -33,7 +33,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb/memorydb"

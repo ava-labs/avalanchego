@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/txpool/legacypool"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 )
 

@@ -11,8 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 

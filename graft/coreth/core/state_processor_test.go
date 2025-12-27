@@ -41,7 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/cortina"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/libevm/common"

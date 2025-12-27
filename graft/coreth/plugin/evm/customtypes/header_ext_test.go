@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
