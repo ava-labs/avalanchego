@@ -63,11 +63,7 @@ func TestGossipSubscribe(t *testing.T) {
 	require.NoError(err)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	go gossipTxPool.Subscribe(ctx)
-
-	require.Eventually(func() bool {
-		return gossipTxPool.IsSubscribed()
-	}, 10*time.Second, 500*time.Millisecond, "expected gossipTxPool to be subscribed")
+	go gossipTxPool.UpdateBloomFilter(ctx)
 
 	// create eth txs
 	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*utils.GWei))
