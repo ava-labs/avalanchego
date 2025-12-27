@@ -38,6 +38,7 @@ triedb/*
 !core/blockchain_ext_test.go
 !core/blockchain_log_test.go
 !core/bounded_buffer.go
+!core/compile.go
 !core/coretest/*
 !core/extstate/*
 !core/fifo_cache.go
