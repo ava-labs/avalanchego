@@ -1,0 +1,30 @@
+{
+    "pull_request": {
+        "include": [
+            {
+                "start-block": "101",
+                "end-block": "200000",
+                "block-dir-src": "cchain-mainnet-blocks-1m-ldb",
+                "current-state-dir-src": "cchain-current-state-firewood-100",
+                "min-wait-time": "120s",
+                "max-wait-time": "150s",
+                "runner": "ubuntu-latest",
+                "timeout-minutes": 60
+            }
+        ]
+    },
+    "schedule": {
+        "include": [
+            {
+                "start-block": "101",
+                "end-block": "200000",
+                "block-dir-src": "cchain-mainnet-blocks-1m-ldb",
+                "current-state-dir-src": "cchain-current-state-firewood-100",
+                "min-wait-time": "120s",
+                "max-wait-time": "150s",
+                "runner": "ubuntu-latest",
+                "timeout-minutes": 60
+            }
+        ]
+    }
+}
