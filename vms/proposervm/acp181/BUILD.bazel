@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "acp181",
+    srcs = ["epoch.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/proposervm/acp181",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//upgrade",
+        "//vms/proposervm/block",
+    ],
+)
+
+go_test(
+    name = "acp181_test",
+    srcs = ["epoch_test.go"],
+    embed = [":acp181"],
+    deps = [
+        "//upgrade",
+        "//upgrade/upgradetest",
+        "//vms/proposervm/block",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "statesynctest",
+    srcs = [
+        "test_sync.go",
+        "test_trie.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/utils/utilstest",
+        "//utils/wrappers",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//trie/trienode",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
+)

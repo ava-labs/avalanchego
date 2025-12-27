@@ -1,0 +1,29 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "txstest",
+    srcs = [
+        "context.go",
+        "wallet.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//utils/constants",
+        "//vms/components/avax",
+        "//vms/components/gas",
+        "//vms/platformvm/config",
+        "//vms/platformvm/fx",
+        "//vms/platformvm/state",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/warp/message",
+        "//vms/secp256k1fx",
+        "//wallet/chain/p/builder",
+        "//wallet/chain/p/signer",
+        "//wallet/chain/p/wallet",
+        "//wallet/subnet/primary/common",
+        "@com_github_stretchr_testify//require",
+    ],
+)

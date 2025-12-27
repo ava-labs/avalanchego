@@ -1,0 +1,32 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "interval",
+    srcs = [
+        "blocks.go",
+        "interval.go",
+        "state.go",
+        "tree.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "@com_github_google_btree//:btree",
+    ],
+)
+
+go_test(
+    name = "interval_test",
+    srcs = [
+        "blocks_test.go",
+        "interval_test.go",
+        "tree_test.go",
+    ],
+    embed = [":interval"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "@com_github_stretchr_testify//require",
+    ],
+)
