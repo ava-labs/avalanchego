@@ -37,7 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 
-	warpBackend "github.com/ava-labs/avalanchego/graft/coreth/warp"
+	warpBackend "github.com/ava-labs/avalanchego/vms/evm/warp"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethereum "github.com/ava-labs/libevm"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -318,7 +318,7 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
 
-	warpAPIs := make(map[ids.NodeID]warpBackend.Client, len(w.sendingSubnetURIs))
+	warpAPIs := make(map[ids.NodeID]*warpBackend.Client, len(w.sendingSubnetURIs))
 	for _, uri := range w.sendingSubnetURIs {
 		client, err := warpBackend.NewClient(uri, w.sendingSubnet.BlockchainID.String())
 		require.NoError(err)

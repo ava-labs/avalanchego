@@ -54,7 +54,7 @@ type Predicater interface {
 }
 
 type WarpMessageWriter interface {
-	AddMessage(unsignedMessage *warp.UnsignedMessage) error
+	Add(unsignedMessage *warp.UnsignedMessage) error
 }
 
 // AcceptContext defines the context passed in to a precompileconfig's Accepter

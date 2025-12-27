@@ -1,13 +1,9 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package messages
+package message
 
-import (
-	"fmt"
-
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 // ValidatorUptime is signed when the ValidationID is known and the validator
 // has been up for TotalUptime seconds.
@@ -18,34 +14,30 @@ type ValidatorUptime struct {
 	bytes []byte
 }
 
-// NewValidatorUptime creates a new *ValidatorUptime and initializes it.
 func NewValidatorUptime(validationID ids.ID, totalUptime uint64) (*ValidatorUptime, error) {
-	bhp := &ValidatorUptime{
+	msg := &ValidatorUptime{
 		ValidationID: validationID,
 		TotalUptime:  totalUptime,
 	}
-	return bhp, initialize(bhp)
+	bytes, err := Codec.Marshal(CodecVersion, msg)
+	if err != nil {
+		return nil, err
+	}
+	msg.bytes = bytes
+	return msg, nil
 }
 
 // ParseValidatorUptime converts a slice of bytes into an initialized ValidatorUptime.
 func ParseValidatorUptime(b []byte) (*ValidatorUptime, error) {
-	payloadIntf, err := Parse(b)
-	if err != nil {
+	var msg ValidatorUptime
+	if _, err := Codec.Unmarshal(b, &msg); err != nil {
 		return nil, err
 	}
-	payload, ok := payloadIntf.(*ValidatorUptime)
-	if !ok {
-		return nil, fmt.Errorf("%w: %T", errWrongType, payloadIntf)
-	}
-	return payload, nil
+	msg.bytes = b
+	return &msg, nil
 }
 
-// Bytes returns the binary representation of this payload. It assumes that the
-// payload is initialized from either NewValidatorUptime or Parse.
-func (b *ValidatorUptime) Bytes() []byte {
-	return b.bytes
-}
-
-func (b *ValidatorUptime) initialize(bytes []byte) {
-	b.bytes = bytes
+// Bytes returns the binary representation of this payload.
+func (v *ValidatorUptime) Bytes() []byte {
+	return v.bytes
 }
