@@ -31,9 +31,8 @@ const pendingTxsBuffer = 10
 var (
 	_ gossip.Gossipable                    = (*GossipEthTx)(nil)
 	_ gossip.Marshaller[*GossipEthTx]      = (*GossipEthTxMarshaller)(nil)
-	_ gossip.HandlerSet[*GossipEthTx]      = (*GossipEthTxPool)(nil)
+	_ gossip.Set[*GossipEthTx]             = (*GossipEthTxPool)(nil)
 	_ gossip.PullGossiperSet[*GossipEthTx] = (*GossipEthTxPool)(nil)
-	_ gossip.PushGossiperSet               = (*GossipEthTxPool)(nil)
 
 	_ eth.PushGossiper = (*EthPushGossiper)(nil)
 )
@@ -140,6 +139,10 @@ func (g *GossipEthTxPool) BloomFilter() (*bloom.Filter, ids.ID) {
 	defer g.lock.RUnlock()
 
 	return g.bloom.BloomFilter()
+}
+
+func (g *GossipEthTxPool) Len() int {
+	return g.mempool.PendingSize(txpool.PendingFilter{})
 }
 
 type GossipEthTxMarshaller struct{}
