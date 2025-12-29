@@ -24,12 +24,12 @@ var (
 )
 
 type SendFailedCallback interface {
-	SendFailed(message.OutboundMessage)
+	SendFailed(*message.OutboundMessage)
 }
 
-type SendFailedFunc func(message.OutboundMessage)
+type SendFailedFunc func(*message.OutboundMessage)
 
-func (f SendFailedFunc) SendFailed(msg message.OutboundMessage) {
+func (f SendFailedFunc) SendFailed(msg *message.OutboundMessage) {
 	f(msg)
 }
 
@@ -37,15 +37,14 @@ type MessageQueue interface {
 	// Push attempts to add the message to the queue. If the context is
 	// canceled, then pushing the message will return `false` and the message
 	// will not be added to the queue.
-	Push(ctx context.Context, msg message.OutboundMessage) bool
+	Push(ctx context.Context, msg *message.OutboundMessage) bool
 
 	// Pop blocks until a message is available and then returns the message. If
 	// the queue is closed, then `false` is returned.
-	Pop() (message.OutboundMessage, bool)
-
+	Pop() (*message.OutboundMessage, bool)
 	// PopNow attempts to return a message without blocking. If a message is not
 	// available or the queue is closed, then `false` is returned.
-	PopNow() (message.OutboundMessage, bool)
+	PopNow() (*message.OutboundMessage, bool)
 
 	// Close empties the queue and prevents further messages from being pushed
 	// onto it. After calling close once, future calls to close will do nothing.
@@ -69,7 +68,7 @@ type throttledMessageQueue struct {
 
 	// queue of the messages
 	// [cond.L] must be held while accessing [queue].
-	queue buffer.Deque[message.OutboundMessage]
+	queue buffer.Deque[*message.OutboundMessage]
 }
 
 func NewThrottledMessageQueue(
@@ -84,15 +83,15 @@ func NewThrottledMessageQueue(
 		log:                  log,
 		outboundMsgThrottler: outboundMsgThrottler,
 		cond:                 sync.NewCond(&sync.Mutex{}),
-		queue:                buffer.NewUnboundedDeque[message.OutboundMessage](initialQueueSize),
+		queue:                buffer.NewUnboundedDeque[*message.OutboundMessage](initialQueueSize),
 	}
 }
 
-func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMessage) bool {
+func (q *throttledMessageQueue) Push(ctx context.Context, msg *message.OutboundMessage) bool {
 	if err := ctx.Err(); err != nil {
 		q.log.Debug(
 			"dropping outgoing message",
-			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("messageOp", msg.Op),
 			zap.Stringer("nodeID", q.id),
 			zap.Error(err),
 		)
@@ -105,7 +104,7 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 		q.log.Debug(
 			"dropping outgoing message",
 			zap.String("reason", "rate-limiting"),
-			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("messageOp", msg.Op),
 			zap.Stringer("nodeID", q.id),
 		)
 		q.onFailed.SendFailed(msg)
@@ -123,7 +122,7 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 		q.log.Debug(
 			"dropping outgoing message",
 			zap.String("reason", "closed queue"),
-			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("messageOp", msg.Op),
 			zap.Stringer("nodeID", q.id),
 		)
 		q.outboundMsgThrottler.Release(msg, q.id)
@@ -136,7 +135,7 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 	return true
 }
 
-func (q *throttledMessageQueue) Pop() (message.OutboundMessage, bool) {
+func (q *throttledMessageQueue) Pop() (*message.OutboundMessage, bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
@@ -155,7 +154,7 @@ func (q *throttledMessageQueue) Pop() (message.OutboundMessage, bool) {
 	return q.pop(), true
 }
 
-func (q *throttledMessageQueue) PopNow() (message.OutboundMessage, bool) {
+func (q *throttledMessageQueue) PopNow() (*message.OutboundMessage, bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
@@ -167,7 +166,7 @@ func (q *throttledMessageQueue) PopNow() (message.OutboundMessage, bool) {
 	return q.pop(), true
 }
 
-func (q *throttledMessageQueue) pop() message.OutboundMessage {
+func (q *throttledMessageQueue) pop() *message.OutboundMessage {
 	msg, _ := q.queue.PopLeft()
 
 	q.outboundMsgThrottler.Release(msg, q.id)
@@ -203,7 +202,7 @@ type blockingMessageQueue struct {
 	closing     chan struct{}
 
 	// queue of the messages
-	queue chan message.OutboundMessage
+	queue chan *message.OutboundMessage
 }
 
 func NewBlockingMessageQueue(
@@ -216,11 +215,11 @@ func NewBlockingMessageQueue(
 		log:      log,
 
 		closing: make(chan struct{}),
-		queue:   make(chan message.OutboundMessage, bufferSize),
+		queue:   make(chan *message.OutboundMessage, bufferSize),
 	}
 }
 
-func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMessage) bool {
+func (q *blockingMessageQueue) Push(ctx context.Context, msg *message.OutboundMessage) bool {
 	q.closingLock.RLock()
 	defer q.closingLock.RUnlock()
 
@@ -230,7 +229,7 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 		q.log.Debug(
 			"dropping message",
 			zap.String("reason", "closed queue"),
-			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("messageOp", msg.Op),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
@@ -238,7 +237,7 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 		q.log.Debug(
 			"dropping message",
 			zap.String("reason", "cancelled context"),
-			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("messageOp", msg.Op),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
@@ -252,7 +251,7 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 		q.log.Debug(
 			"dropping message",
 			zap.String("reason", "cancelled context"),
-			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("messageOp", msg.Op),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
@@ -260,14 +259,14 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 		q.log.Debug(
 			"dropping message",
 			zap.String("reason", "closed queue"),
-			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("messageOp", msg.Op),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
 	}
 }
 
-func (q *blockingMessageQueue) Pop() (message.OutboundMessage, bool) {
+func (q *blockingMessageQueue) Pop() (*message.OutboundMessage, bool) {
 	select {
 	case msg := <-q.queue:
 		return msg, true
@@ -276,7 +275,7 @@ func (q *blockingMessageQueue) Pop() (message.OutboundMessage, bool) {
 	}
 }
 
-func (q *blockingMessageQueue) PopNow() (message.OutboundMessage, bool) {
+func (q *blockingMessageQueue) PopNow() (*message.OutboundMessage, bool) {
 	select {
 	case msg := <-q.queue:
 		return msg, true

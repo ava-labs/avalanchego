@@ -47,9 +47,9 @@ const (
 	repoRelativePath = "tests/fixture/bootstrapmonitor/e2e"
 
 	avalanchegoImage       = "localhost:5001/avalanchego"
-	latestAvalanchegoImage = avalanchegoImage + ":latest"
+	masterAvalanchegoImage = avalanchegoImage + ":master"
 	monitorImage           = "localhost:5001/bootstrap-monitor"
-	latestMonitorImage     = monitorImage + ":latest"
+	masterMonitorImage     = monitorImage + ":master"
 
 	initContainerName    = "init"
 	monitorContainerName = "monitor"
@@ -257,7 +257,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	) // #nosec G204
 	cmd.Env = append(os.Environ(),
 		"DOCKER_IMAGE="+imageName,
-		"FORCE_TAG_LATEST=1",
+		"FORCE_TAG_MASTER=1",
 		"SKIP_BUILD_RACE=1",
 	)
 	output, err := cmd.CombinedOutput()
@@ -268,7 +268,8 @@ func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet 
 	statefulSet := tmpnet.NewNodeStatefulSet(
 		name,
 		true, // generateName
-		latestAvalanchegoImage,
+		masterAvalanchegoImage,
+		corev1.PullAlways, // Ensure the :master image is always pulled
 		nodeContainerName,
 		volumeName,
 		volumeSize,
@@ -371,10 +372,11 @@ func createBootstrapTester(tc tests.TestContext, clientset *kubernetes.Clientset
 // getMonitorContainer retrieves the common container definition for bootstrap-monitor containers.
 func getMonitorContainer(name string, args []string) corev1.Container {
 	return corev1.Container{
-		Name:    name,
-		Image:   latestMonitorImage,
-		Command: []string{"./bootstrap-monitor"},
-		Args:    args,
+		Name:            name,
+		Image:           masterMonitorImage,
+		ImagePullPolicy: corev1.PullAlways, // Ensure the :master image is always pulled
+		Command:         []string{"./bootstrap-monitor"},
+		Args:            args,
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_NAME",

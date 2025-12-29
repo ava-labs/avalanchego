@@ -28,12 +28,12 @@ type OutboundMsgThrottler interface {
 	// If this method returns true, Release([msg], [nodeID]) must be called (!) when
 	// the message is sent (or when we give up trying to send the message, if applicable.)
 	// If this method returns false, do not make a corresponding call to Release.
-	Acquire(msg message.OutboundMessage, nodeID ids.NodeID) bool
+	Acquire(msg *message.OutboundMessage, nodeID ids.NodeID) bool
 
 	// Mark that a message [msg] has been sent to [nodeID] or we have given up
 	// sending the message. Must correspond to a previous call to
 	// Acquire([msg], [nodeID]) that returned true.
-	Release(msg message.OutboundMessage, nodeID ids.NodeID)
+	Release(msg *message.OutboundMessage, nodeID ids.NodeID)
 }
 
 type outboundMsgThrottler struct {
@@ -62,9 +62,9 @@ func NewSybilOutboundMsgThrottler(
 	return t, t.metrics.initialize(registerer)
 }
 
-func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.NodeID) bool {
+func (t *outboundMsgThrottler) Acquire(msg *message.OutboundMessage, nodeID ids.NodeID) bool {
 	// no need to acquire for this message
-	if msg.BypassThrottling() {
+	if msg.BypassThrottling {
 		return true
 	}
 
@@ -72,7 +72,7 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 	defer t.lock.Unlock()
 
 	// Take as many bytes as we can from the at-large allocation.
-	bytesNeeded := uint64(len(msg.Bytes()))
+	bytesNeeded := uint64(len(msg.Bytes))
 	atLargeBytesUsed := min(
 		// only give as many bytes as needed
 		bytesNeeded,
@@ -132,9 +132,9 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 	return true
 }
 
-func (t *outboundMsgThrottler) Release(msg message.OutboundMessage, nodeID ids.NodeID) {
+func (t *outboundMsgThrottler) Release(msg *message.OutboundMessage, nodeID ids.NodeID) {
 	// no need to release for this message
-	if msg.BypassThrottling() {
+	if msg.BypassThrottling {
 		return
 	}
 
@@ -149,7 +149,7 @@ func (t *outboundMsgThrottler) Release(msg message.OutboundMessage, nodeID ids.N
 	// [vdrBytesToReturn] is the number of bytes from [msgSize]
 	// that will be given back to [nodeID]'s validator allocation.
 	vdrBytesUsed := t.nodeToVdrBytesUsed[nodeID]
-	msgSize := uint64(len(msg.Bytes()))
+	msgSize := uint64(len(msg.Bytes))
 	vdrBytesToReturn := min(msgSize, vdrBytesUsed)
 	t.nodeToVdrBytesUsed[nodeID] -= vdrBytesToReturn
 	if t.nodeToVdrBytesUsed[nodeID] == 0 {
@@ -213,8 +213,8 @@ func NewNoOutboundThrottler() OutboundMsgThrottler {
 // [Acquire] always returns true. [Release] does nothing.
 type noOutboundMsgThrottler struct{}
 
-func (*noOutboundMsgThrottler) Acquire(message.OutboundMessage, ids.NodeID) bool {
+func (*noOutboundMsgThrottler) Acquire(*message.OutboundMessage, ids.NodeID) bool {
 	return true
 }
 
-func (*noOutboundMsgThrottler) Release(message.OutboundMessage, ids.NodeID) {}
+func (*noOutboundMsgThrottler) Release(*message.OutboundMessage, ids.NodeID) {}

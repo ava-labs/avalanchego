@@ -21,8 +21,8 @@ inputs:
   current-state-dir-src:
     description: 'The current state directory. Supports S3 directory/zip and local directories.'
     default: ''
-  runner_name:
-    description: 'The name of the runner to use and include in the Golang Benchmark name.'
+  runner_type:
+    description: 'The type/label of the runner to include in the benchmark name for grouping results.'
     required: true
   aws-role:
     description: 'AWS role to assume for S3 access.'
@@ -147,7 +147,7 @@ runs:
       run: |
         TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
         echo "EXECUTION_DATA_DIR=/tmp/reexecution-data-${TIMESTAMP}" >> "$GITHUB_ENV"
-        echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.txt" >> "$GITHUB_ENV"
+        echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.json" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
       run: |
@@ -168,7 +168,7 @@ runs:
             BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}"
         fi
       env:
-        RUNNER_NAME: ${{ inputs.runner_name }}
+        RUNNER_TYPE: ${{ inputs.runner_type }}
         METRICS_COLLECTOR_ENABLED: ${{ inputs.prometheus-username != '' }}
         PROMETHEUS_URL: ${{ inputs.prometheus-url }}
         PROMETHEUS_PUSH_URL: ${{ inputs.prometheus-push-url }}
@@ -183,7 +183,7 @@ runs:
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
       with:
-        tool: 'go'
+        tool: 'customBiggerIsBetter'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         summary-always: true
         github-token: ${{ inputs.github-token }}

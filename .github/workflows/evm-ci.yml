@@ -1,0 +1,39 @@
+name: EVM Shared
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  lint_test:
+    name: Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./graft/evm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Run all lint checks
+        run: ../../scripts/run_task.sh lint-all-ci
+      - name: Check go.mod and go.sum are up-to-date
+        run: ../../scripts/run_task.sh check-go-mod-tidy
+
+  unit_test:
+    name: Unit Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ./graft/evm
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-22.04, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - run: ../../scripts/run_task.sh build-test
+      - run: ../../scripts/run_task.sh coverage
