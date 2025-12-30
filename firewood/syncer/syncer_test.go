@@ -71,7 +71,7 @@ func Test_Firewood_Sync(t *testing.T) {
 func Test_Firewood_Sync_WithCallback(t *testing.T) {
 	var callbackInvoked atomic.Bool
 	config := Config{
-		RangeProofCallback: func(rp *ffi.RangeProof) error {
+		RangeProofCallback: func(*ffi.RangeProof) error {
 			callbackInvoked.Store(true)
 			return nil
 		},
