@@ -376,8 +376,8 @@ func TestGetLeafs(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	largeTrieRoot, largeTrieKeys, _ := statesynctest.GenerateTrie(t, r, trieDB, 100_000, common.HashLength)
-	smallTrieRoot, _, _ := statesynctest.GenerateTrie(t, r, trieDB, leafsLimit, common.HashLength)
+	largeTrieRoot, largeTrieKeys, _ := statesynctest.GenerateIndependentTrie(t, r, trieDB, 100_000, common.HashLength)
+	smallTrieRoot, _, _ := statesynctest.GenerateIndependentTrie(t, r, trieDB, leafsLimit, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 
@@ -687,7 +687,7 @@ func TestGetLeafsRetries(t *testing.T) {
 	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	root, _, _ := statesynctest.GenerateTrie(t, r, trieDB, 100_000, common.HashLength)
+	root, _, _ := statesynctest.GenerateIndependentTrie(t, r, trieDB, 100_000, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	testNetClient := &testNetwork{}
