@@ -25,14 +25,14 @@ on:
       runner:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
         required: true
+      push-post-state:
+        description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
+        default: ''
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
         default: 30
       with-dependencies:
         description: 'Dependencies to use (e.g., "firewood=abc123" or "firewood=abc,libevm=xyz")'
-        default: ''
-      push-post-state:
-        description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
 
   # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
