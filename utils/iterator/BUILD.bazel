@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "iterator",
+    srcs = [
+        "empty.go",
+        "filter.go",
+        "iterator.go",
+        "merge.go",
+        "slice.go",
+        "tree.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/iterator",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "//utils/heap",
+        "//utils/set",
+        "@com_github_google_btree//:btree",
+    ],
+)
+
+go_test(
+    name = "iterator_test",
+    srcs = [
+        "empty_test.go",
+        "filter_test.go",
+        "merge_test.go",
+        "tree_test.go",
+    ],
+    embed = [":iterator"],
+    deps = [
+        "//ids",
+        "//vms/platformvm/state",
+        "@com_github_google_btree//:btree",
+        "@com_github_stretchr_testify//require",
+    ],
+)

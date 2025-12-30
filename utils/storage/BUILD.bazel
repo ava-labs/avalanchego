@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "storage",
+    srcs = [
+        "storage_common.go",
+        "storage_openbsd.go",
+        "storage_unix.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/storage",
+    visibility = ["//visibility:public"],
+)

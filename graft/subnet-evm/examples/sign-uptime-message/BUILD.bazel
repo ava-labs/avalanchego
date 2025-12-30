@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "sign-uptime-message_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/examples/sign-uptime-message",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//api/info",
+        "//graft/subnet-evm/warp/messages",
+        "//ids",
+        "//message",
+        "//network/p2p",
+        "//network/peer",
+        "//proto/pb/sdk",
+        "//snow/networking/router",
+        "//utils/compression",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "//wallet/subnet/primary",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+go_binary(
+    name = "sign-uptime-message",
+    embed = [":sign-uptime-message_lib"],
+    visibility = ["//visibility:public"],
+)

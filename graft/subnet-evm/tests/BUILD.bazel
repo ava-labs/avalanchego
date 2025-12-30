@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "tests",
+    srcs = ["state_test_util.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/tests",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/firewood",
+        "//graft/subnet-evm/core/extstate",
+        "//graft/subnet-evm/core/state/snapshot",
+        "//graft/subnet-evm/plugin/evm/customrawdb",
+        "//graft/subnet-evm/triedb/hashdb",
+        "//graft/subnet-evm/triedb/pathdb",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)

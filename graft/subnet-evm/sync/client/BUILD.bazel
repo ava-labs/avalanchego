@@ -1,0 +1,58 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "client",
+    srcs = [
+        "client.go",
+        "leaf_syncer.go",
+        "mock_network.go",
+        "test_client.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//graft/subnet-evm/network",
+        "//graft/subnet-evm/plugin/evm/message",
+        "//graft/subnet-evm/sync/client/stats",
+        "//graft/subnet-evm/sync/handlers",
+        "//graft/subnet-evm/utils",
+        "//ids",
+        "//version",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
+        "@org_golang_x_sync//errgroup",
+    ],
+)
+
+go_test(
+    name = "client_test",
+    srcs = ["client_test.go"],
+    embed = [":client"],
+    deps = [
+        "//graft/subnet-evm/consensus/dummy",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "//graft/subnet-evm/plugin/evm/message",
+        "//graft/subnet-evm/sync/client/stats",
+        "//graft/subnet-evm/sync/handlers",
+        "//graft/subnet-evm/sync/handlers/stats",
+        "//graft/subnet-evm/sync/statesync/statesynctest",
+        "//ids",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

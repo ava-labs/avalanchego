@@ -189,6 +189,7 @@ tasks:
       - lint
       - lint-action
       - lint-shell
+      - check-go-version
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -196,6 +197,11 @@ tasks:
       - task: lint
       - task: lint-action
       - task: lint-shell
+      - task: check-go-version
+
+  check-go-version:
+    desc: Checks Go version consistency across go.mod, MODULE.bazel, and nix
+    cmd: ./scripts/check_go_version.sh
 
   lint-shell:
     desc: Runs shellcheck to check sanity of shell scripts
@@ -463,3 +469,53 @@ tasks:
     cmds:
       - task: build
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
+
+  # ============================================================================
+  # Bazel Tasks
+  # ============================================================================
+  # These tasks wrap bazel commands and require nix develop shell for Go toolchain.
+  # For developers new to bazel, these tasks provide an easy onboarding path.
+
+  bazel-build:
+    desc: Builds avalanchego with Bazel
+    cmd: bazelisk build //main:main
+
+  bazel-build-race:
+    desc: Builds avalanchego with Bazel (race detection enabled)
+    cmd: bazelisk build --config=race //main:main
+
+  bazel-test:
+    desc: Runs unit tests with Bazel
+    cmd: bazelisk test //...
+
+  bazel-test-race:
+    desc: Runs unit tests with Bazel (race detection enabled)
+    cmd: bazelisk test --config=race //...
+
+  bazel-clean:
+    desc: Cleans Bazel cache
+    cmd: bazelisk clean
+
+  bazel-query:
+    desc: Queries Bazel targets (pass pattern via CLI_ARGS)
+    cmd: bazelisk query {{.CLI_ARGS | default "'//...'"}}
+
+  bazel-generate-gazelle:
+    desc: Regenerates BUILD files with Gazelle
+    cmds:
+      - cmd: bazelisk run //:gazelle
+
+  bazel-check-generate-gazelle:
+    desc: Checks that generated BUILD files are up-to-date (requires clean git tree)
+    cmds:
+      - task: bazel-generate-gazelle
+      - task: check-clean-branch
+
+  bazel-validate:
+    desc: Validates Bazel build by running E2E tests with bazel-built binary
+    cmds:
+      - task: bazel-build
+      - task: build-xsvm
+      - cmd: |
+          AVALANCHEGO_PATH=$(pwd)/bazel-bin/main/main_/main \
+          bash -x ./scripts/tests.e2e.existing.sh

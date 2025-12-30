@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "vertexmock",
+    srcs = ["linearizable_vm.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/vertexmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/consensus/snowman",
+        "//snow/consensus/snowstorm",
+        "//snow/engine/common",
+        "//version",
+        "@org_uber_go_mock//gomock",
+    ],
+)

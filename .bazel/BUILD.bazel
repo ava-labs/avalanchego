@@ -1,0 +1,5 @@
+# Export files for rules_nixpkgs and bazel configuration
+exports_files([
+    "go_toolchain.nix",
+    "go_version_check.bzl",
+])

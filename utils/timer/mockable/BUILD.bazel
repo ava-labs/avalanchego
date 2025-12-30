@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "mockable",
+    srcs = ["clock.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/timer/mockable",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "mockable_test",
+    srcs = ["clock_test.go"],
+    embed = [":mockable"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

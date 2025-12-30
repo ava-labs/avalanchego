@@ -1,0 +1,56 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "fee",
+    srcs = [
+        "calculator.go",
+        "complexity.go",
+        "dynamic_calculator.go",
+        "simple_calculator.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//ids",
+        "//utils/crypto/bls",
+        "//utils/crypto/secp256k1",
+        "//utils/math",
+        "//utils/wrappers",
+        "//vms/components/avax",
+        "//vms/components/gas",
+        "//vms/components/verify",
+        "//vms/platformvm/fx",
+        "//vms/platformvm/signer",
+        "//vms/platformvm/stakeable",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/warp",
+        "//vms/secp256k1fx",
+    ],
+)
+
+go_test(
+    name = "fee_test",
+    srcs = [
+        "calculator_test.go",
+        "complexity_test.go",
+        "dynamic_calculator_test.go",
+    ],
+    embed = [":fee"],
+    deps = [
+        "//codec",
+        "//ids",
+        "//utils/crypto/secp256k1",
+        "//utils/units",
+        "//vms/components/avax",
+        "//vms/components/gas",
+        "//vms/components/verify",
+        "//vms/platformvm/fx",
+        "//vms/platformvm/signer",
+        "//vms/platformvm/stakeable",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/warp/message",
+        "//vms/secp256k1fx",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "fx",
+    srcs = ["fx.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/fx",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//snow",
+        "//vms/components/verify",
+        "//vms/secp256k1fx",
+    ],
+)
+
+go_test(
+    name = "fx_test",
+    srcs = ["mocks_generate_test.go"],
+    embed = [":fx"],
+)

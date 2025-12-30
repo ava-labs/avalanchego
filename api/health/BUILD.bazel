@@ -1,0 +1,44 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "health",
+    srcs = [
+        "checker.go",
+        "client.go",
+        "handler.go",
+        "health.go",
+        "result.go",
+        "service.go",
+        "worker.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/api/health",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "//utils/json",
+        "//utils/logging",
+        "//utils/rpc",
+        "//utils/set",
+        "@com_github_gorilla_rpc//v2:rpc",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "health_test",
+    srcs = [
+        "client_test.go",
+        "health_test.go",
+        "service_test.go",
+    ],
+    embed = [":health"],
+    deps = [
+        "//ids",
+        "//utils",
+        "//utils/logging",
+        "//utils/rpc",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

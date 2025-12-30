@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "vms",
+    srcs = ["manager.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/engine/common",
+        "//utils/logging",
+        "@org_golang_x_exp//maps",
+    ],
+)
+
+go_test(
+    name = "vms_test",
+    srcs = ["mocks_generate_test.go"],
+    embed = [":vms"],
+)

@@ -71,6 +71,9 @@
 
             # s5cmd for rapid s3 interactions
             s5cmd
+
+            # Bazel build system (uses .bazelversion for version pinning)
+            bazelisk
           ];
 
           # Add scripts/ directory to PATH so kind-with-registry.sh is accessible

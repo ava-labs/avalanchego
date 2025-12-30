@@ -1,0 +1,44 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "server",
+    srcs = [
+        "allowed_hosts.go",
+        "metrics.go",
+        "router.go",
+        "server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/api/server",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api",
+        "//ids",
+        "//snow",
+        "//snow/engine/common",
+        "//trace",
+        "//utils/constants",
+        "//utils/logging",
+        "//utils/set",
+        "@com_github_gorilla_mux//:mux",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_rs_cors//:cors",
+        "@org_golang_x_net//http2",
+        "@org_golang_x_net//http2/h2c",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "server_test",
+    srcs = [
+        "allowed_hosts_test.go",
+        "router_test.go",
+        "server_test.go",
+    ],
+    embed = [":server"],
+    deps = [
+        "//snow",
+        "//snow/snowtest",
+        "@com_github_stretchr_testify//require",
+    ],
+)

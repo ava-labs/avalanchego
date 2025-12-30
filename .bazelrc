@@ -1,0 +1,28 @@
+# Enable isolated extension usages for multiple go.mod files
+common --experimental_isolated_extension_usages
+
+# Go settings
+build --@io_bazel_rules_go//go/config:race=false
+test --@io_bazel_rules_go//go/config:race=false
+
+# Build tags for gnark-crypto (use pure Go implementation to avoid assembly include path issues)
+build --@io_bazel_rules_go//go/config:tags=purego
+
+# Test settings (match existing scripts)
+test --test_output=errors
+test --test_timeout=120
+
+# CGO settings for BLST portable build
+build --action_env=CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
+build --action_env=CGO_ENABLED=1
+
+# Cache for faster builds
+build --disk_cache=~/.cache/bazel-disk-cache
+
+# Race detector (opt-in)
+build:race --@io_bazel_rules_go//go/config:race=true
+test:race --@io_bazel_rules_go//go/config:race=true
+
+# Stamp builds with git commit
+build:release --stamp
+build:release --workspace_status_command=scripts/bazel_workspace_status.sh

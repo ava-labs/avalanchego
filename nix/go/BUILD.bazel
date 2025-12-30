@@ -1,0 +1,5 @@
+# Export nix files for rules_nixpkgs
+exports_files([
+    "flake.nix",
+    "default.nix",
+])

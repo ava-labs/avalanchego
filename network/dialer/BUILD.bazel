@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "dialer",
+    srcs = ["dialer.go"],
+    importpath = "github.com/ava-labs/avalanchego/network/dialer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//network/throttling",
+        "//utils/logging",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "dialer_test",
+    srcs = ["dialer_test.go"],
+    embed = [":dialer"],
+    deps = [
+        "//utils/logging",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_sync//errgroup",
+    ],
+)

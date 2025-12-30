@@ -1,0 +1,53 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "warp",
+    srcs = [
+        "codec.go",
+        "constants.go",
+        "message.go",
+        "signature.go",
+        "signer.go",
+        "unsigned_message.go",
+        "validator.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/warp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//ids",
+        "//snow/validators",
+        "//utils/crypto/bls",
+        "//utils/hashing",
+        "//utils/math",
+        "//utils/set",
+    ],
+)
+
+go_test(
+    name = "warp_test",
+    srcs = [
+        "message_test.go",
+        "signature_test.go",
+        "signer_test.go",
+        "unsigned_message_test.go",
+        "validator_test.go",
+    ],
+    embed = [":warp"],
+    deps = [
+        "//codec",
+        "//ids",
+        "//snow/validators",
+        "//snow/validators/validatorsmock",
+        "//snow/validators/validatorstest",
+        "//utils",
+        "//utils/constants",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/set",
+        "//vms/platformvm/warp/signertest",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)
