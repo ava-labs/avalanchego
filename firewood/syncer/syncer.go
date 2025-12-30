@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package firewood
+package syncer
 
 import (
 	"bytes"
@@ -28,7 +28,8 @@ var (
 
 // database wraps a Firewood FFI database to implement the xsync.DB interface.
 type database struct {
-	db *ffi.Database
+	db                 *ffi.Database
+	rangeProofCallback func(*ffi.RangeProof) error
 }
 
 type Config struct {
@@ -36,9 +37,10 @@ type Config struct {
 	Log                   logging.Logger
 	StateSyncNodes        []ids.NodeID
 	Registerer            prometheus.Registerer
+	RangeProofCallback    func(*ffi.RangeProof) error
 }
 
-func NewSyncer(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
+func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
 	if config.Registerer == nil {
 		config.Registerer = prometheus.NewRegistry()
 	}
@@ -48,8 +50,12 @@ func NewSyncer(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofCli
 	if config.SimultaneousWorkLimit == 0 {
 		config.SimultaneousWorkLimit = defaultSimultaneousWorkLimit
 	}
+	wrappedDB := &database{db: db}
+	if config.RangeProofCallback != nil {
+		wrappedDB.rangeProofCallback = config.RangeProofCallback
+	}
 	return xsync.NewSyncer(
-		&database{db: db},
+		wrappedDB,
 		xsync.Config[*RangeProof, struct{}]{
 			RangeProofMarshaler:   rangeProofMarshaler{},
 			ChangeProofMarshaler:  changeProofMarshaler{},
@@ -97,6 +103,12 @@ func (db *database) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[
 	_, err := db.db.VerifyAndCommitRangeProof(proof.rp, start, end, ffi.Hash(proof.root), uint32(proof.maxLength))
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
+	}
+
+	if db.rangeProofCallback != nil {
+		if err := db.rangeProofCallback(proof.rp); err != nil {
+			return maybe.Nothing[[]byte](), err
+		}
 	}
 
 	nextKeyRange, err := proof.rp.FindNextKey()

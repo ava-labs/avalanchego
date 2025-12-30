@@ -1,12 +1,13 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package firewood
+package syncer
 
 import (
 	"bytes"
 	"errors"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -62,12 +63,24 @@ func Test_Firewood_Sync(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testSync(t, 0, tt.clientSize, tt.serverSize)
+			testSync(t, Config{}, 0, tt.clientSize, tt.serverSize)
 		})
 	}
 }
 
-func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
+func Test_Firewood_Sync_WithCallback(t *testing.T) {
+	var callbackInvoked atomic.Bool
+	config := Config{
+		RangeProofCallback: func(rp *ffi.RangeProof) error {
+			callbackInvoked.Store(true)
+			return nil
+		},
+	}
+	testSync(t, config, 0, 0, 1000)
+	require.True(t, callbackInvoked.Load(), "expected callback to be invoked during sync")
+}
+
+func testSync(t *testing.T, config Config, seed int64, clientKeys int, serverKeys int) {
 	ctx := t.Context()
 
 	ffiServer := generateDB(t, serverKeys, seed)
@@ -81,8 +94,8 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 	root, err := serverDB.GetMerkleRoot(ctx)
 	require.NoError(t, err)
 
-	syncer, err := NewSyncer(
-		Config{},
+	syncer, err := New(
+		config,
 		clientDB,
 		root,
 		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(serverDB, rangeProofMarshaler{})),
