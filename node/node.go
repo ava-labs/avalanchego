@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -58,6 +60,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/rpcsigner"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -134,13 +138,18 @@ func New(
 		Config:           config,
 	}
 
-	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	n.StakingSigner, err = newStakingSigner(config.StakingSignerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("problem initializing staking signer: %w", err)
+	}
+
+	pop, err := signer.NewProofOfPossession(n.StakingSigner)
 	if err != nil {
 		return nil, fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
 	logger.Info("initializing node",
-		zap.Stringer("version", version.CurrentApp),
+		zap.Stringer("version", version.Current),
 		zap.String("commit", version.GitCommit),
 		zap.Stringer("nodeID", n.ID),
 		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
@@ -284,6 +293,7 @@ type Node struct {
 
 	StakingTLSSigner crypto.Signer
 	StakingTLSCert   *staking.Certificate
+	StakingSigner    bls.Signer
 
 	// Storage for this node
 	DB database.Database
@@ -571,7 +581,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		err := n.vdrs.AddStaker(
 			constants.PrimaryNetworkID,
 			n.ID,
-			n.Config.StakingSigningKey.PublicKey(),
+			n.StakingSigner.PublicKey(),
 			dummyTxID,
 			n.Config.SybilProtectionDisabledWeight,
 		)
@@ -610,7 +620,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Config.NetworkConfig.Beacons = n.bootstrappers
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
-	n.Config.NetworkConfig.BLSKey = n.Config.StakingSigningKey
+	n.Config.NetworkConfig.BLSKey = n.StakingSigner
 	n.Config.NetworkConfig.TrackedSubnets = n.Config.TrackedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement
@@ -620,7 +630,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
-		n.Config.UpgradeConfig.FortunaTime,
+		n.Config.UpgradeConfig.GraniteTime,
 		n.msgCreator,
 		reg,
 		n.Log,
@@ -675,7 +685,7 @@ func (n *Node) Dispatch() error {
 			)
 		}
 		// If the API server isn't running, shut down the node.
-		// If node is already shutting down, this does not tigger shutdown again,
+		// If node is already shutting down, this does not trigger shutdown again,
 		// and blocks until Shutdown returns.
 		n.Shutdown(1)
 	})
@@ -713,7 +723,7 @@ func (n *Node) Dispatch() error {
 	retErr := n.Net.Dispatch()
 
 	// If the P2P server isn't running, shut down the node.
-	// If node is already shutting down, this does not tigger shutdown again,
+	// If node is already shutting down, this does not trigger shutdown again,
 	// and blocks until Shutdown returns.
 	n.Shutdown(1)
 
@@ -751,7 +761,7 @@ func (n *Node) initDatabase() error {
 	case leveldb.Name:
 		// Prior to v1.10.15, the only on-disk database was leveldb, and its
 		// files went to [dbPath]/[networkID]/v1.4.5.
-		dbFolderName = version.CurrentDatabase.String()
+		dbFolderName = version.CurrentDatabase
 	case pebbledb.Name:
 		dbFolderName = "pebble"
 	default:
@@ -760,19 +770,37 @@ func (n *Node) initDatabase() error {
 	// dbFolderName is appended to the database path given in the config
 	dbFullPath := filepath.Join(n.Config.DatabaseConfig.Path, dbFolderName)
 
-	var err error
-	n.DB, err = databasefactory.New(
+	dbReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		dbNamespace,
+	)
+	if err != nil {
+		return err
+	}
+
+	db, err := databasefactory.New(
 		n.Config.DatabaseConfig.Name,
 		dbFullPath,
 		n.Config.DatabaseConfig.ReadOnly,
 		n.Config.DatabaseConfig.Config,
-		n.MetricsGatherer,
+		dbReg,
 		n.Log,
-		dbNamespace,
-		"all",
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create database: %w", err)
+	}
+
+	meterDBReg, err := metrics.MakeAndRegister(
+		n.MeterDBMetricsGatherer,
+		"all",
+	)
+	if err != nil {
+		return err
+	}
+
+	n.DB, err = meterdb.New(meterDBReg, db)
+	if err != nil {
+		return err
 	}
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
@@ -1100,7 +1128,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
 			StakingTLSSigner:                        n.StakingTLSSigner,
 			StakingTLSCert:                          n.StakingTLSCert,
-			StakingBLSKey:                           n.Config.StakingSigningKey,
+			StakingBLSKey:                           n.StakingSigner,
 			Log:                                     n.Log,
 			LogFactory:                              n.LogFactory,
 			VMManager:                               n.VMManager,
@@ -1234,7 +1262,7 @@ func (n *Node) initVMs() error {
 	return err
 }
 
-// initSharedMemory initializes the shared memory for cross chain interation
+// initSharedMemory initializes the shared memory for cross chain interaction
 func (n *Node) initSharedMemory() {
 	n.Log.Info("initializing SharedMemory")
 	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
@@ -1344,14 +1372,14 @@ func (n *Node) initInfoAPI() error {
 
 	n.Log.Info("initializing info API")
 
-	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	pop, err := signer.NewProofOfPossession(n.StakingSigner)
 	if err != nil {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
 	service, err := info.NewService(
 		info.Parameters{
-			Version:   version.CurrentApp,
+			Version:   version.Current,
 			NodeID:    n.ID,
 			NodePOP:   pop,
 			NetworkID: n.Config.NetworkID,
@@ -1455,7 +1483,7 @@ func (n *Node) initHealthAPI() error {
 			return "validator doesn't have a BLS key", nil
 		}
 
-		nodePK := n.Config.StakingSigningKey.PublicKey()
+		nodePK := n.StakingSigner.PublicKey()
 		if nodePK.Equals(vdrPK) {
 			return "node has the correct BLS key", nil
 		}
@@ -1617,6 +1645,50 @@ func (n *Node) initDiskTargeter(
 	)
 }
 
+// newStakingSigner returns a BLS signer based on the provided validated configuration.
+func newStakingSigner(cfg node.StakingSignerConfig) (bls.Signer, error) {
+	if cfg.EphemeralSignerEnabled {
+		signer, err := localsigner.New()
+		if err != nil {
+			return nil, fmt.Errorf("could not generate ephemeral signer: %w", err)
+		}
+
+		return signer, nil
+	}
+
+	if cfg.KeyContent != "" {
+		signerKeyContent, err := base64.StdEncoding.DecodeString(cfg.KeyContent)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
+		}
+
+		signer, err := localsigner.FromBytes(signerKeyContent)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse signing key: %w", err)
+		}
+
+		return signer, nil
+	}
+
+	if cfg.RPCEndpoint != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		signer, err := rpcsigner.NewClient(ctx, cfg.RPCEndpoint)
+		if err != nil {
+			return nil, fmt.Errorf("could not create rpc signer client: %w", err)
+		}
+
+		return signer, nil
+	}
+
+	if cfg.KeyPathIsSet {
+		return localsigner.FromFile(cfg.KeyPath)
+	}
+
+	return localsigner.FromFileOrPersistNew(cfg.KeyPath)
+}
+
 // Shutdown this node
 // May be called multiple times
 // All calls to shutdownOnce.Do block until the first call returns
@@ -1650,6 +1722,11 @@ func (n *Node) shutdown() {
 		time.Sleep(n.Config.ShutdownWait)
 	}
 
+	if n.StakingSigner != nil {
+		if err := n.StakingSigner.Shutdown(); err != nil {
+			n.Log.Debug("error during staking signer shutdown", zap.Error(err))
+		}
+	}
 	if n.resourceManager != nil {
 		n.resourceManager.Shutdown()
 	}

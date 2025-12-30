@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -81,6 +81,23 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
+	// ApplyAllValidatorWeightDiffs iterates from [startHeight] towards the genesis
+	// block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
+	//
+	// Invariant: If attempting to generate the validator set for
+	// [endHeight - 1], [validators] must initially contain the validator
+	// weights for [startHeight].
+	//
+	// Note: Because this function iterates towards the genesis, [startHeight]
+	// should normally be greater than or equal to [endHeight].
+	ApplyAllValidatorWeightDiffs(
+		ctx context.Context,
+		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
+		startHeight uint64,
+		endHeight uint64,
+	) error
+
 	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
 	// genesis block until it has applied all of the diffs up to and including
 	// [endHeight]. Applying the diffs modifies [validators].
@@ -97,6 +114,23 @@ type State interface {
 		startHeight uint64,
 		endHeight uint64,
 		subnetID ids.ID,
+	) error
+
+	// ApplyAllValidatorPublicKeyDiffs iterates from [startHeight] towards the
+	// genesis block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
+	//
+	// Invariant: If attempting to generate the validator set for
+	// [endHeight - 1], [validators] must initially contain the validator
+	// weights for [startHeight].
+	//
+	// Note: Because this function iterates towards the genesis, [startHeight]
+	// should normally be greater than or equal to [endHeight].
+	ApplyAllValidatorPublicKeyDiffs(
+		ctx context.Context,
+		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
+		startHeight uint64,
+		endHeight uint64,
 	) error
 
 	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*state.Staker, []state.L1Validator, uint64, error)
@@ -196,6 +230,41 @@ func (m *manager) getCurrentHeight(context.Context) (uint64, error) {
 	return lastAccepted.Height(), nil
 }
 
+func (m *manager) GetWarpValidatorSets(
+	ctx context.Context,
+	targetHeight uint64,
+) (map[ids.ID]validators.WarpSet, error) {
+	allValidators, err := m.makeAllValidatorSets(ctx, targetHeight)
+	if err != nil {
+		return nil, err
+	}
+
+	validatorSets := make(map[ids.ID]validators.WarpSet, len(allValidators))
+	for subnetID, vdrSet := range allValidators {
+		ws, err := validators.FlattenValidatorSet(vdrSet)
+		if err != nil {
+			// If we can't flatten the validator set, skip it and disallow warp
+			// message verification from this subnet.
+			continue
+		}
+		validatorSets[subnetID] = ws
+	}
+	return validatorSets, nil
+}
+
+func (m *manager) GetWarpValidatorSet(
+	ctx context.Context,
+	targetHeight uint64,
+	subnetID ids.ID,
+) (validators.WarpSet, error) {
+	vdrSet, err := m.GetValidatorSet(ctx, targetHeight, subnetID)
+	if err != nil {
+		return validators.WarpSet{}, err
+	}
+
+	return validators.FlattenValidatorSet(vdrSet)
+}
+
 func (m *manager) GetValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
@@ -242,6 +311,48 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 	return validatorSetsCache
 }
 
+func (m *manager) makeAllValidatorSets(
+	ctx context.Context,
+	targetHeight uint64,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	allValidators, currentHeight, err := m.getAllCurrentValidatorSets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if currentHeight < targetHeight {
+		return nil, fmt.Errorf("%w: current P-chain height (%d) < requested P-Chain height (%d)",
+			errUnfinalizedHeight,
+			currentHeight,
+			targetHeight,
+		)
+	}
+
+	// Rebuild subnet validators at [targetHeight]
+	//
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
+	lastDiffHeight := targetHeight + 1
+	err = m.state.ApplyAllValidatorWeightDiffs(
+		ctx,
+		allValidators,
+		currentHeight,
+		lastDiffHeight,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.state.ApplyAllValidatorPublicKeyDiffs(
+		ctx,
+		allValidators,
+		currentHeight,
+		lastDiffHeight,
+	)
+	return allValidators, err
+}
+
 func (m *manager) makeValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
@@ -286,6 +397,14 @@ func (m *manager) makeValidatorSet(
 		subnetID,
 	)
 	return validatorSet, currentHeight, err
+}
+
+func (m *manager) getAllCurrentValidatorSets(
+	ctx context.Context,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	subnetsMap := m.cfg.Validators.GetAllMaps()
+	currentHeight, err := m.getCurrentHeight(ctx)
+	return subnetsMap, currentHeight, err
 }
 
 func (m *manager) getCurrentValidatorSet(

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -181,4 +181,8 @@ type Config struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	DiskTargeter tracker.Targeter `json:"-"`
+
+	// If true, connects to all validators regardless of primary network validator
+	// status or of configured tracked subnets.
+	ConnectToAllValidators bool `json:"connectToAllValidators"`
 }

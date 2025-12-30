@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metervm
@@ -32,6 +32,8 @@ type blockMetrics struct {
 	// Block building with context metrics
 	buildBlockWithContext,
 	buildBlockWithContextErr,
+	// Setting preference with context metrics
+	setPreferenceWithContext,
 	// Batched metrics
 	getAncestors,
 	batchedParseBlock,
@@ -47,6 +49,7 @@ type blockMetrics struct {
 
 func (m *blockMetrics) Initialize(
 	supportsBlockBuildingWithContext bool,
+	supportsSettingPreferenceWithContext bool,
 	supportsBatchedFetching bool,
 	supportsStateSync bool,
 	reg prometheus.Registerer,
@@ -72,6 +75,9 @@ func (m *blockMetrics) Initialize(
 	if supportsBlockBuildingWithContext {
 		m.buildBlockWithContext = newAverager("build_block_with_context", reg, &errs)
 		m.buildBlockWithContextErr = newAverager("build_block_with_context_err", reg, &errs)
+	}
+	if supportsSettingPreferenceWithContext {
+		m.setPreferenceWithContext = newAverager("set_preference_with_context", reg, &errs)
 	}
 	if supportsBatchedFetching {
 		m.getAncestors = newAverager("get_ancestors", reg, &errs)

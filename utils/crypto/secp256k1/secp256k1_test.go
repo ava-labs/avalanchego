@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1
@@ -171,6 +171,20 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 			require.ErrorIs(err, tt.err)
 		})
 	}
+}
+
+func TestPrivateKeySECP256K1RUnmarshalText(t *testing.T) {
+	require := require.New(t)
+
+	key, err := NewPrivateKey()
+	require.NoError(err)
+
+	keyText, err := key.MarshalText()
+	require.NoError(err)
+
+	key2 := PrivateKey{}
+	require.NoError(key2.UnmarshalText(keyText))
+	require.Equal(key.PublicKey(), key2.PublicKey())
 }
 
 func TestSigning(t *testing.T) {

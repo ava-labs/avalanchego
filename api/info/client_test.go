@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -46,7 +46,7 @@ func TestClient(t *testing.T) {
 	}
 
 	{
-		bootstrapped, err := c.IsBootstrapped(context.Background(), "X")
+		bootstrapped, err := c.IsBootstrapped(t.Context(), "X")
 		require.NoError(err)
 		require.True(bootstrapped)
 	}
@@ -54,7 +54,7 @@ func TestClient(t *testing.T) {
 	mc.reply.IsBootstrapped = false
 
 	{
-		bootstrapped, err := c.IsBootstrapped(context.Background(), "X")
+		bootstrapped, err := c.IsBootstrapped(t.Context(), "X")
 		require.NoError(err)
 		require.False(bootstrapped)
 	}
@@ -64,7 +64,7 @@ func TestClient(t *testing.T) {
 	}
 
 	{
-		bootstrapped, err := AwaitBootstrapped(context.Background(), c, "X", time.Microsecond)
+		bootstrapped, err := AwaitBootstrapped(t.Context(), c, "X", time.Microsecond)
 		require.NoError(err)
 		require.True(bootstrapped)
 	}

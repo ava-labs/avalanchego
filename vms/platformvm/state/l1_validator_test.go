@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -80,9 +80,9 @@ func TestL1Validator_immutableFieldsAreUnmodified(t *testing.T) {
 	var (
 		randomizeL1Validator = func(l1Validator L1Validator) L1Validator {
 			// Randomize unrelated fields
-			l1Validator.Weight = rand.Uint64()            // #nosec G404
-			l1Validator.MinNonce = rand.Uint64()          // #nosec G404
-			l1Validator.EndAccumulatedFee = rand.Uint64() // #nosec G404
+			l1Validator.Weight = rand.Uint64()
+			l1Validator.MinNonce = rand.Uint64()
+			l1Validator.EndAccumulatedFee = rand.Uint64()
 			return l1Validator
 		}
 		l1Validator = newL1Validator()
@@ -123,7 +123,7 @@ func TestL1Validator_immutableFieldsAreUnmodified(t *testing.T) {
 	})
 	t.Run("different startTime", func(t *testing.T) {
 		v := randomizeL1Validator(l1Validator)
-		v.StartTime = rand.Uint64() // #nosec G404
+		v.StartTime = rand.Uint64()
 		require.False(t, l1Validator.immutableFieldsAreUnmodified(v))
 	})
 }
@@ -239,9 +239,9 @@ func newL1Validator() L1Validator {
 		PublicKey:             utils.RandomBytes(bls.PublicKeyLen),
 		RemainingBalanceOwner: utils.RandomBytes(32),
 		DeactivationOwner:     utils.RandomBytes(32),
-		StartTime:             rand.Uint64(), // #nosec G404
-		Weight:                rand.Uint64(), // #nosec G404
-		MinNonce:              rand.Uint64(), // #nosec G404
-		EndAccumulatedFee:     rand.Uint64(), // #nosec G404
+		StartTime:             rand.Uint64(),
+		Weight:                rand.Uint64(),
+		MinNonce:              rand.Uint64(),
+		EndAccumulatedFee:     rand.Uint64(),
 	}
 }

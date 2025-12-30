@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package grpcutils
@@ -98,7 +98,7 @@ func Serve(listener net.Listener, grpcServer *grpc.Server) {
 	//       log this if it is the primary error.
 	//
 	// There is nothing to with the error returned by serve here. Later requests
-	// will propegate their error if they occur.
+	// will propagate their error if they occur.
 	_ = grpcServer.Serve(listener)
 
 	// Similarly, there is nothing to with an error when the listener is closed.

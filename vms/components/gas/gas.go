@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gas
@@ -25,11 +25,11 @@ func (g Gas) Cost(price Price) (uint64, error) {
 	return safemath.Mul(uint64(g), uint64(price))
 }
 
-// AddPerSecond returns g + gasPerSecond * seconds.
+// AddOverTime returns g + gasRate * duration.
 //
 // If overflow would occur, MaxUint64 is returned.
-func (g Gas) AddPerSecond(gasPerSecond Gas, seconds uint64) Gas {
-	newGas, err := safemath.Mul(uint64(gasPerSecond), seconds)
+func (g Gas) AddOverTime(gasRate Gas, duration uint64) Gas {
+	newGas, err := safemath.Mul(uint64(gasRate), duration)
 	if err != nil {
 		return math.MaxUint64
 	}
@@ -40,11 +40,11 @@ func (g Gas) AddPerSecond(gasPerSecond Gas, seconds uint64) Gas {
 	return Gas(totalGas)
 }
 
-// SubPerSecond returns g - gasPerSecond * seconds.
+// SubOverTime returns g - gasRate * duration.
 //
 // If underflow would occur, 0 is returned.
-func (g Gas) SubPerSecond(gasPerSecond Gas, seconds uint64) Gas {
-	gasToRemove, err := safemath.Mul(uint64(gasPerSecond), seconds)
+func (g Gas) SubOverTime(gasRate Gas, duration uint64) Gas {
+	gasToRemove, err := safemath.Mul(uint64(gasRate), duration)
 	if err != nil {
 		return 0
 	}

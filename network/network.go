@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -242,7 +242,7 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
-	ipTracker, err := newIPTracker(config.TrackedSubnets, log, metricsRegisterer)
+	ipTracker, err := newIPTracker(config.TrackedSubnets, log, metricsRegisterer, config.ConnectToAllValidators)
 	if err != nil {
 		return nil, fmt.Errorf("initializing ip tracker failed with: %w", err)
 	}
@@ -260,28 +260,29 @@ func NewNetwork(
 	}
 
 	peerConfig := &peer.Config{
-		ReadBufferSize:       config.PeerReadBufferSize,
-		WriteBufferSize:      config.PeerWriteBufferSize,
-		Metrics:              peerMetrics,
-		MessageCreator:       msgCreator,
-		Log:                  log,
-		InboundMsgThrottler:  inboundMsgThrottler,
-		Network:              nil, // This is set below.
-		Router:               router,
-		VersionCompatibility: version.GetCompatibility(minCompatibleTime),
-		MyNodeID:             config.MyNodeID,
-		MySubnets:            config.TrackedSubnets,
-		Beacons:              config.Beacons,
-		Validators:           config.Validators,
-		NetworkID:            config.NetworkID,
-		PingFrequency:        config.PingFrequency,
-		PongTimeout:          config.PingPongTimeout,
-		MaxClockDifference:   config.MaxClockDifference,
-		SupportedACPs:        config.SupportedACPs.List(),
-		ObjectedACPs:         config.ObjectedACPs.List(),
-		ResourceTracker:      config.ResourceTracker,
-		UptimeCalculator:     config.UptimeCalculator,
-		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
+		ReadBufferSize:         config.PeerReadBufferSize,
+		WriteBufferSize:        config.PeerWriteBufferSize,
+		Metrics:                peerMetrics,
+		MessageCreator:         msgCreator,
+		Log:                    log,
+		InboundMsgThrottler:    inboundMsgThrottler,
+		Network:                nil, // This is set below.
+		Router:                 router,
+		VersionCompatibility:   version.GetCompatibility(minCompatibleTime),
+		MyNodeID:               config.MyNodeID,
+		MySubnets:              config.TrackedSubnets,
+		Beacons:                config.Beacons,
+		Validators:             config.Validators,
+		NetworkID:              config.NetworkID,
+		PingFrequency:          config.PingFrequency,
+		PongTimeout:            config.PingPongTimeout,
+		MaxClockDifference:     config.MaxClockDifference,
+		SupportedACPs:          config.SupportedACPs.List(),
+		ObjectedACPs:           config.ObjectedACPs.List(),
+		ResourceTracker:        config.ResourceTracker,
+		UptimeCalculator:       config.UptimeCalculator,
+		IPSigner:               peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
+		ConnectToAllValidators: config.ConnectToAllValidators,
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
@@ -508,8 +509,9 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
 	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
+	trackAllSubnets := areWeAPrimaryNetworkAValidator || n.config.ConnectToAllValidators
 	for _, ip := range claimedIPPorts {
-		if err := n.track(ip, areWeAPrimaryNetworkAValidator); err != nil {
+		if err := n.track(ip, trackAllSubnets); err != nil {
 			return err
 		}
 	}
@@ -542,15 +544,15 @@ func (n *network) KnownPeers() ([]byte, []byte) {
 // There are 3 types of responses:
 //
 // - Respond with subnet IPs tracked by both ourselves and the peer
-//   - We do not consider ourself to be a primary network validator
+//   - We do not consider ourself to be a primary network validator and do not track all subnets
 //
 // - Respond with all subnet IPs
 //   - The peer requests all peers
-//   - We believe ourself to be a primary network validator
+//   - We believe ourself to be a primary network validator or we track all subnets
 //
 // - Respond with subnet IPs tracked by the peer
 //   - The peer does not request all peers
-//   - We believe ourself to be a primary network validator
+//   - We believe ourself to be a primary network validator or we track all subnets
 //
 // The reason we allow the peer to request all peers is so that we can avoid
 // sending unnecessary data in the case that we consider them a primary network
@@ -563,10 +565,11 @@ func (n *network) Peers(
 	salt []byte,
 ) []*ips.ClaimedIPPort {
 	_, areWeAPrimaryNetworkValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
+	weHaveAllSubnetIPs := areWeAPrimaryNetworkValidator || n.config.ConnectToAllValidators
 
 	// Only return IPs for subnets that we are tracking.
 	var allowedSubnets func(ids.ID) bool
-	if areWeAPrimaryNetworkValidator {
+	if weHaveAllSubnetIPs {
 		allowedSubnets = func(ids.ID) bool { return true }
 	} else {
 		allowedSubnets = func(subnetID ids.ID) bool {
@@ -574,7 +577,7 @@ func (n *network) Peers(
 		}
 	}
 
-	if areWeAPrimaryNetworkValidator && requestAllPeers {
+	if weHaveAllSubnetIPs && requestAllPeers {
 		// Return IPs for all subnets.
 		return getGossipableIPs(
 			n.ipTracker,

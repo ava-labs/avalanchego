@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrapper
 
 import (
-	"context"
 	"math"
 	"testing"
 
@@ -140,7 +139,7 @@ func TestMajorityGetPeers(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			peers := test.majority.GetPeers(context.Background())
+			peers := test.majority.GetPeers(t.Context())
 			require.Equal(test.expectedState, test.majority)
 			require.Equal(test.expectedPeers, peers)
 		})
@@ -332,7 +331,7 @@ func TestMajorityRecordOpinion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			err := test.majority.RecordOpinion(context.Background(), test.nodeID, test.blkIDs)
+			err := test.majority.RecordOpinion(t.Context(), test.nodeID, test.blkIDs)
 			require.Equal(test.expectedState, test.majority)
 			require.ErrorIs(err, test.expectedErr)
 		})
@@ -388,7 +387,7 @@ func TestMajorityResult(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			accepted, finalized := test.majority.Result(context.Background())
+			accepted, finalized := test.majority.Result(t.Context())
 			require.Equal(test.expectedAccepted, accepted)
 			require.Equal(test.expectedFinalized, finalized)
 		})

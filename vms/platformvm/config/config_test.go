@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -74,7 +74,7 @@ func TestConfigUnmarshal(t *testing.T) {
 				PullGossipPollSize:                          11,
 				PullGossipFrequency:                         12,
 				PullGossipThrottlingPeriod:                  13,
-				PullGossipThrottlingLimit:                   14,
+				PullGossipRequestsPerValidator:              14,
 				ExpectedBloomFilterElements:                 15,
 				ExpectedBloomFilterFalsePositiveProbability: 16,
 				MaxBloomFilterFalsePositiveProbability:      17,
@@ -93,6 +93,7 @@ func TestConfigUnmarshal(t *testing.T) {
 			L1SubnetIDNodeIDCacheSize:     13,
 			ChecksumsEnabled:              true,
 			MempoolPruneFrequency:         time.Minute,
+			MempoolGasCapacity:            14,
 		}
 		verifyInitializedStruct(t, *expected)
 		verifyInitializedStruct(t, expected.Network)

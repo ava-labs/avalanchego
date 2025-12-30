@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -52,10 +52,11 @@ import (
 )
 
 var (
-	_ snowmanblock.ChainVM                      = (*VM)(nil)
-	_ snowmanblock.BuildBlockWithContextChainVM = (*VM)(nil)
-	_ secp256k1fx.VM                            = (*VM)(nil)
-	_ validators.State                          = (*VM)(nil)
+	_ snowmanblock.ChainVM                         = (*VM)(nil)
+	_ snowmanblock.BuildBlockWithContextChainVM    = (*VM)(nil)
+	_ snowmanblock.SetPreferenceWithContextChainVM = (*VM)(nil)
+	_ secp256k1fx.VM                               = (*VM)(nil)
+	_ validators.State                             = (*VM)(nil)
 )
 
 type VM struct {
@@ -166,7 +167,13 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	mempool, err := pmempool.New("mempool", registerer)
+	mempool, err := pmempool.New(
+		"mempool",
+		vm.Internal.DynamicFeeConfig.Weights,
+		execConfig.MempoolGasCapacity,
+		vm.ctx.AVAXAssetID,
+		registerer,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
@@ -425,7 +432,12 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
-	vm.manager.SetPreference(blkID)
+	vm.manager.SetPreference(blkID, nil)
+	return nil
+}
+
+func (vm *VM) SetPreferenceWithContext(_ context.Context, blkID ids.ID, blockCtx *snowmanblock.Context) error {
+	vm.manager.SetPreference(blkID, blockCtx)
 	return nil
 }
 

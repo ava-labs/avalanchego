@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -97,11 +97,11 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.Sender, *vertextes
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(err)
 
-	p2pTracker.Connected(peer, version.CurrentApp)
+	p2pTracker.Connected(peer, version.Current)
 
 	return Config{
 		AllGetsServer:                  avaGetHandler,
@@ -169,7 +169,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_DAG,
 				State: snow.NormalOp,
 			})
 			return nil
@@ -221,7 +221,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0))
+	require.NoError(bs.Start(t.Context(), 0))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -276,7 +276,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_DAG,
 				State: snow.NormalOp,
 			})
 			return nil
@@ -325,12 +325,12 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0)) // should request vtx0
+	require.NoError(bs.Start(t.Context(), 0)) // should request vtx0
 	require.Equal(vtxID0, reqVtxID)
 
 	oldReqID := *requestID
-	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes2})) // send unexpected vertex
-	require.NotEqual(oldReqID, *requestID)                                                       // should have sent a new request
+	require.NoError(bs.Ancestors(t.Context(), peerID, *requestID, [][]byte{vtxBytes2})) // send unexpected vertex
+	require.NotEqual(oldReqID, *requestID)                                              // should have sent a new request
 
 	oldReqID = *requestID
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
@@ -359,8 +359,8 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2})) // send expected vertex and vertex that should not be accepted
-	require.Equal(oldReqID, *requestID)                                                                     // shouldn't have sent a new request
+	require.NoError(bs.Ancestors(t.Context(), peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2})) // send expected vertex and vertex that should not be accepted
+	require.Equal(oldReqID, *requestID)                                                            // shouldn't have sent a new request
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -443,7 +443,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_DAG,
 				State: snow.NormalOp,
 			})
 			return nil
@@ -484,7 +484,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0))
+	require.NoError(bs.Start(t.Context(), 0))
 
 	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
@@ -513,7 +513,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}))
+	require.NoError(bs.Ancestors(t.Context(), peerID, *reqIDPtr, [][]byte{vtxBytes0}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, tx0.Status())
 	require.Equal(choices.Accepted, tx1.Status())
@@ -567,7 +567,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_DAG,
 				State: snow.NormalOp,
 			})
 			return nil
@@ -615,10 +615,10 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0)) // should request vtx1
+	require.NoError(bs.Start(t.Context(), 0)) // should request vtx1
 	require.Equal(vtxID1, requested)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes1})) // Provide vtx1; should request vtx0
+	require.NoError(bs.Ancestors(t.Context(), peerID, *reqIDPtr, [][]byte{vtxBytes1})) // Provide vtx1; should request vtx0
 	require.Equal(snow.Bootstrapping, bs.Context().State.Get().State)
 	require.Equal(vtxID0, requested)
 
@@ -636,7 +636,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})) // Provide vtx0; can finish now
+	require.NoError(bs.Ancestors(t.Context(), peerID, *reqIDPtr, [][]byte{vtxBytes0})) // Provide vtx0; can finish now
 	require.Equal(snow.NormalOp, bs.Context().State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())

@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
 
 import (
-	"context"
 	"math"
 	"testing"
 
@@ -37,7 +36,7 @@ func TestInvalidGenesis(t *testing.T) {
 	defer ctx.Lock.Unlock()
 
 	err := vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,         // context
 		memdb.New(), // database
 		nil,         // genesisState
@@ -56,13 +55,13 @@ func TestInvalidFx(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.XChainID)
 	ctx.Lock.Lock()
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 		ctx.Lock.Unlock()
 	}()
 
 	genesisBytes := newGenesisBytesTest(t)
 	err := vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,          // context
 		memdb.New(),  // database
 		genesisBytes, // genesisState
@@ -83,13 +82,13 @@ func TestFxInitializationFailure(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.XChainID)
 	ctx.Lock.Lock()
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 		ctx.Lock.Unlock()
 	}()
 
 	genesisBytes := newGenesisBytesTest(t)
 	err := vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,          // context
 		memdb.New(),  // database
 		genesisBytes, // genesisState
@@ -425,17 +424,17 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	}}
 	require.NoError(secondTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	parsedFirstTx, err := env.vm.ParseTx(context.Background(), firstTx.Bytes())
+	parsedFirstTx, err := env.vm.ParseTx(t.Context(), firstTx.Bytes())
 	require.NoError(err)
 
-	require.NoError(parsedFirstTx.Verify(context.Background()))
-	require.NoError(parsedFirstTx.Accept(context.Background()))
+	require.NoError(parsedFirstTx.Verify(t.Context()))
+	require.NoError(parsedFirstTx.Accept(t.Context()))
 
-	parsedSecondTx, err := env.vm.ParseTx(context.Background(), secondTx.Bytes())
+	parsedSecondTx, err := env.vm.ParseTx(t.Context(), secondTx.Bytes())
 	require.NoError(err)
 
-	require.NoError(parsedSecondTx.Verify(context.Background()))
-	require.NoError(parsedSecondTx.Accept(context.Background()))
+	require.NoError(parsedSecondTx.Verify(t.Context()))
+	require.NoError(parsedSecondTx.Accept(t.Context()))
 
 	_, err = env.vm.state.GetTx(firstTx.ID())
 	require.NoError(err)
@@ -572,11 +571,11 @@ func TestForceAcceptImportTx(t *testing.T) {
 	}}
 	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	parsedTx, err := env.vm.ParseTx(context.Background(), tx.Bytes())
+	parsedTx, err := env.vm.ParseTx(t.Context(), tx.Bytes())
 	require.NoError(err)
 
-	require.NoError(parsedTx.Verify(context.Background()))
-	require.NoError(parsedTx.Accept(context.Background()))
+	require.NoError(parsedTx.Verify(t.Context()))
+	require.NoError(parsedTx.Accept(t.Context()))
 
 	id := utxoID.InputID()
 	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id[:]})

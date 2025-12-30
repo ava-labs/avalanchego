@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 var Default = Config{
@@ -26,6 +27,7 @@ var Default = Config{
 	L1SubnetIDNodeIDCacheSize:     16 * units.KiB,
 	ChecksumsEnabled:              false,
 	MempoolPruneFrequency:         30 * time.Minute,
+	MempoolGasCapacity:            1_000_000,
 }
 
 // Config contains all of the user-configurable parameters of the PlatformVM.
@@ -45,6 +47,7 @@ type Config struct {
 	L1SubnetIDNodeIDCacheSize     int           `json:"l1-subnet-id-node-id-cache-size"`
 	ChecksumsEnabled              bool          `json:"checksums-enabled"`
 	MempoolPruneFrequency         time.Duration `json:"mempool-prune-frequency"`
+	MempoolGasCapacity            gas.Gas       `json:"mempool-gas-capacity"`
 }
 
 // GetConfig returns a Config from the provided json encoded bytes. If a

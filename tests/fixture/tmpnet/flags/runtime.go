@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package flags
@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
@@ -59,7 +60,7 @@ func (v *RuntimeConfigVars) GetNodeRuntimeConfig() (*tmpnet.NodeRuntimeConfig, e
 	case processRuntime:
 		processRuntimeConfig, err := v.processRuntimeVars.getProcessRuntimeConfig()
 		if err != nil {
-			return nil, fmt.Errorf("failed to configure %s runtime: %w", processRuntime, err)
+			return nil, stacktrace.Errorf("failed to configure %s runtime: %w", processRuntime, err)
 		}
 		return &tmpnet.NodeRuntimeConfig{
 			Process: processRuntimeConfig,
@@ -67,12 +68,12 @@ func (v *RuntimeConfigVars) GetNodeRuntimeConfig() (*tmpnet.NodeRuntimeConfig, e
 	case kubeRuntime:
 		kubeRuntimeConfig, err := v.kubeRuntimeVars.getKubeRuntimeConfig()
 		if err != nil {
-			return nil, err
+			return nil, stacktrace.Wrap(err)
 		}
 		return &tmpnet.NodeRuntimeConfig{
 			Kube: kubeRuntimeConfig,
 		}, nil
 	default:
-		return nil, fmt.Errorf("--runtime expected one of %v, got: %s", validRuntimes, v.runtime)
+		return nil, stacktrace.Errorf("--runtime expected one of %v, got: %s", validRuntimes, v.runtime)
 	}
 }

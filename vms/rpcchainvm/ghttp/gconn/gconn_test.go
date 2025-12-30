@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gconn
@@ -40,7 +40,7 @@ func TestErrIOEOF(t *testing.T) {
 		_ = server.Serve(listener)
 	}()
 
-	grpcConn, err := grpc.DialContext(context.Background(), "bufnet",
+	grpcConn, err := grpc.DialContext(t.Context(), "bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return listener.Dial()
 		}),
@@ -82,7 +82,7 @@ func TestOSErrDeadlineExceeded(t *testing.T) {
 		_ = server.Serve(listener)
 	}()
 
-	grpcConn, err := grpc.DialContext(context.Background(), "bufnet",
+	grpcConn, err := grpc.DialContext(t.Context(), "bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return listener.Dial()
 		}),

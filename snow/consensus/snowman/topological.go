@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -230,7 +230,7 @@ func (ts *Topological) PreferenceAtHeight(height uint64) (ids.ID, bool) {
 //
 // To optimize the theoretical complexity of the vote propagation, a topological
 // sort is done over the blocks that are reachable from the provided votes.
-// During the sort, votes are pushed towards the genesis. To prevent interating
+// During the sort, votes are pushed towards the genesis. To prevent iterating
 // over all blocks that had unsuccessful polls, we set a flag on the block to
 // know that any future traversal through that block should register an
 // unsuccessful poll on that block and every descendant block.

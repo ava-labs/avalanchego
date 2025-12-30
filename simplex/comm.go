@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -105,11 +105,11 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.Ou
 	var simplexMsg *p2p.Simplex
 	switch {
 	case msg.VerifiedBlockMessage != nil:
-		bytes, err := msg.VerifiedBlockMessage.VerifiedBlock.Bytes()
+		msg, err := newBlockProposal(c.chainID, msg.VerifiedBlockMessage)
 		if err != nil {
-			return nil, fmt.Errorf("failed to serialize block: %w", err)
+			return nil, fmt.Errorf("failed to create block proposal: %w", err)
 		}
-		simplexMsg = newBlockProposal(c.chainID, bytes, msg.VerifiedBlockMessage.Vote)
+		simplexMsg = msg
 	case msg.VoteMessage != nil:
 		simplexMsg = newVote(c.chainID, msg.VoteMessage)
 	case msg.EmptyVoteMessage != nil:

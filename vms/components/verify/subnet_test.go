@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package verify
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -91,7 +90,7 @@ func TestSameSubnet(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			ctx := test.ctxF(ctrl)
 
-			result := SameSubnet(context.Background(), ctx, test.chainID)
+			result := SameSubnet(t.Context(), ctx, test.chainID)
 			require.ErrorIs(t, result, test.result)
 		})
 	}

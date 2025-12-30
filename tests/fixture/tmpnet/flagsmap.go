@@ -1,13 +1,13 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
@@ -19,11 +19,11 @@ type FlagsMap map[string]string
 func ReadFlagsMap(path string, description string) (FlagsMap, error) {
 	bytes, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %s: %w", description, err)
+		return nil, stacktrace.Errorf("failed to read %s: %w", description, err)
 	}
 	flagsMap := FlagsMap{}
 	if err := json.Unmarshal(bytes, &flagsMap); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal %s: %w", description, err)
+		return nil, stacktrace.Errorf("failed to unmarshal %s: %w", description, err)
 	}
 	return flagsMap, nil
 }
@@ -50,10 +50,10 @@ func (f FlagsMap) SetDefaults(defaults FlagsMap) {
 func (f FlagsMap) Write(path string, description string) error {
 	bytes, err := DefaultJSONMarshal(f)
 	if err != nil {
-		return fmt.Errorf("failed to marshal %s: %w", description, err)
+		return stacktrace.Errorf("failed to marshal %s: %w", description, err)
 	}
 	if err := os.WriteFile(path, bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write %s: %w", description, err)
+		return stacktrace.Errorf("failed to write %s: %w", description, err)
 	}
 	return nil
 }

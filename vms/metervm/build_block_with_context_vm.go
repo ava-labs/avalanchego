@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metervm
 
 import (
 	"context"
+	"time"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -15,10 +16,9 @@ func (vm *blockVM) BuildBlockWithContext(ctx context.Context, blockCtx *block.Co
 		return vm.BuildBlock(ctx)
 	}
 
-	start := vm.clock.Time()
+	start := time.Now()
 	blk, err := vm.buildBlockVM.BuildBlockWithContext(ctx, blockCtx)
-	end := vm.clock.Time()
-	duration := float64(end.Sub(start))
+	duration := float64(time.Since(start))
 	if err != nil {
 		vm.blockMetrics.buildBlockWithContextErr.Observe(duration)
 		return nil, err

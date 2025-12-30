@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package atomictest
@@ -46,7 +46,7 @@ func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1
 // can support large values.
 func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 atomic.SharedMemory, _ database.Database) {
 	require := require.New(t)
-	rand.Seed(0)
+	rand := rand.New(rand.NewSource(0)) //#nosec G404
 
 	totalSize := 16 * units.MiB  // 16 MiB
 	elementSize := 4 * units.KiB // 4 KiB
@@ -307,7 +307,7 @@ func TestPutAndRemoveBatch(t *testing.T, chainID0, _ ids.ID, _, sm1 atomic.Share
 // support large batches.
 func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ atomic.SharedMemory, db database.Database) {
 	require := require.New(t)
-	rand.Seed(0)
+	rand := rand.New(rand.NewSource(0)) //#nosec G404
 
 	totalSize := 8 * units.MiB   // 8 MiB
 	elementSize := 4 * units.KiB // 4 KiB

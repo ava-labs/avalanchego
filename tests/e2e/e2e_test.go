@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package e2e_test
@@ -7,7 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -28,6 +30,7 @@ import (
 )
 
 func TestE2E(t *testing.T) {
+	evm.RegisterAllLibEVMExtras()
 	ginkgo.RunSpecs(t, "e2e test suites")
 }
 
@@ -50,6 +53,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	upgrades := upgrade.Default
 	if flagVars.ActivateGranite() {
 		upgrades.GraniteTime = upgrade.InitiallyActiveTime
+		upgrades.GraniteEpochDuration = 4 * time.Second
 	} else {
 		upgrades.GraniteTime = upgrade.UnscheduledActivationTime
 	}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -82,6 +82,8 @@ func (s *SlidingWindowThrottler) Handle(nodeID ids.NodeID) bool {
 
 	currentHits := s.windows[s.current].hits
 	current := currentHits[nodeID]
+	currentHits[nodeID]++
+
 	previousFraction := float64(s.period-sinceUpdate) / float64(s.period)
 	previous := s.windows[1-s.current].hits[nodeID]
 	estimatedHits := current + previousFraction*previous
@@ -90,7 +92,6 @@ func (s *SlidingWindowThrottler) Handle(nodeID ids.NodeID) bool {
 		return false
 	}
 
-	currentHits[nodeID]++
 	return true
 }
 
@@ -100,4 +101,11 @@ func (s *SlidingWindowThrottler) rotate(t time.Time) {
 		start: t,
 		hits:  make(map[ids.NodeID]float64),
 	}
+}
+
+func (s *SlidingWindowThrottler) setLimit(limit float64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.limit = limit
 }

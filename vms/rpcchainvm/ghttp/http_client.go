@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ghttp
@@ -7,7 +7,10 @@ import (
 	"io"
 	"net/http"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/proto/pb/io/reader"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
@@ -21,13 +24,15 @@ var _ http.Handler = (*Client)(nil)
 // Client is an http.Handler that talks over RPC.
 type Client struct {
 	client httppb.HTTPClient
+	log    logging.Logger
 }
 
 // NewClient returns an HTTP handler database instance connected to a remote
 // HTTP handler instance
-func NewClient(client httppb.HTTPClient) *Client {
+func NewClient(client httppb.HTTPClient, log logging.Logger) *Client {
 	return &Client{
 		client: client,
+		log:    log,
 	}
 }
 
@@ -190,8 +195,9 @@ func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := convertWriteResponse(w, resp); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		c.log.Debug("failed sending HTTP response",
+			zap.Error(err),
+		)
 	}
 }
 

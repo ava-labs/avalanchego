@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package window
@@ -189,7 +189,7 @@ func TestTTLOldest(t *testing.T) {
 	require.Equal(3, window.elements.Len())
 
 	// Now we're one second before the ttl of 10 seconds as defined in testTTL,
-	// so all existing elements shoud still exist.
+	// so all existing elements should still exist.
 	// Add 4 to the window to make it:
 	// [1, 2, 3, 4]
 	clock.Set(start.Add(testTTL - time.Second))

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -73,6 +73,10 @@ func (o *overriddenManager) TotalWeight(ids.ID) (uint64, error) {
 
 func (o *overriddenManager) Sample(_ ids.ID, size int) ([]ids.NodeID, error) {
 	return o.manager.Sample(o.subnetID, size)
+}
+
+func (o *overriddenManager) GetAllMaps() map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput {
+	return o.manager.GetAllMaps()
 }
 
 func (o *overriddenManager) GetMap(ids.ID) map[ids.NodeID]*validators.GetValidatorOutput {

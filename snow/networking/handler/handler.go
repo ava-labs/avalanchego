@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -492,8 +492,8 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	// We will attempt to pass the message to the requested type for the state
 	// we are currently in.
 	currentState := h.ctx.State.Get()
-	if msg.EngineType == p2ppb.EngineType_ENGINE_TYPE_SNOWMAN &&
-		currentState.Type == p2ppb.EngineType_ENGINE_TYPE_AVALANCHE {
+	if msg.EngineType == p2ppb.EngineType_ENGINE_TYPE_CHAIN &&
+		currentState.Type == p2ppb.EngineType_ENGINE_TYPE_DAG {
 		// The peer is requesting an engine type that hasn't been initialized
 		// yet. This means we know that this isn't a response, so we can safely
 		// drop the message.
@@ -508,13 +508,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 	var engineType p2ppb.EngineType
 	switch msg.EngineType {
-	case p2ppb.EngineType_ENGINE_TYPE_AVALANCHE, p2ppb.EngineType_ENGINE_TYPE_SNOWMAN:
+	case p2ppb.EngineType_ENGINE_TYPE_DAG, p2ppb.EngineType_ENGINE_TYPE_CHAIN:
 		// The peer is requesting an engine type that has been initialized, so
 		// we should attempt to honor the request.
 		engineType = msg.EngineType
 	default:
 		// Note: [msg.EngineType] may have been provided by the peer as an
-		// invalid option. I.E. not one of AVALANCHE, SNOWMAN, or UNSPECIFIED.
+		// invalid option. I.E. not one of DAG, CHAIN, or UNSPECIFIED.
 		// In this case, we treat the value the same way as UNSPECIFIED.
 		//
 		// If the peer didn't request a specific engine type, we default to the

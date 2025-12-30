@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timer
 
 import (
 	"encoding/binary"
+	"math"
 	"time"
 )
 
@@ -18,8 +19,108 @@ func ProgressFromHash(b []byte) uint64 {
 	return binary.BigEndian.Uint64(progress[:])
 }
 
-// EstimateETA attempts to estimate the remaining time for a job to finish given
-// the [startTime] and it's current progress.
+// A sample represents a completed amount and the timestamp of the sample
+type sample struct {
+	completed uint64
+	timestamp time.Time
+}
+
+// EtaTracker tracks the ETA of a job
+type EtaTracker struct {
+	samples        []sample
+	samplePosition uint8
+	totalSamples   uint64
+	slowdownFactor float64
+}
+
+// NewEtaTracker creates a new EtaTracker with the given maximum number of samples
+// and a slowdown factor. The slowdown factor is a multiplier that is added to the ETA
+// based on the percentage completed.
+//
+// The adjustment works as follows:
+//   - At 0% progress: ETA is multiplied by slowdownFactor
+//   - At 100% progress: ETA is the raw estimate (no adjustment)
+//   - Between 0% and 100%: Adjustment decreases linearly with progress
+//
+// Example: With slowdownFactor = 2.0:
+//   - At 0% progress: ETA = raw_estimate * 2.0
+//   - At 50% progress: ETA = raw_estimate * 1.5
+//   - At 100% progress: ETA = raw_estimate * 1.0
+//
+// If maxSamples is less than 1, it will default to 5
+func NewEtaTracker(maxSamples uint8, slowdownFactor float64) *EtaTracker {
+	if maxSamples < 1 {
+		maxSamples = 5
+	}
+	return &EtaTracker{
+		samples:        make([]sample, maxSamples),
+		samplePosition: 0,
+		totalSamples:   0,
+		slowdownFactor: slowdownFactor,
+	}
+}
+
+// AddSample adds a sample to the EtaTracker
+// It returns the remaining time to complete the target and the percent complete
+// The returned values are rounded to the nearest second and 2 decimal places respectively
+// This function can return a nil time.Duration indicating that there are not yet enough
+// samples to calculate an accurate ETA.
+//
+// The first sample should be at 0% progress to establish a baseline
+func (t *EtaTracker) AddSample(completed uint64, target uint64, timestamp time.Time) (*time.Duration, float64) {
+	sample := sample{
+		completed: completed,
+		timestamp: timestamp,
+	}
+	// save the oldest sample; this will not be used if we don't have enough samples
+	maxSamples := len(t.samples)
+	t.samples[t.samplePosition] = sample
+	t.samplePosition = (t.samplePosition + 1) % uint8(maxSamples)
+	t.totalSamples++
+
+	// If we don't have enough samples, return nil
+	if t.totalSamples < uint64(maxSamples) {
+		return nil, 0.0
+	}
+
+	oldestSample := t.samples[t.samplePosition]
+
+	// Calculate the time and progress since the oldest sample
+	timeSinceOldest := sample.timestamp.Sub(oldestSample.timestamp)
+	progressSinceOldest := sample.completed - oldestSample.completed
+
+	// Check if target is already completed or exceeded
+	if sample.completed >= target {
+		zeroDuration := time.Duration(0)
+		return &zeroDuration, 100
+	}
+
+	if timeSinceOldest <= 0 {
+		return nil, 0.0
+	}
+	rate := float64(progressSinceOldest) / float64(timeSinceOldest)
+	if rate == 0 {
+		return nil, 0.0
+	}
+
+	remainingWork := target - sample.completed
+
+	actualPercentComplete := float64(sample.completed) / float64(target)
+	// scale to 0.00 to 100.00
+	roundedScaledPercentComplete := math.Round(actualPercentComplete*10000) / 100
+
+	duration := float64(remainingWork) / rate
+	adjustment := t.slowdownFactor - (t.slowdownFactor-1.0)*actualPercentComplete
+
+	adjustedDuration := duration * adjustment
+	eta := time.Duration(adjustedDuration)
+	roundedEta := eta.Round(time.Second)
+	return &roundedEta, roundedScaledPercentComplete
+}
+
+// EstimateETA calculates ETA from start time and current progress.
+//
+// Deprecated: use EtaTracker instead
 func EstimateETA(startTime time.Time, progress, end uint64) time.Duration {
 	timeSpent := time.Since(startTime)
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package fee
@@ -136,11 +136,7 @@ func TestOutputComplexity(t *testing.T) {
 		{
 			name: "any can spend",
 			out: &avax.TransferableOutput{
-				Out: &secp256k1fx.TransferOutput{
-					OutputOwners: secp256k1fx.OutputOwners{
-						Addrs: make([]ids.ShortID, 0),
-					},
-				},
+				Out: &secp256k1fx.TransferOutput{},
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 60,
@@ -236,15 +232,9 @@ func TestInputComplexity(t *testing.T) {
 		{
 			name: "any can spend",
 			in: &avax.TransferableInput{
-				In: &secp256k1fx.TransferInput{
-					Input: secp256k1fx.Input{
-						SigIndices: make([]uint32, 0),
-					},
-				},
+				In: &secp256k1fx.TransferInput{},
 			},
-			cred: &secp256k1fx.Credential{
-				Sigs: make([][secp256k1.SignatureLen]byte, 0),
-			},
+			cred: &secp256k1fx.Credential{},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 92,
 				gas.DBRead:    1,
@@ -433,10 +423,8 @@ func TestOwnerComplexity(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name: "any can spend",
-			owner: &secp256k1fx.OutputOwners{
-				Addrs: make([]ids.ShortID, 0),
-			},
+			name:  "any can spend",
+			owner: &secp256k1fx.OutputOwners{},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 16,
 			},
@@ -500,12 +488,8 @@ func TestAuthComplexity(t *testing.T) {
 	}{
 		{
 			name: "any can spend",
-			auth: &secp256k1fx.Input{
-				SigIndices: make([]uint32, 0),
-			},
-			cred: &secp256k1fx.Credential{
-				Sigs: make([][secp256k1.SignatureLen]byte, 0),
-			},
+			auth: &secp256k1fx.Input{},
+			cred: &secp256k1fx.Credential{},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 8,
 			},

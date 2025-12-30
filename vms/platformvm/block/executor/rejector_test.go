@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -120,7 +121,13 @@ func TestRejectBlock(t *testing.T) {
 			blk, err := tt.newBlockFunc()
 			require.NoError(err)
 
-			mempool, err := mempool.New("", prometheus.NewRegistry())
+			mempool, err := mempool.New(
+				"",
+				gas.Dimensions{},
+				1_000_000,
+				ids.ID{},
+				prometheus.NewRegistry(),
+			)
 			require.NoError(err)
 			state := state.NewMockState(ctrl)
 			blkIDToState := map[ids.ID]*blockState{

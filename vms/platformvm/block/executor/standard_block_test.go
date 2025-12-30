@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -72,7 +71,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	)
 	require.NoError(err)
 	blk := env.blkManager.NewBlock(apricotChildBlk)
-	err = blk.Verify(context.Background())
+	err = blk.Verify(t.Context())
 	require.ErrorIs(err, errIncorrectBlockHeight)
 
 	// valid height
@@ -83,7 +82,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	)
 	require.NoError(err)
 	blk = env.blkManager.NewBlock(apricotChildBlk)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 }
 
 func TestBanffStandardBlockTimeVerification(t *testing.T) {
@@ -182,7 +181,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, errApricotBlockIssuedAfterFork)
 	}
 
@@ -197,7 +196,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, errIncorrectBlockHeight)
 	}
 
@@ -212,7 +211,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, executor.ErrChildBlockEarlierThanParent)
 	}
 
@@ -228,7 +227,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, executor.ErrChildBlockBeyondSyncBound)
 		env.clk.Set(initClkTime)
 	}
@@ -244,7 +243,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, executor.ErrChildBlockAfterStakerChangeTime)
 	}
 
@@ -259,7 +258,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, ErrStandardBlockWithoutChanges)
 	}
 
@@ -274,7 +273,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		require.NoError(block.Verify(context.Background()))
+		require.NoError(block.Verify(t.Context()))
 	}
 
 	{
@@ -288,7 +287,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		require.NoError(block.Verify(context.Background()))
+		require.NoError(block.Verify(t.Context()))
 	}
 }
 
@@ -327,7 +326,7 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	block := env.blkManager.NewBlock(statelessStandardBlock)
 
 	// update staker set
-	require.NoError(block.Verify(context.Background()))
+	require.NoError(block.Verify(t.Context()))
 
 	// tests
 	blkStateMap := env.blkManager.(*manager).blkIDToState
@@ -341,7 +340,7 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Test VM validators
-	require.NoError(block.Accept(context.Background()))
+	require.NoError(block.Accept(t.Context()))
 	_, ok := env.config.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
 	require.True(ok)
 }
@@ -561,8 +560,8 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 				require.NoError(err)
 
 				// update staker set
-				require.NoError(block.Verify(context.Background()))
-				require.NoError(block.Accept(context.Background()))
+				require.NoError(block.Verify(t.Context()))
+				require.NoError(block.Accept(t.Context()))
 			}
 
 			for stakerNodeID, status := range test.expectedStakers {
@@ -683,7 +682,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	block := env.blkManager.NewBlock(statelessStandardBlock)
 
 	// update staker set
-	require.NoError(block.Verify(context.Background()))
+	require.NoError(block.Verify(t.Context()))
 
 	blkStateMap := env.blkManager.(*manager).blkIDToState
 	updatedState := blkStateMap[block.ID()].onAcceptState
@@ -691,7 +690,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Check VM Validators are removed successfully
-	require.NoError(block.Accept(context.Background()))
+	require.NoError(block.Accept(t.Context()))
 	_, ok := env.config.Validators.GetValidator(subnetID, subnetVdr2NodeID)
 	require.False(ok)
 	_, ok = env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
@@ -757,8 +756,8 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			block := env.blkManager.NewBlock(statelessStandardBlock)
 
 			// update staker set
-			require.NoError(block.Verify(context.Background()))
-			require.NoError(block.Accept(context.Background()))
+			require.NoError(block.Verify(t.Context()))
+			require.NoError(block.Accept(t.Context()))
 			_, ok := env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
 			require.True(ok)
 		})
@@ -797,8 +796,8 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 	blk := env.blkManager.NewBlock(statelessStandardBlock)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Accept(t.Context()))
 	require.NoError(env.state.Commit())
 
 	// Test validator weight before delegation
@@ -848,8 +847,8 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 	blk = env.blkManager.NewBlock(statelessStandardBlock)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Accept(t.Context()))
 	require.NoError(env.state.Commit())
 
 	// Test validator weight after delegation

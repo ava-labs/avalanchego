@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -243,7 +243,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		return err
 	}
 
-	v.Mempool.Remove(b.Tx)
+	v.Mempool.RemoveConflicts(b.Tx.InputIDs())
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
@@ -432,7 +432,7 @@ func (v *verifier) proposalBlock(
 	onCommitState.AddTx(tx, status.Committed)
 	onAbortState.AddTx(tx, status.Aborted)
 
-	v.Mempool.Remove(tx)
+	v.Mempool.RemoveConflicts(tx.InputIDs())
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
@@ -490,7 +490,9 @@ func (v *verifier) standardBlock(
 		return ErrStandardBlockWithoutChanges
 	}
 
-	v.Mempool.Remove(txs...)
+	for _, tx := range txs {
+		v.Mempool.RemoveConflicts(tx.InputIDs())
+	}
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{

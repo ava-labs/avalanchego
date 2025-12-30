@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package acp118
@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -49,7 +50,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 		ctx            context.Context
 		msg            *warp.Message
 		signature      warp.BitSetSignature
-		validators     []*warp.Validator
+		validators     []*validators.Warp
 		quorumNum      uint64
 		quorumDen      uint64
 		wantTotalStake int
@@ -61,7 +62,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer0, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -75,7 +76,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -91,7 +92,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -105,7 +106,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -122,7 +123,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -136,7 +137,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -155,7 +156,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID1: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer1, logging.NoLog{}),
 				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -169,7 +170,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -198,7 +199,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID1: NewHandler(&testVerifier{}, signer1, logging.NoLog{}),
 				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -212,7 +213,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -241,7 +242,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID1: NewHandler(&testVerifier{}, signer1, logging.NoLog{}),
 				nodeID2: NewHandler(&testVerifier{}, signer2, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -255,7 +256,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -284,7 +285,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID1: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer1, logging.NoLog{}),
 				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -298,7 +299,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -327,7 +328,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID1: NewHandler(&testVerifier{}, signer1, logging.NoLog{}),
 				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -341,7 +342,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -370,7 +371,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID1: NewHandler(&testVerifier{}, signer1, logging.NoLog{}),
 				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -384,7 +385,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -413,7 +414,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID1: NewHandler(&testVerifier{}, signer1, logging.NoLog{}),
 				nodeID2: NewHandler(&testVerifier{}, signer1, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -427,7 +428,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk1,
 					Weight:    1,
@@ -446,7 +447,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID1: NewHandler(&testVerifier{}, signer1, logging.NoLog{}),
 				nodeID2: NewHandler(&testVerifier{}, signer1, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -460,7 +461,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -483,7 +484,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID0: p2p.NoOpHandler{},
 			},
 			ctx: func() context.Context {
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithCancel(t.Context())
 				cancel()
 
 				return ctx
@@ -501,7 +502,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -520,7 +521,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: p2p.NoOpHandler{},
 			},
 			ctx: func() context.Context {
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithCancel(t.Context())
 				cancel()
 
 				return ctx
@@ -538,7 +539,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -566,7 +567,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID1: NewHandler(&testVerifier{}, signer1, logging.NoLog{}),
 				nodeID2: NewHandler(&testVerifier{}, signer2, logging.NoLog{}),
 			},
-			ctx: context.Background(),
+			ctx: t.Context(),
 			msg: func() *warp.Message {
 				unsignedMsg, err := warp.NewUnsignedMessage(
 					networkID,
@@ -589,7 +590,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       sig,
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -619,7 +620,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 
 			client := p2ptest.NewClientWithPeers(
 				t,
-				context.Background(),
+				t.Context(),
 				ids.EmptyNodeID,
 				p2p.NoOpHandler{},
 				tt.peers,
@@ -644,8 +645,10 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			bitSet := set.BitsFromBytes(gotSignature.Signers)
 			require.Equal(tt.wantSigners, bitSet.Len())
 
-			pks := make([]*bls.PublicKey, 0)
-			wantAggregatedStake := uint64(0)
+			var (
+				pks                 []*bls.PublicKey
+				wantAggregatedStake uint64
+			)
 			for i := 0; i < bitSet.BitLen(); i++ {
 				if !bitSet.Contains(i) {
 					continue

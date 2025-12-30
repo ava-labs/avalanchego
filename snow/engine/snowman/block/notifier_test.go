@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -39,7 +38,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		{
 			name: "StateSyncEnabled",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.StateSyncEnabled(context.Background())
+				_, err := n.StateSyncEnabled(t.Context())
 				require.NoError(t, err)
 			},
 			vm: fullVM,
@@ -47,7 +46,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		{
 			name: "GetOngoingSyncStateSummary",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.GetOngoingSyncStateSummary(context.Background())
+				_, err := n.GetOngoingSyncStateSummary(t.Context())
 				require.NoError(t, err)
 			},
 			vm: fullVM,
@@ -55,7 +54,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		{
 			name: "GetLastStateSummary",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.GetLastStateSummary(context.Background())
+				_, err := n.GetLastStateSummary(t.Context())
 				require.NoError(t, err)
 			},
 			vm: fullVM,
@@ -63,7 +62,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		{
 			name: "ParseStateSummary",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.ParseStateSummary(context.Background(), []byte{})
+				_, err := n.ParseStateSummary(t.Context(), []byte{})
 				require.NoError(t, err)
 			},
 			vm: fullVM,
@@ -71,7 +70,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		{
 			name: "GetStateSummary",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.GetStateSummary(context.Background(), 0)
+				_, err := n.GetStateSummary(t.Context(), 0)
 				require.NoError(t, err)
 			},
 			vm: fullVM,
@@ -79,7 +78,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		{
 			name: "StateSyncEnabled-not-implemented",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				ok, err := n.StateSyncEnabled(context.Background())
+				ok, err := n.StateSyncEnabled(t.Context())
 				require.NoError(t, err)
 				require.False(t, ok, "expected StateSyncEnabled to return false")
 			},
@@ -88,7 +87,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		{
 			name: "GetOngoingSyncStateSummary-not-implemented",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.GetOngoingSyncStateSummary(context.Background())
+				_, err := n.GetOngoingSyncStateSummary(t.Context())
 				require.ErrorIs(t, err, block.ErrStateSyncableVMNotImplemented)
 			},
 			vm: vm,
@@ -96,21 +95,21 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		{
 			name: "GetLastStateSummary-not-implemented",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.GetLastStateSummary(context.Background())
+				_, err := n.GetLastStateSummary(t.Context())
 				require.ErrorIs(t, err, block.ErrStateSyncableVMNotImplemented)
 			},
 		},
 		{
 			name: "ParseStateSummary-not-implemented",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.ParseStateSummary(context.Background(), []byte{})
+				_, err := n.ParseStateSummary(t.Context(), []byte{})
 				require.ErrorIs(t, err, block.ErrStateSyncableVMNotImplemented)
 			},
 		},
 		{
 			name: "GetStateSummary-not-implemented",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.GetStateSummary(context.Background(), 0)
+				_, err := n.GetStateSummary(t.Context(), 0)
 				require.ErrorIs(t, err, block.ErrStateSyncableVMNotImplemented)
 			},
 		},
@@ -140,7 +139,7 @@ func TestChangeNotifierBatchedChainVM(t *testing.T) {
 		{
 			name: "BatchedParseBlock",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.BatchedParseBlock(context.Background(), [][]byte{})
+				_, err := n.BatchedParseBlock(t.Context(), [][]byte{})
 				require.NoError(t, err)
 			},
 			vm: fullVM,
@@ -148,7 +147,7 @@ func TestChangeNotifierBatchedChainVM(t *testing.T) {
 		{
 			name: "GetAncestors",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.GetAncestors(context.Background(), ids.Empty, 0, 0, 0)
+				_, err := n.GetAncestors(t.Context(), ids.Empty, 0, 0, 0)
 				require.NoError(t, err)
 			},
 			vm: fullVM,
@@ -156,7 +155,7 @@ func TestChangeNotifierBatchedChainVM(t *testing.T) {
 		{
 			name: "BatchedParseBlock-not-implemented",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.BatchedParseBlock(context.Background(), [][]byte{})
+				_, err := n.BatchedParseBlock(t.Context(), [][]byte{})
 				require.ErrorIs(t, err, block.ErrRemoteVMNotImplemented)
 			},
 			vm: vm,
@@ -164,7 +163,7 @@ func TestChangeNotifierBatchedChainVM(t *testing.T) {
 		{
 			name: "GetAncestors-not-implemented",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.GetAncestors(context.Background(), ids.Empty, 0, 0, 0)
+				_, err := n.GetAncestors(t.Context(), ids.Empty, 0, 0, 0)
 				require.ErrorIs(t, err, block.ErrRemoteVMNotImplemented)
 			},
 			vm: vm,
@@ -194,19 +193,19 @@ func TestChangeNotifierNormal(t *testing.T) {
 		{
 			name: "SetPreference",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				require.NoError(t, n.SetPreference(context.Background(), ids.Empty))
+				require.NoError(t, n.SetPreference(t.Context(), ids.Empty))
 			},
 		},
 		{
 			name: "SetState",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				require.NoError(t, n.SetState(context.Background(), snow.NormalOp))
+				require.NoError(t, n.SetState(t.Context(), snow.NormalOp))
 			},
 		},
 		{
 			name: "BuildBlock",
 			f: func(t *testing.T, n *block.ChangeNotifier) {
-				_, err := n.BuildBlock(context.Background())
+				_, err := n.BuildBlock(t.Context())
 				require.NoError(t, err)
 			},
 		},
@@ -240,22 +239,22 @@ func TestChangeNotifierSetPreference(t *testing.T) {
 	}
 
 	// First time SetPreference is called, it should invoke OnChange
-	require.NoError(t, nf.SetPreference(context.Background(), ids.Empty), "expected SetPreference to succeed")
+	require.NoError(t, nf.SetPreference(t.Context(), ids.Empty), "expected SetPreference to succeed")
 	require.True(t, invoked, "expected to have been invoked on first SetPreference call")
 
 	invoked = false
 	// Second time SetPreference is called with the same block ID, it should not invoke OnChange
-	require.NoError(t, nf.SetPreference(context.Background(), ids.Empty), "expected SetPreference to succeed on second call with same block ID")
+	require.NoError(t, nf.SetPreference(t.Context(), ids.Empty), "expected SetPreference to succeed on second call with same block ID")
 	require.False(t, invoked, "expected not to have been invoked on second SetPreference call with same block ID")
 
 	invoked = false
 	// Third time SetPreference is called with a different block ID, it should invoke OnChange again
 	testID := ids.GenerateTestID()
-	require.NoError(t, nf.SetPreference(context.Background(), testID), "expected SetPreference to succeed on third call with different block ID")
+	require.NoError(t, nf.SetPreference(t.Context(), testID), "expected SetPreference to succeed on third call with different block ID")
 	require.True(t, invoked, "expected to have been invoked on third SetPreference call with different block ID")
 
 	invoked = false
 	// Fourth time SetPreference is called with the same block ID, it should not invoke OnChange
-	require.NoError(t, nf.SetPreference(context.Background(), testID), "expected SetPreference to succeed on fourth call with same block ID")
+	require.NoError(t, nf.SetPreference(t.Context(), testID), "expected SetPreference to succeed on fourth call with same block ID")
 	require.False(t, invoked, "expected not to have been invoked on fourth SetPreference call with same block ID")
 }

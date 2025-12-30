@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -24,6 +24,7 @@ func init() {
 	err := errors.Join(
 		lc.RegisterType(&statelessBlock{}),
 		lc.RegisterType(&option{}),
+		lc.RegisterType(&statelessGraniteBlock{}),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {

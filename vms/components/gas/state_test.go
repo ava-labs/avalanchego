@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gas
@@ -12,13 +12,13 @@ import (
 
 func Test_State_AdvanceTime(t *testing.T) {
 	tests := []struct {
-		name            string
-		initial         State
-		maxCapacity     Gas
-		maxPerSecond    Gas
-		targetPerSecond Gas
-		duration        uint64
-		expected        State
+		name         string
+		initial      State
+		maxCapacity  Gas
+		capacityRate Gas
+		targetRate   Gas
+		duration     uint64
+		expected     State
 	}{
 		{
 			name: "cap capacity",
@@ -26,10 +26,10 @@ func Test_State_AdvanceTime(t *testing.T) {
 				Capacity: 10,
 				Excess:   0,
 			},
-			maxCapacity:     20,
-			maxPerSecond:    10,
-			targetPerSecond: 0,
-			duration:        2,
+			maxCapacity:  20,
+			capacityRate: 10,
+			targetRate:   0,
+			duration:     2,
 			expected: State{
 				Capacity: 20,
 				Excess:   0,
@@ -41,10 +41,10 @@ func Test_State_AdvanceTime(t *testing.T) {
 				Capacity: 10,
 				Excess:   0,
 			},
-			maxCapacity:     30,
-			maxPerSecond:    10,
-			targetPerSecond: 0,
-			duration:        1,
+			maxCapacity:  30,
+			capacityRate: 10,
+			targetRate:   0,
+			duration:     1,
 			expected: State{
 				Capacity: 20,
 				Excess:   0,
@@ -56,10 +56,10 @@ func Test_State_AdvanceTime(t *testing.T) {
 				Capacity: 10,
 				Excess:   10,
 			},
-			maxCapacity:     20,
-			maxPerSecond:    10,
-			targetPerSecond: 10,
-			duration:        2,
+			maxCapacity:  20,
+			capacityRate: 10,
+			targetRate:   10,
+			duration:     2,
 			expected: State{
 				Capacity: 20,
 				Excess:   0,
@@ -71,10 +71,10 @@ func Test_State_AdvanceTime(t *testing.T) {
 				Capacity: 10,
 				Excess:   10,
 			},
-			maxCapacity:     20,
-			maxPerSecond:    10,
-			targetPerSecond: 5,
-			duration:        1,
+			maxCapacity:  20,
+			capacityRate: 10,
+			targetRate:   5,
+			duration:     1,
 			expected: State{
 				Capacity: 20,
 				Excess:   5,
@@ -83,7 +83,7 @@ func Test_State_AdvanceTime(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := test.initial.AdvanceTime(test.maxCapacity, test.maxPerSecond, test.targetPerSecond, test.duration)
+			actual := test.initial.AdvanceTime(test.maxCapacity, test.capacityRate, test.targetRate, test.duration)
 			require.Equal(t, test.expected, actual)
 		})
 	}

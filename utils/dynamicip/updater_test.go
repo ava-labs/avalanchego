@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dynamicip
@@ -79,7 +79,7 @@ func TestNewUpdater(t *testing.T) {
 	// Make sure stopChan and doneChan are closed when stop is called
 	updater.Stop()
 
-	ctx, cancel := context.WithTimeout(context.Background(), stopTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), stopTimeout)
 	defer cancel()
 	select {
 	case <-updater.rootCtx.Done():

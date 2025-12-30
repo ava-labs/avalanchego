@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -119,6 +119,15 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 				{
 					time: currentWindowStartTime.Add(10 * period),
 				},
+			},
+		},
+		{
+			name:  "throttled requests are counted as hits",
+			limit: 1,
+			calls: []call{
+				{time: currentWindowStartTime},
+				{time: currentWindowStartTime.Add(period).Add(time.Second), throttled: true},
+				{time: currentWindowStartTime.Add(2 * period).Add(time.Second), throttled: true},
 			},
 		},
 	}

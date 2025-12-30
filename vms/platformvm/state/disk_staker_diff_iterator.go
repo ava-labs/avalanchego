@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -28,18 +28,28 @@ var (
 	errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
 )
 
-// marshalStartDiffKey is used to determine the starting key when iterating.
+// marshalStartDiffKeyBySubnetID is used to determine the starting key when iterating.
 //
-// Invariant: the result is a prefix of [marshalDiffKey] when called with the
+// Invariant: the result is a prefix of [marshalDiffKeyBySubnetID] when called with the
 // same arguments.
-func marshalStartDiffKey(subnetID ids.ID, height uint64) []byte {
+func marshalStartDiffKeyBySubnetID(subnetID ids.ID, height uint64) []byte {
 	key := make([]byte, startDiffKeyLength)
 	copy(key, subnetID[:])
 	packIterableHeight(key[ids.IDLen:], height)
 	return key
 }
 
-func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
+// marshalStartDiffKeyByHeight is used to determine the starting key when iterating.
+//
+// Invariant: the result is a prefix of [marshalDiffKeyByHeight] when called with the
+// same arguments.
+func marshalStartDiffKeyByHeight(height uint64) []byte {
+	key := make([]byte, database.Uint64Size)
+	packIterableHeight(key, height)
+	return key
+}
+
+func marshalDiffKeyBySubnetID(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 	key := make([]byte, diffKeyLength)
 	copy(key, subnetID[:])
 	packIterableHeight(key[ids.IDLen:], height)
@@ -47,7 +57,15 @@ func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 	return key
 }
 
-func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
+func marshalDiffKeyByHeight(height uint64, subnetID ids.ID, nodeID ids.NodeID) []byte {
+	key := make([]byte, diffKeyLength)
+	packIterableHeight(key, height)
+	copy(key[database.Uint64Size:], subnetID[:])
+	copy(key[diffKeyNodeIDOffset:], nodeID.Bytes())
+	return key
+}
+
+func unmarshalDiffKeyBySubnetID(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	if len(key) != diffKeyLength {
 		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedDiffKeyLength
 	}
@@ -59,6 +77,20 @@ func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	height := unpackIterableHeight(key[ids.IDLen:])
 	copy(nodeID[:], key[diffKeyNodeIDOffset:])
 	return subnetID, height, nodeID, nil
+}
+
+func unmarshalDiffKeyByHeight(key []byte) (uint64, ids.ID, ids.NodeID, error) {
+	if len(key) != diffKeyLength {
+		return 0, ids.Empty, ids.EmptyNodeID, errUnexpectedDiffKeyLength
+	}
+	var (
+		subnetID ids.ID
+		nodeID   ids.NodeID
+	)
+	height := unpackIterableHeight(key)
+	copy(subnetID[:], key[database.Uint64Size:])
+	copy(nodeID[:], key[diffKeyNodeIDOffset:])
+	return height, subnetID, nodeID, nil
 }
 
 func marshalWeightDiff(diff *ValidatorWeightDiff) []byte {

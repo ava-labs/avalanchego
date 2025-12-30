@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -124,7 +124,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	require.NoError(err)
 
 	require.NoError(vm.Initialize(
-		context.Background(),
+		tb.Context(),
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
@@ -156,22 +156,23 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		txBuilder:    txstest.New(vm.parser.Codec(), vm.ctx, &vm.Config, vm.feeAssetID, vm.state),
 	}
 
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(tb.Context(), snow.Bootstrapping))
 	if c.notLinearized {
 		return env
 	}
 
-	require.NoError(vm.Linearize(context.Background(), stopVertexID))
+	require.NoError(vm.Linearize(tb.Context(), stopVertexID))
 	if c.notBootstrapped {
 		return env
 	}
 
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(tb.Context(), snow.NormalOp))
 
 	tb.Cleanup(func() {
 		env.vm.ctx.Lock.Lock()
 		defer env.vm.ctx.Lock.Unlock()
 
+		//nolint:usetesting // t.Context() is already canceled inside the cleanup function
 		require.NoError(env.vm.Shutdown(context.Background()))
 	})
 

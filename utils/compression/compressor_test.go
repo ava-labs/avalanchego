@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package compression
@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/DataDog/zstd"
 	"github.com/stretchr/testify/require"
 
 	_ "embed"
@@ -147,6 +148,19 @@ func TestNewCompressorWithInvalidLimit(t *testing.T) {
 			require.ErrorIs(t, err, ErrInvalidMaxSizeCompressor)
 		})
 	}
+}
+
+func TestNewZstdCompressorWithLevel(t *testing.T) {
+	compressor, err := NewZstdCompressorWithLevel(maxMessageSize, zstd.BestSpeed)
+	require.NoError(t, err)
+
+	data := utils.RandomBytes(4096)
+	compressed, err := compressor.Compress(data)
+	require.NoError(t, err)
+
+	decompressed, err := compressor.Decompress(compressed)
+	require.NoError(t, err)
+	require.Equal(t, data, decompressed)
 }
 
 func FuzzZstdCompressor(f *testing.F) {

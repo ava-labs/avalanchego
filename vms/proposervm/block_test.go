@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -26,11 +26,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
+
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
@@ -48,6 +50,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		parentTimestamp        = time.Now().Truncate(time.Second)
 		parentHeight    uint64 = 1234
 		blkID                  = ids.GenerateTestID()
+		parentEpoch            = statelessblock.Epoch{}
 	)
 
 	innerBlk := snowmanmock.NewBlock(ctrl)
@@ -66,7 +69,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	}).Return(builtBlk, nil).AnyTimes()
 
 	vdrState := validatorsmock.NewState(ctrl)
-	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
+	vdrState.EXPECT().GetMinimumHeight(t.Context()).Return(pChainHeight, nil).AnyTimes()
 
 	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
@@ -97,10 +100,11 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 
 	// Should call BuildBlockWithContext since proposervm is activated
 	gotChild, err := blk.buildChild(
-		context.Background(),
+		t.Context(),
 		parentID,
 		parentTimestamp,
-		pChainHeight-1,
+		pChainHeight,
+		parentEpoch,
 	)
 	require.NoError(err)
 	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
@@ -108,13 +112,9 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 
 func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -238,13 +238,9 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 
 func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -367,6 +363,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 		parentPChainHeght        = pChainHeight - 1
 		parentID                 = ids.GenerateTestID()
 		parentTimestamp          = time.Now().Truncate(time.Second)
+		parentEpoch              = statelessblock.Epoch{}
 	)
 
 	innerParentBlock := snowmantest.Genesis
@@ -379,7 +376,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	}).Return(innerChildBlock, nil).AnyTimes()
 
 	vdrState := validatorsmock.NewState(ctrl)
-	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
+	vdrState.EXPECT().GetMinimumHeight(t.Context()).Return(pChainHeight, nil).AnyTimes()
 
 	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
@@ -407,11 +404,160 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 
 	// Should call BuildBlockWithContext since proposervm is activated
 	gotChild, err := blk.buildChild(
-		context.Background(),
+		t.Context(),
 		parentID,
 		parentTimestamp,
 		parentPChainHeght,
+		parentEpoch,
 	)
 	require.NoError(err)
 	require.Equal(innerChildBlock, gotChild.(*postForkBlock).innerBlk)
+}
+
+// Confirm that VM rejects blocks with non-zero epoch prior to granite upgrade activation
+func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
+	require := require.New(t)
+
+	_, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(t.Context()))
+	}()
+
+	innerBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	slb, err := statelessblock.Build(
+		proVM.preferred,
+		proVM.Time(),
+		100, // pChainHeight,
+		statelessblock.Epoch{
+			PChainHeight: 1,
+			Number:       1,
+			StartTime:    1,
+		},
+		proVM.StakingCertLeaf,
+		innerBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.StakingLeafSigner,
+	)
+	require.NoError(err)
+	proBlk := postForkBlock{
+		SignedBlock: slb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: innerBlk,
+		},
+	}
+	err = proBlk.Verify(t.Context())
+	require.ErrorIs(err, errEpochNotZero)
+}
+
+// Verify that post-fork blocks are validated to contain the correct epoch
+// information.
+func TestPostGraniteBlock_EpochMatches(t *testing.T) {
+	ctx := t.Context()
+
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	defer func() {
+		require.NoError(t, proVM.Shutdown(ctx))
+	}()
+
+	coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	coreChildBlk := snowmantest.BuildChild(coreParentBlk)
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) { // needed when setting preference
+		switch {
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
+		case bytes.Equal(b, coreParentBlk.Bytes()):
+			return coreParentBlk, nil
+		case bytes.Equal(b, coreChildBlk.Bytes()):
+			return coreChildBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreParentBlk, nil
+	}
+
+	// Build the first proposervm block so that verification is on top of a
+	// post-fork block.
+	parentTime := upgrade.InitiallyActiveTime.Add(24 * time.Hour) // Some arbitrary time after initial activations
+	proVM.Set(parentTime)
+
+	parentBlk, err := proVM.BuildBlock(ctx)
+	require.NoError(t, err)
+	require.NoError(t, parentBlk.Verify(ctx))
+	require.NoError(t, proVM.SetPreference(ctx, parentBlk.ID()))
+	require.NoError(t, proVM.waitForProposerWindow())
+
+	tests := []struct {
+		name    string
+		epoch   statelessblock.Epoch
+		wantErr error
+	}{
+		{
+			name: "valid",
+			epoch: statelessblock.Epoch{
+				PChainHeight: 0,
+				Number:       1,
+				StartTime:    parentBlk.Timestamp().Unix(),
+			},
+			wantErr: nil,
+		},
+		{
+			name:    "missing_epoch",
+			epoch:   statelessblock.Epoch{},
+			wantErr: errEpochMismatch,
+		},
+		{
+			name: "wrong_p_chain_height",
+			epoch: statelessblock.Epoch{
+				PChainHeight: 1,
+				Number:       1,
+				StartTime:    parentBlk.Timestamp().Unix(),
+			},
+			wantErr: errEpochMismatch,
+		},
+		{
+			name: "wrong_number",
+			epoch: statelessblock.Epoch{
+				PChainHeight: 0,
+				Number:       2,
+				StartTime:    parentBlk.Timestamp().Unix(),
+			},
+			wantErr: errEpochMismatch,
+		},
+		{
+			name: "wrong_start_time",
+			epoch: statelessblock.Epoch{
+				PChainHeight: 0,
+				Number:       1,
+				StartTime:    parentBlk.Timestamp().Unix() + 1,
+			},
+			wantErr: errEpochMismatch,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			statelessBlock, err := statelessblock.Build(
+				parentBlk.ID(),
+				proVM.Time(),
+				defaultPChainHeight,
+				test.epoch,
+				proVM.StakingCertLeaf,
+				coreChildBlk.Bytes(),
+				proVM.ctx.ChainID,
+				proVM.StakingLeafSigner,
+			)
+			require.NoError(err)
+
+			blockBytes := statelessBlock.Bytes()
+			block, err := proVM.ParseBlock(ctx, blockBytes)
+			require.NoError(err)
+
+			err = block.Verify(ctx)
+			require.ErrorIs(err, test.wantErr)
+		})
+	}
 }

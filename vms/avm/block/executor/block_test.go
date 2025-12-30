@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -577,7 +576,7 @@ func TestBlockVerify(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			b := tt.blockFunc(ctrl)
-			err := b.Verify(context.Background())
+			err := b.Verify(t.Context())
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.postVerify != nil {
 				tt.postVerify(require, b)
@@ -784,7 +783,7 @@ func TestBlockAccept(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			b := tt.blockFunc(ctrl)
-			err := b.Accept(context.Background())
+			err := b.Accept(t.Context())
 			require.ErrorIs(err, tt.expectedErr)
 			if err == nil {
 				// Make sure block is removed from cache
@@ -930,7 +929,7 @@ func TestBlockReject(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			b := tt.blockFunc(ctrl)
-			require.NoError(b.Reject(context.Background()))
+			require.NoError(b.Reject(t.Context()))
 			_, ok := b.manager.blkIDToState[b.ID()]
 			require.False(ok)
 		})

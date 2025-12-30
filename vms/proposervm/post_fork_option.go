@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -81,10 +81,16 @@ func (b *postForkOption) verifyPostForkChild(ctx context.Context, child *postFor
 	if err != nil {
 		return err
 	}
+	parentEpoch, err := b.pChainEpoch(ctx)
+	if err != nil {
+		return err
+	}
+
 	return b.postForkCommonComponents.Verify(
 		ctx,
 		parentTimestamp,
 		parentPChainHeight,
+		parentEpoch,
 		child,
 	)
 }
@@ -105,11 +111,22 @@ func (b *postForkOption) buildChild(ctx context.Context) (Block, error) {
 		)
 		return nil, err
 	}
+	parentEpoch, err := b.pChainEpoch(ctx)
+	if err != nil {
+		b.vm.ctx.Log.Error("unexpected build block failure",
+			zap.String("reason", "failed to fetch parent's epoch"),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
 	return b.postForkCommonComponents.buildChild(
 		ctx,
 		parentID,
 		b.Timestamp(),
 		parentPChainHeight,
+		parentEpoch,
 	)
 }
 
@@ -120,6 +137,23 @@ func (b *postForkOption) pChainHeight(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 	return parent.pChainHeight(ctx)
+}
+
+func (b *postForkOption) pChainEpoch(ctx context.Context) (block.Epoch, error) {
+	parent, err := b.vm.getBlock(ctx, b.ParentID())
+	if err != nil {
+		return block.Epoch{}, err
+	}
+	return parent.pChainEpoch(ctx)
+}
+
+func (b *postForkOption) selectChildPChainHeight(ctx context.Context) (uint64, error) {
+	pChainHeight, err := b.pChainHeight(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return b.vm.selectChildPChainHeight(ctx, pChainHeight)
 }
 
 func (b *postForkOption) getStatelessBlk() block.Block {

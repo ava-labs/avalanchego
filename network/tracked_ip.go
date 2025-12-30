@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -9,10 +9,6 @@ import (
 	"sync"
 	"time"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 type trackedIP struct {
 	delayLock sync.RWMutex

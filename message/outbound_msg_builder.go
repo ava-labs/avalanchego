@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -27,6 +27,7 @@ type OutboundMsgBuilder interface {
 		major uint32,
 		minor uint32,
 		patch uint32,
+		upgradeTime uint64,
 		ipSigningTime uint64,
 		ipNodeIDSig []byte,
 		ipBLSSig []byte,
@@ -238,6 +239,7 @@ func (b *outMsgBuilder) Handshake(
 	major uint32,
 	minor uint32,
 	patch uint32,
+	upgradeTime uint64,
 	ipSigningTime uint64,
 	ipNodeIDSig []byte,
 	ipBLSSig []byte,
@@ -258,6 +260,7 @@ func (b *outMsgBuilder) Handshake(
 					MyTime:         myTime,
 					IpAddr:         ip.Addr().AsSlice(),
 					IpPort:         uint32(ip.Port()),
+					UpgradeTime:    upgradeTime,
 					IpSigningTime:  ipSigningTime,
 					IpNodeIdSig:    ipNodeIDSig,
 					TrackedSubnets: subnetIDBytes,

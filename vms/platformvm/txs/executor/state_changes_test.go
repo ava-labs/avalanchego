@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -68,8 +68,8 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 				Excess:   10_000,
 			},
 			expectedState: gas.State{
-				Capacity: min(gas.Gas(1).AddPerSecond(feeConfig.MaxPerSecond, secondsToAdvance), feeConfig.MaxCapacity),
-				Excess:   gas.Gas(10_000).SubPerSecond(feeConfig.TargetPerSecond, secondsToAdvance),
+				Capacity: min(gas.Gas(1).AddOverTime(feeConfig.MaxPerSecond, secondsToAdvance), feeConfig.MaxCapacity),
+				Excess:   gas.Gas(10_000).SubOverTime(feeConfig.TargetPerSecond, secondsToAdvance),
 			},
 		},
 	}

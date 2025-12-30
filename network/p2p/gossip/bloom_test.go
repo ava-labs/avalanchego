@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
@@ -99,7 +99,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 			}
 
 			require.Equal(tt.resetCount, resetCount)
-			require.InDelta(float64(tt.resetCount+1), testutil.ToFloat64(bloom.metrics.ResetCount), 0)
+			require.Equal(float64(tt.resetCount+1), testutil.ToFloat64(bloom.metrics.ResetCount))
 			for _, expected := range tt.expected {
 				require.True(bloom.Has(expected))
 			}

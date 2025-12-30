@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrapmonitor
@@ -299,7 +299,7 @@ func TestStateSyncEnabledFromEnvVars(t *testing.T) {
 			chainConfigContent: marshalAndEncode(t,
 				map[string]chains.ChainConfig{
 					"C": {
-						Config: []byte("{\"state-sync-enabled\":1234}"),
+						Config: []byte("{\"state-sync-enabled\":{}}"),
 					},
 				},
 			),

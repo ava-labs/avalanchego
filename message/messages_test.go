@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -377,7 +377,7 @@ func TestMessage(t *testing.T) {
 						RequestId:   1,
 						Deadline:    1,
 						ContainerId: testID[:],
-						EngineType:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+						EngineType:  p2p.EngineType_ENGINE_TYPE_DAG,
 					},
 				},
 			},

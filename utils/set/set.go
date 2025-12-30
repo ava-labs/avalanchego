@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package set
@@ -191,4 +191,18 @@ func (s *Set[T]) Peek() (T, bool) {
 		return elt, true
 	}
 	return utils.Zero[T](), false
+}
+
+// Intersect returns the set intersection of s1 and s2
+func Intersect[T comparable](s1 Set[T], s2 Set[T]) Set[T] {
+	s := Set[T]{}
+	for k := range s1 {
+		if !s2.Contains(k) {
+			continue
+		}
+
+		s.Add(k)
+	}
+
+	return s
 }

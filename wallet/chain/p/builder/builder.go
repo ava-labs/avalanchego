@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -1603,9 +1603,9 @@ func (b *builder) spend(
 		// Initialize the return values with empty slices to preserve backward
 		// compatibility of the json representation of transactions with no
 		// inputs or outputs.
-		inputs:        make([]*avax.TransferableInput, 0),
-		changeOutputs: make([]*avax.TransferableOutput, 0),
-		stakeOutputs:  make([]*avax.TransferableOutput, 0),
+		inputs:        []*avax.TransferableInput{},
+		changeOutputs: []*avax.TransferableOutput{},
+		stakeOutputs:  []*avax.TransferableOutput{},
 	}
 
 	utxosByLocktime := splitByLocktime(utxos, minIssuanceTime)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -36,7 +36,8 @@ func ParseBlocks(blks [][]byte, chainID ids.ID) []ParseResult {
 }
 
 // Parse a block and verify that the signature attached to the block is valid
-// for the certificate provided in the block.
+// for the certificate provided in the block and that the block has a valid
+// representation.
 func Parse(bytes []byte, chainID ids.ID) (Block, error) {
 	block, err := ParseWithoutVerification(bytes)
 	if err != nil {
@@ -46,7 +47,7 @@ func Parse(bytes []byte, chainID ids.ID) (Block, error) {
 }
 
 // ParseWithoutVerification parses a block without verifying that the signature
-// on the block is correct.
+// on the block is correct or has valid representation.
 func ParseWithoutVerification(bytes []byte) (Block, error) {
 	var block Block
 	parsedVersion, err := Codec.Unmarshal(bytes, &block)

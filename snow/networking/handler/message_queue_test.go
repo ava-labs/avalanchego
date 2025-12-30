@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -57,7 +56,7 @@ func TestQueue(t *testing.T) {
 	// Push then pop should work regardless of usage when there are no other
 	// messages on [u.msgs]
 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.1).Times(1)
-	u.Push(context.Background(), msg1)
+	u.Push(t.Context(), msg1)
 	require.Equal(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok := u.Pop()
@@ -67,7 +66,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(msg1, gotMsg1)
 
 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.0).Times(1)
-	u.Push(context.Background(), msg1)
+	u.Push(t.Context(), msg1)
 	require.Equal(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
@@ -77,7 +76,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(msg1, gotMsg1)
 
 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(1.0).Times(1)
-	u.Push(context.Background(), msg1)
+	u.Push(t.Context(), msg1)
 	require.Equal(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
@@ -87,7 +86,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(msg1, gotMsg1)
 
 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.0).Times(1)
-	u.Push(context.Background(), msg1)
+	u.Push(t.Context(), msg1)
 	require.Equal(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
@@ -97,7 +96,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(msg1, gotMsg1)
 
 	// Push msg1 from vdr1ID
-	u.Push(context.Background(), msg1)
+	u.Push(t.Context(), msg1)
 	require.Equal(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.Equal(1, u.Len())
 
@@ -114,7 +113,7 @@ func TestQueue(t *testing.T) {
 	}
 
 	// Push msg2 from vdr2ID
-	u.Push(context.Background(), msg2)
+	u.Push(t.Context(), msg2)
 	require.Equal(2, u.Len())
 	require.Equal(1, u.nodeToUnprocessedMsgs[vdr2ID])
 	// Set vdr1's usage to 99% and vdr2's to .01
@@ -142,9 +141,9 @@ func TestQueue(t *testing.T) {
 		InboundMessage: message.InboundPushQuery(ids.Empty, 0, 0, nil, 0, nonVdrNodeID2),
 		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
-	u.Push(context.Background(), msg3)
-	u.Push(context.Background(), msg4)
-	u.Push(context.Background(), msg1)
+	u.Push(t.Context(), msg3)
+	u.Push(t.Context(), msg4)
+	u.Push(t.Context(), msg1)
 	require.Equal(3, u.Len())
 
 	// msg1 should get popped first because nonVdrNodeID1 and nonVdrNodeID2

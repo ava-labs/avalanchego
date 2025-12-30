@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -21,6 +21,7 @@ func TestParseBlocks(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
+	pChainEpoch := Epoch{}
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
 
@@ -35,6 +36,7 @@ func TestParseBlocks(t *testing.T) {
 		parentID,
 		timestamp,
 		pChainHeight,
+		pChainEpoch,
 		cert,
 		innerBlockBytes,
 		chainID,
@@ -52,14 +54,36 @@ func TestParseBlocks(t *testing.T) {
 		output []ParseResult
 	}{
 		{
-			name:   "ValidThenInvalid",
-			input:  [][]byte{signedBlockBytes, malformedBlockBytes},
-			output: []ParseResult{{Block: &statelessBlock{bytes: signedBlockBytes}}, {Err: wrappers.ErrInsufficientLength}},
+			name:  "ValidThenInvalid",
+			input: [][]byte{signedBlockBytes, malformedBlockBytes},
+			output: []ParseResult{
+				{
+					Block: &statelessBlock{
+						statelessBlockMetadata: statelessBlockMetadata{
+							bytes: signedBlockBytes,
+						},
+					},
+				},
+				{
+					Err: wrappers.ErrInsufficientLength,
+				},
+			},
 		},
 		{
-			name:   "InvalidThenValid",
-			input:  [][]byte{malformedBlockBytes, signedBlockBytes},
-			output: []ParseResult{{Err: wrappers.ErrInsufficientLength}, {Block: &statelessBlock{bytes: signedBlockBytes}}},
+			name:  "InvalidThenValid",
+			input: [][]byte{malformedBlockBytes, signedBlockBytes},
+			output: []ParseResult{
+				{
+					Err: wrappers.ErrInsufficientLength,
+				},
+				{
+					Block: &statelessBlock{
+						statelessBlockMetadata: statelessBlockMetadata{
+							bytes: signedBlockBytes,
+						},
+					},
+				},
+			},
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -81,6 +105,11 @@ func TestParse(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
+	pChainEpoch := Epoch{
+		PChainHeight: pChainHeight,
+		Number:       1,
+		StartTime:    timestamp.Unix(),
+	}
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
 
@@ -95,18 +124,40 @@ func TestParse(t *testing.T) {
 		parentID,
 		timestamp,
 		pChainHeight,
+		pChainEpoch,
 		cert,
 		innerBlockBytes,
 		chainID,
 		key,
 	)
 	require.NoError(t, err)
+	require.IsType(t, &statelessGraniteBlock{}, signedBlock)
 
-	unsignedBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	signedZeroEpochBlock, err := Build(
+		parentID,
+		timestamp,
+		pChainHeight,
+		Epoch{},
+		cert,
+		innerBlockBytes,
+		chainID,
+		key,
+	)
+	require.NoError(t, err)
+	require.IsType(t, &statelessBlock{}, signedZeroEpochBlock)
+
+	unsignedBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, pChainEpoch, innerBlockBytes)
+	require.IsType(t, &statelessGraniteBlock{}, unsignedBlock)
 	require.NoError(t, err)
 
-	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	unsignedZeroEpochBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, Epoch{}, innerBlockBytes)
+	require.IsType(t, &statelessBlock{}, unsignedZeroEpochBlock)
 	require.NoError(t, err)
+
+	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, Epoch{}, innerBlockBytes)
+	require.IsType(t, &statelessBlock{}, signedWithoutCertBlockIntf)
+	require.NoError(t, err)
+
 	signedWithoutCertBlock := signedWithoutCertBlockIntf.(*statelessBlock)
 	signedWithoutCertBlock.Signature = []byte{5}
 
@@ -152,6 +203,18 @@ func TestParse(t *testing.T) {
 			chainID:     chainID,
 			expectedErr: nil,
 		},
+		{
+			name:        "signed zero epoch block",
+			block:       signedZeroEpochBlock,
+			chainID:     chainID,
+			expectedErr: nil,
+		},
+		{
+			name:        "unsigned zero epoch block",
+			block:       unsignedZeroEpochBlock,
+			chainID:     chainID,
+			expectedErr: nil,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -187,6 +250,11 @@ func TestParseBytes(t *testing.T) {
 			name:        "gibberish",
 			hex:         "000102030405",
 			expectedErr: codec.ErrUnknownVersion,
+		},
+		{
+			name:        "granite block with zero epoch",
+			hex:         "0000000000020100000000000000000000000000000000000000000000000000000000000000000000000000007b000000000000000200000114308201103081b7a003020102020100300a06082a8648ce3d04030230003020170d3939313233313030303030305a180f32313235313030313139313935325a30003059301306072a8648ce3d020106082a8648ce3d03010703420004bd57e69df4a1562baa73dea9014e638aac699a9ded79850b348cd69b312c0344d09e2726f4a778ed23a63cd85c416fc2ce697f5a4fc3468d98a481aae8d396aea320301e300e0603551d0f0101ff040403020780300c0603551d130101ff04023000300a06082a8648ce3d0403020348003045022027f6aa68587db06a05e7bafd7b42bad7e98962fca1549c242c53d62721240bb3022100d0a79da9b971a825e0000350f842b941838da20a1338af79e7db5d4176fb51860000000103000000000000000000000000000000000000000000000000000000483046022100fea2be2c93b6c70d08f8c224e93f47b4547c33b19d36c5e8869627c5f47bc610022100a8d81e273a4483a97bdfa5eedcdba66a4e34e04bcf6d49f4e6bc738b650b69fa",
+			expectedErr: errZeroEpoch,
 		},
 	}
 	for _, test := range tests {

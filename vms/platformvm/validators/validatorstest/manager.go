@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validatorstest
@@ -26,6 +26,14 @@ func (manager) GetCurrentHeight(context.Context) (uint64, error) {
 
 func (manager) GetSubnetID(context.Context, ids.ID) (ids.ID, error) {
 	return ids.Empty, nil
+}
+
+func (manager) GetWarpValidatorSets(context.Context, uint64) (map[ids.ID]snowvalidators.WarpSet, error) {
+	return nil, nil
+}
+
+func (manager) GetWarpValidatorSet(context.Context, uint64, ids.ID) (snowvalidators.WarpSet, error) {
+	return snowvalidators.WarpSet{}, nil
 }
 
 func (manager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*snowvalidators.GetValidatorOutput, error) {

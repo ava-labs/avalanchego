@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -515,7 +515,7 @@ func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
 	e.metrics.bootstrapFinished.Set(1)
 
 	e.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.NormalOp,
 	})
 	if err := e.VM.SetState(ctx, snow.NormalOp); err != nil {

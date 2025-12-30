@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -41,6 +41,6 @@ func TestBlockSizeLimit(t *testing.T) {
 	innerBlockBytes := bytes.Repeat([]byte{0}, 270*units.KiB)
 
 	// with the large limit, it should be able to build large blocks
-	_, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	_, err := BuildUnsigned(parentID, timestamp, pChainHeight, Epoch{}, innerBlockBytes)
 	require.NoError(err)
 }

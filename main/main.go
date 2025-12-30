@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
@@ -18,6 +19,8 @@ import (
 )
 
 func main() {
+	evm.RegisterAllLibEVMExtras()
+
 	fs := config.BuildFlagSet()
 	v, err := config.BuildViper(fs, os.Args[1:])
 

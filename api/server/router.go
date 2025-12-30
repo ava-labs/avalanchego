@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package server
@@ -60,7 +60,7 @@ func (r *router) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 
 	// Request specified the routing header key but did not provide a
 	// corresponding value
-	if len(route) != 1 {
+	if len(route) < 1 {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}

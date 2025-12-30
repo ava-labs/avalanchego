@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -22,6 +22,7 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -75,7 +76,7 @@ func StartKindCluster(
 
 	clusterRunning, err := isKindClusterRunning(log, configPath, configContext)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	if clusterRunning {
 		log.Info("local kind cluster already running",
@@ -94,44 +95,44 @@ func StartKindCluster(
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to run kind-with-registry.sh: %w", err)
+			return stacktrace.Errorf("failed to run kind-with-registry.sh: %w", err)
 		}
 	}
 
 	clientset, err := GetClientset(log, configPath, configContext)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	if err := ensureNamespace(ctx, log, clientset, DefaultTmpnetNamespace); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	// Deploy RBAC resources for tmpnet
 	if err := deployRBAC(ctx, log, configPath, configContext, DefaultTmpnetNamespace); err != nil {
-		return fmt.Errorf("failed to deploy tmpnet RBAC: %w", err)
+		return stacktrace.Errorf("failed to deploy tmpnet RBAC: %w", err)
 	}
 
 	// Create service account kubeconfig context to enable checking that RBAC permissions are sufficient
 	rbacContextName := KindKubeconfigContext + "-tmpnet"
 	if err := createServiceAccountKubeconfig(ctx, log, configPath, configContext, DefaultTmpnetNamespace, rbacContextName); err != nil {
-		return fmt.Errorf("failed to create service account kubeconfig context: %w", err)
+		return stacktrace.Errorf("failed to create service account kubeconfig context: %w", err)
 	}
 
 	if err := deployKubeCollectors(ctx, log, configPath, configContext, startMetricsCollector, startLogsCollector); err != nil {
-		return fmt.Errorf("failed to deploy kube collectors: %w", err)
+		return stacktrace.Errorf("failed to deploy kube collectors: %w", err)
 	}
 
 	if err := deployIngressController(ctx, log, configPath, configContext); err != nil {
-		return fmt.Errorf("failed to deploy ingress controller: %w", err)
+		return stacktrace.Errorf("failed to deploy ingress controller: %w", err)
 	}
 
 	if err := createDefaultsConfigMap(ctx, log, configPath, configContext, DefaultTmpnetNamespace); err != nil {
-		return fmt.Errorf("failed to create defaults ConfigMap: %w", err)
+		return stacktrace.Errorf("failed to create defaults ConfigMap: %w", err)
 	}
 
 	if installChaosMesh {
 		if err := deployChaosMesh(ctx, log, configPath, configContext); err != nil {
-			return fmt.Errorf("failed to deploy chaos mesh: %w", err)
+			return stacktrace.Errorf("failed to deploy chaos mesh: %w", err)
 		}
 	}
 
@@ -148,7 +149,7 @@ func isKindClusterRunning(log logging.Logger, configPath string, configContext s
 		return false, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("failed to check kubeconfig path %s: %w", configPath, err)
+		return false, stacktrace.Errorf("failed to check kubeconfig path %s: %w", configPath, err)
 	}
 
 	clientset, err := GetClientset(log, configPath, configContext)
@@ -161,7 +162,7 @@ func isKindClusterRunning(log logging.Logger, configPath string, configContext s
 			return false, nil
 		} else {
 			// All other errors are assumed fatal
-			return false, err
+			return false, stacktrace.Wrap(err)
 		}
 	}
 
@@ -191,7 +192,7 @@ func ensureNamespace(ctx context.Context, log logging.Logger, clientset *kuberne
 		return nil
 	}
 	if !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to check for namespace %s: %w", namespace, err)
+		return stacktrace.Errorf("failed to check for namespace %s: %w", namespace, err)
 	}
 
 	log.Info("namespace not found, creating",
@@ -203,7 +204,7 @@ func ensureNamespace(ctx context.Context, log logging.Logger, clientset *kuberne
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create namespace %s: %w", namespace, err)
+		return stacktrace.Errorf("failed to create namespace %s: %w", namespace, err)
 	}
 	log.Info("created namespace",
 		zap.String("namespace", namespace),
@@ -226,16 +227,16 @@ func deployRBAC(
 
 	clientConfig, err := GetClientConfig(log, configPath, configContext)
 	if err != nil {
-		return fmt.Errorf("failed to get client config: %w", err)
+		return stacktrace.Errorf("failed to get client config: %w", err)
 	}
 	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create dynamic client: %w", err)
+		return stacktrace.Errorf("failed to create dynamic client: %w", err)
 	}
 
 	// Apply the RBAC manifest
 	if err := applyManifest(ctx, log, dynamicClient, tmpnetRBACManifest, ""); err != nil {
-		return fmt.Errorf("failed to apply RBAC manifest: %w", err)
+		return stacktrace.Errorf("failed to apply RBAC manifest: %w", err)
 	}
 
 	log.Info("successfully deployed tmpnet RBAC resources",
@@ -259,7 +260,7 @@ func createServiceAccountKubeconfig(
 	// Get the existing kubeconfig
 	config, err := clientcmd.LoadFromFile(configPath)
 	if err != nil {
-		return fmt.Errorf("failed to load kubeconfig: %w", err)
+		return stacktrace.Errorf("failed to load kubeconfig: %w", err)
 	}
 
 	if _, exists := config.Contexts[newContextName]; exists {
@@ -282,11 +283,11 @@ func createServiceAccountKubeconfig(
 	// Get clientset to retrieve service account token
 	clientConfig, err := GetClientConfig(log, configPath, configContext)
 	if err != nil {
-		return fmt.Errorf("failed to get client config: %w", err)
+		return stacktrace.Errorf("failed to get client config: %w", err)
 	}
 	clientset, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create clientset: %w", err)
+		return stacktrace.Errorf("failed to create clientset: %w", err)
 	}
 
 	// Create a token for the service account (Kubernetes 1.24+)
@@ -298,7 +299,7 @@ func createServiceAccountKubeconfig(
 	}
 	token, err := clientset.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, "tmpnet", tokenRequest, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create service account token: %w", err)
+		return stacktrace.Errorf("failed to create service account token: %w", err)
 	}
 
 	// Create new context with the token
@@ -315,7 +316,7 @@ func createServiceAccountKubeconfig(
 
 	// Save the updated kubeconfig
 	if err := clientcmd.WriteToFile(*config, configPath); err != nil {
-		return fmt.Errorf("failed to write kubeconfig: %w", err)
+		return stacktrace.Errorf("failed to write kubeconfig: %w", err)
 	}
 
 	log.Info("created service account kubeconfig context",
@@ -333,7 +334,7 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 
 	isRunning, err := isIngressControllerRunning(ctx, log, configPath, configContext)
 	if err != nil {
-		return fmt.Errorf("failed to check nginx ingress controller status: %w", err)
+		return stacktrace.Errorf("failed to check nginx ingress controller status: %w", err)
 	}
 	if isRunning {
 		log.Info("nginx ingress controller already running")
@@ -344,10 +345,10 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 
 	// Add the helm repo for ingress-nginx
 	if err := runHelmCommand(ctx, "repo", "add", "ingress-nginx", ingressChartRepo); err != nil {
-		return fmt.Errorf("failed to add helm repo: %w", err)
+		return stacktrace.Errorf("failed to add helm repo: %w", err)
 	}
 	if err := runHelmCommand(ctx, "repo", "update"); err != nil {
-		return fmt.Errorf("failed to update helm repos: %w", err)
+		return stacktrace.Errorf("failed to update helm repos: %w", err)
 	}
 
 	// Install nginx-ingress with values set directly via flags
@@ -371,7 +372,7 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 	}
 
 	if err := runHelmCommand(ctx, args...); err != nil {
-		return fmt.Errorf("failed to install nginx-ingress: %w", err)
+		return stacktrace.Errorf("failed to install nginx-ingress: %w", err)
 	}
 
 	return waitForDeployment(ctx, log, configPath, configContext, ingressNamespace, ingressControllerName, "nginx ingress controller")
@@ -381,7 +382,7 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 func isIngressControllerRunning(ctx context.Context, log logging.Logger, configPath string, configContext string) (bool, error) {
 	clientset, err := GetClientset(log, configPath, configContext)
 	if err != nil {
-		return false, err
+		return false, stacktrace.Wrap(err)
 	}
 
 	// TODO(marun) Handle the case of the deployment being in a failed state
@@ -402,7 +403,7 @@ func runHelmCommand(ctx context.Context, args ...string) error {
 func createDefaultsConfigMap(ctx context.Context, log logging.Logger, configPath string, configContext string, namespace string) error {
 	clientset, err := GetClientset(log, configPath, configContext)
 	if err != nil {
-		return fmt.Errorf("failed to get clientset: %w", err)
+		return stacktrace.Errorf("failed to get clientset: %w", err)
 	}
 
 	configMapName := defaultsConfigMapName
@@ -417,7 +418,7 @@ func createDefaultsConfigMap(ctx context.Context, log logging.Logger, configPath
 		return nil
 	}
 	if !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to check for configmap %s/%s: %w", namespace, configMapName, err)
+		return stacktrace.Errorf("failed to check for configmap %s/%s: %w", namespace, configMapName, err)
 	}
 
 	log.Info("creating defaults ConfigMap",
@@ -437,7 +438,7 @@ func createDefaultsConfigMap(ctx context.Context, log logging.Logger, configPath
 
 	_, err = clientset.CoreV1().ConfigMaps(namespace).Create(ctx, configMap, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create configmap %s/%s: %w", namespace, configMapName, err)
+		return stacktrace.Errorf("failed to create configmap %s/%s: %w", namespace, configMapName, err)
 	}
 
 	return nil
@@ -449,7 +450,7 @@ func deployChaosMesh(ctx context.Context, log logging.Logger, configPath string,
 
 	isRunning, err := isChaosMeshRunning(ctx, log, configPath, configContext)
 	if err != nil {
-		return fmt.Errorf("failed to check chaos mesh status: %w", err)
+		return stacktrace.Errorf("failed to check chaos mesh status: %w", err)
 	}
 	if isRunning {
 		log.Info("chaos mesh already running")
@@ -460,10 +461,10 @@ func deployChaosMesh(ctx context.Context, log logging.Logger, configPath string,
 
 	// Add the helm repo for chaos-mesh
 	if err := runHelmCommand(ctx, "repo", "add", "chaos-mesh", chaosMeshChartRepo); err != nil {
-		return fmt.Errorf("failed to add chaos mesh helm repo: %w", err)
+		return stacktrace.Errorf("failed to add chaos mesh helm repo: %w", err)
 	}
 	if err := runHelmCommand(ctx, "repo", "update"); err != nil {
-		return fmt.Errorf("failed to update helm repos: %w", err)
+		return stacktrace.Errorf("failed to update helm repos: %w", err)
 	}
 
 	// Install Chaos Mesh with all required settings including ingress
@@ -487,12 +488,12 @@ func deployChaosMesh(ctx context.Context, log logging.Logger, configPath string,
 	}
 
 	if err := runHelmCommand(ctx, args...); err != nil {
-		return fmt.Errorf("failed to install chaos mesh: %w", err)
+		return stacktrace.Errorf("failed to install chaos mesh: %w", err)
 	}
 
 	// Wait for Chaos Mesh to be ready
 	if err := waitForChaosMesh(ctx, log, configPath, configContext); err != nil {
-		return fmt.Errorf("chaos mesh deployment failed: %w", err)
+		return stacktrace.Errorf("chaos mesh deployment failed: %w", err)
 	}
 
 	// Log access information
@@ -508,7 +509,7 @@ func deployChaosMesh(ctx context.Context, log logging.Logger, configPath string,
 func isChaosMeshRunning(ctx context.Context, log logging.Logger, configPath string, configContext string) (bool, error) {
 	clientset, err := GetClientset(log, configPath, configContext)
 	if err != nil {
-		return false, err
+		return false, stacktrace.Wrap(err)
 	}
 
 	// Check if controller manager deployment exists
@@ -520,7 +521,7 @@ func isChaosMeshRunning(ctx context.Context, log logging.Logger, configPath stri
 func waitForChaosMesh(ctx context.Context, log logging.Logger, configPath string, configContext string) error {
 	// Wait for controller manager
 	if err := waitForDeployment(ctx, log, configPath, configContext, chaosMeshNamespace, chaosMeshControllerName, "chaos mesh controller manager"); err != nil {
-		return fmt.Errorf("controller manager not ready: %w", err)
+		return stacktrace.Errorf("controller manager not ready: %w", err)
 	}
 
 	// Wait for dashboard
@@ -531,11 +532,11 @@ func waitForChaosMesh(ctx context.Context, log logging.Logger, configPath string
 func waitForDeployment(ctx context.Context, log logging.Logger, configPath string, configContext string, namespace string, deploymentName string, displayName string) error {
 	clientset, err := GetClientset(log, configPath, configContext)
 	if err != nil {
-		return fmt.Errorf("failed to get clientset: %w", err)
+		return stacktrace.Errorf("failed to get clientset: %w", err)
 	}
 
 	log.Info("waiting for " + displayName + " to be ready")
-	return wait.PollUntilContextCancel(ctx, statusCheckInterval, true /* immediate */, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextCancel(ctx, statusCheckInterval, true /* immediate */, func(ctx context.Context) (bool, error) {
 		deployment, err := clientset.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
 		if err != nil {
 			log.Debug("failed to get "+displayName+" deployment",
@@ -562,4 +563,8 @@ func waitForDeployment(ctx context.Context, log logging.Logger, configPath strin
 		)
 		return true, nil
 	})
+	if err != nil {
+		return stacktrace.Errorf("%s not ready before timeout: %w", displayName, err)
+	}
+	return nil
 }

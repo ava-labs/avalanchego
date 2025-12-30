@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -31,6 +31,9 @@ type Metrics struct {
 	ClockSkewCount prometheus.Counter
 	ClockSkewSum   prometheus.Gauge
 
+	RTTCount prometheus.Counter
+	RTTSum   prometheus.Gauge
+
 	NumFailedToParse prometheus.Counter
 	NumSendFailed    *prometheus.CounterVec // op
 
@@ -41,6 +44,14 @@ type Metrics struct {
 
 func NewMetrics(registerer prometheus.Registerer) (*Metrics, error) {
 	m := &Metrics{
+		RTTCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "round_trip_count",
+			Help: "number of RTT samples taken (n)",
+		}),
+		RTTSum: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "round_trip_sum",
+			Help: "sum of RTT samples taken (ms)",
+		}),
 		ClockSkewCount: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "clock_skew_count",
 			Help: "number of handshake timestamps inspected (n)",
@@ -83,6 +94,8 @@ func NewMetrics(registerer prometheus.Registerer) (*Metrics, error) {
 		),
 	}
 	return m, errors.Join(
+		registerer.Register(m.RTTCount),
+		registerer.Register(m.RTTSum),
 		registerer.Register(m.ClockSkewCount),
 		registerer.Register(m.ClockSkewSum),
 		registerer.Register(m.NumFailedToParse),

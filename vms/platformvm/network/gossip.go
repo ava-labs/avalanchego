@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -18,7 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+
+	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
@@ -66,7 +68,7 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 }
 
 func newGossipMempool(
-	mempool mempool.Mempool[*txs.Tx],
+	mempool *mempool.Mempool,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
@@ -84,7 +86,7 @@ func newGossipMempool(
 }
 
 type gossipMempool struct {
-	mempool.Mempool[*txs.Tx]
+	*mempool.Mempool
 	log        logging.Logger
 	txVerifier TxVerifier
 
@@ -95,7 +97,7 @@ type gossipMempool struct {
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
-		return fmt.Errorf("tx %s dropped: %w", txID, mempool.ErrDuplicateTx)
+		return fmt.Errorf("tx %s dropped: %w", txID, txmempool.ErrDuplicateTx)
 	}
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {
@@ -125,7 +127,10 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	defer g.lock.Unlock()
 
 	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
+	reset, err := gossip.ResetBloomFilterIfNeeded(
+		g.bloom,
+		g.Mempool.Len()*bloomChurnMultiplier,
+	)
 	if err != nil {
 		return err
 	}

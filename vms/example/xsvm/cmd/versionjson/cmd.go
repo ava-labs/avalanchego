@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package versionjson
@@ -16,10 +16,10 @@ import (
 )
 
 type vmVersions struct {
-	Name       string            `json:"name"`
-	VMID       ids.ID            `json:"vmid"`
-	Version    *version.Semantic `json:"version"`
-	RPCChainVM uint64            `json:"rpcchainvm"`
+	Name       string `json:"name"`
+	VMID       ids.ID `json:"vmid"`
+	Version    string `json:"version"`
+	RPCChainVM uint64 `json:"rpcchainvm"`
 }
 
 func Command() *cobra.Command {

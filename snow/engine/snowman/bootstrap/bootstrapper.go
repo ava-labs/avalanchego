@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -40,6 +40,9 @@ const (
 	// maxOutstandingBroadcastRequests is the maximum number of requests to have
 	// outstanding when broadcasting.
 	maxOutstandingBroadcastRequests = 50
+
+	// minimumLogInterval is the minimum time between log entries to avoid noise
+	minimumLogInterval = 5 * time.Second
 
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
@@ -95,6 +98,11 @@ type Bootstrapper struct {
 	initiallyFetched uint64
 	// Time that startSyncing was last called
 	startTime time.Time
+	// Time of the last progress update for accurate ETA calculation
+	lastProgressUpdateTime time.Time
+
+	// ETA tracker for more accurate time estimates
+	etaTracker *timer.EtaTracker
 
 	// tracks which validators were asked for which containers in which requests
 	outstandingRequests     *bimap.BiMap[common.Request, ids.ID]
@@ -138,6 +146,8 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 
 		executedStateTransitions: math.MaxInt,
 		onFinished:               onFinished,
+		lastProgressUpdateTime:   time.Now(),
+		etaTracker:               timer.NewEtaTracker(10, 1.2),
 	}
 
 	timeout := func() {
@@ -166,7 +176,7 @@ func (b *Bootstrapper) Clear(context.Context) error {
 
 func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.Bootstrapping,
 	})
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
@@ -407,6 +417,10 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.
 	b.initiallyFetched = b.tree.Len()
 	b.startTime = time.Now()
 
+	// Add the first sample to the EtaTracker to establish an accurate baseline
+	// It's okay to call this a few times if startSyncing is called more than once.
+	b.etaTracker.AddSample(b.initiallyFetched, b.tipHeight-b.startingHeight, b.startTime)
+
 	// Process received blocks
 	for _, blk := range toProcess {
 		if err := b.process(ctx, blk, nil); err != nil {
@@ -603,25 +617,35 @@ func (b *Bootstrapper) process(
 		height := blk.Height()
 		b.tipHeight = max(b.tipHeight, height)
 
-		if numPreviouslyFetched/statusUpdateFrequency != numFetched/statusUpdateFrequency {
+		// Check if it's time to log progress (both progress-based and time-based frequency)
+		now := time.Now()
+		shouldLog := numPreviouslyFetched/statusUpdateFrequency != numFetched/statusUpdateFrequency &&
+			now.Sub(b.lastProgressUpdateTime) >= minimumLogInterval
+
+		if shouldLog {
 			totalBlocksToFetch := b.tipHeight - b.startingHeight
-			eta := timer.EstimateETA(
-				b.startTime,
-				numFetched-b.initiallyFetched,         // Number of blocks we have fetched during this run
-				totalBlocksToFetch-b.initiallyFetched, // Number of blocks we expect to fetch during this run
+
+			etaPtr, progressPercentage := b.etaTracker.AddSample(
+				numFetched,
+				totalBlocksToFetch,
+				now,
 			)
 
-			if !b.restarted {
-				b.Ctx.Log.Info("fetching blocks",
+			// Update the last progress update time and previous progress for next iteration
+			b.lastProgressUpdateTime = now
+
+			// Only log if we have a valid ETA estimate
+			if etaPtr != nil {
+				logger := b.Ctx.Log.Info
+				if b.restarted {
+					// Lower log level for restarted bootstrapping.
+					logger = b.Ctx.Log.Debug
+				}
+				logger("fetching blocks",
 					zap.Uint64("numFetchedBlocks", numFetched),
 					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
-					zap.Duration("eta", eta),
-				)
-			} else {
-				b.Ctx.Log.Debug("fetching blocks",
-					zap.Uint64("numFetchedBlocks", numFetched),
-					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
-					zap.Duration("eta", eta),
+					zap.Duration("eta", *etaPtr),
+					zap.Float64("pctComplete", progressPercentage),
 				)
 			}
 		}

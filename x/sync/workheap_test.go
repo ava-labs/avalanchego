@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -185,7 +185,7 @@ func TestWorkHeapMergeInsertRandom(t *testing.T) {
 	var (
 		require   = require.New(t)
 		seed      = time.Now().UnixNano()
-		rand      = rand.New(rand.NewSource(seed)) // #nosec G404
+		rand      = rand.New(rand.NewSource(seed))
 		numRanges = 1_000
 		bounds    = [][]byte{}
 		rootID    = ids.GenerateTestID()

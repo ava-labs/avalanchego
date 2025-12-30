@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -156,7 +156,12 @@ func (c *Client) LastAccepted(
 		resp,
 		options...,
 	)
-	return resp.BlockID, resp.Block, err
+	if err != nil {
+		return ids.Empty, nil, err
+	}
+
+	block, err := block.Parse(resp.BlockBytes)
+	return resp.BlockID, block, err
 }
 
 func (c *Client) Block(
@@ -174,7 +179,12 @@ func (c *Client) Block(
 		resp,
 		options...,
 	)
-	return resp.Block, err
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := block.Parse(resp.BlockBytes)
+	return block, err
 }
 
 func (c *Client) Message(

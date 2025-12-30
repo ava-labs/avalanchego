@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package constants
@@ -26,6 +26,9 @@ var (
 		125, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/125-basefee-reduction/README.md
 		131, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/131-cancun-eips/README.md
 		151, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/151-use-current-block-pchain-height-as-context/README.md
+
+		// Fortuna:
+		176, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
 	)
 
 	// CurrentACPs is the set of ACPs that are currently, at the time of
@@ -33,11 +36,15 @@ var (
 	//
 	// See: https://github.com/orgs/avalanche-foundation/projects/1
 	CurrentACPs = set.Of[uint32](
-		176, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
+		181, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/181-p-chain-epoched-views/README.md
+		204, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/204-precompile-secp256r1/README.md
+		226, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
 	)
 
 	// ScheduledACPs are the ACPs included into the next upgrade.
 	ScheduledACPs = set.Of[uint32](
-		176, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
+		181, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/181-p-chain-epoched-views/README.md
+		204, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/204-precompile-secp256r1/README.md
+		226, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
 	)
 )

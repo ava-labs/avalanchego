@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -382,7 +382,7 @@ func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler
 		}
 
 		vm.conns = append(vm.conns, clientConn)
-		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn))
+		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn), vm.logger)
 	}
 	return handlers, nil
 }
@@ -403,7 +403,7 @@ func (vm *VMClient) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 	}
 
 	vm.conns = append(vm.conns, clientConn)
-	return ghttp.NewClient(httppb.NewHTTPClient(clientConn)), nil
+	return ghttp.NewClient(httppb.NewHTTPClient(clientConn), vm.logger), nil
 }
 
 func (vm *VMClient) WaitForEvent(ctx context.Context) (common.Message, error) {

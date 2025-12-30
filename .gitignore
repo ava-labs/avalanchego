@@ -28,8 +28,6 @@ tmp/
 
 *.pb*
 
-db*
-
 *cpu[0-9]*
 *mem[0-9]*
 *lock[0-9]*
@@ -64,3 +62,6 @@ vendor
 .direnv
 # Personal extension to .envrc
 .envrc.local
+
+# debug files
+__debug_*

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package lru
@@ -69,18 +69,18 @@ func TestSizedLRUSizeAlteringRegression(t *testing.T) {
 	valueA := "ab"
 	cache.Put("a", &valueA)
 
-	require.InDelta(expectedPortionFilled, cache.PortionFilled(), 0)
+	require.Equal(expectedPortionFilled, cache.PortionFilled())
 
 	// mutate first value
 	valueA = "abcd"
-	require.InDelta(expectedPortionFilled, cache.PortionFilled(), 0, "after value A mutation, portion filled should be the same")
+	require.Equal(expectedPortionFilled, cache.PortionFilled(), "after value A mutation, portion filled should be the same")
 
 	// put second value
 	expectedPortionFilled = 0.8
 	valueB := "bcd"
 	cache.Put("b", &valueB)
 
-	require.InDelta(expectedPortionFilled, cache.PortionFilled(), 0)
+	require.Equal(expectedPortionFilled, cache.PortionFilled())
 
 	_, ok := cache.Get("a")
 	require.False(ok, "key a shouldn't exist after b is put")

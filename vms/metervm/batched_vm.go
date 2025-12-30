@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metervm
@@ -23,7 +23,7 @@ func (vm *blockVM) GetAncestors(
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
-	start := vm.clock.Time()
+	start := time.Now()
 	ancestors, err := vm.batchedVM.GetAncestors(
 		ctx,
 		blkID,
@@ -31,8 +31,7 @@ func (vm *blockVM) GetAncestors(
 		maxBlocksSize,
 		maxBlocksRetrivalTime,
 	)
-	end := vm.clock.Time()
-	vm.blockMetrics.getAncestors.Observe(float64(end.Sub(start)))
+	vm.blockMetrics.getAncestors.Observe(float64(time.Since(start)))
 	return ancestors, err
 }
 
@@ -41,10 +40,9 @@ func (vm *blockVM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snow
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
-	start := vm.clock.Time()
+	start := time.Now()
 	blocks, err := vm.batchedVM.BatchedParseBlock(ctx, blks)
-	end := vm.clock.Time()
-	vm.blockMetrics.batchedParseBlock.Observe(float64(end.Sub(start)))
+	vm.blockMetrics.batchedParseBlock.Observe(float64(time.Since(start)))
 
 	wrappedBlocks := make([]snowman.Block, len(blocks))
 	for i, block := range blocks {

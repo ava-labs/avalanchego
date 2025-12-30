@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -65,12 +65,12 @@ func TestSystemThrottler(t *testing.T) {
 	targeter.EXPECT().TargetUsage(vdrID).Return(1.0).Times(1)
 	mockTracker.EXPECT().Usage(vdrID, gomock.Any()).Return(0.9).Times(1)
 
-	throttler.Acquire(context.Background(), vdrID)
+	throttler.Acquire(t.Context(), vdrID)
 
 	targeter.EXPECT().TargetUsage(nonVdrID).Return(1.0).Times(1)
 	mockTracker.EXPECT().Usage(nonVdrID, gomock.Any()).Return(0.9).Times(1)
 
-	throttler.Acquire(context.Background(), nonVdrID)
+	throttler.Acquire(t.Context(), nonVdrID)
 
 	// Case: Actual usage > target usage; we should wait.
 	// In the first loop iteration inside acquire,
@@ -90,7 +90,7 @@ func TestSystemThrottler(t *testing.T) {
 
 	// Check for validator
 	go func() {
-		throttler.Acquire(context.Background(), vdrID)
+		throttler.Acquire(t.Context(), vdrID)
 		onAcquire <- struct{}{}
 	}()
 	// Make sure the min re-check frequency is honored
@@ -113,7 +113,7 @@ func TestSystemThrottler(t *testing.T) {
 
 	// Check for non-validator
 	go func() {
-		throttler.Acquire(context.Background(), nonVdrID)
+		throttler.Acquire(t.Context(), nonVdrID)
 		onAcquire <- struct{}{}
 	}()
 	// Make sure the min re-check frequency is honored
@@ -151,7 +151,7 @@ func TestSystemThrottlerContextCancel(t *testing.T) {
 	mockTracker.EXPECT().TimeUntilUsage(vdrID, gomock.Any(), gomock.Any()).Return(maxRecheckDelay).Times(1)
 	onAcquire := make(chan struct{})
 	// Pass a canceled context into Acquire so that it returns immediately.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	go func() {
 		throttler.Acquire(ctx, vdrID)

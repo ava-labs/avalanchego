@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dialer
@@ -24,7 +24,7 @@ func TestDialerDialCanceledContext(t *testing.T) {
 	listenAddrPort := netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
 	dialer := NewDialer("tcp", Config{}, logging.NoLog{})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err := dialer.Dial(ctx, listenAddrPort)
 	require.ErrorIs(err, context.Canceled)
@@ -50,7 +50,7 @@ func TestDialerDial(t *testing.T) {
 
 	eg := errgroup.Group{}
 	eg.Go(func() error {
-		_, err := dialer.Dial(context.Background(), listenedAddrPort)
+		_, err := dialer.Dial(t.Context(), listenedAddrPort)
 		return err
 	})
 

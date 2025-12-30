@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package json
@@ -54,6 +54,6 @@ func TestFloat32(t *testing.T) {
 
 		var f Float32
 		require.NoError(f.UnmarshalJSON(jsonBytes))
-		require.InDelta(tt.expectedUnmarshalled, float32(f), 0)
+		require.Equal(tt.expectedUnmarshalled, float32(f))
 	}
 }
