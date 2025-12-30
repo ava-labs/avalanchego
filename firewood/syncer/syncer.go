@@ -22,13 +22,13 @@ import (
 )
 
 var (
-	_ xsync.DB[*RangeProof, struct{}] = (*database)(nil)
+	_ xsync.DB[*RangeProof, struct{}] = (*Database)(nil)
 
 	defaultSimultaneousWorkLimit = 8
 )
 
-// database wraps a Firewood FFI database to implement the xsync.DB interface.
-type database struct {
+// Database wraps a Firewood FFI Database to implement the xsync.DB interface.
+type Database struct {
 	db                 *ffi.Database
 	rangeProofCallback func(context.Context, *ffi.RangeProof) error
 }
@@ -42,6 +42,7 @@ type Config struct {
 }
 
 func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
+	wrappedDB := NewDatabase(db)
 	if config.Registerer == nil {
 		config.Registerer = prometheus.NewRegistry()
 	}
@@ -51,15 +52,14 @@ func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p
 	if config.SimultaneousWorkLimit == 0 {
 		config.SimultaneousWorkLimit = defaultSimultaneousWorkLimit
 	}
-	wrappedDB := &database{db: db}
 	if config.RangeProofCallback != nil {
 		wrappedDB.rangeProofCallback = config.RangeProofCallback
 	}
 	return xsync.NewSyncer(
 		wrappedDB,
 		xsync.Config[*RangeProof, struct{}]{
-			RangeProofMarshaler:   rangeProofMarshaler{},
-			ChangeProofMarshaler:  changeProofMarshaler{},
+			RangeProofMarshaler:   RangeProofMarshaler{},
+			ChangeProofMarshaler:  ChangeProofMarshaler{},
 			EmptyRoot:             ids.ID(types.EmptyRootHash),
 			RangeProofClient:      rangeProofClient,
 			ChangeProofClient:     changeProofClient,
@@ -72,7 +72,11 @@ func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p
 	)
 }
 
-func (db *database) GetMerkleRoot(context.Context) (ids.ID, error) {
+func NewDatabase(db *ffi.Database) *Database {
+	return &Database{db: db}
+}
+
+func (db *Database) GetMerkleRoot(context.Context) (ids.ID, error) {
 	root, err := db.db.Root()
 	if err != nil {
 		return ids.ID{}, err
@@ -80,7 +84,7 @@ func (db *database) GetMerkleRoot(context.Context) (ids.ID, error) {
 	return ids.ID(root), nil
 }
 
-func (db *database) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error) {
+func (db *Database) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error) {
 	proof, err := db.db.RangeProof(ffi.Hash(rootID), start, end, uint32(maxLength))
 	if err != nil {
 		return nil, err
@@ -91,7 +95,7 @@ func (db *database) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start 
 	}, nil
 }
 
-func (*database) VerifyRangeProof(_ context.Context, proof *RangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
+func (*Database) VerifyRangeProof(_ context.Context, proof *RangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
 	// Extra data must be provided at commit time.
 	// TODO: remove this once the FFI no longer requires it.
 	proof.root = expectedEndRootID
@@ -100,7 +104,7 @@ func (*database) VerifyRangeProof(_ context.Context, proof *RangeProof, start ma
 	return proof.rp.Verify(ffi.Hash(expectedEndRootID), start, end, uint32(maxLength))
 }
 
-func (db *database) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
+func (db *Database) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
 	_, err := db.db.VerifyAndCommitRangeProof(proof.rp, start, end, ffi.Hash(proof.root), uint32(proof.maxLength))
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
@@ -135,21 +139,21 @@ func (db *database) CommitRangeProof(ctx context.Context, start, end maybe.Maybe
 }
 
 // TODO: implement this method.
-func (*database) GetChangeProof(context.Context, ids.ID, ids.ID, maybe.Maybe[[]byte], maybe.Maybe[[]byte], int) (struct{}, error) {
+func (*Database) GetChangeProof(context.Context, ids.ID, ids.ID, maybe.Maybe[[]byte], maybe.Maybe[[]byte], int) (struct{}, error) {
 	return struct{}{}, errors.New("change proofs are not implemented")
 }
 
 // TODO: implement this method.
-func (*database) VerifyChangeProof(context.Context, struct{}, maybe.Maybe[[]byte], maybe.Maybe[[]byte], ids.ID, int) error {
+func (*Database) VerifyChangeProof(context.Context, struct{}, maybe.Maybe[[]byte], maybe.Maybe[[]byte], ids.ID, int) error {
 	return errors.New("change proofs are not implemented")
 }
 
 // TODO: implement this method.
-func (*database) CommitChangeProof(context.Context, maybe.Maybe[[]byte], struct{}) (maybe.Maybe[[]byte], error) {
+func (*Database) CommitChangeProof(context.Context, maybe.Maybe[[]byte], struct{}) (maybe.Maybe[[]byte], error) {
 	return maybe.Nothing[[]byte](), errors.New("change proofs are not implemented")
 }
 
-func (db *database) Clear() error {
+func (db *Database) Clear() error {
 	// Prefix delete key of length 0.
 	_, err := db.db.Update([][]byte{{}}, [][]byte{nil})
 	return err

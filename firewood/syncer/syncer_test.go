@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package syncer
+package syncer_test
 
 import (
 	"bytes"
@@ -15,8 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/firewood/syncer"
+	"github.com/ava-labs/avalanchego/firewood/syncer/syncertest"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/x/sync"
 )
 
@@ -64,14 +65,14 @@ func Test_Firewood_Sync(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testSync(t, Config{}, 0, tt.clientSize, tt.serverSize)
+			testSync(t, syncer.Config{}, 0, tt.clientSize, tt.serverSize)
 		})
 	}
 }
 
 func Test_Firewood_Sync_WithCallback(t *testing.T) {
 	var callbackInvoked atomic.Bool
-	config := Config{
+	config := syncer.Config{
 		RangeProofCallback: func(context.Context, *ffi.RangeProof) error {
 			callbackInvoked.Store(true)
 			return nil
@@ -81,26 +82,25 @@ func Test_Firewood_Sync_WithCallback(t *testing.T) {
 	require.True(t, callbackInvoked.Load(), "expected callback to be invoked during sync")
 }
 
-func testSync(t *testing.T, config Config, seed int64, clientKeys int, serverKeys int) {
+func testSync(t *testing.T, config syncer.Config, seed int64, clientKeys int, serverKeys int) {
 	ctx := t.Context()
 
-	ffiServer := generateDB(t, serverKeys, seed)
-	serverDB := &database{db: ffiServer}
+	serverDB := generateDB(t, serverKeys, seed)
 	clientDB := generateDB(t, clientKeys, seed+1) // guarantee different data
 	defer func() {
-		require.NoError(t, serverDB.db.Close(ctx))
+		require.NoError(t, serverDB.Close(ctx))
 		require.NoError(t, clientDB.Close(ctx))
 	}()
 
-	root, err := serverDB.GetMerkleRoot(ctx)
+	root, err := serverDB.Root()
 	require.NoError(t, err)
 
-	syncer, err := New(
+	syncer, err := syncer.New(
 		config,
 		clientDB,
-		root,
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(serverDB, rangeProofMarshaler{})),
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(serverDB, rangeProofMarshaler{}, changeProofMarshaler{})),
+		ids.ID(root),
+		syncertest.NewTestRangeProofHandler(t, serverDB),
+		syncertest.NewTestChangeProofHandler(t, serverDB),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, syncer)
@@ -109,7 +109,7 @@ func testSync(t *testing.T, config Config, seed int64, clientKeys int, serverKey
 	err = syncer.Wait(ctx)
 	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
-		logDiff(t, serverDB.db, clientDB)
+		logDiff(t, serverDB, clientDB)
 	}
 	require.NoError(t, err)
 }
