@@ -8,9 +8,15 @@ This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/av
 
 - ...
 
+### Config
+
+- Added `--system-tracker-disk-required-available-space-percentage` and `--system-tracker-disk-warning-available-space-percentage` options.
+- Deprecate `--system-tracker-disk-required-available-space` and `--system-tracker-disk-warning-threshold-available-space` options.
+
 ### Fixes
 
 - Update go version to 1.24.11
+- Add Linux arm64 to tier one support status
 
 ### EVM
 

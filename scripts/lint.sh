@@ -32,11 +32,15 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
+TESTS=${TESTS:-"golangci_lint warn_testify_assert license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
   ./scripts/run_tool.sh golangci-lint run --config .golangci.yml
 }
+
+# Source shared helper for testify/assert warnings (provides test_warn_testify_assert)
+# shellcheck disable=SC1091
+source ./scripts/lint_warn_assert.sh
 
 # automatically checks license headers
 # to modify the file headers (if missing), remove "--verify" flag

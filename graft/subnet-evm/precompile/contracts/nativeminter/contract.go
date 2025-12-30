@@ -39,7 +39,7 @@ var (
 	ErrUnpackInput = errors.New("failed to unpack input")
 
 	// NativeMinterRawABI contains the raw ABI of NativeMinter contract.
-	//go:embed contract.abi
+	//go:embed INativeMinter.abi
 	NativeMinterRawABI string
 
 	NativeMinterABI = contract.ParseABI(NativeMinterRawABI)
