@@ -139,7 +139,6 @@ runs:
           # Granular mode - validate required inputs
           missing=()
           [[ -z "${{ inputs.block-dir-src }}" ]] && missing+=("block-dir-src")
-          [[ -z "${{ inputs.current-state-dir-src }}" ]] && missing+=("current-state-dir-src")
           [[ -z "${{ inputs.start-block }}" ]] && missing+=("start-block")
           [[ -z "${{ inputs.end-block }}" ]] && missing+=("end-block")
 
