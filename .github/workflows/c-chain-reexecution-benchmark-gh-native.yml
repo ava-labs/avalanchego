@@ -28,7 +28,7 @@ on:
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
         default: 30
-      with:
+      with-dependencies:
         description: 'Dependencies to use (e.g., "firewood=abc123" or "firewood=abc,libevm=xyz")'
         default: ''
       push-post-state:
@@ -52,10 +52,10 @@ jobs:
         shell: bash -x {0}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            # Parse 'with' input for dependency refs
+            # Parse 'with-dependencies' input for dependency refs
             FIREWOOD_REF="" LIBEVM_REF=""
-            [[ "${{ github.event.inputs.with }}" =~ firewood=([^,]+) ]] && FIREWOOD_REF="${BASH_REMATCH[1]}"
-            [[ "${{ github.event.inputs.with }}" =~ libevm=([^,]+) ]] && LIBEVM_REF="${BASH_REMATCH[1]}"
+            [[ "${{ github.event.inputs.with-dependencies }}" =~ firewood=([^,]+) ]] && FIREWOOD_REF="${BASH_REMATCH[1]}"
+            [[ "${{ github.event.inputs.with-dependencies }}" =~ libevm=([^,]+) ]] && LIBEVM_REF="${BASH_REMATCH[1]}"
             {
               echo "matrix<<EOF"
               printf '{ "include": [{ "task": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s, "firewood-ref": "%s", "libevm-ref": "%s" }] }\n' \
