@@ -264,7 +264,7 @@ Pass `LIBEVM_REF` and/or `FIREWOOD_REF` to any benchmark task:
 # Test with custom firewood version
 ./scripts/run_task.sh c-chain-reexecution-firewood-101-250k FIREWOOD_REF=abc123def
 
-# Test with custom libevm version  
+# Test with custom libevm version
 ./scripts/run_task.sh c-chain-reexecution-firewood-101-250k LIBEVM_REF=v1.2.3
 
 # Test with both custom versions
@@ -284,8 +284,8 @@ Pass `LIBEVM_REF` and/or `FIREWOOD_REF` to any benchmark task:
 
 For workflow dispatch, use the `with` input to specify custom dependency versions:
 
-- Single dependency: `-f with=firewood=abc123`
-- Multiple dependencies: `-f with="firewood=abc123,libevm=v1.2.3"`
+- Single dependency: `-f with-dependencies=firewood=abc123`
+- Multiple dependencies: `-f with-dependencies="firewood=abc123,libevm=v1.2.3"`
 
 See [Trigger Workflow Dispatch with GitHub CLI](#trigger-workflow-dispatch-with-github-cli) for complete examples.
 
@@ -300,9 +300,9 @@ export METRICS_COLLECTOR_ENABLED=true
 ./scripts/run_task.sh c-chain-reexecution-hashdb-101-250k
 ```
 
-You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).  
+You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
 
-**NOTE: Prometheus credentials are required for collection**  
+**NOTE: Prometheus credentials are required for collection**
 
 ---
 
@@ -368,14 +368,14 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
 # Test with custom firewood commit
 gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
   -f task=c-chain-reexecution-firewood-101-250k \
-  -f with=firewood=abc123def \
+  -f with-dependencies=firewood=abc123def \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f timeout-minutes=60
 
 # Test with custom libevm and firewood
 gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
   -f task=c-chain-reexecution-firewood-101-250k \
-  -f with="firewood=abc123def,libevm=v1.2.3" \
+  -f with-dependencies="firewood=abc123def,libevm=v1.2.3" \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f timeout-minutes=60
 ```
