@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/core/types"
@@ -29,7 +30,7 @@ var (
 // database wraps a Firewood FFI database to implement the xsync.DB interface.
 type database struct {
 	db                 *ffi.Database
-	rangeProofCallback func(*ffi.RangeProof) error
+	rangeProofCallback func(context.Context, *ffi.RangeProof) error
 }
 
 type Config struct {
@@ -37,7 +38,7 @@ type Config struct {
 	Log                   logging.Logger
 	StateSyncNodes        []ids.NodeID
 	Registerer            prometheus.Registerer
-	RangeProofCallback    func(*ffi.RangeProof) error
+	RangeProofCallback    func(context.Context, *ffi.RangeProof) error
 }
 
 func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
@@ -99,15 +100,15 @@ func (*database) VerifyRangeProof(_ context.Context, proof *RangeProof, start ma
 	return proof.rp.Verify(ffi.Hash(expectedEndRootID), start, end, uint32(maxLength))
 }
 
-func (db *database) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
+func (db *database) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
 	_, err := db.db.VerifyAndCommitRangeProof(proof.rp, start, end, ffi.Hash(proof.root), uint32(proof.maxLength))
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
 
 	if db.rangeProofCallback != nil {
-		if err := db.rangeProofCallback(proof.rp); err != nil {
-			return maybe.Nothing[[]byte](), err
+		if err := db.rangeProofCallback(ctx, proof.rp); err != nil {
+			return maybe.Nothing[[]byte](), fmt.Errorf("error in range proof callback: %w", err)
 		}
 	}
 
