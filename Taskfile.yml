@@ -154,10 +154,12 @@ tasks:
         vars:
           SRC: '{{.BLOCK_DIR_SRC}}'
           DST: '{{.EXECUTION_DATA_DIR}}/blocks'
-      - task: import-s3-to-dir
-        vars:
-          SRC: '{{.CURRENT_STATE_DIR_SRC}}'
-          DST: '{{.EXECUTION_DATA_DIR}}/current-state'
+      - cmd: |
+          if [[ "{{.CURRENT_STATE_DIR_SRC}}" != "genesis" ]]; then
+            task import-s3-to-dir SRC="{{.CURRENT_STATE_DIR_SRC}}" DST="{{.EXECUTION_DATA_DIR}}/current-state"
+          else
+            mkdir -p "{{.EXECUTION_DATA_DIR}}/current-state"
+          fi
 
   import-s3-to-dir:
     desc: Imports an S3 path to a local directory.
@@ -271,7 +273,7 @@ tasks:
       - task: import-cchain-reexecute-range
         vars:
           BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.BLOCK_DIR_SRC}}/**'
-          CURRENT_STATE_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.CURRENT_STATE_DIR_SRC}}/**'
+          CURRENT_STATE_DIR_SRC: '{{if .CURRENT_STATE_DIR_SRC}}{{.S3_BOOTSTRAP_BUCKET}}/{{.CURRENT_STATE_DIR_SRC}}/**{{else}}genesis{{end}}'
           EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       - task: reexecute-cchain-range
         vars:
