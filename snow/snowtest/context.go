@@ -75,6 +75,9 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 		GetMinimumHeightF: func(context.Context) (uint64, error) {
 			return 0, nil
 		},
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return 0, nil
+		},
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			switch chainID {
 			case PChainID, XChainID, CChainID:
