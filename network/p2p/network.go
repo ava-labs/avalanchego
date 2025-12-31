@@ -167,6 +167,13 @@ func (p *Peers) Has(nodeID ids.NodeID) bool {
 	return p.set.Contains(nodeID)
 }
 
+func (p *Peers) Len() int {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.set.Len()
+}
+
 // Sample returns a pseudo-random sample of up to limit Peers
 func (p *Peers) Sample(limit int) []ids.NodeID {
 	p.lock.RLock()

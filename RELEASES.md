@@ -16,6 +16,7 @@ This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/av
 ### Fixes
 
 - Update go version to 1.24.11
+- Add Linux arm64 to tier one support status
 
 ### EVM
 
