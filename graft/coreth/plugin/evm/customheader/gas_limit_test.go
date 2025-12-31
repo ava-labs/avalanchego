@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/cortina"
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
@@ -94,13 +94,13 @@ func TestVerifyGasUsed(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(0),
+				TimeMilliseconds: utils.PointerTo[uint64](0),
 			}),
 			header: customtypes.WithHeaderExtra(&types.Header{
 				Time:    1,
 				GasUsed: acp176.MinMaxPerSecond + 500,
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(1500),
+				TimeMilliseconds: utils.PointerTo[uint64](1500),
 			}),
 			want: nil,
 		},
@@ -206,12 +206,12 @@ func TestVerifyGasLimit(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(0),
+				TimeMilliseconds: utils.PointerTo[uint64](0),
 			}),
 			header: customtypes.WithHeaderExtra(&types.Header{
 				GasLimit: acp176.MinMaxPerSecond - 1,
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(0),
+				TimeMilliseconds: utils.PointerTo[uint64](0),
 			}),
 			want: errInvalidGasLimit,
 		},
@@ -221,12 +221,12 @@ func TestVerifyGasLimit(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(0),
+				TimeMilliseconds: utils.PointerTo[uint64](0),
 			}),
 			header: customtypes.WithHeaderExtra(&types.Header{
 				GasLimit: acp176.MinMaxCapacity,
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(0),
+				TimeMilliseconds: utils.PointerTo[uint64](0),
 			}),
 		},
 		{
@@ -390,7 +390,7 @@ func TestGasCapacity(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(0),
+				TimeMilliseconds: utils.PointerTo[uint64](0),
 			}),
 			timestamp: 1000,
 			want:      acp176.MinMaxPerSecond,
@@ -401,7 +401,7 @@ func TestGasCapacity(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(0),
+				TimeMilliseconds: utils.PointerTo[uint64](0),
 			}),
 			timestamp: 1500,
 			want:      acp176.MinMaxPerSecond * 3 / 2,
@@ -474,13 +474,13 @@ func TestRemainingAtomicGasCapacity(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(0),
+				TimeMilliseconds: utils.PointerTo[uint64](0),
 			}),
 			header: customtypes.WithHeaderExtra(&types.Header{
 				Time:    1,
 				GasUsed: 1,
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(1500),
+				TimeMilliseconds: utils.PointerTo[uint64](1500),
 			}),
 			want: acp176.MinMaxPerSecond*3/2 - 1,
 		},
