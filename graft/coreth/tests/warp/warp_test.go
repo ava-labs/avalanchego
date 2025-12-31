@@ -9,6 +9,8 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -43,10 +45,14 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
+const (
+	subnetAName = "warp-subnet-a"
+)
+
 var (
 	flagVars *e2e.FlagVars
 
-	cChainSubnetDetails *Subnet
+	subnetA, cChainSubnetDetails *Subnet
 
 	testPayload = []byte{1, 2, 3}
 )
@@ -74,9 +80,10 @@ func TestE2E(t *testing.T) {
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
-
 	tc := e2e.NewTestContext()
 	nodes := tmpnet.NewNodesOrPanic(tmpnet.DefaultNodeCount)
+	_, thisFile, _, _ := runtime.Caller(0)
+	genesisPath := filepath.Join(filepath.Dir(thisFile), "genesis.json")
 
 	env := e2e.NewTestEnvironment(
 		tc,
@@ -85,6 +92,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			"coreth-warp-e2e",
 			nodes,
 			tmpnet.FlagsMap{},
+			utils.NewTmpnetSubnet(subnetAName, genesisPath, utils.DefaultChainConfig, nodes...),
 		),
 	)
 
@@ -108,6 +116,15 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		validatorURIs[i] = node.URI
 	}
 
+	tmpnetSubnetA := network.GetSubnet(subnetAName)
+	require.NotNil(tmpnetSubnetA)
+	subnetA = &Subnet{
+		SubnetID:      tmpnetSubnetA.SubnetID,
+		BlockchainID:  tmpnetSubnetA.Chains[0].ChainID,
+		PreFundedKey:  tmpnetSubnetA.Chains[0].PreFundedKey.ToECDSA(),
+		ValidatorURIs: validatorURIs,
+	}
+
 	infoClient := info.NewClient(network.Nodes[0].URI)
 	cChainBlockchainID, err := infoClient.GetBlockchainID(tc.DefaultContext(), "C")
 	require.NoError(err)
@@ -125,15 +142,10 @@ var _ = ginkgo.Describe("[Warp]", func() {
 		name            string
 		sendingSubnet   *Subnet
 		receivingSubnet *Subnet
-		skip            bool
 	}{
-		// TODO: Uncomment these tests when we have a way to run them in CI, currently we should not depend on Subnet-EVM
-		// as Coreth and Subnet-EVM have different release cycles. The problem is that once we update AvalancheGo (protocol version),
-		// we need to update Subnet-EVM to the same protocol version. Until then all Subnet-EVM tests are broken, so it's blocking Coreth development.
-		// It's best to not run these tests until we have a way to run them in CI.
-		// {"SubnetA -> C-Chain", subnetA, cChainSubnetDetails, true},
-		// {"C-Chain -> SubnetA", cChainSubnetDetails, subnetA, true},
-		{"C-Chain -> C-Chain", cChainSubnetDetails, cChainSubnetDetails, false},
+		{"SubnetA -> C-Chain", subnetA, cChainSubnetDetails},
+		{"C-Chain -> SubnetA", cChainSubnetDetails, subnetA},
+		{"C-Chain -> C-Chain", cChainSubnetDetails, cChainSubnetDetails},
 	}
 
 	for _, combination := range testCombinations {
@@ -143,9 +155,6 @@ var _ = ginkgo.Describe("[Warp]", func() {
 			var w *warpTest
 
 			ginkgo.BeforeAll(func() {
-				if combination.skip {
-					ginkgo.Skip("Test skipped - see TODO comment")
-				}
 				tc := e2e.NewTestContext()
 				w = newWarpTest(tc.DefaultContext(), combination.sendingSubnet, combination.receivingSubnet)
 			})
