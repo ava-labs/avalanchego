@@ -7,7 +7,6 @@ package warp
 import (
 	"context"
 	"crypto/ecdsa"
-	_ "embed"
 	"fmt"
 	"math/big"
 	"strings"
@@ -19,6 +18,8 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
 	"github.com/stretchr/testify/require"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
