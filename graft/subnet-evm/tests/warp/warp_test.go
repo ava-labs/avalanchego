@@ -7,6 +7,7 @@ package warp
 import (
 	"context"
 	"crypto/ecdsa"
+	_ "embed"
 	"fmt"
 	"math/big"
 	"strings"
@@ -29,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp/warpbindings"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests/utils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -54,6 +54,9 @@ const (
 )
 
 var (
+	//go:embed genesis.json
+	genesis []byte
+
 	flagVars *e2e.FlagVars
 
 	subnetA, subnetB, cChainSubnetDetails *Subnet
@@ -95,8 +98,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			"subnet-evm-warp-e2e",
 			nodes,
 			tmpnet.FlagsMap{},
-			utils.NewTmpnetSubnet(subnetAName, tests.Genesis, utils.DefaultChainConfig, nodes...),
-			utils.NewTmpnetSubnet(subnetBName, tests.Genesis, utils.DefaultChainConfig, nodes...),
+			utils.NewTmpnetSubnet(subnetAName, genesis, utils.DefaultChainConfig, nodes...),
+			utils.NewTmpnetSubnet(subnetBName, genesis, utils.DefaultChainConfig, nodes...),
 		),
 	)
 
