@@ -121,32 +121,61 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.Describe("[Warp]", func() {
-	testFunc := func(sendingSubnet *Subnet, receivingSubnet *Subnet) {
-		tc := e2e.NewTestContext()
-		w := newWarpTest(tc.DefaultContext(), sendingSubnet, receivingSubnet)
-
-		ginkgo.GinkgoLogr.Info("Sending message from A to B")
-		w.sendMessageFromSendingSubnet()
-
-		ginkgo.GinkgoLogr.Info("Aggregating signatures via API")
-		w.aggregateSignaturesViaAPI()
-
-		ginkgo.GinkgoLogr.Info("Delivering addressed call payload to receiving subnet")
-		w.deliverAddressedCallToReceivingSubnet()
-
-		ginkgo.GinkgoLogr.Info("Delivering block hash payload to receiving subnet")
-		w.deliverBlockHashPayload()
-
-		ginkgo.GinkgoLogr.Info("Executing warp load test")
-		w.warpLoad()
+	testCombinations := []struct {
+		name            string
+		sendingSubnet   *Subnet
+		receivingSubnet *Subnet
+		skip            bool
+	}{
+		// TODO: Uncomment these tests when we have a way to run them in CI, currently we should not depend on Subnet-EVM
+		// as Coreth and Subnet-EVM have different release cycles. The problem is that once we update AvalancheGo (protocol version),
+		// we need to update Subnet-EVM to the same protocol version. Until then all Subnet-EVM tests are broken, so it's blocking Coreth development.
+		// It's best to not run these tests until we have a way to run them in CI.
+		// {"SubnetA -> C-Chain", subnetA, cChainSubnetDetails, true},
+		// {"C-Chain -> SubnetA", cChainSubnetDetails, subnetA, true},
+		{"C-Chain -> C-Chain", cChainSubnetDetails, cChainSubnetDetails, false},
 	}
-	// TODO: Uncomment these tests when we have a way to run them in CI, currently we should not depend on Subnet-EVM
-	// as Coreth and Subnet-EVM have different release cycles. The problem is that once we update AvalancheGo (protocol version),
-	// we need to update Subnet-EVM to the same protocol version. Until then all Subnet-EVM tests are broken, so it's blocking Coreth development.
-	// It's best to not run these tests until we have a way to run them in CI.
-	// ginkgo.It("SubnetA -> C-Chain", func() { testFunc(subnetA, cChainSubnetDetails) })
-	// ginkgo.It("C-Chain -> SubnetA", func() { testFunc(cChainSubnetDetails, subnetA) })
-	ginkgo.It("C-Chain -> C-Chain", func() { testFunc(cChainSubnetDetails, cChainSubnetDetails) })
+
+	for _, combination := range testCombinations {
+		combination := combination
+
+		ginkgo.Describe(combination.name, ginkgo.Ordered, func() {
+			var w *warpTest
+
+			ginkgo.BeforeAll(func() {
+				if combination.skip {
+					ginkgo.Skip("Test skipped - see TODO comment")
+				}
+				tc := e2e.NewTestContext()
+				w = newWarpTest(tc.DefaultContext(), combination.sendingSubnet, combination.receivingSubnet)
+			})
+
+			ginkgo.It("should send warp message from sending subnet", func() {
+				ginkgo.GinkgoLogr.Info("Sending message from sending subnet")
+				w.sendMessageFromSendingSubnet()
+			})
+
+			ginkgo.It("should aggregate signatures via API", func() {
+				ginkgo.GinkgoLogr.Info("Aggregating signatures via API")
+				w.aggregateSignaturesViaAPI()
+			})
+
+			ginkgo.It("should deliver addressed call payload to receiving subnet", func() {
+				ginkgo.GinkgoLogr.Info("Delivering addressed call payload to receiving subnet")
+				w.deliverAddressedCallToReceivingSubnet()
+			})
+
+			ginkgo.It("should deliver block hash payload", func() {
+				ginkgo.GinkgoLogr.Info("Delivering block hash payload to receiving subnet")
+				w.deliverBlockHashPayload()
+			})
+
+			ginkgo.It("should handle warp load testing", func() {
+				ginkgo.GinkgoLogr.Info("Executing warp load test")
+				w.warpLoad()
+			})
+		})
+	}
 })
 
 type warpTest struct {
