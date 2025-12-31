@@ -9,8 +9,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp/warpbindings"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests/utils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -88,8 +87,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	tc := e2e.NewTestContext()
 	nodes := utils.NewTmpnetNodes(tmpnet.DefaultNodeCount)
-	_, thisFile, _, _ := runtime.Caller(0)
-	genesisPath := filepath.Join(filepath.Dir(thisFile), "genesis.json")
 
 	env := e2e.NewTestEnvironment(
 		tc,
@@ -98,8 +95,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			"subnet-evm-warp-e2e",
 			nodes,
 			tmpnet.FlagsMap{},
-			utils.NewTmpnetSubnet(subnetAName, genesisPath, utils.DefaultChainConfig, nodes...),
-			utils.NewTmpnetSubnet(subnetBName, genesisPath, utils.DefaultChainConfig, nodes...),
+			utils.NewTmpnetSubnet(subnetAName, tests.Genesis, utils.DefaultChainConfig, nodes...),
+			utils.NewTmpnetSubnet(subnetBName, tests.Genesis, utils.DefaultChainConfig, nodes...),
 		),
 	)
 

@@ -5,7 +5,6 @@ package utils
 
 import (
 	"encoding/json"
-	"os"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
@@ -45,7 +44,7 @@ func NewTmpnetNetwork(owner string, nodes []*tmpnet.Node, flags tmpnet.FlagsMap,
 
 // Create the configuration that will enable creation and access to a
 // subnet created on a temporary network.
-func NewTmpnetSubnet(name string, genesisPath string, chainConfig map[string]any, nodes ...*tmpnet.Node) *tmpnet.Subnet {
+func NewTmpnetSubnet(name string, genesis []byte, chainConfig map[string]any, nodes ...*tmpnet.Node) *tmpnet.Subnet {
 	if len(nodes) == 0 {
 		panic("a subnet must be validated by at least one node")
 	}
@@ -53,11 +52,6 @@ func NewTmpnetSubnet(name string, genesisPath string, chainConfig map[string]any
 	validatorIDs := make([]ids.NodeID, len(nodes))
 	for i, node := range nodes {
 		validatorIDs[i] = node.NodeID
-	}
-
-	genesisBytes, err := os.ReadFile(genesisPath)
-	if err != nil {
-		panic(err)
 	}
 
 	chainConfigBytes, err := json.Marshal(chainConfig)
@@ -70,7 +64,7 @@ func NewTmpnetSubnet(name string, genesisPath string, chainConfig map[string]any
 		Chains: []*tmpnet.Chain{
 			{
 				VMID:         evm.ID,
-				Genesis:      genesisBytes,
+				Genesis:      genesis,
 				Config:       string(chainConfigBytes),
 				PreFundedKey: tmpnet.HardhatKey,
 			},
