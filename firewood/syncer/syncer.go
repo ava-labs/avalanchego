@@ -27,7 +27,7 @@ var (
 	defaultSimultaneousWorkLimit = 8
 )
 
-// Database wraps a Firewood FFI Database to implement the xsync.DB interface.
+// Database wraps a Firewood ffi.Database to implement the xsync.DB interface.
 type Database struct {
 	db                 *ffi.Database
 	rangeProofCallback func(context.Context, *ffi.RangeProof) error
