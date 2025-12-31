@@ -138,25 +138,25 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.Describe("[Warp]", func() {
-	testCombinations := []struct {
+	type testCombination struct {
 		name            string
-		sendingSubnet   *Subnet
-		receivingSubnet *Subnet
-	}{
-		{"SubnetA -> C-Chain", subnetA, cChainSubnetDetails},
-		{"C-Chain -> SubnetA", cChainSubnetDetails, subnetA},
-		{"C-Chain -> C-Chain", cChainSubnetDetails, cChainSubnetDetails},
+		sendingSubnet   func() *Subnet
+		receivingSubnet func() *Subnet
+	}
+
+	testCombinations := []testCombination{
+		{"SubnetA -> C-Chain", func() *Subnet { return subnetA }, func() *Subnet { return cChainSubnetDetails }},
+		{"C-Chain -> SubnetA", func() *Subnet { return cChainSubnetDetails }, func() *Subnet { return subnetA }},
+		{"C-Chain -> C-Chain", func() *Subnet { return cChainSubnetDetails }, func() *Subnet { return cChainSubnetDetails }},
 	}
 
 	for _, combination := range testCombinations {
-		combination := combination
-
 		ginkgo.Describe(combination.name, ginkgo.Ordered, func() {
 			var w *warpTest
 
 			ginkgo.BeforeAll(func() {
 				tc := e2e.NewTestContext()
-				w = newWarpTest(tc.DefaultContext(), combination.sendingSubnet, combination.receivingSubnet)
+				w = newWarpTest(tc.DefaultContext(), combination.sendingSubnet(), combination.receivingSubnet())
 			})
 
 			ginkgo.It("should send warp message from sending subnet", func() {
