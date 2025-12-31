@@ -121,33 +121,29 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.Describe("[Warp]", func() {
-	testCombinations := []struct {
+	type testCombination struct {
 		name            string
-		sendingSubnet   *Subnet
-		receivingSubnet *Subnet
-		skip            bool
-	}{
+		sendingSubnet   func() *Subnet
+		receivingSubnet func() *Subnet
+	}
+
+	testCombinations := []testCombination{
 		// TODO: Uncomment these tests when we have a way to run them in CI, currently we should not depend on Subnet-EVM
 		// as Coreth and Subnet-EVM have different release cycles. The problem is that once we update AvalancheGo (protocol version),
 		// we need to update Subnet-EVM to the same protocol version. Until then all Subnet-EVM tests are broken, so it's blocking Coreth development.
 		// It's best to not run these tests until we have a way to run them in CI.
-		// {"SubnetA -> C-Chain", subnetA, cChainSubnetDetails, true},
-		// {"C-Chain -> SubnetA", cChainSubnetDetails, subnetA, true},
-		{"C-Chain -> C-Chain", cChainSubnetDetails, cChainSubnetDetails, false},
+		// {"SubnetA -> C-Chain", func() *Subnet { return subnetA }, func() *Subnet { return cChainSubnetDetails }},
+		// {"C-Chain -> SubnetA", func() *Subnet { return cChainSubnetDetails }, func() *Subnet { return subnetA }},
+		{"C-Chain -> C-Chain", func() *Subnet { return cChainSubnetDetails }, func() *Subnet { return cChainSubnetDetails }},
 	}
 
 	for _, combination := range testCombinations {
-		combination := combination
-
 		ginkgo.Describe(combination.name, ginkgo.Ordered, func() {
 			var w *warpTest
 
 			ginkgo.BeforeAll(func() {
-				if combination.skip {
-					ginkgo.Skip("Test skipped - see TODO comment")
-				}
 				tc := e2e.NewTestContext()
-				w = newWarpTest(tc.DefaultContext(), combination.sendingSubnet, combination.receivingSubnet)
+				w = newWarpTest(tc.DefaultContext(), combination.sendingSubnet(), combination.receivingSubnet())
 			})
 
 			ginkgo.It("should send warp message from sending subnet", func() {
