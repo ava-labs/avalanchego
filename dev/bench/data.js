@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1767193541277,
+  "lastUpdate": 1767271211594,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1127,6 +1127,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
             "value": 48.03876327411399,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Tsvetan Dimitrov",
+            "username": "powerslider",
+            "email": "tsvetan.dimitrov23@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "1e65fa2d048fd30f4ad7f58b3f1e65d2a0982b2e",
+          "message": "refactor(vmsync): extract strategy pattern for static state sync via `Executor` interface (#4652)\n\nSigned-off-by: Tsvetan Dimitrov (tsvetan.dimitrov@avalabs.org)\nCo-authored-by: Jonathan Oppenheimer <jonathan.oppenheimer@avalabs.org>",
+          "timestamp": "2026-01-01T07:45:25Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/1e65fa2d048fd30f4ad7f58b3f1e65d2a0982b2e"
+        },
+        "date": 1767271211046,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - mgas/s",
+            "value": 72.74187876438641,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - ms/ggas",
+            "value": 13747.239100587933,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_parse_ms/ggas",
+            "value": 75.27468925520671,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_verify_ms/ggas",
+            "value": 13613.480508719264,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
+            "value": 55.369717376434025,
             "unit": "block_accept_ms/ggas"
           }
         ]
