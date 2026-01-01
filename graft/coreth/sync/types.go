@@ -22,6 +22,9 @@ type Syncer interface {
 	// The sync will respect context cancellation.
 	Sync(ctx context.Context) error
 
+	// UpdateTarget updates the syncer's target while running to support dynamic state sync.
+	UpdateTarget(newTarget message.Syncable) error
+
 	// Name returns a human-readable name for this syncer implementation.
 	Name() string
 

@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
@@ -111,4 +113,8 @@ func (s *BlockSyncer) Sync(ctx context.Context) error {
 
 	log.Info("fetched blocks from peer", "total", blocksToFetch)
 	return batch.Write()
+}
+
+func (*BlockSyncer) UpdateTarget(_ message.Syncable) error {
+	return nil
 }
