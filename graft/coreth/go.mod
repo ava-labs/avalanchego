@@ -184,6 +184,8 @@ tool (
 	github.com/onsi/ginkgo/v2/ginkgo
 )
 
-replace github.com/ava-labs/avalanchego => ../../
-
-replace github.com/ava-labs/avalanchego/graft/evm => ../evm
+replace (
+	github.com/ava-labs/avalanchego => ../../
+	github.com/ava-labs/avalanchego/graft/evm => ../evm
+	github.com/ava-labs/avalanchego/graft/subnet-evm => ../subnet-evm
+)
