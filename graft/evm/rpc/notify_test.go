@@ -9,10 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/evm/libevmtest"
-	"github.com/ava-labs/avalanchego/graft/evm/rpc"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+
+	"github.com/ava-labs/avalanchego/graft/evm/libevmtest"
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 )
 
 func TestNotify(t *testing.T) {
@@ -24,7 +27,7 @@ func TestNotify(t *testing.T) {
 		ParentHash: common.HexToHash("0x01"),
 		Number:     big.NewInt(100),
 	}
-	notifier.Notify(id, msg)
+	require.NoError(t, notifier.Notify(id, msg))
 	have := strings.TrimSpace(out.String())
 
 	// Expected JSON for C-Chain (includes extDataHash and extDataGasUsed)
@@ -35,16 +38,10 @@ func TestNotify(t *testing.T) {
 
 	switch currentVariant.Get() {
 	case libevmtest.CChainVariant:
-		if have != wantCChain {
-			t.Errorf("C-Chain variant: JSON does not match expected format.\nhave:\n%v\nwant:\n%v",
-				have, wantCChain)
-		}
+		require.Equal(t, wantCChain, have)
 	case libevmtest.SubnetEVMVariant:
-		if have != wantSubnetEVM {
-			t.Errorf("Subnet-EVM variant: JSON does not match expected format.\nhave:\n%v\nwant:\n%v",
-				have, wantSubnetEVM)
-		}
+		require.Equal(t, wantSubnetEVM, have)
 	default:
-		t.Fatalf("Unknown or unregistered variant: %v (this test must run via TestMain)", currentVariant.Get())
+		require.FailNow(t, "Unknown or unregistered variant (this test must run via TestMain)")
 	}
 }

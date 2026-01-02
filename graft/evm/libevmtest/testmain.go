@@ -35,26 +35,26 @@ const (
 func RunWithAll(m *testing.M, currentVariant *utils.Atomic[Variant]) int {
 	fmt.Println("=== Running tests with both C-Chain and Subnet-EVM ===")
 
-	fmt.Println("\n--- Running C-Chain variant ---")
+	fmt.Println("--- Running C-Chain variant ---")
 	cchainCode := runWith(m, currentVariant, emulate.CChain, CChainVariant)
 
-	fmt.Println("\n--- Running Subnet-EVM variant ---")
+	fmt.Println("--- Running Subnet-EVM variant ---")
 	subnetCode := runWith(m, currentVariant, emulate.SubnetEVM, SubnetEVMVariant)
 
 	if cchainCode != 0 {
-		fmt.Fprintf(os.Stderr, "\nC-Chain tests failed")
+		fmt.Fprintln(os.Stderr, "C-Chain tests failed")
 	} else {
-		fmt.Println("\nC-Chain tests passed")
+		fmt.Println("C-Chain tests passed")
 	}
 
 	if subnetCode != 0 {
-		fmt.Fprintf(os.Stderr, "Subnet-EVM tests failed")
+		fmt.Fprintln(os.Stderr, "Subnet-EVM tests failed")
 	} else {
 		fmt.Println("Subnet-EVM tests passed")
 	}
 
 	if cchainCode != 0 || subnetCode != 0 {
-	    return 1
+		return 1
 	}
 
 	return 0
