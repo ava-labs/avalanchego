@@ -131,3 +131,11 @@ jobs:
           path: ${{ github.workspace }}/benchmark-output.txt
           retention-days: 30
           if-no-files-found: error
+      - name: Upload pprof profiles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pprof-profiles
+          path: pprof/
+          retention-days: 30
+          if-no-files-found: ignore
