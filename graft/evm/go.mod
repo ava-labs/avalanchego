@@ -4,8 +4,6 @@ go 1.24.11
 
 require (
 	github.com/ava-labs/avalanchego v1.14.1-antithesis-docker-image-fix
-	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca
-	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18
 	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -21,6 +19,8 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/StephenButtolph/canoto v0.17.3 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
+	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca // indirect
+	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5 // indirect
@@ -129,6 +129,3 @@ replace (
 	github.com/ava-labs/avalanchego/graft/coreth => ../coreth
 	github.com/ava-labs/avalanchego/graft/subnet-evm => ../subnet-evm
 )
-
-// Exclude old genproto version to avoid conflicts
-exclude google.golang.org/genproto v0.0.0-20210624195500-8bfb893ecb84
