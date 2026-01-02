@@ -53,11 +53,8 @@ func RunWithAll(m *testing.M, currentVariant *utils.Atomic[Variant]) int {
 		fmt.Println("Subnet-EVM tests passed")
 	}
 
-	if cchainCode != 0 {
-		return cchainCode
-	}
-	if subnetCode != 0 {
-		return subnetCode
+	if cchainCode != 0 || subnetCode != 0 {
+	    return 1
 	}
 
 	return 0
