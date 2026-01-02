@@ -70,7 +70,6 @@ func RunWithAll(m *testing.M) int {
 		return subnetCode
 	}
 
-	fmt.Println("\nAll tests passed with both variants")
 	return 0
 }
 
