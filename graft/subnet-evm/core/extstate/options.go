@@ -6,7 +6,7 @@ package extstate
 import (
 	"github.com/ava-labs/libevm/core/state"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 )
 
 type workerPool struct {

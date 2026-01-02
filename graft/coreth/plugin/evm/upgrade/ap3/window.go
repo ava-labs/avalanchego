@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	safemath "github.com/ava-labs/libevm/common/math"

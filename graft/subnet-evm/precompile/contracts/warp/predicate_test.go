@@ -12,15 +12,16 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -225,7 +226,7 @@ func createSnowCtx(tb testing.TB, validatorRanges []validatorRange) *snow.Contex
 	// results.
 	warpValidators, warpValidatorsErr := validators.FlattenValidatorSet(validatorSet)
 
-	snowCtx := utilstest.NewTestSnowContext(tb)
+	snowCtx := snowtest.Context(tb, utilstest.SubnetEVMTestChainID)
 	snowCtx.ValidatorState = &validatorstest.State{
 		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			return sourceSubnetID, nil
@@ -313,7 +314,7 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 
 	pred := predicate.New(warpMsg.Bytes())
 
-	snowCtx := utilstest.NewTestSnowContext(t)
+	snowCtx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 	snowCtx.SubnetID = ids.GenerateTestID()
 	snowCtx.ChainID = ids.GenerateTestID()
 	snowCtx.CChainID = cChainID
@@ -787,7 +788,7 @@ func makeWarpPredicateTests(tb testing.TB, rules extras.AvalancheRules) []precom
 		warpValidators, err := validators.FlattenValidatorSet(validatorSet)
 		require.NoError(tb, err)
 
-		snowCtx := utilstest.NewTestSnowContext(tb)
+		snowCtx := utilstest.NewTestSnowContext(tb, utilstest.SubnetEVMTestChainID)
 
 		snowCtx.ValidatorState = &validatorstest.State{
 			GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {

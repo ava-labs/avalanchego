@@ -13,7 +13,7 @@ import (
 
 func TestNewTestSnowContext(t *testing.T) {
 	// Test that NewTestSnowContext creates a context with validator state
-	snowCtx := NewTestSnowContext(t)
+	snowCtx := NewTestSnowContext(t, SubnetEVMTestChainID)
 	require.NotNil(t, snowCtx.ValidatorState)
 
 	// Test that the validator state has the required functions
