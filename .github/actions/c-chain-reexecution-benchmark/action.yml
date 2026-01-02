@@ -120,7 +120,7 @@ runs:
         echo "Grafana: ${metrics_url}"
         echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
       env:
-        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
+        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository-owner }}%2F${{ inputs.repository-name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run-id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run-attempt }}
         GH_JOB_ID: ${{ inputs.job }}
     - name: Warn that collection of metrics and logs will not be performed
       if: inputs.prometheus-username == ''
@@ -183,11 +183,11 @@ runs:
         PROMETHEUS_PUSH_URL: ${{ inputs.prometheus-push-url }}
         PROMETHEUS_USERNAME: ${{ inputs.prometheus-username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus-password }}
-        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
+        GH_REPO: ${{ inputs.repository-owner }}/${{ inputs.repository-name }}
         GH_WORKFLOW: ${{ inputs.workflow }}
-        GH_RUN_ID: ${{ inputs.run_id }}
-        GH_RUN_NUMBER: ${{ inputs.run_number }}
-        GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        GH_RUN_ID: ${{ inputs.run-id }}
+        GH_RUN_NUMBER: ${{ inputs.run-number }}
+        GH_RUN_ATTEMPT: ${{ inputs.run-attempt }}
         GH_JOB_ID: ${{ inputs.job }}
         # Required for Nix builds in CI self-hosted runners (e.g., building Firewood via polyrepo)
         TMPDIR: /tmp
