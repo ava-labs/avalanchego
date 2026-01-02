@@ -236,6 +236,7 @@ tasks:
     # - METRICS_SERVER_PORT (monitoring config)
     # - METRICS_SERVER_ENABLED (runtime monitoring decision)
     # - METRICS_COLLECTOR_ENABLED (runtime monitoring decision)
+    # - PROFILE (runtime profiling decision, see benchmark_cchain_range.sh for details)
     # - PROMETHEUS_URL, PROMETHEUS_USERNAME, PROMETHEUS_PASSWORD (monitoring config)
     # - GH_REPO, GH_WORKFLOW, GH_RUN_ID, etc. (GitHub context)
 
