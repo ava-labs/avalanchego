@@ -51,7 +51,6 @@ func RunWithAll(m *testing.M) int {
 	fmt.Println("\n--- Running Subnet-EVM variant ---")
 	subnetCode := runWith(m, emulate.SubnetEVM, SubnetEVMVariant)
 
-	// Always print results for both variants
 	if cchainCode != 0 {
 		fmt.Fprintf(os.Stderr, "\nC-Chain tests failed with exit code %d\n", cchainCode)
 	} else {
@@ -64,7 +63,6 @@ func RunWithAll(m *testing.M) int {
 		fmt.Println("Subnet-EVM tests passed")
 	}
 
-	// Return the first non-zero exit code, or 0 if both passed
 	if cchainCode != 0 {
 		return cchainCode
 	}
