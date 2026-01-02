@@ -67,7 +67,8 @@ var (
 			"state-scheme": "firewood",
 			"snapshot-cache": 0,
 			"pruning-enabled": true,
-			"state-sync-enabled": false
+			"state-sync-enabled": false,
+			"metrics-expensive-enabled": true
 		}`,
 		"firewood-archive": `{
 			"state-scheme": "firewood",
