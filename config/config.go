@@ -55,7 +55,8 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 
-	maxDiskSpaceThreshold = 50
+	maxDiskSpaceThreshold   = 50
+	maxMemorySpaceThreshold = 50
 )
 
 var (
@@ -88,6 +89,8 @@ var (
 	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
 	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
+	errMemorySpaceOutOfRange                  = fmt.Errorf("out of range [0,%d]", maxMemorySpaceThreshold)
+	errMemoryWarnAfterFatal                   = errors.New("warning memory threshold cannot be greater than fatal threshold")
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
@@ -1167,6 +1170,28 @@ func getDiskSpaceConfig(v *viper.Viper) (
 	}
 }
 
+func getMemoryConfig(v *viper.Viper) (
+	requiredAvailableMemoryPercentage uint64,
+	warningAvailableMemoryPercentage uint64,
+	err error,
+) {
+	var (
+		warnKey     = SystemTrackerWarningAvailableMemoryPercentageKey
+		requiredKey = SystemTrackerRequiredAvailableMemoryPercentageKey
+
+		warn     = v.GetUint64(warnKey)
+		required = v.GetUint64(requiredKey)
+	)
+	switch {
+	case warn > maxMemorySpaceThreshold:
+		return 0, 0, fmt.Errorf("%w: %q (%d)", errMemorySpaceOutOfRange, warnKey, warn)
+	case warn < required:
+		return 0, 0, fmt.Errorf("%w: %d < %d", errMemoryWarnAfterFatal, warn, required)
+	default:
+		return required, warn, nil
+	}
+}
+
 func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 	vdrAlloc := v.GetFloat64(DiskVdrAllocKey)
 	maxNonVdrUsage := v.GetFloat64(DiskMaxNonVdrUsageKey)
@@ -1419,6 +1444,11 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
 
 	nodeConfig.RequiredAvailableDiskSpacePercentage, nodeConfig.WarningAvailableDiskSpacePercentage, err = getDiskSpaceConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.RequiredAvailableMemoryPercentage, nodeConfig.WarningAvailableMemoryPercentage, err = getMemoryConfig(v)
 	if err != nil {
 		return node.Config{}, err
 	}
