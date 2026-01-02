@@ -19,9 +19,8 @@ import (
 )
 
 var (
-	_ gossip.HandlerSet[*atomic.Tx]      = (*Mempool)(nil)
+	_ gossip.Set[*atomic.Tx]             = (*Mempool)(nil)
 	_ gossip.PullGossiperSet[*atomic.Tx] = (*Mempool)(nil)
-	_ gossip.PushGossiperSet             = (*Mempool)(nil)
 
 	ErrAlreadyKnown    = errors.New("already known")
 	ErrConflict        = errors.New("conflict present")
@@ -306,4 +305,11 @@ func (m *Mempool) BloomFilter() (*bloom.Filter, ids.ID) {
 	defer m.lock.RUnlock()
 
 	return m.bloom.BloomFilter()
+}
+
+func (m *Mempool) Len() int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.length()
 }
