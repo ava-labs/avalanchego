@@ -8,6 +8,11 @@ version: '3'
 env:
   S3_BOOTSTRAP_BUCKET: 's3://avalanchego-bootstrap-testing'
 
+vars:
+  # Sentinel value to indicate starting from genesis (empty state) instead of S3 snapshot
+  # for c-chain re-execution tasks
+  GENESIS_SENTINEL: 'genesis'
+
 tasks:
   default: ./scripts/run_task.sh --list
 
@@ -155,7 +160,7 @@ tasks:
           SRC: '{{.BLOCK_DIR_SRC}}'
           DST: '{{.EXECUTION_DATA_DIR}}/blocks'
       - cmd: |
-          if [[ "{{.CURRENT_STATE_DIR_SRC}}" != "genesis" ]]; then
+          if [[ "{{.CURRENT_STATE_DIR_SRC}}" != "{{.GENESIS_SENTINEL}}" ]]; then
             task import-s3-to-dir SRC="{{.CURRENT_STATE_DIR_SRC}}" DST="{{.EXECUTION_DATA_DIR}}/current-state"
           else
             mkdir -p "{{.EXECUTION_DATA_DIR}}/current-state"
@@ -273,7 +278,7 @@ tasks:
       - task: import-cchain-reexecute-range
         vars:
           BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.BLOCK_DIR_SRC}}/**'
-          CURRENT_STATE_DIR_SRC: '{{if .CURRENT_STATE_DIR_SRC}}{{.S3_BOOTSTRAP_BUCKET}}/{{.CURRENT_STATE_DIR_SRC}}/**{{else}}genesis{{end}}'
+          CURRENT_STATE_DIR_SRC: '{{if .CURRENT_STATE_DIR_SRC}}{{.S3_BOOTSTRAP_BUCKET}}/{{.CURRENT_STATE_DIR_SRC}}/**{{else}}{{.GENESIS_SENTINEL}}{{end}}'
           EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       - task: reexecute-cchain-range
         vars:
