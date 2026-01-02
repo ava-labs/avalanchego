@@ -15,7 +15,7 @@ import (
 )
 
 // Variant represents which EVM variant is currently registered.
-type Variant int32
+type utils.AtomicInt32 int32
 
 const (
 	// UnknownVariant indicates no variant is registered.
@@ -52,13 +52,13 @@ func RunWithAll(m *testing.M) int {
 	subnetCode := runWith(m, emulate.SubnetEVM, SubnetEVMVariant)
 
 	if cchainCode != 0 {
-		fmt.Fprintf(os.Stderr, "\nC-Chain tests failed with exit code %d\n", cchainCode)
+		fmt.Fprintf(os.Stderr, "\nC-Chain tests failed")
 	} else {
 		fmt.Println("\nC-Chain tests passed")
 	}
 
 	if subnetCode != 0 {
-		fmt.Fprintf(os.Stderr, "Subnet-EVM tests failed with exit code %d\n", subnetCode)
+		fmt.Fprintf(os.Stderr, "Subnet-EVM tests failed")
 	} else {
 		fmt.Println("Subnet-EVM tests passed")
 	}
