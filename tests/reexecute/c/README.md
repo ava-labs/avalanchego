@@ -282,7 +282,7 @@ Pass `LIBEVM_REF` and/or `FIREWOOD_REF` to any benchmark task:
 
 ### CI Usage
 
-For workflow dispatch, use the `with` input to specify custom dependency versions:
+For workflow dispatch, use the `with-dependencies` input to specify custom dependency versions:
 
 - Single dependency: `-f with-dependencies=firewood=abc123`
 - Multiple dependencies: `-f with-dependencies="firewood=abc123,libevm=v1.2.3"`
