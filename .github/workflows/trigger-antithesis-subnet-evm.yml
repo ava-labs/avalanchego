@@ -1,12 +1,11 @@
-name: Trigger Antithesis
+name: Trigger Antithesis Subnet-EVM Setup
 
 on:
   schedule:
     # When adjusting the schedule and duration of execution, make sure
-    # to check the schedule of antithesis jobs scheduled by other
-    # repos (avalanchego and hypersdk). Ideally the schedules for
-    # different test setups should not overlap to avoid unintended
-    # resource contention.
+    # to check the schedule of other antithesis jobs (trigger-antithesis-*).
+    # The schedules for different test setups should not overlap to avoid 
+    # unintended resource contention.
     - cron: '0 14 * * *' # Every day at 2PM UTC
   workflow_dispatch:
     inputs:
@@ -16,7 +15,7 @@ on:
         required: true
         type: string
       recipients:
-        description: 'Comma-seperated email addresses to send the test report to'
+        description: 'Comma-separated email addresses to send the test report to'
         required: true
         type: string
       image_tag:
@@ -26,8 +25,8 @@ on:
         type: string
 
 jobs:
-  antithesis:
-    name: Run Antithesis
+  antithesis_subnet_evm:
+    name: Run Antithesis Subnet-EVM Test Setup
     runs-on: ubuntu-latest
     steps:
       - uses: antithesishq/antithesis-trigger-action@6c0a27302c0a3cd97d87d40bd6704e673abed4bb #v0.9
