@@ -1,1 +1,5 @@
 rpc/*
+
+!rpc/main_test.go
+!rpc/notify_test.go
+!rpc/testing.go
