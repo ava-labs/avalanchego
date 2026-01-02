@@ -173,8 +173,7 @@ var _ = ginkgo.Describe("[Warp]", func() {
 			var w *warpTest
 
 			ginkgo.BeforeAll(func() {
-				tc := e2e.NewTestContext()
-				w = newWarpTest(tc.DefaultContext(), combination.sendingSubnet(), combination.receivingSubnet())
+				w = newWarpTest(combination.sendingSubnet(), combination.receivingSubnet())
 			})
 
 			ginkgo.It("should send warp message from sending subnet", func() {
@@ -239,8 +238,10 @@ type warpTest struct {
 	addressedCallSignedMessage   *avalancheWarp.Message
 }
 
-func newWarpTest(ctx context.Context, sendingSubnet *Subnet, receivingSubnet *Subnet) *warpTest {
+func newWarpTest(sendingSubnet *Subnet, receivingSubnet *Subnet) *warpTest {
 	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	ctx := tc.DefaultContext()
 
 	sendingSubnetFundedKey := sendingSubnet.PreFundedKey
 	receivingSubnetFundedKey := receivingSubnet.PreFundedKey
@@ -315,9 +316,10 @@ func (*warpTest) getBlockHashAndNumberFromTxReceipt(ctx context.Context, client 
 }
 
 func (w *warpTest) sendMessageFromSendingSubnet() {
+	require := require.New(ginkgo.GinkgoT())
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
-	require := require.New(ginkgo.GinkgoT())
+
 	client := w.sendingSubnetClients[0]
 
 	blockHash, blockNumber := w.sendWarpMessageTx(ctx, client)
