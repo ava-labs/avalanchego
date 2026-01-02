@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/coreth/triedb/pathdb"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -338,8 +339,13 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	if _, err := statedb.Commit(0, false, stateconf.WithTrieDBUpdateOpts(triedbOpt)); err != nil {
 		panic(fmt.Sprintf("unable to commit genesis block to statedb: %v", err))
 	}
+	if root == types.EmptyRootHash && isFirewood(triedb) {
+		if err := triedb.Update(root, root, 0, nil, nil, triedbOpt); err != nil {
+			panic(fmt.Sprintf("unable to update genesis block in triedb: %v", err))
+		}
+	}
 	// Commit newly generated states into disk if it's not empty.
-	if root != types.EmptyRootHash {
+	if root != types.EmptyRootHash || isFirewood(triedb) {
 		if err := triedb.Commit(root, true); err != nil {
 			panic(fmt.Sprintf("unable to commit genesis block: %v", err))
 		}
@@ -397,4 +403,9 @@ func ReadBlockByHash(db ethdb.Reader, hash common.Hash) *types.Block {
 		return nil
 	}
 	return rawdb.ReadBlock(db, hash, *blockNumber)
+}
+
+func isFirewood(db *triedb.Database) bool {
+	_, ok := db.Backend().(*firewood.TrieDB)
+	return ok
 }
