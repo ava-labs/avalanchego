@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // AP5 defines constants used after the Apricot Phase 5 upgrade.
