@@ -11,6 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/process"
 	"go.uber.org/zap"
 
@@ -46,9 +47,18 @@ type DiskUser interface {
 	AvailableDiskPercentage() uint64
 }
 
+type MemoryUser interface {
+	// returns number of bytes available in system memory
+	AvailableMemoryBytes() uint64
+
+	// returns percentage of available memory
+	AvailableMemoryPercentage() uint64
+}
+
 type User interface {
 	CPUUser
 	DiskUser
+	MemoryUser
 }
 
 type ProcessTracker interface {
@@ -87,6 +97,10 @@ type manager struct {
 
 	availableDiskPercent uint64
 
+	availableMemoryBytes uint64
+
+	availableMemoryPercent uint64
+
 	closeOnce sync.Once
 	onClose   chan struct{}
 }
@@ -105,11 +119,12 @@ func NewManager(
 	}
 
 	m := &manager{
-		log:                log,
-		processMetrics:     processMetrics,
-		processes:          make(map[int]*proc),
-		onClose:            make(chan struct{}),
-		availableDiskBytes: math.MaxUint64,
+		log:                  log,
+		processMetrics:       processMetrics,
+		processes:            make(map[int]*proc),
+		onClose:              make(chan struct{}),
+		availableDiskBytes:   math.MaxUint64,
+		availableMemoryBytes: math.MaxUint64,
 	}
 
 	go m.update(diskPath, frequency, cpuHalflife, diskHalflife)
@@ -142,6 +157,20 @@ func (m *manager) AvailableDiskPercentage() uint64 {
 	defer m.usageLock.RUnlock()
 
 	return m.availableDiskPercent
+}
+
+func (m *manager) AvailableMemoryBytes() uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.availableMemoryBytes
+}
+
+func (m *manager) AvailableMemoryPercentage() uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.availableMemoryPercent
 }
 
 func (m *manager) TrackProcess(pid int) {
@@ -195,6 +224,14 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 			)
 		}
 
+		virtualMem, getMemErr := mem.VirtualMemory()
+		if getMemErr != nil {
+			m.log.Verbo("failed to lookup resource",
+				zap.String("resource", "system memory"),
+				zap.Error(getMemErr),
+			)
+		}
+
 		m.usageLock.Lock()
 		m.cpuUsage = oldCPUWeight*m.cpuUsage + currentScaledCPUUsage
 		m.readUsage = oldDiskWeight*m.readUsage + currentScaledReadUsage
@@ -203,6 +240,11 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 		if getBytesErr == nil {
 			m.availableDiskBytes = availableBytes
 			m.availableDiskPercent = availablePercentage
+		}
+
+		if getMemErr == nil {
+			m.availableMemoryBytes = virtualMem.Available
+			m.availableMemoryPercent = uint64(100 - virtualMem.UsedPercent)
 		}
 
 		m.usageLock.Unlock()
