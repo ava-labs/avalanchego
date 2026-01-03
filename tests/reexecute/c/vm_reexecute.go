@@ -11,6 +11,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"slices"
 	"strconv"
 	"strings"
@@ -42,6 +43,7 @@ var (
 	executionTimeout   time.Duration
 	labelsArg          string
 
+	pprofEnabled               bool
 	metricsServerEnabledArg    bool
 	metricsServerPortArg       uint64
 	metricsCollectorEnabledArg bool
@@ -92,6 +94,7 @@ func init() {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
+	flag.BoolVar(&pprofEnabled, "pprof", false, "Enable full suite of pprof profiling.")
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
 	flag.Uint64Var(&metricsServerPortArg, "metrics-server-port", 0, "The port the metrics server will listen to.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
@@ -134,6 +137,10 @@ func main() {
 	tc := tests.NewTestContext(tests.NewDefaultLogger("c-chain-reexecution"))
 	tc.SetDefaultContextParent(context.Background())
 	defer tc.RecoverAndExit()
+
+	if pprofEnabled {
+		defer setupPprof(tc)()
+	}
 
 	benchmarkName := fmt.Sprintf(
 		"BenchmarkReexecuteRange/[%d,%d]-Config-%s-Runner-%s",
@@ -209,15 +216,16 @@ func benchmarkReexecuteRange(
 		zap.String("runner", runnerTypeArg),
 		zap.String("config", configNameArg),
 		zap.String("labels", labelsArg),
-		zap.String("metrics-server-enabled", strconv.FormatBool(metricsServerEnabled)),
+		zap.Bool("metrics-server-enabled", metricsServerEnabled),
 		zap.Uint64("metrics-server-port", metricsPort),
-		zap.String("metrics-collector-enabled", strconv.FormatBool(metricsCollectorEnabled)),
+		zap.Bool("metrics-collector-enabled", metricsCollectorEnabled),
 		zap.String("block-dir", blockDir),
 		zap.String("vm-db-dir", vmDBDir),
 		zap.String("chain-data-dir", chainDataDir),
 		zap.Uint64("start-block", startBlock),
 		zap.Uint64("end-block", endBlock),
 		zap.Int("chan-size", chanSize),
+		zap.Bool("pprof-enabled", pprofEnabled),
 	)
 
 	blockChan, err := reexecute.CreateBlockChanFromLevelDB(tc, blockDir, startBlock, endBlock, chanSize)
@@ -552,4 +560,38 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 		labels[parts[0]] = parts[1]
 	}
 	return labels, nil
+}
+
+func setupPprof(tc tests.TestContext) func() {
+	r := require.New(tc)
+	logger := tests.NewDefaultLogger("pprof")
+
+	cwd, err := os.Getwd()
+	r.NoError(err, "failed to get current working directory")
+
+	profileDir := filepath.Join(cwd, "pprof")
+	r.NoError(os.MkdirAll(profileDir, perms.ReadWriteExecute), "failed to create profile directory")
+
+	cpuFile, err := os.Create(filepath.Join(profileDir, "cpu.prof"))
+	r.NoError(err, "failed to create CPU profile")
+
+	r.NoError(pprof.StartCPUProfile(cpuFile), "failed to start CPU profile")
+
+	return func() {
+		pprof.StopCPUProfile()
+		cpuFile.Close()
+		logger.Info("CPU profile", zap.String("path", cpuFile.Name()))
+
+		memFile, err := os.Create(filepath.Join(profileDir, "mem.prof"))
+		if err != nil {
+			logger.Error("failed to create memory profile", zap.Error(err))
+			return
+		}
+		defer memFile.Close()
+		if err := pprof.WriteHeapProfile(memFile); err != nil {
+			logger.Error("failed to write memory profile", zap.Error(err))
+			return
+		}
+		logger.Info("memory profile", zap.String("path", memFile.Name()))
+	}
 }
