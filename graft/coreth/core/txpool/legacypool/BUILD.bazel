@@ -1,0 +1,55 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "legacypool",
+    srcs = [
+        "journal.go",
+        "legacypool.go",
+        "list.go",
+        "noncer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/core/txpool/legacypool",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/core",
+        "//graft/coreth/core/txpool",
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customheader",
+        "//graft/coreth/utils",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/prque",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/txpool/legacypool",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_holiman_uint256//:uint256",
+        "@org_golang_x_exp//slices",
+    ],
+)
+
+go_test(
+    name = "legacypool_test",
+    srcs = [
+        "legacypool2_test.go",
+        "legacypool_test.go",
+        "list_test.go",
+    ],
+    embed = [":legacypool"],
+    deps = [
+        "//graft/coreth/core",
+        "//graft/coreth/core/txpool",
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customtypes",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)

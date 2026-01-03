@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "commonmock",
+    srcs = ["sender.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/common/commonmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/engine/common",
+        "//utils/set",
+        "@org_uber_go_mock//gomock",
+    ],
+)

@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "mempool",
+    srcs = ["mempool.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/avm/txs/mempool",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vms/avm/txs",
+        "//vms/txs/mempool",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)

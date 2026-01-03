@@ -1,0 +1,41 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "grpcutils",
+    srcs = [
+        "client.go",
+        "server.go",
+        "server_closer.go",
+        "util.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto/pb/http",
+        "@org_golang_google_genproto_googleapis_rpc//status",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//credentials/insecure",
+        "@org_golang_google_grpc//keepalive",
+        "@org_golang_google_grpc//status",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/anypb",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)
+
+go_test(
+    name = "grpcutils_test",
+    srcs = ["client_test.go"],
+    embed = [":grpcutils"],
+    deps = [
+        "//database/memdb",
+        "//database/rpcdb",
+        "//proto/pb/rpcdb",
+        "@com_github_grpc_ecosystem_go_grpc_prometheus//:go-grpc-prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//credentials/insecure",
+        "@org_golang_google_grpc//status",
+    ],
+)

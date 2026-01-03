@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "metricsmock",
+    srcs = ["metrics.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/avm/metrics/metricsmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vms/avm/block",
+        "//vms/avm/txs",
+        "@com_github_gorilla_rpc//v2:rpc",
+        "@org_uber_go_mock//gomock",
+    ],
+)

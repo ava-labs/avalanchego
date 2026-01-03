@@ -1,0 +1,111 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/BUILD.bazel
+@@ -0,0 +1,59 @@
++# Custom BUILD file for github.com/supranational/blst
++# Based on prysmaticlabs/prysm's third_party/blst/blst.BUILD
++
++load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
++
++cc_library(
++    name = "blst",
++    srcs = [
++        "bindings/blst.h",
++        "bindings/blst_aux.h",
++    ],
++    hdrs = [
++        "bindings/blst.h",
++        "bindings/blst_aux.h",
++    ],
++    deps = [
++        ":src",
++        ":asm",
++    ],
++    strip_include_prefix = "bindings",
++    visibility = ["//visibility:public"],
++)
++
++cc_library(
++    name = "asm_hdrs",
++    hdrs = glob([
++        "build/**/*.s",
++        "build/**/*.S",
++    ], exclude = ["build/assembly.s"]),
++)
++
++cc_library(
++    name = "asm",
++    srcs = ["build/assembly.S"],
++    copts = [
++        "-O2",
++        "-D__BLST_PORTABLE__",
++    ] + select({
++        "@io_bazel_rules_go//go/platform:amd64": [
++            "-mno-avx",
++            "-D__ADX__",
++        ],
++        "//conditions:default": [],
++    }),
++    deps = [":asm_hdrs"],
++    linkstatic = True,
++)
++
++cc_library(
++    name = "hdrs",
++    hdrs = glob(["src/*.c", "src/*.h"], exclude = ["src/client_*.c"]),
++    strip_include_prefix = "src",
++)
++
++cc_library(
++    name = "src",
++    srcs = ["src/server.c"],
++    deps = [":hdrs"],
++)
+diff --git a/bindings/go/BUILD.bazel b/bindings/go/BUILD.bazel
+new file mode 100644
+index 0000000..abcdef0
+--- /dev/null
++++ b/bindings/go/BUILD.bazel
+@@ -0,0 +1,40 @@
++# Go bindings for blst library
++
++load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
++
++go_library(
++    name = "go",
++    srcs = [
++        "blst.go",
++        "cgo_server.c",
++    ],
++    cgo = True,
++    copts = [
++        "-D__BLST_CGO__",
++        "-I../..",
++        "-I../../bindings",
++        "-I../../src",
++        "-O2",
++        "-D__BLST_PORTABLE__",
++    ] + select({
++        "@io_bazel_rules_go//go/platform:amd64": [
++            "-mno-avx",
++            "-D__ADX__",
++        ],
++        "//conditions:default": [],
++    }),
++    cdeps = ["//:blst"],
++    importpath = "github.com/supranational/blst/bindings/go",
++    visibility = ["//visibility:public"],
++)
++
++go_test(
++    name = "go_test",
++    srcs = [
++        "blst_htoc_test.go",
++        "blst_minpk_test.go",
++        "blst_minsig_test.go",
++    ],
++    embed = [":go"],
++    data = glob(["hash_to_curve/*.json"]),
++)
