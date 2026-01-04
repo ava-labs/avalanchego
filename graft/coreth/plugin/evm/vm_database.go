@@ -4,6 +4,10 @@
 package evm
 
 import (
+	"context"
+	"errors"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -13,13 +17,15 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
+	"github.com/ava-labs/avalanchego/vms/evm/database/blockdb"
 
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
+	heightindexdb "github.com/ava-labs/avalanchego/x/blockdb"
 )
 
 // initializeDBs initializes the databases used by the VM.
 // coreth always uses the avalanchego provided database.
-func (vm *VM) initializeDBs(db avalanchedatabase.Database) {
+func (vm *VM) initializeDBs(db avalanchedatabase.Database) error {
 	// Use NewNested rather than New so that the structure of the database
 	// remains the same regardless of the provided baseDB type.
 	vm.chaindb = rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, db)))
@@ -30,6 +36,13 @@ func (vm *VM) initializeDBs(db avalanchedatabase.Database) {
 	// that warp signatures are committed to the database atomically with
 	// the last accepted block.
 	vm.warpDB = prefixdb.New(warpPrefix, db)
+
+	// initBlockDB must be called after acceptedBlockDB and chaindb are initialized
+	// because it uses them.
+	if err := vm.initBlockDB(db); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (vm *VM) inspectDatabases() error {
@@ -78,5 +91,50 @@ func inspectDB(db avalanchedatabase.Database, label string) error {
 	}
 	// Display the database statistic.
 	log.Info("Database statistics", "label", label, "total", total.String(), "count", count)
+	return nil
+}
+
+// initBlockDB wraps the chaindb with a blockdb.Database that
+// stores blocks data in separate databases when enabled.
+func (vm *VM) initBlockDB(db avalanchedatabase.Database) error {
+	// Error if block database has been enabled and then disabled
+	metaDB := prefixdb.New(blockDBPrefix, db)
+	enabled, err := blockdb.IsEnabled(metaDB)
+	if err != nil {
+		return err
+	}
+	if !vm.config.BlockDatabaseEnabled {
+		if enabled {
+			return errors.New("block database should not be disabled after it has been enabled")
+		}
+		return nil
+	}
+
+	version := strconv.FormatUint(heightindexdb.IndexFileVersion, 10)
+	path := filepath.Join(vm.ctx.ChainDataDir, "blockdb", version)
+	_, height, err := vm.ReadLastAccepted()
+	if err != nil {
+		return err
+	}
+	ssEnabled := vm.stateSyncEnabled(height)
+	cfg := heightindexdb.DefaultConfig().WithSyncToDisk(vm.config.BlockDatabaseSync)
+	bdb, initialized, err := blockdb.New(
+		metaDB,
+		vm.chaindb,
+		path,
+		ssEnabled,
+		cfg,
+		vm.ctx.Log,
+		vm.sdkMetrics,
+	)
+	if err != nil {
+		return err
+	}
+	if initialized && !vm.config.SkipBlockDatabaseAutoMigrate {
+		if err := bdb.StartMigration(context.Background()); err != nil {
+			return err
+		}
+	}
+	vm.chaindb = bdb
 	return nil
 }
