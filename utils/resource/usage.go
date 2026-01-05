@@ -244,7 +244,7 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 
 		if getMemErr == nil {
 			m.availableMemoryBytes = virtualMem.Available
-			m.availableMemoryPercent = uint64(100 - virtualMem.UsedPercent)
+			m.availableMemoryPercent = virtualMem.Available * 100 / virtualMem.Total
 		}
 
 		m.usageLock.Unlock()
