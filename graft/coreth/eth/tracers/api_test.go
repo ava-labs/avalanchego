@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -30,6 +30,7 @@ package tracers
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -54,6 +55,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/ethtest"
 	ethparams "github.com/ava-labs/libevm/params"
 	"golang.org/x/exp/slices"
 )
@@ -630,7 +632,9 @@ func TestTracingWithOverrides(t *testing.T) {
 
 func testTracingWithOverrides(t *testing.T, scheme string) {
 	// Initialize test accounts
-	accounts := newAccounts(3)
+	// This test requires deterministic block hashes, since it will fail 1/256 times,
+	// when the final block hash starts with 0xef.
+	accounts := UNSAFEDeterministicAccounts(t, 3)
 	storageAccount := common.Address{0x13, 37}
 	genesis := &core.Genesis{
 		Config: params.TestChainConfig,
@@ -993,6 +997,19 @@ func newAccounts(n int) (accounts []Account) {
 		accounts = append(accounts, Account{key: key, addr: addr})
 	}
 	slices.SortFunc(accounts, func(a, b Account) int { return a.addr.Cmp(b.addr) })
+	return accounts
+}
+
+// WARNING: only use for tests that require deterministic accounts
+func UNSAFEDeterministicAccounts(t *testing.T, n uint64) []Account {
+	seed := make([]byte, 8) // uint64 size
+	accounts := make([]Account, 0, n)
+	for i := range n {
+		binary.BigEndian.PutUint64(seed, i)
+		key := ethtest.UNSAFEDeterministicPrivateKey(t, seed)
+		addr := crypto.PubkeyToAddress(key.PublicKey)
+		accounts = append(accounts, Account{key: key, addr: addr})
+	}
 	return accounts
 }
 

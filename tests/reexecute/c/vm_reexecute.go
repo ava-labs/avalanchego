@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -22,35 +22,15 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/reexecute"
-	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/vms/metervm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-)
-
-var (
-	mainnetXChainID    = ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
-	mainnetCChainID    = ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
-	mainnetAvaxAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
 )
 
 var (
@@ -96,7 +76,7 @@ var (
 	}
 
 	configNameArg  string
-	runnerNameArg  string
+	runnerTypeArg  string
 	configBytesArg []byte
 
 	benchmarkOutputFileArg string
@@ -120,7 +100,7 @@ func init() {
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
 	flag.StringVar(&configNameArg, configKey, defaultConfigKey, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
-	flag.StringVar(&runnerNameArg, "runner", "dev", "Name of the runner executing this test. Added as a metric label and to the sub-benchmark's name to differentiate results on the runner key.")
+	flag.StringVar(&runnerTypeArg, "runner", "dev", "Type/label of the runner executing this test. Added as a metric label and to the benchmark name for grouping results.")
 
 	flag.StringVar(&benchmarkOutputFileArg, "benchmark-output-file", benchmarkOutputFileArg, "Filepath where benchmark results will be written to.")
 
@@ -146,8 +126,8 @@ func init() {
 	labels[configKey] = configNameArg
 	configBytesArg = []byte(predefinedConfigStr)
 
-	// Set the runner name label on the metrics.
-	labels["runner"] = runnerNameArg
+	// Set the runner label on the metrics.
+	labels["runner"] = runnerTypeArg
 }
 
 func main() {
@@ -160,7 +140,7 @@ func main() {
 		startBlockArg,
 		endBlockArg,
 		configNameArg,
-		runnerNameArg,
+		runnerTypeArg,
 	)
 
 	benchmarkReexecuteRange(
@@ -226,7 +206,7 @@ func benchmarkReexecuteRange(
 
 	log := tc.Log()
 	log.Info("re-executing block range with params",
-		zap.String("runner", runnerNameArg),
+		zap.String("runner", runnerTypeArg),
 		zap.String("config", configNameArg),
 		zap.String("labels", labelsArg),
 		zap.String("metrics-server-enabled", strconv.FormatBool(metricsServerEnabled)),
@@ -252,7 +232,7 @@ func benchmarkReexecuteRange(
 		r.NoError(db.Close())
 	}()
 
-	vm, err := newMainnetCChainVM(
+	vm, err := reexecute.NewMainnetCChainVM(
 		ctx,
 		db,
 		chainDataDir,
@@ -287,87 +267,6 @@ func benchmarkReexecuteRange(
 	if len(benchmarkOutputFile) != 0 {
 		r.NoError(benchmarkTool.saveToFile(benchmarkOutputFile))
 	}
-}
-
-func newMainnetCChainVM(
-	ctx context.Context,
-	vmAndSharedMemoryDB database.Database,
-	chainDataDir string,
-	configBytes []byte,
-	vmMultiGatherer metrics.MultiGatherer,
-	meterVMRegistry prometheus.Registerer,
-) (block.ChainVM, error) {
-	factory := factory.Factory{}
-	vmIntf, err := factory.New(logging.NoLog{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create VM from factory: %w", err)
-	}
-	vm := vmIntf.(block.ChainVM)
-
-	blsKey, err := localsigner.New()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create BLS key: %w", err)
-	}
-
-	blsPublicKey := blsKey.PublicKey()
-	warpSigner := warp.NewSigner(blsKey, constants.MainnetID, mainnetCChainID)
-
-	genesisConfig := genesis.GetConfig(constants.MainnetID)
-
-	sharedMemoryDB := prefixdb.New([]byte("sharedmemory"), vmAndSharedMemoryDB)
-	atomicMemory := atomic.NewMemory(sharedMemoryDB)
-
-	chainIDToSubnetID := map[ids.ID]ids.ID{
-		mainnetXChainID: constants.PrimaryNetworkID,
-		mainnetCChainID: constants.PrimaryNetworkID,
-		ids.Empty:       constants.PrimaryNetworkID,
-	}
-
-	vm = metervm.NewBlockVM(vm, meterVMRegistry)
-
-	if err := vm.Initialize(
-		ctx,
-		&snow.Context{
-			NetworkID:       constants.MainnetID,
-			SubnetID:        constants.PrimaryNetworkID,
-			ChainID:         mainnetCChainID,
-			NodeID:          ids.GenerateTestNodeID(),
-			PublicKey:       blsPublicKey,
-			NetworkUpgrades: upgrade.Mainnet,
-
-			XChainID:    mainnetXChainID,
-			CChainID:    mainnetCChainID,
-			AVAXAssetID: mainnetAvaxAssetID,
-
-			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
-			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
-			BCLookup:     ids.NewAliaser(),
-			Metrics:      vmMultiGatherer,
-
-			WarpSigner: warpSigner,
-
-			ValidatorState: &validatorstest.State{
-				GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-					subnetID, ok := chainIDToSubnetID[chainID]
-					if ok {
-						return subnetID, nil
-					}
-					return ids.Empty, fmt.Errorf("unknown chainID: %s", chainID)
-				},
-			},
-			ChainDataDir: chainDataDir,
-		},
-		prefixdb.New([]byte("vm"), vmAndSharedMemoryDB),
-		[]byte(genesisConfig.CChainGenesis),
-		nil,
-		configBytes,
-		nil,
-		&enginetest.Sender{},
-	); err != nil {
-		return nil, fmt.Errorf("failed to initialize VM: %w", err)
-	}
-
-	return vm, nil
 }
 
 type vmExecutorConfig struct {
@@ -653,29 +552,4 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 		labels[parts[0]] = parts[1]
 	}
 	return labels, nil
-}
-
-func getTopLevelMetrics(tc tests.TestContext, tool *benchmarkTool, registry prometheus.Gatherer, elapsed time.Duration) {
-	r := require.New(tc)
-
-	gasUsed, err := getCounterMetricValue(registry, "avalanche_evm_eth_chain_block_gas_used_processed")
-	r.NoError(err)
-	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
-
-	tool.addResult(mgasPerSecond, "mgas/s")
-}
-
-func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
-	metricFamilies, err := registry.Gather()
-	if err != nil {
-		return 0, fmt.Errorf("failed to gather metrics: %w", err)
-	}
-
-	for _, mf := range metricFamilies {
-		if mf.GetName() == query {
-			return mf.GetMetric()[0].Counter.GetValue(), nil
-		}
-	}
-
-	return 0, fmt.Errorf("metric %s not found", query)
 }
