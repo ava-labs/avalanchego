@@ -9,10 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/libevmtest"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
