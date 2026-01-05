@@ -353,12 +353,12 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	require.NoError(err)
 
 	ginkgo.GinkgoLogr.Info("Fetching addressed call aggregate signature via p2p API")
-	subnetIDStr := ""
+	subnetID := ids.Empty
 	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {
-		subnetIDStr = w.receivingSubnet.SubnetID.String()
+		subnetID = w.receivingSubnet.SubnetID
 	}
 
-	signedWarpMessageBytes, err := client.GetMessageAggregateSignature(ctx, w.addressedCallUnsignedMessage.ID(), warp.WarpQuorumDenominator, subnetIDStr)
+	signedWarpMessageBytes, err := client.GetMessageAggregateSignature(ctx, w.addressedCallUnsignedMessage.ID(), warp.WarpQuorumDenominator, subnetID)
 	require.NoError(err)
 	parsedWarpMessage, err := avalancheWarp.ParseMessage(signedWarpMessageBytes)
 	require.NoError(err)
@@ -370,7 +370,7 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	w.addressedCallSignedMessage = parsedWarpMessage
 
 	ginkgo.GinkgoLogr.Info("Fetching block payload aggregate signature via p2p API")
-	signedWarpBlockBytes, err := client.GetBlockAggregateSignature(ctx, w.blockID, warp.WarpQuorumDenominator, subnetIDStr)
+	signedWarpBlockBytes, err := client.GetBlockAggregateSignature(ctx, w.blockID, warp.WarpQuorumDenominator, subnetID)
 	require.NoError(err)
 	parsedWarpBlockMessage, err := avalancheWarp.ParseMessage(signedWarpBlockBytes)
 	require.NoError(err)
@@ -560,9 +560,9 @@ func (w *warpTest) warpLoad() {
 
 	warpClient, err := warpBackend.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
 	require.NoError(err)
-	subnetIDStr := ""
+	subnetID := ids.Empty
 	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {
-		subnetIDStr = w.receivingSubnet.SubnetID.String()
+		subnetID = w.receivingSubnet.SubnetID
 	}
 
 	ginkgo.GinkgoLogr.Info("Executing warp delivery sequences...")
@@ -576,7 +576,7 @@ func (w *warpTest) warpLoad() {
 		}
 		ginkgo.GinkgoLogr.Info("Fetching addressed call aggregate signature via p2p API")
 
-		signedWarpMessageBytes, err := warpClient.GetMessageAggregateSignature(ctx, unsignedMessage.ID(), warp.WarpDefaultQuorumNumerator, subnetIDStr)
+		signedWarpMessageBytes, err := warpClient.GetMessageAggregateSignature(ctx, unsignedMessage.ID(), warp.WarpDefaultQuorumNumerator, subnetID)
 		if err != nil {
 			return nil, err
 		}

@@ -153,16 +153,16 @@ func (a *Service) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexuti
 }
 
 // GetMessageAggregateSignature fetches the aggregate signature for the requested [messageID]
-func (a *Service) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetIDStr string) (signedMessageBytes hexutil.Bytes, err error) {
+func (a *Service) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetID ids.ID) (signedMessageBytes hexutil.Bytes, err error) {
 	unsignedMessage, err := a.getMessage(messageID)
 	if err != nil {
 		return nil, err
 	}
-	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetIDStr)
+	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetID)
 }
 
 // GetBlockAggregateSignature fetches the aggregate signature for the requested [blockID]
-func (a *Service) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetIDStr string) (signedMessageBytes hexutil.Bytes, err error) {
+func (a *Service) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetID ids.ID) (signedMessageBytes hexutil.Bytes, err error) {
 	blockHashPayload, err := payload.NewHash(blockID)
 	if err != nil {
 		return nil, err
@@ -172,18 +172,10 @@ func (a *Service) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID
 		return nil, err
 	}
 
-	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetIDStr)
+	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetID)
 }
 
-func (a *Service) aggregateSignatures(ctx context.Context, unsignedMessage *warp.UnsignedMessage, quorumNum uint64, subnetIDStr string) (hexutil.Bytes, error) {
-	subnetID := a.subnetID
-	if len(subnetIDStr) > 0 {
-		sid, err := ids.FromString(subnetIDStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse subnetID: %q", subnetIDStr)
-		}
-		subnetID = sid
-	}
+func (a *Service) aggregateSignatures(ctx context.Context, unsignedMessage *warp.UnsignedMessage, quorumNum uint64, subnetID ids.ID) (hexutil.Bytes, error) {
 	validatorState := a.validatorState
 	pChainHeight, err := validatorState.GetCurrentHeight(ctx)
 	if err != nil {

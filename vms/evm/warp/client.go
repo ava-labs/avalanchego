@@ -44,9 +44,9 @@ func (c *Client) GetMessageSignature(ctx context.Context, messageID ids.ID) ([]b
 	return res, nil
 }
 
-func (c *Client) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetIDStr string) ([]byte, error) {
+func (c *Client) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetID ids.ID) ([]byte, error) {
 	var res hexutil.Bytes
-	if err := c.client.CallContext(ctx, &res, "warp_getMessageAggregateSignature", messageID, quorumNum, subnetIDStr); err != nil {
+	if err := c.client.CallContext(ctx, &res, "warp_getMessageAggregateSignature", messageID, quorumNum, subnetID); err != nil {
 		return nil, fmt.Errorf("call to warp_getMessageAggregateSignature failed: %w", err)
 	}
 	return res, nil
@@ -60,9 +60,9 @@ func (c *Client) GetBlockSignature(ctx context.Context, blockID ids.ID) ([]byte,
 	return res, nil
 }
 
-func (c *Client) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetIDStr string) ([]byte, error) {
+func (c *Client) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetID ids.ID) ([]byte, error) {
 	var res hexutil.Bytes
-	if err := c.client.CallContext(ctx, &res, "warp_getBlockAggregateSignature", blockID, quorumNum, subnetIDStr); err != nil {
+	if err := c.client.CallContext(ctx, &res, "warp_getBlockAggregateSignature", blockID, quorumNum, subnetID); err != nil {
 		return nil, fmt.Errorf("call to warp_getBlockAggregateSignature failed: %w", err)
 	}
 	return res, nil
