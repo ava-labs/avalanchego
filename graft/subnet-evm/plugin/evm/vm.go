@@ -488,7 +488,10 @@ func (vm *VM) Initialize(
 
 	// Create warp API (signatureAggregator will be nil until createAPIs)
 	vm.warpAPI, err = warp.NewService(
-		vm.ctx,
+		vm.ctx.NetworkID,
+		vm.ctx.ChainID,
+		vm.ctx.SubnetID,
+		vm.ctx.ValidatorState,
 		vm.warpMsgDB,
 		vm.ctx.WarpSigner,
 		vm.warpVerifier,
@@ -1219,7 +1222,10 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)
 
 		warpAPI, err := warp.NewService(
-			vm.ctx,
+			vm.ctx.NetworkID,
+			vm.ctx.ChainID,
+			vm.ctx.SubnetID,
+			vm.ctx.ValidatorState,
 			vm.warpMsgDB,
 			vm.ctx.WarpSigner,
 			vm.warpVerifier,
