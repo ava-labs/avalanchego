@@ -81,10 +81,10 @@ type Verifier struct {
 	blockClient   BlockStore
 	uptimeTracker *uptimetracker.UptimeTracker
 
-	messageParseFail            metrics.Counter
-	addressedCallValidationFail metrics.Counter
-	blockValidationFail         metrics.Counter
-	uptimeValidationFail        metrics.Counter
+	messageParseFail        metrics.Counter
+	addressedCallVerifyFail metrics.Counter
+	blockVerifyFail         metrics.Counter
+	uptimeVerifyFail        metrics.Counter
 }
 
 // NewVerifier creates a new warp message verifier.
@@ -94,13 +94,13 @@ func NewVerifier(
 	uptimeTracker *uptimetracker.UptimeTracker,
 ) *Verifier {
 	return &Verifier{
-		db:                          db,
-		blockClient:                 blockClient,
-		uptimeTracker:               uptimeTracker,
-		messageParseFail:            metrics.NewRegisteredCounter("warp_backend_message_parse_fail", nil),
-		addressedCallValidationFail: metrics.NewRegisteredCounter("warp_backend_addressed_call_validation_fail", nil),
-		blockValidationFail:         metrics.NewRegisteredCounter("warp_backend_block_validation_fail", nil),
-		uptimeValidationFail:        metrics.NewRegisteredCounter("warp_backend_uptime_validation_fail", nil),
+		db:                      db,
+		blockClient:             blockClient,
+		uptimeTracker:           uptimeTracker,
+		messageParseFail:        metrics.NewRegisteredCounter("warp_backend_message_parse_fail", nil),
+		addressedCallVerifyFail: metrics.NewRegisteredCounter("warp_backend_addressed_call_verify_fail", nil),
+		blockVerifyFail:         metrics.NewRegisteredCounter("warp_backend_block_verify_fail", nil),
+		uptimeVerifyFail:        metrics.NewRegisteredCounter("warp_backend_uptime_verify_fail", nil),
 	}
 }
 
@@ -145,7 +145,7 @@ func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 func (v *Verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *payload.Hash) *common.AppError {
 	blockID := blockHashPayload.Hash
 	if err := v.blockClient.HasBlock(ctx, blockID); err != nil {
-		v.blockValidationFail.Inc(1)
+		v.blockVerifyFail.Inc(1)
 		return &common.AppError{
 			Code:    VerifyErrCode,
 			Message: fmt.Sprintf("failed to get block %s: %s", blockID, err),
@@ -158,7 +158,7 @@ func (v *Verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *pay
 // verifyOffchainAddressedCall verifies the addressed call message
 func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
 	if len(addressedCall.SourceAddress) != 0 {
-		v.addressedCallValidationFail.Inc(1)
+		v.addressedCallVerifyFail.Inc(1)
 		return &common.AppError{
 			Code:    VerifyErrCode,
 			Message: "source address should be empty for offchain addressed messages",
@@ -175,7 +175,7 @@ func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedC
 	}
 
 	if err := v.verifyUptimeMessage(uptimeMsg); err != nil {
-		v.uptimeValidationFail.Inc(1)
+		v.uptimeVerifyFail.Inc(1)
 		return err
 	}
 

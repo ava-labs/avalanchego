@@ -220,7 +220,7 @@ func TestHandlerMessageSignature(t *testing.T) {
 			},
 			verifyStats: func(t *testing.T, v *Verifier) {
 				require.Zero(t, v.messageParseFail.Snapshot().Count())
-				require.Zero(t, v.blockValidationFail.Snapshot().Count())
+				require.Zero(t, v.blockVerifyFail.Snapshot().Count())
 			},
 		},
 		{
@@ -234,7 +234,7 @@ func TestHandlerMessageSignature(t *testing.T) {
 			},
 			verifyStats: func(t *testing.T, v *Verifier) {
 				require.Equal(t, int64(1), v.messageParseFail.Snapshot().Count())
-				require.Zero(t, v.blockValidationFail.Snapshot().Count())
+				require.Zero(t, v.blockVerifyFail.Snapshot().Count())
 			},
 			err: &common.AppError{Code: ParseErrCode},
 		},
@@ -308,7 +308,7 @@ func TestHandlerBlockSignature(t *testing.T) {
 				return toMessageBytes(knownBlkID), signature
 			},
 			verifyStats: func(t *testing.T, v *Verifier) {
-				require.Zero(t, v.blockValidationFail.Snapshot().Count())
+				require.Zero(t, v.blockVerifyFail.Snapshot().Count())
 				require.Zero(t, v.messageParseFail.Snapshot().Count())
 			},
 		},
@@ -319,7 +319,7 @@ func TestHandlerBlockSignature(t *testing.T) {
 				return toMessageBytes(unknownBlockID), nil
 			},
 			verifyStats: func(t *testing.T, v *Verifier) {
-				require.Equal(t, int64(1), v.blockValidationFail.Snapshot().Count())
+				require.Equal(t, int64(1), v.blockVerifyFail.Snapshot().Count())
 				require.Zero(t, v.messageParseFail.Snapshot().Count())
 			},
 			err: &common.AppError{Code: VerifyErrCode},
