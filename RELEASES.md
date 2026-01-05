@@ -25,6 +25,12 @@ The plugin version is unchanged at `44` and is compatible with version `v1.14.0`
 - Enabled Firewood to run with pruning disabled.
   - This change modified the filepath of Firewood. Sny nodes using Firewood will need to resync.
 
+### What's Changed
+
+The changelog is omitted, as the Coreth and Subnet-EVM repositories were grafted into the repository.
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.0...v1.14.1
+
 ## [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0)
 
 This release schedules the activation of the following Avalanche Community Proposals (ACPs):
