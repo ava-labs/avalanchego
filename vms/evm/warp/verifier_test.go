@@ -77,6 +77,29 @@ func TestCodecSerialization(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x39,
 			},
 		},
+		{
+			name: "max uptime",
+			msg: &ValidatorUptime{
+				ValidationID: ids.ID{
+					0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+					0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+					0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+					0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				},
+				TotalUptime: ^uint64(0),
+			},
+			wantBytes: []byte{
+				// Codec version (0)
+				0x00, 0x00,
+				// ValidationID (32 bytes of 0xff)
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				// TotalUptime (8 bytes, max uint64 in big-endian)
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -93,51 +116,6 @@ func TestCodecSerialization(t *testing.T) {
 			require.Equal(uint16(CodecVersion), version)
 			require.Equal(tt.msg.ValidationID, gotMsg.ValidationID)
 			require.Equal(tt.msg.TotalUptime, gotMsg.TotalUptime)
-		})
-	}
-}
-
-// TestCodecRoundTrip verifies that messages can be marshaled and unmarshaled
-// without data loss.
-func TestCodecRoundTrip(t *testing.T) {
-	tests := []struct {
-		name string
-		msg  *ValidatorUptime
-	}{
-		{
-			name: "zero values",
-			msg: &ValidatorUptime{
-				ValidationID: ids.Empty,
-				TotalUptime:  0,
-			},
-		},
-		{
-			name: "max uptime",
-			msg: &ValidatorUptime{
-				ValidationID: ids.GenerateTestID(),
-				TotalUptime:  ^uint64(0), // max uint64
-			},
-		},
-		{
-			name: "random values",
-			msg: &ValidatorUptime{
-				ValidationID: ids.GenerateTestID(),
-				TotalUptime:  987654321,
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			bytes, err := Codec.Marshal(CodecVersion, tt.msg)
-			require.NoError(t, err)
-
-			var gotMsg ValidatorUptime
-			version, err := Codec.Unmarshal(bytes, &gotMsg)
-			require.NoError(t, err)
-			require.Equal(t, uint16(CodecVersion), version)
-			require.Equal(t, tt.msg.ValidationID, gotMsg.ValidationID)
-			require.Equal(t, tt.msg.TotalUptime, gotMsg.TotalUptime)
 		})
 	}
 }
