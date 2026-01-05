@@ -2,6 +2,8 @@
 
 The C-Chain benchmarks support re-executing a range of mainnet C-Chain blocks against a provided snapshot of the current state as of some initial state.
 
+Benchmarks can be invoked by running `./scripts/run_task.sh test-cchain-reexecution` or `./scripts/benchmark_cchain_range.sh`.
+
 ## Prerequisites
 
 Configuring your AvalancheGo dev environment requires:

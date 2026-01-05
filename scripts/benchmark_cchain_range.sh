@@ -7,7 +7,8 @@ set -euo pipefail
 # Usage:
 #   ./benchmark_cchain_range.sh [test-name]
 #
-# Running without arguments will output available tests.
+# To see available tests: use `help` as the test name or invoke
+# without a test name and without required env vars.
 #
 # Test names configure defaults for S3 sources and block ranges.
 # All defaults can be overridden via environment variables.
@@ -20,7 +21,7 @@ set -euo pipefail
 #     CURRENT_STATE_DIR: Path to local current state directory.
 #
 #   Required:
-#     START_BLOCK: The starting block height (exclusive).
+#     START_BLOCK: The starting block height (inclusive).
 #     END_BLOCK: The ending block height (inclusive).
 #
 #   Optional:
