@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/libevm/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
@@ -76,33 +76,60 @@ type BlockStore interface {
 	HasBlock(ctx context.Context, blockID ids.ID) error
 }
 
+// MessageDB provides access to warp messages.
+type MessageDB interface {
+	Get(ids.ID) (*warp.UnsignedMessage, error)
+}
+
 // Verifier validates whether a warp message should be signed.
 type Verifier struct {
-	db            *DB
+	db            MessageDB
 	blockClient   BlockStore
 	uptimeTracker *uptimetracker.UptimeTracker
 
-	messageParseFail        metrics.Counter
-	addressedCallVerifyFail metrics.Counter
-	blockVerifyFail         metrics.Counter
-	uptimeVerifyFail        metrics.Counter
+	messageParseFail        prometheus.Counter
+	addressedCallVerifyFail prometheus.Counter
+	blockVerifyFail         prometheus.Counter
+	uptimeVerifyFail        prometheus.Counter
 }
 
 // NewVerifier creates a new warp message verifier.
 func NewVerifier(
-	db *DB,
+	db MessageDB,
 	blockClient BlockStore,
 	uptimeTracker *uptimetracker.UptimeTracker,
+	reg prometheus.Registerer,
 ) *Verifier {
-	return &Verifier{
-		db:                      db,
-		blockClient:             blockClient,
-		uptimeTracker:           uptimeTracker,
-		messageParseFail:        metrics.NewRegisteredCounter("warp_backend_message_parse_fail", nil),
-		addressedCallVerifyFail: metrics.NewRegisteredCounter("warp_backend_addressed_call_verify_fail", nil),
-		blockVerifyFail:         metrics.NewRegisteredCounter("warp_backend_block_verify_fail", nil),
-		uptimeVerifyFail:        metrics.NewRegisteredCounter("warp_backend_uptime_verify_fail", nil),
+	v := &Verifier{
+		db:            db,
+		blockClient:   blockClient,
+		uptimeTracker: uptimeTracker,
+		messageParseFail: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "warp_backend_message_parse_fail",
+			Help: "Number of warp message parse failures",
+		}),
+		addressedCallVerifyFail: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "warp_backend_addressed_call_verify_fail",
+			Help: "Number of addressed call verification failures",
+		}),
+		blockVerifyFail: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "warp_backend_block_verify_fail",
+			Help: "Number of block verification failures",
+		}),
+		uptimeVerifyFail: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "warp_backend_uptime_verify_fail",
+			Help: "Number of uptime verification failures",
+		}),
 	}
+
+	if reg != nil {
+		reg.MustRegister(v.messageParseFail)
+		reg.MustRegister(v.addressedCallVerifyFail)
+		reg.MustRegister(v.blockVerifyFail)
+		reg.MustRegister(v.uptimeVerifyFail)
+	}
+
+	return v
 }
 
 // Verify validates whether a warp message should be signed.
@@ -120,7 +147,7 @@ func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 
 	parsed, err := payload.Parse(unsignedMessage.Payload)
 	if err != nil {
-		v.messageParseFail.Inc(1)
+		v.messageParseFail.Inc()
 		return &common.AppError{
 			Code:    ParseErrCode,
 			Message: fmt.Sprintf("failed to parse payload: %s", err),
@@ -133,7 +160,7 @@ func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 	case *payload.Hash:
 		return v.verifyBlockMessage(ctx, p)
 	default:
-		v.messageParseFail.Inc(1)
+		v.messageParseFail.Inc()
 		return &common.AppError{
 			Code:    ParseErrCode,
 			Message: fmt.Sprintf("unknown payload type: %T", p),
@@ -146,7 +173,7 @@ func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 func (v *Verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *payload.Hash) *common.AppError {
 	blockID := blockHashPayload.Hash
 	if err := v.blockClient.HasBlock(ctx, blockID); err != nil {
-		v.blockVerifyFail.Inc(1)
+		v.blockVerifyFail.Inc()
 		return &common.AppError{
 			Code:    VerifyErrCode,
 			Message: fmt.Sprintf("failed to get block %s: %s", blockID, err),
@@ -159,7 +186,7 @@ func (v *Verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *pay
 // verifyOffchainAddressedCall verifies the addressed call message
 func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
 	if len(addressedCall.SourceAddress) != 0 {
-		v.addressedCallVerifyFail.Inc(1)
+		v.addressedCallVerifyFail.Inc()
 		return &common.AppError{
 			Code:    VerifyErrCode,
 			Message: "source address should be empty for offchain addressed messages",
@@ -168,7 +195,7 @@ func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedC
 
 	uptimeMsg, err := ParseValidatorUptime(addressedCall.Payload)
 	if err != nil {
-		v.messageParseFail.Inc(1)
+		v.messageParseFail.Inc()
 		return &common.AppError{
 			Code:    ParseErrCode,
 			Message: fmt.Sprintf("failed to parse addressed call message: %s", err),
@@ -176,7 +203,7 @@ func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedC
 	}
 
 	if err := v.verifyUptimeMessage(uptimeMsg); err != nil {
-		v.uptimeVerifyFail.Inc(1)
+		v.uptimeVerifyFail.Inc()
 		return err
 	}
 

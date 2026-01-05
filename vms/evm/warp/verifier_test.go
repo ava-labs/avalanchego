@@ -5,17 +5,15 @@ package warp
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -126,11 +124,10 @@ func TestVerifierKnownMessage(t *testing.T) {
 	warpSigner := warp.NewSigner(sk, networkID, sourceChainID)
 
 	messageDB := NewDB(db)
-	verifier := NewVerifier(messageDB, nil, nil)
+	verifier := NewVerifier(messageDB, nil, nil, prometheus.NewRegistry())
 
 	require.NoError(t, messageDB.Add(testUnsignedMessage))
 
-	// Known messages in the DB should pass verification
 	appErr := verifier.Verify(t.Context(), testUnsignedMessage)
 	require.Nil(t, appErr)
 
@@ -140,15 +137,21 @@ func TestVerifierKnownMessage(t *testing.T) {
 	wantSig, err := warpSigner.Sign(testUnsignedMessage)
 	require.NoError(t, err)
 	require.Equal(t, wantSig, signature)
+
+	requireMetrics(t, verifier, metricExpectations{
+		messageParseFail:        0,
+		addressedCallVerifyFail: 0,
+		blockVerifyFail:         0,
+		uptimeVerifyFail:        0,
+	})
 }
 
 func TestVerifierUnknownMessage(t *testing.T) {
 	db := memdb.New()
 
 	messageDB := NewDB(db)
-	verifier := NewVerifier(messageDB, nil, nil)
+	verifier := NewVerifier(messageDB, nil, nil, prometheus.NewRegistry())
 
-	// Create an unknown message with empty source address to test parse failure
 	unknownPayload, err := payload.NewAddressedCall([]byte{}, []byte("unknown message"))
 	require.NoError(t, err)
 	unknownMessage, err := warp.NewUnsignedMessage(networkID, sourceChainID, unknownPayload.Bytes())
@@ -156,6 +159,13 @@ func TestVerifierUnknownMessage(t *testing.T) {
 
 	appErr := verifier.Verify(t.Context(), unknownMessage)
 	require.ErrorIs(t, appErr, &common.AppError{Code: ParseErrCode})
+
+	requireMetrics(t, verifier, metricExpectations{
+		messageParseFail:        1,
+		addressedCallVerifyFail: 0,
+		blockVerifyFail:         0,
+		uptimeVerifyFail:        0,
+	})
 }
 
 func TestVerifierBlockMessage(t *testing.T) {
@@ -168,7 +178,7 @@ func TestVerifierBlockMessage(t *testing.T) {
 	warpSigner := warp.NewSigner(sk, networkID, sourceChainID)
 
 	messageDB := NewDB(db)
-	verifier := NewVerifier(messageDB, blockStore, nil)
+	verifier := NewVerifier(messageDB, blockStore, nil, prometheus.NewRegistry())
 
 	blockHashPayload, err := payload.NewHash(blkID)
 	require.NoError(t, err)
@@ -177,7 +187,6 @@ func TestVerifierBlockMessage(t *testing.T) {
 	wantSig, err := warpSigner.Sign(unsignedMessage)
 	require.NoError(t, err)
 
-	// Known block should pass verification
 	appErr := verifier.Verify(t.Context(), unsignedMessage)
 	require.Nil(t, appErr)
 
@@ -185,84 +194,118 @@ func TestVerifierBlockMessage(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, wantSig, signature)
 
-	// Unknown block should fail verification
+	requireMetrics(t, verifier, metricExpectations{
+		messageParseFail:        0,
+		addressedCallVerifyFail: 0,
+		blockVerifyFail:         0,
+		uptimeVerifyFail:        0,
+	})
+
 	unknownBlockHashPayload, err := payload.NewHash(ids.GenerateTestID())
 	require.NoError(t, err)
 	unknownUnsignedMessage, err := warp.NewUnsignedMessage(networkID, sourceChainID, unknownBlockHashPayload.Bytes())
 	require.NoError(t, err)
 	unknownAppErr := verifier.Verify(t.Context(), unknownUnsignedMessage)
 	require.ErrorIs(t, unknownAppErr, &common.AppError{Code: VerifyErrCode})
+
+	requireMetrics(t, verifier, metricExpectations{
+		messageParseFail:        0,
+		addressedCallVerifyFail: 0,
+		blockVerifyFail:         1,
+		uptimeVerifyFail:        0,
+	})
+}
+
+func TestVerifierMalformedPayload(t *testing.T) {
+	db := memdb.New()
+	messageDB := NewDB(db)
+	v := NewVerifier(messageDB, emptyBlockStore, nil, prometheus.NewRegistry())
+
+	invalidPayload := []byte{0xFF, 0xFF, 0xFF, 0xFF}
+	msg, err := warp.NewUnsignedMessage(networkID, sourceChainID, invalidPayload)
+	require.NoError(t, err)
+
+	appErr := v.Verify(context.Background(), msg)
+	require.NotNil(t, appErr)
+	require.Equal(t, int32(ParseErrCode), appErr.Code)
+
+	require.Equal(t, float64(1), testutil.ToFloat64(v.messageParseFail))
+	require.Equal(t, float64(0), testutil.ToFloat64(v.blockVerifyFail))
+}
+
+func TestVerifierMalformedUptimePayload(t *testing.T) {
+	db := memdb.New()
+	messageDB := NewDB(db)
+	v := NewVerifier(messageDB, emptyBlockStore, nil, prometheus.NewRegistry())
+
+	invalidUptimeBytes := []byte{0xFF, 0xFF, 0xFF}
+	addressedCall, err := payload.NewAddressedCall([]byte{}, invalidUptimeBytes)
+	require.NoError(t, err)
+
+	msg, err := warp.NewUnsignedMessage(networkID, sourceChainID, addressedCall.Bytes())
+	require.NoError(t, err)
+
+	appErr := v.Verify(context.Background(), msg)
+	require.NotNil(t, appErr)
+	require.Equal(t, int32(ParseErrCode), appErr.Code)
+
+	require.Equal(t, float64(1), testutil.ToFloat64(v.messageParseFail))
 }
 
 func TestHandlerMessageSignature(t *testing.T) {
 	metricstest.WithMetrics(t)
 
-	database := memdb.New()
+	ctx := context.Background()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
 	tests := []struct {
-		name        string
-		setup       func(db *DB) (request []byte, wantResponse []byte)
-		verifyStats func(t *testing.T, v *Verifier)
-		err         *common.AppError
+		name          string
+		setupMessage  func(db *DB) *warp.UnsignedMessage
+		wantError     bool
+		wantSignature bool
+		wantMetrics   metricExpectations
 	}{
 		{
 			name: "known message",
-			setup: func(db *DB) (request []byte, wantResponse []byte) {
+			setupMessage: func(db *DB) *warp.UnsignedMessage {
 				knownPayload, err := payload.NewAddressedCall([]byte{0, 0, 0}, []byte("test"))
 				require.NoError(t, err)
 				msg, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, knownPayload.Bytes())
 				require.NoError(t, err)
-				signature, err := snowCtx.WarpSigner.Sign(msg)
-				require.NoError(t, err)
 				require.NoError(t, db.Add(msg))
-				return msg.Bytes(), signature
+				return msg
 			},
-			verifyStats: func(t *testing.T, v *Verifier) {
-				require.Zero(t, v.messageParseFail.Snapshot().Count())
-				require.Zero(t, v.blockVerifyFail.Snapshot().Count())
+			wantSignature: true,
+			wantMetrics: metricExpectations{
+				messageParseFail: 0,
+				blockVerifyFail:  0,
 			},
 		},
 		{
 			name: "unknown message",
-			setup: func(_ *DB) (request []byte, wantResponse []byte) {
+			setupMessage: func(_ *DB) *warp.UnsignedMessage {
 				unknownPayload, err := payload.NewAddressedCall([]byte{}, []byte("unknown message"))
 				require.NoError(t, err)
-				unknownMessage, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, unknownPayload.Bytes())
+				msg, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, unknownPayload.Bytes())
 				require.NoError(t, err)
-				return unknownMessage.Bytes(), nil
+				return msg
 			},
-			verifyStats: func(t *testing.T, v *Verifier) {
-				require.Equal(t, int64(1), v.messageParseFail.Snapshot().Count())
-				require.Zero(t, v.blockVerifyFail.Snapshot().Count())
+			wantError: true,
+			wantMetrics: metricExpectations{
+				messageParseFail: 1,
+				blockVerifyFail:  0,
 			},
-			err: &common.AppError{Code: ParseErrCode},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sigCache := lru.NewCache[ids.ID, []byte](100)
-			db := NewDB(database)
-			v := NewVerifier(db, emptyBlockStore, nil)
-			handler := NewHandler(sigCache, v, snowCtx.WarpSigner)
+			setup := setupHandler(t, ctx, memdb.New(), emptyBlockStore, nil, snowCtx.NetworkID, snowCtx.ChainID)
 
-			requestBytes, wantResponse := tt.setup(db)
-			protoMsg := &sdk.SignatureRequest{Message: requestBytes}
-			protoBytes, err := proto.Marshal(protoMsg)
-			require.NoError(t, err)
-			responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
-			require.ErrorIs(t, appErr, tt.err)
-			tt.verifyStats(t, v)
+			message := tt.setupMessage(setup.db)
+			sendSignatureRequest(t, ctx, setup, message, tt.wantError)
 
-			if len(wantResponse) == 0 {
-				require.Empty(t, responseBytes)
-				return
-			}
-
-			response := &sdk.SignatureResponse{}
-			require.NoError(t, proto.Unmarshal(responseBytes, response))
-			require.Equal(t, wantResponse, response.Signature)
+			requireMetrics(t, setup.verifier, tt.wantMetrics)
 		})
 	}
 }
@@ -270,182 +313,193 @@ func TestHandlerMessageSignature(t *testing.T) {
 func TestHandlerBlockSignature(t *testing.T) {
 	metricstest.WithMetrics(t)
 
-	database := memdb.New()
+	ctx := context.Background()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
 	knownBlkID := ids.GenerateTestID()
 	blockStore := testBlockStore(set.Of(knownBlkID))
 
-	toMessageBytes := func(id ids.ID) []byte {
-		idPayload, err := payload.NewHash(id)
-		if err != nil {
-			panic(err)
-		}
-
-		msg, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, idPayload.Bytes())
-		if err != nil {
-			panic(err)
-		}
-
-		return msg.Bytes()
-	}
-
 	tests := []struct {
 		name        string
-		setup       func() (request []byte, wantResponse []byte)
-		verifyStats func(t *testing.T, v *Verifier)
-		err         *common.AppError
+		blockID     ids.ID
+		wantError   bool
+		wantMetrics metricExpectations
 	}{
 		{
-			name: "known block",
-			setup: func() (request []byte, wantResponse []byte) {
-				hashPayload, err := payload.NewHash(knownBlkID)
-				require.NoError(t, err)
-				unsignedMessage, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, hashPayload.Bytes())
-				require.NoError(t, err)
-				signature, err := snowCtx.WarpSigner.Sign(unsignedMessage)
-				require.NoError(t, err)
-				return toMessageBytes(knownBlkID), signature
-			},
-			verifyStats: func(t *testing.T, v *Verifier) {
-				require.Zero(t, v.blockVerifyFail.Snapshot().Count())
-				require.Zero(t, v.messageParseFail.Snapshot().Count())
+			name:    "known block",
+			blockID: knownBlkID,
+			wantMetrics: metricExpectations{
+				blockVerifyFail:  0,
+				messageParseFail: 0,
 			},
 		},
 		{
-			name: "unknown block",
-			setup: func() (request []byte, wantResponse []byte) {
-				unknownBlockID := ids.GenerateTestID()
-				return toMessageBytes(unknownBlockID), nil
+			name:      "unknown block",
+			blockID:   ids.GenerateTestID(),
+			wantError: true,
+			wantMetrics: metricExpectations{
+				blockVerifyFail:  1,
+				messageParseFail: 0,
 			},
-			verifyStats: func(t *testing.T, v *Verifier) {
-				require.Equal(t, int64(1), v.blockVerifyFail.Snapshot().Count())
-				require.Zero(t, v.messageParseFail.Snapshot().Count())
-			},
-			err: &common.AppError{Code: VerifyErrCode},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sigCache := lru.NewCache[ids.ID, []byte](100)
-			db := NewDB(database)
-			v := NewVerifier(db, blockStore, nil)
-			handler := NewHandler(sigCache, v, snowCtx.WarpSigner)
+			setup := setupHandler(t, ctx, memdb.New(), blockStore, nil, snowCtx.NetworkID, snowCtx.ChainID)
 
-			requestBytes, wantResponse := tt.setup()
-			protoMsg := &sdk.SignatureRequest{Message: requestBytes}
-			protoBytes, err := proto.Marshal(protoMsg)
+			hashPayload, err := payload.NewHash(tt.blockID)
 			require.NoError(t, err)
-			responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
-			require.ErrorIs(t, appErr, tt.err)
+			message, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, hashPayload.Bytes())
+			require.NoError(t, err)
 
-			tt.verifyStats(t, v)
+			sendSignatureRequest(t, ctx, setup, message, tt.wantError)
 
-			if len(wantResponse) == 0 {
-				require.Empty(t, responseBytes)
-				return
-			}
-
-			var response sdk.SignatureResponse
-			require.NoError(t, proto.Unmarshal(responseBytes, &response))
-			require.Equal(t, wantResponse, response.Signature)
+			requireMetrics(t, setup.verifier, tt.wantMetrics)
 		})
 	}
 }
 
 func TestHandlerUptimeSignature(t *testing.T) {
-	database := memdb.New()
+	metricstest.WithMetrics(t)
+
+	ctx := context.Background()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
 	validationID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
 	startTime := uint64(time.Now().Unix())
+	requestedUptime := uint64(80)
 
-	getUptimeMessageBytes := func(sourceAddress []byte, vID ids.ID) ([]byte, *warp.UnsignedMessage) {
-		uptimePayload := &ValidatorUptime{ValidationID: vID, TotalUptime: 80}
-		uptimeBytes, err := uptimePayload.Bytes()
-		require.NoError(t, err)
-		addressedCall, err := payload.NewAddressedCall(sourceAddress, uptimeBytes)
-		require.NoError(t, err)
-		unsignedMessage, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, addressedCall.Bytes())
-		require.NoError(t, err)
-
-		protoMsg := &sdk.SignatureRequest{Message: unsignedMessage.Bytes()}
-		protoBytes, err := proto.Marshal(protoMsg)
-		require.NoError(t, err)
-		return protoBytes, unsignedMessage
-	}
-
-	sigCache := lru.NewCache[ids.ID, []byte](100)
-
-	// TODO(JonathanOppenheimer): see func NewTestValidatorState() -- this should be examined
-	// when we address the issue of that function.
-	validatorState := &validatorstest.State{
-		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-			return map[ids.ID]*validators.GetCurrentValidatorOutput{
-				validationID: {
-					ValidationID:  validationID,
-					NodeID:        nodeID,
-					Weight:        1,
-					StartTime:     startTime,
-					IsActive:      true,
-					IsL1Validator: true,
-				},
-			}, 0, nil
+	tests := []struct {
+		name               string
+		sourceAddress      []byte
+		validationID       ids.ID
+		setupUptimeTracker func(*uptimetracker.UptimeTracker, *mockable.Clock)
+		wantError          bool
+		wantMetrics        metricExpectations
+	}{
+		{
+			name:               "non-empty source address",
+			sourceAddress:      []byte{1, 2, 3},
+			validationID:       ids.GenerateTestID(),
+			setupUptimeTracker: func(_ *uptimetracker.UptimeTracker, _ *mockable.Clock) {},
+			wantError:          true,
+			wantMetrics: metricExpectations{
+				addressedCallVerifyFail: 1,
+			},
+		},
+		{
+			name:               "unknown validation ID",
+			sourceAddress:      []byte{},
+			validationID:       ids.GenerateTestID(),
+			setupUptimeTracker: func(_ *uptimetracker.UptimeTracker, _ *mockable.Clock) {},
+			wantError:          true,
+			wantMetrics: metricExpectations{
+				uptimeVerifyFail: 1,
+			},
+		},
+		{
+			name:          "validator not connected",
+			sourceAddress: []byte{},
+			validationID:  validationID,
+			setupUptimeTracker: func(_ *uptimetracker.UptimeTracker, _ *mockable.Clock) {
+			},
+			wantError: true,
+			wantMetrics: metricExpectations{
+				uptimeVerifyFail: 1,
+			},
+		},
+		{
+			name:          "insufficient uptime",
+			sourceAddress: []byte{},
+			validationID:  validationID,
+			setupUptimeTracker: func(tracker *uptimetracker.UptimeTracker, clk *mockable.Clock) {
+				require.NoError(t, tracker.Connect(nodeID))
+				clk.Set(clk.Time().Add(40 * time.Second))
+			},
+			wantError: true,
+			wantMetrics: metricExpectations{
+				uptimeVerifyFail: 1,
+			},
+		},
+		{
+			name:          "sufficient uptime",
+			sourceAddress: []byte{},
+			validationID:  validationID,
+			setupUptimeTracker: func(tracker *uptimetracker.UptimeTracker, clk *mockable.Clock) {
+				require.NoError(t, tracker.Connect(nodeID))
+				clk.Set(clk.Time().Add(80 * time.Second))
+			},
+			wantMetrics: metricExpectations{},
 		},
 	}
 
-	clk := &mockable.Clock{}
-	uptimeTracker, err := uptimetracker.New(
-		validatorState,
-		snowCtx.SubnetID,
-		memdb.New(),
-		clk,
-	)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			validatorState := &validatorstest.State{
+				GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+					return map[ids.ID]*validators.GetCurrentValidatorOutput{
+						validationID: {
+							ValidationID:  validationID,
+							NodeID:        nodeID,
+							Weight:        1,
+							StartTime:     startTime,
+							IsActive:      true,
+							IsL1Validator: true,
+						},
+					}, 0, nil
+				},
+			}
+
+			clk := &mockable.Clock{}
+			uptimeTracker, err := uptimetracker.New(validatorState, snowCtx.SubnetID, memdb.New(), clk)
+			require.NoError(t, err)
+			require.NoError(t, uptimeTracker.Sync(ctx))
+
+			tt.setupUptimeTracker(uptimeTracker, clk)
+
+			setup := setupHandler(t, ctx, memdb.New(), emptyBlockStore, uptimeTracker, snowCtx.NetworkID, snowCtx.ChainID)
+
+			uptimePayload := &ValidatorUptime{
+				ValidationID: tt.validationID,
+				TotalUptime:  requestedUptime,
+			}
+			uptimeBytes, err := uptimePayload.Bytes()
+			require.NoError(t, err)
+
+			addressedCall, err := payload.NewAddressedCall(tt.sourceAddress, uptimeBytes)
+			require.NoError(t, err)
+
+			message, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, addressedCall.Bytes())
+			require.NoError(t, err)
+
+			sendSignatureRequest(t, ctx, setup, message, tt.wantError)
+
+			requireMetrics(t, setup.verifier, tt.wantMetrics)
+		})
+	}
+}
+
+func TestHandlerCacheBehavior(t *testing.T) {
+	metricstest.WithMetrics(t)
+
+	ctx := context.Background()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	setup := setupHandler(t, ctx, memdb.New(), emptyBlockStore, nil, snowCtx.NetworkID, snowCtx.ChainID)
+
+	knownPayload, err := payload.NewAddressedCall([]byte{0, 0, 0}, []byte("test"))
 	require.NoError(t, err)
-
-	require.NoError(t, uptimeTracker.Sync(t.Context()))
-
-	db := NewDB(database)
-	verifier := NewVerifier(db, emptyBlockStore, uptimeTracker)
-	handler := NewHandler(sigCache, verifier, snowCtx.WarpSigner)
-
-	// sourceAddress nonZero
-	protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID())
-	_, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
-	require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-	require.Equal(t, "2: source address should be empty for offchain addressed messages", appErr.Error())
-
-	// not existing validationID
-	vID := ids.GenerateTestID()
-	protoBytes, _ = getUptimeMessageBytes([]byte{}, vID)
-	_, appErr = handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
-	require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-	require.Equal(t, fmt.Sprintf("2: failed to get uptime: validationID not found: %s", vID), appErr.Error())
-
-	// uptime is less than requested (not connected)
-	protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
-	_, appErr = handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
-	require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-	require.Equal(t, fmt.Sprintf("2: current uptime 0 is less than queried uptime 80 for validationID %s", validationID), appErr.Error())
-
-	// uptime is less than requested (not enough time)
-	require.NoError(t, uptimeTracker.Connect(nodeID))
-	clk.Set(clk.Time().Add(40 * time.Second))
-	protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
-	_, appErr = handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
-	require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-	require.Equal(t, fmt.Sprintf("2: current uptime 40 is less than queried uptime 80 for validationID %s", validationID), appErr.Error())
-
-	// valid uptime (enough time has passed)
-	clk.Set(clk.Time().Add(40 * time.Second))
-	protoBytes, msg := getUptimeMessageBytes([]byte{}, validationID)
-	responseBytes, appErr := handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
-	require.Nil(t, appErr)
-	wantSignature, err := snowCtx.WarpSigner.Sign(msg)
+	message, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, knownPayload.Bytes())
 	require.NoError(t, err)
-	response := &sdk.SignatureResponse{}
-	require.NoError(t, proto.Unmarshal(responseBytes, response))
-	require.Equal(t, wantSignature, response.Signature)
+	require.NoError(t, setup.db.Add(message))
+
+	firstSignature := sendSignatureRequest(t, ctx, setup, message, false)
+
+	cachedSig, ok := setup.sigCache.Get(message.ID())
+	require.True(t, ok)
+	require.Equal(t, firstSignature, cachedSig)
+
+	secondSignature := sendSignatureRequest(t, ctx, setup, message, false)
+	require.Equal(t, firstSignature, secondSignature)
 }
