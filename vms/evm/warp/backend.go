@@ -5,6 +5,7 @@ package warp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/metrics"
@@ -25,7 +26,7 @@ const (
 	VerifyErrCode
 )
 
-var _ acp118.Verifier = (*acp118Adapter)(nil)
+var _ acp118.Verifier = (*acp118Handler)(nil)
 
 // BlockStore provides access to accepted blocks.
 type BlockStore interface {
@@ -48,9 +49,6 @@ func NewDB(db database.Database) *DB {
 func (d *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
 	msgID := unsignedMsg.ID()
 
-	// In the case when a node restarts, and possibly changes its bls key, the cache gets emptied but the database does not.
-	// So to avoid having incorrect signatures saved in the database after a bls key change, we save the full message in the database.
-	// Whereas for the cache, after the node restart, the cache would be emptied so we can directly save the signatures.
 	if err := d.db.Put(msgID[:], unsignedMsg.Bytes()); err != nil {
 		return fmt.Errorf("failed to put warp message in db: %w", err)
 	}
@@ -73,13 +71,12 @@ func (d *DB) Get(msgID ids.ID) (*warp.UnsignedMessage, error) {
 	return unsignedMessage, nil
 }
 
-// Verifier implements acp118.Verifier and validates whether a warp message should be signed.
+// Verifier validates whether a warp message should be signed.
 type Verifier struct {
 	db            *DB
 	blockClient   BlockStore
 	uptimeTracker *uptimetracker.UptimeTracker
 
-	// Metrics
 	messageParseFail            metrics.Counter
 	addressedCallValidationFail metrics.Counter
 	blockValidationFail         metrics.Counter
@@ -109,7 +106,7 @@ func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 	// Known on-chain messages should be signed
 	if _, err := v.db.Get(messageID); err == nil {
 		return nil
-	} else if err != database.ErrNotFound {
+	} else if !errors.Is(err, database.ErrNotFound) {
 		return &common.AppError{
 			Code:    ParseErrCode,
 			Message: fmt.Sprintf("failed to get message %s: %s", messageID, err),
@@ -202,21 +199,16 @@ func (v *Verifier) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *comm
 	return nil
 }
 
-// acp118Adapter adapts the EVM warp Verifier to the acp118.Verifier interface.
-// This adapter ignores the justification parameter since the EVM verifier doesn't use it.
-type acp118Adapter struct {
+// acp118Handler supports signing warp messages requested by peers.
+type acp118Handler struct {
 	verifier *Verifier
 }
 
-// Verify implements acp118.Verifier by delegating to the wrapped Verifier.
-// The justification parameter is ignored as it's not used by the EVM warp verifier.
-func (a *acp118Adapter) Verify(ctx context.Context, message *warp.UnsignedMessage, _ []byte) *common.AppError {
+func (a *acp118Handler) Verify(ctx context.Context, message *warp.UnsignedMessage, _ []byte) *common.AppError {
 	return a.verifier.Verify(ctx, message)
 }
 
-// NewHandler creates a new acp118.Handler for signing warp messages.
-// This is a convenience function that wraps the verifier in an acp118Adapter
-// and creates a cached handler.
+// NewHandler returns a handler for signing warp messages requested by peers.
 func NewHandler(
 	signatureCache cache.Cacher[ids.ID, []byte],
 	verifier *Verifier,
@@ -224,7 +216,7 @@ func NewHandler(
 ) *acp118.Handler {
 	return acp118.NewCachedHandler(
 		signatureCache,
-		&acp118Adapter{verifier: verifier},
+		&acp118Handler{verifier: verifier},
 		signer,
 	)
 }

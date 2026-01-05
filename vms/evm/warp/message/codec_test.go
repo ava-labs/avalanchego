@@ -11,8 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// TestCodecSerialization tests the registration order changes in codec.go,
-// does not change, preventing unintended serialization format changes.
+// TestCodecSerialization ensures the serialization format remains stable.
 func TestCodecSerialization(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -69,7 +68,7 @@ func TestCodecSerialization(t *testing.T) {
 			// Test marshaling produces expected bytes
 			gotBytes, err := Codec.Marshal(CodecVersion, tt.msg)
 			require.NoError(err)
-			require.Equal(tt.wantBytes, gotBytes, "marshaled bytes do not match expected - codec registration order may have changed")
+			require.Equal(tt.wantBytes, gotBytes)
 
 			// Test unmarshaling the expected bytes produces the original message
 			var gotMsg ValidatorUptime

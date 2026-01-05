@@ -253,7 +253,7 @@ type VM struct {
 	warpVerifier         *warp.Verifier
 	warpSignatureCache   cache.Cacher[ids.ID, []byte]
 	offchainWarpMessages [][]byte
-	warpAPI              *warp.API
+	warpAPI              *warp.Service
 
 	ethTxPushGossiper avalancheUtils.Atomic[*avalanchegossip.PushGossiper[*GossipEthTx]]
 
@@ -456,7 +456,7 @@ func (vm *VM) Initialize(
 	vm.warpVerifier = warp.NewVerifier(vm.warpMsgDB, vm, nil)
 
 	// Create warp API (signatureAggregator will be nil until createAPIs)
-	vm.warpAPI, err = warp.NewAPI(
+	vm.warpAPI, err = warp.NewService(
 		vm.ctx,
 		vm.warpMsgDB,
 		vm.ctx.WarpSigner,
@@ -1092,7 +1092,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		warpSDKClient := vm.Network.NewClient(p2p.SignatureRequestHandlerID)
 		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)
 
-		warpAPI, err := warp.NewAPI(
+		warpAPI, err := warp.NewService(
 			vm.ctx,
 			vm.warpMsgDB,
 			vm.ctx.WarpSigner,

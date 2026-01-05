@@ -27,9 +27,9 @@ var (
 	ErrBlockNotFound   = errors.New("block not found")
 )
 
-// API introduces snowman specific functionality to the evm.
+// Service introduces snowman specific functionality to the evm.
 // It provides caching and orchestration over the core warp primitives.
-type API struct {
+type Service struct {
 	chainContext        *snow.Context
 	db                  *DB
 	signer              warp.Signer
@@ -42,7 +42,7 @@ type API struct {
 	offchainMessages map[ids.ID]*warp.UnsignedMessage
 }
 
-func NewAPI(
+func NewService(
 	chainCtx *snow.Context,
 	db *DB,
 	signer warp.Signer,
@@ -50,7 +50,7 @@ func NewAPI(
 	signatureCache cache.Cacher[ids.ID, []byte],
 	signatureAggregator *acp118.SignatureAggregator,
 	offchainMessages [][]byte,
-) (*API, error) {
+) (*Service, error) {
 	offchainMsgs := make(map[ids.ID]*warp.UnsignedMessage)
 	for i, offchainMsg := range offchainMessages {
 		unsignedMsg, err := warp.ParseUnsignedMessage(offchainMsg)
@@ -73,7 +73,7 @@ func NewAPI(
 		offchainMsgs[unsignedMsg.ID()] = unsignedMsg
 	}
 
-	return &API{
+	return &Service{
 		db:                  db,
 		signer:              signer,
 		verifier:            verifier,
@@ -86,7 +86,7 @@ func NewAPI(
 }
 
 // GetMessage returns the Warp message associated with a messageID.
-func (a *API) GetMessage(_ context.Context, messageID ids.ID) (hexutil.Bytes, error) {
+func (a *Service) GetMessage(_ context.Context, messageID ids.ID) (hexutil.Bytes, error) {
 	message, err := a.getMessage(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message %s: %w", messageID, err)
@@ -95,7 +95,7 @@ func (a *API) GetMessage(_ context.Context, messageID ids.ID) (hexutil.Bytes, er
 }
 
 // getMessage retrieves a message from cache, offchain messages, or database.
-func (a *API) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
+func (a *Service) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
 	if msg, ok := a.messageCache.Get(messageID); ok {
 		return msg, nil
 	}
@@ -114,7 +114,7 @@ func (a *API) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
 }
 
 // GetMessageSignature returns the BLS signature associated with a messageID.
-func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
+func (a *Service) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
 	unsignedMessage, err := a.getMessage(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("%w %s: %w", ErrMessageNotFound, messageID, err)
@@ -125,7 +125,7 @@ func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexuti
 // GetBlockSignature returns the BLS signature associated with a blockID.
 // It constructs a warp message with a Hash payload containing the blockID,
 // then returns the signature for that message.
-func (a *API) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.Bytes, error) {
+func (a *Service) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.Bytes, error) {
 	blockHashPayload, err := payload.NewHash(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create block hash payload: %w", err)
@@ -144,7 +144,7 @@ func (a *API) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.By
 }
 
 // GetMessageAggregateSignature fetches the aggregate signature for the requested [messageID]
-func (a *API) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetIDStr string) (signedMessageBytes hexutil.Bytes, err error) {
+func (a *Service) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetIDStr string) (signedMessageBytes hexutil.Bytes, err error) {
 	unsignedMessage, err := a.getMessage(messageID)
 	if err != nil {
 		return nil, err
@@ -153,7 +153,7 @@ func (a *API) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID
 }
 
 // GetBlockAggregateSignature fetches the aggregate signature for the requested [blockID]
-func (a *API) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetIDStr string) (signedMessageBytes hexutil.Bytes, err error) {
+func (a *Service) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetIDStr string) (signedMessageBytes hexutil.Bytes, err error) {
 	blockHashPayload, err := payload.NewHash(blockID)
 	if err != nil {
 		return nil, err
@@ -166,7 +166,7 @@ func (a *API) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, qu
 	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetIDStr)
 }
 
-func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.UnsignedMessage, quorumNum uint64, subnetIDStr string) (hexutil.Bytes, error) {
+func (a *Service) aggregateSignatures(ctx context.Context, unsignedMessage *warp.UnsignedMessage, quorumNum uint64, subnetIDStr string) (hexutil.Bytes, error) {
 	subnetID := a.chainContext.SubnetID
 	if len(subnetIDStr) > 0 {
 		sid, err := ids.FromString(subnetIDStr)
@@ -217,7 +217,7 @@ func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.Uns
 }
 
 // signMessage verifies, signs, and caches a signature for the given unsigned message.
-func (a *API) signMessage(ctx context.Context, unsignedMessage *warp.UnsignedMessage) (hexutil.Bytes, error) {
+func (a *Service) signMessage(ctx context.Context, unsignedMessage *warp.UnsignedMessage) (hexutil.Bytes, error) {
 	msgID := unsignedMessage.ID()
 
 	if sig, ok := a.signatureCache.Get(msgID); ok {
