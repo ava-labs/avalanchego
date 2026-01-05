@@ -93,9 +93,8 @@ tasks:
   generate-bindings:
     desc: Generates Go bindings from Solidity contracts in precompile
     cmds:
-      - cmd: |
-          # Find and remove generated binding files in precompile directories only
-          find ./precompile -type f -name 'gen_*binding.go' -exec grep -l '^// Code generated - DO NOT EDIT\.$' {} \; | xargs -r rm
+      - cmd: find ./precompile -type f -name 'gen_*binding.go' -exec grep -l '^// Code generated - DO NOT EDIT\.$' {} \; | xargs -r rm
+      - cmd: find ./precompile -type f -name '*.abi' | xargs -r rm
       - cmd: go generate ./precompile/...
 
   lint:

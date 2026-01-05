@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -76,7 +76,7 @@ var (
 	}
 
 	configNameArg  string
-	runnerNameArg  string
+	runnerTypeArg  string
 	configBytesArg []byte
 
 	benchmarkOutputFileArg string
@@ -100,7 +100,7 @@ func init() {
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
 	flag.StringVar(&configNameArg, configKey, defaultConfigKey, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
-	flag.StringVar(&runnerNameArg, "runner", "dev", "Name of the runner executing this test. Added as a metric label and to the sub-benchmark's name to differentiate results on the runner key.")
+	flag.StringVar(&runnerTypeArg, "runner", "dev", "Type/label of the runner executing this test. Added as a metric label and to the benchmark name for grouping results.")
 
 	flag.StringVar(&benchmarkOutputFileArg, "benchmark-output-file", benchmarkOutputFileArg, "Filepath where benchmark results will be written to.")
 
@@ -126,8 +126,8 @@ func init() {
 	labels[configKey] = configNameArg
 	configBytesArg = []byte(predefinedConfigStr)
 
-	// Set the runner name label on the metrics.
-	labels["runner"] = runnerNameArg
+	// Set the runner label on the metrics.
+	labels["runner"] = runnerTypeArg
 }
 
 func main() {
@@ -140,7 +140,7 @@ func main() {
 		startBlockArg,
 		endBlockArg,
 		configNameArg,
-		runnerNameArg,
+		runnerTypeArg,
 	)
 
 	benchmarkReexecuteRange(
@@ -206,7 +206,7 @@ func benchmarkReexecuteRange(
 
 	log := tc.Log()
 	log.Info("re-executing block range with params",
-		zap.String("runner", runnerNameArg),
+		zap.String("runner", runnerTypeArg),
 		zap.String("config", configNameArg),
 		zap.String("labels", labelsArg),
 		zap.String("metrics-server-enabled", strconv.FormatBool(metricsServerEnabled)),

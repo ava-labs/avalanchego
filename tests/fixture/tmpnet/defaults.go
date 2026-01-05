@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -38,13 +38,15 @@ const (
 // Flags suggested for temporary networks. Applied by default.
 func DefaultTmpnetFlags() FlagsMap {
 	return FlagsMap{
+		config.NetworkPeerListPullGossipFreqKey: "250ms",
+		config.NetworkMaxReconnectDelayKey:      "1s",
+		config.HealthCheckFreqKey:               "2s",
+		config.AdminAPIEnabledKey:               "true",
+		config.IndexEnabledKey:                  "true",
+		// Disable disk checks by default since temporary networks often run in
+		// resource-constrained environments that commonly have low disk space.
 		config.SystemTrackerRequiredAvailableDiskSpacePercentageKey: "0",
 		config.SystemTrackerWarningAvailableDiskSpacePercentageKey:  "0",
-		config.NetworkPeerListPullGossipFreqKey:                     "250ms",
-		config.NetworkMaxReconnectDelayKey:                          "1s",
-		config.HealthCheckFreqKey:                                   "2s",
-		config.AdminAPIEnabledKey:                                   "true",
-		config.IndexEnabledKey:                                      "true",
 	}
 }
 
