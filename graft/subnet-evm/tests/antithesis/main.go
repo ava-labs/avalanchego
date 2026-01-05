@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -52,7 +52,7 @@ func main() {
 		),
 		func(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
 			_, thisFile, _, _ := runtime.Caller(0)
-			genesisPath := filepath.Join(filepath.Dir(thisFile), "..", "load", "genesis", "genesis.json")
+			genesisPath := filepath.Join(filepath.Dir(thisFile), "..", "load", "genesis.json")
 			return []*tmpnet.Subnet{
 				utils.NewTmpnetSubnet("subnet-evm", genesisPath, utils.DefaultChainConfig, nodes...),
 			}
