@@ -91,7 +91,7 @@ func NewService(
 	}, nil
 }
 
-// GetMessage returns the Warp message associated with a messageID.
+// GetMessage returns the Warp message associated with the given messageID.
 func (s *Service) GetMessage(messageID ids.ID) (hexutil.Bytes, error) {
 	message, err := s.getMessage(messageID)
 	if err != nil {
@@ -119,7 +119,7 @@ func (s *Service) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
 	return msg, nil
 }
 
-// GetMessageSignature returns the BLS signature associated with a messageID.
+// GetMessageSignature returns the BLS signature associated with the given messageID.
 func (s *Service) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
 	unsignedMessage, err := s.getMessage(messageID)
 	if err != nil {
@@ -128,7 +128,7 @@ func (s *Service) GetMessageSignature(ctx context.Context, messageID ids.ID) (he
 	return s.signMessage(ctx, unsignedMessage)
 }
 
-// GetBlockSignature returns the BLS signature associated with a blockID.
+// GetBlockSignature returns the BLS signature associated with the given blockID.
 // It constructs a warp message with a Hash payload containing the blockID,
 // then returns the signature for that message.
 func (s *Service) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.Bytes, error) {
@@ -155,7 +155,7 @@ func (s *Service) SetSignatureAggregator(signatureAggregator *acp118.SignatureAg
 	s.signatureAggregator = signatureAggregator
 }
 
-// GetMessageAggregateSignature fetches the aggregate signature for the requested [messageID]
+// GetMessageAggregateSignature fetches the aggregate signature for the requested messageID.
 func (s *Service) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetID ids.ID) (signedMessageBytes hexutil.Bytes, err error) {
 	unsignedMessage, err := s.getMessage(messageID)
 	if err != nil {
@@ -164,7 +164,7 @@ func (s *Service) GetMessageAggregateSignature(ctx context.Context, messageID id
 	return s.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetID)
 }
 
-// GetBlockAggregateSignature fetches the aggregate signature for the requested [blockID]
+// GetBlockAggregateSignature fetches the aggregate signature for the requested blockID.
 func (s *Service) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetID ids.ID) (signedMessageBytes hexutil.Bytes, err error) {
 	blockHashPayload, err := payload.NewHash(blockID)
 	if err != nil {

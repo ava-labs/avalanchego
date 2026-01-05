@@ -34,7 +34,7 @@ func (d *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
 	return nil
 }
 
-// Get retrieves a warp message from the database.
+// Get retrieves a warp message for the given msgID from the database.
 func (d *DB) Get(msgID ids.ID) (*warp.UnsignedMessage, error) {
 	unsignedMessageBytes, err := d.db.Get(msgID[:])
 	if err != nil {
