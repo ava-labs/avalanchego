@@ -114,6 +114,7 @@ const (
 	ethMetricsPrefix        = "eth"
 	sdkMetricsPrefix        = "sdk"
 	chainStateMetricsPrefix = "chain_state"
+	warpMetricsPrefix       = "warp"
 )
 
 // Define the API endpoints for the VM
@@ -453,7 +454,11 @@ func (vm *VM) Initialize(
 	}
 
 	vm.warpMsgDB = warp.NewDB(vm.warpDB)
-	vm.warpVerifier = warp.NewVerifier(vm.warpMsgDB, vm, nil)
+	warpMetrics := prometheus.NewRegistry()
+	vm.warpVerifier = warp.NewVerifier(vm.warpMsgDB, vm, nil, warpMetrics)
+	if err := vm.ctx.Metrics.Register(warpMetricsPrefix, warpMetrics); err != nil {
+		return err
+	}
 
 	// Create warp API. The signatureAggregator will be set later in CreateHandlers
 	// when the p2p network client becomes available.

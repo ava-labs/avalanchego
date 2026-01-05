@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -62,9 +63,9 @@ func TestDBGetCorruptedData(t *testing.T) {
 	msgID := testUnsignedMessage.ID()
 	require.NoError(t, db.Put(msgID[:], corruptedBytes))
 
-	_, err := messageDB.Get(msgID)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to parse unsigned message")
+	msg, err := messageDB.Get(msgID)
+	require.Nil(t, msg)
+	require.ErrorIs(t, err, codec.ErrUnknownVersion)
 }
 
 func TestDBAddDuplicate(t *testing.T) {

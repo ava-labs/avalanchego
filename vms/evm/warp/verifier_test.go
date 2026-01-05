@@ -225,8 +225,7 @@ func TestVerifierMalformedPayload(t *testing.T) {
 	msg, err := warp.NewUnsignedMessage(networkID, sourceChainID, invalidPayload)
 	require.NoError(t, err)
 
-	appErr := v.Verify(context.Background(), msg)
-	require.NotNil(t, appErr)
+	appErr := v.Verify(t.Context(), msg)
 	require.Equal(t, int32(ParseErrCode), appErr.Code)
 
 	require.Equal(t, float64(1), testutil.ToFloat64(v.messageParseFail))
@@ -245,8 +244,7 @@ func TestVerifierMalformedUptimePayload(t *testing.T) {
 	msg, err := warp.NewUnsignedMessage(networkID, sourceChainID, addressedCall.Bytes())
 	require.NoError(t, err)
 
-	appErr := v.Verify(context.Background(), msg)
-	require.NotNil(t, appErr)
+	appErr := v.Verify(t.Context(), msg)
 	require.Equal(t, int32(ParseErrCode), appErr.Code)
 
 	require.Equal(t, float64(1), testutil.ToFloat64(v.messageParseFail))
@@ -255,13 +253,13 @@ func TestVerifierMalformedUptimePayload(t *testing.T) {
 func TestHandlerMessageSignature(t *testing.T) {
 	metricstest.WithMetrics(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
 	tests := []struct {
 		name          string
 		setupMessage  func(db *DB) *warp.UnsignedMessage
-		wantError     bool
+		wantErrCode   *int32 // nil if no error expected
 		wantSignature bool
 		wantMetrics   metricExpectations
 	}{
@@ -290,7 +288,7 @@ func TestHandlerMessageSignature(t *testing.T) {
 				require.NoError(t, err)
 				return msg
 			},
-			wantError: true,
+			wantErrCode: func() *int32 { i := int32(ParseErrCode); return &i }(),
 			wantMetrics: metricExpectations{
 				messageParseFail: 1,
 				blockVerifyFail:  0,
@@ -303,7 +301,12 @@ func TestHandlerMessageSignature(t *testing.T) {
 			setup := setupHandler(t, ctx, memdb.New(), emptyBlockStore, nil, snowCtx.NetworkID, snowCtx.ChainID)
 
 			message := tt.setupMessage(setup.db)
-			sendSignatureRequest(t, ctx, setup, message, tt.wantError)
+			_, appErr := sendSignatureRequest(t, ctx, setup, message)
+			if tt.wantErrCode != nil {
+				require.Equal(t, *tt.wantErrCode, appErr.Code)
+			} else {
+				require.Nil(t, appErr)
+			}
 
 			requireMetrics(t, setup.verifier, tt.wantMetrics)
 		})
@@ -313,7 +316,7 @@ func TestHandlerMessageSignature(t *testing.T) {
 func TestHandlerBlockSignature(t *testing.T) {
 	metricstest.WithMetrics(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
 	knownBlkID := ids.GenerateTestID()
@@ -322,7 +325,7 @@ func TestHandlerBlockSignature(t *testing.T) {
 	tests := []struct {
 		name        string
 		blockID     ids.ID
-		wantError   bool
+		wantErrCode *int32 // nil if no error expected
 		wantMetrics metricExpectations
 	}{
 		{
@@ -334,9 +337,9 @@ func TestHandlerBlockSignature(t *testing.T) {
 			},
 		},
 		{
-			name:      "unknown block",
-			blockID:   ids.GenerateTestID(),
-			wantError: true,
+			name:        "unknown block",
+			blockID:     ids.GenerateTestID(),
+			wantErrCode: func() *int32 { i := int32(VerifyErrCode); return &i }(),
 			wantMetrics: metricExpectations{
 				blockVerifyFail:  1,
 				messageParseFail: 0,
@@ -353,7 +356,12 @@ func TestHandlerBlockSignature(t *testing.T) {
 			message, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, hashPayload.Bytes())
 			require.NoError(t, err)
 
-			sendSignatureRequest(t, ctx, setup, message, tt.wantError)
+			_, appErr := sendSignatureRequest(t, ctx, setup, message)
+			if tt.wantErrCode != nil {
+				require.Equal(t, *tt.wantErrCode, appErr.Code)
+			} else {
+				require.Nil(t, appErr)
+			}
 
 			requireMetrics(t, setup.verifier, tt.wantMetrics)
 		})
@@ -363,7 +371,7 @@ func TestHandlerBlockSignature(t *testing.T) {
 func TestHandlerUptimeSignature(t *testing.T) {
 	metricstest.WithMetrics(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
 	validationID := ids.GenerateTestID()
@@ -376,7 +384,7 @@ func TestHandlerUptimeSignature(t *testing.T) {
 		sourceAddress      []byte
 		validationID       ids.ID
 		setupUptimeTracker func(*uptimetracker.UptimeTracker, *mockable.Clock)
-		wantError          bool
+		wantErrCode        *int32 // nil if no error expected
 		wantMetrics        metricExpectations
 	}{
 		{
@@ -384,7 +392,7 @@ func TestHandlerUptimeSignature(t *testing.T) {
 			sourceAddress:      []byte{1, 2, 3},
 			validationID:       ids.GenerateTestID(),
 			setupUptimeTracker: func(_ *uptimetracker.UptimeTracker, _ *mockable.Clock) {},
-			wantError:          true,
+			wantErrCode:        func() *int32 { i := int32(VerifyErrCode); return &i }(),
 			wantMetrics: metricExpectations{
 				addressedCallVerifyFail: 1,
 			},
@@ -394,7 +402,7 @@ func TestHandlerUptimeSignature(t *testing.T) {
 			sourceAddress:      []byte{},
 			validationID:       ids.GenerateTestID(),
 			setupUptimeTracker: func(_ *uptimetracker.UptimeTracker, _ *mockable.Clock) {},
-			wantError:          true,
+			wantErrCode:        func() *int32 { i := int32(VerifyErrCode); return &i }(),
 			wantMetrics: metricExpectations{
 				uptimeVerifyFail: 1,
 			},
@@ -405,7 +413,7 @@ func TestHandlerUptimeSignature(t *testing.T) {
 			validationID:  validationID,
 			setupUptimeTracker: func(_ *uptimetracker.UptimeTracker, _ *mockable.Clock) {
 			},
-			wantError: true,
+			wantErrCode: func() *int32 { i := int32(VerifyErrCode); return &i }(),
 			wantMetrics: metricExpectations{
 				uptimeVerifyFail: 1,
 			},
@@ -418,7 +426,7 @@ func TestHandlerUptimeSignature(t *testing.T) {
 				require.NoError(t, tracker.Connect(nodeID))
 				clk.Set(clk.Time().Add(40 * time.Second))
 			},
-			wantError: true,
+			wantErrCode: func() *int32 { i := int32(VerifyErrCode); return &i }(),
 			wantMetrics: metricExpectations{
 				uptimeVerifyFail: 1,
 			},
@@ -474,7 +482,12 @@ func TestHandlerUptimeSignature(t *testing.T) {
 			message, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, addressedCall.Bytes())
 			require.NoError(t, err)
 
-			sendSignatureRequest(t, ctx, setup, message, tt.wantError)
+			_, appErr := sendSignatureRequest(t, ctx, setup, message)
+			if tt.wantErrCode != nil {
+				require.Equal(t, *tt.wantErrCode, appErr.Code)
+			} else {
+				require.Nil(t, appErr)
+			}
 
 			requireMetrics(t, setup.verifier, tt.wantMetrics)
 		})
@@ -484,7 +497,7 @@ func TestHandlerUptimeSignature(t *testing.T) {
 func TestHandlerCacheBehavior(t *testing.T) {
 	metricstest.WithMetrics(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	setup := setupHandler(t, ctx, memdb.New(), emptyBlockStore, nil, snowCtx.NetworkID, snowCtx.ChainID)
 
@@ -494,12 +507,14 @@ func TestHandlerCacheBehavior(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, setup.db.Add(message))
 
-	firstSignature := sendSignatureRequest(t, ctx, setup, message, false)
+	firstSignature, appErr := sendSignatureRequest(t, ctx, setup, message)
+	require.Nil(t, appErr)
 
 	cachedSig, ok := setup.sigCache.Get(message.ID())
 	require.True(t, ok)
 	require.Equal(t, firstSignature, cachedSig)
 
-	secondSignature := sendSignatureRequest(t, ctx, setup, message, false)
+	secondSignature, appErr := sendSignatureRequest(t, ctx, setup, message)
+	require.Nil(t, appErr)
 	require.Equal(t, firstSignature, secondSignature)
 }

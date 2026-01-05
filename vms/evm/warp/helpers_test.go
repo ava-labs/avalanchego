@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -120,14 +121,13 @@ func setupHandler(
 	}
 }
 
-// sendSignatureRequest sends a signature request and returns the signature bytes
+// sendSignatureRequest sends a signature request and returns the signature bytes and any error
 func sendSignatureRequest(
 	t *testing.T,
 	ctx context.Context,
 	setup *handlerTestSetup,
 	message *warp.UnsignedMessage,
-	wantError bool,
-) []byte {
+) ([]byte, *common.AppError) {
 	t.Helper()
 
 	request := &sdk.SignatureRequest{
@@ -137,16 +137,15 @@ func sendSignatureRequest(
 	require.NoError(t, err)
 
 	var signature []byte
+	var appErr *common.AppError
 	responseChan := make(chan struct{})
-	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
+	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		defer close(responseChan)
 
-		if wantError {
-			require.Error(t, appErr)
+		if err != nil {
+			appErr, _ = err.(*common.AppError)
 			return
 		}
-
-		require.NoError(t, appErr)
 
 		var response sdk.SignatureResponse
 		require.NoError(t, proto.Unmarshal(responseBytes, &response))
@@ -160,5 +159,5 @@ func sendSignatureRequest(
 	require.NoError(t, setup.client.AppRequest(ctx, set.Of(setup.serverNodeID), requestBytes, onResponse))
 	<-responseChan
 
-	return signature
+	return signature, appErr
 }
