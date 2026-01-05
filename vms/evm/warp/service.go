@@ -92,8 +92,8 @@ func NewService(
 }
 
 // GetMessage returns the Warp message associated with a messageID.
-func (a *Service) GetMessage(messageID ids.ID) (hexutil.Bytes, error) {
-	message, err := a.getMessage(messageID)
+func (s *Service) GetMessage(messageID ids.ID) (hexutil.Bytes, error) {
+	message, err := s.getMessage(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message %s: %w", messageID, err)
 	}
@@ -101,79 +101,85 @@ func (a *Service) GetMessage(messageID ids.ID) (hexutil.Bytes, error) {
 }
 
 // getMessage retrieves a message from cache, offchain messages, or database.
-func (a *Service) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
-	if msg, ok := a.messageCache.Get(messageID); ok {
+func (s *Service) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
+	if msg, ok := s.messageCache.Get(messageID); ok {
 		return msg, nil
 	}
 
-	if msg, ok := a.offChainMessages[messageID]; ok {
+	if msg, ok := s.offChainMessages[messageID]; ok {
 		return msg, nil
 	}
 
-	msg, err := a.db.Get(messageID)
+	msg, err := s.db.Get(messageID)
 	if err != nil {
 		return nil, err
 	}
 
-	a.messageCache.Put(messageID, msg)
+	s.messageCache.Put(messageID, msg)
 	return msg, nil
 }
 
 // GetMessageSignature returns the BLS signature associated with a messageID.
-func (a *Service) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
-	unsignedMessage, err := a.getMessage(messageID)
+func (s *Service) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
+	unsignedMessage, err := s.getMessage(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("%w %s: %w", ErrMessageNotFound, messageID, err)
 	}
-	return a.signMessage(ctx, unsignedMessage)
+	return s.signMessage(ctx, unsignedMessage)
 }
 
 // GetBlockSignature returns the BLS signature associated with a blockID.
 // It constructs a warp message with a Hash payload containing the blockID,
 // then returns the signature for that message.
-func (a *Service) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.Bytes, error) {
+func (s *Service) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.Bytes, error) {
 	blockHashPayload, err := payload.NewHash(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create block hash payload: %w", err)
 	}
 
 	unsignedMessage, err := warp.NewUnsignedMessage(
-		a.networkID,
-		a.chainID,
+		s.networkID,
+		s.chainID,
 		blockHashPayload.Bytes(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unsigned warp message: %w", err)
 	}
 
-	return a.signMessage(ctx, unsignedMessage)
+	return s.signMessage(ctx, unsignedMessage)
+}
+
+// SetSignatureAggregator sets the signature aggregator for the service.
+// This must be called before any aggregate signature methods are used.
+func (s *Service) SetSignatureAggregator(signatureAggregator *acp118.SignatureAggregator) {
+	s.signatureAggregator = signatureAggregator
 }
 
 // GetMessageAggregateSignature fetches the aggregate signature for the requested [messageID]
-func (a *Service) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetID ids.ID) (signedMessageBytes hexutil.Bytes, err error) {
-	unsignedMessage, err := a.getMessage(messageID)
+func (s *Service) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetID ids.ID) (signedMessageBytes hexutil.Bytes, err error) {
+	unsignedMessage, err := s.getMessage(messageID)
 	if err != nil {
 		return nil, err
 	}
-	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetID)
+	return s.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetID)
 }
 
 // GetBlockAggregateSignature fetches the aggregate signature for the requested [blockID]
-func (a *Service) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetID ids.ID) (signedMessageBytes hexutil.Bytes, err error) {
+func (s *Service) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetID ids.ID) (signedMessageBytes hexutil.Bytes, err error) {
 	blockHashPayload, err := payload.NewHash(blockID)
 	if err != nil {
 		return nil, err
 	}
-	unsignedMessage, err := warp.NewUnsignedMessage(a.networkID, a.chainID, blockHashPayload.Bytes())
+	unsignedMessage, err := warp.NewUnsignedMessage(s.networkID, s.chainID, blockHashPayload.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
-	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetID)
+	return s.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetID)
 }
 
-func (a *Service) aggregateSignatures(ctx context.Context, unsignedMessage *warp.UnsignedMessage, quorumNum uint64, subnetID ids.ID) (hexutil.Bytes, error) {
-	validatorState := a.validatorState
+func (s *Service) aggregateSignatures(ctx context.Context, unsignedMessage *warp.UnsignedMessage, quorumNum uint64, subnetID ids.ID) (hexutil.Bytes, error) {
+	validatorState := s.validatorState
 	pChainHeight, err := validatorState.GetCurrentHeight(ctx)
 	if err != nil {
 		return nil, err
@@ -197,7 +203,7 @@ func (a *Service) aggregateSignatures(ctx context.Context, unsignedMessage *warp
 		UnsignedMessage: *unsignedMessage,
 		Signature:       &warp.BitSetSignature{},
 	}
-	signedMessage, _, _, err := a.signatureAggregator.AggregateSignatures(
+	signedMessage, _, _, err := s.signatureAggregator.AggregateSignatures(
 		ctx,
 		warpMessage,
 		nil,
@@ -215,25 +221,25 @@ func (a *Service) aggregateSignatures(ctx context.Context, unsignedMessage *warp
 }
 
 // signMessage verifies, signs, and caches a signature for the given unsigned message.
-func (a *Service) signMessage(ctx context.Context, unsignedMessage *warp.UnsignedMessage) (hexutil.Bytes, error) {
+func (s *Service) signMessage(ctx context.Context, unsignedMessage *warp.UnsignedMessage) (hexutil.Bytes, error) {
 	msgID := unsignedMessage.ID()
 
-	if sig, ok := a.signatureCache.Get(msgID); ok {
+	if sig, ok := s.signatureCache.Get(msgID); ok {
 		return sig, nil
 	}
 
-	if err := a.verifier.Verify(ctx, unsignedMessage); err != nil {
+	if err := s.verifier.Verify(ctx, unsignedMessage); err != nil {
 		if err.Code == VerifyErrCode {
 			return nil, fmt.Errorf("%w: %w", ErrBlockNotFound, err)
 		}
 		return nil, fmt.Errorf("failed to verify message %s: %w", msgID, err)
 	}
 
-	signature, err := a.signer.Sign(unsignedMessage)
+	signature, err := s.signer.Sign(unsignedMessage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message %s: %w", msgID, err)
 	}
 
-	a.signatureCache.Put(msgID, signature)
+	s.signatureCache.Put(msgID, signature)
 	return signature, nil
 }
