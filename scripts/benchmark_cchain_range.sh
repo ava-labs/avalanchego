@@ -11,9 +11,9 @@ set -euo pipefail
 #   RUNNER_TYPE (optional): Runner type/label to include in benchmark naming.
 #   LABELS (optional): Comma-separated key=value pairs for metric labels.
 #   BENCHMARK_OUTPUT_FILE (optional): If set, benchmark output is also written to this file.
-#   METRICS_SERVER_ENABLED (optional, bool): If set, starts HTTP server exposing /metrics endpoint
+#   METRICS_SERVER_ENABLED (optional): If set, enables the metrics server.
 #   METRICS_SERVER_PORT (optional): If set, determines the port the metrics server will listen to.
-#   METRICS_COLLECTOR_ENABLED (optional, bool): If set, starts Prometheus agent to collect and forward metrics to remote instance
+#   METRICS_COLLECTOR_ENABLED (optional): If set, enables the metrics collector.
 
 : "${BLOCK_DIR:?BLOCK_DIR must be set}"
 : "${CURRENT_STATE_DIR:?CURRENT_STATE_DIR must be set}"
