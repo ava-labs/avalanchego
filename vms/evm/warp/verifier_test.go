@@ -106,14 +106,12 @@ func TestCodecSerialization(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			gotBytes, err := Codec.Marshal(CodecVersion, tt.msg)
+			gotBytes, err := tt.msg.Bytes()
 			require.NoError(err)
 			require.Equal(tt.wantBytes, gotBytes)
 
-			var gotMsg ValidatorUptime
-			version, err := Codec.Unmarshal(tt.wantBytes, &gotMsg)
+			gotMsg, err := ParseValidatorUptime(tt.wantBytes)
 			require.NoError(err)
-			require.Equal(uint16(CodecVersion), version)
 			require.Equal(tt.msg.ValidationID, gotMsg.ValidationID)
 			require.Equal(tt.msg.TotalUptime, gotMsg.TotalUptime)
 		})

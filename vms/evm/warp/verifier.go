@@ -26,23 +26,23 @@ const (
 	ParseErrCode = iota + 1
 	VerifyErrCode
 
-	CodecVersion   = 0
-	MaxMessageSize = 24 * units.KiB
+	codecVersion   = 0
+	maxMessageSize = 24 * units.KiB
 )
 
 var (
 	_ acp118.Verifier = (*acp118Handler)(nil)
 
-	Codec codec.Manager
+	c codec.Manager
 )
 
 func init() {
-	Codec = codec.NewManager(MaxMessageSize)
+	c = codec.NewManager(maxMessageSize)
 	lc := linearcodec.NewDefault()
 
 	err := errors.Join(
 		lc.RegisterType(&ValidatorUptime{}),
-		Codec.RegisterCodec(CodecVersion, lc),
+		c.RegisterCodec(codecVersion, lc),
 	)
 	if err != nil {
 		panic(err)
@@ -59,7 +59,7 @@ type ValidatorUptime struct {
 // ParseValidatorUptime converts a slice of bytes into a ValidatorUptime.
 func ParseValidatorUptime(b []byte) (*ValidatorUptime, error) {
 	var msg ValidatorUptime
-	if _, err := Codec.Unmarshal(b, &msg); err != nil {
+	if _, err := c.Unmarshal(b, &msg); err != nil {
 		return nil, err
 	}
 	return &msg, nil
@@ -67,7 +67,7 @@ func ParseValidatorUptime(b []byte) (*ValidatorUptime, error) {
 
 // Bytes returns the binary representation of this payload.
 func (v *ValidatorUptime) Bytes() ([]byte, error) {
-	return Codec.Marshal(CodecVersion, v)
+	return c.Marshal(codecVersion, v)
 }
 
 // BlockStore provides access to accepted blocks.
