@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/metrics"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -19,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/libevm/metrics"
 )
 
 const (

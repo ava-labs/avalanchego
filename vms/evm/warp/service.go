@@ -32,7 +32,6 @@ var (
 type Service struct {
 	networkID      uint32
 	chainID        ids.ID
-	subnetID       ids.ID
 	validatorState validators.State
 
 	db                  *DB
@@ -48,7 +47,6 @@ type Service struct {
 func NewService(
 	networkID uint32,
 	chainID ids.ID,
-	subnetID ids.ID,
 	validatorState validators.State,
 	db *DB,
 	signer warp.Signer,
@@ -82,7 +80,6 @@ func NewService(
 	return &Service{
 		networkID:           networkID,
 		chainID:             chainID,
-		subnetID:            subnetID,
 		validatorState:      validatorState,
 		db:                  db,
 		signer:              signer,

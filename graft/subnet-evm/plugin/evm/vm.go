@@ -490,7 +490,6 @@ func (vm *VM) Initialize(
 	vm.warpAPI, err = warp.NewService(
 		vm.ctx.NetworkID,
 		vm.ctx.ChainID,
-		vm.ctx.SubnetID,
 		vm.ctx.ValidatorState,
 		vm.warpMsgDB,
 		vm.ctx.WarpSigner,
@@ -1224,7 +1223,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		warpAPI, err := warp.NewService(
 			vm.ctx.NetworkID,
 			vm.ctx.ChainID,
-			vm.ctx.SubnetID,
 			vm.ctx.ValidatorState,
 			vm.warpMsgDB,
 			vm.ctx.WarpSigner,
