@@ -1,8 +1,6 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package libevmtest provides test utilities for packages that need to test
-// both C-Chain and Subnet-EVM type registration.
 package libevmtest
 
 import (
