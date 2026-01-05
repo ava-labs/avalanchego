@@ -41,6 +41,6 @@ func TestNotify(t *testing.T) {
 	case libevmtest.SubnetEVMVariant:
 		require.Equal(t, wantSubnetEVM, have)
 	default:
-		require.FailNow(t, "Unknown or unregistered variant (this test must run via TestMain)")
+		require.FailNow(t, "libevm extras not registered (use libevmtest to aid tracking registrations)")
 	}
 }
