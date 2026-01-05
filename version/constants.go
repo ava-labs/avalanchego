@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -27,7 +27,7 @@ var (
 		Name:  Client,
 		Major: 1,
 		Minor: 14,
-		Patch: 0,
+		Patch: 1,
 	}
 	MinimumCompatibleVersion = &Application{
 		Name:  Client,

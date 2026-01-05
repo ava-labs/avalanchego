@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package feemanager
@@ -56,7 +56,7 @@ var (
 	ErrUnpackOutput    = errors.New("failed to unpack output")
 
 	// IFeeManagerRawABI contains the raw ABI of FeeManager contract.
-	//go:embed contract.abi
+	//go:embed IFeeManager.abi
 	FeeManagerRawABI string
 
 	FeeManagerABI = contract.ParseABI(FeeManagerRawABI)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -23,7 +23,7 @@ func main() {
 		log.Fatalf("failed to get current working directory: %s", err)
 	}
 
-	genesisPath := filepath.Join(cwd, "tests/load/genesis/genesis.json")
+	genesisPath := filepath.Join(cwd, "tests/load/genesis.json")
 
 	// Create a network with a subnet-evm subnet
 	network := tmpnet.LocalNetworkOrPanic()
