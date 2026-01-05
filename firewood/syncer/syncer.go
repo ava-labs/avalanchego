@@ -49,7 +49,7 @@ func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p
 		config.SimultaneousWorkLimit = defaultSimultaneousWorkLimit
 	}
 	return xsync.NewSyncer(
-		&database{db},
+		&database{db: db},
 		xsync.Config[*RangeProof, struct{}]{
 			RangeProofMarshaler:   rangeProofMarshaler{},
 			ChangeProofMarshaler:  changeProofMarshaler{},
