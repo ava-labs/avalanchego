@@ -1,0 +1,55 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "primary",
+    srcs = [
+        "api.go",
+        "wallet.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/info",
+        "//codec",
+        "//graft/coreth/ethclient",
+        "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/client",
+        "//ids",
+        "//utils/constants",
+        "//utils/crypto/keychain",
+        "//utils/rpc",
+        "//utils/set",
+        "//vms/avm",
+        "//vms/components/avax",
+        "//vms/platformvm",
+        "//vms/platformvm/txs",
+        "//wallet/chain/c",
+        "//wallet/chain/p",
+        "//wallet/chain/p/builder",
+        "//wallet/chain/p/signer",
+        "//wallet/chain/p/wallet",
+        "//wallet/chain/x",
+        "//wallet/chain/x/builder",
+        "//wallet/chain/x/signer",
+        "//wallet/subnet/primary/common",
+        "@com_github_ava_labs_libevm//common",
+    ],
+)
+
+go_test(
+    name = "primary_test",
+    srcs = ["example_test.go"],
+    embed = [":primary"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//utils/constants",
+        "//utils/units",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/platformvm/reward",
+        "//vms/platformvm/signer",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+    ],
+)

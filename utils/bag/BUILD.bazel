@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "bag",
+    srcs = [
+        "bag.go",
+        "unique_bag.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/bag",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "//utils/set",
+        "@org_golang_x_exp//maps",
+    ],
+)
+
+go_test(
+    name = "bag_test",
+    srcs = [
+        "bag_benchmark_test.go",
+        "bag_test.go",
+        "unique_bag_test.go",
+    ],
+    embed = [":bag"],
+    deps = [
+        "//utils/set",
+        "@com_github_stretchr_testify//require",
+    ],
+)

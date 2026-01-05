@@ -1,0 +1,50 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "block",
+    srcs = [
+        "batched_vm.go",
+        "block_context_vm.canoto.go",
+        "block_context_vm.go",
+        "notifier.go",
+        "state_summary.go",
+        "state_sync_mode.go",
+        "state_syncable_vm.go",
+        "vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/snowman/block",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/consensus/snowman",
+        "//snow/engine/common",
+        "//utils/logging",
+        "//utils/wrappers",
+        "@com_github_stephenbuttolph_canoto//:canoto",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "block_test",
+    srcs = [
+        "batched_vm_test.go",
+        "mocks_generate_test.go",
+        "notifier_test.go",
+    ],
+    embed = [":block"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/consensus/snowman",
+        "//snow/consensus/snowman/snowmantest",
+        "//snow/engine/snowman/block/blockmock",
+        "//snow/engine/snowman/block/blocktest",
+        "//utils/logging",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

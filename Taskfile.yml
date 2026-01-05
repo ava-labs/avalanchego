@@ -201,6 +201,82 @@ tasks:
     desc: Runs shellcheck to check sanity of shell scripts
     cmd: ./scripts/shellcheck.sh
 
+  # ============================================
+  # Bazel Tasks
+  # ============================================
+
+  check-go-version:
+    desc: Verify Go version consistency across go.mod, MODULE.bazel, nix/go/default.nix, and graft modules
+    cmd: ./scripts/check_go_version.sh
+
+  bazel-build:
+    desc: Build avalanchego with Bazel
+    cmd: bazel build //main:avalanchego
+
+  bazel-build-race:
+    desc: Build avalanchego with Bazel (race detection)
+    cmd: bazel build --config=race //main:avalanchego
+
+  bazel-test:
+    desc: Run unit tests with Bazel
+    cmd: bazel test //...
+
+  bazel-test-race:
+    desc: Run unit tests with Bazel (race detection)
+    cmd: bazel test --config=race //...
+
+  bazel-clean:
+    desc: Clean Bazel cache
+    cmd: bazel clean
+
+  bazel-query:
+    desc: Query Bazel targets
+    cmd: bazel query '//...' {{.CLI_ARGS}}
+
+  bazel-mod-tidy:
+    desc: Update use_repo() in MODULE.bazel from go.mod
+    cmd: bazel mod tidy
+
+  bazel-validate:
+    desc: Validate Bazel build by running E2E tests with bazel-built binary
+    cmds:
+      - task: bazel-build
+      - task: build-xsvm
+      - cmd: |
+          AVALANCHEGO_PATH=$(pwd)/bazel-bin/main/avalanchego_/avalanchego \
+          bash -x ./scripts/tests.e2e.existing.sh
+
+  # ============================================
+  # Gazelle Generated Files Tasks
+  # ============================================
+
+  bazel-delete-gazelle:
+    desc: Delete all gazelle-generated BUILD.bazel files (except manually maintained ones)
+    cmd: |
+      find . -name 'BUILD.bazel' -type f | while read f; do
+        # Skip root and graft module roots (manually maintained)
+        case "$f" in
+          ./BUILD.bazel|./graft/coreth/BUILD.bazel|./graft/evm/BUILD.bazel|./graft/subnet-evm/BUILD.bazel|./.bazel/*)
+            continue
+            ;;
+        esac
+        rm -f "$f"
+      done
+
+  bazel-generate-gazelle:
+    desc: Regenerate BUILD files with Gazelle (all modules)
+    cmds:
+      - bazel run //:gazelle
+      - bazel run //graft/coreth:gazelle
+      - bazel run //graft/evm:gazelle
+      - bazel run //graft/subnet-evm:gazelle
+
+  check-bazel-generate-gazelle:
+    desc: Check that generated BUILD files are up-to-date (requires clean git tree)
+    cmds:
+      - task: bazel-generate-gazelle
+      - task: check-clean-branch
+
   reexecute-cchain-range:
     desc: Re-execute a range of C-Chain blocks.
     vars:

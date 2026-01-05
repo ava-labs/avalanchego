@@ -1,0 +1,5 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/ava-labs/avalanchego/tools
+
+gazelle(name = "gazelle", command = "update")

@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "stakeable",
+    srcs = ["stakeable_lock.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/stakeable",
+    visibility = ["//visibility:public"],
+    deps = ["//vms/components/avax"],
+)
+
+go_test(
+    name = "stakeable_test",
+    srcs = ["stakeable_lock_test.go"],
+    embed = [":stakeable"],
+    deps = [
+        "//vms/components/avax",
+        "//vms/components/avax/avaxmock",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

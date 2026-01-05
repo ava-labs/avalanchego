@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ips",
+    srcs = [
+        "claimed_ip_port.go",
+        "ip.go",
+        "lookup.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/ips",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//staking",
+        "//utils/hashing",
+        "//utils/wrappers",
+    ],
+)
+
+go_test(
+    name = "ips_test",
+    srcs = ["lookup_test.go"],
+    embed = [":ips"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "metrics",
+    srcs = [
+        "metrics.go",
+        "tx_metrics.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/avm/metrics",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/metric",
+        "//utils/wrappers",
+        "//vms/avm/block",
+        "//vms/avm/txs",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "metrics_test",
+    srcs = ["mocks_generate_test.go"],
+    embed = [":metrics"],
+)

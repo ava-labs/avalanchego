@@ -1,0 +1,8 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/ava-labs/avalanchego/graft/subnet-evm
+
+gazelle(
+    name = "gazelle",
+    command = "update",
+)

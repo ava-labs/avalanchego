@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "payload",
+    srcs = [
+        "addressed_call.go",
+        "codec.go",
+        "hash.go",
+        "payload.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/warp/payload",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//ids",
+        "//utils/units",
+    ],
+)
+
+go_test(
+    name = "payload_test",
+    srcs = [
+        "addressed_call_test.go",
+        "hash_test.go",
+        "payload_test.go",
+    ],
+    embed = [":payload"],
+    deps = [
+        "//codec",
+        "//ids",
+        "@com_github_stretchr_testify//require",
+    ],
+)

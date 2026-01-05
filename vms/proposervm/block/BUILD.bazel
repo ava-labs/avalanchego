@@ -1,0 +1,42 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "block",
+    srcs = [
+        "block.go",
+        "build.go",
+        "codec.go",
+        "header.go",
+        "option.go",
+        "parse.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/proposervm/block",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//ids",
+        "//staking",
+        "//utils/hashing",
+        "//utils/wrappers",
+    ],
+)
+
+go_test(
+    name = "block_test",
+    srcs = [
+        "block_test.go",
+        "build_test.go",
+        "header_test.go",
+        "parse_test.go",
+    ],
+    embed = [":block"],
+    deps = [
+        "//codec",
+        "//ids",
+        "//staking",
+        "//utils/units",
+        "//utils/wrappers",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "password",
+    srcs = [
+        "hash.go",
+        "password.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/password",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_nbutton23_zxcvbn_go//:zxcvbn-go",
+        "@org_golang_x_crypto//argon2",
+    ],
+)
+
+go_test(
+    name = "password_test",
+    srcs = [
+        "hash_test.go",
+        "password_test.go",
+    ],
+    embed = [":password"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

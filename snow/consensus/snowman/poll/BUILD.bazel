@@ -1,0 +1,42 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "poll",
+    srcs = [
+        "early_term_traversal.go",
+        "graph.go",
+        "interfaces.go",
+        "prefix.go",
+        "set.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/consensus/snowman/poll",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/bag",
+        "//utils/formatting",
+        "//utils/linked",
+        "//utils/logging",
+        "//utils/metric",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "poll_test",
+    srcs = [
+        "early_term_traversal_test.go",
+        "graph_test.go",
+        "prefix_test.go",
+        "set_test.go",
+    ],
+    embed = [":poll"],
+    deps = [
+        "//ids",
+        "//utils/bag",
+        "//utils/logging",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

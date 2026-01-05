@@ -37,6 +37,7 @@
           packages = with pkgs; [
             # Build requirements
             git
+            bazelisk
 
             # Task runner
             go-task

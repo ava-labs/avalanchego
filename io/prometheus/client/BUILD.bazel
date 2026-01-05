@@ -1,0 +1,20 @@
+# Aliases to external prometheus/client_model proto definitions
+# These match the import path "io/prometheus/client/metrics.proto"
+
+alias(
+    name = "client_proto",
+    actual = "@com_github_prometheus_client_model//io/prometheus/client:io_prometheus_client_proto",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "metrics_proto",
+    actual = "@com_github_prometheus_client_model//io/prometheus/client:io_prometheus_client_go_proto",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "go",
+    actual = "@com_github_prometheus_client_model//io/prometheus/client:go",
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "types",
+    srcs = ["blob_data.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/types",
+    visibility = ["//visibility:public"],
+    deps = ["//utils/formatting"],
+)
+
+go_test(
+    name = "types_test",
+    srcs = ["blob_data_test.go"],
+    embed = [":types"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

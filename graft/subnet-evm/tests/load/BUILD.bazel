@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "load_test",
+    srcs = ["load_test.go"],
+    deps = [
+        "//graft/subnet-evm/tests/utils",
+        "//ids",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//utils/set",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+    ],
+)
