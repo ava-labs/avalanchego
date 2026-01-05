@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -30,39 +30,45 @@ var (
 // Service introduces snowman specific functionality to the evm.
 // It provides caching and orchestration over the core warp primitives.
 type Service struct {
-	chainContext        *snow.Context
+	networkID      uint32
+	chainID        ids.ID
+	subnetID       ids.ID
+	validatorState validators.State
+
 	db                  *DB
 	signer              warp.Signer
 	verifier            *Verifier
 	signatureAggregator *acp118.SignatureAggregator
 
-	// Caching
 	messageCache     *lru.Cache[ids.ID, *warp.UnsignedMessage]
 	signatureCache   cache.Cacher[ids.ID, []byte]
-	offchainMessages map[ids.ID]*warp.UnsignedMessage
+	offChainMessages map[ids.ID]*warp.UnsignedMessage
 }
 
 func NewService(
-	chainCtx *snow.Context,
+	networkID uint32,
+	chainID ids.ID,
+	subnetID ids.ID,
+	validatorState validators.State,
 	db *DB,
 	signer warp.Signer,
 	verifier *Verifier,
 	signatureCache cache.Cacher[ids.ID, []byte],
 	signatureAggregator *acp118.SignatureAggregator,
-	offchainMessages [][]byte,
+	offChainMessages [][]byte,
 ) (*Service, error) {
 	offchainMsgs := make(map[ids.ID]*warp.UnsignedMessage)
-	for i, offchainMsg := range offchainMessages {
+	for i, offchainMsg := range offChainMessages {
 		unsignedMsg, err := warp.ParseUnsignedMessage(offchainMsg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse off-chain message at index %d: %w", i, err)
 		}
 
-		if unsignedMsg.NetworkID != chainCtx.NetworkID {
+		if unsignedMsg.NetworkID != networkID {
 			return nil, fmt.Errorf("wrong network ID at index %d", i)
 		}
 
-		if unsignedMsg.SourceChainID != chainCtx.ChainID {
+		if unsignedMsg.SourceChainID != chainID {
 			return nil, fmt.Errorf("wrong source chain ID at index %d", i)
 		}
 
@@ -74,19 +80,22 @@ func NewService(
 	}
 
 	return &Service{
+		networkID:           networkID,
+		chainID:             chainID,
+		subnetID:            subnetID,
+		validatorState:      validatorState,
 		db:                  db,
 		signer:              signer,
 		verifier:            verifier,
-		chainContext:        chainCtx,
 		signatureAggregator: signatureAggregator,
 		messageCache:        lru.NewCache[ids.ID, *warp.UnsignedMessage](500),
 		signatureCache:      signatureCache,
-		offchainMessages:    offchainMsgs,
+		offChainMessages:    offchainMsgs,
 	}, nil
 }
 
 // GetMessage returns the Warp message associated with a messageID.
-func (a *Service) GetMessage(_ context.Context, messageID ids.ID) (hexutil.Bytes, error) {
+func (a *Service) GetMessage(messageID ids.ID) (hexutil.Bytes, error) {
 	message, err := a.getMessage(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message %s: %w", messageID, err)
@@ -100,7 +109,7 @@ func (a *Service) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
 		return msg, nil
 	}
 
-	if msg, ok := a.offchainMessages[messageID]; ok {
+	if msg, ok := a.offChainMessages[messageID]; ok {
 		return msg, nil
 	}
 
@@ -132,8 +141,8 @@ func (a *Service) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexuti
 	}
 
 	unsignedMessage, err := warp.NewUnsignedMessage(
-		a.chainContext.NetworkID,
-		a.chainContext.ChainID,
+		a.networkID,
+		a.chainID,
 		blockHashPayload.Bytes(),
 	)
 	if err != nil {
@@ -158,7 +167,7 @@ func (a *Service) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID
 	if err != nil {
 		return nil, err
 	}
-	unsignedMessage, err := warp.NewUnsignedMessage(a.chainContext.NetworkID, a.chainContext.ChainID, blockHashPayload.Bytes())
+	unsignedMessage, err := warp.NewUnsignedMessage(a.networkID, a.chainID, blockHashPayload.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +176,7 @@ func (a *Service) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID
 }
 
 func (a *Service) aggregateSignatures(ctx context.Context, unsignedMessage *warp.UnsignedMessage, quorumNum uint64, subnetIDStr string) (hexutil.Bytes, error) {
-	subnetID := a.chainContext.SubnetID
+	subnetID := a.subnetID
 	if len(subnetIDStr) > 0 {
 		sid, err := ids.FromString(subnetIDStr)
 		if err != nil {
@@ -175,7 +184,7 @@ func (a *Service) aggregateSignatures(ctx context.Context, unsignedMessage *warp
 		}
 		subnetID = sid
 	}
-	validatorState := a.chainContext.ValidatorState
+	validatorState := a.validatorState
 	pChainHeight, err := validatorState.GetCurrentHeight(ctx)
 	if err != nil {
 		return nil, err

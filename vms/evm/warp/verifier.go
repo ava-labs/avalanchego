@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -8,67 +8,71 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/libevm/metrics"
-
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
-	"github.com/ava-labs/avalanchego/vms/evm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/libevm/metrics"
 )
 
 const (
 	ParseErrCode = iota + 1
 	VerifyErrCode
+
+	CodecVersion   = 0
+	MaxMessageSize = 24 * units.KiB
 )
 
-var _ acp118.Verifier = (*acp118Handler)(nil)
+var (
+	_ acp118.Verifier = (*acp118Handler)(nil)
+
+	Codec codec.Manager
+)
+
+func init() {
+	Codec = codec.NewManager(MaxMessageSize)
+	lc := linearcodec.NewDefault()
+
+	err := errors.Join(
+		lc.RegisterType(&ValidatorUptime{}),
+		Codec.RegisterCodec(CodecVersion, lc),
+	)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// ValidatorUptime is signed when the ValidationID is known and the validator
+// has been up for TotalUptime seconds.
+type ValidatorUptime struct {
+	ValidationID ids.ID `serialize:"true"`
+	TotalUptime  uint64 `serialize:"true"` // in seconds
+}
+
+// ParseValidatorUptime converts a slice of bytes into a ValidatorUptime.
+func ParseValidatorUptime(b []byte) (*ValidatorUptime, error) {
+	var msg ValidatorUptime
+	if _, err := Codec.Unmarshal(b, &msg); err != nil {
+		return nil, err
+	}
+	return &msg, nil
+}
+
+// Bytes returns the binary representation of this payload.
+func (v *ValidatorUptime) Bytes() ([]byte, error) {
+	return Codec.Marshal(CodecVersion, v)
+}
 
 // BlockStore provides access to accepted blocks.
 type BlockStore interface {
 	HasBlock(ctx context.Context, blockID ids.ID) error
-}
-
-// DB stores and retrieves warp messages from the underlying database.
-type DB struct {
-	db database.Database
-}
-
-// NewDB creates a new warp message database.
-func NewDB(db database.Database) *DB {
-	return &DB{
-		db: db,
-	}
-}
-
-// Add stores a warp message in the database and cache.
-func (d *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
-	msgID := unsignedMsg.ID()
-
-	if err := d.db.Put(msgID[:], unsignedMsg.Bytes()); err != nil {
-		return fmt.Errorf("failed to put warp message in db: %w", err)
-	}
-
-	return nil
-}
-
-// Get retrieves a warp message from the database.
-func (d *DB) Get(msgID ids.ID) (*warp.UnsignedMessage, error) {
-	unsignedMessageBytes, err := d.db.Get(msgID[:])
-	if err != nil {
-		return nil, err
-	}
-
-	unsignedMessage, err := warp.ParseUnsignedMessage(unsignedMessageBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse unsigned message %s: %w", msgID.String(), err)
-	}
-
-	return unsignedMessage, nil
 }
 
 // Verifier validates whether a warp message should be signed.
@@ -161,7 +165,7 @@ func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedC
 		}
 	}
 
-	uptimeMsg, err := message.ParseValidatorUptime(addressedCall.Payload)
+	uptimeMsg, err := ParseValidatorUptime(addressedCall.Payload)
 	if err != nil {
 		v.messageParseFail.Inc(1)
 		return &common.AppError{
@@ -178,7 +182,7 @@ func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedC
 	return nil
 }
 
-func (v *Verifier) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *common.AppError {
+func (v *Verifier) verifyUptimeMessage(uptimeMsg *ValidatorUptime) *common.AppError {
 	currentUptime, _, err := v.uptimeTracker.GetUptime(uptimeMsg.ValidationID)
 	if err != nil {
 		return &common.AppError{
