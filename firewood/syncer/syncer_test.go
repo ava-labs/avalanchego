@@ -1,23 +1,20 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package syncer_test
+package syncer
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"math/rand"
-	"sync/atomic"
 	"testing"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/firewood/syncer"
-	"github.com/ava-labs/avalanchego/firewood/syncer/syncertest"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/x/sync"
 )
 
@@ -65,24 +62,12 @@ func Test_Firewood_Sync(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testSync(t, syncer.Config{}, 0, tt.clientSize, tt.serverSize)
+			testSync(t, 0, tt.clientSize, tt.serverSize)
 		})
 	}
 }
 
-func Test_Firewood_Sync_WithCallback(t *testing.T) {
-	var callbackInvoked atomic.Bool
-	config := syncer.Config{
-		RangeProofCallback: func(context.Context, *ffi.RangeProof) error {
-			callbackInvoked.Store(true)
-			return nil
-		},
-	}
-	testSync(t, config, 0, 0, 1000)
-	require.True(t, callbackInvoked.Load(), "expected callback to be invoked during sync")
-}
-
-func testSync(t *testing.T, config syncer.Config, seed int64, clientKeys int, serverKeys int) {
+func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 	ctx := t.Context()
 
 	serverDB := generateDB(t, serverKeys, seed)
@@ -95,12 +80,12 @@ func testSync(t *testing.T, config syncer.Config, seed int64, clientKeys int, se
 	root, err := serverDB.Root()
 	require.NoError(t, err)
 
-	syncer, err := syncer.New(
-		config,
+	syncer, err := New(
+		Config{},
 		clientDB,
 		ids.ID(root),
-		syncertest.NewTestRangeProofHandler(t, serverDB),
-		syncertest.NewTestChangeProofHandler(t, serverDB),
+		p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, NewGetRangeProofHandler(serverDB)),
+		p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, syncer)
