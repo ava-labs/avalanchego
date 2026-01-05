@@ -348,8 +348,7 @@ func TestHandlerBlockSignature(t *testing.T) {
 			}
 
 			var response sdk.SignatureResponse
-			err = proto.Unmarshal(responseBytes, &response)
-			require.NoError(t, err)
+			require.NoError(t, proto.Unmarshal(responseBytes, &response))
 			require.Equal(t, wantResponse, response.Signature)
 		})
 	}
