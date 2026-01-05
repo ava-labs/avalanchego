@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -266,47 +265,29 @@ func TestHandlerMessageSignature(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		for _, withCache := range []bool{true, false} {
-			name := tt.name
-			if withCache {
-				name += "_with_cache"
-			} else {
-				name += "_no_cache"
+		t.Run(tt.name, func(t *testing.T) {
+			sigCache := lru.NewCache[ids.ID, []byte](100)
+			db := NewDB(database)
+			v := NewVerifier(db, emptyBlockStore, nil)
+			handler := NewHandler(sigCache, v, snowCtx.WarpSigner)
+
+			requestBytes, wantResponse := tt.setup(db)
+			protoMsg := &sdk.SignatureRequest{Message: requestBytes}
+			protoBytes, err := proto.Marshal(protoMsg)
+			require.NoError(t, err)
+			responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
+			require.ErrorIs(t, appErr, tt.err)
+			tt.verifyStats(t, v)
+
+			if len(wantResponse) == 0 {
+				require.Empty(t, responseBytes)
+				return
 			}
-			t.Run(name, func(t *testing.T) {
-				var sigCache cache.Cacher[ids.ID, []byte]
-				if withCache {
-					sigCache = lru.NewCache[ids.ID, []byte](100)
-				} else {
-					sigCache = &cache.Empty[ids.ID, []byte]{}
-				}
-				db := NewDB(database)
-				v := NewVerifier(db, emptyBlockStore, nil)
-				handler := NewHandler(sigCache, v, snowCtx.WarpSigner)
 
-				requestBytes, wantResponse := tt.setup(db)
-				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
-				protoBytes, err := proto.Marshal(protoMsg)
-				require.NoError(t, err)
-				responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
-				require.ErrorIs(t, appErr, tt.err)
-				tt.verifyStats(t, v)
-
-				if len(wantResponse) == 0 {
-					require.Empty(t, responseBytes)
-					return
-				}
-
-				if withCache {
-					require.NotZero(t, sigCache.Len())
-				} else {
-					require.Zero(t, sigCache.Len())
-				}
-				response := &sdk.SignatureResponse{}
-				require.NoError(t, proto.Unmarshal(responseBytes, response))
-				require.Equal(t, wantResponse, response.Signature)
-			})
-		}
+			response := &sdk.SignatureResponse{}
+			require.NoError(t, proto.Unmarshal(responseBytes, response))
+			require.Equal(t, wantResponse, response.Signature)
+		})
 	}
 }
 
@@ -370,49 +351,31 @@ func TestHandlerBlockSignature(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		for _, withCache := range []bool{true, false} {
-			name := tt.name
-			if withCache {
-				name += "_with_cache"
-			} else {
-				name += "_no_cache"
+		t.Run(tt.name, func(t *testing.T) {
+			sigCache := lru.NewCache[ids.ID, []byte](100)
+			db := NewDB(database)
+			v := NewVerifier(db, blockStore, nil)
+			handler := NewHandler(sigCache, v, snowCtx.WarpSigner)
+
+			requestBytes, wantResponse := tt.setup()
+			protoMsg := &sdk.SignatureRequest{Message: requestBytes}
+			protoBytes, err := proto.Marshal(protoMsg)
+			require.NoError(t, err)
+			responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
+			require.ErrorIs(t, appErr, tt.err)
+
+			tt.verifyStats(t, v)
+
+			if len(wantResponse) == 0 {
+				require.Empty(t, responseBytes)
+				return
 			}
-			t.Run(name, func(t *testing.T) {
-				var sigCache cache.Cacher[ids.ID, []byte]
-				if withCache {
-					sigCache = lru.NewCache[ids.ID, []byte](100)
-				} else {
-					sigCache = &cache.Empty[ids.ID, []byte]{}
-				}
-				db := NewDB(database)
-				v := NewVerifier(db, blockStore, nil)
-				handler := NewHandler(sigCache, v, snowCtx.WarpSigner)
 
-				requestBytes, wantResponse := tt.setup()
-				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
-				protoBytes, err := proto.Marshal(protoMsg)
-				require.NoError(t, err)
-				responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
-				require.ErrorIs(t, appErr, tt.err)
-
-				tt.verifyStats(t, v)
-
-				if len(wantResponse) == 0 {
-					require.Empty(t, responseBytes)
-					return
-				}
-
-				if withCache {
-					require.NotZero(t, sigCache.Len())
-				} else {
-					require.Zero(t, sigCache.Len())
-				}
-				var response sdk.SignatureResponse
-				err = proto.Unmarshal(responseBytes, &response)
-				require.NoError(t, err)
-				require.Equal(t, wantResponse, response.Signature)
-			})
-		}
+			var response sdk.SignatureResponse
+			err = proto.Unmarshal(responseBytes, &response)
+			require.NoError(t, err)
+			require.Equal(t, wantResponse, response.Signature)
+		})
 	}
 }
 
@@ -439,82 +402,75 @@ func TestHandlerUptimeSignature(t *testing.T) {
 		return protoBytes, unsignedMessage
 	}
 
-	for _, withCache := range []bool{true, false} {
-		var sigCache cache.Cacher[ids.ID, []byte]
-		if withCache {
-			sigCache = lru.NewCache[ids.ID, []byte](100)
-		} else {
-			sigCache = &cache.Empty[ids.ID, []byte]{}
-		}
+	sigCache := lru.NewCache[ids.ID, []byte](100)
 
-		// TODO(JonathanOppenheimer): see func NewTestValidatorState() -- this should be examined
-		// when we address the issue of that function.
-		validatorState := &validatorstest.State{
-			GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-				return map[ids.ID]*validators.GetCurrentValidatorOutput{
-					validationID: {
-						ValidationID:  validationID,
-						NodeID:        nodeID,
-						Weight:        1,
-						StartTime:     startTime,
-						IsActive:      true,
-						IsL1Validator: true,
-					},
-				}, 0, nil
-			},
-		}
-
-		clk := &mockable.Clock{}
-		uptimeTracker, err := uptimetracker.New(
-			validatorState,
-			snowCtx.SubnetID,
-			memdb.New(),
-			clk,
-		)
-		require.NoError(t, err)
-
-		require.NoError(t, uptimeTracker.Sync(t.Context()))
-
-		db := NewDB(database)
-		verifier := NewVerifier(db, emptyBlockStore, uptimeTracker)
-		handler := NewHandler(sigCache, verifier, snowCtx.WarpSigner)
-
-		// sourceAddress nonZero
-		protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID())
-		_, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
-		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-		require.Equal(t, "2: source address should be empty for offchain addressed messages", appErr.Error())
-
-		// not existing validationID
-		vID := ids.GenerateTestID()
-		protoBytes, _ = getUptimeMessageBytes([]byte{}, vID)
-		_, appErr = handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
-		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-		require.Equal(t, fmt.Sprintf("2: failed to get uptime: validationID not found: %s", vID), appErr.Error())
-
-		// uptime is less than requested (not connected)
-		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
-		_, appErr = handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
-		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-		require.Equal(t, fmt.Sprintf("2: current uptime 0 is less than queried uptime 80 for validationID %s", validationID), appErr.Error())
-
-		// uptime is less than requested (not enough time)
-		require.NoError(t, uptimeTracker.Connect(nodeID))
-		clk.Set(clk.Time().Add(40 * time.Second))
-		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
-		_, appErr = handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
-		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-		require.Equal(t, fmt.Sprintf("2: current uptime 40 is less than queried uptime 80 for validationID %s", validationID), appErr.Error())
-
-		// valid uptime (enough time has passed)
-		clk.Set(clk.Time().Add(40 * time.Second))
-		protoBytes, msg := getUptimeMessageBytes([]byte{}, validationID)
-		responseBytes, appErr := handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
-		require.Nil(t, appErr)
-		wantSignature, err := snowCtx.WarpSigner.Sign(msg)
-		require.NoError(t, err)
-		response := &sdk.SignatureResponse{}
-		require.NoError(t, proto.Unmarshal(responseBytes, response))
-		require.Equal(t, wantSignature, response.Signature)
+	// TODO(JonathanOppenheimer): see func NewTestValidatorState() -- this should be examined
+	// when we address the issue of that function.
+	validatorState := &validatorstest.State{
+		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+			return map[ids.ID]*validators.GetCurrentValidatorOutput{
+				validationID: {
+					ValidationID:  validationID,
+					NodeID:        nodeID,
+					Weight:        1,
+					StartTime:     startTime,
+					IsActive:      true,
+					IsL1Validator: true,
+				},
+			}, 0, nil
+		},
 	}
+
+	clk := &mockable.Clock{}
+	uptimeTracker, err := uptimetracker.New(
+		validatorState,
+		snowCtx.SubnetID,
+		memdb.New(),
+		clk,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, uptimeTracker.Sync(t.Context()))
+
+	db := NewDB(database)
+	verifier := NewVerifier(db, emptyBlockStore, uptimeTracker)
+	handler := NewHandler(sigCache, verifier, snowCtx.WarpSigner)
+
+	// sourceAddress nonZero
+	protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID())
+	_, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
+	require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
+	require.Equal(t, "2: source address should be empty for offchain addressed messages", appErr.Error())
+
+	// not existing validationID
+	vID := ids.GenerateTestID()
+	protoBytes, _ = getUptimeMessageBytes([]byte{}, vID)
+	_, appErr = handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
+	require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
+	require.Equal(t, fmt.Sprintf("2: failed to get uptime: validationID not found: %s", vID), appErr.Error())
+
+	// uptime is less than requested (not connected)
+	protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
+	_, appErr = handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
+	require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
+	require.Equal(t, fmt.Sprintf("2: current uptime 0 is less than queried uptime 80 for validationID %s", validationID), appErr.Error())
+
+	// uptime is less than requested (not enough time)
+	require.NoError(t, uptimeTracker.Connect(nodeID))
+	clk.Set(clk.Time().Add(40 * time.Second))
+	protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
+	_, appErr = handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
+	require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
+	require.Equal(t, fmt.Sprintf("2: current uptime 40 is less than queried uptime 80 for validationID %s", validationID), appErr.Error())
+
+	// valid uptime (enough time has passed)
+	clk.Set(clk.Time().Add(40 * time.Second))
+	protoBytes, msg := getUptimeMessageBytes([]byte{}, validationID)
+	responseBytes, appErr := handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
+	require.Nil(t, appErr)
+	wantSignature, err := snowCtx.WarpSigner.Sign(msg)
+	require.NoError(t, err)
+	response := &sdk.SignatureResponse{}
+	require.NoError(t, proto.Unmarshal(responseBytes, response))
+	require.Equal(t, wantSignature, response.Signature)
 }
