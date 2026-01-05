@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Code generated
@@ -11,11 +11,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
+	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
@@ -41,7 +41,7 @@ var (
 	ErrEmptyRewardAddress      = errors.New("reward address cannot be empty")
 
 	// RewardManagerRawABI contains the raw ABI of RewardManager contract.
-	//go:embed contract.abi
+	//go:embed IRewardManager.abi
 	RewardManagerRawABI string
 
 	RewardManagerABI        = contract.ParseABI(RewardManagerRawABI)

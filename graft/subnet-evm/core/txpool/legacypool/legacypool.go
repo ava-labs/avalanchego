@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -449,6 +449,11 @@ func (pool *LegacyPool) Close() error {
 	if pool.journal != nil {
 		pool.journal.close()
 	}
+
+	// remove all references to state to allow GC to reclaim memory
+	pool.pendingNonces = nil
+	pool.currentState = nil
+
 	log.Info("Transaction pool stopped")
 	return nil
 }

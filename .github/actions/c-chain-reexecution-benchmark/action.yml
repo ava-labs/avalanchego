@@ -21,8 +21,8 @@ inputs:
   current-state-dir-src:
     description: 'The current state directory. Supports S3 directory/zip and local directories.'
     default: ''
-  runner_name:
-    description: 'The name of the runner to use and include in the Golang Benchmark name.'
+  runner_type:
+    description: 'The type/label of the runner to include in the benchmark name for grouping results.'
     required: true
   aws-role:
     description: 'AWS role to assume for S3 access.'
@@ -114,7 +114,7 @@ runs:
         echo "Grafana: ${metrics_url}"
         echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
       env:
-        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
+        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository-owner }}%2F${{ inputs.repository-name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run-id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run-attempt }}
         GH_JOB_ID: ${{ inputs.job }}
     - name: Warn that collection of metrics and logs will not be performed
       if: inputs.prometheus-username == ''
@@ -147,7 +147,7 @@ runs:
       run: |
         TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
         echo "EXECUTION_DATA_DIR=/tmp/reexecution-data-${TIMESTAMP}" >> "$GITHUB_ENV"
-        echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.txt" >> "$GITHUB_ENV"
+        echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.json" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
       run: |
@@ -168,22 +168,22 @@ runs:
             BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}"
         fi
       env:
-        RUNNER_NAME: ${{ inputs.runner_name }}
+        RUNNER_TYPE: ${{ inputs.runner_type }}
         METRICS_COLLECTOR_ENABLED: ${{ inputs.prometheus-username != '' }}
         PROMETHEUS_URL: ${{ inputs.prometheus-url }}
         PROMETHEUS_PUSH_URL: ${{ inputs.prometheus-push-url }}
         PROMETHEUS_USERNAME: ${{ inputs.prometheus-username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus-password }}
-        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
+        GH_REPO: ${{ inputs.repository-owner }}/${{ inputs.repository-name }}
         GH_WORKFLOW: ${{ inputs.workflow }}
-        GH_RUN_ID: ${{ inputs.run_id }}
-        GH_RUN_NUMBER: ${{ inputs.run_number }}
-        GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        GH_RUN_ID: ${{ inputs.run-id }}
+        GH_RUN_NUMBER: ${{ inputs.run-number }}
+        GH_RUN_ATTEMPT: ${{ inputs.run-attempt }}
         GH_JOB_ID: ${{ inputs.job }}
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
       with:
-        tool: 'go'
+        tool: 'customBiggerIsBetter'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         summary-always: true
         github-token: ${{ inputs.github-token }}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -370,6 +370,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		statefulSetName,
 		false, // generateName
 		runtimeConfig.Image,
+		"", // imagePullPolicy - use default behavior
 		containerName,
 		volumeName,
 		fmt.Sprintf("%dGi", runtimeConfig.VolumeSizeGB),

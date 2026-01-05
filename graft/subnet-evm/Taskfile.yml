@@ -93,14 +93,13 @@ tasks:
   generate-bindings:
     desc: Generates Go bindings from Solidity contracts in precompile
     cmds:
-      - cmd: |
-          # Find and remove generated binding files in precompile directories only
-          find ./precompile -type f -name 'gen_*binding.go' -exec grep -l '^// Code generated - DO NOT EDIT\.$' {} \; | xargs -r rm
+      - cmd: find ./precompile -type f -name 'gen_*binding.go' -exec grep -l '^// Code generated - DO NOT EDIT\.$' {} \; | xargs -r rm
+      - cmd: find ./precompile -type f -name '*.abi' | xargs -r rm
       - cmd: go generate ./precompile/...
 
   lint:
     desc: Run golangci-lint and check for allowed Ethereum imports in Go code
-    cmd: ../evm-shared/scripts/lint.sh
+    cmd: ../evm/scripts/lint.sh
 
   lint-all:
     desc: Runs all lint checks in parallel
@@ -124,7 +123,7 @@ tasks:
   
   lint-fix:
     desc: Run golangci-lint with auto-fix where possible
-    cmd: ../evm-shared/scripts/lint_fix.sh
+    cmd: ../evm/scripts/lint_fix.sh
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management

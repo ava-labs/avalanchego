@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package reexecute
@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -27,19 +28,16 @@ type BlockResult struct {
 // It opens the database at sourceDir and iterates through blocks from startBlock to endBlock (inclusive).
 // Blocks are read sequentially and sent to the returned channel as BlockResult values.
 //
-// cleanup is a function that registers cleanup callbacks and is used to ensure
-// that the database being read from is properly closed prior to the test terminating.
-//
 // Any validation errors or iteration errors are sent as BlockResult with Err set, then the channel is closed.
-func CreateBlockChanFromLevelDB(t require.TestingT, sourceDir string, startBlock, endBlock uint64, chanSize int, cleanup func(func())) (<-chan BlockResult, error) {
-	r := require.New(t)
+func CreateBlockChanFromLevelDB(tc tests.TestContext, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
+	r := require.New(tc)
 	ch := make(chan BlockResult, chanSize)
 
 	db, err := leveldb.New(sourceDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
 	}
-	cleanup(func() {
+	tc.DeferCleanup(func() {
 		r.NoError(db.Close())
 	})
 

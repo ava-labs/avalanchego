@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vm
@@ -82,10 +82,12 @@ type VM struct {
 	Ctx *snow.Context
 
 	// TODO: unexport these fields
-	SecpCache     *secp256k1.RecoverCache
-	Fx            secp256k1fx.Fx
-	baseCodec     codec.Registry
-	AtomicMempool *txpool.Mempool
+	SecpCache             *secp256k1.RecoverCache
+	Fx                    secp256k1fx.Fx
+	baseCodec             codec.Registry
+	AtomicMempool         *txpool.Mempool
+	AtomicTxGossipMetrics avalanchegossip.Metrics
+	AtomicTxPushGossiper  *avalanchegossip.PushGossiper[*atomic.Tx]
 
 	// AtomicTxRepository maintains two indexes on accepted atomic txs.
 	// - txID to accepted atomic tx
@@ -94,8 +96,6 @@ type VM struct {
 	AtomicTxRepository *atomicstate.AtomicRepository
 	// AtomicBackend abstracts verification and processing of atomic transactions
 	AtomicBackend *atomicstate.AtomicBackend
-
-	AtomicTxPushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
 
 	// cancel may be nil until [snow.NormalOp] starts
 	cancel     context.CancelFunc
@@ -183,6 +183,38 @@ func (vm *VM) Initialize(
 	}
 	vm.AtomicMempool = atomicMempool
 
+	atomicTxGossipMetrics, err := avalanchegossip.NewMetrics(vm.InnerVM.MetricRegistry(), atomicTxGossipNamespace)
+	if err != nil {
+		return fmt.Errorf("failed to initialize atomic tx gossip metrics: %w", err)
+	}
+	vm.AtomicTxGossipMetrics = atomicTxGossipMetrics
+
+	pushGossipParams := avalanchegossip.BranchingFactor{
+		StakePercentage: vm.InnerVM.Config().PushGossipPercentStake,
+		Validators:      vm.InnerVM.Config().PushGossipNumValidators,
+		Peers:           vm.InnerVM.Config().PushGossipNumPeers,
+	}
+	pushRegossipParams := avalanchegossip.BranchingFactor{
+		Validators: vm.InnerVM.Config().PushRegossipNumValidators,
+		Peers:      vm.InnerVM.Config().PushRegossipNumPeers,
+	}
+	atomicTxGossipClient := vm.InnerVM.NewClient(p2p.AtomicTxGossipHandlerID)
+	vm.AtomicTxPushGossiper, err = avalanchegossip.NewPushGossiper[*atomic.Tx](
+		&atomic.TxMarshaller{},
+		vm.AtomicMempool,
+		vm.InnerVM.P2PValidators(),
+		atomicTxGossipClient,
+		atomicTxGossipMetrics,
+		pushGossipParams,
+		pushRegossipParams,
+		config.PushGossipDiscardedElements,
+		config.TxGossipTargetMessageSize,
+		vm.InnerVM.Config().RegossipFrequency.Duration,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize atomic tx push gossiper: %w", err)
+	}
+
 	// initialize bonus blocks on mainnet
 	var (
 		bonusBlockHeights map[uint64]ids.ID
@@ -261,50 +293,18 @@ func (vm *VM) onNormalOperationsStarted() error {
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel
-	atomicTxGossipMarshaller := atomic.TxMarshaller{}
-	atomicTxGossipClient := vm.InnerVM.NewClient(p2p.AtomicTxGossipHandlerID)
-	atomicTxGossipMetrics, err := avalanchegossip.NewMetrics(vm.InnerVM.MetricRegistry(), atomicTxGossipNamespace)
-	if err != nil {
-		return fmt.Errorf("failed to initialize atomic tx gossip metrics: %w", err)
-	}
-
-	pushGossipParams := avalanchegossip.BranchingFactor{
-		StakePercentage: vm.InnerVM.Config().PushGossipPercentStake,
-		Validators:      vm.InnerVM.Config().PushGossipNumValidators,
-		Peers:           vm.InnerVM.Config().PushGossipNumPeers,
-	}
-	pushRegossipParams := avalanchegossip.BranchingFactor{
-		Validators: vm.InnerVM.Config().PushRegossipNumValidators,
-		Peers:      vm.InnerVM.Config().PushRegossipNumPeers,
-	}
-
-	vm.AtomicTxPushGossiper, err = avalanchegossip.NewPushGossiper[*atomic.Tx](
-		&atomicTxGossipMarshaller,
-		vm.AtomicMempool,
-		vm.InnerVM.P2PValidators(),
-		atomicTxGossipClient,
-		atomicTxGossipMetrics,
-		pushGossipParams,
-		pushRegossipParams,
-		config.PushGossipDiscardedElements,
-		config.TxGossipTargetMessageSize,
-		vm.InnerVM.Config().RegossipFrequency.Duration,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to initialize atomic tx push gossiper: %w", err)
-	}
 
 	atomicTxGossipHandler, err := gossip.NewTxGossipHandler[*atomic.Tx](
 		vm.Ctx.Log,
-		&atomicTxGossipMarshaller,
+		&atomic.TxMarshaller{},
 		vm.AtomicMempool,
-		atomicTxGossipMetrics,
+		vm.AtomicTxGossipMetrics,
 		config.TxGossipTargetMessageSize,
 		config.TxGossipThrottlingPeriod,
 		config.TxGossipRequestsPerPeer,
 		vm.InnerVM.P2PValidators(),
 		vm.MetricRegistry(),
-		"atomic_tx_gossip",
+		atomicTxGossipNamespace,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize atomic tx gossip handler: %w", err)
@@ -314,15 +314,15 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return fmt.Errorf("failed to add atomic tx gossip handler: %w", err)
 	}
 
+	atomicTxGossipClient := vm.InnerVM.NewClient(p2p.AtomicTxGossipHandlerID)
 	atomicTxPullGossiper := avalanchegossip.NewPullGossiper[*atomic.Tx](
 		vm.Ctx.Log,
-		&atomicTxGossipMarshaller,
+		&atomic.TxMarshaller{},
 		vm.AtomicMempool,
 		atomicTxGossipClient,
-		atomicTxGossipMetrics,
+		vm.AtomicTxGossipMetrics,
 		config.TxGossipPollSize,
 	)
-
 	atomicTxPullGossiperWhenValidator := &avalanchegossip.ValidatorGossiper{
 		Gossiper:   atomicTxPullGossiper,
 		NodeID:     vm.Ctx.NodeID,
@@ -363,7 +363,13 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	if err != nil {
 		return nil, err
 	}
-	avaxAPI, err := rpc.NewHandler("avax", &AvaxAPI{vm})
+	avaxAPI, err := rpc.NewHandler("avax", &AvaxAPI{
+		bc:           vm.InnerVM.Ethereum().BlockChain(),
+		Context:      vm.Ctx,
+		Mempool:      vm.AtomicMempool,
+		PushGossiper: vm.AtomicTxPushGossiper,
+		AcceptedTxs:  vm.AtomicTxRepository,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
 	}
@@ -763,25 +769,4 @@ func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
 func (vm *VM) CurrentRules() extras.Rules {
 	header := vm.InnerVM.Ethereum().BlockChain().CurrentHeader()
 	return vm.rules(header.Number, header.Time)
-}
-
-// TODO: these should be unexported after test refactor is done
-
-// getAtomicTx returns the requested transaction, status, and height.
-// If the status is Unknown, then the returned transaction will be nil.
-func (vm *VM) GetAtomicTx(txID ids.ID) (*atomic.Tx, atomic.Status, uint64, error) {
-	if tx, height, err := vm.AtomicTxRepository.GetByTxID(txID); err == nil {
-		return tx, atomic.Accepted, height, nil
-	} else if err != avalanchedatabase.ErrNotFound {
-		return nil, atomic.Unknown, 0, err
-	}
-	tx, dropped, found := vm.AtomicMempool.GetTx(txID)
-	switch {
-	case found && dropped:
-		return tx, atomic.Dropped, 0, nil
-	case found:
-		return tx, atomic.Processing, 0, nil
-	default:
-		return nil, atomic.Unknown, 0, nil
-	}
 }
