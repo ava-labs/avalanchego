@@ -84,8 +84,8 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 		Config{},
 		clientDB,
 		ids.ID(root),
-		p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, NewGetRangeProofHandler(serverDB)),
-		p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(serverDB)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, syncer)

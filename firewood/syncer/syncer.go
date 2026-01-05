@@ -26,7 +26,7 @@ var (
 	defaultSimultaneousWorkLimit = 8
 )
 
-// database wraps a Firewood ffi.database to implement the xsync.DB interface.
+// database wraps a Firewood [ffi.Database] to implement the xsync.DB interface.
 type database struct {
 	db *ffi.Database
 }
@@ -93,7 +93,7 @@ func (*database) VerifyRangeProof(_ context.Context, proof *RangeProof, start ma
 	return proof.rp.Verify(ffi.Hash(expectedEndRootID), start, end, uint32(maxLength))
 }
 
-func (db *database) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
+func (db *database) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
 	_, err := db.db.VerifyAndCommitRangeProof(proof.rp, start, end, ffi.Hash(proof.root), uint32(proof.maxLength))
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
