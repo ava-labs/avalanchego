@@ -11,7 +11,6 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"runtime/pprof"
 	"slices"
 	"strconv"
 	"strings"
@@ -31,8 +30,11 @@ import (
 	"github.com/ava-labs/avalanchego/tests/reexecute"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
+
+const pprofDir = "pprof"
 
 var (
 	blockDirArg        string
@@ -94,7 +96,7 @@ func init() {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.BoolVar(&pprofEnabled, "pprof", false, "Enable full suite of pprof profiling.")
+	flag.BoolVar(&pprofEnabled, "pprof", true, "Enable cpu, memory and lock profiling.")
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
 	flag.Uint64Var(&metricsServerPortArg, "metrics-server-port", 0, "The port the metrics server will listen to.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
@@ -137,10 +139,6 @@ func main() {
 	tc := tests.NewTestContext(tests.NewDefaultLogger("c-chain-reexecution"))
 	tc.SetDefaultContextParent(context.Background())
 	defer tc.RecoverAndExit()
-
-	if pprofEnabled {
-		defer setupPprof(tc)()
-	}
 
 	benchmarkName := fmt.Sprintf(
 		"BenchmarkReexecuteRange/[%d,%d]-Config-%s-Runner-%s",
@@ -209,10 +207,11 @@ func benchmarkReexecuteRange(
 	var (
 		vmDBDir      = filepath.Join(currentStateDir, "db")
 		chainDataDir = filepath.Join(currentStateDir, "chain-data-dir")
+		pprofDirPath string
 	)
 
 	log := tc.Log()
-	log.Info("re-executing block range with params",
+	logFields := []zap.Field{
 		zap.String("runner", runnerTypeArg),
 		zap.String("config", configNameArg),
 		zap.String("labels", labelsArg),
@@ -225,8 +224,24 @@ func benchmarkReexecuteRange(
 		zap.Uint64("start-block", startBlock),
 		zap.Uint64("end-block", endBlock),
 		zap.Int("chan-size", chanSize),
-		zap.Bool("pprof-enabled", pprofEnabled),
-	)
+	}
+
+	if pprofEnabled {
+		cwd, err := os.Getwd()
+		r.NoError(err, "failed to get current working directory for pprof")
+		pprofDirPath = filepath.Join(cwd, pprofDir)
+
+		p := profiler.New(pprofDirPath)
+		r.NoError(p.StartCPUProfiler())
+		defer func() {
+			r.NoError(p.StopCPUProfiler())
+			r.NoError(p.MemoryProfile())
+			r.NoError(p.LockProfile())
+		}()
+
+		logFields = append(logFields, zap.String("pprof-dir", pprofDirPath))
+	}
+	log.Info("re-executing block range with params", logFields...)
 
 	blockChan, err := reexecute.CreateBlockChanFromLevelDB(tc, blockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
@@ -560,38 +575,4 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 		labels[parts[0]] = parts[1]
 	}
 	return labels, nil
-}
-
-func setupPprof(tc tests.TestContext) func() {
-	r := require.New(tc)
-	logger := tests.NewDefaultLogger("pprof")
-
-	cwd, err := os.Getwd()
-	r.NoError(err, "failed to get current working directory")
-
-	profileDir := filepath.Join(cwd, "pprof")
-	r.NoError(os.MkdirAll(profileDir, perms.ReadWriteExecute), "failed to create profile directory")
-
-	cpuFile, err := os.Create(filepath.Join(profileDir, "cpu.prof"))
-	r.NoError(err, "failed to create CPU profile")
-
-	r.NoError(pprof.StartCPUProfile(cpuFile), "failed to start CPU profile")
-
-	return func() {
-		pprof.StopCPUProfile()
-		cpuFile.Close()
-		logger.Info("CPU profile", zap.String("path", cpuFile.Name()))
-
-		memFile, err := os.Create(filepath.Join(profileDir, "mem.prof"))
-		if err != nil {
-			logger.Error("failed to create memory profile", zap.Error(err))
-			return
-		}
-		defer memFile.Close()
-		if err := pprof.WriteHeapProfile(memFile); err != nil {
-			logger.Error("failed to write memory profile", zap.Error(err))
-			return
-		}
-		logger.Info("memory profile", zap.String("path", memFile.Name()))
-	}
 }
