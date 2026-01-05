@@ -23,7 +23,7 @@ The plugin version is unchanged at `44` and is compatible with version `v1.14.0`
 - Removed `customethclient` package in favor of `ethclient` package and temporary type registrations (`WithTempRegisteredLibEVMExtras`)
   - Removed blockHook extension in `ethclient` package.
 - Enabled Firewood to run with pruning disabled.
-  - This change modified the filepath of Firewood. Sny nodes using Firewood will need to resync.
+  - This change modified the filepath of Firewood. Any nodes using Firewood will need to resync.
 
 ### What's Changed
 
