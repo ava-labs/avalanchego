@@ -37,6 +37,10 @@ rules:
 - apiGroups: [""]
   resources: ["services"]
   verbs: ["create"]
+# Chaos Mesh CRD permissions for fault injection testing
+- apiGroups: ["chaos-mesh.org"]
+  resources: ["podchaos", "networkchaos"]
+  verbs: ["create", "delete", "get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

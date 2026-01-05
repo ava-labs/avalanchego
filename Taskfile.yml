@@ -239,6 +239,11 @@ tasks:
     cmds:
       - cmd: bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}
 
+  test-faultinjection-e2e:
+    desc: Runs fault injection e2e tests against a kind cluster with Chaos Mesh
+    cmds:
+      - cmd: bash -x ./scripts/tests.faultinjection.e2e.sh {{.CLI_ARGS}}
+
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
 
