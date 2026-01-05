@@ -53,6 +53,12 @@ type TrieDB struct {
 
 	// kvStore is used for storing recovery information.
 	kvStore ethdb.Database
+
+	// possible temporarily holds proposals created during a trie update.
+	// This is cleared after the update is complete and the proposals have been sent to the database.
+	// It's unexpected for mulitple updates to this to occur simultaneously, but a lock is used to ensure safety.
+	possible     map[possibleKey]*proposal
+	possibleLock sync.Mutex
 }
 
 type proposals struct {
@@ -64,9 +70,6 @@ type proposals struct {
 	// in the case of duplicate state roots.
 	// The root of the tree is stored here, and represents the top-most layer on disk.
 	tree *proposal
-	// possible temporarily holds proposals created during a trie update.
-	// This is cleared after the update is complete and the proposals have been sent to the database.
-	possible map[possibleKey]*proposal
 }
 
 type possibleKey struct {
@@ -177,8 +180,8 @@ func New(config Config, disk ethdb.Database) (*TrieDB, error) {
 					height:      height,
 				},
 			},
-			possible: make(map[possibleKey]*proposal),
 		},
+		possible: make(map[possibleKey]*proposal),
 	}, nil
 }
 
@@ -247,6 +250,8 @@ func (t *TrieDB) Close() error {
 	p := &t.proposals
 	p.Lock()
 	defer p.Unlock()
+	t.possibleLock.Lock()
+	defer t.possibleLock.Unlock()
 
 	if p.tree == nil {
 		return nil // already closed
@@ -258,7 +263,7 @@ func (t *TrieDB) Close() error {
 	}
 	p.tree = nil
 	p.byStateRoot = nil
-	p.possible = nil
+	t.possible = nil
 
 	// We must provide a context to close since it may hang while waiting for the finalizers to complete.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -282,12 +287,14 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 	// The rest of the operations except key-value arranging must occur with a lock
 	t.proposals.Lock()
 	defer t.proposals.Unlock()
+	t.possibleLock.Lock()
+	defer t.possibleLock.Unlock()
 
 	p, ok := t.possible[possibleKey{parentBlockHash: parentBlockHash, root: root}]
 	// Now, all unused proposals have no other references, since we didn't store them
 	// in the proposal map or tree, so they will be garbage collected.
 	// Any proposals with a different root were mistakenly created, so they can be freed as well.
-	t.proposals.possible = make(map[possibleKey]*proposal)
+	clear(t.possible)
 	if !ok {
 		return fmt.Errorf("no proposal found for block %d, root %s, hash %s", height, root.Hex(), blockHash.Hex())
 	}
@@ -527,6 +534,8 @@ func (t *TrieDB) createProposals(parentRoot common.Hash, keys, values [][]byte) 
 	// Must prevent a simultaneous `Commit`, as it alters the proposal tree/disk state.
 	t.proposals.RLock()
 	defer t.proposals.RUnlock()
+	t.possibleLock.Lock()
+	defer t.possibleLock.Unlock()
 
 	var (
 		count int         // number of proposals created.
