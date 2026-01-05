@@ -34,8 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-const pprofDir = "pprof"
-
 var (
 	blockDirArg        string
 	currentStateDirArg string
@@ -45,7 +43,7 @@ var (
 	executionTimeout   time.Duration
 	labelsArg          string
 
-	pprofEnabled               bool
+	pprofDirArg                string
 	metricsServerEnabledArg    bool
 	metricsServerPortArg       uint64
 	metricsCollectorEnabledArg bool
@@ -96,7 +94,7 @@ func init() {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.BoolVar(&pprofEnabled, "pprof", true, "Enable cpu, memory and lock profiling.")
+	flag.StringVar(&pprofDirArg, "pprof-dir", "", "Directory to write cpu, mem, and lock profiles. Empty to disable.")
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
 	flag.Uint64Var(&metricsServerPortArg, "metrics-server-port", 0, "The port the metrics server will listen to.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
@@ -207,7 +205,6 @@ func benchmarkReexecuteRange(
 	var (
 		vmDBDir      = filepath.Join(currentStateDir, "db")
 		chainDataDir = filepath.Join(currentStateDir, "chain-data-dir")
-		pprofDirPath string
 	)
 
 	log := tc.Log()
@@ -226,12 +223,8 @@ func benchmarkReexecuteRange(
 		zap.Int("chan-size", chanSize),
 	}
 
-	if pprofEnabled {
-		cwd, err := os.Getwd()
-		r.NoError(err, "failed to get current working directory for pprof")
-		pprofDirPath = filepath.Join(cwd, pprofDir)
-
-		p := profiler.New(pprofDirPath)
+	if pprofDirArg != "" {
+		p := profiler.New(pprofDirArg)
 		r.NoError(p.StartCPUProfiler())
 		defer func() {
 			r.NoError(p.StopCPUProfiler())
@@ -239,7 +232,7 @@ func benchmarkReexecuteRange(
 			r.NoError(p.LockProfile())
 		}()
 
-		logFields = append(logFields, zap.String("pprof-dir", pprofDirPath))
+		logFields = append(logFields, zap.String("pprof-dir", pprofDirArg))
 	}
 	log.Info("re-executing block range with params", logFields...)
 
