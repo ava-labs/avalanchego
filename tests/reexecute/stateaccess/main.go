@@ -24,7 +24,6 @@ import (
 )
 
 var (
-	blockDirArg        string
 	currentStateDirArg string
 	startBlockArg      uint64
 	endBlockArg        uint64
@@ -33,7 +32,6 @@ var (
 func init() {
 	evm.RegisterAllLibEVMExtras()
 
-	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block directory to read from.")
 	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Current state directory including VM DB and Chain Data Directory.")
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (inclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
@@ -50,9 +48,6 @@ func main() {
 
 	r := require.New(tc)
 	ctx := context.Background()
-
-	blockChan, err := reexecute.CreateBlockChanFromLevelDB(tc, blockDirArg, startBlockArg, endBlockArg, 100)
-	r.NoError(err)
 
 	var (
 		vmDBDir      = filepath.Join(currentStateDirArg, "db")
@@ -89,11 +84,8 @@ func main() {
 	client, err := ethclient.Dial(server.URL)
 	r.NoError(err)
 
-	for blkResult := range blockChan {
-		blk, err := vm.ParseBlock(ctx, blkResult.BlockBytes)
-		r.NoError(err)
-
-		nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(blk.Height())))
+	for i := startBlockArg; i <= endBlockArg; i += 1 {
+		nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
 		r.NoError(err)
 		r.Zero(nonce)
 	}
