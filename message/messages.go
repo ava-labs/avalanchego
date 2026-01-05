@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -28,71 +28,31 @@ const (
 )
 
 var (
-	_ InboundMessage = (*inboundMessage)(nil)
+	_ fmt.Stringer = (*InboundMessage)(nil)
 
 	metricLabels = []string{typeLabel, opLabel, directionLabel}
 
 	errUnknownCompressionType = errors.New("message is compressed with an unknown compression type")
 )
 
-// InboundMessage represents a set of fields for an inbound message
-type InboundMessage interface {
-	fmt.Stringer
-	// NodeID returns the ID of the node that sent this message
-	NodeID() ids.NodeID
-	// Op returns the op that describes this message type
-	Op() Op
-	// Message returns the message that was sent
-	Message() fmt.Stringer
-	// Expiration returns the time that the sender will have already timed out
-	// this request
-	Expiration() time.Time
-	// OnFinishedHandling must be called one time when this message has been
-	// handled by the message handler
-	OnFinishedHandling()
-	// BytesSavedCompression returns the number of bytes that this message saved
-	// due to being compressed
-	BytesSavedCompression() int
-}
-
-type inboundMessage struct {
-	nodeID                ids.NodeID
-	op                    Op
-	message               fmt.Stringer
-	expiration            time.Time
+type InboundMessage struct {
+	NodeID                ids.NodeID
+	Op                    Op
+	Message               fmt.Stringer
+	Expiration            time.Time
+	BytesSavedCompression int
 	onFinishedHandling    func()
-	bytesSavedCompression int
 }
 
-func (m *inboundMessage) NodeID() ids.NodeID {
-	return m.nodeID
-}
-
-func (m *inboundMessage) Op() Op {
-	return m.op
-}
-
-func (m *inboundMessage) Message() fmt.Stringer {
-	return m.message
-}
-
-func (m *inboundMessage) Expiration() time.Time {
-	return m.expiration
-}
-
-func (m *inboundMessage) OnFinishedHandling() {
+func (m *InboundMessage) OnFinishedHandling() {
 	if m.onFinishedHandling != nil {
 		m.onFinishedHandling()
 	}
 }
 
-func (m *inboundMessage) BytesSavedCompression() int {
-	return m.bytesSavedCompression
-}
-
-func (m *inboundMessage) String() string {
+func (m *InboundMessage) String() string {
 	return fmt.Sprintf("%s Op: %s Message: %s",
-		m.nodeID, m.op, m.message)
+		m.NodeID, m.Op, m.Message)
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can
@@ -280,7 +240,7 @@ func (mb *msgBuilder) parseInbound(
 	bytes []byte,
 	nodeID ids.NodeID,
 	onFinishedHandling func(),
-) (*inboundMessage, error) {
+) (*InboundMessage, error) {
 	m, bytesSavedCompression, op, err := mb.unmarshal(bytes)
 	if err != nil {
 		return nil, err
@@ -297,12 +257,12 @@ func (mb *msgBuilder) parseInbound(
 		expiration = time.Now().Add(deadline)
 	}
 
-	return &inboundMessage{
-		nodeID:                nodeID,
-		op:                    op,
-		message:               msg,
-		expiration:            expiration,
+	return &InboundMessage{
+		NodeID:                nodeID,
+		Op:                    op,
+		Message:               msg,
+		Expiration:            expiration,
 		onFinishedHandling:    onFinishedHandling,
-		bytesSavedCompression: bytesSavedCompression,
+		BytesSavedCompression: bytesSavedCompression,
 	}, nil
 }

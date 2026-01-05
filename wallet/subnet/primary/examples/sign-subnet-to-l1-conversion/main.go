@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -67,8 +67,8 @@ func main() {
 			9651,
 		),
 		networkID,
-		router.InboundHandlerFunc(func(_ context.Context, msg p2pmessage.InboundMessage) {
-			log.Printf("received %s: %s", msg.Op(), msg.Message())
+		router.InboundHandlerFunc(func(_ context.Context, msg *p2pmessage.InboundMessage) {
+			log.Printf("received %s: %s", msg.Op, msg.Message)
 		}),
 	)
 	if err != nil {
