@@ -18,7 +18,6 @@ module github.com/ava-labs/avalanchego
 //   - README.md
 //   - RELEASES.md
 //   - nix/go/default.nix (update version and sha256 for supported arches)
-//   - graft/subnet-evm/Dockerfile // TODO(JonathanOppenheimer): issue #4764
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
 //   - Consider updating the version of golangci-lint (see tools/go.mod)
@@ -100,7 +99,7 @@ require github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-00000000
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18 // indirect
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18
 	github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect

@@ -28,7 +28,7 @@ let
     "darwin-arm64" = "a9c90c786e75d5d1da0547de2d1199034df6a4b163af2fa91b9168c65f229c12";
   };
 
-  targetSystem = parseSystem pkgs.system;
+  targetSystem = parseSystem pkgs.stdenv.hostPlatform.system;
 in
 pkgs.stdenv.mkDerivation {
   name = "go-${goVersion}";
@@ -40,7 +40,7 @@ pkgs.stdenv.mkDerivation {
 
   src = pkgs.fetchurl {
     url = "https://go.dev/dl/go${goVersion}.${targetSystem.goURLPath}.tar.gz";
-    sha256 = goSHA256s.${targetSystem.goURLPath} or (throw "Unsupported system: ${pkgs.system}");
+    sha256 = goSHA256s.${targetSystem.goURLPath} or (throw "Unsupported system: ${pkgs.stdenv.hostPlatform.system}");
   };
 
   # Skip unpacking since we need special handling for the tarball
