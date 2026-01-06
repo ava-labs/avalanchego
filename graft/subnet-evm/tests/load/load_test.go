@@ -63,7 +63,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
 
-		scriptPath = filepath.Join("..", "..", "..", "..", "scripts", "run_simulator.sh")
+		scriptPath = filepath.Join("..", "..", "scripts", "run_simulator.sh")
 		if _, err := os.Stat(scriptPath); err != nil {
 			if repoRootPath != "" {
 				scriptPath = filepath.Join(repoRootPath, "scripts", "run_simulator.sh")
