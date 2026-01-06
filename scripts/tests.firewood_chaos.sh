@@ -25,8 +25,6 @@ set -euo pipefail
 #     END_BLOCK: The ending block height (inclusive).
 #     MIN_WAIT_TIME: The minimum amount of time to wait before crashing.
 #     MAX_WAIT_TIME: The maximum amount of time to wait before crashing.
-#
-#   Optional:
 #     CONFIG: VM config preset (firewood, firewood-archive).
 
 show_usage() {
@@ -120,12 +118,13 @@ elif [[ -z "${BLOCK_DIR:-}" || -z "${CURRENT_STATE_DIR:-}" ]]; then
 fi
 
 # Validate block range
-if [[ -z "${START_BLOCK:-}" || -z "${END_BLOCK:-}" ]]; then
-    error "START_BLOCK and END_BLOCK are required"
+if [[ -z "${START_BLOCK:-}" || -z "${END_BLOCK:-}" || -z "${CONFIG:-}" ]]; then
+    error "START_BLOCK and END_BLOCK and CONFIG are required"
 fi
 
 echo "=== Firewood Chaos Test: ${TEST_NAME:-custom} ==="
 echo "Blocks: ${START_BLOCK} - ${END_BLOCK}"
+echo "CONFIG: ${CONFIG}"
 echo "Crashing between ${MIN_WAIT_TIME} and ${MAX_WAIT_TIME}"
 
 echo "=== Running Chaos Test ==="
@@ -135,4 +134,5 @@ go run ./tests/reexecute/chaos \
     --current-state-dir="${CURRENT_STATE_DIR}" \
     --block-dir="${BLOCK_DIR}" \
     --min-wait-time="${MIN_WAIT_TIME}" \
-    --max-wait-time="${MAX_WAIT_TIME}"
+    --max-wait-time="${MAX_WAIT_TIME}" \
+    --config="${CONFIG}"

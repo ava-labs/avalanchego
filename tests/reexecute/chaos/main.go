@@ -7,11 +7,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"maps"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -35,13 +38,23 @@ var (
 	endBlockArg        uint64
 	minWaitTimeArg     time.Duration
 	maxWaitTimeArg     time.Duration
+	configNameArg      string
+	configBytesArg     []byte
 
-	firewoodConfig = `{
-		"state-scheme": "firewood",
-		"snapshot-cache": 0,
-		"pruning-enabled": true,
-		"state-sync-enabled": false
-	}`
+	predefinedConfigs = map[string]string{
+		"firewood": `{
+			"state-scheme": "firewood",
+			"snapshot-cache": 0,
+			"pruning-enabled": true,
+			"state-sync-enabled": false
+		}`,
+		"firewood-archive": `{
+			"state-scheme": "firewood",
+			"snapshot-cache": 0,
+			"pruning-enabled": false,
+			"state-sync-enabled": false
+		}`,
+	}
 )
 
 func init() {
@@ -54,7 +67,18 @@ func init() {
 	flag.DurationVar(&minWaitTimeArg, "min-wait-time", 20*time.Second, "Minimum amount of time to wait before crashing.")
 	flag.DurationVar(&maxWaitTimeArg, "max-wait-time", 30*time.Second, "Maximum amount of time to wait before crashing.")
 
+	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
+	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
+	flag.StringVar(&configNameArg, "config", configNameArg, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
+
 	flag.Parse()
+
+	predefinedConfigStr, ok := predefinedConfigs[configNameArg]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "invalid config name %q. Valid options include %s.\n", configNameArg, predefinedConfigOptionsStr)
+		os.Exit(1)
+	}
+	configBytesArg = []byte(predefinedConfigStr)
 }
 
 func main() {
@@ -70,6 +94,8 @@ func main() {
 		currentStateDirArg,
 		startBlockArg,
 		endBlockArg,
+		configNameArg,
+		configBytesArg,
 	)
 }
 
@@ -92,11 +118,13 @@ func run(
 	currentStateDir string,
 	startBlock uint64,
 	endBlock uint64,
+	configName string,
+	configBytes []byte,
 ) {
 	r := require.New(tc)
 	log := tc.Log()
 
-	cmd := createReexecutionCmd(blockDir, currentStateDir, startBlock, endBlock)
+	cmd := createReexecutionCmd(blockDir, currentStateDir, startBlock, endBlock, configName)
 	// Set process group ID so we can kill all child processes
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
@@ -157,7 +185,7 @@ func run(
 		ctx,
 		db,
 		chainDataDir,
-		[]byte(firewoodConfig),
+		configBytes,
 		metrics.NewPrefixGatherer(),
 		prometheus.NewRegistry(),
 	)
@@ -174,7 +202,7 @@ func run(
 
 	log.Debug("read VM", zap.Uint64("latest height", lastAcceptedBlock.Height()))
 
-	cmd = createReexecutionCmd(blockDir, currentStateDir, lastAcceptedBlock.Height()+1, endBlock)
+	cmd = createReexecutionCmd(blockDir, currentStateDir, lastAcceptedBlock.Height()+1, endBlock, configName)
 
 	// 5. Restart the reexecution test from the recovered height to verify state consistency
 	r.NoError(cmd.Run())
@@ -209,6 +237,7 @@ func createReexecutionCmd(
 	currentStateDir string,
 	startBlock uint64,
 	endBlock uint64,
+	configName string,
 ) *exec.Cmd {
 	cmd := exec.Command("go",
 		"run",
@@ -218,6 +247,7 @@ func createReexecutionCmd(
 		"--current-state-dir="+currentStateDir,
 		"--start-block="+strconv.Itoa(int(startBlock)),
 		"--end-block="+strconv.Itoa(int(endBlock)),
+		"--config="+configName,
 	)
 
 	cmd.Stdout = os.Stdout
