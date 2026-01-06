@@ -44,7 +44,7 @@ func init() {
 // arbitrary historical blocks.
 func main() {
 	tc := tests.NewTestContext(tests.NewDefaultLogger(""))
-	tc.RecoverAndExit()
+	defer tc.RecoverAndExit()
 
 	r := require.New(tc)
 	ctx := context.Background()
