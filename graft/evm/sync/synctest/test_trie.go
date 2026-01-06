@@ -45,7 +45,7 @@ func FillAccountsWithOverlappingStorage(
 			account.Root = storageRoots[storageRootIndex%numOverlappingStorageRoots]
 			storageRootIndex++
 		case 2: // account with unique storage root
-			FillStorageForAccount(t, r, root, 26, addr, storageTr)
+			FillStorageForAccount(t, r, 26, addr, storageTr)
 		}
 
 		return account
@@ -198,7 +198,7 @@ func FillAccounts(
 			}
 		}
 
-		tr.UpdateAccount(key.Address, &acc)
+		require.NoError(t, tr.UpdateAccount(key.Address, &acc))
 		accounts[key] = &acc
 	}
 
@@ -212,11 +212,11 @@ func FillAccounts(
 
 // FillStorageForAccount adds [numStorageKeys] random key-value pairs to the storage trie for [addr] in [storageTr].
 func FillStorageForAccount(
-	t *testing.T, r *rand.Rand, root common.Hash, numStorageKeys int,
+	t *testing.T, r *rand.Rand, numStorageKeys int,
 	addr common.Address, storageTr state.Trie,
 ) {
 	keys, values := makeKeyValues(t, r, 0, numStorageKeys, common.HashLength)
 	for i := range numStorageKeys {
-		storageTr.UpdateStorage(addr, keys[i], values[i])
+		require.NoError(t, storageTr.UpdateStorage(addr, keys[i], values[i]))
 	}
 }

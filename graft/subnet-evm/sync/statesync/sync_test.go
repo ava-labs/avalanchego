@@ -125,7 +125,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with code": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, index int, _ common.Address, account types.StateAccount, tr state.Trie) types.StateAccount {
+				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 					if index%3 == 0 {
 						codeBytes := make([]byte, 256)
 						_, err := r.Read(codeBytes)
@@ -143,7 +143,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with code and storage": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root := fillAccountsWithStorage(t, r, serverDB, common.Hash{}, numAccounts)
+				root := fillAccountsWithStorage(t, r, serverDB, numAccounts)
 				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 		},
@@ -152,7 +152,7 @@ func TestSimpleSyncCases(t *testing.T) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, i int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
 					if i%5 == 0 {
-						synctest.FillStorageForAccount(t, r, types.EmptyRootHash, 16, addr, storageTr)
+						synctest.FillStorageForAccount(t, r, 16, addr, storageTr)
 					}
 					return account
 				})
@@ -180,7 +180,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"failed to fetch code": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root := fillAccountsWithStorage(t, r, serverDB, common.Hash{}, numAccountsSmall)
+				root := fillAccountsWithStorage(t, r, serverDB, numAccountsSmall)
 				return serverDB, serverDB, root
 			},
 			GetCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {
@@ -206,7 +206,7 @@ func TestCancelSync(t *testing.T) {
 		prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 			// Create trie with 2000 accounts (more than one leaf request)
 			serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-			root := fillAccountsWithStorage(t, r, serverDB, common.Hash{}, 2000)
+			root := fillAccountsWithStorage(t, r, serverDB, 2000)
 			return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 		},
 		expectedError: context.Canceled,
@@ -569,8 +569,8 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB state.Database
 	require.Equal(t, trieAccountLeaves, numSnapshotAccounts)
 }
 
-func fillAccountsWithStorage(t *testing.T, r *rand.Rand, serverDB state.Database, root common.Hash, numAccounts int) common.Hash {
-	newRoot, _ := synctest.FillAccounts(t, r, serverDB, root, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
+func fillAccountsWithStorage(t *testing.T, r *rand.Rand, serverDB state.Database, numAccounts int) common.Hash {
+	newRoot, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
 		codeBytes := make([]byte, 256)
 		_, err := r.Read(codeBytes)
 		require.NoError(t, err, "error reading random code bytes")
@@ -580,7 +580,7 @@ func fillAccountsWithStorage(t *testing.T, r *rand.Rand, serverDB state.Database
 		account.CodeHash = codeHash[:]
 
 		// now create state trie
-		synctest.FillStorageForAccount(t, r, types.EmptyRootHash, 16, addr, storageTr)
+		synctest.FillStorageForAccount(t, r, 16, addr, storageTr)
 		return account
 	})
 	return newRoot
@@ -590,7 +590,7 @@ func TestDifferentWaitContext(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 	// Create trie with many accounts to ensure sync takes time
-	root := fillAccountsWithStorage(t, r, serverDB, common.Hash{}, 2000)
+	root := fillAccountsWithStorage(t, r, serverDB, 2000)
 	clientDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
 	// Track requests to show sync continues after Wait returns
