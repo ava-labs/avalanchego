@@ -360,19 +360,19 @@ func newCPUTrackerMetrics(reg prometheus.Registerer) (*trackerMetrics, error) {
 			Help: "Disk writes (bytes/sec) tracked by the resource manager",
 		}),
 		diskSpaceAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "disk_available_space",
+			Name: "disk_available",
 			Help: "Available space remaining (bytes) on the database volume",
 		}),
 		diskPercentageAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "disk_available_percentage",
+			Name: "disk_percentage_available",
 			Help: "Percentage of database volume available",
 		}),
 		memoryAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "memory_available_space",
+			Name: "memory_available",
 			Help: "Available memory remaining (bytes) on the system",
 		}),
 		memoryPercentageAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "memory_available_percentage",
+			Name: "memory_percentage_available",
 			Help: "Percentage of system memory available",
 		}),
 	}
