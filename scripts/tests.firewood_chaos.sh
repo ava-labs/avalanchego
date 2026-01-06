@@ -25,6 +25,9 @@ set -euo pipefail
 #     END_BLOCK: The ending block height (inclusive).
 #     MIN_WAIT_TIME: The minimum amount of time to wait before crashing.
 #     MAX_WAIT_TIME: The maximum amount of time to wait before crashing.
+#
+#   Optional:
+#     CONFIG: VM config preset (firewood, firewood-archive).
 
 show_usage() {
     cat <<EOF
@@ -65,6 +68,7 @@ if [[ -n "$TEST_NAME" ]]; then
             END_BLOCK="${END_BLOCK:-250000}"
             MIN_WAIT_TIME="${MIN_WAIT_TIME:-120s}"
             MAX_WAIT_TIME="${MAX_WAIT_TIME:-150s}"
+            CONFIG="${CONFIG:-firewood}"
             ;;
         archive-101-250k)
             BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-1m-ldb}"
@@ -73,6 +77,7 @@ if [[ -n "$TEST_NAME" ]]; then
             END_BLOCK="${END_BLOCK:-250000}"
             MIN_WAIT_TIME="${MIN_WAIT_TIME:-120s}"
             MAX_WAIT_TIME="${MAX_WAIT_TIME:-150s}"
+            CONFIG="${CONFIG:-firewood-archive}"
             ;;
         *)
             error "Unknown test '$TEST_NAME'"
