@@ -14,13 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
@@ -178,7 +178,7 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state *tes
 	} else {
 		blockContext.EXPECT().Number().Return(big.NewInt(0)).AnyTimes()
 	}
-	snowContext := utilstest.NewTestSnowContext(t)
+	snowContext := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 
 	// If Rules is explicitly set, use it; otherwise derive from ChainConfig
 	rules := test.Rules
