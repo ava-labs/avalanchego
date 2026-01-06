@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package load
@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
-		genesisPath := filepath.Join(testDir, "genesis/genesis.json")
+		genesisPath := filepath.Join(testDir, "genesis.json")
 
 		nodes := utils.NewTmpnetNodes(nodeCount)
 		env = e2e.NewTestEnvironment(

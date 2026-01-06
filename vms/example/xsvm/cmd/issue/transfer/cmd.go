@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package transfer
@@ -70,14 +70,20 @@ func Transfer(ctx context.Context, config *Config) (*status.TxIssuance, error) {
 		return nil, err
 	}
 
-	if err := api.AwaitTxAccepted(ctx, client, address, nonce, api.DefaultPollingInterval); err != nil {
-		return nil, err
-	}
-
-	return &status.TxIssuance{
+	txStatus := &status.TxIssuance{
 		Tx:        stx,
 		TxID:      txID,
 		Nonce:     nonce,
 		StartTime: issueTxStartTime,
-	}, nil
+	}
+
+	if !config.WaitForAcceptance {
+		return txStatus, nil
+	}
+
+	if err := api.AwaitTxAccepted(ctx, client, address, nonce, api.DefaultPollingInterval); err != nil {
+		return nil, err
+	}
+
+	return txStatus, nil
 }
