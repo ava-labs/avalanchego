@@ -63,25 +63,24 @@ type ProposalContext struct {
 	Children []*ProposalContext
 }
 
-// Config provides necessary parameters for creating a Firewood database.
-type Config struct {
-	DatabaseDirPath      string
+type TrieDBConfig struct {
+	DatabaseDir          string
 	CacheSizeBytes       uint
 	FreeListCacheEntries uint
 	RevisionsInMemory    uint // must be >= 2
 	CacheStrategy        ffi.CacheStrategy
-	Archive              bool // whether to write keep all historical revisions on disk
+	Archive              bool
 }
 
-// DefaultConfig returns a default Config with the given directory.
+// DefaultConfig returns a sensible TrieDBConfig with the given directory.
 // The default config is:
 //   - CacheSizeBytes: 1MB
 //   - FreeListCacheEntries: 40,000
 //   - RevisionsInMemory: 100
 //   - CacheStrategy: [ffi.CacheAllReads]
-func DefaultConfig(dir string) Config {
-	return Config{
-		DatabaseDirPath:      dir,
+func DefaultConfig(dir string) TrieDBConfig {
+	return TrieDBConfig{
+		DatabaseDir:          dir,
 		CacheSizeBytes:       1024 * 1024, // 1MB
 		FreeListCacheEntries: 40_000,
 		RevisionsInMemory:    100,
@@ -89,7 +88,7 @@ func DefaultConfig(dir string) Config {
 	}
 }
 
-func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
+func (c TrieDBConfig) BackendConstructor(ethdb.Database) triedb.DBOverride {
 	db, err := New(c)
 	if err != nil {
 		log.Crit("firewood: error creating database", "error", err)
@@ -116,8 +115,8 @@ type TrieDB struct {
 
 // New creates a new Firewood database with the given disk database and configuration.
 // Any error during creation will cause the program to exit.
-func New(config Config) (*TrieDB, error) {
-	path := filepath.Join(config.DatabaseDirPath, firewoodDir)
+func New(config TrieDBConfig) (*TrieDB, error) {
+	path := filepath.Join(config.DatabaseDir, firewoodDir)
 	if err := validatePath(path); err != nil {
 		return nil, err
 	}
