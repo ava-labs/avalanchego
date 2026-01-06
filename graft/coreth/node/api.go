@@ -29,7 +29,7 @@ package node
 
 import (
 	"github.com/ava-labs/avalanchego/graft/coreth/internal/debug"
-	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/crypto"
 )
