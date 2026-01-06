@@ -357,22 +357,3 @@ func NewPChainFeeCalculatorFromContext(context *builder.Context) fee.Calculator 
 	}
 	return fee.NewSimpleCalculator(0)
 }
-
-// GetRepoRootPath strips the provided suffix from the current working
-// directory. If the test binary is executed from the root of the repo, the
-// result will be the repo root.
-func GetRepoRootPath(suffix string) (string, error) {
-	// - When executed via a test binary, the working directory will be wherever
-	// the binary is executed from, but scripts should require execution from
-	// the repo root.
-	//
-	// - When executed via ginkgo (nicer for development + supports
-	// parallel execution) the working directory will always be the
-	// target path (e.g. [repo root]./tests/bootstrap/e2e) and getting the repo
-	// root will require stripping the target path suffix.
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSuffix(cwd, suffix), nil
-}

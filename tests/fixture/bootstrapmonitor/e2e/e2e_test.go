@@ -41,11 +41,6 @@ func TestE2E(t *testing.T) {
 }
 
 const (
-	// The relative path to the repo root enables discovery of the
-	// repo root when the test is executed from the root or the path
-	// of this file.
-	repoRelativePath = "tests/fixture/bootstrapmonitor/e2e"
-
 	avalanchegoImage       = "localhost:5001/avalanchego"
 	masterAvalanchegoImage = avalanchegoImage + ":master"
 	monitorImage           = "localhost:5001/bootstrap-monitor"
@@ -65,6 +60,7 @@ var (
 	kubeconfigVars            *flags.KubeconfigVars
 	skipAvalanchegoImageBuild bool
 	skipMonitorImageBuild     bool
+	repoRootPath              string
 
 	nodeDataDir = bootstrapmonitor.NodeDataDir(dataDir) // Use a subdirectory of the data path so that os.RemoveAll can be used when starting a new test
 )
@@ -82,6 +78,12 @@ func init() {
 		"skip-monitor-image-build",
 		false,
 		"whether to skip building the bootstrap-monitor image",
+	)
+	flag.StringVar(
+		&repoRootPath,
+		"repo-root",
+		"",
+		"absolute path to the repository root (required if scripts cannot be found via relative paths)",
 	)
 }
 
@@ -238,12 +240,19 @@ func buildAvalanchegoImage(tc tests.TestContext, imageName string, forceNewHash 
 func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scriptName string) {
 	require := require.New(tc)
 
-	repoRoot, err := e2e.GetRepoRootPath(repoRelativePath)
-	require.NoError(err)
+	// Check for script via relative path from this test directory
+	scriptPath := filepath.Join("..", "..", "..", "..", "scripts", scriptName)
+	if _, err := os.Stat(scriptPath); err != nil {
+		// Fall back to the provided repo root flag
+		if repoRootPath != "" {
+			scriptPath = filepath.Join(repoRootPath, "scripts", scriptName)
+		}
+		require.NoError(err, "failed to locate %s - try specifying -repo-root flag", scriptName)
+	}
 
 	args := []string{
 		"-x", // Ensure script output to aid in debugging
-		filepath.Join(repoRoot, "scripts", scriptName),
+		scriptPath,
 	}
 	if forceNewHash {
 		// Ensure the build results in a new image hash by preventing use of a cached final stage

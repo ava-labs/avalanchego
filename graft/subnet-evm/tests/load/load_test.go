@@ -4,9 +4,11 @@
 package load
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -30,11 +32,20 @@ const (
 	subnetAName = "load-subnet-a"
 )
 
-var flagVars *e2e.FlagVars
+var (
+	flagVars     *e2e.FlagVars
+	repoRootPath string
+)
 
 func init() {
 	// Configures flags used to configure tmpnet
 	flagVars = e2e.RegisterFlags()
+	flag.StringVar(
+		&repoRootPath,
+		"repo-root",
+		"",
+		"absolute path to the repository root (required if scripts cannot be found via relative paths)",
+	)
 }
 
 func TestE2E(t *testing.T) {
@@ -45,16 +56,20 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	var (
-		env      *e2e.TestEnvironment
-		repoRoot string
+		env        *e2e.TestEnvironment
+		scriptPath string
 	)
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
 
-		var err error
-		repoRoot, err = e2e.GetRepoRootPath("tests/load")
-		require.NoError(err)
+		scriptPath = filepath.Join("..", "..", "..", "..", "scripts", "run_simulator.sh")
+		if _, err := os.Stat(scriptPath); err != nil {
+			if repoRootPath != "" {
+				scriptPath = filepath.Join(repoRootPath, "scripts", "run_simulator.sh")
+			}
+			require.NoError(err, "failed to locate run_simulator.sh - try specifying -repo-root flag")
+		}
 
 		nodes := utils.NewTmpnetNodes(nodeCount)
 		env = e2e.NewTestEnvironment(
@@ -90,8 +105,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		require.NoError(os.Setenv("RPC_ENDPOINTS", commaSeparatedRPCEndpoints))
 
 		log.Info("Running load simulator...", "rpcEndpoints", commaSeparatedRPCEndpoints)
-		cmd := exec.Command("./scripts/run_simulator.sh")
-		cmd.Dir = repoRoot
+		cmd := exec.Command(scriptPath)
 		log.Info("Running load simulator script", "cmd", cmd.String())
 
 		out, err := cmd.CombinedOutput()
