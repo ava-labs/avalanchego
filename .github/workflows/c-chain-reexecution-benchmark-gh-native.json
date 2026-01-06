@@ -3,17 +3,17 @@
         "include": [
             {
               "runner": "ubuntu-latest",
-              "task": "c-chain-reexecution-hashdb-101-250k",
+              "test": "hashdb-101-250k",
               "timeout-minutes": 30
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
-                "task": "c-chain-reexecution-hashdb-101-250k",
+                "test": "hashdb-101-250k",
                 "timeout-minutes": 30
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
-                "task": "c-chain-reexecution-hashdb-archive-101-250k",
+                "test": "hashdb-archive-101-250k",
                 "timeout-minutes": 30
             }
         ]
