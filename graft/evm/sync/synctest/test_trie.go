@@ -196,7 +196,6 @@ func FillAccounts(
 				require.NoError(t, mergedSet.Merge(nodes))
 				acc.Root = root
 			}
-
 		}
 
 		tr.UpdateAccount(key.Address, &acc)
@@ -211,6 +210,7 @@ func FillAccounts(
 	return newRoot, accounts
 }
 
+// FillStorageForAccount adds [numStorageKeys] random key-value pairs to the storage trie for [addr] in [storageTr].
 func FillStorageForAccount(
 	t *testing.T, r *rand.Rand, root common.Hash, numStorageKeys int,
 	addr common.Address, storageTr state.Trie,
