@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package statesyncclient
@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 )
 
 var errFailedToFetchLeafs = errors.New("failed to fetch leafs")

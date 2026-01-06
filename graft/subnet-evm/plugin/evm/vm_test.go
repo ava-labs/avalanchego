@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -30,6 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
@@ -50,8 +52,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -153,7 +153,7 @@ type testVM struct {
 }
 
 func newVM(t *testing.T, config testVMConfig) *testVM {
-	ctx := utilstest.NewTestSnowContext(t)
+	ctx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 	fork := upgradetest.Latest
 	if config.fork != nil {
 		fork = *config.fork
@@ -228,7 +228,7 @@ func setupGenesis(
 	*prefixdb.Database,
 	[]byte,
 ) {
-	ctx := utilstest.NewTestSnowContext(t)
+	ctx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 
 	genesisJSON := toGenesisJSON(paramstest.ForkToChainConfig[fork])
 	ctx.NetworkUpgrades = upgradetest.GetConfig(fork)
@@ -2671,7 +2671,7 @@ func TestParentBeaconRootBlock(t *testing.T) {
 
 func TestStandaloneDB(t *testing.T) {
 	vm := &VM{}
-	ctx := utilstest.NewTestSnowContext(t)
+	ctx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 	baseDB := memdb.New()
 	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
 	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
