@@ -7,12 +7,14 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 
@@ -37,15 +39,10 @@ func IssueTxsToActivateProposerVMFork(
 		return err
 	}
 
-	newHeads := make(chan *types.Header, 1)
-	sub, err := client.SubscribeNewHead(ctx, newHeads)
-	if err != nil {
-		return err
-	}
-	defer sub.Unsubscribe()
-
 	gasPrice := big.NewInt(legacy.BaseFee)
 	txSigner := types.LatestSignerForChainID(chainID)
+
+	// Send exactly 2 transactions, waiting for each to be included in a block
 	for i := 0; i < numTriggerTxs; i++ {
 		tx := types.NewTransaction(
 			nonce, addr, common.Big1, ethparams.TxGas, gasPrice, nil)
@@ -56,9 +53,17 @@ func IssueTxsToActivateProposerVMFork(
 		if err := client.SendTransaction(ctx, triggerTx); err != nil {
 			return err
 		}
-		<-newHeads // wait for block to be accepted
+
+		// Wait for this transaction to be included in a block
+		receiptCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		if _, err := bind.WaitMined(receiptCtx, client, triggerTx); err != nil {
+			cancel()
+			return err
+		}
+		cancel()
 		nonce++
 	}
+
 	log.Info(
 		"Built sufficient blocks to activate proposerVM fork",
 		"txCount", numTriggerTxs,
