@@ -33,7 +33,7 @@ Usage: $0 [test-name]
 Available tests:
     help                    - Show this help message
     101-250k                - Blocks 101-250k with Firewood
-EOF
+    archive-101-250k        - Blocks 101-250k with Firewood archive mode
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -65,6 +65,14 @@ if [[ -n "$TEST_NAME" ]]; then
             MIN_WAIT_TIME="${MIN_WAIT_TIME:-120s}"
             MAX_WAIT_TIME="${MAX_WAIT_TIME:-150s}"
             ;;
+        archive-101-250k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-1m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-archive-100}"
+            START_BLOCK="${START_BLOCK:-101}"
+            END_BLOCK="${END_BLOCK:-250000}"
+            MIN_WAIT_TIME="${MIN_WAIT_TIME:-120s}"
+            MAX_WAIT_TIME="${MAX_WAIT_TIME:-150s}"
+            ;;
         *)
             error "Unknown test '$TEST_NAME'"
             ;;
@@ -75,7 +83,7 @@ fi
 if [[ -n "${BLOCK_DIR_SRC:-}" && -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
     # S3 mode - import data
     TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
-    EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR:-/tmp/reexec-${TEST_NAME:-custom}-${TIMESTAMP}}"
+    EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR:-/tmp/chaos-test-${TEST_NAME:-custom}-${TIMESTAMP}}"
 
     BLOCK_DIR_SRC="${BLOCK_DIR_SRC}" \
     CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC}" \

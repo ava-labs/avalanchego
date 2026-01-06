@@ -239,6 +239,10 @@ tasks:
     cmds:
       - cmd: bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}
 
+  test-firewood-chaos:
+    desc: Runs Firewood chaos test. Run with 'help' to see all available tests.
+    cmd: ./scripts/tests.firewood_chaos.sh {{.CLI_ARGS}}
+
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
 
