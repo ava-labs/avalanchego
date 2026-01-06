@@ -1,6 +1,35 @@
 # Release Notes
 
-## Pending
+## Pending (v1.14.2)
+
+## [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1)
+
+This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `44` and is compatible with version `v1.14.0`.
+
+### Config
+
+- Added:
+  - `--system-tracker-disk-required-available-space-percentage`
+  - `--system-tracker-disk-warning-available-space-percentage`
+- Deprecated:
+  - `--system-tracker-disk-required-available-space`
+  - `--system-tracker-disk-warning-threshold-available-space`
+
+### EVM
+
+- Removed `avax.version` API
+- Removed `customethclient` package in favor of `ethclient` package and temporary type registrations (`WithTempRegisteredLibEVMExtras`)
+  - Removed blockHook extension in `ethclient` package.
+- Enabled Firewood to run with pruning disabled.
+  - This change modified the filepath of Firewood. Any nodes using Firewood will need to resync.
+
+### What's Changed
+
+The changelog is omitted, as the Coreth and Subnet-EVM repositories were grafted into the repository.
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.0...v1.14.1
 
 ## [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0)
 
@@ -4960,3 +4989,10 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 ### ProposerVM
 
 - Updated block `Delay` in `--staking-enabled=false` networks to be `0`.
+
+## Historical Note
+
+In the past, [subnet-evm](./graft/subnet-evm) and [coreth](./graft/coreth) were their own repositories. Their change logs are preserved for posterity here:
+
+- coreth [RELEASES.MD](https://github.com/ava-labs/coreth/blob/master/RELEASES.md)
+- subnet-evm [RELEASES.MD](https://github.com/ava-labs/subnet-evm/blob/master/RELEASES.md)

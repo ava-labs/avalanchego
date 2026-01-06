@@ -3,8 +3,12 @@
 # This value is not intended to be used but silences a warning
 ARG AVALANCHEGO_NODE_IMAGE="invalid-image"
 
+# The version is supplied as a build argument rather than hard-coded
+# to minimize the cost of version changes.
+ARG GO_VERSION=INVALID # This value is not intended to be used but silences a warning
+
 # ============= Compilation Stage ================
-FROM --platform=$BUILDPLATFORM golang:1.24.9-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-bookworm AS builder
 
 WORKDIR /build
 

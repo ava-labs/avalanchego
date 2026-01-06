@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrapmonitor
@@ -111,7 +111,7 @@ func bootstrapTestConfigForPod(pod *corev1.Pod, nodeContainerName string) (*Boot
 	}
 
 	// Attempt to retrieve the image versions from a pod annotation. The annotation may not be populated in
-	// the case of a newly-created bootstrap test using an image tagged `latest` that hasn't yet had a
+	// the case of a newly-created bootstrap test using an image tagged `master` that hasn't yet had a
 	// chance to discover the versions.
 	if versionsAnnotation := pod.Annotations[VersionsAnnotationKey]; len(versionsAnnotation) > 0 {
 		if err := json.Unmarshal([]byte(versionsAnnotation), &testConfig.Versions); err != nil {

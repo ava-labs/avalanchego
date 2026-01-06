@@ -1,11 +1,11 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bindings
 
 // Step 1: Compile Solidity contract to generate ABI and bin files
 // Uses base-path to resolve imports from the repo root
-//go:generate solc-v0.8.30 -o artifacts --overwrite --abi --bin --base-path ../../../../.. precompile/=precompile/ --evm-version cancun WarpTest.sol
+//go:generate solc-v0.8.30 -o artifacts --overwrite --abi --bin --base-path ../../../../.. --evm-version cancun WarpTest.sol
 // Step 2: Generate Go bindings from the compiled artifacts
 // WarpTest binding includes WarpMessage and WarpBlockHash struct definitions.
 // For event filtering, use the IWarpMessenger binding from the warpbindings package.
