@@ -71,8 +71,8 @@ Available tests:
   firewood-33m-40m             - Blocks 33m-40m with firewood
 
   Chaos tests:
-  chaos-101-250k               - Blocks 101-250k with Firewood chaos test
-  chaos-archive-101-250k       - Blocks 101-250k with Firewood archive chaos test
+  chaos-101-250k               - Blocks 101-250k with Firewood
+  chaos-archive-101-250k       - Blocks 101-250k with Firewood archive
 EOF
 }
 
