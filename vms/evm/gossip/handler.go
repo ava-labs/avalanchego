@@ -19,10 +19,15 @@ import (
 
 var _ p2p.Handler = (*txGossipHandler)(nil)
 
+type txGossipHandler struct {
+	appGossipHandler  p2p.Handler
+	appRequestHandler p2p.Handler
+}
+
 func NewTxGossipHandler[T gossip.Gossipable](
 	log logging.Logger,
 	marshaller gossip.Marshaller[T],
-	mempool gossip.HandlerSet[T],
+	mempool gossip.Set[T],
 	metrics gossip.Metrics,
 	maxMessageSize int,
 	throttlingPeriod time.Duration,
@@ -30,7 +35,7 @@ func NewTxGossipHandler[T gossip.Gossipable](
 	validators p2p.ValidatorSet,
 	registerer prometheus.Registerer,
 	namespace string,
-) (*txGossipHandler, error) {
+) (p2p.Handler, error) {
 	// push gossip messages can be handled from any peer
 	handler := gossip.NewHandler(
 		log,
@@ -65,11 +70,6 @@ func NewTxGossipHandler[T gossip.Gossipable](
 		appGossipHandler:  handler,
 		appRequestHandler: validatorHandler,
 	}, nil
-}
-
-type txGossipHandler struct {
-	appGossipHandler  p2p.Handler
-	appRequestHandler p2p.Handler
 }
 
 func (t *txGossipHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
