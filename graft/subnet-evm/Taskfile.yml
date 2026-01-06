@@ -57,7 +57,7 @@ tasks:
       - task: check-clean-branch
 
   check-generate-bindings:
-    desc: Checks that generated Go bindings from Solidity contracts in precompile are up-to-date (requires a clean git working tree)
+    desc: Checks that generated Go bindings from all Solidity contracts are up-to-date (requires a clean git working tree)
     cmds:
       - task: generate-bindings
       - task: check-clean-branch
@@ -91,11 +91,11 @@ tasks:
       - cmd: go generate -run rlpgen ./...
 
   generate-bindings:
-    desc: Generates Go bindings from Solidity contracts in precompile
+    desc: Generates Go bindings from Solidity contracts (searches for all compile.go files)
     cmds:
-      - cmd: find ./precompile -type f -name 'gen_*binding.go' -exec grep -l '^// Code generated - DO NOT EDIT\.$' {} \; | xargs -r rm
-      - cmd: find ./precompile -type f -name '*.abi' | xargs -r rm
-      - cmd: go generate ./precompile/...
+      - cmd: find . -type f -name 'gen_*binding.go' -exec grep -l '^// Code generated - DO NOT EDIT\.$' {} \; | xargs -r rm
+      - cmd: find . -type f \( -name '*.abi' -o -name '*.bin' \) ! -path '*/artifacts/*' ! -path '*/setup-solc_downloads/*' | xargs -r rm
+      - cmd: find . -type f -name 'compile.go' -execdir go generate {} \;
 
   lint:
     desc: Run golangci-lint and check for allowed Ethereum imports in Go code

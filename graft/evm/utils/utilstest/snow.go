@@ -38,14 +38,14 @@ func NewTestValidatorState() *validatorstest.State {
 			}
 			return subnetID, nil
 		},
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
-		},
 		GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
 			return nil, nil
 		},
 		GetWarpValidatorSetF: func(context.Context, uint64, ids.ID) (validators.WarpSet, error) {
 			return validators.WarpSet{}, nil
+		},
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
 		},
 		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 			return map[ids.ID]*validators.GetCurrentValidatorOutput{}, 0, nil
@@ -64,18 +64,18 @@ func NewTestValidatorState() *validatorstest.State {
 //	// snowCtx.ValidatorState = validatorState
 //
 //	// Use:
-//	snowCtx := utils.NewTestSnowContext(t)
+//	snowCtx := utils.NewTestSnowContext(t, snowtest.CChainID)
 //
 // This function ensures that the snow context has a properly configured validator state
 // that includes the GetValidatorSetF function, which is required by many tests.
-func NewTestSnowContext(t testing.TB) *snow.Context {
-	return NewTestSnowContextWithValidatorState(t, NewTestValidatorState())
+func NewTestSnowContext(t testing.TB, chainID ids.ID) *snow.Context {
+	return NewTestSnowContextWithValidatorState(t, chainID, NewTestValidatorState())
 }
 
 // NewTestSnowContextWithValidatorState returns a snow.Context with the provided validator state.
 // This is useful when you need to customize the validator state behavior for specific tests.
-func NewTestSnowContextWithValidatorState(t testing.TB, validatorState validators.State) *snow.Context {
-	snowCtx := snowtest.Context(t, SubnetEVMTestChainID)
+func NewTestSnowContextWithValidatorState(t testing.TB, chainID ids.ID, validatorState validators.State) *snow.Context {
+	snowCtx := snowtest.Context(t, chainID)
 	snowCtx.ValidatorState = validatorState
 	return snowCtx
 }

@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 )
 
 func TestVerifyStateUpgrades(t *testing.T) {
@@ -64,7 +64,7 @@ func TestVerifyStateUpgrades(t *testing.T) {
 			require := require.New(t)
 			c := *TestChainConfig
 			config := &c
-			config.SnowCtx = utilstest.NewTestSnowContext(t)
+			config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 			config.StateUpgrades = tt.upgrades
 
 			err := config.Verify()

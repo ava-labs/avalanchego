@@ -4,7 +4,7 @@
 // AP1 defines constants used after the Apricot Phase 1 upgrade.
 package ap1
 
-import "github.com/ava-labs/avalanchego/graft/coreth/utils"
+import "github.com/ava-labs/avalanchego/graft/evm/utils"
 
 const (
 	// MinGasPrice is the minimum gas price of a transaction after the Apricot
