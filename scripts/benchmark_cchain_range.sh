@@ -186,14 +186,12 @@ if [[ -z "${START_BLOCK:-}" || -z "${END_BLOCK:-}" ]]; then
     error "START_BLOCK and END_BLOCK are required"
 fi
 
-# Chaos tests require additional validation
 if [[ -n "${CHAOS_MODE:-}" ]]; then
+    # Chaos tests require additional validation
     if [[ -z "${MIN_WAIT_TIME:-}" || -z "${MAX_WAIT_TIME:-}" || -z "${CONFIG:-}" ]]; then
         error "MIN_WAIT_TIME and MAX_WAIT_TIME and CONFIG are required for chaos tests"
     fi
-fi
 
-if [[ -n "${CHAOS_MODE:-}" ]]; then
     echo "=== Firewood Chaos Test: ${TEST_NAME:-custom} ==="
     echo "Crashing between ${MIN_WAIT_TIME} and ${MAX_WAIT_TIME}"
 else
