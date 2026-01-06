@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/warptest"
 	"github.com/ava-labs/avalanchego/ids"
@@ -36,7 +36,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 	metricstest.WithMetrics(t)
 
 	database := memdb.New()
-	snowCtx := utilstest.NewTestSnowContext(t)
+	snowCtx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 
 	offChainPayload, err := payload.NewAddressedCall([]byte{1, 2, 3}, []byte{1, 2, 3})
 	require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestBlockSignatures(t *testing.T) {
 	metricstest.WithMetrics(t)
 
 	database := memdb.New()
-	snowCtx := utilstest.NewTestSnowContext(t)
+	snowCtx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 
 	knownBlkID := ids.GenerateTestID()
 	blockClient := warptest.MakeBlockClient(knownBlkID)
@@ -255,7 +255,7 @@ func TestBlockSignatures(t *testing.T) {
 
 func TestUptimeSignatures(t *testing.T) {
 	database := memdb.New()
-	snowCtx := utilstest.NewTestSnowContext(t)
+	snowCtx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 
 	validationID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()

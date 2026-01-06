@@ -20,6 +20,7 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -28,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
