@@ -3,11 +3,15 @@ name: Firewood Chaos Test
 on:
   workflow_dispatch:
     inputs:
+      test:
+        description: 'Test name to run (e.g., 101-250k). Leave empty to use custom inputs below.'
+        default: ''
+      # Custom inputs (used when test is not provided)
       start-block:
-        description: 'The start block for the chaos test.'
+        description: 'The start block for the benchmark.'
         default: ''
       end-block:
-        description: 'The end block for the chaos test.'
+        description: 'The end block for the benchmark.'
         default: ''
       block-dir-src:
         description: 'The source block directory. Supports S3 directory/zip and local directories.'
@@ -15,6 +19,7 @@ on:
       current-state-dir-src:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         default: ''
+      # Chaos test specific inputs
       min-wait-time:
         description: 'Minimum wait time before killing the process (e.g., 120s, 2m).'
         default: '120s'
@@ -46,7 +51,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "min-wait-time": "%s", "max-wait-time": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+              printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "min-wait-time": "%s", "max-wait-time": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+                "${{ github.event.inputs.test }}" \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
                 "${{ github.event.inputs.block-dir-src }}" \
@@ -87,22 +93,14 @@ jobs:
           aws-region: 'us-east-2'
           role-duration-seconds: '43200'
       - uses: actions/checkout@v4
-      - name: Set task env
-        shell: bash
-        run: |
-          TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
-          echo "EXECUTION_DATA_DIR=/tmp/reexecution-data-${TIMESTAMP}" >> "$GITHUB_ENV"
       - name: Run chaos test with Firewood
         shell: nix develop --impure --command bash -x {0}
-        run: |
-          TIMESTAMP=$(date +%s)
-          EXECUTION_DATA_DIR="/tmp/reexecution-data-${TIMESTAMP}"
-          ./scripts/run_task.sh test-firewood-chaos-with-copied-data \
-            START_BLOCK=${{ matrix.start-block }} \
-            END_BLOCK=${{ matrix.end-block }} \
-            BLOCK_DIR_SRC=${{ matrix.block-dir-src }} \
-            EXECUTION_DATA_DIR=$EXECUTION_DATA_DIR \
-            CURRENT_STATE_DIR_SRC=${{ matrix.current-state-dir-src }} \
-            MIN_WAIT_TIME=${{ matrix.min-wait-time }} \
-            MAX_WAIT_TIME=${{ matrix.max-wait-time }}
+        run: ./scripts/tests.firewood_chaos.sh "${{ matrix.test || '' }}"
+        env:
+          START_BLOCK: ${{ matrix.start-block }}
+          END_BLOCK: ${{ matrix.end-block }}
+          BLOCK_DIR_SRC: ${{ matrix.block-dir-src }}
+          CURRENT_STATE_DIR_SRC: ${{ matrix.current-state-dir-src }}
+          MIN_WAIT_TIME: ${{ matrix.min-wait-time }}
+          MAX_WAIT_TIME: ${{ matrix.max-wait-time }}
 
