@@ -610,8 +610,11 @@ func (dl *diskLayer) abortGeneration() bool {
 	}
 
 	// If the disk layer is running a snapshot generator, abort it
+	// Note: genStats can be non-nil even when the generator is still running
+	// (waiting for abort signal after completing generation), so we check
+	// genAbort to determine if the goroutine is still active.
 	dl.lock.RLock()
-	shouldAbort := dl.genAbort != nil && dl.genStats == nil
+	shouldAbort := dl.genAbort != nil
 	dl.lock.RUnlock()
 	if shouldAbort {
 		abort := make(chan struct{})

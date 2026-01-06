@@ -68,6 +68,10 @@ type diskLayer struct {
 // Reset() in order to not leak memory.
 // OBS: It does not invoke Close on the diskdb
 func (dl *diskLayer) Release() error {
+	// Stop any ongoing snapshot generation to prevent it from accessing
+	// the database after it's closed during shutdown
+	dl.abortGeneration()
+
 	if dl.cache != nil {
 		dl.cache.Reset()
 	}
