@@ -46,7 +46,6 @@ func FillAccountsWithOverlappingStorage(
 			storageRootIndex++
 		case 2: // account with unique storage root
 			FillStorageForAccount(t, r, 16, addr, storageTr)
-			// account.Root, _, _ = GenerateIndependentTrie(t, r, s.TrieDB(), 16, common.HashLength)
 		}
 
 		return account
