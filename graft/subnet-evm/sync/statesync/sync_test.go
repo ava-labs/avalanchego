@@ -156,14 +156,14 @@ func TestSimpleSyncCases(t *testing.T) {
 					}
 					return account
 				})
-				return serverDB, serverDB, root
+				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 		},
 		"accounts with overlapping storage": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 				root, _ := synctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, numAccounts, 3)
-				return serverDB, serverDB, root
+				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 		},
 		"failed to fetch leafs": {
@@ -181,7 +181,7 @@ func TestSimpleSyncCases(t *testing.T) {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 				root := fillAccountsWithStorage(t, r, serverDB, numAccountsSmall)
-				return serverDB, serverDB, root
+				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 			GetCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {
 				return nil, clientErr
