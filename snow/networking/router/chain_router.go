@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -149,7 +149,7 @@ func (cr *ChainRouter) RegisterRequest(
 	chainID ids.ID,
 	requestID uint32,
 	op message.Op,
-	timeoutMsg message.InboundMessage,
+	timeoutMsg *message.InboundMessage,
 	engineType p2p.EngineType,
 ) {
 	cr.lock.Lock()
@@ -203,11 +203,11 @@ func (cr *ChainRouter) RegisterRequest(
 	)
 }
 
-func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
+func (cr *ChainRouter) HandleInbound(ctx context.Context, msg *message.InboundMessage) {
 	cr.handleMessage(ctx, msg, false)
 }
 
-func (cr *ChainRouter) HandleInternal(ctx context.Context, msg message.InboundMessage) {
+func (cr *ChainRouter) HandleInternal(ctx context.Context, msg *message.InboundMessage) {
 	// handleMessage is called in a separate goroutine because internal messages
 	// may be sent while holding the chain's context lock. To enforce the
 	// expected lock ordering, we must not grab the chain router lock while
@@ -219,11 +219,11 @@ func (cr *ChainRouter) HandleInternal(ctx context.Context, msg message.InboundMe
 // unrequested, responses, or timeouts. The internal flag indicates whether the
 // message is being sent from an internal component, such as due to a timeout,
 // or if the message originated from a remote peer.
-func (cr *ChainRouter) handleMessage(ctx context.Context, msg message.InboundMessage, internal bool) {
-	nodeID := msg.NodeID()
-	op := msg.Op()
+func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMessage, internal bool) {
+	nodeID := msg.NodeID
+	op := msg.Op
 
-	m := msg.Message()
+	m := msg.Message
 	chainID, err := message.GetChainID(m)
 	if err != nil {
 		cr.log.Debug("dropping message with invalid field",

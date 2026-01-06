@@ -18,7 +18,6 @@ module github.com/ava-labs/avalanchego
 //   - README.md
 //   - RELEASES.md
 //   - nix/go/default.nix (update version and sha256 for supported arches)
-//   - graft/subnet-evm/Dockerfile // TODO(JonathanOppenheimer): issue #4764
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
 //   - Consider updating the version of golangci-lint (see tools/go.mod)

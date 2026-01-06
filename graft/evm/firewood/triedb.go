@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package firewood
@@ -29,7 +29,7 @@ import (
 const firewoodDir = "firewood"
 
 var (
-	_ triedb.DBConstructor = Config{}.BackendConstructor
+	_ triedb.DBConstructor = TrieDBConfig{}.BackendConstructor
 	_ triedb.DBOverride    = (*TrieDB)(nil)
 
 	hashCount              = metrics.GetOrRegisterCounter("firewood/triedb/hash/count", nil)
@@ -95,25 +95,24 @@ type proposalMeta struct {
 	height      uint64
 }
 
-// Config provides necessary parameters for creating a Firewood database.
-type Config struct {
-	DatabasePath         string // directory where the database files will be stored
+type TrieDBConfig struct {
+	DatabaseDir          string
 	CacheSizeBytes       uint
 	FreeListCacheEntries uint
 	RevisionsInMemory    uint // must be >= 2
 	CacheStrategy        ffi.CacheStrategy
-	Archive              bool // whether to write keep all historical revisions on disk
+	Archive              bool
 }
 
-// DefaultConfig returns a default Config with the given directory.
+// DefaultConfig returns a sensible TrieDBConfig with the given directory.
 // The default config is:
 //   - CacheSizeBytes: 1MB
 //   - FreeListCacheEntries: 40,000
-//   - MaxRevisions: 100
+//   - RevisionsInMemory: 100
 //   - CacheStrategy: [ffi.CacheAllReads]
-func DefaultConfig(dir string) Config {
-	return Config{
-		DatabasePath:         dir,
+func DefaultConfig(dir string) TrieDBConfig {
+	return TrieDBConfig{
+		DatabaseDir:          dir,
 		CacheSizeBytes:       1024 * 1024, // 1MB
 		FreeListCacheEntries: 40_000,
 		RevisionsInMemory:    100,
@@ -124,7 +123,7 @@ func DefaultConfig(dir string) Config {
 // BackendConstructor implements the [triedb.DBConstructor] interface.
 // It creates a new Firewood database with the given configuration.
 // Any error during creation will cause the program to exit.
-func (c Config) BackendConstructor(disk ethdb.Database) triedb.DBOverride {
+func (c TrieDBConfig) BackendConstructor(disk ethdb.Database) triedb.DBOverride {
 	db, err := New(c, disk)
 	if err != nil {
 		log.Crit("firewood: creating database", "error", err)
@@ -134,17 +133,17 @@ func (c Config) BackendConstructor(disk ethdb.Database) triedb.DBOverride {
 
 // New creates a new Firewood database with the given configuration.
 // The database will not be opened on error.
-func New(config Config, disk ethdb.Database) (*TrieDB, error) {
+func New(config TrieDBConfig, disk ethdb.Database) (*TrieDB, error) {
 	height := ReadCommittedHeight(disk)
 	blockHashes, err := ReadCommittedBlockHashes(disk)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := validateDir(config.DatabasePath); err != nil {
+	if err := validateDir(config.DatabaseDir); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(config.DatabasePath, firewoodDir)
+	path := filepath.Join(config.DatabaseDir, firewoodDir)
 	options := []ffi.Option{
 		ffi.WithNodeCacheEntries(config.CacheSizeBytes / 256), // TODO(#4750): is 256 bytes per node a good estimate?
 		ffi.WithFreeListCacheEntries(config.FreeListCacheEntries),

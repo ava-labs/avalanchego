@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Implements solidity tests.
@@ -9,8 +9,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +18,8 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
 	"github.com/stretchr/testify/require"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
@@ -55,6 +55,9 @@ const (
 )
 
 var (
+	//go:embed genesis.json
+	genesis []byte
+
 	flagVars *e2e.FlagVars
 
 	subnetA, subnetB, cChainSubnetDetails *Subnet
@@ -88,8 +91,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	tc := e2e.NewTestContext()
 	nodes := utils.NewTmpnetNodes(tmpnet.DefaultNodeCount)
-	_, thisFile, _, _ := runtime.Caller(0)
-	genesisPath := filepath.Join(filepath.Dir(thisFile), "genesis.json")
 
 	env := e2e.NewTestEnvironment(
 		tc,
@@ -98,8 +99,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			"subnet-evm-warp-e2e",
 			nodes,
 			tmpnet.FlagsMap{},
-			utils.NewTmpnetSubnet(subnetAName, genesisPath, utils.DefaultChainConfig, nodes...),
-			utils.NewTmpnetSubnet(subnetBName, genesisPath, utils.DefaultChainConfig, nodes...),
+			utils.NewTmpnetSubnet(subnetAName, genesis, utils.DefaultChainConfig, nodes...),
+			utils.NewTmpnetSubnet(subnetBName, genesis, utils.DefaultChainConfig, nodes...),
 		),
 	)
 
