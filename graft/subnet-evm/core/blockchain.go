@@ -243,7 +243,7 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 		}
 
 		config.DBOverride = firewood.Config{
-			DatabasePath:         c.ChainDataDir,
+			DatabaseDirPath:      c.ChainDataDir,
 			CacheSizeBytes:       uint(c.TrieCleanLimit * 1024 * 1024),
 			FreeListCacheEntries: 40_000,               // Firewood default
 			RevisionsInMemory:    uint(c.StateHistory), // must be at least 2

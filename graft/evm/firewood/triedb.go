@@ -65,7 +65,7 @@ type ProposalContext struct {
 
 // Config provides necessary parameters for creating a Firewood database.
 type Config struct {
-	DatabasePath         string // directory where the database files will be stored
+	DatabaseDirPath      string
 	CacheSizeBytes       uint
 	FreeListCacheEntries uint
 	RevisionsInMemory    uint // must be >= 2
@@ -81,7 +81,7 @@ type Config struct {
 //   - CacheStrategy: [ffi.CacheAllReads]
 func DefaultConfig(dir string) Config {
 	return Config{
-		DatabasePath:         dir,
+		DatabaseDirPath:      dir,
 		CacheSizeBytes:       1024 * 1024, // 1MB
 		FreeListCacheEntries: 40_000,
 		RevisionsInMemory:    100,
@@ -117,7 +117,7 @@ type TrieDB struct {
 // New creates a new Firewood database with the given disk database and configuration.
 // Any error during creation will cause the program to exit.
 func New(config Config) (*TrieDB, error) {
-	path := filepath.Join(config.DatabasePath, firewoodDir)
+	path := filepath.Join(config.DatabaseDirPath, firewoodDir)
 	if err := validatePath(path); err != nil {
 		return nil, err
 	}
