@@ -34,6 +34,7 @@ Available tests:
     help                    - Show this help message
     101-250k                - Blocks 101-250k with Firewood
     archive-101-250k        - Blocks 101-250k with Firewood archive mode
+EOF
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
