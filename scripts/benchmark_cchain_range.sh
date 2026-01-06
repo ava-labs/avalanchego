@@ -11,6 +11,8 @@ set -euo pipefail
 # without a test name and without required env vars.
 #
 # Test names configure defaults for S3 sources and block ranges.
+# If running in chaos mode, test names also configure defaults for the VM Config
+# and min/max wait times.
 # All defaults can be overridden via environment variables.
 #
 # Environment variables:
@@ -135,6 +137,12 @@ if [[ -n "$TEST_NAME" ]]; then
             error "Unknown test '$TEST_NAME'"
             ;;
     esac
+fi
+
+# Set chaos test defaults when using a defined test with CHAOS_MODE
+if [[ -n "${CHAOS_MODE:-}" && -n "${TEST_NAME:-}" ]]; then
+    MIN_WAIT_TIME="${MIN_WAIT_TIME:-120s}"
+    MAX_WAIT_TIME="${MAX_WAIT_TIME:-150s}"
 fi
 
 # Determine data source: S3 import or local paths
