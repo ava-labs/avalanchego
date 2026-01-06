@@ -543,10 +543,10 @@ func (t *TrieDB) createProposals(parentRoot common.Hash, keys, values [][]byte) 
 	if t.proposals.tree.root == parentRoot {
 		// Propose from the database root.
 		p, err := t.createProposal(t.proposals.tree, keys, values)
-		root = p.root
 		if err != nil {
 			return common.Hash{}, fmt.Errorf("proposing from root %s: %w", parentRoot.Hex(), err)
 		}
+		root = p.root
 		for parentHash := range t.proposals.tree.blockHashes {
 			t.possible[possibleKey{parentBlockHash: parentHash, root: root}] = p
 		}
