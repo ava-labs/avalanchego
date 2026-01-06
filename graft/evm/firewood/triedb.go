@@ -63,24 +63,32 @@ type ProposalContext struct {
 	Children []*ProposalContext
 }
 
-type Config struct {
-	ChainDataDir         string
-	CleanCacheSize       int  // Size of the clean cache in bytes
-	FreeListCacheEntries uint // Number of free list entries to cache
-	Revisions            uint // Number of revisions to keep in memory (must be >= 2)
-	ReadCacheStrategy    ffi.CacheStrategy
-	ArchiveMode          bool
+type TrieDBConfig struct {
+	DatabaseDir          string
+	CacheSizeBytes       uint
+	FreeListCacheEntries uint
+	RevisionsInMemory    uint // must be >= 2
+	CacheStrategy        ffi.CacheStrategy
+	Archive              bool
 }
 
-// Note that `FilePath` is not specified, and must always be set by the user.
-var Defaults = Config{
-	CleanCacheSize:       1024 * 1024, // 1MB
-	FreeListCacheEntries: 40_000,
-	Revisions:            100,
-	ReadCacheStrategy:    ffi.CacheAllReads,
+// DefaultConfig returns a sensible TrieDBConfig with the given directory.
+// The default config is:
+//   - CacheSizeBytes: 1MB
+//   - FreeListCacheEntries: 40,000
+//   - RevisionsInMemory: 100
+//   - CacheStrategy: [ffi.CacheAllReads]
+func DefaultConfig(dir string) TrieDBConfig {
+	return TrieDBConfig{
+		DatabaseDir:          dir,
+		CacheSizeBytes:       1024 * 1024, // 1MB
+		FreeListCacheEntries: 40_000,
+		RevisionsInMemory:    100,
+		CacheStrategy:        ffi.CacheAllReads,
+	}
 }
 
-func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
+func (c TrieDBConfig) BackendConstructor(ethdb.Database) triedb.DBOverride {
 	db, err := New(c)
 	if err != nil {
 		log.Crit("firewood: error creating database", "error", err)
@@ -89,7 +97,12 @@ func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
 }
 
 type TrieDB struct {
-	fwDisk       *ffi.Database // The underlying Firewood database, used for storing proposals and revisions.
+	// The underlying Firewood database, used for storing proposals and revisions.
+	// This is exported with the knowledge that consumer will not close it and the latest state can be modified
+	// at any time via block execution. The consumer should only use for read operations,
+	// or ensure that writes occur outside of block execution.
+	Firewood *ffi.Database
+
 	proposalLock sync.RWMutex
 	// proposalMap provides O(1) access by state root to all proposals stored in the proposalTree
 	proposalMap map[common.Hash][]*ProposalContext
@@ -102,19 +115,19 @@ type TrieDB struct {
 
 // New creates a new Firewood database with the given disk database and configuration.
 // Any error during creation will cause the program to exit.
-func New(config Config) (*TrieDB, error) {
-	path := filepath.Join(config.ChainDataDir, firewoodDir)
+func New(config TrieDBConfig) (*TrieDB, error) {
+	path := filepath.Join(config.DatabaseDir, firewoodDir)
 	if err := validatePath(path); err != nil {
 		return nil, err
 	}
 
 	options := []ffi.Option{
-		ffi.WithNodeCacheEntries(uint(config.CleanCacheSize / 256)), // TODO(#4750): is 256 bytes per node a good estimate?
+		ffi.WithNodeCacheEntries(config.CacheSizeBytes / 256), // TODO(#4750): is 256 bytes per node a good estimate?
 		ffi.WithFreeListCacheEntries(config.FreeListCacheEntries),
-		ffi.WithRevisions(config.Revisions),
-		ffi.WithReadCacheStrategy(config.ReadCacheStrategy),
+		ffi.WithRevisions(config.RevisionsInMemory),
+		ffi.WithReadCacheStrategy(config.CacheStrategy),
 	}
-	if config.ArchiveMode {
+	if config.Archive {
 		options = append(options, ffi.WithRootStore())
 	}
 
@@ -129,7 +142,7 @@ func New(config Config) (*TrieDB, error) {
 	}
 
 	return &TrieDB{
-		fwDisk:      fw,
+		Firewood:    fw,
 		proposalMap: make(map[common.Hash][]*ProposalContext),
 		proposalTree: &ProposalContext{
 			Root: common.Hash(currentRoot),
@@ -173,7 +186,7 @@ func (*TrieDB) Scheme() string {
 
 // Initialized checks whether a non-empty genesis block has been written.
 func (t *TrieDB) Initialized(common.Hash) bool {
-	root, err := t.fwDisk.Root()
+	root, err := t.Firewood.Root()
 	if err != nil {
 		log.Error("firewood: error getting current root", "error", err)
 		return false
@@ -269,7 +282,7 @@ func (t *TrieDB) propose(root common.Hash, parentRoot common.Hash, hash common.H
 	}
 
 	log.Debug("firewood: proposing from database root", "root", root.Hex(), "height", block)
-	p, err := createProposal(t.fwDisk, root, keys, values)
+	p, err := createProposal(t.Firewood, root, keys, values)
 	if err != nil {
 		return err
 	}
@@ -329,7 +342,7 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	defer t.cleanupCommittedProposal(pCtx)
 
 	// Assert that the root of the database matches the committed proposal root.
-	currentRoot, err := t.fwDisk.Root()
+	currentRoot, err := t.Firewood.Root()
 	if err != nil {
 		return fmt.Errorf("firewood: error getting current root after commit: %w", err)
 	}
@@ -382,7 +395,7 @@ func (t *TrieDB) Close() error {
 
 	// Close the database
 	// This may block momentarily while finalizers for Firewood objects run.
-	return t.fwDisk.Close(context.Background())
+	return t.Firewood.Close(context.Background())
 }
 
 // createProposal creates a new proposal from the given layer
@@ -486,7 +499,7 @@ func (t *TrieDB) removeProposalFromMap(pCtx *ProposalContext) {
 // Reader retrieves a node reader belonging to the given state root.
 // An error will be returned if the requested state is not available.
 func (t *TrieDB) Reader(root common.Hash) (database.Reader, error) {
-	revision, err := t.fwDisk.Revision(ffi.Hash(root))
+	revision, err := t.Firewood.Revision(ffi.Hash(root))
 	if err != nil {
 		return nil, fmt.Errorf("firewood: unable to retrieve from root %s: %w", root.Hex(), err)
 	}
@@ -526,7 +539,7 @@ func (t *TrieDB) getProposalHash(parentRoot common.Hash, keys, values [][]byte) 
 	start := time.Now()
 	if t.proposalTree.Root == parentRoot {
 		// Propose from the database root.
-		p, err = t.fwDisk.Propose(keys, values)
+		p, err = t.Firewood.Propose(keys, values)
 		if err != nil {
 			return common.Hash{}, fmt.Errorf("firewood: error proposing from root %s: %w", parentRoot.Hex(), err)
 		}
