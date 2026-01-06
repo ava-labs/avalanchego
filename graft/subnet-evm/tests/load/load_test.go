@@ -44,10 +44,17 @@ func TestE2E(t *testing.T) {
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	require := require.New(ginkgo.GinkgoT())
 
-	var env *e2e.TestEnvironment
+	var (
+		env      *e2e.TestEnvironment
+		repoRoot string
+	)
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
+
+		var err error
+		repoRoot, err = e2e.GetRepoRootPath("tests/load")
+		require.NoError(err)
 
 		nodes := utils.NewTmpnetNodes(nodeCount)
 		env = e2e.NewTestEnvironment(
@@ -84,7 +91,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 
 		log.Info("Running load simulator...", "rpcEndpoints", commaSeparatedRPCEndpoints)
 		cmd := exec.Command("./scripts/run_simulator.sh")
-		cmd.Dir = "../.."
+		cmd.Dir = repoRoot
 		log.Info("Running load simulator script", "cmd", cmd.String())
 
 		out, err := cmd.CombinedOutput()
