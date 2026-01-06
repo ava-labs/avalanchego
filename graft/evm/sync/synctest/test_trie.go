@@ -45,7 +45,8 @@ func FillAccountsWithOverlappingStorage(
 			account.Root = storageRoots[storageRootIndex%numOverlappingStorageRoots]
 			storageRootIndex++
 		case 2: // account with unique storage root
-			FillStorageForAccount(t, r, 26, addr, storageTr)
+			FillStorageForAccount(t, r, 16, addr, storageTr)
+			// account.Root, _, _ = GenerateIndependentTrie(t, r, s.TrieDB(), 16, common.HashLength)
 		}
 
 		return account
@@ -70,21 +71,6 @@ func FillIndependentTrie(t *testing.T, r *rand.Rand, start, numKeys int, keySize
 	testTrie, err := trie.New(trie.TrieID(root), trieDB)
 	require.NoError(t, err)
 
-	keys, values := makeKeyValues(t, r, start, numKeys, keySize)
-	for i := start; i < numKeys; i++ {
-		testTrie.MustUpdate(keys[i], values[i])
-	}
-
-	// Commit the root to [trieDB]
-	nextRoot, nodes, err := testTrie.Commit(false)
-	require.NoError(t, err)
-	require.NoError(t, trieDB.Update(nextRoot, root, 0, trienode.NewWithNodeSet(nodes), nil))
-	require.NoError(t, trieDB.Commit(nextRoot, false))
-
-	return nextRoot, keys, values
-}
-
-func makeKeyValues(t *testing.T, r *rand.Rand, start, numKeys, keySize int) ([][]byte, [][]byte) {
 	keys := make([][]byte, 0, numKeys)
 	values := make([][]byte, 0, numKeys)
 
@@ -94,16 +80,23 @@ func makeKeyValues(t *testing.T, r *rand.Rand, start, numKeys, keySize int) ([][
 		binary.BigEndian.PutUint64(key[:wrappers.LongLen], uint64(i+1))
 		_, err := r.Read(key[wrappers.LongLen:])
 		require.NoError(t, err)
-
 		value := make([]byte, r.Intn(128)+128) // min 128 bytes, max 256 bytes
 		_, err = r.Read(value)
 		require.NoError(t, err)
+
+		testTrie.MustUpdate(key, value)
 
 		keys = append(keys, key)
 		values = append(values, value)
 	}
 
-	return keys, values
+	// Commit the root to [trieDB]
+	nextRoot, nodes, err := testTrie.Commit(false)
+	require.NoError(t, err)
+	require.NoError(t, trieDB.Update(nextRoot, root, 0, trienode.NewWithNodeSet(nodes), nil))
+	require.NoError(t, trieDB.Commit(nextRoot, false))
+
+	return nextRoot, keys, values
 }
 
 // AssertTrieConsistency ensures given trieDB [a] and [b] both have the same
@@ -202,7 +195,7 @@ func FillAccounts(
 		accounts[key] = &acc
 	}
 
-	newRoot, nodes, err := tr.Commit(false)
+	newRoot, nodes, err := tr.Commit(true)
 	require.NoError(t, err)
 	require.NoError(t, mergedSet.Merge(nodes))
 	require.NoError(t, s.TrieDB().Update(newRoot, root, 0, mergedSet, nil))
@@ -215,8 +208,29 @@ func FillStorageForAccount(
 	t *testing.T, r *rand.Rand, numStorageKeys int,
 	addr common.Address, storageTr state.Trie,
 ) {
-	keys, values := makeKeyValues(t, r, 0, numStorageKeys, common.HashLength)
+	keys, values := makeKeyValues(t, r, numStorageKeys, common.HashLength)
 	for i := range numStorageKeys {
 		require.NoError(t, storageTr.UpdateStorage(addr, keys[i], values[i]))
 	}
+}
+
+func makeKeyValues(t *testing.T, r *rand.Rand, numKeys, keySize int) ([][]byte, [][]byte) {
+	keys := make([][]byte, 0, numKeys)
+	values := make([][]byte, 0, numKeys)
+
+	// Generate key-value pairs
+	for range numKeys {
+		key := make([]byte, keySize)
+		_, err := r.Read(key)
+		require.NoError(t, err)
+
+		value := make([]byte, r.Intn(128)+128) // min 128 bytes, max 256 bytes
+		_, err = r.Read(value)
+		require.NoError(t, err)
+
+		keys = append(keys, key)
+		values = append(values, value)
+	}
+
+	return keys, values
 }
