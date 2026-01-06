@@ -15,6 +15,8 @@ set -euo pipefail
 # and min/max wait times.
 # All defaults can be overridden via environment variables.
 #
+# Note: chaos tests can only be run with firewood VM configs.
+#
 # Environment variables:
 #   Data sources (provide S3 sources OR local paths):
 #     BLOCK_DIR_SRC: S3 object key for blocks (triggers S3 import).
@@ -37,7 +39,7 @@ set -euo pipefail
 #
 #   Required (chaos tests):
 #     CHAOS_MODE: Set to enable chaos test mode (e.g., CHAOS_MODE=1).
-#     CONFIG: VM config preset (firewood, firewood-archive).
+#     CONFIG: VM config preset (firewood or firewood-archive only).
 #     MIN_WAIT_TIME: Minimum wait before crash (e.g., 120s).
 #     MAX_WAIT_TIME: Maximum wait before crash (e.g., 150s).
 
