@@ -240,10 +240,8 @@ func buildAvalanchegoImage(tc tests.TestContext, imageName string, forceNewHash 
 func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scriptName string) {
 	require := require.New(tc)
 
-	// Check for script via relative path from this test directory
 	scriptPath := filepath.Join("..", "..", "..", "..", "scripts", scriptName)
 	if _, err := os.Stat(scriptPath); err != nil {
-		// Fall back to the provided repo root flag
 		if repoRootPath != "" {
 			scriptPath = filepath.Join(repoRootPath, "scripts", scriptName)
 		}
