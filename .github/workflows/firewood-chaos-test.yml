@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       test:
-        description: 'Test name to run (e.g., 101-250k). Leave empty to use custom inputs below.'
+        description: 'Test name to run (e.g., chaos-101-250k). Leave empty to use custom inputs below.'
         default: ''
       # Custom inputs (used when test is not provided)
       start-block:
@@ -20,6 +20,9 @@ on:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         default: ''
       # Chaos test specific inputs
+      config:
+        description: 'VM config preset (firewood, firewood-archive). Required for custom tests.'
+        default: 'firewood'
       min-wait-time:
         description: 'Minimum wait time before killing the process (e.g., 120s, 2m).'
         default: '120s'
@@ -51,12 +54,13 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "min-wait-time": "%s", "max-wait-time": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+              printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "min-wait-time": "%s", "max-wait-time": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
                 "${{ github.event.inputs.test }}" \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
                 "${{ github.event.inputs.block-dir-src }}" \
                 "${{ github.event.inputs.current-state-dir-src }}" \
+                "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.min-wait-time }}" \
                 "${{ github.event.inputs.max-wait-time }}" \
                 "${{ github.event.inputs.runner }}" \
@@ -66,7 +70,7 @@ jobs:
           else
             {
               echo "matrix<<EOF"
-              echo '{ "include": [{ "test": "101-250k" }, { "test": "archive-101-250k" }] }'
+              echo '{ "include": [{ "test": "chaos-101-250k" }, { "test": "chaos-archive-101-250k" }] }'
               echo EOF
             } >> "$GITHUB_OUTPUT"
           fi
@@ -94,12 +98,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run chaos test with Firewood
         shell: nix develop --impure --command bash -x {0}
-        run: ./scripts/run_task.sh test-firewood-chaos -- "${{ matrix.test || '' }}"
+        run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ matrix.test || '' }}"
         env:
+          CHAOS_MODE: 'true'
           START_BLOCK: ${{ matrix.start-block }}
           END_BLOCK: ${{ matrix.end-block }}
           BLOCK_DIR_SRC: ${{ matrix.block-dir-src }}
           CURRENT_STATE_DIR_SRC: ${{ matrix.current-state-dir-src }}
+          CONFIG: ${{ matrix.config }}
           MIN_WAIT_TIME: ${{ matrix.min-wait-time }}
           MAX_WAIT_TIME: ${{ matrix.max-wait-time }}
 

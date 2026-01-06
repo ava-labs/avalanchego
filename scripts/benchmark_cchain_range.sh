@@ -2,10 +2,13 @@
 
 set -euo pipefail
 
-# C-Chain Re-execution Benchmark Script
+# C-Chain Re-execution Benchmark and Chaos Test Script
 #
 # Usage:
 #   ./benchmark_cchain_range.sh [test-name]
+#
+# Test names starting with "chaos-" run crash tests.
+# All other test names run reexecution tests.
 #
 # To see available tests: use `help` as the test name or invoke
 # without a test name and without required env vars.
@@ -24,14 +27,20 @@ set -euo pipefail
 #     START_BLOCK: The starting block height (inclusive).
 #     END_BLOCK: The ending block height (inclusive).
 #
-#   Optional:
-#     CONFIG: VM config preset (default, archive, firewood).
+#   Optional (reexecution tests):
+#     CONFIG: VM config preset (default, archive, firewood, firewood-archive).
 #     LABELS: Comma-separated key=value pairs for metric labels.
 #     BENCHMARK_OUTPUT_FILE: If set, benchmark output is also written to this file.
 #     METRICS_SERVER_ENABLED: If set, enables the metrics server.
 #     METRICS_SERVER_PORT: If set, determines the port the metrics server will listen to.
 #     METRICS_COLLECTOR_ENABLED: If set, enables the metrics collector.
 #     PUSH_POST_STATE: S3 destination to push current-state after execution.
+#
+#   Required (chaos tests):
+#     CHAOS_MODE: Set to "true" to run chaos test with custom parameters.
+#     CONFIG: VM config preset (firewood, firewood-archive).
+#     MIN_WAIT_TIME: Minimum wait before crash (e.g., 120s).
+#     MAX_WAIT_TIME: Maximum wait before crash (e.g., 150s).
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -51,6 +60,8 @@ Usage: $0 [test-name]
 
 Available tests:
   help                         - Show this help message
+
+  Reexecution tests:
   default                      - Quick test run (blocks 101-200, hashdb)
   hashdb-101-250k              - Blocks 101-250k with hashdb
   hashdb-archive-101-250k      - Blocks 101-250k with hashdb archive
@@ -58,6 +69,10 @@ Available tests:
   firewood-101-250k            - Blocks 101-250k with firewood
   firewood-33m-33m500k         - Blocks 33m-33.5m with firewood
   firewood-33m-40m             - Blocks 33m-40m with firewood
+
+  Chaos tests:
+  chaos-101-250k               - Blocks 101-250k with Firewood chaos test
+  chaos-archive-101-250k       - Blocks 101-250k with Firewood archive chaos test
 EOF
 }
 
@@ -116,10 +131,34 @@ if [[ -n "$TEST_NAME" ]]; then
             END_BLOCK="${END_BLOCK:-40000000}"
             CONFIG="${CONFIG:-firewood}"
             ;;
+        chaos-101-250k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-1m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-100}"
+            START_BLOCK="${START_BLOCK:-101}"
+            END_BLOCK="${END_BLOCK:-250000}"
+            MIN_WAIT_TIME="${MIN_WAIT_TIME:-120s}"
+            MAX_WAIT_TIME="${MAX_WAIT_TIME:-150s}"
+            CONFIG="${CONFIG:-firewood}"
+            ;;
+        chaos-archive-101-250k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-1m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-archive-100}"
+            START_BLOCK="${START_BLOCK:-101}"
+            END_BLOCK="${END_BLOCK:-250000}"
+            MIN_WAIT_TIME="${MIN_WAIT_TIME:-120s}"
+            MAX_WAIT_TIME="${MAX_WAIT_TIME:-150s}"
+            CONFIG="${CONFIG:-firewood-archive}"
+            ;;
         *)
             error "Unknown test '$TEST_NAME'"
             ;;
     esac
+fi
+
+# Detect if this is a chaos test
+IS_CHAOS_TEST=false
+if [[ "${TEST_NAME:-}" == chaos-* ]] || [[ "${CHAOS_MODE:-}" == "true" ]]; then
+    IS_CHAOS_TEST=true
 fi
 
 # Determine data source: S3 import or local paths
@@ -150,6 +189,9 @@ elif [[ -z "${BLOCK_DIR:-}" || -z "${CURRENT_STATE_DIR:-}" ]]; then
     echo "  Block range:"
     [[ -n "${START_BLOCK:-}" ]] && echo "    START_BLOCK: ${START_BLOCK}" || echo "    START_BLOCK: (not set)"
     [[ -n "${END_BLOCK:-}" ]] && echo "    END_BLOCK: ${END_BLOCK}" || echo "    END_BLOCK: (not set)"
+    echo "  Timeouts (chaos tests):"
+    [[ -n "${MIN_WAIT_TIME:-}" ]] && echo "    MIN_WAIT_TIME: ${MIN_WAIT_TIME}" || echo "    MIN_WAIT_TIME: (not set)"
+    [[ -n "${MAX_WAIT_TIME:-}" ]] && echo "    MAX_WAIT_TIME: ${MAX_WAIT_TIME}" || echo "    MAX_WAIT_TIME: (not set)"
     exit 1
 fi
 
@@ -158,25 +200,52 @@ if [[ -z "${START_BLOCK:-}" || -z "${END_BLOCK:-}" ]]; then
     error "START_BLOCK and END_BLOCK are required"
 fi
 
-echo "=== C-Chain Re-execution: ${TEST_NAME:-custom} ==="
-echo "Blocks: ${START_BLOCK} - ${END_BLOCK}"
-echo "Config: ${CONFIG:-default}"
+# Chaos tests require additional validation
+if [[ "$IS_CHAOS_TEST" == "true" ]]; then
+    if [[ -z "${CONFIG:-}" ]]; then
+        error "CONFIG is required for chaos tests"
+    fi
+    if [[ -z "${MIN_WAIT_TIME:-}" || -z "${MAX_WAIT_TIME:-}" ]]; then
+        error "MIN_WAIT_TIME and MAX_WAIT_TIME are required for chaos tests"
+    fi
+fi
 
-echo "=== Running re-execution ==="
-go run github.com/ava-labs/avalanchego/tests/reexecute/c \
-  --block-dir="${BLOCK_DIR}" \
-  --current-state-dir="${CURRENT_STATE_DIR}" \
-  ${RUNNER_TYPE:+--runner="${RUNNER_TYPE}"} \
-  ${CONFIG:+--config="${CONFIG}"} \
-  --start-block="${START_BLOCK}" \
-  --end-block="${END_BLOCK}" \
-  ${LABELS:+--labels="${LABELS}"} \
-  ${BENCHMARK_OUTPUT_FILE:+--benchmark-output-file="${BENCHMARK_OUTPUT_FILE}"} \
-  ${METRICS_SERVER_ENABLED:+--metrics-server-enabled="${METRICS_SERVER_ENABLED}"} \
-  ${METRICS_SERVER_PORT:+--metrics-server-port="${METRICS_SERVER_PORT}"} \
-  ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled="${METRICS_COLLECTOR_ENABLED}"}
+if [[ "$IS_CHAOS_TEST" == "true" ]]; then
+    echo "=== Firewood Chaos Test: ${TEST_NAME:-custom} ==="
+    echo "Blocks: ${START_BLOCK} - ${END_BLOCK}"
+    echo "CONFIG: ${CONFIG}"
+    echo "Crashing between ${MIN_WAIT_TIME} and ${MAX_WAIT_TIME}"
 
-if [[ -n "${PUSH_POST_STATE:-}" ]]; then
-    echo "=== Pushing post-state to S3 ==="
-    "${SCRIPT_DIR}/copy_dir.sh" "${CURRENT_STATE_DIR}/" "${PUSH_POST_STATE}"
+    echo "=== Running Chaos Test ==="
+    go run ./tests/reexecute/chaos \
+        --start-block="${START_BLOCK}" \
+        --end-block="${END_BLOCK}" \
+        --current-state-dir="${CURRENT_STATE_DIR}" \
+        --block-dir="${BLOCK_DIR}" \
+        --min-wait-time="${MIN_WAIT_TIME}" \
+        --max-wait-time="${MAX_WAIT_TIME}" \
+        --config="${CONFIG}"
+else
+    echo "=== C-Chain Re-execution: ${TEST_NAME:-custom} ==="
+    echo "Blocks: ${START_BLOCK} - ${END_BLOCK}"
+    echo "Config: ${CONFIG:-default}"
+
+    echo "=== Running re-execution ==="
+    go run github.com/ava-labs/avalanchego/tests/reexecute/c \
+      --block-dir="${BLOCK_DIR}" \
+      --current-state-dir="${CURRENT_STATE_DIR}" \
+      ${RUNNER_TYPE:+--runner="${RUNNER_TYPE}"} \
+      ${CONFIG:+--config="${CONFIG}"} \
+      --start-block="${START_BLOCK}" \
+      --end-block="${END_BLOCK}" \
+      ${LABELS:+--labels="${LABELS}"} \
+      ${BENCHMARK_OUTPUT_FILE:+--benchmark-output-file="${BENCHMARK_OUTPUT_FILE}"} \
+      ${METRICS_SERVER_ENABLED:+--metrics-server-enabled="${METRICS_SERVER_ENABLED}"} \
+      ${METRICS_SERVER_PORT:+--metrics-server-port="${METRICS_SERVER_PORT}"} \
+      ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled="${METRICS_COLLECTOR_ENABLED}"}
+
+    if [[ -n "${PUSH_POST_STATE:-}" ]]; then
+        echo "=== Pushing post-state to S3 ==="
+        "${SCRIPT_DIR}/copy_dir.sh" "${CURRENT_STATE_DIR}/" "${PUSH_POST_STATE}"
+    fi
 fi
