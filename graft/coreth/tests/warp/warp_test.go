@@ -145,30 +145,15 @@ var _ = ginkgo.Describe("[Warp]", func() {
 				w = newWarpTest(combination.sendingSubnet(), combination.receivingSubnet())
 			})
 
-			ginkgo.It("should send warp message from sending subnet", func() {
-				ginkgo.GinkgoLogr.Info("Sending message from sending subnet")
-				w.sendMessageFromSendingSubnet()
-			})
+			ginkgo.It("should send warp message from sending subnet", w.sendMessageFromSendingSubnet)
 
-			ginkgo.It("should aggregate signatures via API", func() {
-				ginkgo.GinkgoLogr.Info("Aggregating signatures via API")
-				w.aggregateSignaturesViaAPI()
-			})
+			ginkgo.It("should aggregate signatures via API", w.aggregateSignaturesViaAPI)
 
-			ginkgo.It("should deliver addressed call payload to receiving subnet", func() {
-				ginkgo.GinkgoLogr.Info("Delivering addressed call payload to receiving subnet")
-				w.deliverAddressedCallToReceivingSubnet()
-			})
+			ginkgo.It("should deliver addressed call payload to receiving subnet", w.deliverAddressedCallToReceivingSubnet)
 
-			ginkgo.It("should deliver block hash payload", func() {
-				ginkgo.GinkgoLogr.Info("Delivering block hash payload to receiving subnet")
-				w.deliverBlockHashPayload()
-			})
+			ginkgo.It("should deliver block hash payload", w.deliverBlockHashPayload)
 
-			ginkgo.It("should handle warp load testing", func() {
-				ginkgo.GinkgoLogr.Info("Executing warp load test")
-				w.warpLoad()
-			})
+			ginkgo.It("should handle warp load testing", w.warpLoad)
 		})
 	}
 })
