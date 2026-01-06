@@ -1,7 +1,7 @@
 #!/bin/sh
 # Based on https://raw.githubusercontent.com/kubernetes-sigs/kind/7cb9e6be25b48a0e248097eef29d496ab1a044d0/site/static/examples/kind-with-registry.sh
 # Original work Copyright 2019 The Kubernetes Authors
-# Modifications Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+# Modifications Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 # See the file LICENSE for licensing terms.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
