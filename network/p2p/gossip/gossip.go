@@ -131,7 +131,7 @@ func NewMetrics(
 		count: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "gossip_count",
+				Name:      "count",
 				Help:      "amount of gossip (n)",
 			},
 			ioTypeLabels,
@@ -139,7 +139,7 @@ func NewMetrics(
 		bytes: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "gossip_bytes",
+				Name:      "bytes",
 				Help:      "amount of gossip (bytes)",
 			},
 			ioTypeLabels,
@@ -147,14 +147,14 @@ func NewMetrics(
 		tracking: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
-				Name:      "gossip_tracking",
+				Name:      "tracking",
 				Help:      "number of gossipables being tracked",
 			},
 			typeLabels,
 		),
 		trackingLifetimeAverage: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "gossip_tracking_lifetime_average",
+			Name:      "tracking_lifetime_average",
 			Help:      "average duration a gossipable has been tracked (ns)",
 		}),
 		topValidators: prometheus.NewGaugeVec(
