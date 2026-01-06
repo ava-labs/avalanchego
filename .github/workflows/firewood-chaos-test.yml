@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       test:
-        description: 'Test name to run (e.g., chaos-101-250k). Leave empty to use custom inputs below.'
+        description: 'Test name to run (e.g., firewood-101-250k). Leave empty to use custom inputs below.'
         default: ''
       # Custom inputs (used when test is not provided)
       start-block:
@@ -70,7 +70,7 @@ jobs:
           else
             {
               echo "matrix<<EOF"
-              echo '{ "include": [{ "test": "chaos-101-250k" }, { "test": "chaos-archive-101-250k" }] }'
+              echo '{ "include": [{ "test": "firewood-101-250k" }, { "test": "firewood-archive-101-250k" }] }'
               echo EOF
             } >> "$GITHUB_OUTPUT"
           fi
@@ -100,7 +100,7 @@ jobs:
         shell: nix develop --impure --command bash -x {0}
         run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ matrix.test || '' }}"
         env:
-          CHAOS_MODE: 'true'
+          CHAOS_MODE: '1'
           START_BLOCK: ${{ matrix.start-block }}
           END_BLOCK: ${{ matrix.end-block }}
           BLOCK_DIR_SRC: ${{ matrix.block-dir-src }}
