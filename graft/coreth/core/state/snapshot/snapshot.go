@@ -613,17 +613,24 @@ func (dl *diskLayer) abortGeneration() bool {
 	// Note: genStats can be non-nil even when the generator is still running
 	// (waiting for abort signal after completing generation), so we check
 	// genAbort to determine if the goroutine is still active.
-	dl.lock.RLock()
-	shouldAbort := dl.genAbort != nil
-	dl.lock.RUnlock()
-	if shouldAbort {
-		abort := make(chan struct{})
-		dl.genAbort <- abort
-		<-abort
-		return true
+	//
+	// Use write lock to ensure only one abort can proceed at a time and to
+	// safely clear genAbort after the generator exits.
+	dl.lock.Lock()
+	defer dl.lock.Unlock()
+
+	if dl.genAbort == nil {
+		return false
 	}
 
-	return false
+	abort := make(chan struct{})
+	dl.genAbort <- abort
+	<-abort
+
+	// Clear genAbort to prevent subsequent calls from trying to send to a
+	// channel that no longer has a listener, which would block forever.
+	dl.genAbort = nil
+	return true
 }
 
 // diffToDisk merges a bottom-most diff into the persistent disk layer underneath
