@@ -131,7 +131,7 @@ func (*Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash commo
 		"logData", common.Bytes2Hex(logData),
 		"warpMessageID", unsignedMessage.ID(),
 	)
-	if err := acceptCtx.Warp.AddMessage(unsignedMessage); err != nil {
+	if err := acceptCtx.Warp.Add(unsignedMessage); err != nil {
 		return fmt.Errorf("failed to add warp message during accept (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
 	}
 	return nil
