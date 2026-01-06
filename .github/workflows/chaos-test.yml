@@ -64,10 +64,9 @@ jobs:
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
-            json_string=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/chaos-test.json)
             {
               echo "matrix<<EOF"
-              echo "$json_string"
+              echo '{ "include": [{ "test": "101-250k" }, { "test": "archive-101-250k" }] }'
               echo EOF
             } >> "$GITHUB_OUTPUT"
           fi
@@ -77,8 +76,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
-    timeout-minutes: ${{ matrix.timeout-minutes }}
-    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout-minutes || 60 }}
+    runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
     permissions:
       id-token: write
       contents: read
