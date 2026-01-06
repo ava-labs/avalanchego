@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
@@ -115,14 +115,14 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root, _ := statesynctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, nil)
+				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, nil)
 				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 		},
 		"accounts with code": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root, _ := statesynctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
+				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 					if index%3 == 0 {
 						codeBytes := make([]byte, 256)
 						_, err := r.Read(codeBytes)
@@ -147,9 +147,9 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with storage": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root, _ := statesynctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, i int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
+				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, i int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
 					if i%5 == 0 {
-						statesynctest.FillStorageForAccount(t, r, types.EmptyRootHash, 16, addr, storageTr)
+						synctest.FillStorageForAccount(t, r, types.EmptyRootHash, 16, addr, storageTr)
 					}
 					return account
 				})
@@ -159,14 +159,14 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with overlapping storage": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root, _ := statesynctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, numAccounts, 3)
+				root, _ := synctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, numAccounts, 3)
 				return serverDB, serverDB, root
 			},
 		},
 		"failed to fetch leafs": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root, _ := statesynctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccountsSmall, nil)
+				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccountsSmall, nil)
 				return serverDB, serverDB, root
 			},
 			GetLeafsIntercept: func(_ message.LeafsRequest, _ message.LeafsResponse) (message.LeafsResponse, error) {
@@ -197,15 +197,15 @@ func TestSimpleSyncCases(t *testing.T) {
 func TestCancelSync(t *testing.T) {
 	t.Parallel()
 	r := rand.New(rand.NewSource(1))
-	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-	// Create trie with 2000 accounts (more than one leaf request)
-	root := fillAccountsWithStorage(t, r, serverDB, common.Hash{}, 2000)
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
 	testSync(t, syncTest{
 		ctx: ctx,
 		prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
+			// Create trie with 2000 accounts (more than one leaf request)
+			serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+			root := fillAccountsWithStorage(t, r, serverDB, common.Hash{}, 2000)
 			return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 		},
 		expectedError: context.Canceled,
@@ -241,7 +241,7 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-	root, _ := statesynctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, 2000, 3)
+	root, _ := synctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, 2000, 3)
 	clientDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 	intercept := &interruptLeafsIntercept{
 		root:           root,
@@ -269,8 +269,8 @@ func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
-	largeStorageRoot, _, _ := statesynctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
-	root, _ := statesynctest.FillAccounts(t, r, serverDB, common.Hash{}, 2000, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
+	largeStorageRoot, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
+	root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, 2000, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 		// Set the root for a single account
 		if index == 10 {
 			account.Root = largeStorageRoot
@@ -302,16 +302,16 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
-	largeStorageRoot1, _, _ := statesynctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
-	largeStorageRoot2, _, _ := statesynctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
-	root1, _ := statesynctest.FillAccounts(t, r, serverDB, common.Hash{}, 2000, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
+	largeStorageRoot1, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
+	largeStorageRoot2, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
+	root1, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, 2000, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 		// Set the root for a single account
 		if index == 10 {
 			account.Root = largeStorageRoot1
 		}
 		return account
 	})
-	root2, _ := statesynctest.FillAccounts(t, r, serverDB, root1, 100, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
+	root2, _ := synctest.FillAccounts(t, r, serverDB, root1, 100, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 		if index == 20 {
 			account.Root = largeStorageRoot2
 		}
@@ -344,8 +344,8 @@ func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testi
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
-	largeStorageRoot, _, _ := statesynctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
-	root, _ := statesynctest.FillAccounts(t, r, serverDB, common.Hash{}, 100, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
+	largeStorageRoot, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
+	root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, 100, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 		// Set the root for 2 successive accounts
 		if index == 10 || index == 11 {
 			account.Root = largeStorageRoot
@@ -377,8 +377,8 @@ func TestResumeSyncLargeStorageTrieWithSpreadOutDuplicatesInterrupted(t *testing
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
-	largeStorageRoot, _, _ := statesynctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
-	root, _ := statesynctest.FillAccounts(t, r, serverDB, common.Hash{}, 100, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
+	largeStorageRoot, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
+	root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, 100, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 		if index == 10 || index == 90 {
 			account.Root = largeStorageRoot
 		}
@@ -453,7 +453,7 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 					corruptedStorageRoots[acc.Root] = struct{}{}
 					tr, err := trie.New(trie.TrieID(acc.Root), clientTrieDB)
 					require.NoError(t, err, "failed to create trie for root %s", acc.Root)
-					statesynctest.CorruptTrie(t, clientDB.DiskDB(), tr, 2)
+					synctest.CorruptTrie(t, clientDB.DiskDB(), tr, 2)
 				}
 				require.NoError(t, it.Err, "error iterating over trie nodes")
 			},
@@ -463,7 +463,7 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 				clientTrieDB := clientDB.TrieDB()
 				tr, err := trie.New(trie.TrieID(root), clientTrieDB)
 				require.NoError(t, err, "failed to create trie for root %s", root)
-				statesynctest.CorruptTrie(t, clientDB.DiskDB(), tr, 5)
+				synctest.CorruptTrie(t, clientDB.DiskDB(), tr, 5)
 			},
 		},
 	} {
@@ -479,8 +479,8 @@ func testSyncerSyncsToNewRoot(t *testing.T, deleteBetweenSyncs func(*testing.T, 
 	clientDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
-	root1, _ := statesynctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, 1000, 3)
-	root2, _ := statesynctest.FillAccountsWithOverlappingStorage(t, r, serverDB, root1, 1000, 3)
+	root1, _ := synctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, 1000, 3)
+	root2, _ := synctest.FillAccountsWithOverlappingStorage(t, r, serverDB, root1, 1000, 3)
 
 	called := false
 
@@ -524,7 +524,7 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB, serverDB stat
 	require.NoError(t, accountIt.Error(), "error iterating over account snapshots")
 	trieAccountLeaves := 0
 
-	statesynctest.AssertTrieConsistency(t, root, serverDB.TrieDB(), clientDB.TrieDB(), func(key, val []byte) error {
+	synctest.AssertTrieConsistency(t, root, serverDB.TrieDB(), clientDB.TrieDB(), func(key, val []byte) error {
 		trieAccountLeaves++
 		accHash := common.BytesToHash(key)
 		var acc types.StateAccount
@@ -559,7 +559,7 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB, serverDB stat
 		storageTrieLeavesCount := 0
 
 		// check storage trie and storage snapshot consistency
-		statesynctest.AssertTrieConsistency(t, acc.Root, serverDB.TrieDB(), clientDB.TrieDB(), func(key, val []byte) error {
+		synctest.AssertTrieConsistency(t, acc.Root, serverDB.TrieDB(), clientDB.TrieDB(), func(key, val []byte) error {
 			storageTrieLeavesCount++
 			snapshotVal := rawdb.ReadStorageSnapshot(clientDB.DiskDB(), accHash, common.BytesToHash(key))
 			require.Equal(t, val, snapshotVal)
@@ -575,7 +575,7 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB, serverDB stat
 }
 
 func fillAccountsWithStorage(t *testing.T, r *rand.Rand, serverDB state.Database, root common.Hash, numAccounts int) common.Hash {
-	newRoot, _ := statesynctest.FillAccounts(t, r, serverDB, root, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
+	newRoot, _ := synctest.FillAccounts(t, r, serverDB, root, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
 		codeBytes := make([]byte, 256)
 		_, err := r.Read(codeBytes)
 		require.NoError(t, err, "error reading random code bytes")
@@ -585,7 +585,7 @@ func fillAccountsWithStorage(t *testing.T, r *rand.Rand, serverDB state.Database
 		account.CodeHash = codeHash[:]
 
 		// now create state trie
-		statesynctest.FillStorageForAccount(t, r, types.EmptyRootHash, 16, addr, storageTr)
+		synctest.FillStorageForAccount(t, r, types.EmptyRootHash, 16, addr, storageTr)
 		return account
 	})
 	return newRoot

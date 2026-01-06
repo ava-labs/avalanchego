@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats/statstest"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -32,15 +32,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	db := state.NewDatabase(memdb)
 	trieDB := db.TrieDB()
 
-	corruptedTrieRoot, _, _ := statesynctest.GenerateIndependentTrie(t, r, trieDB, 100, common.HashLength)
+	corruptedTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100, common.HashLength)
 	tr, err := trie.New(trie.TrieID(corruptedTrieRoot), trieDB)
 	require.NoError(t, err)
 	// Corrupt [corruptedTrieRoot]
-	statesynctest.CorruptTrie(t, memdb, tr, 5)
+	synctest.CorruptTrie(t, memdb, tr, 5)
 
-	largeTrieRoot, largeTrieKeys, _ := statesynctest.GenerateIndependentTrie(t, r, trieDB, 10_000, common.HashLength)
-	smallTrieRoot, _, _ := statesynctest.GenerateIndependentTrie(t, r, trieDB, 500, common.HashLength)
-	accountTrieRoot, accounts := statesynctest.FillAccounts(
+	largeTrieRoot, largeTrieKeys, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 10_000, common.HashLength)
+	smallTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 500, common.HashLength)
+	accountTrieRoot, accounts := synctest.FillAccounts(
 		t,
 		r,
 		db,

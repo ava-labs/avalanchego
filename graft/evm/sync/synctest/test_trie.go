@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesynctest
+package synctest
 
 import (
 	"encoding/binary"
@@ -21,6 +21,36 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+// FillAccountsWithOverlappingStorage adds [numAccounts] randomly generated accounts to the secure trie at [root]
+// and commits it to [trieDB]. For each 3 accounts created:
+// - One does not have a storage trie,
+// - One has a storage trie shared with other accounts (total number of shared storage tries [numOverlappingStorageRoots]),
+// - One has a uniquely generated storage trie,
+// returns the new trie root and a map of funded keys to StateAccount structs.
+// This is only safe for HashDB, as path-based DBs do not share storage tries.
+func FillAccountsWithOverlappingStorage(
+	t *testing.T, r *rand.Rand, s state.Database, root common.Hash, numAccounts int, numOverlappingStorageRoots int,
+) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
+	storageRoots := make([]common.Hash, 0, numOverlappingStorageRoots)
+	for i := 0; i < numOverlappingStorageRoots; i++ {
+		storageRoot, _, _ := GenerateIndependentTrie(t, r, s.TrieDB(), 16, common.HashLength)
+		storageRoots = append(storageRoots, storageRoot)
+	}
+	storageRootIndex := 0
+	return FillAccounts(t, r, s, root, numAccounts, func(t *testing.T, i int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
+		switch i % 3 {
+		case 0: // unmodified account
+		case 1: // account with overlapping storage root
+			account.Root = storageRoots[storageRootIndex%numOverlappingStorageRoots]
+			storageRootIndex++
+		case 2: // account with unique storage root
+			FillStorageForAccount(t, r, root, 26, addr, storageTr)
+		}
+
+		return account
+	})
+}
 
 // GenerateIndependentTrie creates a trie with [numKeys] random key-value pairs inside of [trieDB].
 // Returns the root of the generated trie, the slice of keys inserted into the trie in lexicographical
@@ -130,8 +160,9 @@ func CorruptTrie(t *testing.T, diskdb ethdb.Batcher, tr *trie.Trie, n int) {
 }
 
 // FillAccounts adds [numAccounts] randomly generated accounts to the secure trie at [root] and commits it to [trieDB].
-// [onAccount] is called if non-nil (so the caller can modify the account before it is stored in the secure trie).
-// returns the new trie root and a map of funded keys to StateAccount structs.
+// [onAccount] is called if non-nil so the caller can modify the account before it is stored in the trie.
+// If the trie in the callback is used (i.e. tr.Hash() doesn't return the empty root), the account's storage root will be updated to match.
+// Returns the new trie root and a map of funded keys to StateAccount structs.
 func FillAccounts(
 	t *testing.T, r *rand.Rand, s state.Database, root common.Hash, numAccounts int,
 	onAccount func(*testing.T, int, common.Address, types.StateAccount, state.Trie) types.StateAccount,
