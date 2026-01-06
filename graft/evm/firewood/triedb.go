@@ -77,7 +77,7 @@ type Config struct {
 // The default config is:
 //   - CacheSizeBytes: 1MB
 //   - FreeListCacheEntries: 40,000
-//   - MaxRevisions: 100
+//   - RevisionsInMemory: 100
 //   - CacheStrategy: [ffi.CacheAllReads]
 func DefaultConfig(dir string) Config {
 	return Config{
