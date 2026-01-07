@@ -2252,11 +2252,10 @@ func TestFirewoodArchivalNode(t *testing.T) {
 			vmtest.InitialBaseFee,
 			nil,
 		)
-		blk, err := vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm)
+		blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
 		require.NoError(err)
 
 		require.NoError(blk.Accept(ctx))
-		require.NoError(vm.SetPreference(ctx, blk.ID()))
 	}
 
 	handlers, err := vm.CreateHandlers(ctx)
