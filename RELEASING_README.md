@@ -1,3 +1,5 @@
+# THIS README IS WHOLLY OUT OF DATE AND WILL BE UPDATED! 
+
 # Releasing
 
 ## When to release

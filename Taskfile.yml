@@ -28,6 +28,11 @@ tasks:
       TEST_SETUP: xsvm
     cmd: bash -x ./scripts/build_antithesis_images.sh
 
+  build-antithesis-images-subnet-evm:
+    desc: Builds docker images for antithesis for the subnet-evm test setup
+    dir: graft/subnet-evm
+    cmd: bash -x ./scripts/build_antithesis_images.sh
+
   build-bootstrap-monitor:
     desc: Builds bootstrap-monitor
     cmd: ./scripts/build_bootstrap_monitor.sh
@@ -39,6 +44,11 @@ tasks:
   build-image:
     desc: Builds docker image for avalanchego
     cmd: ./scripts/build_image.sh
+
+  build-subnet-evm-image:
+    desc: Builds docker image for subnet-evm
+    dir: graft/subnet-evm
+    cmd: ./scripts/build_docker_image.sh
 
   build-race:
     desc: Builds avalanchego with race detection enabled
