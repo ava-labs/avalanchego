@@ -2221,6 +2221,10 @@ func TestFirewoodArchivalNode(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
 
+	// Setting the state history to 5 means that we keep around only the 5 latest
+	// tries in memory. By creating 10 blocks, we'll have:
+	//	- Tries 0-5: on-disk
+	// 	- Tries 6-10: in-memory
 	firewoodArchiveConfig := `{
 		"state-scheme": "firewood",
 		"snapshot-cache": 0,
