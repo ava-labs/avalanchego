@@ -118,11 +118,10 @@ const (
 
 // Define the API endpoints for the VM
 const (
-	adminEndpoint        = "/admin"
-	ethRPCEndpoint       = "/rpc"
-	ethWSEndpoint        = "/ws"
-	validatorsEndpoint   = "/validators"
-	ethTxGossipNamespace = "eth_tx_gossip"
+	adminEndpoint      = "/admin"
+	ethRPCEndpoint     = "/rpc"
+	ethWSEndpoint      = "/ws"
+	validatorsEndpoint = "/validators"
 )
 
 var (
@@ -855,7 +854,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		avalanchegossip.SystemConfig{
 			Log:           vm.ctx.Log,
 			Registry:      vm.sdkMetrics,
-			Namespace:     ethTxGossipNamespace,
+			Namespace:     "eth_tx_gossip",
 			RequestPeriod: vm.config.PullGossipFrequency.Duration,
 			PushGossipParams: avalanchegossip.BranchingFactor{
 				StakePercentage: vm.config.PushGossipPercentStake,

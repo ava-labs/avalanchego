@@ -71,7 +71,6 @@ const (
 	// blocks with larger atomic transactions, but they will not be accepted
 	// into the mempool.
 	maxAtomicTxMempoolGas = ap5.AtomicGasLimit
-	gossipNamespace       = "atomic_tx_gossip"
 	avaxEndpoint          = "/avax"
 )
 
@@ -192,7 +191,7 @@ func (vm *VM) Initialize(
 		avalanchegossip.SystemConfig{
 			Log:           chainCtx.Log,
 			Registry:      vm.InnerVM.MetricRegistry(),
-			Namespace:     gossipNamespace,
+			Namespace:     "atomic_tx_gossip",
 			HandlerID:     p2p.AtomicTxGossipHandlerID,
 			RequestPeriod: vm.InnerVM.Config().PullGossipFrequency.Duration,
 			PushGossipParams: avalanchegossip.BranchingFactor{
