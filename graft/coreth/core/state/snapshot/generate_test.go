@@ -986,7 +986,7 @@ func testGenerateBrokenSnapshotWithDanglingStorage(t *testing.T, scheme string) 
 // shutdown where the generator could access the database after it's closed.
 //
 // The generator goroutine waits for an abort signal even after completing
-// generation successfully. Without calling abortGeneration(), Release() would
+// generation successfully. Without calling stopGeneration(), Release() would
 // leave the generator hanging forever, which could prevent clean shutdown.
 func TestReleaseStopsGeneration(t *testing.T) {
 	testReleaseStopsGeneration(t, rawdb.HashScheme)
@@ -1022,6 +1022,6 @@ func testReleaseStopsGeneration(t *testing.T, scheme string) {
 	select {
 	case <-done:
 	case <-time.After(3 * time.Second):
-		t.Fatal("Release() hung - abortGeneration() was likely not called")
+		t.Fatal("Release() hung - stopGeneration() was likely not called")
 	}
 }

@@ -30,6 +30,7 @@ package snapshot
 import (
 	"bytes"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
@@ -37,6 +38,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 )
@@ -54,6 +56,7 @@ type diskLayer struct {
 	genMarker  []byte             // Marker for the state that's indexed during initial layer generation
 	genPending chan struct{}      // Notification channel when generation is done (test synchronicity)
 	genAbort   chan chan struct{} // Notification channel to abort generating the snapshot in this layer
+	genRunning atomic.Bool        // Tracks whether the generator goroutine is actually running
 
 	genStats *generatorStats // Stats for snapshot generation (generation aborted/finished if non-nil)
 
@@ -68,6 +71,10 @@ type diskLayer struct {
 // Reset() in order to not leak memory.
 // OBS: It does not invoke Close on the diskdb
 func (dl *diskLayer) Release() error {
+	// Stop any ongoing snapshot generation to prevent it from accessing
+	// the database after it's closed during shutdown
+	dl.stopGeneration()
+
 	if dl.cache != nil {
 		dl.cache.Reset()
 	}
@@ -198,4 +205,46 @@ func (dl *diskLayer) Storage(accountHash, storageHash common.Hash) ([]byte, erro
 // copying everything.
 func (dl *diskLayer) Update(blockHash, blockRoot common.Hash, destructs map[common.Hash]struct{}, accounts map[common.Hash][]byte, storage map[common.Hash]map[common.Hash][]byte) *diffLayer {
 	return newDiffLayer(dl, blockHash, blockRoot, destructs, accounts, storage)
+}
+
+// stopGeneration aborts the state snapshot generation if it is currently running.
+func (dl *diskLayer) stopGeneration() {
+	// Check if generation goroutine is actually running.
+	//
+	// Note: genMarker can be nil even when the generator is still running (waiting
+	// for abort signal after completing generation), so we can't rely on genMarker.
+	if !dl.genRunning.Load() {
+		return
+	}
+
+	// Store ideal time for abort to get better estimate of load
+	//
+	// Note that we set this time regardless if abortion was skipped otherwise we
+	// will never restart generation (age will always be negative).
+	if dl.abortStarted.IsZero() {
+		dl.abortStarted = time.Now()
+	}
+
+	// Use write lock to ensure only one goroutine can stop generation at a time,
+	// preventing a race where multiple callers might try to send abort signals.
+	dl.lock.Lock()
+	genAbort := dl.genAbort
+	if genAbort == nil {
+		dl.lock.Unlock()
+		return
+	}
+	// Clear genAbort immediately while holding the lock to prevent other callers
+	// from attempting to use the same channel
+	dl.genAbort = nil
+	dl.lock.Unlock()
+
+	// Perform the channel handshake without holding the lock to avoid deadlocks.
+	abort := make(chan struct{})
+	select {
+	case genAbort <- abort:
+		// Generator received the abort signal, wait for it to respond
+		<-abort
+	case <-time.After(5 * time.Second):
+		log.Error("Snapshot generator did not respond despite being marked as running")
+	}
 }

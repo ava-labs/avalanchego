@@ -594,43 +594,7 @@ func (t *Tree) AbortGeneration() {
 	defer t.lock.Unlock()
 
 	dl := t.disklayer()
-	dl.abortGeneration()
-}
-
-// abortGeneration sends an abort message to the generate goroutine and waits
-// for it to shutdown before returning (if it is running). This call should not
-// be made concurrently.
-func (dl *diskLayer) abortGeneration() bool {
-	// Store ideal time for abort to get better estimate of load
-	//
-	// Note that we set this time regardless if abortion was skipped otherwise we
-	// will never restart generation (age will always be negative).
-	if dl.abortStarted.IsZero() {
-		dl.abortStarted = time.Now()
-	}
-
-	// If the disk layer is running a snapshot generator, abort it
-	// Note: genStats can be non-nil even when the generator is still running
-	// (waiting for abort signal after completing generation), so we check
-	// genAbort to determine if the goroutine is still active.
-	//
-	// Use write lock to ensure only one abort can proceed at a time and to
-	// safely clear genAbort after the generator exits.
-	dl.lock.Lock()
-	defer dl.lock.Unlock()
-
-	if dl.genAbort == nil {
-		return false
-	}
-
-	abort := make(chan struct{})
-	dl.genAbort <- abort
-	<-abort
-
-	// Clear genAbort to prevent subsequent calls from trying to send to a
-	// channel that no longer has a listener, which would block forever.
-	dl.genAbort = nil
-	return true
+	dl.stopGeneration()
 }
 
 // diffToDisk merges a bottom-most diff into the persistent disk layer underneath
@@ -645,7 +609,7 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 	)
 
 	// Attempt to abort generation (if not already aborted)
-	base.abortGeneration()
+	base.stopGeneration()
 
 	// Put the deletion in the batch writer, flush all updates in the final step.
 	customrawdb.DeleteSnapshotBlockHash(batch)
