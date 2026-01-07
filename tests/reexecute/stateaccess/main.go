@@ -84,7 +84,7 @@ func main() {
 	client, err := ethclient.Dial(server.URL)
 	r.NoError(err)
 
-	for i := startBlockArg; i <= endBlockArg; i += 1 {
+	for i := startBlockArg; i <= endBlockArg; i++ {
 		nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
 		r.NoErrorf(err, "failed to get nonce at block %d", i)
 		r.Zero(nonce)

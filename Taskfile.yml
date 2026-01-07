@@ -241,7 +241,7 @@ tasks:
 
   test-firewood-state-access:
     desc: Runs Firewood state access test
-    cmd: ./scripts/tests.firewood_state_access.sh {{.CLI_ARGS}}    
+    cmd: ./scripts/tests.firewood_state_access.sh {{.CLI_ARGS}}
 
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
