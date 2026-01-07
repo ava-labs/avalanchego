@@ -317,9 +317,6 @@ func (c *client) signalDone(err error) {
 	})
 }
 
-// Error returns a non-nil error if one occurred during the sync.
-func (c *client) Error() error { return c.err }
-
 // AcceptSync implements Acceptor. It resets the blockchain to the synced block,
 // preparing it for execution, and updates disk and memory pointers so the VM
 // is ready for bootstrapping. Also executes any shared memory operations from
@@ -422,7 +419,7 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		return nil, fmt.Errorf("failed to create code queue: %w", err)
 	}
 
-	codeSyncer, err := statesync.NewCodeSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
+	codeSyncer, err := statesync.NewCodeSyncerFromQueue(c.config.Client, c.config.ChainDB, codeQueue)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create code syncer: %w", err)
 	}

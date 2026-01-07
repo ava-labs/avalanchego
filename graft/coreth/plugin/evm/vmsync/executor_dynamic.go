@@ -20,11 +20,11 @@ type dynamicExecutor struct {
 	coordinator *Coordinator
 }
 
-func newDynamicExecutor(registry *SyncerRegistry, committer Committer, pivotInterval uint64) *dynamicExecutor {
+func newDynamicExecutor(registry *SyncerRegistry, acceptor Acceptor, pivotInterval uint64) *dynamicExecutor {
 	coordinator := NewCoordinator(
 		registry,
 		Callbacks{
-			FinalizeVM: committer.Commit,
+			FinalizeVM: acceptor.AcceptSync,
 			OnDone:     nil, // Set in Execute to capture completion.
 		},
 		WithPivotInterval(pivotInterval),
