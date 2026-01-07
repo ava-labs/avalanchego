@@ -43,7 +43,7 @@ func init() {
 // at each block height. This confirms the node can serve state queries for
 // arbitrary historical blocks.
 func main() {
-	tc := tests.NewTestContext(tests.NewDefaultLogger(""))
+	tc := tests.NewTestContext(tests.NewDefaultLogger("state-access"))
 	defer tc.RecoverAndExit()
 
 	r := require.New(tc)
