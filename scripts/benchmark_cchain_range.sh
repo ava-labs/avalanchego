@@ -15,9 +15,7 @@ set -euo pipefail
 # and min/max wait times.
 # All defaults can be overridden via environment variables.
 #
-# Notes: 
-#   - Chaos tests can only be run with firewood VM configs.
-#   - State access tests can only be run with firewood archival states.
+# Note: chaos tests can only be run with firewood VM configs.
 #
 # Environment variables:
 #   Data sources (provide S3 sources OR local paths):
@@ -44,9 +42,6 @@ set -euo pipefail
 #     CONFIG: VM config preset (firewood or firewood-archive only).
 #     MIN_WAIT_TIME: Minimum wait before crash (e.g., 120s).
 #     MAX_WAIT_TIME: Maximum wait before crash (e.g., 150s).
-#
-#   Required (state access test):
-#     STATE_ACCESS_MODE: Set to enable state access test mode (e.g. STATE_ACCESS_MODE=1).
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -153,42 +148,20 @@ if [[ -n "${CHAOS_MODE:-}" && -n "${TEST_NAME:-}" ]]; then
 fi
 
 # Determine data source: S3 import or local paths
-if [[ -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
+if [[ -n "${BLOCK_DIR_SRC:-}" && -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
     # S3 mode - import data
     TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
     EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR:-/tmp/reexec-${TEST_NAME:-custom}-${TIMESTAMP}}"
 
-    # For non-state access modes, require BLOCK_DIR_SRC
-    if [[ -z "${STATE_ACCESS_MODE:-}" && -z "${BLOCK_DIR_SRC:-}" ]]; then
-        error "BLOCK_DIR_SRC is required (unless running in STATE_ACCESS_MODE)"
-    fi
-
-    BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-}" \
+    BLOCK_DIR_SRC="${BLOCK_DIR_SRC}" \
     CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC}" \
     EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR}" \
     "${SCRIPT_DIR}/import_cchain_data.sh"
 
-    if [[ -n "${BLOCK_DIR_SRC:-}" ]]; then
-        BLOCK_DIR="${EXECUTION_DATA_DIR}/blocks"
-    fi
+    BLOCK_DIR="${EXECUTION_DATA_DIR}/blocks"
     CURRENT_STATE_DIR="${EXECUTION_DATA_DIR}/current-state"
-elif [[ -n "${BLOCK_DIR_SRC:-}" ]]; then
-    error "CURRENT_STATE_DIR_SRC is required when using S3 import"
-elif [[ -n "${STATE_ACCESS_MODE:-}" ]]; then
-    # State access mode only requires CURRENT_STATE_DIR
-    if [[ -z "${CURRENT_STATE_DIR:-}" ]]; then
-        show_usage
-        echo ""
-        echo "Env vars status (state access mode):"
-        echo "  S3 sources:"
-        [[ -n "${CURRENT_STATE_DIR_SRC:-}" ]] && echo "    CURRENT_STATE_DIR_SRC: ${CURRENT_STATE_DIR_SRC}" || echo "    CURRENT_STATE_DIR_SRC: (not set)"
-        echo "  Local paths:"
-        [[ -n "${CURRENT_STATE_DIR:-}" ]] && echo "    CURRENT_STATE_DIR: ${CURRENT_STATE_DIR}" || echo "    CURRENT_STATE_DIR: (not set)"
-        echo "  Block range:"
-        [[ -n "${START_BLOCK:-}" ]] && echo "    START_BLOCK: ${START_BLOCK}" || echo "    START_BLOCK: (not set)"
-        [[ -n "${END_BLOCK:-}" ]] && echo "    END_BLOCK: ${END_BLOCK}" || echo "    END_BLOCK: (not set)"
-        exit 1
-    fi
+elif [[ -n "${BLOCK_DIR_SRC:-}" || -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
+    error "Both BLOCK_DIR_SRC and CURRENT_STATE_DIR_SRC must be provided together"
 elif [[ -z "${BLOCK_DIR:-}" || -z "${CURRENT_STATE_DIR:-}" ]]; then
     show_usage
     echo ""
@@ -215,9 +188,7 @@ if [[ -z "${START_BLOCK:-}" || -z "${END_BLOCK:-}" ]]; then
     error "START_BLOCK and END_BLOCK are required"
 fi
 
-if [[ -n "${STATE_ACCESS_MODE:-}" ]]; then
-    echo "=== State Access Test: ${TEST_NAME:-custom} ==="
-elif [[ -n "${CHAOS_MODE:-}" ]]; then
+if [[ -n "${CHAOS_MODE:-}" ]]; then
     # Chaos tests require additional validation
     if [[ -z "${MIN_WAIT_TIME:-}" || -z "${MAX_WAIT_TIME:-}" || -z "${CONFIG:-}" ]]; then
         error "MIN_WAIT_TIME and MAX_WAIT_TIME and CONFIG are required for chaos tests"
@@ -230,17 +201,10 @@ else
 fi
 
 echo "Blocks: ${START_BLOCK} - ${END_BLOCK}"
-if [[ -z "${STATE_ACCESS_MODE:-}" ]]; then
-    echo "CONFIG: ${CONFIG:-default}"
-fi
+echo "CONFIG: ${CONFIG:-default}"
 
 echo "=== Running Test ==="
-if [[ -n "${STATE_ACCESS_MODE:-}" ]]; then
-    go run ./tests/reexecute/stateaccess \
-        --current-state-dir="${CURRENT_STATE_DIR}" \
-        --start-block="${START_BLOCK}" \
-        --end-block="${END_BLOCK}"
-elif [[ -n "${CHAOS_MODE:-}" ]]; then
+if [[ -n "${CHAOS_MODE:-}" ]]; then
     go run ./tests/reexecute/chaos \
         --start-block="${START_BLOCK}" \
         --end-block="${END_BLOCK}" \
