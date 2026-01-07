@@ -54,7 +54,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/gossip"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
@@ -763,12 +762,6 @@ func (vm *VM) initBlockBuilding() error {
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel
 
-	ethTxGossipMarshaller := GossipEthTxMarshaller{}
-	ethTxGossipClient := vm.P2PNetwork().NewClient(p2p.TxGossipHandlerID, vm.P2PValidators())
-	ethTxGossipMetrics, err := avalanchegossip.NewMetrics(vm.sdkMetrics, ethTxGossipNamespace)
-	if err != nil {
-		return fmt.Errorf("failed to initialize eth tx gossip metrics: %w", err)
-	}
 	ethTxPool, err := NewGossipEthTxPool(vm.txPool, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to initialize gossip eth tx pool: %w", err)
@@ -778,32 +771,34 @@ func (vm *VM) initBlockBuilding() error {
 		ethTxPool.Subscribe(ctx)
 		vm.shutdownWg.Done()
 	}()
-	pushGossipParams := avalanchegossip.BranchingFactor{
-		StakePercentage: vm.config.PushGossipPercentStake,
-		Validators:      vm.config.PushGossipNumValidators,
-		Peers:           vm.config.PushGossipNumPeers,
-	}
-	pushRegossipParams := avalanchegossip.BranchingFactor{
-		Validators: vm.config.PushRegossipNumValidators,
-		Peers:      vm.config.PushRegossipNumPeers,
-	}
 
-	ethTxPushGossiper, err := avalanchegossip.NewPushGossiper[*GossipEthTx](
-		ethTxGossipMarshaller,
-		ethTxPool,
+	handler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
+		vm.ctx.NodeID,
+		vm.P2PNetwork(),
 		vm.P2PValidators(),
-		ethTxGossipClient,
-		ethTxGossipMetrics,
-		pushGossipParams,
-		pushRegossipParams,
-		config.PushGossipDiscardedElements,
-		config.TxGossipTargetMessageSize,
-		vm.config.RegossipFrequency.Duration,
+		ethTxPool,
+		GossipEthTxMarshaller{},
+		avalanchegossip.SystemConfig{
+			Log:           vm.ctx.Log,
+			Registry:      vm.sdkMetrics,
+			Namespace:     ethTxGossipNamespace,
+			RequestPeriod: vm.config.PullGossipFrequency.Duration,
+			PushGossipParams: avalanchegossip.BranchingFactor{
+				StakePercentage: vm.config.PushGossipPercentStake,
+				Validators:      vm.config.PushGossipNumValidators,
+				Peers:           vm.config.PushGossipNumPeers,
+			},
+			PushRegossipParams: avalanchegossip.BranchingFactor{
+				Validators: vm.config.PushRegossipNumValidators,
+				Peers:      vm.config.PushRegossipNumPeers,
+			},
+			RegossipPeriod: vm.config.RegossipFrequency.Duration,
+		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to initialize eth tx push gossiper: %w", err)
+		return fmt.Errorf("failed to initialize eth tx gossip system: %w", err)
 	}
-	vm.ethTxPushGossiper.Set(ethTxPushGossiper)
+	vm.ethTxPushGossiper.Set(pushGossiper)
 
 	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will not work.
 	vm.builderLock.Lock()
@@ -813,49 +808,18 @@ func (vm *VM) initBlockBuilding() error {
 	vm.builder.awaitSubmittedTxs()
 	vm.builderLock.Unlock()
 
-	ethTxGossipHandler, err := gossip.NewTxGossipHandler[*GossipEthTx](
-		vm.ctx.Log,
-		ethTxGossipMarshaller,
-		ethTxPool,
-		ethTxGossipMetrics,
-		config.TxGossipTargetMessageSize,
-		config.TxGossipThrottlingPeriod,
-		config.TxGossipRequestsPerPeer,
-		vm.P2PValidators(),
-		vm.sdkMetrics,
-		"eth_tx_gossip",
-	)
-	if err != nil {
-		return fmt.Errorf("failed to initialize eth tx gossip handler: %w", err)
-	}
-
-	if err := vm.P2PNetwork().AddHandler(p2p.TxGossipHandlerID, ethTxGossipHandler); err != nil {
+	if err := vm.P2PNetwork().AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
 		return fmt.Errorf("failed to add eth tx gossip handler: %w", err)
-	}
-
-	ethTxPullGossiper := avalanchegossip.NewPullGossiper[*GossipEthTx](
-		vm.ctx.Log,
-		ethTxGossipMarshaller,
-		ethTxPool,
-		ethTxGossipClient,
-		ethTxGossipMetrics,
-		config.TxGossipPollSize,
-	)
-
-	ethTxPullGossiperWhenValidator := avalanchegossip.ValidatorGossiper{
-		Gossiper:   ethTxPullGossiper,
-		NodeID:     vm.ctx.NodeID,
-		Validators: vm.P2PValidators(),
 	}
 
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.ctx.Log, ethTxPushGossiper, vm.config.PushGossipFrequency.Duration)
+		avalanchegossip.Every(ctx, vm.ctx.Log, pushGossiper, vm.config.PushGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.ctx.Log, ethTxPullGossiperWhenValidator, vm.config.PullGossipFrequency.Duration)
+		avalanchegossip.Every(ctx, vm.ctx.Log, pullGossiper, vm.config.PullGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 

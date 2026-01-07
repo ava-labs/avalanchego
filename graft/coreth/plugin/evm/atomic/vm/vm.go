@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/txpool"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
@@ -191,13 +190,11 @@ func (vm *VM) Initialize(
 		atomicMempool,
 		&atomic.TxMarshaller{},
 		avalanchegossip.SystemConfig{
-			Log:               chainCtx.Log,
-			Registry:          vm.InnerVM.MetricRegistry(),
-			Namespace:         gossipNamespace,
-			HandlerID:         p2p.AtomicTxGossipHandlerID,
-			TargetMessageSize: config.TxGossipTargetMessageSize,
-			ThrottlingPeriod:  config.TxGossipThrottlingPeriod,
-			RequestPeriod:     vm.InnerVM.Config().PullGossipFrequency.Duration,
+			Log:           chainCtx.Log,
+			Registry:      vm.InnerVM.MetricRegistry(),
+			Namespace:     gossipNamespace,
+			HandlerID:     p2p.AtomicTxGossipHandlerID,
+			RequestPeriod: vm.InnerVM.Config().PullGossipFrequency.Duration,
 			PushGossipParams: avalanchegossip.BranchingFactor{
 				StakePercentage: vm.InnerVM.Config().PushGossipPercentStake,
 				Validators:      vm.InnerVM.Config().PushGossipNumValidators,
@@ -207,8 +204,7 @@ func (vm *VM) Initialize(
 				Validators: vm.InnerVM.Config().PushRegossipNumValidators,
 				Peers:      vm.InnerVM.Config().PushRegossipNumPeers,
 			},
-			DiscardedPushCacheSize: config.PushGossipDiscardedElements,
-			RegossipPeriod:         vm.InnerVM.Config().RegossipFrequency.Duration,
+			RegossipPeriod: vm.InnerVM.Config().RegossipFrequency.Duration,
 		},
 	)
 	if err != nil {
