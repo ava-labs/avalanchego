@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1767799955243,
+  "lastUpdate": 1767805816406,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1785,6 +1785,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
             "value": 61.66708496878796,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Draco",
+            "username": "DracoLi",
+            "email": "draco@dracoli.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "311ca97d021e8f2d835b817e27c928fbece1356b",
+          "message": "feat(reexecution): collect leveldb and meterdb metrics (#4804)",
+          "timestamp": "2026-01-07T16:18:46Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/311ca97d021e8f2d835b817e27c928fbece1356b"
+        },
+        "date": 1767805815940,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - mgas/s",
+            "value": 102.49054492738614,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - ms/ggas",
+            "value": 9756.99759142166,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_parse_ms/ggas",
+            "value": 398.0649061573237,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_verify_ms/ggas",
+            "value": 8566.77173151125,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_accept_ms/ggas",
+            "value": 769.6193057008071,
             "unit": "block_accept_ms/ggas"
           }
         ]
