@@ -82,7 +82,7 @@ func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache
 		created:    time.Now(),
 	}
 	go base.generate(stats)
-	log.Debug("Start snapshot generation", "root", root)
+	log.Info("[LEAK-DEBUG] Starting snapshot generation", "root", root, "blockHash", blockHash)
 	return base
 }
 
@@ -339,6 +339,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	dl.genStats = stats
 	close(dl.genPending)
 	genAbort := dl.genAbort
+	log.Info("[LEAK-DEBUG] Snapshot generation complete, waiting for abort signal", "root", dl.root, "blockHash", dl.blockHash, "genAbortIsNil", genAbort == nil)
 	dl.lock.Unlock()
 
 	// Someone will be looking for us (via stopGeneration or test cleanup), wait it out.
@@ -346,6 +347,9 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	if genAbort != nil {
 		abort := <-genAbort
 		close(abort)
+		log.Info("[LEAK-DEBUG] Received abort signal and exiting cleanly", "root", dl.root, "blockHash", dl.blockHash)
+	} else {
+		log.Info("[LEAK-DEBUG] genAbort already nil, exiting immediately", "root", dl.root, "blockHash", dl.blockHash)
 	}
 }
 

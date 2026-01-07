@@ -972,11 +972,6 @@ func (bc *BlockChain) stopWithoutSaving() {
 		bc.txIndexer.close()
 	}
 
-	// Stop snapshot generation to prevent goroutine leaks
-	if bc.snaps != nil {
-		bc.snaps.Release()
-	}
-
 	log.Info("Closing quit channel")
 	close(bc.quit)
 	// Wait for accepted feed to process all remaining items
@@ -1003,6 +998,10 @@ func (bc *BlockChain) stopWithoutSaving() {
 func (bc *BlockChain) Stop() {
 	bc.stopWithoutSaving()
 
+	// Stop snapshot generation and release resources
+	if bc.snaps != nil {
+		bc.snaps.Release()
+	}
 	if bc.triedb.Scheme() == rawdb.PathScheme {
 		// Ensure that the in-memory trie nodes are journaled to disk properly.
 		if err := bc.triedb.Journal(bc.CurrentBlock().Root); err != nil {
