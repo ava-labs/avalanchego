@@ -227,19 +227,19 @@ func benchmarkReexecuteRange(
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
-	dbReg, err := metrics.MakeAndRegister(
+	dbRegistry, err := metrics.MakeAndRegister(
 		prefixGatherer,
 		metric.AppendNamespace(constants.PlatformName, "db"),
 	)
 	r.NoError(err)
-	db, err := leveldb.New(vmDBDir, nil, dbLogger, dbReg)
+	db, err := leveldb.New(vmDBDir, nil, dbLogger, dbRegistry)
 	r.NoError(err)
-	meterDBReg, err := metrics.MakeAndRegister(
+	meterDBRegistry, err := metrics.MakeAndRegister(
 		prefixGatherer,
 		metric.AppendNamespace(constants.PlatformName, "meterdb"),
 	)
 	r.NoError(err)
-	db, err = meterdb.New(meterDBReg, db)
+	db, err = meterdb.New(meterDBRegistry, db)
 	r.NoError(err)
 	defer func() {
 		log.Info("shutting down DB")
