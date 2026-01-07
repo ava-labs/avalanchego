@@ -40,13 +40,94 @@ func TestBlockQueue_RemoveBelowHeight(t *testing.T) {
 		q.enqueue(newMockBlock(i), OpAccept)
 	}
 
-	// Remove blocks at or below height 105.
+	// Remove blocks strictly below height 105.
 	q.removeBelowHeight(105)
 
-	// Only blocks > 105 should remain (106, 107, 108, 109, 110).
+	// Only blocks >= 105 should remain (105, 106, 107, 108, 109, 110).
 	batch := q.dequeueBatch()
-	require.Len(t, batch, 5)
-	require.Equal(t, uint64(106), batch[0].block.GetEthBlock().NumberU64())
+	require.Len(t, batch, 6)
+	require.Equal(t, uint64(105), batch[0].block.GetEthBlock().NumberU64())
+}
+
+func TestBlockQueue_DedupeSameOperation(t *testing.T) {
+	q := newBlockQueue()
+
+	b := newMockBlock(100)
+	// Duplicate enqueue should return true (treated as deferred) but not create duplicates.
+	require.True(t, q.enqueue(b, OpVerify))
+	require.True(t, q.enqueue(b, OpVerify))
+
+	batch := q.dequeueBatch()
+	require.Len(t, batch, 1)
+	require.Equal(t, OpVerify, batch[0].operation)
+}
+
+func TestBlockQueue_AllowsDifferentOperationsSameBlock(t *testing.T) {
+	q := newBlockQueue()
+
+	b := newMockBlock(100)
+	require.True(t, q.enqueue(b, OpVerify))
+	require.True(t, q.enqueue(b, OpAccept))
+
+	batch := q.dequeueBatch()
+	require.Len(t, batch, 2)
+	require.Equal(t, OpVerify, batch[0].operation)
+	require.Equal(t, OpAccept, batch[1].operation)
+}
+
+func TestBlockQueue_DoesNotDedupeAcceptOrReject(t *testing.T) {
+	q := newBlockQueue()
+
+	b := newMockBlock(100)
+	require.True(t, q.enqueue(b, OpAccept))
+	require.True(t, q.enqueue(b, OpAccept))
+	require.True(t, q.enqueue(b, OpReject))
+	require.True(t, q.enqueue(b, OpReject))
+
+	batch := q.dequeueBatch()
+	require.Len(t, batch, 4)
+	require.Equal(t, OpAccept, batch[0].operation)
+	require.Equal(t, OpAccept, batch[1].operation)
+	require.Equal(t, OpReject, batch[2].operation)
+	require.Equal(t, OpReject, batch[3].operation)
+}
+
+func TestBlockQueue_VerifyCanBeRequeuedAfterForget(t *testing.T) {
+	q := newBlockQueue()
+
+	b := newMockBlock(100)
+	require.True(t, q.enqueue(b, OpVerify))
+
+	batch := q.dequeueBatch()
+	require.Len(t, batch, 1)
+	require.Equal(t, OpVerify, batch[0].operation)
+
+	// Simulate coordinator having executed the batch.
+	q.forget(batch)
+
+	// Verify should be enqueueable again after forget.
+	require.True(t, q.enqueue(b, OpVerify))
+	batch2 := q.dequeueBatch()
+	require.Len(t, batch2, 1)
+	require.Equal(t, OpVerify, batch2[0].operation)
+}
+
+func TestBlockQueue_VerifyCanBeRequeuedAfterPruneDrop(t *testing.T) {
+	q := newBlockQueue()
+
+	b := newMockBlock(100)
+	require.True(t, q.enqueue(b, OpVerify))
+
+	// Drop blocks strictly below 101, so our block at height 100 is pruned.
+	q.removeBelowHeight(101)
+
+	require.Empty(t, q.dequeueBatch())
+
+	// Verify should be enqueueable again after being pruned.
+	require.True(t, q.enqueue(b, OpVerify))
+	batch := q.dequeueBatch()
+	require.Len(t, batch, 1)
+	require.Equal(t, OpVerify, batch[0].operation)
 }
 
 func TestBlockQueue_ConcurrentAccess(t *testing.T) {

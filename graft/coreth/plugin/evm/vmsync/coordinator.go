@@ -59,6 +59,11 @@ type Coordinator struct {
 	// pivotInterval configures the pivot policy throttling. 0 disables throttling.
 	pivotInterval uint64
 	pivot         *pivotPolicy
+
+	// initial is the original sync target passed to Start. This is used as the
+	// commit target for dynamic sync to avoid committing to a pivoted target
+	// that syncers may not have actually downloaded.
+	initial message.Syncable
 }
 
 // CoordinatorOption follows the functional options pattern for Coordinator.
@@ -88,6 +93,7 @@ func NewCoordinator(syncerRegistry *SyncerRegistry, cbs Callbacks, opts ...Coord
 // in the background and will transition to [StateAborted].
 func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 	co.state.Store(int32(StateInitializing))
+	co.initial = initial
 	co.target.Store(initial)
 	co.pivot = newPivotPolicy(co.pivotInterval)
 
@@ -97,7 +103,12 @@ func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 	co.state.Store(int32(StateRunning))
 
 	go func() {
-		if err := g.Wait(); err != nil {
+		// Ensure registered syncers that implement sync.Finalizer get a chance to flush
+		// best-effort cleanup regardless of success or failure.
+		err := g.Wait()
+		co.syncerRegistry.FinalizeAll(co.initial)
+
+		if err != nil {
 			co.finish(cancel, err)
 			return
 		}
@@ -125,13 +136,11 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 			return err
 		}
 
-		loaded := co.target.Load()
-		current, ok := loaded.(message.Syncable)
-		if !ok {
+		if co.initial == nil {
 			co.state.Store(int32(StateAborted))
 			return errInvalidTargetType
 		}
-		if err := co.callbacks.FinalizeVM(ctx, current); err != nil {
+		if err := co.callbacks.FinalizeVM(ctx, co.initial); err != nil {
 			co.state.Store(int32(StateAborted))
 			return err
 		}
@@ -144,8 +153,19 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 
 	co.state.Store(int32(StateExecutingBatch))
 
-	if err := co.executeBlockOperationBatch(ctx); err != nil {
-		return err
+	// Drain the queue in batches. Enqueues are allowed during batch execution. Any
+	// operations arriving mid-batch will be picked up by a subsequent iteration.
+	for {
+		operations := co.queue.dequeueBatch()
+		if len(operations) == 0 {
+			break
+		}
+		err := co.executeBlockOperations(ctx, operations)
+		// Ensure we drop dedupe markers even on error to avoid leaking memory.
+		co.queue.forget(operations)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -197,10 +217,9 @@ func (co *Coordinator) CurrentState() State {
 	return State(co.state.Load())
 }
 
-// executeBlockOperationBatch executes queued block operations in FIFO order.
+// executeBlockOperations executes a batch of queued block operations in FIFO order.
 // Partial completion is acceptable as operations are idempotent.
-func (co *Coordinator) executeBlockOperationBatch(ctx context.Context) error {
-	operations := co.queue.dequeueBatch()
+func (co *Coordinator) executeBlockOperations(ctx context.Context, operations []blockOperation) error {
 	for i, op := range operations {
 		select {
 		case <-ctx.Done():

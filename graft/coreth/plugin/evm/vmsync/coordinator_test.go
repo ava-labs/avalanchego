@@ -55,7 +55,7 @@ func TestCoordinator_UpdateSyncTarget_RemovesStaleBlocks(t *testing.T) {
 	require.NoError(t, co.UpdateSyncTarget(newTestSyncTarget(105)))
 
 	batch := co.queue.dequeueBatch()
-	require.Len(t, batch, 5) // Only 106-110 remain.
+	require.Len(t, batch, 6) // Only 105-110 remain (keep pivot block).
 }
 
 func TestCoordinator_Lifecycle(t *testing.T) {
