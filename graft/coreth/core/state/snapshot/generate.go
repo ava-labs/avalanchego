@@ -341,16 +341,11 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	genAbort := dl.genAbort
 	dl.lock.Unlock()
 
-	// Wait briefly for stopGeneration() or test cleanup to signal us.
-	// Use a timeout to prevent hanging if no one calls stopGeneration().
+	// Someone will be looking for us (via stopGeneration or test cleanup), wait it out.
+	// If genAbort is nil, stopGeneration() already ran and we can exit immediately.
 	if genAbort != nil {
-		select {
-		case abort := <-genAbort:
-			// Someone called stopGeneration(), complete the handshake
-			close(abort)
-		case <-time.After(100 * time.Millisecond):
-			// No abort signal received, exit cleanly (normal completion)
-		}
+		abort := <-genAbort
+		close(abort)
 	}
 }
 
