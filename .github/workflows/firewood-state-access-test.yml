@@ -24,6 +24,8 @@ on:
         default: '60'
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
+  # XXX: REMOVE BEFORE MERGING
+  pull_request:
 
 jobs:
   define-matrix:
