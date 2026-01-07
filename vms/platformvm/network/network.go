@@ -87,8 +87,6 @@ func New(
 		return nil, err
 	}
 
-	marshaller := txMarshaller{}
-
 	systemConfig := gossip.SystemConfig{
 		Log:               log,
 		Registry:          registerer,
@@ -116,7 +114,7 @@ func New(
 		p2pNetwork,
 		validators,
 		gossipMempool,
-		marshaller,
+		txMarshaller{},
 		systemConfig,
 	)
 	if err != nil {
