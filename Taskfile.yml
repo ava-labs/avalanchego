@@ -244,6 +244,11 @@ tasks:
     cmds:
       - cmd: bash -x ./scripts/tests.faultinjection.e2e.sh {{.CLI_ARGS}}
 
+  test-chaos:
+    desc: Runs antithesis workload with fault injection against a kind cluster
+    cmds:
+      - cmd: bash -x ./scripts/tests.chaos.kube.sh {{.CLI_ARGS}}
+
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
 

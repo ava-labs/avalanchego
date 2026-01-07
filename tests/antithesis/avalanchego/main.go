@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/faultinjection"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -61,6 +62,29 @@ func main() {
 	ctx := tests.DefaultNotifyContext(c.Duration, tc.DeferCleanup)
 	// Ensure contexts sourced from the test context use the notify context as their parent
 	tc.SetDefaultContextParent(ctx)
+
+	// Start fault injection if enabled
+	if c.InjectFaults {
+		tc.Log().Info("starting fault injection",
+			zap.String("namespace", c.Namespace),
+			zap.String("networkUUID", c.NetworkUUID),
+			zap.Duration("interval", c.ChaosConfig.Interval),
+		)
+		injector, err := faultinjection.NewInjector(
+			tc.Log(),
+			c.KubeConfig,
+			c.ChaosConfig,
+			c.Namespace, // chaos experiments created in same namespace as pods
+			c.Namespace, // target namespace where pods are running
+			c.NetworkUUID,
+		)
+		require.NoError(err, "failed to create fault injector")
+		injector.Start(ctx)
+		tc.DeferCleanup(func() {
+			tc.Log().Info("stopping fault injector")
+			injector.Stop()
+		})
+	}
 
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 	walletSyncStartTime := time.Now()

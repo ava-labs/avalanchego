@@ -4,6 +4,7 @@
 package antithesis
 
 import (
+	"errors"
 	"flag"
 	"os"
 	"strings"
@@ -14,7 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/faultinjection"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+
+	restclient "k8s.io/client-go/rest"
 )
 
 const (
@@ -25,10 +29,19 @@ const (
 	EnvPrefix = "avawl"
 )
 
+var errFaultInjectionRequiresKube = errors.New("--inject-faults requires --runtime=kube")
+
 type Config struct {
 	URIs     []string
 	ChainIDs []string
 	Duration time.Duration
+
+	// Fault injection fields (only populated when InjectFaults is true and runtime is kube)
+	InjectFaults bool
+	ChaosConfig  *faultinjection.Config
+	KubeConfig   *restclient.Config
+	Namespace    string
+	NetworkUUID  string
 }
 
 type SubnetsForNodesFunc func(nodes ...*tmpnet.Node) []*tmpnet.Subnet
@@ -42,8 +55,9 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 	flagVars := e2e.RegisterFlags()
 
 	var (
-		duration time.Duration
-		uris     CSV
+		duration     time.Duration
+		injectFaults bool
+		uris         CSV
 		// Accept a list of chain IDs, assume they each belong to a separate subnet
 		// TODO(marun) Revisit how chain IDs are provided when 1:n subnet:chain configuration is required.
 		chainIDs CSV
@@ -51,6 +65,10 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 	flag.DurationVar(&duration, DurationKey, 0, "[optional] the duration to execute the workload for")
 	flag.Var(&uris, URIsKey, "[optional] URIs of nodes that the workload can communicate with")
 	flag.Var(&chainIDs, ChainIDsKey, "[optional] IDs of chains to target for testing")
+	flag.BoolVar(&injectFaults, "inject-faults", false, "[optional] enable fault injection using Chaos Mesh (requires --runtime=kube)")
+
+	// Register chaos config flags
+	chaosFlags := faultinjection.RegisterFlags()
 
 	flag.Parse()
 
@@ -66,6 +84,11 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 		chainIDs.Set(envChainIDs)
 	}
 
+	// Fault injection requires creating a new network (can't inject into existing)
+	if injectFaults && len(uris) != 0 {
+		require.FailNow(tc, "--inject-faults cannot be used with --uris (fault injection requires creating a new kube network)")
+	}
+
 	// Use the network configuration provided
 	if len(uris) != 0 {
 		require.NoError(tc, awaitHealthyNodes(tc.DefaultContext(), tc.Log(), uris), "failed to see healthy nodes")
@@ -77,7 +100,7 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 	}
 
 	// Create a new network
-	return configForNewNetwork(tc, defaultNetwork, getSubnets, flagVars, duration)
+	return configForNewNetwork(tc, defaultNetwork, getSubnets, flagVars, duration, injectFaults, chaosFlags)
 }
 
 // configForNewNetwork creates a new network and returns the resulting config.
@@ -87,6 +110,8 @@ func configForNewNetwork(
 	getSubnets SubnetsForNodesFunc,
 	flagVars *e2e.FlagVars,
 	duration time.Duration,
+	injectFaults bool,
+	chaosFlags *faultinjection.FlagVars,
 ) *Config {
 	if defaultNetwork.Nodes == nil {
 		nodeCount, err := flagVars.NodeCount()
@@ -111,6 +136,21 @@ func configForNewNetwork(
 	c.ChainIDs = make(CSV, len(network.Subnets))
 	for i, subnet := range network.Subnets {
 		c.ChainIDs[i] = subnet.Chains[0].ChainID.String()
+	}
+
+	// Configure fault injection if enabled
+	if injectFaults {
+		kubeConfig := network.DefaultRuntimeConfig.Kube
+		require.NotNil(tc, kubeConfig, errFaultInjectionRequiresKube.Error())
+
+		restConfig, err := tmpnet.GetClientConfig(tc.Log(), kubeConfig.ConfigPath, kubeConfig.ConfigContext)
+		require.NoError(tc, err, "failed to get kube client config for fault injection")
+
+		c.InjectFaults = true
+		c.ChaosConfig = chaosFlags.ToConfig()
+		c.KubeConfig = restConfig
+		c.Namespace = kubeConfig.Namespace
+		c.NetworkUUID = network.UUID
 	}
 
 	return c
