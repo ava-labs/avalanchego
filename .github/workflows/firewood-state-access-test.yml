@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       test:
-        description: 'Test name to run (e.g., firewood-archive-1m). Leave empty to use custom inputs below.'
+        description: 'Test name to run (e.g., firewood-archive-250k). Leave empty to use custom inputs below.'
         default: ''
       # Custom inputs (used when test is not provided)
       start-block:
