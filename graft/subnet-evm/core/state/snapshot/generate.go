@@ -187,6 +187,11 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	// If a database wipe is in operation, wait until it's done
 	if stats.wiping != nil {
 		stats.Info("Wiper running, state snapshotting paused", common.Hash{}, dl.genMarker)
+
+		dl.lock.RLock()
+		genAbort := dl.genAbort
+		dl.lock.RUnlock()
+
 		select {
 		// If wiper is done, resume normal mode of operation
 		case <-stats.wiping:
@@ -194,7 +199,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			stats.start = time.Now()
 
 		// If generator was aborted during wipe, return
-		case abort := <-dl.genAbort:
+		case abort := <-genAbort:
 			stats.Debug("Aborting state snapshot generation", dl.root, dl.genMarker)
 			dl.genStats = stats
 			close(abort)
