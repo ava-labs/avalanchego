@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
-	"path/filepath"
 	"time"
 
 	"github.com/antithesishq/antithesis-sdk-go/assert"
@@ -51,10 +50,8 @@ func main() {
 			tmpnet.FlagsMap{},
 		),
 		func(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
-			repoRootPath := tests.GetRepoRootPath("tests/antithesis")
-			genesisPath := filepath.Join(repoRootPath, "tests/load/genesis/genesis.json")
 			return []*tmpnet.Subnet{
-				utils.NewTmpnetSubnet("subnet-evm", genesisPath, utils.DefaultChainConfig, nodes...),
+				utils.NewTmpnetSubnet("subnet-evm", tests.Genesis, utils.DefaultChainConfig, nodes...),
 			}
 		},
 	)

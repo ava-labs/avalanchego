@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -584,12 +584,9 @@ func (vm *VM) initializeMetrics() error {
 		return err
 	}
 
-	if vm.config.MetricsExpensiveEnabled && vm.config.StateScheme == customrawdb.FirewoodScheme {
-		if err := ffi.StartMetrics(); err != nil {
-			return fmt.Errorf("failed to start firewood metrics collection: %w", err)
-		}
-		if err := vm.ctx.Metrics.Register("firewood", ffi.Gatherer{}); err != nil {
-			return fmt.Errorf("failed to register firewood metrics: %w", err)
+	if vm.config.StateScheme == customrawdb.FirewoodScheme {
+		if err := vm.ctx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
+			return fmt.Errorf("registering firewood metrics: %w", err)
 		}
 	}
 	return vm.ctx.Metrics.Register(sdkMetricsPrefix, vm.sdkMetrics)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vmtest
@@ -30,8 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"

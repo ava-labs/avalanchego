@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -205,9 +205,8 @@ type Config struct {
 
 	DiskTargeterConfig tracker.TargeterConfig `json:"diskTargeterConfig"`
 
-	RequiredAvailableDiskSpace                   uint64 `json:"requiredAvailableDiskSpace"`
-	WarningThresholdAvailableDiskSpace           uint64 `json:"warningThresholdAvailableDiskSpace"`
-	WarningThresholdAvailableDiskSpacePercentage uint64 `json:"warningThresholdAvailableDiskSpacePercentage"`
+	RequiredAvailableDiskSpacePercentage uint64 `json:"requiredAvailableDiskSpacePercentage"`
+	WarningAvailableDiskSpacePercentage  uint64 `json:"warningAvailableDiskSpacePercentage"`
 
 	TraceConfig trace.Config `json:"traceConfig"`
 

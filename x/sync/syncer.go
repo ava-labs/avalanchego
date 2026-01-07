@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -150,6 +150,7 @@ type Config[R any, C any] struct {
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
+	EmptyRoot             ids.ID
 	StateSyncNodes        []ids.NodeID
 }
 
@@ -332,7 +333,7 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	if targetRootID == ids.Empty {
+	if targetRootID == s.config.EmptyRoot {
 		defer s.finishWorkItem()
 
 		// The trie is empty after this change.
@@ -387,7 +388,7 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := s.getTargetRoot()
 
-	if targetRootID == ids.Empty {
+	if targetRootID == s.config.EmptyRoot {
 		defer s.finishWorkItem()
 
 		if err := s.db.Clear(); err != nil {

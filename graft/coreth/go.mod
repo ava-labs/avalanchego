@@ -5,19 +5,18 @@ module github.com/ava-labs/avalanchego/graft/coreth
 // CONTRIBUTING.md for more details.
 
 // See ../../go.mod for guidelines on updating the Go version.
-go 1.24.9
+go 1.24.11
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/ava-labs/avalanchego v1.14.1-0.20251120155522-df4a8e531761
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.16
-	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18
+	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/go-cmd/cmd v1.4.3
 	github.com/google/go-cmp v0.7.0
-	github.com/gorilla/rpc v1.2.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-bexpr v0.1.10
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
@@ -48,7 +47,6 @@ require (
 require (
 	connectrpc.com/connect v1.18.1 // indirect
 	connectrpc.com/grpcreflect v1.3.0 // indirect
-	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/StephenButtolph/canoto v0.17.3 // indirect
@@ -98,6 +96,7 @@ require (
 	github.com/google/renameio/v2 v2.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/gorilla/rpc v1.2.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect

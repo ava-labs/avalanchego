@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -37,13 +37,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/prque"
 	"github.com/ava-labs/libevm/core/state"
@@ -449,6 +449,11 @@ func (pool *LegacyPool) Close() error {
 	if pool.journal != nil {
 		pool.journal.close()
 	}
+
+	// remove all references to state to allow GC to reclaim memory
+	pool.pendingNonces = nil
+	pool.currentState = nil
+
 	log.Info("Transaction pool stopped")
 	return nil
 }

@@ -2,10 +2,10 @@ name: 'C-Chain Re-Execution Benchmark'
 description: 'Run C-Chain re-execution benchmark'
 
 inputs:
-  task:
-    description: 'Task name to execute from Taskfile.yml. Leave empty to use custom inputs below.'
+  test:
+    description: 'Test name to run (e.g., hashdb-101-250k). Leave empty to use custom inputs below.'
     default: ''
-  # Custom inputs (alternative to task-based approach)
+  # Custom inputs (used when test is not provided)
   config:
     description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
     default: ''
@@ -21,8 +21,8 @@ inputs:
   current-state-dir-src:
     description: 'The current state directory. Supports S3 directory/zip and local directories.'
     default: ''
-  runner_name:
-    description: 'The name of the runner to use and include in the Golang Benchmark name.'
+  runner_type:
+    description: 'The type/label of the runner to include in the benchmark name for grouping results.'
     required: true
   aws-role:
     description: 'AWS role to assume for S3 access.'
@@ -50,10 +50,6 @@ inputs:
     description: 'The password for the Prometheus instance.'
     required: true
     default: ''
-  workspace:
-    description: 'Working directory to use for the benchmark.'
-    required: true
-    default: ${{ github.workspace }}
   github-token:
     description: 'GitHub token provided to GitHub Action Benchmark.'
     required: true
@@ -114,7 +110,7 @@ runs:
         echo "Grafana: ${metrics_url}"
         echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
       env:
-        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
+        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository-owner }}%2F${{ inputs.repository-name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run-id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run-attempt }}
         GH_JOB_ID: ${{ inputs.job }}
     - name: Warn that collection of metrics and logs will not be performed
       if: inputs.prometheus-username == ''
@@ -126,59 +122,35 @@ runs:
         role-to-assume: ${{ inputs.aws-role }}
         aws-region: ${{ inputs.aws-region }}
         role-duration-seconds: ${{ inputs.aws-role-duration-seconds }}
-    - name: Validate inputs
+    - name: Set benchmark output file
       shell: bash
-      run: |
-        if [[ -z "${{ inputs.task }}" ]]; then
-          # Granular mode - validate required inputs
-          missing=()
-          [[ -z "${{ inputs.block-dir-src }}" ]] && missing+=("block-dir-src")
-          [[ -z "${{ inputs.current-state-dir-src }}" ]] && missing+=("current-state-dir-src")
-          [[ -z "${{ inputs.start-block }}" ]] && missing+=("start-block")
-          [[ -z "${{ inputs.end-block }}" ]] && missing+=("end-block")
-
-          if [[ ${#missing[@]} -gt 0 ]]; then
-            echo "::error::When 'task' is empty, the following inputs are required: ${missing[*]}"
-            exit 1
-          fi
-        fi
-    - name: Set task env
-      shell: bash
-      run: |
-        TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
-        echo "EXECUTION_DATA_DIR=/tmp/reexecution-data-${TIMESTAMP}" >> "$GITHUB_ENV"
-        echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.json" >> "$GITHUB_ENV"
+      run: echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.json" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
-      run: |
-        if [[ -n "${{ inputs.task }}" ]]; then
-          # Task-based approach
-          ./scripts/run_task.sh ${{ inputs.task }} \
-            BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}" \
-            EXECUTION_DATA_DIR="${{ env.EXECUTION_DATA_DIR }}"
-        else
-          # Granular approach
-          ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
-            CONFIG=${{ inputs.config }} \
-            EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
-            BLOCK_DIR_SRC=${{ inputs.block-dir-src }} \
-            CURRENT_STATE_DIR_SRC=${{ inputs.current-state-dir-src }} \
-            START_BLOCK=${{ inputs.start-block }} \
-            END_BLOCK=${{ inputs.end-block }} \
-            BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}"
-        fi
+      run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ inputs.test || '' }}"
       env:
-        RUNNER_NAME: ${{ inputs.runner_name }}
+        # Test configuration overrides
+        BLOCK_DIR_SRC: ${{ inputs.block-dir-src }}
+        CURRENT_STATE_DIR_SRC: ${{ inputs.current-state-dir-src }}
+        START_BLOCK: ${{ inputs.start-block }}
+        END_BLOCK: ${{ inputs.end-block }}
+        CONFIG: ${{ inputs.config }}
+        # Execution environment
+        BENCHMARK_OUTPUT_FILE: ${{ env.BENCHMARK_OUTPUT_FILE }}
+        PUSH_POST_STATE: ${{ inputs.push-post-state }}
+        # Runner and metrics
+        RUNNER_TYPE: ${{ inputs.runner_type }}
         METRICS_COLLECTOR_ENABLED: ${{ inputs.prometheus-username != '' }}
         PROMETHEUS_URL: ${{ inputs.prometheus-url }}
         PROMETHEUS_PUSH_URL: ${{ inputs.prometheus-push-url }}
         PROMETHEUS_USERNAME: ${{ inputs.prometheus-username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus-password }}
-        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
+        # Github metadata
+        GH_REPO: ${{ inputs.repository-owner }}/${{ inputs.repository-name }}
         GH_WORKFLOW: ${{ inputs.workflow }}
-        GH_RUN_ID: ${{ inputs.run_id }}
-        GH_RUN_NUMBER: ${{ inputs.run_number }}
-        GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        GH_RUN_ID: ${{ inputs.run-id }}
+        GH_RUN_NUMBER: ${{ inputs.run-number }}
+        GH_RUN_ATTEMPT: ${{ inputs.run-attempt }}
         GH_JOB_ID: ${{ inputs.job }}
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
@@ -188,10 +160,3 @@ runs:
         summary-always: true
         github-token: ${{ inputs.github-token }}
         auto-push: ${{ inputs.push-github-action-benchmark }}
-    - name: Push Post-State to S3
-      if: inputs.push-post-state != ''
-      shell: nix develop --impure --command bash -x {0}
-      run: |
-        ./scripts/run_task.sh export-dir-to-s3 \
-          SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ \
-          DST=${{ inputs.push-post-state }}

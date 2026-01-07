@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package allowlist
@@ -33,7 +33,7 @@ var (
 	ErrCannotModifyAllowList = errors.New("cannot modify allow list")
 
 	// AllowListRawABI contains the raw ABI of AllowList library interface.
-	//go:embed allowlist.abi
+	//go:embed IAllowList.abi
 	AllowListRawABI string
 
 	AllowListABI = contract.ParseABI(AllowListRawABI)

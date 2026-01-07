@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package load
@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -31,10 +30,7 @@ const (
 	subnetAName = "load-subnet-a"
 )
 
-var (
-	flagVars     *e2e.FlagVars
-	repoRootPath = tests.GetRepoRootPath("tests/load")
-)
+var flagVars *e2e.FlagVars
 
 func init() {
 	// Configures flags used to configure tmpnet
@@ -48,11 +44,17 @@ func TestE2E(t *testing.T) {
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	require := require.New(ginkgo.GinkgoT())
 
-	var env *e2e.TestEnvironment
+	var (
+		env      *e2e.TestEnvironment
+		repoRoot string
+	)
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
-		genesisPath := filepath.Join(repoRootPath, "tests/load/genesis/genesis.json")
+
+		var err error
+		repoRoot, err = e2e.GetRepoRootPath("tests/load")
+		require.NoError(err)
 
 		nodes := utils.NewTmpnetNodes(nodeCount)
 		env = e2e.NewTestEnvironment(
@@ -62,7 +64,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 				"subnet-evm-small-load",
 				nodes,
 				tmpnet.FlagsMap{},
-				utils.NewTmpnetSubnet(subnetAName, genesisPath, utils.DefaultChainConfig, nodes...),
+				utils.NewTmpnetSubnet(subnetAName, tests.Genesis, utils.DefaultChainConfig, nodes...),
 			),
 		)
 	})
@@ -89,7 +91,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 
 		log.Info("Running load simulator...", "rpcEndpoints", commaSeparatedRPCEndpoints)
 		cmd := exec.Command("./scripts/run_simulator.sh")
-		cmd.Dir = repoRootPath
+		cmd.Dir = repoRoot
 		log.Info("Running load simulator script", "cmd", cmd.String())
 
 		out, err := cmd.CombinedOutput()

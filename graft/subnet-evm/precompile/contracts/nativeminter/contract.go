@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nativeminter
@@ -39,7 +39,7 @@ var (
 	ErrUnpackInput = errors.New("failed to unpack input")
 
 	// NativeMinterRawABI contains the raw ABI of NativeMinter contract.
-	//go:embed contract.abi
+	//go:embed INativeMinter.abi
 	NativeMinterRawABI string
 
 	NativeMinterABI = contract.ParseABI(NativeMinterRawABI)

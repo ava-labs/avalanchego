@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -48,6 +48,7 @@ func NewNodeStatefulSet(
 	name string,
 	generateName bool,
 	imageName string,
+	imagePullPolicy corev1.PullPolicy,
 	containerName string,
 	volumeName string,
 	volumeSize string,
@@ -115,8 +116,9 @@ func NewNodeStatefulSet(
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  containerName,
-							Image: imageName,
+							Name:            containerName,
+							Image:           imageName,
+							ImagePullPolicy: imagePullPolicy,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",

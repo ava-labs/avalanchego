@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -1459,25 +1459,19 @@ func (n *Node) initHealthAPI() error {
 		availableDiskBytes := n.resourceTracker.DiskTracker().AvailableDiskBytes()
 		availableDiskPercentage := n.resourceTracker.DiskTracker().AvailableDiskPercentage()
 
-		var diskSpaceErrors []error
-		if availableDiskBytes < n.Config.RequiredAvailableDiskSpace {
+		var err error
+
+		if availableDiskPercentage < n.Config.RequiredAvailableDiskSpacePercentage {
 			n.Log.Fatal("low on disk space. Shutting down...",
-				zap.Uint64("remainingDiskBytes", availableDiskBytes),
+				zap.Uint64("availableDiskBytes", availableDiskBytes),
+				zap.Uint64("remainingDiskPercentage", availableDiskPercentage),
+				zap.Uint64("requiredDiskPercentage", n.Config.RequiredAvailableDiskSpacePercentage),
 			)
 			go n.Shutdown(1)
-			err := fmt.Errorf("remaining available disk space (%d) is below minimum required available space (%d)", availableDiskBytes, n.Config.RequiredAvailableDiskSpace)
-			diskSpaceErrors = append(diskSpaceErrors, err)
-		} else if availableDiskBytes < n.Config.WarningThresholdAvailableDiskSpace {
-			err := fmt.Errorf("remaining available disk space (%d) is below the warning threshold of disk space (%d)", availableDiskBytes, n.Config.WarningThresholdAvailableDiskSpace)
-			diskSpaceErrors = append(diskSpaceErrors, err)
+			err = fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.RequiredAvailableDiskSpacePercentage)
+		} else if availableDiskPercentage < n.Config.WarningAvailableDiskSpacePercentage {
+			err = fmt.Errorf("remaining available disk space percentage (%d%%) is below warning threshold available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningAvailableDiskSpacePercentage)
 		}
-
-		if availableDiskPercentage < n.Config.WarningThresholdAvailableDiskSpacePercentage {
-			err := fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningThresholdAvailableDiskSpacePercentage)
-			diskSpaceErrors = append(diskSpaceErrors, err)
-		}
-
-		err = errors.Join(diskSpaceErrors...)
 
 		return map[string]interface{}{
 			"availableDiskBytes":      availableDiskBytes,
