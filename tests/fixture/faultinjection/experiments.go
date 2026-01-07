@@ -52,12 +52,17 @@ const (
 
 // Experiment represents an active chaos experiment.
 type Experiment struct {
-	Name       string
-	Namespace  string
-	Type       ExperimentType
-	GVR        schema.GroupVersionResource
-	StartTime  time.Time
-	Duration   time.Duration
+	Name      string
+	Namespace string
+	Type      ExperimentType
+	GVR       schema.GroupVersionResource
+	StartTime time.Time
+	Duration  time.Duration
+}
+
+// IsActive returns true if the experiment is currently active at the given time.
+func (e *Experiment) IsActive(now time.Time) bool {
+	return now.After(e.StartTime) && now.Before(e.StartTime.Add(e.Duration))
 }
 
 // createPodChaos creates a PodChaos CRD for pod-kill experiments.

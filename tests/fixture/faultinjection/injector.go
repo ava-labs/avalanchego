@@ -100,6 +100,24 @@ func (i *Injector) InjectOnce(ctx context.Context, experimentType ExperimentType
 	return i.injectExperiment(ctx, experimentType, duration)
 }
 
+// ActiveFaults returns a copy of all currently active fault experiments.
+// This can be used to annotate failure logs with active fault context.
+func (i *Injector) ActiveFaults() []*Experiment {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	now := time.Now()
+	var active []*Experiment
+	for _, exp := range i.experiments {
+		if exp.IsActive(now) {
+			// Return a copy to avoid data races
+			expCopy := *exp
+			active = append(active, &expCopy)
+		}
+	}
+	return active
+}
+
 func (i *Injector) run(ctx context.Context) {
 	ticker := time.NewTicker(i.config.Interval)
 	defer ticker.Stop()
