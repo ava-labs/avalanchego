@@ -328,10 +328,11 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	dl.genMarker = nil
 	dl.genStats = stats
 	close(dl.genPending)
+	genAbort := dl.genAbort
 	dl.lock.Unlock()
 
 	// Someone will be looking for us, wait it out
-	abort := <-dl.genAbort
+	abort := <-genAbort
 	close(abort)
 }
 
