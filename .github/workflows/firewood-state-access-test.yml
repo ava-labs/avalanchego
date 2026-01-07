@@ -53,7 +53,7 @@ jobs:
           else
             {
               echo "matrix<<EOF"
-              echo '{ "include": [{ "test": "firewood-archive-101-250k" }] }'
+              echo '{ "include": [{ "test": "firewood-archive-1m" }] }'
               echo EOF
             } >> "$GITHUB_OUTPUT"
           fi
