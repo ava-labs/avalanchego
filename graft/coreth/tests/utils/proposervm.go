@@ -21,7 +21,9 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-const numTriggerTxs = 2 // Number of txs needed to activate the proposer VM fork
+// expectedBlockHeight is the block height that activates the proposerVM fork.
+// We issue 2 txs (one per block) to reach block height 2.
+const expectedBlockHeight = 2
 
 // IssueTxsToActivateProposerVMFork issues transactions at the current
 // timestamp, which should be after the ProposerVM activation time (aka
@@ -39,11 +41,11 @@ func IssueTxsToActivateProposerVMFork(
 		return err
 	}
 
-	gasPrice := big.NewInt(ap1.MinGasPrice)
+	gasPrice := big.NewInt(ap1.MinGasPrice) // should be pretty generous for c-chain and subnets
 	txSigner := types.LatestSignerForChainID(chainID)
 
 	// Send exactly 2 transactions, waiting for each to be included in a block
-	for i := 0; i < numTriggerTxs; i++ {
+	for i := 0; i < expectedBlockHeight; i++ {
 		tx := types.NewTransaction(
 			nonce, addr, common.Big1, ethparams.TxGas, gasPrice, nil)
 		triggerTx, err := types.SignTx(tx, txSigner, fundedKey)
@@ -66,7 +68,7 @@ func IssueTxsToActivateProposerVMFork(
 
 	log.Info(
 		"Built sufficient blocks to activate proposerVM fork",
-		"txCount", numTriggerTxs,
+		"blockHeight", expectedBlockHeight,
 	)
 	return nil
 }
