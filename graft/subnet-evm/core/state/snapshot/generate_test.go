@@ -33,6 +33,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/pathdb"
 	"github.com/ava-labs/libevm/common"
@@ -45,8 +46,15 @@ import (
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
+	"go.uber.org/goleak"
 	"golang.org/x/crypto/sha3"
 )
+
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
+	os.Exit(m.Run())
+}
 
 var testBlockHash = common.HexToHash("0xdeadbeef")
 

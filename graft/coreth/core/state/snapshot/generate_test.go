@@ -46,11 +46,13 @@ import (
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
+	"go.uber.org/goleak"
 	"golang.org/x/crypto/sha3"
 )
 
 func TestMain(m *testing.M) {
 	customtypes.Register()
+	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 	os.Exit(m.Run())
 }
 
