@@ -127,8 +127,13 @@ func journalProgress(db ethdb.KeyValueWriter, marker []byte, stats *generatorSta
 func (dl *diskLayer) checkAndFlush(batch ethdb.Batch, stats *generatorStats, currentLocation []byte) bool {
 	// If we've exceeded our batch allowance or termination was requested, flush to disk
 	var abort chan struct{}
+
+	dl.lock.RLock()
+	genAbort := dl.genAbort
+	dl.lock.RUnlock()
+
 	select {
-	case abort = <-dl.genAbort:
+	case abort = <-genAbort:
 	default:
 	}
 	if batch.ValueSize() > ethdb.IdealBatchSize || abort != nil {
@@ -145,7 +150,7 @@ func (dl *diskLayer) checkAndFlush(batch ethdb.Batch, stats *generatorStats, cur
 		if err := batch.Write(); err != nil {
 			log.Error("Failed to flush batch", "err", err)
 			if abort == nil {
-				abort = <-dl.genAbort
+				abort = <-genAbort
 			}
 			dl.genStats = stats
 			close(abort)
