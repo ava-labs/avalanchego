@@ -90,6 +90,7 @@ func NewSystem[T Gossipable](
 	marshaller Marshaller[T],
 	c SystemConfig,
 ) (
+	p2p.Handler,
 	*ValidatorGossiper,
 	*PushGossiper[T],
 	error,
@@ -98,7 +99,7 @@ func NewSystem[T Gossipable](
 
 	metrics, err := NewMetrics(c.Registry, c.Namespace)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	handler := NewHandler(
@@ -120,7 +121,7 @@ func NewSystem[T Gossipable](
 		c.Namespace,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	validatorOnlyHandler := p2p.NewValidatorHandler(
 		throttledHandler,
@@ -175,11 +176,7 @@ func NewSystem[T Gossipable](
 		c.RegossipPeriod,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-
-	if err := network.AddHandler(c.HandlerID, gossipHandler); err != nil {
-		return nil, nil, err
-	}
-	return pullGossiperWhenValidator, pushGossiper, nil
+	return gossipHandler, pullGossiperWhenValidator, pushGossiper, nil
 }

@@ -105,7 +105,7 @@ func New(
 	// Set the defaults so that we can use `config.PullGossipFrequency` after
 	// the default has been set.
 	systemConfig.SetDefaults()
-	pullGossiper, pushGossiper, err := gossip.NewSystem(
+	handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 		nodeID,
 		p2pNetwork,
 		validators,
@@ -114,6 +114,9 @@ func New(
 		systemConfig,
 	)
 	if err != nil {
+		return nil, err
+	}
+	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
 		return nil, err
 	}
 

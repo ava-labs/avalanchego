@@ -43,7 +43,7 @@ func TestAtomicSyncerVM(t *testing.T) {
 					// spend the UTXOs from shared memory
 					importTx, err := atomicVM.newImportTx(atomicVM.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
 					require.NoError(t, err)
-					require.NoError(t, atomicVM.AtomicMempool.AddLocalTx(importTx))
+					require.NoError(t, atomicVM.mempool.AddLocalTx(importTx))
 					includedAtomicTxs = append(includedAtomicTxs, importTx)
 				case 1:
 					// export some of the imported UTXOs to test exportTx is properly synced
@@ -62,7 +62,7 @@ func TestAtomicSyncerVM(t *testing.T) {
 						vmtest.TestKeys[0:1],
 					)
 					require.NoError(t, err)
-					require.NoError(t, atomicVM.AtomicMempool.AddLocalTx(exportTx))
+					require.NoError(t, atomicVM.mempool.AddLocalTx(exportTx))
 					includedAtomicTxs = append(includedAtomicTxs, exportTx)
 				default: // Generate simple transfer transactions.
 					pk := vmtest.TestKeys[0].ToECDSA()
