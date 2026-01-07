@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package faultinjection
@@ -191,7 +191,7 @@ func (i *Injector) selectExperimentType() ExperimentType {
 		return ExperimentTypePodKill
 	}
 
-	r := rand.Intn(totalWeight) //nolint:gosec
+	r := rand.Intn(totalWeight)
 	if r < i.config.PodKillWeight {
 		return ExperimentTypePodKill
 	}
@@ -208,10 +208,10 @@ func (i *Injector) randomDuration() time.Duration {
 	if maxNanos <= minNanos {
 		return i.config.MinDuration
 	}
-	return time.Duration(minNanos + rand.Int63n(maxNanos-minNanos)) //nolint:gosec
+	return time.Duration(minNanos + rand.Int63n(maxNanos-minNanos))
 }
 
-func (i *Injector) generateExperimentName(experimentType ExperimentType) string {
+func (*Injector) generateExperimentName(experimentType ExperimentType) string {
 	return string(experimentType) + "-" + randomSuffix()
 }
 
@@ -248,7 +248,7 @@ func randomSuffix() string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, 8)
 	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))] //nolint:gosec
+		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(b)
 }

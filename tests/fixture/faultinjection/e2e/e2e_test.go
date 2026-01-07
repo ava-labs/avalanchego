@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package e2e
@@ -12,6 +12,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -19,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,15 +27,7 @@ func TestE2E(t *testing.T) {
 	ginkgo.RunSpecs(t, "fault injection e2e test suite")
 }
 
-const (
-	avalanchegoImage = "localhost:5001/avalanchego"
-
-	// Default recovery timeout after pod kill (nodes need time to bootstrap)
-	podRecoveryTimeout = 5 * time.Minute
-
-	// Health check polling interval
-	healthCheckInterval = 2 * time.Second
-)
+const avalanchegoImage = "localhost:5001/avalanchego"
 
 var (
 	kubeconfigVars *flags.KubeconfigVars
@@ -122,8 +114,8 @@ var _ = ginkgo.Describe("[Fault Injection]", func() {
 			tc.Log(),
 			kubeconfig,
 			chaosConfig,
-			namespace,           // chaos experiments created in same namespace
-			namespace,           // target namespace (where pods are)
+			namespace, // chaos experiments created in same namespace
+			namespace, // target namespace (where pods are)
 			network.UUID,
 		)
 		require.NoError(err)

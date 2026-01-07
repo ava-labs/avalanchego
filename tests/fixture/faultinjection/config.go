@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package faultinjection
@@ -14,13 +14,13 @@ const (
 	defaultChaosMaxDuration = 30 * time.Second
 
 	// Default weights for experiment types (relative probability)
-	defaultPodKillWeight     = 1
+	defaultPodKillWeight      = 1
 	defaultNetworkDelayWeight = 1
 	defaultNetworkLossWeight  = 1
 
 	// Default network chaos parameters
-	defaultNetworkLatency   = "100ms"
-	defaultNetworkJitter    = "50ms"
+	defaultNetworkLatency     = "100ms"
+	defaultNetworkJitter      = "50ms"
 	defaultNetworkLossPercent = "25"
 )
 
