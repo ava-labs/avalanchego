@@ -9,8 +9,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +17,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
@@ -50,6 +50,9 @@ const (
 )
 
 var (
+	//go:embed genesis.json
+	genesis []byte
+
 	flagVars *e2e.FlagVars
 
 	subnetA, cChainSubnetDetails *Subnet
@@ -81,9 +84,7 @@ func TestE2E(t *testing.T) {
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 	tc := e2e.NewTestContext()
-	nodes := tmpnet.NewNodesOrPanic(tmpnet.DefaultNodeCount)
-	_, thisFile, _, _ := runtime.Caller(0)
-	genesisPath := filepath.Join(filepath.Dir(thisFile), "genesis.json")
+	nodes := utils.NewTmpnetNodes(tmpnet.DefaultNodeCount)
 
 	env := e2e.NewTestEnvironment(
 		tc,
@@ -92,7 +93,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			"coreth-warp-e2e",
 			nodes,
 			tmpnet.FlagsMap{},
-			utils.NewTmpnetSubnet(subnetAName, genesisPath, utils.DefaultChainConfig, nodes...),
+			utils.NewTmpnetSubnet(subnetAName, genesis, utils.DefaultChainConfig, nodes...),
 		),
 	)
 
