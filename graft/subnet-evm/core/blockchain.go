@@ -985,7 +985,7 @@ func (bc *BlockChain) stopWithoutSaving() {
 		bc.txIndexer.close()
 	}
 
-	// Release the state snapshot, and stops generation goroutines
+	// Stop snapshot generation to prevent goroutine leaks
 	if bc.snaps != nil {
 		bc.snaps.Release()
 	}
