@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -19,7 +19,7 @@ type InboundMsgBuilder interface {
 		bytes []byte,
 		nodeID ids.NodeID,
 		onFinishedHandling func(),
-	) (InboundMessage, error)
+	) (*InboundMessage, error)
 }
 
 type inMsgBuilder struct {
@@ -32,7 +32,7 @@ func newInboundBuilder(builder *msgBuilder) InboundMsgBuilder {
 	}
 }
 
-func (b *inMsgBuilder) Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()) (InboundMessage, error) {
+func (b *inMsgBuilder) Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()) (*InboundMessage, error) {
 	return b.builder.parseInbound(bytes, nodeID, onFinishedHandling)
 }
 
@@ -41,16 +41,16 @@ func InboundGetStateSummaryFrontier(
 	requestID uint32,
 	deadline time.Duration,
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     GetStateSummaryFrontierOp,
-		message: &p2p.GetStateSummaryFrontier{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     GetStateSummaryFrontierOp,
+		Message: &p2p.GetStateSummaryFrontier{
 			ChainId:   chainID[:],
 			RequestId: requestID,
 			Deadline:  uint64(deadline),
 		},
-		expiration: time.Now().Add(deadline),
+		Expiration: time.Now().Add(deadline),
 	}
 }
 
@@ -59,16 +59,16 @@ func InboundStateSummaryFrontier(
 	requestID uint32,
 	summary []byte,
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     StateSummaryFrontierOp,
-		message: &p2p.StateSummaryFrontier{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     StateSummaryFrontierOp,
+		Message: &p2p.StateSummaryFrontier{
 			ChainId:   chainID[:],
 			RequestId: requestID,
 			Summary:   summary,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -78,17 +78,17 @@ func InboundGetAcceptedStateSummary(
 	heights []uint64,
 	deadline time.Duration,
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     GetAcceptedStateSummaryOp,
-		message: &p2p.GetAcceptedStateSummary{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     GetAcceptedStateSummaryOp,
+		Message: &p2p.GetAcceptedStateSummary{
 			ChainId:   chainID[:],
 			RequestId: requestID,
 			Deadline:  uint64(deadline),
 			Heights:   heights,
 		},
-		expiration: time.Now().Add(deadline),
+		Expiration: time.Now().Add(deadline),
 	}
 }
 
@@ -97,18 +97,18 @@ func InboundAcceptedStateSummary(
 	requestID uint32,
 	summaryIDs []ids.ID,
 	nodeID ids.NodeID,
-) InboundMessage {
+) *InboundMessage {
 	summaryIDBytes := make([][]byte, len(summaryIDs))
 	encodeIDs(summaryIDs, summaryIDBytes)
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     AcceptedStateSummaryOp,
-		message: &p2p.AcceptedStateSummary{
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     AcceptedStateSummaryOp,
+		Message: &p2p.AcceptedStateSummary{
 			ChainId:    chainID[:],
 			RequestId:  requestID,
 			SummaryIds: summaryIDBytes,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -117,16 +117,16 @@ func InboundGetAcceptedFrontier(
 	requestID uint32,
 	deadline time.Duration,
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     GetAcceptedFrontierOp,
-		message: &p2p.GetAcceptedFrontier{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     GetAcceptedFrontierOp,
+		Message: &p2p.GetAcceptedFrontier{
 			ChainId:   chainID[:],
 			RequestId: requestID,
 			Deadline:  uint64(deadline),
 		},
-		expiration: time.Now().Add(deadline),
+		Expiration: time.Now().Add(deadline),
 	}
 }
 
@@ -135,16 +135,16 @@ func InboundAcceptedFrontier(
 	requestID uint32,
 	containerID ids.ID,
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     AcceptedFrontierOp,
-		message: &p2p.AcceptedFrontier{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     AcceptedFrontierOp,
+		Message: &p2p.AcceptedFrontier{
 			ChainId:     chainID[:],
 			RequestId:   requestID,
 			ContainerId: containerID[:],
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -154,19 +154,19 @@ func InboundGetAccepted(
 	deadline time.Duration,
 	containerIDs []ids.ID,
 	nodeID ids.NodeID,
-) InboundMessage {
+) *InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     GetAcceptedOp,
-		message: &p2p.GetAccepted{
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     GetAcceptedOp,
+		Message: &p2p.GetAccepted{
 			ChainId:      chainID[:],
 			RequestId:    requestID,
 			Deadline:     uint64(deadline),
 			ContainerIds: containerIDBytes,
 		},
-		expiration: time.Now().Add(deadline),
+		Expiration: time.Now().Add(deadline),
 	}
 }
 
@@ -175,18 +175,18 @@ func InboundAccepted(
 	requestID uint32,
 	containerIDs []ids.ID,
 	nodeID ids.NodeID,
-) InboundMessage {
+) *InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     AcceptedOp,
-		message: &p2p.Accepted{
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     AcceptedOp,
+		Message: &p2p.Accepted{
 			ChainId:      chainID[:],
 			RequestId:    requestID,
 			ContainerIds: containerIDBytes,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -197,18 +197,18 @@ func InboundPushQuery(
 	container []byte,
 	requestedHeight uint64,
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     PushQueryOp,
-		message: &p2p.PushQuery{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     PushQueryOp,
+		Message: &p2p.PushQuery{
 			ChainId:         chainID[:],
 			RequestId:       requestID,
 			Deadline:        uint64(deadline),
 			Container:       container,
 			RequestedHeight: requestedHeight,
 		},
-		expiration: time.Now().Add(deadline),
+		Expiration: time.Now().Add(deadline),
 	}
 }
 
@@ -219,18 +219,18 @@ func InboundPullQuery(
 	containerID ids.ID,
 	requestedHeight uint64,
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     PullQueryOp,
-		message: &p2p.PullQuery{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     PullQueryOp,
+		Message: &p2p.PullQuery{
 			ChainId:         chainID[:],
 			RequestId:       requestID,
 			Deadline:        uint64(deadline),
 			ContainerId:     containerID[:],
 			RequestedHeight: requestedHeight,
 		},
-		expiration: time.Now().Add(deadline),
+		Expiration: time.Now().Add(deadline),
 	}
 }
 
@@ -241,18 +241,18 @@ func InboundChits(
 	preferredIDAtHeight ids.ID,
 	acceptedID ids.ID,
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     ChitsOp,
-		message: &p2p.Chits{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     ChitsOp,
+		Message: &p2p.Chits{
 			ChainId:             chainID[:],
 			RequestId:           requestID,
 			PreferredId:         preferredID[:],
 			PreferredIdAtHeight: preferredIDAtHeight[:],
 			AcceptedId:          acceptedID[:],
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -262,17 +262,17 @@ func InboundAppRequest(
 	deadline time.Duration,
 	msg []byte,
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     AppRequestOp,
-		message: &p2p.AppRequest{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     AppRequestOp,
+		Message: &p2p.AppRequest{
 			ChainId:   chainID[:],
 			RequestId: requestID,
 			Deadline:  uint64(deadline),
 			AppBytes:  msg,
 		},
-		expiration: time.Now().Add(deadline),
+		Expiration: time.Now().Add(deadline),
 	}
 }
 
@@ -282,17 +282,17 @@ func InboundAppError(
 	requestID uint32,
 	errorCode int32,
 	errorMessage string,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     AppErrorOp,
-		message: &p2p.AppError{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     AppErrorOp,
+		Message: &p2p.AppError{
 			ChainId:      chainID[:],
 			RequestId:    requestID,
 			ErrorCode:    errorCode,
 			ErrorMessage: errorMessage,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -301,16 +301,16 @@ func InboundAppResponse(
 	requestID uint32,
 	msg []byte,
 	nodeID ids.NodeID,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     AppResponseOp,
-		message: &p2p.AppResponse{
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID: nodeID,
+		Op:     AppResponseOp,
+		Message: &p2p.AppResponse{
 			ChainId:   chainID[:],
 			RequestId: requestID,
 			AppBytes:  msg,
 		},
-		expiration: mockable.MaxTime,
+		Expiration: mockable.MaxTime,
 	}
 }
 
@@ -318,12 +318,12 @@ func InboundAppResponse(
 func InboundSimplexMessage(
 	nodeID ids.NodeID,
 	msg *p2p.Simplex,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID:     nodeID,
-		op:         SimplexOp,
-		message:    msg,
-		expiration: mockable.MaxTime,
+) *InboundMessage {
+	return &InboundMessage{
+		NodeID:     nodeID,
+		Op:         SimplexOp,
+		Message:    msg,
+		Expiration: mockable.MaxTime,
 	}
 }
 

@@ -1,10 +1,10 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // AP1 defines constants used after the Apricot Phase 1 upgrade.
 package ap1
 
-import "github.com/ava-labs/avalanchego/graft/coreth/utils"
+import "github.com/ava-labs/avalanchego/graft/evm/utils"
 
 const (
 	// MinGasPrice is the minimum gas price of a transaction after the Apricot

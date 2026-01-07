@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Implements solidity tests.
@@ -155,32 +155,26 @@ var _ = ginkgo.Describe("[Warp]", func() {
 			var w *warpTest
 
 			ginkgo.BeforeAll(func() {
-				tc := e2e.NewTestContext()
-				w = newWarpTest(tc.DefaultContext(), combination.sendingSubnet(), combination.receivingSubnet())
+				w = newWarpTest(combination.sendingSubnet(), combination.receivingSubnet())
 			})
 
 			ginkgo.It("should send warp message from sending subnet", func() {
-				ginkgo.GinkgoLogr.Info("Sending message from sending subnet")
 				w.sendMessageFromSendingSubnet()
 			})
 
 			ginkgo.It("should aggregate signatures via API", func() {
-				ginkgo.GinkgoLogr.Info("Aggregating signatures via API")
 				w.aggregateSignaturesViaAPI()
 			})
 
 			ginkgo.It("should deliver addressed call payload to receiving subnet", func() {
-				ginkgo.GinkgoLogr.Info("Delivering addressed call payload to receiving subnet")
 				w.deliverAddressedCallToReceivingSubnet()
 			})
 
 			ginkgo.It("should deliver block hash payload", func() {
-				ginkgo.GinkgoLogr.Info("Delivering block hash payload to receiving subnet")
 				w.deliverBlockHashPayload()
 			})
 
 			ginkgo.It("should handle warp load testing", func() {
-				ginkgo.GinkgoLogr.Info("Executing warp load test")
 				w.warpLoad()
 			})
 		})
@@ -216,8 +210,10 @@ type warpTest struct {
 	addressedCallSignedMessage   *avalancheWarp.Message
 }
 
-func newWarpTest(ctx context.Context, sendingSubnet *Subnet, receivingSubnet *Subnet) *warpTest {
+func newWarpTest(sendingSubnet *Subnet, receivingSubnet *Subnet) *warpTest {
 	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	ctx := tc.DefaultContext()
 
 	sendingSubnetFundedKey := sendingSubnet.PreFundedKey
 	receivingSubnetFundedKey := receivingSubnet.PreFundedKey
@@ -278,9 +274,9 @@ func (w *warpTest) initClients() {
 }
 
 func (w *warpTest) sendMessageFromSendingSubnet() {
+	require := require.New(ginkgo.GinkgoT())
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
-	require := require.New(ginkgo.GinkgoT())
 
 	client := w.sendingSubnetClients[0]
 
