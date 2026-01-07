@@ -690,6 +690,57 @@ func TestGetDiskSpaceConfig(t *testing.T) {
 	}
 }
 
+func TestGetMemoryConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      map[string]uint64
+		expectedErr error
+	}{
+		{
+			name:   "empty config",
+			config: map[string]uint64{},
+		},
+		{
+			name: "valid config",
+			config: map[string]uint64{
+				SystemTrackerWarningAvailableMemoryPercentageKey:  maxMemorySpaceThreshold,
+				SystemTrackerRequiredAvailableMemoryPercentageKey: 1,
+			},
+		},
+		{
+			name: "invalid config - warning less than required",
+			config: map[string]uint64{
+				SystemTrackerWarningAvailableMemoryPercentageKey:  25,
+				SystemTrackerRequiredAvailableMemoryPercentageKey: 30,
+			},
+			expectedErr: errMemoryWarnAfterFatal,
+		},
+		{
+			name: "invalid config - warning too big",
+			config: map[string]uint64{
+				SystemTrackerWarningAvailableMemoryPercentageKey:  maxMemorySpaceThreshold + 1,
+				SystemTrackerRequiredAvailableMemoryPercentageKey: 15,
+			},
+			expectedErr: errMemorySpaceOutOfRange,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+
+			for key, value := range tt.config {
+				v.Set(key, value)
+			}
+
+			_, err := GetNodeConfig(v)
+
+			require.ErrorIs(err, tt.expectedErr)
+		})
+	}
+}
+
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := filepath.Join(rootPath, "config.json")

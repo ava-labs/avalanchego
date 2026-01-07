@@ -13,6 +13,9 @@ The plugin version is unchanged at `44` and is compatible with version `v1.14.0`
 - Added:
   - `--system-tracker-disk-required-available-space-percentage`
   - `--system-tracker-disk-warning-available-space-percentage`
+  - `--system-tracker-memory-required-available-space-percentage`
+  - `--system-tracker-memory-warning-available-space-percentage`
+
 - Deprecated:
   - `--system-tracker-disk-required-available-space`
   - `--system-tracker-disk-warning-threshold-available-space`
