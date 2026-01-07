@@ -9,8 +9,10 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
@@ -56,7 +58,8 @@ func FillAccountsWithOverlappingStorage(
 // Returns the root of the generated trie, the slice of keys inserted into the trie in lexicographical
 // order, and the slice of corresponding values.
 //
-// This is safe for use with HashDB.
+// This is safe for use with HashDB, intended for use creating a storage trie independent of an account,
+// or for an atomic trie.
 func GenerateIndependentTrie(t *testing.T, r *rand.Rand, trieDB *triedb.Database, numKeys int, keySize int) (common.Hash, [][]byte, [][]byte) {
 	require.GreaterOrEqual(t, keySize, wrappers.LongLen+1, "key size must be at least 9 bytes (8 bytes for uint64 and 1 random byte)")
 	return FillIndependentTrie(t, r, 0, numKeys, keySize, trieDB, types.EmptyRootHash)
@@ -79,7 +82,7 @@ func FillIndependentTrie(t *testing.T, r *rand.Rand, start, numKeys int, keySize
 		binary.BigEndian.PutUint64(key[:wrappers.LongLen], uint64(i+1))
 		_, err := r.Read(key[wrappers.LongLen:])
 		require.NoError(t, err)
-		value := make([]byte, r.Intn(128)+128) // min 128 bytes, max 256 bytes
+		value := make([]byte, r.Intn(128)+128) // min 128 bytes, max 255 bytes
 		_, err = r.Read(value)
 		require.NoError(t, err)
 
@@ -202,6 +205,23 @@ func FillAccounts(
 	return newRoot, accounts
 }
 
+func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.Database, numAccounts int) common.Hash {
+	newRoot, _ := FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
+		codeBytes := make([]byte, 256)
+		_, err := r.Read(codeBytes)
+		require.NoError(t, err, "error reading random code bytes")
+
+		codeHash := crypto.Keccak256Hash(codeBytes)
+		rawdb.WriteCode(serverDB.DiskDB(), codeHash, codeBytes)
+		account.CodeHash = codeHash[:]
+
+		// now create state trie
+		FillStorageForAccount(t, r, 16, addr, storageTr)
+		return account
+	})
+	return newRoot
+}
+
 // FillStorageForAccount adds [numStorageKeys] random key-value pairs to the storage trie for [addr] in [storageTr].
 func FillStorageForAccount(
 	t *testing.T, r *rand.Rand, numStorageKeys int,
@@ -223,7 +243,7 @@ func makeKeyValues(t *testing.T, r *rand.Rand, numKeys, keySize int) ([][]byte, 
 		_, err := r.Read(key)
 		require.NoError(t, err)
 
-		value := make([]byte, r.Intn(128)+128) // min 128 bytes, max 256 bytes
+		value := make([]byte, r.Intn(128)+128) // min 128 bytes, max 255 bytes
 		_, err = r.Read(value)
 		require.NoError(t, err)
 

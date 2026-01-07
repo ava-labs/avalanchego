@@ -53,7 +53,9 @@ func testSync(t *testing.T, test syncTest) {
 	}
 	r := rand.New(rand.NewSource(1))
 	clientDB, serverDB, root := test.prepareForTest(t, r)
-	clientEthDB := clientDB.DiskDB().(ethdb.Database)
+	clientEthDB, ok := clientDB.DiskDB().(ethdb.Database)
+	require.Truef(t, ok, "%T is not ethdb.Database", clientDB.DiskDB())
+
 	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverDB.TrieDB(), message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
 	mockClient := statesyncclient.NewTestClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
@@ -143,7 +145,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with code and storage": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root := fillAccountsWithStorage(t, r, serverDB, numAccounts)
+				root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, numAccounts)
 				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 		},
@@ -180,7 +182,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"failed to fetch code": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root := fillAccountsWithStorage(t, r, serverDB, numAccountsSmall)
+				root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, numAccountsSmall)
 				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 			GetCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {
@@ -206,7 +208,7 @@ func TestCancelSync(t *testing.T) {
 		prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 			// Create trie with 2000 accounts (more than one leaf request)
 			serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-			root := fillAccountsWithStorage(t, r, serverDB, 2000)
+			root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, 2000)
 			return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 		},
 		expectedError: context.Canceled,
@@ -569,29 +571,12 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB state.Database
 	require.Equal(t, trieAccountLeaves, numSnapshotAccounts)
 }
 
-func fillAccountsWithStorage(t *testing.T, r *rand.Rand, serverDB state.Database, numAccounts int) common.Hash {
-	newRoot, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
-		codeBytes := make([]byte, 256)
-		_, err := r.Read(codeBytes)
-		require.NoError(t, err, "error reading random code bytes")
-
-		codeHash := crypto.Keccak256Hash(codeBytes)
-		rawdb.WriteCode(serverDB.DiskDB(), codeHash, codeBytes)
-		account.CodeHash = codeHash[:]
-
-		// now create state trie
-		synctest.FillStorageForAccount(t, r, 16, addr, storageTr)
-		return account
-	})
-	return newRoot
-}
-
 func TestDifferentWaitContext(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 	// Create trie with many accounts to ensure sync takes time
-	root := fillAccountsWithStorage(t, r, serverDB, 2000)
-	clientDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+	root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, 2000)
+	clientEthDB := rawdb.NewMemoryDatabase()
 
 	// Track requests to show sync continues after Wait returns
 	var requestCount int64
@@ -611,7 +596,7 @@ func TestDifferentWaitContext(t *testing.T) {
 	s, err := NewStateSyncer(&StateSyncerConfig{
 		Client:                   mockClient,
 		Root:                     root,
-		DB:                       clientDB.DiskDB().(ethdb.Database),
+		DB:                       clientEthDB,
 		BatchSize:                1000,
 		NumCodeFetchingWorkers:   DefaultNumCodeFetchingWorkers,
 		MaxOutstandingCodeHashes: DefaultMaxOutstandingCodeHashes,
