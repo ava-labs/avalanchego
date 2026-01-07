@@ -86,7 +86,7 @@ func main() {
 
 	for i := startBlockArg; i <= endBlockArg; i += 1 {
 		nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
-		r.NoError(err)
+		r.NoErrorf(err, "failed to get nonce at block %d", i)
 		r.Zero(nonce)
 	}
 }
