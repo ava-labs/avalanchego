@@ -6,9 +6,6 @@ package e2e
 import (
 	"context"
 	"flag"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -31,11 +28,6 @@ func TestE2E(t *testing.T) {
 }
 
 const (
-	// The relative path to the repo root enables discovery of the
-	// repo root when the test is executed from the root or the path
-	// of this file.
-	repoRelativePath = "tests/fixture/faultinjection/e2e"
-
 	avalanchegoImage = "localhost:5001/avalanchego"
 
 	// Default recovery timeout after pod kill (nodes need time to bootstrap)
@@ -46,19 +38,12 @@ const (
 )
 
 var (
-	kubeconfigVars       *flags.KubeconfigVars
-	skipImageBuild       bool
-	kubeImage            string
+	kubeconfigVars *flags.KubeconfigVars
+	kubeImage      string
 )
 
 func init() {
 	kubeconfigVars = flags.NewKubeconfigFlagVars()
-	flag.BoolVar(
-		&skipImageBuild,
-		"skip-image-build",
-		false,
-		"whether to skip building the avalanchego image",
-	)
 	flag.StringVar(
 		&kubeImage,
 		"kube-image",
@@ -71,13 +56,6 @@ var _ = ginkgo.Describe("[Fault Injection]", func() {
 	ginkgo.It("should inject pod-kill and recover", func() {
 		tc := e2e.NewTestContext()
 		require := require.New(tc)
-
-		if !skipImageBuild {
-			ginkgo.By("Building the avalanchego image")
-			buildAvalanchegoImage(tc, avalanchegoImage)
-		} else {
-			tc.Log().Warn("skipping build of avalanchego image")
-		}
 
 		ginkgo.By("Configuring kubernetes clients")
 		kubeconfig, err := tmpnet.GetClientConfig(tc.Log(), kubeconfigVars.Path, kubeconfigVars.Context)
@@ -215,30 +193,3 @@ var _ = ginkgo.Describe("[Fault Injection]", func() {
 		tc.Log().Info("chaos injection verified successfully")
 	})
 })
-
-func buildAvalanchegoImage(tc *e2e.GinkgoTestContext, imageName string) {
-	require := require.New(tc)
-
-	repoRoot, err := e2e.GetRepoRootPath(repoRelativePath)
-	require.NoError(err)
-
-	args := []string{
-		"-x", // Ensure script output to aid in debugging
-		filepath.Join(repoRoot, "scripts", "build_image.sh"),
-	}
-
-	cmd := exec.CommandContext(
-		tc.ContextWithTimeout(e2e.DefaultTimeout*2),
-		"bash",
-		args...,
-	) // #nosec G204
-	cmd.Env = append(os.Environ(),
-		"DOCKER_IMAGE="+imageName,
-		"FORCE_TAG_MASTER=1",
-		"SKIP_BUILD_RACE=1",
-	)
-	cmd.Stdout = ginkgo.GinkgoWriter
-	cmd.Stderr = ginkgo.GinkgoWriter
-	output, err := cmd.CombinedOutput()
-	require.NoError(err, "Image build failed: %s", output)
-}

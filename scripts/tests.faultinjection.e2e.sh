@@ -44,5 +44,4 @@ echo "Running fault injection e2e tests..."
   -- \
   --kube-image="${AVALANCHEGO_IMAGE}:master" \
   ${KUBECONFIG_CONTEXT} \
-  --skip-image-build \
   "$@"
