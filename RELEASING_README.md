@@ -79,8 +79,6 @@ Coreth is compiled directly into AvalancheGo - there is no separate release arti
    Version string = "v0.15.1"
    ```
 
-1. Update [`graft/coreth/RELEASES.md`](graft/coreth/RELEASES.md) - rename "Pending" section.
-
 #### Subnet-EVM
 
 1. Update [`graft/subnet-evm/plugin/evm/version.go`](graft/subnet-evm/plugin/evm/version.go):
@@ -94,8 +92,6 @@ Coreth is compiled directly into AvalancheGo - there is no separate release arti
    ```json
    "v1.14.1": 45,
    ```
-
-1. Update [`graft/subnet-evm/RELEASES.md`](graft/subnet-evm/RELEASES.md).
 
 1. Update [`graft/subnet-evm/README.md`](graft/subnet-evm/README.md) compatibility section.
 
@@ -416,8 +412,8 @@ export NEXT_VERSION=v1.14.2
 | Component | Version File | Other Files | Notes |
 |-----------|-------------|-------------|-------|
 | AvalancheGo | [`version/constants.go`](version/constants.go) | [`RELEASES.md`](RELEASES.md), [`version/compatibility.json`](version/compatibility.json) | Primary version |
-| Coreth | [`graft/coreth/plugin/evm/version.go`](graft/coreth/plugin/evm/version.go) | [`graft/coreth/RELEASES.md`](graft/coreth/RELEASES.md) | Informational only (no separate release) |
-| Subnet-EVM | [`graft/subnet-evm/plugin/evm/version.go`](graft/subnet-evm/plugin/evm/version.go) | [`graft/subnet-evm/RELEASES.md`](graft/subnet-evm/RELEASES.md), [`graft/subnet-evm/compatibility.json`](graft/subnet-evm/compatibility.json) | Aligned with AvalancheGo |
+| Coreth | [`graft/coreth/plugin/evm/version.go`](graft/coreth/plugin/evm/version.go) | | Informational only (no separate release) |
+| Subnet-EVM | [`graft/subnet-evm/plugin/evm/version.go`](graft/subnet-evm/plugin/evm/version.go) | [`graft/subnet-evm/compatibility.json`](graft/subnet-evm/compatibility.json) | Aligned with AvalancheGo |
 
 ## RPC Chain VM Protocol Version
 
