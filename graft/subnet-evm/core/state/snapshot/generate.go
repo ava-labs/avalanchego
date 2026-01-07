@@ -337,8 +337,11 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	dl.lock.Unlock()
 
 	// Someone will be looking for us, wait it out
-	abort := <-genAbort
-	close(abort)
+	// If genAbort is nil, stopGeneration() already ran and we can exit
+	if genAbort != nil {
+		abort := <-genAbort
+		close(abort)
+	}
 }
 
 func newMeteredSnapshotCache(size int) *utils.MeteredCache {
