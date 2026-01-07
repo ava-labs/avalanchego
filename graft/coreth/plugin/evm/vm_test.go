@@ -2264,7 +2264,7 @@ func TestFirewoodArchivalNode(t *testing.T) {
 	client, err := ethclient.Dial(server.URL)
 	require.NoError(err)
 
-	for i := 1; i <= numBlocks; i++ {
+	for i := 0; i <= numBlocks; i++ {
 		nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
 		require.NoErrorf(err, "failed to get nonce at block %d", i)
 		require.Zero(nonce)
