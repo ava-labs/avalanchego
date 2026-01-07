@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -370,9 +370,7 @@ func newDbConfig(t *testing.T, scheme string) *triedb.Config {
 	case rawdb.PathScheme:
 		return &triedb.Config{DBOverride: pathdb.Defaults.BackendConstructor}
 	case customrawdb.FirewoodScheme:
-		fwCfg := firewood.Defaults
-		// Create a unique temporary directory for each test
-		fwCfg.ChainDataDir = t.TempDir()
+		fwCfg := firewood.DefaultConfig(t.TempDir())
 		return &triedb.Config{DBOverride: fwCfg.BackendConstructor}
 	default:
 		t.Fatalf("unknown scheme %s", scheme)
