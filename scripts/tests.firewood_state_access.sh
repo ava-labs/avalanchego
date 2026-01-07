@@ -53,10 +53,10 @@ if [[ -n "$TEST_NAME" ]]; then
             show_usage
             exit 0
             ;;
-        firewood-archive-1m)
-            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-archive-1m}"
+        firewood-archive-250k)
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-archive-250k}"
             START_BLOCK="${START_BLOCK:-0}"
-            END_BLOCK="${END_BLOCK:-1_000_000}"
+            END_BLOCK="${END_BLOCK:-250_000}"
             ;;
         *)
             error "Unknown test '$TEST_NAME'"
