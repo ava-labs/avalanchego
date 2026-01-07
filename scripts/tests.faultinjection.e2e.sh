@@ -37,12 +37,6 @@ else
     echo "Defaulting to 'kind-kind' context"
 fi
 
-# Determine if we should skip the image build in ginkgo (we already built it above)
-SKIP_IMAGE_BUILD_FLAG=""
-if [[ -n "${SKIP_BUILD_IMAGE:-}" ]]; then
-  SKIP_IMAGE_BUILD_FLAG="--skip-image-build"
-fi
-
 echo "Running fault injection e2e tests..."
 ./bin/ginkgo -v \
   --timeout=30m \
@@ -50,6 +44,5 @@ echo "Running fault injection e2e tests..."
   -- \
   --kube-image="${AVALANCHEGO_IMAGE}:master" \
   ${KUBECONFIG_CONTEXT} \
-  ${SKIP_IMAGE_BUILD_FLAG} \
   --skip-image-build \
   "$@"
