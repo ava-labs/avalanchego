@@ -40,7 +40,7 @@ Usage: $0 [test-name]
 Available tests:
   help                         - Show this help message
 
-  firewood-archive-1m          - Query the first 1m blocks with Firewood archive.
+  firewood-archive-250k          - Query the first 250k blocks with Firewood archive.
 EOF
 }
 
