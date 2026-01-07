@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package extras
@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
@@ -18,15 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 )
 
 func TestVerifyWithChainConfig(t *testing.T) {
 	admins := []common.Address{{1}}
 	c := *TestChainConfig
 	config := &c
-	config.SnowCtx = utilstest.NewTestSnowContext(t)
+	config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 	config.GenesisPrecompiles = Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(2), nil, nil, nil),
 	}
@@ -72,7 +72,7 @@ func TestVerifyWithChainConfigAtNilTimestamp(t *testing.T) {
 	admins := []common.Address{{0}}
 	c := *TestChainConfig
 	config := &c
-	config.SnowCtx = utilstest.NewTestSnowContext(t)
+	config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 	config.PrecompileUpgrades = []PrecompileUpgrade{
 		// this does NOT enable the precompile, so it should be upgradeable.
 		{Config: txallowlist.NewConfig(nil, nil, nil, nil)},
@@ -193,7 +193,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 			require := require.New(t)
 			c := *TestChainConfig
 			config := &c
-			config.SnowCtx = utilstest.NewTestSnowContext(t)
+			config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 			config.PrecompileUpgrades = tt.upgrades
 
 			err := config.Verify()
@@ -234,7 +234,7 @@ func TestVerifyPrecompiles(t *testing.T) {
 			require := require.New(t)
 			c := *TestChainConfig
 			config := &c
-			config.SnowCtx = utilstest.NewTestSnowContext(t)
+			config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 			config.GenesisPrecompiles = tt.precompiles
 
 			err := config.Verify()
@@ -248,7 +248,7 @@ func TestVerifyRequiresSortedTimestamps(t *testing.T) {
 	config := &ChainConfig{
 		FeeConfig: DefaultFeeConfig,
 		AvalancheContext: AvalancheContext{
-			SnowCtx: utilstest.NewTestSnowContext(t),
+			SnowCtx: utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID),
 		},
 	}
 	config.PrecompileUpgrades = []PrecompileUpgrade{
