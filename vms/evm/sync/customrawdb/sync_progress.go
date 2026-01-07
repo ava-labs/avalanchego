@@ -78,6 +78,16 @@ func NewCodeToFetchIterator(db ethdb.Iteratee) ethdb.Iterator {
 	)
 }
 
+// ParseCodeToFetchKey parses a code hash out of a key produced by [NewCodeToFetchIterator].
+func ParseCodeToFetchKey(key []byte) common.Hash {
+	return common.BytesToHash(key[len(CodeToFetchPrefix):])
+}
+
+// ClearAllCodeToFetch removes all outstanding "code to fetch" markers from db.
+func ClearAllCodeToFetch(db ethdb.KeyValueStore) error {
+	return clearPrefix(db, CodeToFetchPrefix, codeToFetchKeyLength)
+}
+
 func codeToFetchKey(codeHash common.Hash) []byte {
 	codeToFetchKey := make([]byte, codeToFetchKeyLength)
 	copy(codeToFetchKey, CodeToFetchPrefix)
