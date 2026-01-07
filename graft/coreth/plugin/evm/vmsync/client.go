@@ -36,7 +36,6 @@ const BlocksToFetch = 256
 var (
 	stateSyncSummaryKey = []byte("stateSyncSummary")
 
-	errSkipSync            = errors.New("skip sync")
 	errBlockNotFound       = errors.New("block not found in state")
 	errInvalidBlockType    = errors.New("invalid block wrapper type")
 	errBlockHashMismatch   = errors.New("block hash mismatch")
@@ -121,8 +120,8 @@ type client struct {
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
 	err              error
-	stateSyncOnce    sync.Once  // ensures only one state sync can be in progress at a time
-	executor         Executor   // executor manages sync execution (static or dynamic)
+	stateSyncOnce    sync.Once // ensures only one state sync can be in progress at a time
+	executor         Executor  // executor manages sync execution (static or dynamic)
 }
 
 func NewClient(config *ClientConfig) Client {

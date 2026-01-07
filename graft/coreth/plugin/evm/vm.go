@@ -667,6 +667,8 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		MinBlocks:          vm.config.StateSyncMinBlocks,
 		RequestSize:        vm.config.StateSyncRequestSize,
 		LastAcceptedHeight: lastAcceptedHeight, // TODO clean up how this is passed around
+		DynamicStateSyncEnabled: vm.config.StateSyncDynamicEnabled,
+		PivotInterval:           vm.config.StateSyncPivotInterval,
 		ChainDB:            vm.chaindb,
 		VerDB:              vm.versiondb,
 		MetadataDB:         vm.metadataDB,

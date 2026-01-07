@@ -138,6 +138,14 @@ type Config struct {
 	StateSyncMinBlocks       uint64 `json:"state-sync-min-blocks"`
 	StateSyncRequestSize     uint16 `json:"state-sync-request-size"`
 
+	// Dynamic state sync settings
+	//
+	// StateSyncDynamicEnabled toggles dynamic (deferred block operation) orchestration.
+	// When false, the VM performs the existing static state sync flow.
+	StateSyncDynamicEnabled bool `json:"state-sync-dynamic-enabled"`
+	// StateSyncPivotInterval advances the dynamic sync target every N blocks.
+	StateSyncPivotInterval uint64 `json:"state-sync-pivot-interval"`
+
 	// Database Settings
 	InspectDatabase bool `json:"inspect-database"` // Inspects the database on startup if enabled.
 
