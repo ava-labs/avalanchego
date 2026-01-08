@@ -119,6 +119,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
+
 	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
 		return nil, err
 	}
