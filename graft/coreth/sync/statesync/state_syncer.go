@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -24,7 +25,15 @@ import (
 )
 
 const (
-	segmentThreshold       = 500_000 // if we estimate trie to have greater than this number of leafs, split it
+	// Segment threshold constants for adaptive sizing
+	baseSegmentThreshold = 500_000   // Default threshold for medium-memory systems
+	lowMemThreshold      = 250_000   // Conservative threshold for <8GB systems
+	highMemThreshold     = 1_000_000 // Aggressive threshold for >=16GB systems
+
+	// Memory tier thresholds in GB
+	lowMemoryGB  = 8
+	highMemoryGB = 16
+
 	numStorageTrieSegments = 4
 	numMainTrieSegments    = 8
 	defaultNumWorkers      = 12 // Tested working value - balances performance vs memory usage
@@ -34,7 +43,43 @@ var (
 	_                           syncpkg.Syncer = (*stateSync)(nil)
 	errCodeRequestQueueRequired                = errors.New("code request queue is required")
 	errLeafsRequestSizeRequired                = errors.New("leafs request size must be > 0")
+
+	// Cache the computed segment threshold to avoid repeated memory stats calls
+	cachedSegmentThreshold     uint64
+	segmentThresholdComputedOnce sync.Once
 )
+
+// getSegmentThreshold returns the adaptive segment threshold based on available system memory.
+// Caches the result since system memory doesn't change during runtime.
+func getSegmentThreshold() uint64 {
+	segmentThresholdComputedOnce.Do(func() {
+		var memStats runtime.MemStats
+		runtime.ReadMemStats(&memStats)
+
+		// Calculate total system memory (approximated from heap limit)
+		// Sys includes all memory obtained from OS, giving us a reasonable estimate
+		totalMemoryGB := float64(memStats.Sys) / (1024 * 1024 * 1024)
+
+		switch {
+		case totalMemoryGB < lowMemoryGB:
+			// Conservative for low-memory nodes
+			cachedSegmentThreshold = lowMemThreshold
+			log.Info("Using conservative segment threshold for low-memory system",
+				"threshold", cachedSegmentThreshold, "memoryGB", totalMemoryGB)
+		case totalMemoryGB >= highMemoryGB:
+			// Aggressive for high-memory nodes
+			cachedSegmentThreshold = highMemThreshold
+			log.Info("Using aggressive segment threshold for high-memory system",
+				"threshold", cachedSegmentThreshold, "memoryGB", totalMemoryGB)
+		default:
+			// Default for medium-memory nodes
+			cachedSegmentThreshold = baseSegmentThreshold
+			log.Info("Using default segment threshold for medium-memory system",
+				"threshold", cachedSegmentThreshold, "memoryGB", totalMemoryGB)
+		}
+	})
+	return cachedSegmentThreshold
+}
 
 // stateSync keeps the state of the entire state sync operation.
 type stateSync struct {
@@ -97,9 +142,9 @@ func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, co
 		triesInProgressSem: make(chan struct{}, defaultNumWorkers),
 
 		// Each [trieToSync] will have a maximum of [numSegments] segments.
-		// We set the capacity of [segments] such that [defaultNumWorkers]
-		// storage tries can sync concurrently.
-		segments:         make(chan syncclient.LeafSyncTask, defaultNumWorkers*numStorageTrieSegments),
+		// We set the capacity of [segments] to accommodate the main trie (8 segments)
+		// plus concurrent storage tries. Sized for main trie to avoid blocking during initialization.
+		segments:         make(chan syncclient.LeafSyncTask, defaultNumWorkers*numMainTrieSegments),
 		mainTrieDone:     make(chan struct{}),
 		storageTriesDone: make(chan struct{}),
 		batchSize:        ethdb.IdealBatchSize * 4, // 4x larger batches = fewer DB writes (I/O optimization)

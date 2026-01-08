@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-const MaxCodeHashesPerRequest = 5
+const MaxCodeHashesPerRequest = 64
 
 var _ Request = LeafsRequest{}
 

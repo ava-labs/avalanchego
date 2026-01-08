@@ -116,11 +116,27 @@ func (q *CodeQueue) closeChannelOnce() bool {
 }
 
 // AddCode persists and enqueues new code hashes.
-// Persists idempotent "to-fetch" markers for all inputs and enqueues them as-is.
+// Deduplicates within the batch, then persists idempotent "to-fetch" markers and enqueues unique hashes.
 // Returns errAddCodeAfterFinalize after a clean finalize and errFailedToAddCodeHashesToQueue on early quit.
 func (q *CodeQueue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
+	}
+
+	// Dedupe within this batch before any processing to reduce channel contention.
+	// Many contracts share code (proxies, token implementations), so this is common.
+	seen := make(map[common.Hash]struct{}, len(codeHashes))
+	dedupedHashes := make([]common.Hash, 0, len(codeHashes))
+	for _, h := range codeHashes {
+		if _, exists := seen[h]; exists {
+			continue // Skip duplicate within this batch
+		}
+		seen[h] = struct{}{}
+		dedupedHashes = append(dedupedHashes, h)
+	}
+
+	if len(dedupedHashes) == 0 {
+		return nil // All were duplicates
 	}
 
 	// Mark this enqueue as in-flight immediately so shutdown paths wait for us
@@ -134,12 +150,12 @@ func (q *CodeQueue) AddCode(ctx context.Context, codeHashes []common.Hash) error
 	}
 
 	batch := q.db.NewBatch()
-	// Persist all input hashes as to-fetch markers. Consumer will dedupe and skip
-	// already-present code. Persisting all enables consumer-side retry.
+	// Persist all deduplicated hashes as to-fetch markers. Consumer will further
+	// dedupe against already-present code. Persisting enables consumer-side retry.
 	// Note: markers are keyed by code hash, so repeated persists overwrite the same
 	// key rather than growing DB usage. The consumer deletes the marker after
 	// fulfilling the request (or when it detects code is already present).
-	for _, codeHash := range codeHashes {
+	for _, codeHash := range dedupedHashes {
 		if err := customrawdb.WriteCodeToFetch(batch, codeHash); err != nil {
 			return fmt.Errorf("failed to write code to fetch marker: %w", err)
 		}
@@ -149,7 +165,7 @@ func (q *CodeQueue) AddCode(ctx context.Context, codeHashes []common.Hash) error
 		return fmt.Errorf("failed to write batch of code to fetch markers due to: %w", err)
 	}
 
-	for _, h := range codeHashes {
+	for _, h := range dedupedHashes {
 		select {
 		case q.in <- h: // guaranteed to be open or nil, but never closed
 		case <-q.quit:

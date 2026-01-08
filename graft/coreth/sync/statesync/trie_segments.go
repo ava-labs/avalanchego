@@ -398,11 +398,11 @@ func (t *trieToSync) shouldSegment() bool {
 		return false
 	}
 
-	// Return true iff the estimated size of the trie exceeds [segmentThreshold].
+	// Return true iff the estimated size of the trie exceeds the adaptive segment threshold.
 	// Note: at this point there is only a single segment (loadSegments guarantees there
 	// is at least one segment).
 	segment := t.segments[0]
-	return segment.estimateSize() >= uint64(segmentThreshold)
+	return segment.estimateSize() >= getSegmentThreshold()
 }
 
 // divide the key space into [numSegments] consecutive segments.
@@ -525,7 +525,7 @@ func (t *trieSegment) OnLeafs(ctx context.Context, keys, vals [][]byte) error {
 	// Cache leaf data for parallel hashing (I/O optimization)
 	// This avoids re-reading from DB during the hashing phase
 	for i := range keys {
-		t.cachedKeys = append(t.cachedKeys, common.CopyBytes(keys[i]))
+		t.cachedKeys = append(t.cachedKeys, keys[i]) // Keys are immutable hashes - no copy needed
 		t.cachedVals = append(t.cachedVals, common.CopyBytes(vals[i]))
 	}
 

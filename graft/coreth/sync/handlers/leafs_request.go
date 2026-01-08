@@ -58,32 +58,20 @@ func newProofDBPool() *proofDBPool {
 	}
 }
 
-// get retrieves a proof database from the pool, creating a new one if none available.
+// get creates a new proof database.
+// Note: We don't actually pool these anymore because memorydb.New() is very cheap (just map allocation),
+// while clearing an existing database is O(n). Simpler to create new and let GC reclaim old ones.
 func (p *proofDBPool) get() *memorydb.Database {
-	return p.pool.Get().(*memorydb.Database)
+	return memorydb.New()
 }
 
-// put returns a proof database to the pool after clearing its contents.
+// put closes the proof database and allows GC to reclaim it.
+// We don't return it to the pool since clearing is more expensive than creating new.
 func (p *proofDBPool) put(db *memorydb.Database) {
 	if db == nil {
 		return
 	}
-	// Clear the database before returning to pool to avoid retaining old data
-	// We iterate and delete all keys to reset the database state
-	it := db.NewIterator(nil, nil)
-	keysToDelete := make([][]byte, 0, db.Len())
-	for it.Next() {
-		keysToDelete = append(keysToDelete, common.CopyBytes(it.Key()))
-	}
-	it.Release()
-
-	batch := db.NewBatch()
-	for _, key := range keysToDelete {
-		_ = batch.Delete(key) // memorydb delete doesn't error
-	}
-	_ = batch.Write() // memorydb write doesn't error
-
-	p.pool.Put(db)
+	_ = db.Close()
 }
 
 type LeafRequestHandler interface {
@@ -323,6 +311,10 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 	// The data from the snapshot could not be validated as a whole. It is still likely
 	// most of the data from the snapshot is useable, so we try to validate smaller
 	// segments of the data and use them in the response.
+	// Smart early termination: if we hit multiple consecutive failures, the snapshot
+	// is likely stale and we should stop wasting CPU on validation.
+	const maxConsecutiveFailures = 3
+	consecutiveFailures := 0
 	hasGap := false
 	for i := 0; i < len(snapKeys); i += segmentLen {
 		segmentEnd := min(i+segmentLen, len(snapKeys))
@@ -335,11 +327,18 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 		if !ok {
 			// segment is not valid
 			rb.stats.IncSnapshotSegmentInvalid()
+			consecutiveFailures++
+			if consecutiveFailures >= maxConsecutiveFailures {
+				// Snapshot is clearly stale - stop validating remaining segments
+				// to avoid wasting CPU on expensive proof generation
+				break
+			}
 			hasGap = true
 			continue
 		}
 
-		// segment is valid
+		// segment is valid - reset consecutive failure counter
+		consecutiveFailures = 0
 		rb.stats.IncSnapshotSegmentValid()
 		if hasGap {
 			// if there is a gap between valid segments, fill the gap with data from the trie
