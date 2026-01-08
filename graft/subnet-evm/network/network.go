@@ -492,7 +492,7 @@ func (n *network) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, r
 	return waitingHandler.WaitForResult(ctx)
 }
 
-// P2pNetwork returns the p2p network
+// P2PNetwork returns the p2p network
 func (n *network) P2PNetwork() *p2p.Network {
 	return n.sdkNetwork
 }
