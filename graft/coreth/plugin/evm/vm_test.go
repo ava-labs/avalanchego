@@ -2212,12 +2212,12 @@ func TestInspectDatabases(t *testing.T) {
 	require.NoError(t, vm.inspectDatabases())
 }
 
-// Tests that querying states no longer in memory is still possible when using
-// Firewood in archive mode.
+// Tests that querying states no longer in memory is still possible when in
+// archival mode.
 //
 // Querying for the nonce of the zero address at various heights is sufficient
 // as this succeeds only if the EVM has the matching trie at each height.
-func TestFirewoodArchivalNode(t *testing.T) {
+func TestArchivalQueries(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
 
@@ -2225,51 +2225,65 @@ func TestFirewoodArchivalNode(t *testing.T) {
 	// tries in memory. By creating numBlocks (10), we'll have:
 	//	- Tries 0-5: on-disk
 	// 	- Tries 6-10: in-memory
-	firewoodArchiveConfig := `{
-		"state-scheme": "firewood",
-		"snapshot-cache": 0,
-		"pruning-enabled": false,
-		"state-sync-enabled": false,
-		"state-history": 5
-	}`
-
-	vm := newDefaultTestVM()
-	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		ConfigJSON: firewoodArchiveConfig,
-	})
-
-	numBlocks := 10
-	for range numBlocks {
-		nonce := vm.txPool.Nonce(vmtest.TestEthAddrs[0])
-		signedTx := newSignedLegacyTx(
-			t,
-			vm.chainConfig,
-			vmtest.TestKeys[0].ToECDSA(),
-			nonce,
-			&common.Address{},
-			big.NewInt(0),
-			21_000,
-			vmtest.InitialBaseFee,
-			nil,
-		)
-		blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
-		require.NoError(err)
-
-		require.NoError(blk.Accept(ctx))
+	tests := []struct {
+		name   string
+		scheme string
+	}{
+		{
+			name:   "firewood",
+			scheme: customrawdb.FirewoodScheme,
+		},
+		{
+			name:   "hashdb",
+			scheme: rawdb.HashScheme,
+		},
 	}
 
-	handlers, err := vm.CreateHandlers(ctx)
-	require.NoError(err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := newDefaultTestVM()
+			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+				ConfigJSON: `{
+					"pruning-enabled": false,
+					"state-history": 5
+				}`,
+				Scheme: tt.scheme,
+			})
 
-	server := httptest.NewServer(handlers[ethRPCEndpoint])
-	t.Cleanup(server.Close)
+			numBlocks := 10
+			for range numBlocks {
+				nonce := vm.txPool.Nonce(vmtest.TestEthAddrs[0])
+				signedTx := newSignedLegacyTx(
+					t,
+					vm.chainConfig,
+					vmtest.TestKeys[0].ToECDSA(),
+					nonce,
+					&common.Address{},
+					big.NewInt(0),
+					21_000,
+					vmtest.InitialBaseFee,
+					nil,
+				)
+				blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
+				require.NoError(err)
 
-	client, err := ethclient.Dial(server.URL)
-	require.NoError(err)
+				require.NoError(blk.Accept(ctx))
+			}
 
-	for i := 0; i <= numBlocks; i++ {
-		nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
-		require.NoErrorf(err, "failed to get nonce at block %d", i)
-		require.Zero(nonce)
+			handlers, err := vm.CreateHandlers(ctx)
+			require.NoError(err)
+
+			server := httptest.NewServer(handlers[ethRPCEndpoint])
+			t.Cleanup(server.Close)
+
+			client, err := ethclient.Dial(server.URL)
+			require.NoError(err)
+
+			for i := 0; i <= numBlocks; i++ {
+				nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
+				require.NoErrorf(err, "failed to get nonce at block %d", i)
+				require.Zero(nonce)
+			}
+		})
 	}
 }
