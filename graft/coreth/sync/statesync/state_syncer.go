@@ -40,7 +40,7 @@ const (
 	// Worker count constants for dynamic scaling
 	minNumWorkers     = 8  // Minimum workers even on low-CPU systems
 	maxNumWorkers     = 32 // Maximum workers to prevent resource exhaustion
-	getNumWorkers() = 12 // Fallback value if CPU count detection fails
+	defaultNumWorkers = 12 // Fallback value if CPU count detection fails
 )
 
 var (

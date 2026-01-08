@@ -4,10 +4,10 @@
 package lru
 
 import (
+	"fmt"
 	"hash/fnv"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 const (
@@ -68,10 +68,10 @@ func (sc *ShardedCache[K, V]) getShard(key K) *Cache[K, V] {
 	// Hash the key to determine shard
 	h := fnv.New64a()
 
-	// Convert key to bytes using the hashing utility
-	// This handles various comparable types (string, int, struct, etc.)
-	keyBytes := hashing.ComputeHash256(key)
-	h.Write(keyBytes[:])
+	// Convert key to string, then to bytes for hashing
+	// This works for all comparable types (string, int, struct, etc.)
+	keyStr := fmt.Sprint(key)
+	h.Write([]byte(keyStr))
 
 	// Use modulo to get shard index
 	shardIdx := h.Sum64() % uint64(sc.numShards)
