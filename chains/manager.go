@@ -540,12 +540,15 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	succeeded := false
 	defer func() {
 		if !succeeded {
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			if shutdownErr := vm.Shutdown(shutdownCtx); shutdownErr != nil {
-				chainLog.Error("failed to shutdown VM after error",
-					zap.Error(shutdownErr),
-				)
+			// Type assert to common.VM to call Shutdown
+			if commonVM, ok := vm.(common.VM); ok {
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				if shutdownErr := commonVM.Shutdown(shutdownCtx); shutdownErr != nil {
+					chainLog.Error("failed to shutdown VM after error",
+						zap.Error(shutdownErr),
+					)
+				}
 			}
 		}
 	}()
