@@ -211,7 +211,7 @@ func recoverUnfetchedCodeHashes(db ethdb.Database) ([]common.Hash, error) {
 		if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
 			return nil, fmt.Errorf("failed to delete code to fetch marker: %w", err)
 		}
-		if batch.ValueSize() < ethdb.IdealBatchSize {
+		if batch.ValueSize() < ethdb.IdealBatchSize*4 {
 			continue
 		}
 

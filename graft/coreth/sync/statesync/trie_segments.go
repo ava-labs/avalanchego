@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -42,9 +43,13 @@ type trieToSync struct {
 	segments []*trieSegment
 
 	// Parallel hashing: track completion instead of forcing order
-	lock         sync.Mutex
-	segmentsDone map[int]struct{} // segments that finished downloading
+	lock               sync.Mutex
+	segmentsDone       map[int]struct{} // segments that finished downloading
 	segmentsHashedDone map[int]struct{} // segments that finished hashing (NEW)
+
+	// Atomic completion tracking for reduced lock contention
+	segmentsCompleted atomic.Uint32
+	totalSegments     int
 
 	// We use a thread-safe stack trie wrapper to hash the leafs
 	// and have a batch used for writing it to disk.
@@ -80,7 +85,12 @@ func NewTrieToSync(sync *stateSync, root common.Hash, account common.Hash, syncT
 		segmentsDone:       make(map[int]struct{}),
 		segmentsHashedDone: make(map[int]struct{}),
 	}
-	return trieToSync, trieToSync.loadSegments()
+	if err := trieToSync.loadSegments(); err != nil {
+		return nil, err
+	}
+	// Initialize totalSegments after segments are loaded
+	trieToSync.totalSegments = len(trieToSync.segments)
+	return trieToSync, nil
 }
 
 // loadSegments reads persistent storage and initializes trieSegments that
@@ -190,15 +200,18 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 	}
 	segment.batch.Reset()
 
-	t.lock.Lock()
-	t.segmentsDone[idx] = struct{}{}
-	allDone := len(t.segmentsDone) == len(t.segments)
-	t.lock.Unlock()
+	// Atomically increment completion counter without lock contention
+	completed := t.segmentsCompleted.Add(1)
+	allDone := int(completed) == t.totalSegments
 
 	if !allDone {
 		// Other segments still downloading, wait for them
 		return nil
 	}
+
+	// All segments done - acquire lock only for final processing
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
 	// All segments downloaded - now merge and hash in sorted order
 	log.Info("[DEBUG-SYNC] All segments downloaded, starting parallel merge and hashing",

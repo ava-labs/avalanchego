@@ -144,14 +144,18 @@ func (s *storageTrieTask) OnFinish() error {
 }
 
 func (s *storageTrieTask) OnLeafs(ctx context.Context, db ethdb.KeyValueWriter, keys, vals [][]byte) error {
-	// persists the trie leafs to the snapshot for all accounts associated with this root
-	for _, account := range s.accounts {
-		// Check context cancellation before processing each account to allow early exit during shutdown.
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		for i, key := range keys {
-			rawdb.WriteStorageSnapshot(db, account, common.BytesToHash(key), vals[i])
+	// Check context cancellation once before processing to allow early exit during shutdown
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// Persist trie leafs to the snapshot for all accounts associated with this root.
+	// Loop order optimized: iterate keys first (outer), then accounts (inner) to improve
+	// cache locality and reduce overhead from repeated key hashing.
+	for i, key := range keys {
+		keyHash := common.BytesToHash(key)
+		for _, account := range s.accounts {
+			rawdb.WriteStorageSnapshot(db, account, keyHash, vals[i])
 		}
 	}
 	return nil

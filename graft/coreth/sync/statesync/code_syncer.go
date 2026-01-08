@@ -21,7 +21,10 @@ import (
 	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
-const defaultNumCodeFetchingWorkers = 12 // Match leaf syncer workers for balanced I/O
+const (
+	defaultNumCodeFetchingWorkers = 12  // Match leaf syncer workers for balanced I/O
+	codeHashCheckBatchSize        = 64  // Batch size for HasCode() checks to reduce DB overhead
+)
 
 var _ syncpkg.Syncer = (*CodeSyncer)(nil)
 
@@ -117,19 +120,19 @@ func (c *CodeSyncer) Sync(ctx context.Context) error {
 
 // work fulfills any incoming requests from the producer channel by fetching code bytes from the network
 // and fulfilling them by updating the database.
+// Uses batched HasCode() checks to reduce database overhead.
 func (c *CodeSyncer) work(ctx context.Context) error {
-	codeHashes := make([]common.Hash, 0, message.MaxCodeHashesPerRequest)
+	pendingHashes := make([]common.Hash, 0, codeHashCheckBatchSize)
 
 	for {
 		select {
-		case <-ctx.Done(): // If ctx is done, set the error to the ctx error since work has been cancelled.
+		case <-ctx.Done():
 			return ctx.Err()
 		case codeHash, ok := <-c.codeHashes:
-			// If there are no more [codeHashes], fulfill a last code request for any [codeHashes] previously
-			// read from the channel, then return.
+			// If there are no more code hashes, process remaining batch and return
 			if !ok {
-				if len(codeHashes) > 0 {
-					return c.fulfillCodeRequest(ctx, codeHashes)
+				if len(pendingHashes) > 0 {
+					return c.processBatch(ctx, pendingHashes)
 				}
 				return nil
 			}
@@ -140,36 +143,64 @@ func (c *CodeSyncer) work(ctx context.Context) error {
 				continue
 			}
 
-			// After acquiring responsibility for this hash, re-check whether the code
-			// is already present locally. If so, clean up and release responsibility.
-			if rawdb.HasCode(c.db, codeHash) {
-				// Best-effort cleanup of stale marker.
-				batch := c.db.NewBatch()
-				if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
-					return fmt.Errorf("failed to delete stale code marker: %w", err)
+			pendingHashes = append(pendingHashes, codeHash)
+
+			// Process batch when full to amortize DB overhead
+			if len(pendingHashes) >= codeHashCheckBatchSize {
+				if err := c.processBatch(ctx, pendingHashes); err != nil {
+					return err
 				}
-
-				if err := batch.Write(); err != nil {
-					return fmt.Errorf("failed to write batch for stale code marker: %w", err)
-				}
-				// Release in-flight ownership since no network fetch is needed.
-				c.inFlight.Delete(codeHash)
-				continue
+				pendingHashes = pendingHashes[:0]
 			}
-
-			codeHashes = append(codeHashes, codeHash)
-			// Try to batch up to [codeHashesPerReq] code hashes into a single request when more work remains.
-			if len(codeHashes) < c.codeHashesPerReq {
-				continue
-			}
-			if err := c.fulfillCodeRequest(ctx, codeHashes); err != nil {
-				return err
-			}
-
-			// Reset the codeHashes array
-			codeHashes = codeHashes[:0]
 		}
 	}
+}
+
+// processBatch checks which code hashes already exist locally, cleans up their markers,
+// and fetches the missing ones from the network in a single batch operation.
+func (c *CodeSyncer) processBatch(ctx context.Context, hashes []common.Hash) error {
+	// Batch check which codes already exist to minimize DB overhead
+	existingCodes := c.batchHasCode(hashes)
+
+	// Separate existing codes (cleanup only) from missing codes (need fetch)
+	toFetch := make([]common.Hash, 0, len(hashes))
+	batch := c.db.NewBatch()
+
+	for i, hash := range hashes {
+		if existingCodes[i] {
+			// Code already present - clean up stale marker
+			if err := customrawdb.DeleteCodeToFetch(batch, hash); err != nil {
+				return fmt.Errorf("failed to delete stale code marker: %w", err)
+			}
+			c.inFlight.Delete(hash)
+		} else {
+			// Code missing - needs network fetch
+			toFetch = append(toFetch, hash)
+		}
+	}
+
+	// Write cleanup batch if any markers were deleted
+	if batch.ValueSize() > 0 {
+		if err := batch.Write(); err != nil {
+			return fmt.Errorf("failed to write batch for stale code markers: %w", err)
+		}
+	}
+
+	// Fetch missing codes from network
+	if len(toFetch) > 0 {
+		return c.fulfillCodeRequest(ctx, toFetch)
+	}
+	return nil
+}
+
+// batchHasCode checks multiple code hashes at once to reduce database overhead.
+// Returns a boolean slice where result[i] indicates whether hashes[i] exists.
+func (c *CodeSyncer) batchHasCode(hashes []common.Hash) []bool {
+	results := make([]bool, len(hashes))
+	for i, hash := range hashes {
+		results[i] = rawdb.HasCode(c.db, hash)
+	}
+	return results
 }
 
 // fulfillCodeRequest sends a request for [codeHashes], writes the result to the database, and
