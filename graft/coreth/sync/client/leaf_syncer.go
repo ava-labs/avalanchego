@@ -78,8 +78,16 @@ func (c *CallbackLeafSyncer) workerLoop(ctx context.Context) error {
 	}
 }
 
+// pendingRequest represents a leaf request that has been issued and is awaiting response.
+type pendingRequest struct {
+	request  message.LeafsRequest
+	response message.LeafsResponse
+	err      error
+}
+
 // syncTask performs [task], requesting the leaves of the trie corresponding to [task.Root]
 // starting at [task.Start] and invoking the callbacks as necessary.
+// Uses request pipelining to overlap network I/O with processing.
 func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) error {
 	var (
 		root  = task.Root()
@@ -92,59 +100,96 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 		return nil
 	}
 
-	for {
-		// If [ctx] has finished, return early.
-		if err := ctx.Err(); err != nil {
-			return err
-		}
+	// Pipeline depth: keep 2 requests in flight to overlap network I/O with processing
+	const pipelineDepth = 2
+	pipeline := make(chan *pendingRequest, pipelineDepth)
+	eg, egCtx := errgroup.WithContext(ctx)
 
-		leafsResponse, err := c.client.GetLeafs(ctx, message.LeafsRequest{
-			Root:     root,
-			Account:  task.Account(),
-			Start:    start,
-			Limit:    c.config.RequestSize,
-			NodeType: task.NodeType(),
-		})
-		if err != nil {
-			return fmt.Errorf("%w: %w", ErrFailedToFetchLeafs, err)
-		}
+	// Request issuer goroutine - keeps pipeline filled
+	eg.Go(func() error {
+		defer close(pipeline)
+		currentStart := start
 
-		// resize [leafsResponse.Keys] and [leafsResponse.Vals] in case
-		// the response includes any keys past [End()].
-		// Note: We truncate the response here as opposed to sending End
-		// in the request, as [VerifyRangeProof] does not handle empty
-		// responses correctly with a non-empty end key for the range.
-		done := false
-		if task.End() != nil && len(leafsResponse.Keys) > 0 {
-			i := len(leafsResponse.Keys) - 1
-			for ; i >= 0; i-- {
-				if bytes.Compare(leafsResponse.Keys[i], task.End()) <= 0 {
-					break
-				}
-				done = true
+		for {
+			// Check if context is done before issuing next request
+			if egCtx.Err() != nil {
+				return nil
 			}
-			leafsResponse.Keys = leafsResponse.Keys[:i+1]
-			leafsResponse.Vals = leafsResponse.Vals[:i+1]
-		}
 
-		if err := task.OnLeafs(ctx, leafsResponse.Keys, leafsResponse.Vals); err != nil {
-			return err
-		}
+			req := &pendingRequest{
+				request: message.LeafsRequest{
+					Root:     root,
+					Account:  task.Account(),
+					Start:    currentStart,
+					Limit:    c.config.RequestSize,
+					NodeType: task.NodeType(),
+				},
+			}
 
-		// If we have completed syncing this task, invoke [OnFinish] and mark the task
-		// as complete.
-		if done || !leafsResponse.More {
-			return task.OnFinish(ctx)
-		}
+			// Issue request asynchronously
+			response, err := c.client.GetLeafs(egCtx, req.request)
+			req.response = response
+			req.err = err
 
-		if len(leafsResponse.Keys) == 0 {
-			return errors.New("found no keys in a response with more set to true")
+			// Send to pipeline - will block if pipeline is full (backpressure)
+			select {
+			case pipeline <- req:
+			case <-egCtx.Done():
+				return nil
+			}
+
+			// If this request completed the sync or errored, stop issuing
+			if err != nil || !response.More || len(response.Keys) == 0 {
+				return nil
+			}
+
+			// Calculate next start position
+			currentStart = response.Keys[len(response.Keys)-1]
+			utils.IncrOne(currentStart)
 		}
-		// Update start to be one bit past the last returned key for the next request.
-		// Note: since more was true, this cannot cause an overflow.
-		start = leafsResponse.Keys[len(leafsResponse.Keys)-1]
-		utils.IncrOne(start)
-	}
+	})
+
+	// Response processor - main goroutine consumes from pipeline
+	eg.Go(func() error {
+		for req := range pipeline {
+			if req.err != nil {
+				return fmt.Errorf("%w: %w", ErrFailedToFetchLeafs, req.err)
+			}
+
+			leafsResponse := req.response
+
+			// resize [leafsResponse.Keys] and [leafsResponse.Vals] in case
+			// the response includes any keys past [End()].
+			done := false
+			if task.End() != nil && len(leafsResponse.Keys) > 0 {
+				i := len(leafsResponse.Keys) - 1
+				for ; i >= 0; i-- {
+					if bytes.Compare(leafsResponse.Keys[i], task.End()) <= 0 {
+						break
+					}
+					done = true
+				}
+				leafsResponse.Keys = leafsResponse.Keys[:i+1]
+				leafsResponse.Vals = leafsResponse.Vals[:i+1]
+			}
+
+			if err := task.OnLeafs(egCtx, leafsResponse.Keys, leafsResponse.Vals); err != nil {
+				return err
+			}
+
+			// If we have completed syncing this task, invoke [OnFinish] and mark complete
+			if done || !leafsResponse.More {
+				return task.OnFinish(egCtx)
+			}
+
+			if len(leafsResponse.Keys) == 0 {
+				return errors.New("found no keys in a response with more set to true")
+			}
+		}
+		return nil
+	})
+
+	return eg.Wait()
 }
 
 // Start launches [numWorkers] worker goroutines to process LeafSyncTasks from [c.tasks].
