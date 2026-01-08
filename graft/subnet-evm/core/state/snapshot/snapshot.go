@@ -729,11 +729,10 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 	// If snapshot generation hasn't finished yet, port over all the starts and
 	// continue where the previous round left off.
 	//
-	// Note, the `base.genAbort` comparison is not used normally, it's checked
+	// Note, the `base.genPending` comparison is not used normally, it's checked
 	// to allow the tests to play with the marker without triggering this path.
-	if base.genMarker != nil && base.genAbort != nil {
+	if base.genMarker != nil && base.genPending != nil {
 		res.genMarker = base.genMarker
-		res.genAbort = make(chan chan struct{})
 
 		// If the diskLayer we are about to discard is not very old, we skip
 		// generation on the next layer (assuming generation will just get canceled
@@ -743,6 +742,8 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 			log.Debug("Skipping snapshot generation", "previous disk layer age", diskLayerAge)
 			res.genStats = base.genStats
 		} else {
+			res.cancel = make(chan struct{})
+			res.done = make(chan struct{})
 			go res.generate(base.genStats)
 		}
 	}
@@ -771,14 +772,9 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 		switch layer := layer.(type) {
 		case *diskLayer:
 			// If the base layer is generating, abort it and save
-			if layer.genAbort != nil {
-				abort := make(chan struct{})
-				layer.genAbort <- abort
-				<-abort
-
-				if stats := layer.genStats; stats != nil {
-					wiper = stats.wiping
-				}
+			layer.stopGeneration()
+			if stats := layer.genStats; stats != nil {
+				wiper = stats.wiping
 			}
 			// Layer should be inactive now, mark it as stale
 			layer.lock.Lock()
