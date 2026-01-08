@@ -339,6 +339,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	internalBlock, ok := internalWrappedBlock.(*chain.BlockWrapper)
 	require.True(ok)
 	require.NoError(serverVM.SetLastAcceptedBlock(internalBlock.Block))
+	require.NoError(serverVM.VersionDB().Commit())
 
 	// initialise [syncerVM] with blank genesis state
 	// we also override [syncerVM]'s commit interval so the atomic trie works correctly.
