@@ -31,13 +31,14 @@ import (
 )
 
 const (
-	failedRequestSleepInterval = 10 * time.Millisecond
+	baseRetryInterval = 10 * time.Millisecond // Initial retry interval
+	maxRetryInterval  = 1 * time.Second       // Maximum retry interval (cap exponential backoff)
 
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 
 	// Peer scoring constants
-	minRequestsForScoring = 5               // Minimum requests before using peer scoring
-	scoringDecayFactor    = 0.9             // Exponential moving average weight for response time
+	minRequestsForScoring = 5                // Minimum requests before using peer scoring
+	scoringDecayFactor    = 0.9              // Exponential moving average weight for response time
 	stickyPeerDuration    = 30 * time.Second // How long to prefer the same peer
 )
 
@@ -163,6 +164,21 @@ func NewClient(config *ClientConfig) *client {
 	}
 
 	return c
+}
+
+// calculateRetryBackoff returns exponential backoff duration for retry attempts.
+// First retry is quick (10ms), then exponentially increases: 20ms, 40ms, 80ms, etc.
+// Capped at maxRetryInterval (1 second) to avoid excessive delays.
+func calculateRetryBackoff(attempt int) time.Duration {
+	if attempt == 0 {
+		return baseRetryInterval // First retry: quick 10ms
+	}
+	// Exponential backoff: 10ms * 2^attempt, capped at 1 second
+	backoff := baseRetryInterval * (1 << uint(attempt))
+	if backoff > maxRetryInterval {
+		return maxRetryInterval
+	}
+	return backoff
 }
 
 // selectPeer chooses the best peer for the next request using scoring and sticky affinity.
@@ -485,7 +501,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			metric.IncFailed()
 			c.networkClient.TrackBandwidth(nodeID, 0)
 			c.recordPeerResponse(nodeID, duration, false) // Record network failure
-			time.Sleep(failedRequestSleepInterval)
+			time.Sleep(calculateRetryBackoff(attempt))
 			continue
 		} else {
 			responseIntf, numElements, err = parseFn(c.codec, request, response)
