@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	batchWritePeriod      = 64
-	iteratorReleasePeriod = 1024
+	batchWritePeriod      = 256  // Increased from 64 to reduce DB write frequency
+	iteratorReleasePeriod = 8192 // Increased from 1024 to reduce iterator overhead
 	logPeriod             = 5 * time.Second
 	minBlocksToCompact    = 5000
 )
