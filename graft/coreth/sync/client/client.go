@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -33,6 +34,11 @@ const (
 	failedRequestSleepInterval = 10 * time.Millisecond
 
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
+
+	// Peer scoring constants
+	minRequestsForScoring = 5               // Minimum requests before using peer scoring
+	scoringDecayFactor    = 0.9             // Exponential moving average weight for response time
+	stickyPeerDuration    = 30 * time.Second // How long to prefer the same peer
 )
 
 var (
@@ -51,6 +57,45 @@ var (
 	errMaxCodeSizeExceeded    = errors.New("max code size exceeded")
 )
 var _ Client = (*client)(nil)
+
+// peerStats tracks performance metrics for a single peer to enable intelligent peer selection.
+type peerStats struct {
+	nodeID          ids.NodeID
+	successCount    atomic.Uint64  // Total successful requests
+	failureCount    atomic.Uint64  // Total failed requests
+	avgResponseTime atomic.Uint64  // Exponential moving average response time in nanoseconds
+	lastUsed        atomic.Int64   // Unix nanoseconds when peer was last used
+	totalRequests   atomic.Uint64  // Total requests (success + failure)
+}
+
+// score calculates a peer's quality score based on success rate and response time.
+// Higher score = better peer. Returns 0 for peers with insufficient data.
+func (p *peerStats) score() float64 {
+	total := p.totalRequests.Load()
+	if total < minRequestsForScoring {
+		return 0 // Not enough data to score reliably
+	}
+
+	success := p.successCount.Load()
+	avgTime := p.avgResponseTime.Load()
+
+	// Calculate success rate (0.0 to 1.0)
+	successRate := float64(success) / float64(total)
+
+	// Calculate score: success rate divided by response time
+	// Better peers have high success rate and low response time
+	if avgTime == 0 {
+		return successRate // Avoid division by zero
+	}
+
+	// Convert nanoseconds to seconds for more reasonable numbers
+	avgTimeSeconds := float64(avgTime) / 1e9
+
+	// Score = success_rate / response_time
+	// Example: 95% success, 0.1s response = 9.5 score
+	//          90% success, 0.2s response = 4.5 score
+	return successRate / (avgTimeSeconds + epsilon)
+}
 
 // Client synchronously fetches data from the network to fulfill state sync requests.
 // Repeatedly requests failed requests until the context to the request is expired.
@@ -77,9 +122,15 @@ type client struct {
 	networkClient    network.SyncedNetworkClient
 	codec            codec.Manager
 	stateSyncNodes   []ids.NodeID
-	stateSyncNodeIdx uint32
+	stateSyncNodeIdx uint32 // Fallback round-robin index for peers without sufficient stats
 	stats            stats.ClientSyncerStats
 	blockParser      EthBlockParser
+
+	// Peer performance tracking for intelligent peer selection
+	peerStats     map[ids.NodeID]*peerStats
+	peerStatsLock sync.RWMutex
+	stickyPeer    atomic.Value // *ids.NodeID - currently preferred peer for sticky affinity
+	stickyUntil   atomic.Int64 // Unix nanoseconds until which sticky peer is preferred
 }
 
 type ClientConfig struct {
@@ -95,13 +146,109 @@ type EthBlockParser interface {
 }
 
 func NewClient(config *ClientConfig) *client {
-	return &client{
+	c := &client{
 		networkClient:  config.NetworkClient,
 		codec:          config.Codec,
 		stats:          config.Stats,
 		stateSyncNodes: config.StateSyncNodeIDs,
 		blockParser:    config.BlockParser,
+		peerStats:      make(map[ids.NodeID]*peerStats),
 	}
+
+	// Initialize peer stats for all known state sync nodes
+	for _, nodeID := range config.StateSyncNodeIDs {
+		c.peerStats[nodeID] = &peerStats{
+			nodeID: nodeID,
+		}
+	}
+
+	return c
+}
+
+// selectPeer chooses the best peer for the next request using scoring and sticky affinity.
+// Returns ids.EmptyNodeID if no suitable peer is available.
+func (c *client) selectPeer() ids.NodeID {
+	if len(c.stateSyncNodes) == 0 {
+		return ids.EmptyNodeID
+	}
+
+	// Check if we have a sticky peer that's still valid
+	now := time.Now().UnixNano()
+	if stickyUntil := c.stickyUntil.Load(); now < stickyUntil {
+		if stickyPeerIntf := c.stickyPeer.Load(); stickyPeerIntf != nil {
+			stickyPeer := stickyPeerIntf.(*ids.NodeID)
+			return *stickyPeer
+		}
+	}
+
+	c.peerStatsLock.RLock()
+	defer c.peerStatsLock.RUnlock()
+
+	var (
+		bestPeer  ids.NodeID
+		bestScore float64
+	)
+
+	// Find peer with highest score
+	for nodeID, stats := range c.peerStats {
+		score := stats.score()
+		if score > bestScore {
+			bestScore = score
+			bestPeer = nodeID
+		}
+	}
+
+	// If no peer has sufficient data for scoring, fall back to round-robin
+	if bestScore == 0 {
+		nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
+		return c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
+	}
+
+	// Set sticky peer for the next duration
+	c.stickyPeer.Store(&bestPeer)
+	c.stickyUntil.Store(now + int64(stickyPeerDuration))
+
+	return bestPeer
+}
+
+// recordPeerResponse updates peer statistics based on request outcome.
+func (c *client) recordPeerResponse(nodeID ids.NodeID, duration time.Duration, success bool) {
+	if nodeID == ids.EmptyNodeID {
+		return
+	}
+
+	c.peerStatsLock.Lock()
+	stats, ok := c.peerStats[nodeID]
+	if !ok {
+		// Create stats for new peer
+		stats = &peerStats{nodeID: nodeID}
+		c.peerStats[nodeID] = stats
+	}
+	c.peerStatsLock.Unlock()
+
+	// Update atomic counters
+	stats.totalRequests.Add(1)
+	if success {
+		stats.successCount.Add(1)
+	} else {
+		stats.failureCount.Add(1)
+	}
+
+	// Update exponential moving average of response time
+	oldAvg := stats.avgResponseTime.Load()
+	newSample := uint64(duration.Nanoseconds())
+
+	var newAvg uint64
+	if oldAvg == 0 {
+		// First sample
+		newAvg = newSample
+	} else {
+		// Exponential moving average: new = old * decay + sample * (1 - decay)
+		newAvg = uint64(float64(oldAvg)*scoringDecayFactor + float64(newSample)*(1-scoringDecayFactor))
+	}
+	stats.avgResponseTime.Store(newAvg)
+
+	stats.lastUsed.Store(time.Now().UnixNano())
 }
 
 // GetLeafs synchronously retrieves leafs as per given [message.LeafsRequest]
@@ -321,14 +468,12 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 		if len(c.stateSyncNodes) == 0 {
 			response, nodeID, err = c.networkClient.SendSyncedAppRequestAny(ctx, StateSyncVersion, requestBytes)
 		} else {
-			// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
-			// we do this every attempt to ensure we get a different node each time if possible.
-			nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
-			nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
-
+			// Use peer scoring and sticky affinity for intelligent peer selection
+			nodeID = c.selectPeer()
 			response, err = c.networkClient.SendSyncedAppRequest(ctx, nodeID, requestBytes)
 		}
-		metric.UpdateRequestLatency(time.Since(start))
+		duration := time.Since(start)
+		metric.UpdateRequestLatency(duration)
 
 		if err != nil {
 			ctx := make([]interface{}, 0, 8)
@@ -339,6 +484,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			log.Debug("request failed, retrying", ctx...)
 			metric.IncFailed()
 			c.networkClient.TrackBandwidth(nodeID, 0)
+			c.recordPeerResponse(nodeID, duration, false) // Record network failure
 			time.Sleep(failedRequestSleepInterval)
 			continue
 		} else {
@@ -349,6 +495,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 				c.networkClient.TrackBandwidth(nodeID, 0)
 				metric.IncFailed()
 				metric.IncInvalidResponse()
+				c.recordPeerResponse(nodeID, duration, false) // Record invalid response
 				continue
 			}
 
@@ -356,6 +503,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			c.networkClient.TrackBandwidth(nodeID, bandwidth)
 			metric.IncSucceeded()
 			metric.IncReceived(int64(numElements))
+			c.recordPeerResponse(nodeID, duration, true) // Record success
 			return responseIntf, nil
 		}
 	}
