@@ -19,6 +19,11 @@ updates:
     directory: "/graft/subnet-evm"
     schedule:
       interval: "daily"
+    open-pull-requests-limit: 
+  - package-ecosystem: "gomod"
+    directory: "/graft/evm"
+    schedule:
+      interval: "daily"
     open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: "/"
