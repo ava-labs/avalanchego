@@ -2218,9 +2218,6 @@ func TestInspectDatabases(t *testing.T) {
 // Querying for the nonce of the zero address at various heights is sufficient
 // as this succeeds only if the EVM has the matching trie at each height.
 func TestArchivalQueries(t *testing.T) {
-	require := require.New(t)
-	ctx := t.Context()
-
 	// Setting the state history to 5 means that we keep around only the 5 latest
 	// tries in memory. By creating numBlocks (10), we'll have:
 	//	- Tries 0-5: on-disk
@@ -2241,6 +2238,9 @@ func TestArchivalQueries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := t.Context()
+
 			vm := newDefaultTestVM()
 			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 				ConfigJSON: `{
