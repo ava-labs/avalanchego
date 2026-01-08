@@ -84,6 +84,7 @@ type VM struct {
 	Fx        secp256k1fx.Fx
 	baseCodec codec.Registry
 
+	// TODO: Remove Atomic prefix and unexport these fields
 	AtomicMempool        *txpool.Mempool
 	gossipHandler        p2p.Handler
 	pullGossiper         *avalanchegossip.ValidatorGossiper
