@@ -750,7 +750,7 @@ func (m *manager) createAvalancheChain(
 	var (
 		// A default subnet configuration will be present if explicit configuration is not provided
 		subnetCfg           = m.SubnetConfigs[ctx.SubnetID]
-		minBlockDelay       = m.ProposerMinBlockDelay // X-chain defaults to this value
+		minBlockDelay       = m.ProposerMinBlockDelay // X-chain uses this value
 		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
 	)
 	m.Log.Info("creating proposervm wrapper",
