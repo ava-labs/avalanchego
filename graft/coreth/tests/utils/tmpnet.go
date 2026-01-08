@@ -18,16 +18,6 @@ var DefaultChainConfig = map[string]any{
 	"local-txs-enabled": true,
 }
 
-func NewTmpnetNodes(count int) []*tmpnet.Node {
-	nodes := make([]*tmpnet.Node, count)
-	for i := range nodes {
-		node := tmpnet.NewNode()
-		_ = node.EnsureKeys() // guaranteed to be nil for new node
-		nodes[i] = node
-	}
-	return nodes
-}
-
 func NewTmpnetNetwork(owner string, nodes []*tmpnet.Node, flags tmpnet.FlagsMap, subnets ...*tmpnet.Subnet) *tmpnet.Network {
 	defaultFlags := tmpnet.FlagsMap{}
 	defaultFlags.SetDefaults(flags)
