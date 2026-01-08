@@ -26,7 +26,16 @@ const (
 	defaultNumWorkers      = 8
 )
 
-var errWaitBeforeStart = errors.New("cannot call Wait before Start")
+var (
+	errWaitBeforeStart = errors.New("cannot call Wait before Start")
+	errStateSyncStuck  = errors.New("state sync stuck, fallback to block sync required")
+)
+
+// ErrStateSyncStuck returns the sentinel error for stuck state sync detection.
+// This allows external packages to check for this specific error condition.
+func ErrStateSyncStuck() error {
+	return errStateSyncStuck
+}
 
 type StateSyncerConfig struct {
 	Root                     common.Hash
@@ -64,6 +73,7 @@ type stateSync struct {
 	triesInProgressSem chan struct{}
 	done               chan error
 	stats              *trieSyncStats
+	stuckDetector      *StuckDetector // monitors for stalled sync and triggers fallback
 
 	// context cancellation management
 	cancelFunc context.CancelFunc
@@ -91,6 +101,10 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		storageTriesDone: make(chan struct{}),
 		done:             make(chan error, 1),
 	}
+
+	// Initialize stuck detector to monitor sync progress
+	ss.stuckDetector = NewStuckDetector(ss.stats)
+
 	ss.syncer = syncclient.NewCallbackLeafSyncer(config.Client, ss.segments, config.RequestSize)
 	ss.codeSyncer = newCodeSyncer(CodeSyncerConfig{
 		DB:                       config.DB,
@@ -228,6 +242,9 @@ func (t *stateSync) Start(ctx context.Context) error {
 	syncCtx, cancel := context.WithCancel(ctx)
 	t.cancelFunc = cancel
 
+	// Start stuck detector to monitor for stalled sync
+	t.stuckDetector.Start(syncCtx)
+
 	// Start the code syncer and leaf syncer.
 	eg, egCtx := errgroup.WithContext(syncCtx)
 	t.codeSyncer.start(egCtx) // start the code syncer first since the leaf syncer may add code tasks
@@ -246,10 +263,24 @@ func (t *stateSync) Start(ctx context.Context) error {
 		return t.storageTrieProducer(egCtx)
 	})
 
+	// Monitor for stuck detection alongside sync operations
+	eg.Go(func() error {
+		select {
+		case <-t.stuckDetector.StuckChannel():
+			log.Warn("Stuck detected, canceling state sync to trigger fallback")
+			cancel() // Cancel sync to trigger fallback
+			return errStateSyncStuck
+		case <-egCtx.Done():
+			return nil // Normal completion or cancellation
+		}
+	})
+
 	// The errgroup wait will take care of returning the first error that occurs, or returning
-	// nil if both finish without an error.
+	// nil if all finish without an error.
 	go func() {
-		t.done <- eg.Wait()
+		err := eg.Wait()
+		t.stuckDetector.Stop() // Stop monitoring when sync completes or fails
+		t.done <- err
 	}()
 	return nil
 }

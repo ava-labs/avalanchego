@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-const MaxCodeHashesPerRequest = 5
+const MaxCodeHashesPerRequest = 64 // Increased from 5 to reduce network round trips (Phase D3 optimization)
 
 // NodeType outlines the trie that a leaf node belongs to
 // handlers.LeafsRequestHandler uses this information to determine

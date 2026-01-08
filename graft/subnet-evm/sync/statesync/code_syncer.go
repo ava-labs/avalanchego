@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	DefaultMaxOutstandingCodeHashes = 5000
-	DefaultNumCodeFetchingWorkers   = 5
+	DefaultMaxOutstandingCodeHashes = 10000 // Increased from 5000 to reduce blocking during code sync
+	DefaultNumCodeFetchingWorkers   = 10    // Increased from 5 to improve code fetch throughput
 )
 
 var errFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")

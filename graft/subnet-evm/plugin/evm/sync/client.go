@@ -350,7 +350,32 @@ func (client *client) syncStateTrie(ctx context.Context, summary message.Syncabl
 	}
 	err = evmSyncer.Wait(ctx)
 	log.Info("state sync: sync finished", "root", summary.GetBlockRoot().Hex(), "err", err)
+
+	// Check if sync was stuck and trigger fallback to block sync
+	if errors.Is(err, statesync.ErrStateSyncStuck()) {
+		log.Warn("State sync stuck detected, initiating fallback to block sync")
+		if fallbackErr := client.fallbackToBlockSync(); fallbackErr != nil {
+			return fmt.Errorf("failed to fallback to block sync: %w", fallbackErr)
+		}
+		// Return the stuck error to signal chain manager to restart with block sync
+		return err
+	}
+
 	return err
+}
+
+// fallbackToBlockSync clears state sync metadata and disables state sync for the next restart.
+func (client *client) fallbackToBlockSync() error {
+	// Clear incomplete state sync metadata
+	if err := client.ClearOngoingSummary(); err != nil {
+		return fmt.Errorf("failed to clear state sync metadata: %w", err)
+	}
+
+	// Disable state sync for next restart (engine will use block sync instead)
+	client.Enabled = false
+
+	log.Info("State sync disabled, node will use block sync on next restart")
+	return nil
 }
 
 func (client *client) Shutdown() error {

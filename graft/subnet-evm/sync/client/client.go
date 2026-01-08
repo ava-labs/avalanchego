@@ -35,6 +35,27 @@ const (
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
 
+// exponentialBackoff calculates exponential backoff delay with a maximum cap.
+// Starts at baseDelay and doubles with each attempt, capped at 5 seconds.
+// This reduces time wasted on repeatedly failing peers.
+func exponentialBackoff(attempt int, baseDelay time.Duration) time.Duration {
+	// Cap exponent at 9 to prevent overflow (2^9 = 512)
+	exp := attempt
+	if exp > 9 {
+		exp = 9
+	}
+
+	delay := baseDelay * time.Duration(1<<exp) // 2^attempt
+
+	// Cap at 5 seconds to avoid excessive delays
+	maxDelay := 5 * time.Second
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+
+	return delay
+}
+
 var (
 	StateSyncVersion = &version.Application{
 		Major: 1,
@@ -339,7 +360,9 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			log.Debug("request failed, retrying", ctx...)
 			metric.IncFailed()
 			c.networkClient.TrackBandwidth(nodeID, 0)
-			time.Sleep(failedRequestSleepInterval)
+			// Use exponential backoff to avoid wasting time on repeatedly failing peers
+		backoff := exponentialBackoff(attempt, failedRequestSleepInterval)
+		time.Sleep(backoff)
 			continue
 		} else {
 			responseIntf, numElements, err = parseFn(c.codec, request, response)
