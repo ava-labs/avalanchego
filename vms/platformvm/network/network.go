@@ -60,7 +60,6 @@ func New(
 		vdrs,
 		config.MaxValidatorSetStaleness,
 	)
-
 	peers := &p2p.Peers{}
 	p2pNetwork, err := p2p.NewNetwork(
 		log,
