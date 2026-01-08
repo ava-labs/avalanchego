@@ -61,10 +61,21 @@ func (m *mainTrieTask) OnFinish() error {
 }
 
 func (m *mainTrieTask) OnLeafs(ctx context.Context, db ethdb.KeyValueWriter, keys, vals [][]byte) error {
-	codeHashes := make([]common.Hash, 0)
-	// loop over the keys, decode them as accounts, then check for any
+	// Pre-allocate codeHashes with estimated capacity to reduce allocations
+	codeHashes := make([]common.Hash, 0, len(keys)/4) // Estimate ~25% of accounts have code
+
+	// Loop over the keys, decode them as accounts, then check for any
 	// storage or code we need to sync as well.
+	// Add periodic context checks for graceful cancellation during large batches
+	const checkInterval = 100
 	for i, key := range keys {
+		// Periodic context cancellation check every 100 iterations
+		if i%checkInterval == 0 {
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("main trie processing cancelled after %d/%d accounts: %w", i, len(keys), err)
+			}
+		}
+
 		var acc types.StateAccount
 		accountHash := common.BytesToHash(key)
 		if err := rlp.DecodeBytes(vals[i], &acc); err != nil {
@@ -152,7 +163,16 @@ func (s *storageTrieTask) OnLeafs(ctx context.Context, db ethdb.KeyValueWriter, 
 	// Persist trie leafs to the snapshot for all accounts associated with this root.
 	// Loop order optimized: iterate keys first (outer), then accounts (inner) to improve
 	// cache locality and reduce overhead from repeated key hashing.
+	// Add periodic context checks every 100 iterations to allow cancellation during large batches
+	const checkInterval = 100
 	for i, key := range keys {
+		// Periodic context cancellation check to allow graceful shutdown of large batches
+		if i%checkInterval == 0 {
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("storage trie processing cancelled after %d/%d keys: %w", i, len(keys), err)
+			}
+		}
+
 		keyHash := common.BytesToHash(key)
 		for _, account := range s.accounts {
 			rawdb.WriteStorageSnapshot(db, account, keyHash, vals[i])
