@@ -229,8 +229,13 @@ func createSnowCtx(tb testing.TB, validatorRanges []validatorRange) *snow.Contex
 		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			return sourceSubnetID, nil
 		},
-		GetWarpValidatorSetF: func(context.Context, uint64, ids.ID) (validators.WarpSet, error) {
-			return warpValidators, warpValidatorsErr
+		GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
+			if warpValidatorsErr != nil {
+				return nil, warpValidatorsErr
+			}
+			return map[ids.ID]validators.WarpSet{
+				sourceSubnetID: warpValidators,
+			}, nil
 		},
 	}
 	return snowCtx
@@ -320,13 +325,11 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 			require.Equal(chainID, cChainID)
 			return constants.PrimaryNetworkID, nil // Return Primary Network SubnetID
 		},
-		GetWarpValidatorSetF: func(_ context.Context, _ uint64, subnetID ids.ID) (validators.WarpSet, error) {
-			expectedSubnetID := snowCtx.SubnetID
-			if requirePrimaryNetworkSigners {
-				expectedSubnetID = constants.PrimaryNetworkID
-			}
-			require.Equal(expectedSubnetID, subnetID)
-			return warpValidators, nil
+		GetWarpValidatorSetsF: func(_ context.Context, _ uint64) (map[ids.ID]validators.WarpSet, error) {
+			return map[ids.ID]validators.WarpSet{
+				snowCtx.SubnetID:           warpValidators,
+				constants.PrimaryNetworkID: warpValidators,
+			}, nil
 		},
 	}
 
@@ -790,8 +793,10 @@ func makeWarpPredicateTests(tb testing.TB, rules extras.AvalancheRules) []precom
 			GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 				return sourceSubnetID, nil
 			},
-			GetWarpValidatorSetF: func(context.Context, uint64, ids.ID) (validators.WarpSet, error) {
-				return warpValidators, nil
+			GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
+				return map[ids.ID]validators.WarpSet{
+					sourceSubnetID: warpValidators,
+				}, nil
 			},
 		}
 

@@ -1543,7 +1543,6 @@ func TestWaitForEvent(t *testing.T) {
 		err error
 	}
 
-	fortunaFork := upgradetest.Fortuna
 	for _, testCase := range []struct {
 		name     string
 		Fork     *upgradetest.Fork
@@ -1708,48 +1707,6 @@ func TestWaitForEvent(t *testing.T) {
 				res := <-results
 				require.NoError(t, res.err)
 				require.Equal(t, commonEng.PendingTxs, res.msg)
-			},
-		},
-		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/avalanchego/graft/coreth/issues/1318)
-		{
-			name: "WaitForEvent does not wait for new block to be built in fortuna",
-			Fork: &fortunaFork,
-			testCase: func(t *testing.T, vm *VM) {
-				t.Parallel()
-				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
-				blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
-				require.NoError(t, err)
-				require.NoError(t, blk.Accept(t.Context()))
-				signedTx = newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 1, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
-
-				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-					require.NoError(t, err)
-				}
-
-				msg, err := vm.WaitForEvent(t.Context())
-				require.NoError(t, err)
-				require.Equal(t, commonEng.PendingTxs, msg)
-			},
-		},
-		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/avalanchego/graft/coreth/issues/1318)
-		{
-			name: "WaitForEvent waits for a delay with a retry in fortuna",
-			Fork: &fortunaFork,
-			testCase: func(t *testing.T, vm *VM) {
-				t.Parallel()
-				lastBuildBlockTime := time.Now()
-				_, err := vm.BuildBlock(t.Context())
-				require.NoError(t, err)
-				// we haven't accepted the previous built block, so this should be a retry
-				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
-				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-					require.NoError(t, err)
-				}
-
-				msg, err := vm.WaitForEvent(t.Context())
-				require.NoError(t, err)
-				require.Equal(t, commonEng.PendingTxs, msg)
-				require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
 			},
 		},
 	} {

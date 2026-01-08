@@ -2909,7 +2909,6 @@ func TestWaitForEvent(t *testing.T) {
 		err error
 	}
 
-	fortunaFork := upgradetest.Fortuna
 	for _, testCase := range []struct {
 		name     string
 		Fork     *upgradetest.Fork
@@ -3092,52 +3091,6 @@ func TestWaitForEvent(t *testing.T) {
 				res := <-results
 				require.NoError(t, res.err)
 				require.Equal(t, commonEng.PendingTxs, res.msg)
-			},
-		},
-		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
-		{
-			name: "WaitForEvent does not wait for new block to be built in fortuna",
-			Fork: &fortunaFork,
-			testCase: func(t *testing.T, vm *VM) {
-				t.Parallel()
-
-				signedTx := newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 0, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-				blk, err := IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
-				require.NoError(t, err)
-				require.NoError(t, blk.Accept(t.Context()))
-				signedTx = newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 1, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-
-				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-					require.NoError(t, err)
-				}
-
-				msg, err := vm.WaitForEvent(t.Context())
-				require.NoError(t, err)
-				require.Equal(t, commonEng.PendingTxs, msg)
-			},
-		},
-		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
-		{
-			name: "WaitForEvent waits for a delay with a retry in fortuna",
-			Fork: &fortunaFork,
-			testCase: func(t *testing.T, vm *VM) {
-				lastBuildBlockTime := time.Now()
-				signedTx := newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 0, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-					require.NoError(t, err)
-				}
-				_, err := vm.BuildBlock(t.Context())
-				require.NoError(t, err)
-				// we haven't advanced the tip to include the previous built block, so this is a retry
-				signedTx = newSignedLegacyTx(t, vm.chainConfig, testKeys[1].ToECDSA(), 0, &testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
-				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-					require.NoError(t, err)
-				}
-
-				msg, err := vm.WaitForEvent(t.Context())
-				require.NoError(t, err)
-				require.Equal(t, commonEng.PendingTxs, msg)
-				require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
 			},
 		},
 	} {
