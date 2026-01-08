@@ -45,10 +45,10 @@ type trieToSync struct {
 	segmentsDone map[int]struct{} // segments that finished downloading
 	segmentsHashedDone map[int]struct{} // segments that finished hashing (NEW)
 
-	// We use a stack trie to hash the leafs and have
-	// a batch used for writing it to disk.
+	// We use a thread-safe stack trie wrapper to hash the leafs
+	// and have a batch used for writing it to disk.
 	batch     ethdb.Batch
-	stackTrie *trie.StackTrie
+	stackTrie *ThreadSafeStackTrie
 
 	// We keep a pointer to the overall sync operation,
 	// used to add segments to the work queue and to
@@ -73,7 +73,7 @@ func NewTrieToSync(sync *stateSync, root common.Hash, account common.Hash, syncT
 		root:               root,
 		account:            account,
 		batch:              batch,
-		stackTrie:          trie.NewStackTrie(&trie.StackTrieOptions{Writer: writeFn}),
+		stackTrie:          NewThreadSafeStackTrie(&trie.StackTrieOptions{Writer: writeFn}),
 		isMainTrie:         (root == sync.root),
 		task:               syncTask,
 		segmentsDone:       make(map[int]struct{}),
