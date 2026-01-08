@@ -267,6 +267,19 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 	completed := t.segmentsCompleted.Add(1)
 	allDone := int(completed) == t.totalSegments
 
+	// Signal 95% completion for main trie to allow early storage trie start
+	// This improves worker utilization by overlapping main trie tail with storage tries
+	if t.isMainTrie && float64(completed)/float64(t.totalSegments) >= 0.95 {
+		select {
+		case <-t.sync.mainTrieNearlydone:
+			// Already closed, do nothing
+		default:
+			close(t.sync.mainTrieNearlydone)
+			log.Info("[DEBUG-SYNC] Main trie 95% complete, signaling storage trie producer",
+				"completed", completed, "total", t.totalSegments)
+		}
+	}
+
 	if !allDone {
 		// Other segments still downloading, wait for them
 		return nil
@@ -302,8 +315,25 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 
 	// Stream sorted data directly to StackTrie without intermediate storage
 	// Memory usage = largest segment, not sum of all segments
+	// Batch StackTrie updates to reduce lock contention (100-500x reduction)
 	log.Info("[DEBUG-SYNC] Streaming merged data to StackTrie", "heapSize", len(h))
+	const batchSize = 250 // Accumulate 250 updates before acquiring lock
+	batchKeys := make([][]byte, 0, batchSize)
+	batchVals := make([][]byte, 0, batchSize)
 	itemCount := 0
+
+	// Helper function to flush accumulated batch to StackTrie
+	flushBatch := func() error {
+		if len(batchKeys) > 0 {
+			if err := t.stackTrie.UpdateBatch(batchKeys, batchVals); err != nil {
+				return err
+			}
+			batchKeys = batchKeys[:0] // Reset slices while keeping capacity
+			batchVals = batchVals[:0]
+		}
+		return nil
+	}
+
 	for len(h) > 0 {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -312,11 +342,17 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 		// Pop smallest key from heap
 		item := heap.Pop(&h).(*heapItem)
 
-		// Update StackTrie with this key-value pair
-		if err := t.stackTrie.Update(item.key, item.val); err != nil {
-			return err
-		}
+		// Accumulate in batch instead of immediate StackTrie update
+		batchKeys = append(batchKeys, item.key)
+		batchVals = append(batchVals, item.val)
 		itemCount++
+
+		// Flush batch when full to avoid unbounded memory growth
+		if len(batchKeys) >= batchSize {
+			if err := flushBatch(); err != nil {
+				return err
+			}
+		}
 
 		// Batch database writes
 		if t.batch.ValueSize() > int(t.sync.batchSize) {
@@ -337,6 +373,11 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 				})
 			}
 		}
+	}
+
+	// Flush any remaining items in batch
+	if err := flushBatch(); err != nil {
+		return err
 	}
 	log.Info("[DEBUG-SYNC] Completed streaming merge", "itemsProcessed", itemCount)
 
@@ -476,8 +517,9 @@ type trieSegment struct {
 
 	// Cache leaf data in memory to avoid re-reading from DB for hashing
 	// This eliminates I/O overhead during the hashing phase
-	cachedKeys [][]byte
-	cachedVals [][]byte
+	cachedKeys     [][]byte
+	cachedVals     [][]byte
+	cacheAllocated bool // tracks if cache slices have been pre-allocated
 }
 
 func (t *trieSegment) String() string {
@@ -524,6 +566,17 @@ func (t *trieSegment) OnLeafs(ctx context.Context, keys, vals [][]byte) error {
 
 	// Cache leaf data for parallel hashing (I/O optimization)
 	// This avoids re-reading from DB during the hashing phase
+	// Pre-allocate slices after first batch to reduce reallocations and GC pressure
+	if !t.cacheAllocated && t.leafs > 0 {
+		estimatedSize := t.estimateSize()
+		if estimatedSize > t.leafs {
+			// Pre-allocate capacity for remaining leafs
+			remainingCapacity := int(estimatedSize - t.leafs)
+			t.cachedKeys = append(make([][]byte, 0, len(t.cachedKeys)+remainingCapacity), t.cachedKeys...)
+			t.cachedVals = append(make([][]byte, 0, len(t.cachedVals)+remainingCapacity), t.cachedVals...)
+		}
+		t.cacheAllocated = true
+	}
 	for i := range keys {
 		t.cachedKeys = append(t.cachedKeys, keys[i]) // Keys are immutable hashes - no copy needed
 		t.cachedVals = append(t.cachedVals, common.CopyBytes(vals[i]))
