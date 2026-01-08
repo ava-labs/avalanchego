@@ -7,12 +7,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // SystemConfig provides all the configurations needed to create a gossip
