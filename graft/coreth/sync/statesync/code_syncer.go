@@ -193,13 +193,45 @@ func (c *CodeSyncer) processBatch(ctx context.Context, hashes []common.Hash) err
 	return nil
 }
 
-// batchHasCode checks multiple code hashes at once to reduce database overhead.
+// batchHasCode checks multiple code hashes in parallel to reduce I/O latency.
+// Parallelizes database reads across worker goroutines for better throughput.
 // Returns a boolean slice where result[i] indicates whether hashes[i] exists.
 func (c *CodeSyncer) batchHasCode(hashes []common.Hash) []bool {
 	results := make([]bool, len(hashes))
-	for i, hash := range hashes {
-		results[i] = rawdb.HasCode(c.db, hash)
+	if len(hashes) == 0 {
+		return results
 	}
+
+	// For small batches, sequential is faster due to goroutine overhead
+	if len(hashes) <= 4 {
+		for i, hash := range hashes {
+			results[i] = rawdb.HasCode(c.db, hash)
+		}
+		return results
+	}
+
+	// Parallel checks for larger batches - improves I/O scheduling
+	var wg sync.WaitGroup
+	numWorkers := min(8, len(hashes)) // Cap workers to avoid excessive goroutines
+	chunkSize := (len(hashes) + numWorkers - 1) / numWorkers
+
+	for workerID := 0; workerID < numWorkers; workerID++ {
+		start := workerID * chunkSize
+		if start >= len(hashes) {
+			break
+		}
+		end := min(start+chunkSize, len(hashes))
+
+		wg.Add(1)
+		go func(startIdx, endIdx int) {
+			defer wg.Done()
+			for i := startIdx; i < endIdx; i++ {
+				results[i] = rawdb.HasCode(c.db, hashes[i])
+			}
+		}(start, end)
+	}
+
+	wg.Wait()
 	return results
 }
 
