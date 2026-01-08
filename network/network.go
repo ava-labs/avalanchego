@@ -666,9 +666,13 @@ func (n *network) Dispatch() error {
 	connected := n.connectedPeers.Sample(n.connectedPeers.Len(), peer.NoPrecondition)
 	n.peersLock.RUnlock()
 
+	// Use timeout context for peer shutdown to prevent indefinite blocking
+	peerShutdownCtx, peerShutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer peerShutdownCancel()
+
 	errs := wrappers.Errs{}
 	for _, peer := range append(connecting, connected...) {
-		errs.Add(peer.AwaitClosed(context.TODO()))
+		errs.Add(peer.AwaitClosed(peerShutdownCtx))
 	}
 	return errs.Err
 }

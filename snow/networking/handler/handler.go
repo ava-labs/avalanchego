@@ -931,12 +931,16 @@ func (h *handler) handleChanMsg(msg *message.InboundMessage) error {
 		)
 	}
 
+	// Create a timeout context for engine operations to prevent indefinite blocking
+	engineCtx, engineCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer engineCancel()
+
 	switch msg := body.(type) {
 	case *message.VMMessage:
-		return engine.Notify(context.TODO(), common.Message(msg.Notification))
+		return engine.Notify(engineCtx, common.Message(msg.Notification))
 
 	case *message.GossipRequest:
-		return engine.Gossip(context.TODO())
+		return engine.Gossip(engineCtx)
 
 	default:
 		return fmt.Errorf(

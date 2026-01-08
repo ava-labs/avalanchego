@@ -151,8 +151,12 @@ func (s *server) Dispatch() error {
 }
 
 func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM) {
+	// Use a context with timeout for handler creation to prevent indefinite blocking
+	handlerCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	ctx.Lock.Lock()
-	pathRouteHandlers, err := vm.CreateHandlers(context.TODO())
+	pathRouteHandlers, err := vm.CreateHandlers(handlerCtx)
 	ctx.Lock.Unlock()
 	if err != nil {
 		s.log.Error("failed to create path route handlers",
@@ -187,8 +191,12 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 		}
 	}
 
+	// Use a context with timeout for HTTP handler creation to prevent indefinite blocking
+	httpHandlerCtx, httpHandlerCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer httpHandlerCancel()
+
 	ctx.Lock.Lock()
-	headerRouteHandler, err := vm.NewHTTPHandler(context.TODO())
+	headerRouteHandler, err := vm.NewHTTPHandler(httpHandlerCtx)
 	ctx.Lock.Unlock()
 	if err != nil {
 		s.log.Error("failed to create header route handler",

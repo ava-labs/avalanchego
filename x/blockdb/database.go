@@ -30,7 +30,7 @@ import (
 const (
 	indexFileName          = "blockdb.idx"
 	dataFileNameFormat     = "blockdb_%d.dat"
-	defaultFilePermissions = 0o666
+	defaultFilePermissions = 0o600
 
 	// Since 0 is a valid height, math.MaxUint64 is used to indicate unset height.
 	// It is not possible for block height to be max uint64 as it would overflow the index entry offset

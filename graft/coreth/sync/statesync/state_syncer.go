@@ -36,7 +36,11 @@ const (
 
 	numStorageTrieSegments = 4
 	numMainTrieSegments    = 8
-	defaultNumWorkers      = 12 // Tested working value - balances performance vs memory usage
+
+	// Worker count constants for dynamic scaling
+	minNumWorkers     = 8  // Minimum workers even on low-CPU systems
+	maxNumWorkers     = 32 // Maximum workers to prevent resource exhaustion
+	getNumWorkers() = 12 // Fallback value if CPU count detection fails
 )
 
 var (
@@ -45,8 +49,12 @@ var (
 	errLeafsRequestSizeRequired                = errors.New("leafs request size must be > 0")
 
 	// Cache the computed segment threshold to avoid repeated memory stats calls
-	cachedSegmentThreshold     uint64
+	cachedSegmentThreshold       uint64
 	segmentThresholdComputedOnce sync.Once
+
+	// Cache the computed worker count to avoid repeated CPU count calls
+	cachedNumWorkers       int
+	numWorkersComputedOnce sync.Once
 )
 
 // getSegmentThreshold returns the adaptive segment threshold based on available system memory.
@@ -79,6 +87,43 @@ func getSegmentThreshold() uint64 {
 		}
 	})
 	return cachedSegmentThreshold
+}
+
+// getNumWorkers returns the optimal number of workers based on available CPU cores.
+// Caches the result since CPU count doesn't change during runtime.
+// Scales workers between minNumWorkers and maxNumWorkers based on runtime.NumCPU().
+func getNumWorkers() int {
+	numWorkersComputedOnce.Do(func() {
+		numCPU := runtime.NumCPU()
+
+		// Scale workers with CPU count: use NumCPU for systems with sufficient cores
+		// Ensure we stay within min/max bounds
+		switch {
+		case numCPU <= 4:
+			// Conservative for low-CPU systems (e.g., containers, small VMs)
+			cachedNumWorkers = minNumWorkers
+			log.Info("Using minimum worker count for low-CPU system",
+				"numWorkers", cachedNumWorkers, "numCPU", numCPU)
+		case numCPU >= 24:
+			// Cap at maxNumWorkers for high-CPU systems to prevent over-subscription
+			cachedNumWorkers = maxNumWorkers
+			log.Info("Using maximum worker count for high-CPU system",
+				"numWorkers", cachedNumWorkers, "numCPU", numCPU)
+		default:
+			// Scale linearly with CPU count for medium systems
+			// Use NumCPU directly if it falls within our range, otherwise clamp
+			cachedNumWorkers = numCPU
+			if cachedNumWorkers < minNumWorkers {
+				cachedNumWorkers = minNumWorkers
+			}
+			if cachedNumWorkers > maxNumWorkers {
+				cachedNumWorkers = maxNumWorkers
+			}
+			log.Info("Using CPU-scaled worker count",
+				"numWorkers", cachedNumWorkers, "numCPU", numCPU)
+		}
+	})
+	return cachedNumWorkers
 }
 
 // stateSync keeps the state of the entire state sync operation.
@@ -138,13 +183,13 @@ func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, co
 		triesInProgress: make(map[common.Hash]*trieToSync),
 
 		// [triesInProgressSem] is used to keep the number of tries syncing
-		// less than or equal to [defaultNumWorkers].
-		triesInProgressSem: make(chan struct{}, defaultNumWorkers),
+		// less than or equal to [getNumWorkers()].
+		triesInProgressSem: make(chan struct{}, getNumWorkers()),
 
 		// Each [trieToSync] will have a maximum of [numSegments] segments.
 		// We set the capacity of [segments] to accommodate the main trie (8 segments)
 		// plus concurrent storage tries. Sized for main trie to avoid blocking during initialization.
-		segments:         make(chan syncclient.LeafSyncTask, defaultNumWorkers*numMainTrieSegments),
+		segments:         make(chan syncclient.LeafSyncTask, getNumWorkers()*numMainTrieSegments),
 		mainTrieDone:     make(chan struct{}),
 		storageTriesDone: make(chan struct{}),
 		batchSize:        ethdb.IdealBatchSize * 4, // 4x larger batches = fewer DB writes (I/O optimization)
@@ -155,7 +200,7 @@ func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, co
 
 	ss.syncer = syncclient.NewCallbackLeafSyncer(client, ss.segments, &syncclient.LeafSyncerConfig{
 		RequestSize: leafsRequestSize,
-		NumWorkers:  defaultNumWorkers,
+		NumWorkers:  getNumWorkers(),
 	})
 
 	if codeQueue == nil {
@@ -198,7 +243,7 @@ func (*stateSync) ID() string {
 func (t *stateSync) Sync(ctx context.Context) error {
 	log.Info("[DEBUG-SYNC] State sync starting",
 		"root", t.root,
-		"numWorkers", defaultNumWorkers,
+		"numWorkers", getNumWorkers(),
 	)
 
 	// Start the leaf syncer and storage trie producer.

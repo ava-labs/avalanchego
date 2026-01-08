@@ -124,7 +124,6 @@ linters:
     gosec:
       excludes:
         - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
-        - G115 # TODO(marun) Enable this ruleset in a follow-up PR
     importas:
       # Do not allow unaliased imports of aliased packages.
       no-unaliased: false

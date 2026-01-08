@@ -452,7 +452,8 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	// Allows messages to be routed to the new chain. If the handler hasn't been
 	// started and a message is forwarded, then the message will block until the
 	// handler is started.
-	m.ManagerConfig.Router.AddChain(context.TODO(), chain.Handler)
+	// Use background context for chain handler registration - runs for chain lifetime
+	m.ManagerConfig.Router.AddChain(context.Background(), chain.Handler)
 
 	// Register bootstrapped health checks after P chain has been added to
 	// chains.
@@ -462,13 +463,15 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	//       the manager.
 	if chainParams.ID == constants.PlatformChainID {
 		if err := m.registerBootstrappedHealthChecks(); err != nil {
-			chain.Handler.StopWithError(context.TODO(), err)
+			// Use background context for error handling during startup
+			chain.Handler.StopWithError(context.Background(), err)
 		}
 	}
 
 	// Tell the chain to start processing messages.
 	// If the X, P, or C Chain panics, do not attempt to recover
-	chain.Handler.Start(context.TODO(), !m.CriticalChains.Contains(chainParams.ID))
+	// Use background context for chain handler start - runs for chain lifetime
+	chain.Handler.Start(context.Background(), !m.CriticalChains.Contains(chainParams.ID))
 }
 
 // Create a chain
@@ -531,7 +534,21 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	if err != nil {
 		return nil, fmt.Errorf("error while creating vm: %w", err)
 	}
-	// TODO: Shutdown VM if an error occurs
+
+	// Ensure VM is shut down if chain creation fails
+	// succeeded tracks whether we successfully completed chain creation
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if shutdownErr := vm.Shutdown(shutdownCtx); shutdownErr != nil {
+				chainLog.Error("failed to shutdown VM after error",
+					zap.Error(shutdownErr),
+				)
+			}
+		}
+	}()
 
 	chainFxs := make([]*common.Fx, len(chainParams.FxIDs))
 	for i, fxID := range chainParams.FxIDs {
@@ -592,10 +609,17 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, err
 	}
 
-	return chain, errors.Join(
+	registrationErr := errors.Join(
 		m.snowmanGatherer.Register(primaryAlias, ctx.Registerer),
 		vmGatherer.Register(primaryAlias, ctx.Metrics),
 	)
+	if registrationErr != nil {
+		return nil, registrationErr
+	}
+
+	// Mark as succeeded to prevent VM shutdown in defer
+	succeeded = true
+	return chain, nil
 }
 
 func (m *manager) AddRegistrant(r Registrant) {
@@ -731,8 +755,9 @@ func (m *manager) createAvalancheChain(
 	// snowmanMessageSender here is where the metrics will be placed. Because we
 	// end up using this sender after the linearization, we pass in
 	// snowmanMessageSender here.
+	// Use background context for VM initialization - one-time setup
 	err = dagVM.Initialize(
-		context.TODO(),
+		context.Background(),
 		ctx.Context,
 		vmDB,
 		genesisData,
@@ -1218,8 +1243,9 @@ func (m *manager) createSnowmanChain(
 	}
 	vm = cn
 
+	// Use background context for VM initialization - one-time setup
 	if err := vm.Initialize(
-		context.TODO(),
+		context.Background(),
 		ctx.Context,
 		vmDB,
 		genesisData,
@@ -1524,7 +1550,11 @@ func (m *manager) Shutdown() {
 	m.chainsQueue.Close()
 	close(m.chainCreatorShutdownCh)
 	m.chainCreatorExited.Wait()
-	m.ManagerConfig.Router.Shutdown(context.TODO())
+
+	// Use timeout context for router shutdown to prevent indefinite blocking
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	m.ManagerConfig.Router.Shutdown(shutdownCtx)
 }
 
 // LookupVM returns the ID of the VM associated with an alias

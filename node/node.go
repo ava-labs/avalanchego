@@ -278,7 +278,8 @@ func New(
 		return nil, fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
 
-	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
+	// Use background context for health checks - they run for the lifetime of the node
+	n.health.Start(context.Background(), n.Config.HealthCheckFreq)
 	n.initProfiler()
 
 	// Start the Platform chain
@@ -1201,8 +1202,9 @@ func (n *Node) initVMs() error {
 	}
 
 	// Register the VMs that Avalanche supports
+	// Use background context for VM factory registration during node initialization
 	err := errors.Join(
-		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
+		n.VMManager.RegisterFactory(context.Background(), constants.PlatformVMID, &platformvm.Factory{
 			Internal: platformconfig.Internal{
 				Chains:                    n.chainManager,
 				Validators:                vdrs,
@@ -1224,14 +1226,14 @@ func (n *Node) initVMs() error {
 				UseCurrentHeight:          n.Config.UseCurrentHeight,
 			},
 		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
+		n.VMManager.RegisterFactory(context.Background(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
 				Upgrades:         n.Config.UpgradeConfig,
 				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
+		n.VMManager.RegisterFactory(context.Background(), constants.EVMID, &coreth.Factory{}),
 	)
 	if err != nil {
 		return err
@@ -1259,7 +1261,7 @@ func (n *Node) initVMs() error {
 	})
 
 	// register any vms that need to be installed as plugins from disk
-	_, failedVMs, err := n.VMRegistry.Reload(context.TODO())
+	_, failedVMs, err := n.VMRegistry.Reload(context.Background())
 	for failedVM, err := range failedVMs {
 		n.Log.Error("failed to register VM",
 			zap.Stringer("vmID", failedVM),
@@ -1887,7 +1889,9 @@ func (n *Node) shutdown() {
 
 	// Ensure all runtimes are shutdown
 	n.Log.Info("cleaning up plugin runtimes")
-	n.runtimeManager.Stop(context.TODO())
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), n.Config.ShutdownTimeout)
+	defer shutdownCancel()
+	n.runtimeManager.Stop(shutdownCtx)
 
 	if n.DB != nil {
 		if err := n.DB.Delete(ungracefulShutdown); err != nil {
