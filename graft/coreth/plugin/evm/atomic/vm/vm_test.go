@@ -146,7 +146,7 @@ func testImportMissingUTXOs(t *testing.T, scheme string) {
 
 	importTx, err := vm1.newImportTx(vm1.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
 	require.NoError(err)
-	require.NoError(vm1.mempool.AddLocalTx(importTx))
+	require.NoError(vm1.AtomicMempool.AddLocalTx(importTx))
 	msg, err := vm1.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
@@ -203,7 +203,7 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
 	require.NoError(err)
-	require.NoError(vm.mempool.AddLocalTx(importTx))
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -226,7 +226,7 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	wrappedState := extstate.New(state)
 	exportTx, err := atomic.NewExportTx(vm.Ctx, vm.CurrentRules(), wrappedState, vm.Ctx.AVAXAssetID, importAmount-(2*ap0.AtomicTxFee), vm.Ctx.XChainID, vmtest.TestShortIDAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
 	require.NoError(err)
-	require.NoError(vm.mempool.AddLocalTx(exportTx))
+	require.NoError(vm.AtomicMempool.AddLocalTx(exportTx))
 
 	msg, err = vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -243,7 +243,7 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 
 	s := AvaxAPI{
 		Context:      vm.Ctx,
-		Mempool:      vm.mempool,
+		Mempool:      vm.AtomicMempool,
 		PushGossiper: vm.pushGossiper,
 		AcceptedTxs:  vm.AtomicTxRepository,
 	}
@@ -296,7 +296,7 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 	expectedParentBlkID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	for _, tx := range importTxs[:2] {
-		require.NoError(vm.mempool.AddLocalTx(tx))
+		require.NoError(vm.AtomicMempool.AddLocalTx(tx))
 
 		msg, err := vm.WaitForEvent(t.Context())
 		require.NoError(err)
@@ -317,10 +317,10 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 	// the VM returns an error when it attempts to issue the conflict into the mempool
 	// and when it attempts to build a block with the conflict force added to the mempool.
 	for i, tx := range conflictTxs[:2] {
-		err = vm.mempool.AddLocalTx(tx)
+		err = vm.AtomicMempool.AddLocalTx(tx)
 		require.ErrorIsf(err, ErrConflictingAtomicInputs, "tx index %d", i)
 		// Force issue transaction directly to the mempool
-		require.NoErrorf(vm.mempool.ForceAddTx(tx), "force issue failed for tx index %d", i)
+		require.NoErrorf(vm.AtomicMempool.ForceAddTx(tx), "force issue failed for tx index %d", i)
 		msg, err := vm.WaitForEvent(t.Context())
 		require.NoErrorf(err, "wait for event failed for tx index %d", i)
 		require.Equal(commonEng.PendingTxs, msg)
@@ -336,7 +336,7 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 	// Generate one more valid block so that we can copy the header to create an invalid block
 	// with modified extra data. This new block will be invalid for more than one reason (invalid merkle root)
 	// so we check to make sure that the expected error is returned from block verification.
-	require.NoError(vm.mempool.AddLocalTx(importTxs[2]))
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTxs[2]))
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
@@ -421,8 +421,8 @@ func testReissueAtomicTxHigherGasPrice(t *testing.T, scheme string) {
 			require.NoError(t, err)
 			tx2, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, vmtest.TestEthAddrs[0], new(big.Int).Mul(common.Big2, vmtest.InitialBaseFee), kc, []*avax.UTXO{utxo})
 			require.NoError(t, err)
-			require.NoError(t, vm.mempool.AddLocalTx(tx1))
-			require.NoError(t, vm.mempool.AddLocalTx(tx2))
+			require.NoError(t, vm.AtomicMempool.AddLocalTx(tx1))
+			require.NoError(t, vm.AtomicMempool.AddLocalTx(tx2))
 
 			return []*atomic.Tx{tx2}, []*atomic.Tx{tx1}
 		},
@@ -435,8 +435,8 @@ func testReissueAtomicTxHigherGasPrice(t *testing.T, scheme string) {
 			require.NoError(t, err)
 			tx2, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, vmtest.TestEthAddrs[0], new(big.Int).Mul(common.Big2, vmtest.InitialBaseFee), kc, []*avax.UTXO{utxo1})
 			require.NoError(t, err)
-			require.NoError(t, vm.mempool.AddLocalTx(tx1))
-			require.NoError(t, vm.mempool.AddLocalTx(tx2))
+			require.NoError(t, vm.AtomicMempool.AddLocalTx(tx1))
+			require.NoError(t, vm.AtomicMempool.AddLocalTx(tx2))
 
 			return []*atomic.Tx{tx2}, []*atomic.Tx{tx1}
 		},
@@ -451,19 +451,19 @@ func testReissueAtomicTxHigherGasPrice(t *testing.T, scheme string) {
 			require.NoError(t, err)
 			reissuanceTx1, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, vmtest.TestEthAddrs[0], new(big.Int).Mul(big.NewInt(2), vmtest.InitialBaseFee), kc, []*avax.UTXO{utxo1, utxo2})
 			require.NoError(t, err)
-			require.NoError(t, vm.mempool.AddLocalTx(importTx1))
-			require.NoError(t, vm.mempool.AddLocalTx(importTx2))
+			require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx1))
+			require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx2))
 
-			err = vm.mempool.AddLocalTx(reissuanceTx1)
+			err = vm.AtomicMempool.AddLocalTx(reissuanceTx1)
 			require.ErrorIs(t, err, txpool.ErrConflict)
 
-			require.True(t, vm.mempool.Has(importTx1.ID()))
-			require.True(t, vm.mempool.Has(importTx2.ID()))
-			require.False(t, vm.mempool.Has(reissuanceTx1.ID()))
+			require.True(t, vm.AtomicMempool.Has(importTx1.ID()))
+			require.True(t, vm.AtomicMempool.Has(importTx2.ID()))
+			require.False(t, vm.AtomicMempool.Has(reissuanceTx1.ID()))
 
 			reissuanceTx2, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, vmtest.TestEthAddrs[0], new(big.Int).Mul(big.NewInt(4), vmtest.InitialBaseFee), kc, []*avax.UTXO{utxo1, utxo2})
 			require.NoError(t, err)
-			require.NoError(t, vm.mempool.AddLocalTx(reissuanceTx2))
+			require.NoError(t, vm.AtomicMempool.AddLocalTx(reissuanceTx2))
 
 			return []*atomic.Tx{reissuanceTx2}, []*atomic.Tx{importTx1, importTx2}
 		},
@@ -480,12 +480,12 @@ func testReissueAtomicTxHigherGasPrice(t *testing.T, scheme string) {
 			issuedTxs, evictedTxs := issueTxs(t, vm, tvm.AtomicMemory)
 
 			for i, tx := range issuedTxs {
-				_, issued := vm.mempool.GetPendingTx(tx.ID())
+				_, issued := vm.AtomicMempool.GetPendingTx(tx.ID())
 				require.True(t, issued, "expected issued tx at index %d to be issued", i)
 			}
 
 			for i, tx := range evictedTxs {
-				_, discarded, _ := vm.mempool.GetTx(tx.ID())
+				_, discarded, _ := vm.AtomicMempool.GetTx(tx.ID())
 				require.True(t, discarded, "expected discarded tx at index %d to be discarded", i)
 			}
 		})
@@ -552,7 +552,7 @@ func testConflictingTransitiveAncestryWithGap(t *testing.T, scheme string) {
 	// Create a conflicting transaction
 	importTx0B, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[2], vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key0})
 	require.NoError(err)
-	require.NoError(vm.mempool.AddLocalTx(importTx0A))
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx0A))
 
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -577,7 +577,7 @@ func testConflictingTransitiveAncestryWithGap(t *testing.T, scheme string) {
 
 	importTx1, err := vm.newImportTx(vm.Ctx.XChainID, key.Address, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key1})
 	require.NoError(err)
-	require.NoError(vm.mempool.AddLocalTx(importTx1))
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx1))
 
 	msg, err = vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -588,11 +588,11 @@ func testConflictingTransitiveAncestryWithGap(t *testing.T, scheme string) {
 	require.NoError(blk2.Verify(t.Context()))
 	require.NoError(vm.SetPreference(t.Context(), blk2.ID()))
 
-	err = vm.mempool.AddLocalTx(importTx0B)
+	err = vm.AtomicMempool.AddLocalTx(importTx0B)
 	require.ErrorIs(err, ErrConflictingAtomicInputs)
 
 	// Force issue transaction directly into the mempool
-	require.NoError(vm.mempool.ForceAddTx(importTx0B))
+	require.NoError(vm.AtomicMempool.ForceAddTx(importTx0B))
 	msg, err = vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
@@ -649,7 +649,7 @@ func testBonusBlocksTxs(t *testing.T, scheme string) {
 
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
 	require.NoError(err)
-	require.NoError(vm.mempool.AddLocalTx(importTx))
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -706,7 +706,7 @@ func testReissueAtomicTx(t *testing.T, scheme string) {
 	require.NoError(err)
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
 	require.NoError(err)
-	require.NoError(vm.mempool.AddLocalTx(importTx))
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -780,7 +780,7 @@ func testAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T, scheme string) {
 	exportTxs := createExportTxOptions(t, vm, tvm.AtomicMemory)
 	exportTx1, exportTx2 := exportTxs[0], exportTxs[1]
 
-	require.NoError(vm.mempool.AddLocalTx(exportTx1))
+	require.NoError(vm.AtomicMempool.AddLocalTx(exportTx1))
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
@@ -790,14 +790,14 @@ func testAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T, scheme string) {
 
 	require.NoError(vm.SetPreference(t.Context(), exportBlk1.ID()))
 
-	err = vm.mempool.AddLocalTx(exportTx2)
+	err = vm.AtomicMempool.AddLocalTx(exportTx2)
 	require.ErrorIs(err, atomic.ErrInvalidNonce)
 
-	err = vm.mempool.AddRemoteTx(exportTx2)
+	err = vm.AtomicMempool.AddRemoteTx(exportTx2)
 	require.ErrorIs(err, atomic.ErrInvalidNonce)
 
 	// Manually add transaction to mempool to bypass validation
-	require.NoError(vm.mempool.ForceAddTx(exportTx2))
+	require.NoError(vm.AtomicMempool.ForceAddTx(exportTx2))
 	msg, err = vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
@@ -832,7 +832,7 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 	importTxs := createImportTxOptions(t, vm, tvm.AtomicMemory)
 
 	// Issue the first import transaction, build, and accept the block.
-	require.NoError(vm.mempool.AddLocalTx(importTxs[0]))
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTxs[0]))
 
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -849,9 +849,9 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 
 	// Add the two conflicting transactions directly to the mempool, so that two consecutive transactions
 	// will fail verification when build block is called.
-	require.NoError(vm.mempool.ForceAddTx(importTxs[1]))
-	require.NoError(vm.mempool.ForceAddTx(importTxs[2]))
-	require.Equal(2, vm.mempool.Txs.PendingLen())
+	require.NoError(vm.AtomicMempool.ForceAddTx(importTxs[1]))
+	require.NoError(vm.AtomicMempool.ForceAddTx(importTxs[2]))
+	require.Equal(2, vm.AtomicMempool.Txs.PendingLen())
 
 	_, err = vm.BuildBlock(t.Context())
 	require.ErrorIs(err, ErrEmptyBlock)
@@ -881,14 +881,14 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 	for index, key := range vmtest.TestKeys {
 		importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[index], vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key})
 		require.NoError(err)
-		require.NoError(vm.mempool.AddLocalTx(importTx))
+		require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 		conflictSets[index].Add(importTx.ID())
 		conflictTx, err := vm.newImportTx(vm.Ctx.XChainID, conflictKey.Address, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key})
 		require.NoError(err)
-		err = vm.mempool.AddLocalTx(conflictTx)
+		err = vm.AtomicMempool.AddLocalTx(conflictTx)
 		require.ErrorIs(err, txpool.ErrConflict)
 		// force add the tx
-		require.NoError(vm.mempool.ForceAddTx(conflictTx))
+		require.NoError(vm.AtomicMempool.ForceAddTx(conflictTx))
 		conflictSets[index].Add(conflictTx.ID())
 	}
 	msg, err := vm.WaitForEvent(t.Context())
@@ -945,7 +945,7 @@ func TestBuildBlockDoesNotExceedAtomicGasLimit(t *testing.T) {
 
 		importTx, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, kc, []*avax.UTXO{utxo})
 		require.NoError(err)
-		require.NoError(vm.mempool.AddLocalTx(importTx))
+		require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 	}
 
 	msg, err := vm.WaitForEvent(t.Context())
@@ -1002,7 +1002,7 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 	// used in ApricotPhase5 it still pays a sufficient fee with the fixed fee per atomic transaction.
 	importTx, err := vm1.newImportTx(vm1.Ctx.XChainID, vmtest.TestEthAddrs[0], new(big.Int).Mul(common.Big2, vmtest.InitialBaseFee), []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
 	require.NoError(err)
-	require.NoError(vm1.mempool.ForceAddTx(importTx))
+	require.NoError(vm1.AtomicMempool.ForceAddTx(importTx))
 
 	msg, err := vm1.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -1064,7 +1064,7 @@ func testEmptyBlock(t *testing.T, scheme string) {
 
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
 	require.NoError(err)
-	require.NoError(vm.mempool.AddLocalTx(importTx))
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -1155,7 +1155,7 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, address, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
 	require.NoError(err)
-	require.NoError(vm.mempool.AddLocalTx(importTx))
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -1283,7 +1283,7 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, address, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
 	require.NoError(err)
-	require.NoError(vm.mempool.AddLocalTx(importTx))
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -1403,10 +1403,10 @@ func testBuildInvalidBlockHead(t *testing.T, scheme string) {
 
 	// Verify that the transaction fails verification when attempting to issue
 	// it into the atomic mempool.
-	err := vm.mempool.AddLocalTx(tx)
+	err := vm.AtomicMempool.AddLocalTx(tx)
 	require.ErrorIs(err, errFailedToFetchImportUTXOs)
 	// Force issue the transaction directly to the mempool
-	require.NoError(vm.mempool.ForceAddTx(tx))
+	require.NoError(vm.AtomicMempool.ForceAddTx(tx))
 
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
@@ -1436,7 +1436,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			defer func() {
 				require.NoError(vm.Shutdown(t.Context()))
 			}()
-			mempool := vm.mempool
+			mempool := vm.AtomicMempool
 
 			// generate a valid and conflicting tx
 			var (
@@ -1453,12 +1453,12 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			conflictingTxID := conflictingTx.ID()
 
 			// add a tx to the mempool
-			require.NoError(vm.mempool.AddLocalTx(tx))
+			require.NoError(vm.AtomicMempool.AddLocalTx(tx))
 			has := mempool.Has(txID)
 			require.True(has, "valid tx not recorded into mempool")
 
 			// try to add a conflicting tx
-			err := vm.mempool.AddLocalTx(conflictingTx)
+			err := vm.AtomicMempool.AddLocalTx(conflictingTx)
 			require.ErrorIs(err, txpool.ErrConflict)
 			has = mempool.Has(conflictingTxID)
 			require.False(has, "conflicting tx in mempool")
@@ -1531,7 +1531,7 @@ func TestWaitForEvent(t *testing.T) {
 					}
 				}()
 
-				require.NoError(t, vm.mempool.AddLocalTx(importTx))
+				require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
 
 				r := <-results
 				require.NoError(t, r.err)
