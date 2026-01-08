@@ -244,7 +244,7 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	s := AvaxAPI{
 		Context:      vm.Ctx,
 		Mempool:      vm.AtomicMempool,
-		PushGossiper: vm.pushGossiper,
+		PushGossiper: vm.AtomicTxPushGossiper,
 		AcceptedTxs:  vm.AtomicTxRepository,
 	}
 

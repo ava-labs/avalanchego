@@ -229,7 +229,7 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	tx, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, address, vmtest.InitialBaseFee, secp256k1fx.NewKeychain(pk), []*avax.UTXO{utxo})
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(tx))
-	vm.pushGossiper.Add(tx)
+	vm.AtomicTxPushGossiper.Add(tx)
 
 	gossipedBytes := <-sender.SentAppGossip
 	require.Equal(byte(p2p.AtomicTxGossipHandlerID), gossipedBytes[0])

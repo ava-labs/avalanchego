@@ -84,11 +84,11 @@ type VM struct {
 	Fx        secp256k1fx.Fx
 	baseCodec codec.Registry
 
-	AtomicMempool    *txpool.Mempool
-	gossipHandler    p2p.Handler
-	pullGossiper     *avalanchegossip.ValidatorGossiper
-	pullGossipPeriod time.Duration
-	pushGossiper     *avalanchegossip.PushGossiper[*atomic.Tx]
+	AtomicMempool        *txpool.Mempool
+	gossipHandler        p2p.Handler
+	pullGossiper         *avalanchegossip.ValidatorGossiper
+	pullGossipPeriod     time.Duration
+	AtomicTxPushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
 
 	// AtomicTxRepository maintains two indexes on accepted atomic txs.
 	// - txID to accepted atomic tx
@@ -203,7 +203,7 @@ func (vm *VM) Initialize(
 	}
 	systemConfig.SetDefaults()
 	vm.pullGossipPeriod = systemConfig.RequestPeriod
-	vm.gossipHandler, vm.pullGossiper, vm.pushGossiper, err = avalanchegossip.NewSystem(
+	vm.gossipHandler, vm.pullGossiper, vm.AtomicTxPushGossiper, err = avalanchegossip.NewSystem(
 		vm.Ctx.NodeID,
 		vm.InnerVM.P2PNetwork(),
 		vm.InnerVM.P2PValidators(),
@@ -300,7 +300,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.Ctx.Log, vm.pushGossiper, vm.InnerVM.Config().PushGossipFrequency.Duration)
+		avalanchegossip.Every(ctx, vm.Ctx.Log, vm.AtomicTxPushGossiper, vm.InnerVM.Config().PushGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 
@@ -336,7 +336,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 		bc:           vm.InnerVM.Ethereum().BlockChain(),
 		Context:      vm.Ctx,
 		Mempool:      vm.AtomicMempool,
-		PushGossiper: vm.pushGossiper,
+		PushGossiper: vm.AtomicTxPushGossiper,
 		AcceptedTxs:  vm.AtomicTxRepository,
 	})
 	if err != nil {
