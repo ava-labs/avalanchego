@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/ava-labs/libevm/common"
@@ -168,8 +169,17 @@ func (t *trieToSync) addSegment(start, end []byte) *trieSegment {
 }
 
 // segmentFinished is called when one the trie segment with index [idx] finishes syncing.
-// Uses parallel hashing: each segment hashes independently using cached leaf data (no I/O),
-// then merges all segments into final trie when all are done.
+// Uses optimized parallel processing: segments download in parallel (all 12 workers),
+// then all cached data is merged and sorted for feeding to StackTrie.
+//
+// Performance notes:
+// - Segment downloads: Parallel (12 workers downloading simultaneously)
+// - Data collection: Linear O(n) but fast (just appending to slice)
+// - Sorting: O(n log n) using Go's optimized sort.Slice
+// - StackTrie updates: Sequential but using cached data (no I/O)
+//
+// This approach eliminates I/O overhead while preparing data optimally for
+// StackTrie's ascending key order requirement.
 func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 	segment := t.segments[idx]
 	log.Info("[DEBUG-SYNC] Segment finished downloading", "segment", segment, "cachedLeafs", len(segment.cachedKeys))
@@ -190,41 +200,63 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 		return nil
 	}
 
-	// All segments downloaded - now hash them in parallel using cached data
-	log.Info("[DEBUG-SYNC] All segments downloaded, starting parallel hashing",
+	// All segments downloaded - now merge and hash in sorted order
+	log.Info("[DEBUG-SYNC] All segments downloaded, starting parallel merge and hashing",
 		"root", t.root,
 		"segments", len(t.segments),
 		"totalCachedLeafs", t.getTotalCachedLeafs())
 
-	// Hash all segments from cached data (pure CPU work, no I/O)
-	for i, seg := range t.segments {
+	// Step 1: Collect all keys and values from all segments
+	// Note: Segments are downloaded in parallel, so we collect them all first
+	type keyValue struct {
+		key []byte
+		val []byte
+	}
+
+	totalLeafs := t.getTotalCachedLeafs()
+	allData := make([]keyValue, 0, totalLeafs)
+
+	for _, seg := range t.segments {
+		for j := range seg.cachedKeys {
+			allData = append(allData, keyValue{
+				key: seg.cachedKeys[j],
+				val: seg.cachedVals[j],
+			})
+		}
+		// Clear cached data to free memory as we collect
+		seg.cachedKeys = nil
+		seg.cachedVals = nil
+	}
+
+	// Step 2: Sort all keys (StackTrie requires ascending order)
+	// This is the CPU-intensive part that can benefit from Go's optimized sort
+	log.Info("[DEBUG-SYNC] Sorting merged keys", "totalKeys", len(allData))
+	sort.Slice(allData, func(i, j int) bool {
+		return bytes.Compare(allData[i].key, allData[j].key) < 0
+	})
+
+	// Step 3: Feed sorted data to thread-safe StackTrie
+	// The mutex in ThreadSafeStackTrie ensures safe access even if this
+	// is called from multiple tries finishing simultaneously
+	log.Info("[DEBUG-SYNC] Hashing sorted data into StackTrie", "totalKeys", len(allData))
+	for i := range allData {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		log.Debug("statesync: hashing segment from cache", "segment", seg, "leafs", len(seg.cachedKeys))
-
-		// Hash this segment's cached data into the shared stackTrie
-		for j := range seg.cachedKeys {
-			if err := t.stackTrie.Update(seg.cachedKeys[j], seg.cachedVals[j]); err != nil {
+		if err := t.stackTrie.Update(allData[i].key, allData[i].val); err != nil {
+			return err
+		}
+		if t.batch.ValueSize() > int(t.sync.batchSize) {
+			if err := t.batch.Write(); err != nil {
 				return err
 			}
-			if t.batch.ValueSize() > int(t.sync.batchSize) {
-				if err := t.batch.Write(); err != nil {
-					return err
-				}
-				t.batch.Reset()
-			}
+			t.batch.Reset()
 		}
-
-		// Clear cached data to free memory as we go
-		seg.cachedKeys = nil
-		seg.cachedVals = nil
-
-		t.lock.Lock()
-		t.segmentsHashedDone[i] = struct{}{}
-		t.lock.Unlock()
 	}
+
+	// Clear merged data to free memory
+	allData = nil
 
 	// Commit the final trie and verify root
 	log.Info("[DEBUG-SYNC] Committing final trie", "root", t.root)
