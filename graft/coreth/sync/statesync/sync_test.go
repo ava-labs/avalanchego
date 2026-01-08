@@ -54,11 +54,9 @@ func testSync(t *testing.T, test syncTest) {
 	clientDB, serverDB, root := test.prepareForTest(t, r)
 	clientEthDB, ok := clientDB.DiskDB().(ethdb.Database)
 	require.Truef(t, ok, "%T is not an ethdb.Database", clientDB.DiskDB())
-	serverEthDB, ok := serverDB.DiskDB().(ethdb.Database)
-	require.Truef(t, ok, "%T is not an ethdb.Database", serverDB.DiskDB())
 
 	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverDB.TrieDB(), message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
-	codeRequestHandler := handlers.NewCodeRequestHandler(serverEthDB, message.Codec, handlerstats.NewNoopHandlerStats())
+	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
 	mockClient := statesyncclient.NewTestClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
 	// Set intercept functions for the mock client
 	mockClient.GetLeafsIntercept = test.GetLeafsIntercept
