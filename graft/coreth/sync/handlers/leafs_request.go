@@ -6,6 +6,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -40,6 +41,51 @@ const (
 	segmentLen = 64 // divide data from snapshot to segments of this size
 )
 
+// proofDBPool manages a pool of reusable memorydb.Database instances for proof generation.
+// Reduces GC pressure by reusing databases instead of creating new ones for each request.
+type proofDBPool struct {
+	pool sync.Pool
+}
+
+// newProofDBPool creates a new pool for proof databases.
+func newProofDBPool() *proofDBPool {
+	return &proofDBPool{
+		pool: sync.Pool{
+			New: func() interface{} {
+				return memorydb.New()
+			},
+		},
+	}
+}
+
+// get retrieves a proof database from the pool, creating a new one if none available.
+func (p *proofDBPool) get() *memorydb.Database {
+	return p.pool.Get().(*memorydb.Database)
+}
+
+// put returns a proof database to the pool after clearing its contents.
+func (p *proofDBPool) put(db *memorydb.Database) {
+	if db == nil {
+		return
+	}
+	// Clear the database before returning to pool to avoid retaining old data
+	// We iterate and delete all keys to reset the database state
+	it := db.NewIterator(nil, nil)
+	keysToDelete := make([][]byte, 0, db.Len())
+	for it.Next() {
+		keysToDelete = append(keysToDelete, common.CopyBytes(it.Key()))
+	}
+	it.Release()
+
+	batch := db.NewBatch()
+	for _, key := range keysToDelete {
+		_ = batch.Delete(key) // memorydb delete doesn't error
+	}
+	_ = batch.Write() // memorydb write doesn't error
+
+	p.pool.Put(db)
+}
+
 type LeafRequestHandler interface {
 	OnLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error)
 }
@@ -52,6 +98,7 @@ type leafsRequestHandler struct {
 	codec            codec.Manager
 	stats            stats.LeafsRequestHandlerStats
 	trieKeyLength    int
+	proofDBPool      *proofDBPool // Pool for reusing proof databases
 }
 
 func NewLeafsRequestHandler(trieDB *triedb.Database, trieKeyLength int, snapshotProvider SnapshotProvider, codec codec.Manager, syncerStats stats.LeafsRequestHandlerStats) *leafsRequestHandler {
@@ -61,6 +108,7 @@ func NewLeafsRequestHandler(trieDB *triedb.Database, trieKeyLength int, snapshot
 		codec:            codec,
 		stats:            syncerStats,
 		trieKeyLength:    trieKeyLength,
+		proofDBPool:      newProofDBPool(),
 	}
 }
 
@@ -114,12 +162,13 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 	leafsResponse.Vals = make([][]byte, 0, limit)
 
 	responseBuilder := &responseBuilder{
-		request:   &leafsRequest,
-		response:  &leafsResponse,
-		t:         t,
-		keyLength: lrh.trieKeyLength,
-		limit:     limit,
-		stats:     lrh.stats,
+		request:     &leafsRequest,
+		response:    &leafsResponse,
+		t:           t,
+		keyLength:   lrh.trieKeyLength,
+		limit:       limit,
+		stats:       lrh.stats,
+		proofDBPool: lrh.proofDBPool,
 	}
 	// pass snapshot to responseBuilder if non-nil snapshot getter provided
 	if lrh.snapshotProvider != nil {
@@ -155,17 +204,26 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 }
 
 type responseBuilder struct {
-	request   *message.LeafsRequest
-	response  *message.LeafsResponse
-	t         *trie.Trie
-	snap      *snapshot.Tree
-	keyLength int
-	limit     uint16
+	request     *message.LeafsRequest
+	response    *message.LeafsResponse
+	t           *trie.Trie
+	snap        *snapshot.Tree
+	keyLength   int
+	limit       uint16
+	proofDBPool *proofDBPool // Pool for reusing proof databases
 
 	// stats
 	trieReadTime time.Duration
 	proofTime    time.Duration
 	stats        stats.LeafsRequestHandlerStats
+}
+
+// closeAndReturnProof closes the proof database and returns it to the pool for reuse.
+func (rb *responseBuilder) closeAndReturnProof(proof *memorydb.Database) {
+	if proof != nil {
+		_ = proof.Close() // closing memdb does not error
+		rb.proofDBPool.put(proof)
+	}
 }
 
 func (rb *responseBuilder) handleRequest(ctx context.Context) error {
@@ -199,7 +257,7 @@ func (rb *responseBuilder) handleRequest(ctx context.Context) error {
 		rb.stats.IncProofError()
 		return err
 	}
-	defer proof.Close() // closing memdb does not error
+	defer rb.closeAndReturnProof(proof)
 
 	rb.response.ProofVals, err = iterateVals(proof)
 	if err != nil {
@@ -246,7 +304,7 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 		rb.stats.IncProofError()
 		return false, err
 	}
-	defer proof.Close() // closing memdb does not error
+	defer rb.closeAndReturnProof(proof)
 	if ok {
 		rb.response.Keys, rb.response.Vals = snapKeys, snapVals
 		if len(rb.request.Start) == 0 && !more {
@@ -273,7 +331,7 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 			rb.stats.IncProofError()
 			return false, err
 		}
-		_ = proof.Close() // we don't need this proof
+		rb.closeAndReturnProof(proof) // Return proof to pool immediately
 		if !ok {
 			// segment is not valid
 			rb.stats.IncSnapshotSegmentInvalid()
@@ -315,8 +373,9 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 }
 
 // generateRangeProof returns a range proof for the range specified by [start] and [keys] using [t].
+// Uses pooled proof database to reduce GC pressure.
 func (rb *responseBuilder) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Database, error) {
-	proof := memorydb.New()
+	proof := rb.proofDBPool.get()
 	startTime := time.Now()
 	defer func() { rb.proofTime += time.Since(startTime) }()
 
@@ -326,14 +385,14 @@ func (rb *responseBuilder) generateRangeProof(start []byte, keys [][]byte) (*mem
 	}
 
 	if err := rb.t.Prove(start, proof); err != nil {
-		_ = proof.Close() // closing memdb does not error
+		rb.proofDBPool.put(proof)
 		return nil, err
 	}
 	if len(keys) > 0 {
 		// If there is a non-zero number of keys, set [end] for the range proof to the last key.
 		end := keys[len(keys)-1]
 		if err := rb.t.Prove(end, proof); err != nil {
-			_ = proof.Close() // closing memdb does not error
+			rb.proofDBPool.put(proof)
 			return nil, err
 		}
 	}
