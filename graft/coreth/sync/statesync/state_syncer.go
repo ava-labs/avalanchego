@@ -102,7 +102,7 @@ func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, co
 		segments:         make(chan syncclient.LeafSyncTask, defaultNumWorkers*numStorageTrieSegments),
 		mainTrieDone:     make(chan struct{}),
 		storageTriesDone: make(chan struct{}),
-		batchSize:        ethdb.IdealBatchSize,
+		batchSize:        ethdb.IdealBatchSize * 4, // 4x larger batches = fewer DB writes (I/O optimization)
 	}
 
 	// Apply functional options.

@@ -21,7 +21,7 @@ import (
 	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
-const defaultNumCodeFetchingWorkers = 5
+const defaultNumCodeFetchingWorkers = 12 // Match leaf syncer workers for balanced I/O
 
 var _ syncpkg.Syncer = (*CodeSyncer)(nil)
 
