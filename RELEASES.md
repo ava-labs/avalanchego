@@ -2,6 +2,10 @@
 
 ## Pending (v1.14.2)
 
+### Fixes
+
+- Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space.
+
 ## [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1)
 
 This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0). It is optional, but encouraged.
