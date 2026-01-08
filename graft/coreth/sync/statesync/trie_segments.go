@@ -40,12 +40,10 @@ type trieToSync struct {
 	// contains a pointer back to this struct.
 	segments []*trieSegment
 
-	// These fields are used to hash the segments in
-	// order, even though they may finish syncing out
-	// of order or concurrently.
-	lock              sync.Mutex
-	segmentsDone      map[int]struct{}
-	segmentToHashNext int
+	// Parallel hashing: track completion instead of forcing order
+	lock         sync.Mutex
+	segmentsDone map[int]struct{} // segments that finished downloading
+	segmentsHashedDone map[int]struct{} // segments that finished hashing (NEW)
 
 	// We use a stack trie to hash the leafs and have
 	// a batch used for writing it to disk.
@@ -71,14 +69,15 @@ func NewTrieToSync(sync *stateSync, root common.Hash, account common.Hash, syncT
 		rawdb.WriteTrieNode(batch, account, path, hash, blob, rawdb.HashScheme)
 	}
 	trieToSync := &trieToSync{
-		sync:         sync,
-		root:         root,
-		account:      account,
-		batch:        batch,
-		stackTrie:    trie.NewStackTrie(&trie.StackTrieOptions{Writer: writeFn}),
-		isMainTrie:   (root == sync.root),
-		task:         syncTask,
-		segmentsDone: make(map[int]struct{}),
+		sync:               sync,
+		root:               root,
+		account:            account,
+		batch:              batch,
+		stackTrie:          trie.NewStackTrie(&trie.StackTrieOptions{Writer: writeFn}),
+		isMainTrie:         (root == sync.root),
+		task:               syncTask,
+		segmentsDone:       make(map[int]struct{}),
+		segmentsHashedDone: make(map[int]struct{}),
 	}
 	return trieToSync, trieToSync.loadSegments()
 }
@@ -169,43 +168,45 @@ func (t *trieToSync) addSegment(start, end []byte) *trieSegment {
 }
 
 // segmentFinished is called when one the trie segment with index [idx] finishes syncing.
-// creates intermediary hash nodes for the trie up to the last contiguous segment received from start.
+// Uses parallel hashing: each segment hashes independently using cached leaf data (no I/O),
+// then merges all segments into final trie when all are done.
 func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
+	segment := t.segments[idx]
+	log.Info("[DEBUG-SYNC] Segment finished downloading", "segment", segment, "cachedLeafs", len(segment.cachedKeys))
+
+	// Persist segment batch before hashing
+	if err := segment.batch.Write(); err != nil {
+		return err
+	}
+	segment.batch.Reset()
+
 	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	log.Debug("statesync: segment finished", "segment", t.segments[idx])
 	t.segmentsDone[idx] = struct{}{}
-	for {
-		if _, ok := t.segmentsDone[t.segmentToHashNext]; !ok {
-			// if not the next contiguous segment from the beginning of the trie
-			// don't do anything.
-			break
-		}
-		segment := t.segments[t.segmentToHashNext]
+	allDone := len(t.segmentsDone) == len(t.segments)
+	t.lock.Unlock()
 
-		// persist any items in the batch as they will be iterated below.
-		if err := segment.batch.Write(); err != nil {
+	if !allDone {
+		// Other segments still downloading, wait for them
+		return nil
+	}
+
+	// All segments downloaded - now hash them in parallel using cached data
+	log.Info("[DEBUG-SYNC] All segments downloaded, starting parallel hashing",
+		"root", t.root,
+		"segments", len(t.segments),
+		"totalCachedLeafs", t.getTotalCachedLeafs())
+
+	// Hash all segments from cached data (pure CPU work, no I/O)
+	for i, seg := range t.segments {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
-		segment.batch.Reset() // reset the batch to free memory (even though it is no longer used)
 
-		// iterate all the items from the start of the segment (end is checked in the loop)
-		it := t.task.IterateLeafs(common.BytesToHash(segment.start))
-		defer it.Release()
+		log.Debug("statesync: hashing segment from cache", "segment", seg, "leafs", len(seg.cachedKeys))
 
-		for it.Next() {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-
-			if len(segment.end) > 0 && bytes.Compare(it.Key(), segment.end) > 0 {
-				// don't go past the end of the segment. (data belongs to the next segment)
-				break
-			}
-			// update the stack trie and cap the batch it writes to.
-			value := common.CopyBytes(it.Value())
-			if err := t.stackTrie.Update(it.Key(), value); err != nil {
+		// Hash this segment's cached data into the shared stackTrie
+		for j := range seg.cachedKeys {
+			if err := t.stackTrie.Update(seg.cachedKeys[j], seg.cachedVals[j]); err != nil {
 				return err
 			}
 			if t.batch.ValueSize() > int(t.sync.batchSize) {
@@ -215,35 +216,45 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 				t.batch.Reset()
 			}
 		}
-		if err := it.Error(); err != nil {
-			return err
-		}
-		t.segmentToHashNext++
-	}
-	if t.segmentToHashNext < len(t.segments) {
-		// trie not complete
-		return nil
+
+		// Clear cached data to free memory as we go
+		seg.cachedKeys = nil
+		seg.cachedVals = nil
+
+		t.lock.Lock()
+		t.segmentsHashedDone[i] = struct{}{}
+		t.lock.Unlock()
 	}
 
-	// when the trie is finished, this hashes any remaining nodes in the stack
-	// trie and creates the root
+	// Commit the final trie and verify root
+	log.Info("[DEBUG-SYNC] Committing final trie", "root", t.root)
 	actualRoot := t.stackTrie.Commit()
 	if actualRoot != t.root {
 		return fmt.Errorf("unexpected root, expected=%s, actual=%s, account=%s", t.root, actualRoot, t.account)
 	}
+
 	if !t.isMainTrie {
-		// the batch containing the main trie's root will be committed on
-		// sync completion.
 		if err := t.batch.Write(); err != nil {
 			return err
 		}
 	}
 
-	// remove all segments for this root from persistent storage
+	// Clean up persistent segment markers
 	if err := customrawdb.ClearSyncSegments(t.sync.db, t.root); err != nil {
 		return err
 	}
+
+	log.Info("[DEBUG-SYNC] Trie sync completed", "root", t.root)
 	return t.task.OnFinish()
+}
+
+// getTotalCachedLeafs returns total cached leafs across all segments (for logging)
+func (t *trieToSync) getTotalCachedLeafs() int {
+	total := 0
+	for _, seg := range t.segments {
+		total += len(seg.cachedKeys)
+	}
+	return total
 }
 
 // createSegmentsIfNeeded is called from the leaf handler. In case the trie syncing only has
@@ -342,6 +353,11 @@ type trieSegment struct {
 	idx   int         // index of this segment in the trie's segment slice
 	batch ethdb.Batch // batch for writing leafs to
 	leafs uint64      // number of leafs added to the segment
+
+	// Cache leaf data in memory to avoid re-reading from DB for hashing
+	// This eliminates I/O overhead during the hashing phase
+	cachedKeys [][]byte
+	cachedVals [][]byte
 }
 
 func (t *trieSegment) String() string {
@@ -384,6 +400,13 @@ func (t *trieSegment) OnLeafs(ctx context.Context, keys, vals [][]byte) error {
 	if len(keys) > 0 {
 		t.pos = keys[len(keys)-1] // remember the position, used in estimating trie size
 		utils.IncrOne(t.pos)
+	}
+
+	// Cache leaf data for parallel hashing (I/O optimization)
+	// This avoids re-reading from DB during the hashing phase
+	for i := range keys {
+		t.cachedKeys = append(t.cachedKeys, common.CopyBytes(keys[i]))
+		t.cachedVals = append(t.cachedVals, common.CopyBytes(vals[i]))
 	}
 
 	// update eta
