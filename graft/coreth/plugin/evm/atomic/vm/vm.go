@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
@@ -83,10 +84,11 @@ type VM struct {
 	Fx        secp256k1fx.Fx
 	baseCodec codec.Registry
 
-	mempool       *txpool.Mempool
-	gossipHandler p2p.Handler
-	pullGossiper  *avalanchegossip.ValidatorGossiper
-	pushGossiper  *avalanchegossip.PushGossiper[*atomic.Tx]
+	mempool          *txpool.Mempool
+	gossipHandler    p2p.Handler
+	pullGossiper     *avalanchegossip.ValidatorGossiper
+	pullGossipPeriod time.Duration
+	pushGossiper     *avalanchegossip.PushGossiper[*atomic.Tx]
 
 	// AtomicTxRepository maintains two indexes on accepted atomic txs.
 	// - txID to accepted atomic tx
@@ -182,29 +184,32 @@ func (vm *VM) Initialize(
 	}
 	vm.mempool = atomicMempool
 
+	systemConfig := avalanchegossip.SystemConfig{
+		Log:           chainCtx.Log,
+		Registry:      vm.InnerVM.MetricRegistry(),
+		Namespace:     "atomic_tx_gossip",
+		HandlerID:     p2p.AtomicTxGossipHandlerID,
+		RequestPeriod: vm.InnerVM.Config().PullGossipFrequency.Duration,
+		PushGossipParams: avalanchegossip.BranchingFactor{
+			StakePercentage: vm.InnerVM.Config().PushGossipPercentStake,
+			Validators:      vm.InnerVM.Config().PushGossipNumValidators,
+			Peers:           vm.InnerVM.Config().PushGossipNumPeers,
+		},
+		PushRegossipParams: avalanchegossip.BranchingFactor{
+			Validators: vm.InnerVM.Config().PushRegossipNumValidators,
+			Peers:      vm.InnerVM.Config().PushRegossipNumPeers,
+		},
+		RegossipPeriod: vm.InnerVM.Config().RegossipFrequency.Duration,
+	}
+	systemConfig.SetDefaults()
+	vm.pullGossipPeriod = systemConfig.RequestPeriod
 	vm.gossipHandler, vm.pullGossiper, vm.pushGossiper, err = avalanchegossip.NewSystem(
 		vm.Ctx.NodeID,
 		vm.InnerVM.P2PNetwork(),
 		vm.InnerVM.P2PValidators(),
 		atomicMempool,
 		&atomic.TxMarshaller{},
-		avalanchegossip.SystemConfig{
-			Log:           chainCtx.Log,
-			Registry:      vm.InnerVM.MetricRegistry(),
-			Namespace:     "atomic_tx_gossip",
-			HandlerID:     p2p.AtomicTxGossipHandlerID,
-			RequestPeriod: vm.InnerVM.Config().PullGossipFrequency.Duration,
-			PushGossipParams: avalanchegossip.BranchingFactor{
-				StakePercentage: vm.InnerVM.Config().PushGossipPercentStake,
-				Validators:      vm.InnerVM.Config().PushGossipNumValidators,
-				Peers:           vm.InnerVM.Config().PushGossipNumPeers,
-			},
-			PushRegossipParams: avalanchegossip.BranchingFactor{
-				Validators: vm.InnerVM.Config().PushRegossipNumValidators,
-				Peers:      vm.InnerVM.Config().PushRegossipNumPeers,
-			},
-			RegossipPeriod: vm.InnerVM.Config().RegossipFrequency.Duration,
-		},
+		systemConfig,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize atomic gossip system: %w", err)
@@ -301,7 +306,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.Ctx.Log, vm.pullGossiper, vm.InnerVM.Config().PullGossipFrequency.Duration)
+		avalanchegossip.Every(ctx, vm.Ctx.Log, vm.pullGossiper, vm.pullGossipPeriod)
 		vm.shutdownWg.Done()
 	}()
 
