@@ -16,6 +16,7 @@ import (
 
 var (
 	errRemoteMinDelayExcessNil = errors.New("remote min delay excess should not be nil")
+	errRemoteMinDelayExcessSet = errors.New("remote min delay excess should be nil")
 	errIncorrectMinDelayExcess = errors.New("incorrect min delay excess")
 	errParentMinDelayExcessNil = errors.New("parent min delay excess should not be nil")
 )
@@ -47,10 +48,20 @@ func VerifyMinDelayExcess(
 	parent *types.Header,
 	header *types.Header,
 ) error {
+	isGraniteActive := config.IsGranite(header.Time)
 	remoteDelayExcess := customtypes.GetHeaderExtra(header).MinDelayExcess
-	if remoteDelayExcess == nil {
+
+	switch {
+	case !isGraniteActive:
+		// Before Granite, min delay excess should not be set.
+		if remoteDelayExcess != nil {
+			return fmt.Errorf("%w: %s", errRemoteMinDelayExcessSet, header.Hash())
+		}
+		return nil
+	case remoteDelayExcess == nil:
 		return fmt.Errorf("%w: %s", errRemoteMinDelayExcessNil, header.Hash())
 	}
+
 	// By passing in the claimed excess, we ensure that the expected
 	// excess is equal to the claimed excess if it is possible
 	// to have correctly set it to that value. Otherwise, the resulting
