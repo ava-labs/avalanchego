@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -17,8 +17,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -38,7 +38,7 @@ func TestEthTxGossip(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
 	validatorState := utilstest.NewTestValidatorState()
-	snowCtx := utilstest.NewTestSnowContextWithValidatorState(t, validatorState)
+	snowCtx := utilstest.NewTestSnowContextWithValidatorState(t, utilstest.SubnetEVMTestChainID, validatorState)
 
 	responseSender := &enginetest.SenderStub{
 		SentAppResponse: make(chan []byte, 1),
@@ -159,7 +159,7 @@ func TestEthTxGossip(t *testing.T) {
 func TestEthTxPushGossipOutbound(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
-	snowCtx := utilstest.NewTestSnowContext(t)
+	snowCtx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 	sender := &enginetest.SenderStub{
 		SentAppGossip: make(chan []byte, 1),
 	}
@@ -212,7 +212,7 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 func TestEthTxPushGossipInbound(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
-	snowCtx := utilstest.NewTestSnowContext(t)
+	snowCtx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 
 	sender := &enginetest.Sender{}
 	vm := &VM{
