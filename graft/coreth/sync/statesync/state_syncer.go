@@ -27,7 +27,7 @@ const (
 	segmentThreshold       = 500_000 // if we estimate trie to have greater than this number of leafs, split it
 	numStorageTrieSegments = 4
 	numMainTrieSegments    = 8
-	defaultNumWorkers      = 12 // DEBUG: Testing incremental increase from 8 to find crash threshold
+	defaultNumWorkers      = 48 // Increased from 8 for better multicore utilization during state sync
 )
 
 var (
