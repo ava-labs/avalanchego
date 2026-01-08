@@ -27,7 +27,7 @@ const (
 	segmentThreshold       = 500_000 // if we estimate trie to have greater than this number of leafs, split it
 	numStorageTrieSegments = 4
 	numMainTrieSegments    = 8
-	defaultNumWorkers      = 8
+	defaultNumWorkers      = 12 // DEBUG: Testing incremental increase from 8 to find crash threshold
 )
 
 var (
@@ -151,24 +151,52 @@ func (*stateSync) ID() string {
 }
 
 func (t *stateSync) Sync(ctx context.Context) error {
+	log.Info("[DEBUG-SYNC] State sync starting",
+		"root", t.root,
+		"numWorkers", defaultNumWorkers,
+	)
+
 	// Start the leaf syncer and storage trie producer.
 	eg, egCtx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error("[PANIC-SYNC] Leaf syncer panicked", "panic", r, "stack", fmt.Sprintf("%+v", r))
+				panic(r)
+			}
+		}()
+		log.Info("[DEBUG-SYNC] Leaf syncer goroutine started")
 		if err := t.syncer.Sync(egCtx); err != nil {
+			log.Error("[ERROR-SYNC] Leaf syncer failed", "err", err)
 			return err
 		}
+		log.Info("[DEBUG-SYNC] Leaf syncer completed, calling onSyncComplete")
 		return t.onSyncComplete()
 	})
 
 	// Note: code fetcher should already be initialized.
 	eg.Go(func() error {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error("[PANIC-SYNC] Storage trie producer panicked", "panic", r, "stack", fmt.Sprintf("%+v", r))
+				panic(r)
+			}
+		}()
+		log.Info("[DEBUG-SYNC] Storage trie producer goroutine started")
 		return t.storageTrieProducer(egCtx)
 	})
 
 	// The errgroup wait will take care of returning the first error that occurs, or returning
 	// nil if syncing finish without an error.
-	return eg.Wait()
+	log.Info("[DEBUG-SYNC] Waiting for sync goroutines")
+	err := eg.Wait()
+	if err != nil {
+		log.Error("[ERROR-SYNC] State sync failed", "err", err)
+	} else {
+		log.Info("[DEBUG-SYNC] State sync completed successfully")
+	}
+	return err
 }
 
 // onStorageTrieFinished is called after a storage trie finishes syncing.
