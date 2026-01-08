@@ -35,8 +35,6 @@ on:
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
         default: '60'
-  # XXX: remove this before merging
-  pull_request:
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 

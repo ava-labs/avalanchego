@@ -105,11 +105,12 @@ func NewManager(
 	}
 
 	m := &manager{
-		log:                log,
-		processMetrics:     processMetrics,
-		processes:          make(map[int]*proc),
-		onClose:            make(chan struct{}),
-		availableDiskBytes: math.MaxUint64,
+		log:                  log,
+		processMetrics:       processMetrics,
+		processes:            make(map[int]*proc),
+		onClose:              make(chan struct{}),
+		availableDiskBytes:   math.MaxUint64,
+		availableDiskPercent: 100,
 	}
 
 	go m.update(diskPath, frequency, cpuHalflife, diskHalflife)
