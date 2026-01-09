@@ -11,17 +11,17 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats/statstest"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -29,23 +29,24 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	testHandlerStats := &statstest.TestHandlerStats{}
 	memdb := rawdb.NewMemoryDatabase()
-	trieDB := triedb.NewDatabase(memdb, nil)
+	db := state.NewDatabase(memdb)
+	trieDB := db.TrieDB()
 
-	corruptedTrieRoot, _, _ := statesynctest.GenerateTrie(t, r, trieDB, 100, common.HashLength)
+	corruptedTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100, common.HashLength)
 	tr, err := trie.New(trie.TrieID(corruptedTrieRoot), trieDB)
 	require.NoError(t, err)
 	// Corrupt [corruptedTrieRoot]
-	statesynctest.CorruptTrie(t, memdb, tr, 5)
+	synctest.CorruptTrie(t, memdb, tr, 5)
 
-	largeTrieRoot, largeTrieKeys, _ := statesynctest.GenerateTrie(t, r, trieDB, 10_000, common.HashLength)
-	smallTrieRoot, _, _ := statesynctest.GenerateTrie(t, r, trieDB, 500, common.HashLength)
-	accountTrieRoot, accounts := statesynctest.FillAccounts(
+	largeTrieRoot, largeTrieKeys, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 10_000, common.HashLength)
+	smallTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 500, common.HashLength)
+	accountTrieRoot, accounts := synctest.FillAccounts(
 		t,
 		r,
-		trieDB,
+		db,
 		common.Hash{},
 		10_000,
-		func(_ *testing.T, i int, acc types.StateAccount) types.StateAccount {
+		func(_ *testing.T, i int, _ common.Address, acc types.StateAccount, _ state.Trie) types.StateAccount {
 			// set the storage trie root for two accounts
 			switch i {
 			case 0:
