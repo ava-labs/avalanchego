@@ -24,11 +24,17 @@ const (
 	numStorageTrieSegments = 4
 	numMainTrieSegments    = 8
 	defaultNumWorkers      = 8
+
+	// Request size bounds - prevents misconfiguration
+	minRequestSize = 16    // Too small causes excessive round trips
+	maxRequestSize = 10240 // Too large can cause timeouts and memory issues
 )
 
 var (
-	errWaitBeforeStart = errors.New("cannot call Wait before Start")
-	errStateSyncStuck  = errors.New("state sync stuck, fallback to block sync required")
+	errWaitBeforeStart     = errors.New("cannot call Wait before Start")
+	errStateSyncStuck      = errors.New("state sync stuck, fallback to block sync required")
+	errInvalidRequestSize  = errors.New("request size must be between 16 and 10240")
+	errInvalidWorkerConfig = errors.New("NumCodeFetchingWorkers must be positive")
 )
 
 // ErrStateSyncStuck returns the sentinel error for stuck state sync detection.
@@ -80,6 +86,14 @@ type stateSync struct {
 }
 
 func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
+	// Validate configuration
+	if config.RequestSize < minRequestSize || config.RequestSize > maxRequestSize {
+		return nil, fmt.Errorf("%w: got %d", errInvalidRequestSize, config.RequestSize)
+	}
+	if config.NumCodeFetchingWorkers <= 0 {
+		return nil, errInvalidWorkerConfig
+	}
+
 	ss := &stateSync{
 		batchSize:       config.BatchSize,
 		db:              config.DB,
@@ -267,7 +281,12 @@ func (t *stateSync) Start(ctx context.Context) error {
 	eg.Go(func() error {
 		select {
 		case <-t.stuckDetector.StuckChannel():
-			log.Warn("Stuck detected, canceling state sync to trigger fallback")
+			// Log final state before canceling
+			triesSynced, triesRemaining := t.stats.getProgress()
+			log.Warn("Stuck detected, canceling state sync to trigger fallback",
+				"triesSynced", triesSynced,
+				"triesRemaining", triesRemaining,
+				"totalLeafs", t.stats.totalLeafs.Count())
 			cancel() // Cancel sync to trigger fallback
 			return errStateSyncStuck
 		case <-egCtx.Done():

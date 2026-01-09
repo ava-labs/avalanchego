@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -31,6 +32,9 @@ import (
 
 const (
 	failedRequestSleepInterval = 10 * time.Millisecond
+	peerBlacklistDuration      = 2 * time.Minute // How long to avoid a peer after consecutive failures
+	maxConsecutiveFailures     = 3               // Consecutive failures before blacklisting
+	perRequestTimeout          = 30 * time.Second // Timeout for individual request attempts
 
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
@@ -94,6 +98,60 @@ type Client interface {
 // Returns the number of elements in the response (specific to the response type, used in metrics)
 type parseResponseFn func(codec codec.Manager, request message.Request, response []byte) (interface{}, int, error)
 
+// peerFailureTracker tracks consecutive failures per peer for blacklisting
+type peerFailureTracker struct {
+	failures      map[ids.NodeID]int
+	blacklistUntil map[ids.NodeID]time.Time
+	lock          sync.RWMutex
+}
+
+func newPeerFailureTracker() *peerFailureTracker {
+	return &peerFailureTracker{
+		failures:      make(map[ids.NodeID]int),
+		blacklistUntil: make(map[ids.NodeID]time.Time),
+	}
+}
+
+func (p *peerFailureTracker) recordFailure(nodeID ids.NodeID) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.failures[nodeID]++
+	if p.failures[nodeID] >= maxConsecutiveFailures {
+		p.blacklistUntil[nodeID] = time.Now().Add(peerBlacklistDuration)
+		log.Debug("peer blacklisted temporarily", "nodeID", nodeID, "failures", p.failures[nodeID], "until", p.blacklistUntil[nodeID])
+	}
+}
+
+func (p *peerFailureTracker) recordSuccess(nodeID ids.NodeID) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	delete(p.failures, nodeID)
+	delete(p.blacklistUntil, nodeID)
+}
+
+func (p *peerFailureTracker) isBlacklisted(nodeID ids.NodeID) bool {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	until, exists := p.blacklistUntil[nodeID]
+	if !exists {
+		return false
+	}
+	if time.Now().After(until) {
+		// Blacklist expired, clean up in a deferred goroutine to avoid holding lock
+		go func() {
+			p.lock.Lock()
+			defer p.lock.Unlock()
+			delete(p.blacklistUntil, nodeID)
+			delete(p.failures, nodeID)
+		}()
+		return false
+	}
+	return true
+}
+
 type client struct {
 	networkClient    network.SyncedNetworkClient
 	codec            codec.Manager
@@ -101,6 +159,7 @@ type client struct {
 	stateSyncNodeIdx uint32
 	stats            stats.ClientSyncerStats
 	blockParser      EthBlockParser
+	peerTracker      *peerFailureTracker
 }
 
 type ClientConfig struct {
@@ -122,6 +181,7 @@ func NewClient(config *ClientConfig) *client {
 		stats:          config.Stats,
 		stateSyncNodes: config.StateSyncNodeIDs,
 		blockParser:    config.BlockParser,
+		peerTracker:    newPeerFailureTracker(),
 	}
 }
 
@@ -339,22 +399,44 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			nodeID   ids.NodeID
 			start    = time.Now()
 		)
-		if len(c.stateSyncNodes) == 0 {
-			response, nodeID, err = c.networkClient.SendSyncedAppRequestAny(ctx, StateSyncVersion, requestBytes)
-		} else {
-			// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
-			// we do this every attempt to ensure we get a different node each time if possible.
-			nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
-			nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
 
-			response, err = c.networkClient.SendSyncedAppRequest(ctx, nodeID, requestBytes)
-		}
+		// Create a per-request timeout context to prevent hanging on slow peers
+		// Use an anonymous function to ensure cancel() is called after each request
+		func() {
+			requestCtx, cancel := context.WithTimeout(ctx, perRequestTimeout)
+			defer cancel()
+
+			if len(c.stateSyncNodes) == 0 {
+				response, nodeID, err = c.networkClient.SendSyncedAppRequestAny(requestCtx, StateSyncVersion, requestBytes)
+			} else {
+				// Round-robin through static peers, skipping blacklisted ones
+				tried := 0
+				for tried < len(c.stateSyncNodes) {
+					nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
+					nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
+
+					if !c.peerTracker.isBlacklisted(nodeID) {
+						break
+					}
+					tried++
+				}
+
+				// If all peers are blacklisted, use the next one anyway (stale blacklist)
+				if tried >= len(c.stateSyncNodes) {
+					log.Debug("all static peers blacklisted, using next peer anyway", "numPeers", len(c.stateSyncNodes))
+				}
+
+				response, err = c.networkClient.SendSyncedAppRequest(requestCtx, nodeID, requestBytes)
+			}
+		}()
+
 		metric.UpdateRequestLatency(time.Since(start))
 
 		if err != nil {
 			ctx := make([]interface{}, 0, 8)
 			if nodeID != ids.EmptyNodeID {
 				ctx = append(ctx, "nodeID", nodeID)
+				c.peerTracker.recordFailure(nodeID)
 			}
 			ctx = append(ctx, "attempt", attempt, "request", request, "err", err)
 			log.Debug("request failed, retrying", ctx...)
@@ -370,6 +452,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 				lastErr = err
 				log.Debug("could not validate response, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
 				c.networkClient.TrackBandwidth(nodeID, 0)
+				c.peerTracker.recordFailure(nodeID)
 				metric.IncFailed()
 				metric.IncInvalidResponse()
 				continue
@@ -377,6 +460,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 
 			bandwidth := float64(len(response)) / (time.Since(start).Seconds() + epsilon)
 			c.networkClient.TrackBandwidth(nodeID, bandwidth)
+			c.peerTracker.recordSuccess(nodeID)
 			metric.IncSucceeded()
 			metric.IncReceived(int64(numElements))
 			return responseIntf, nil

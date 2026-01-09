@@ -14,7 +14,7 @@ import (
 const (
 	// Thresholds for stuck detection
 	zeroRateTimeout     = 10 * time.Minute // No leafs fetched
-	noTrieTimeout       = 30 * time.Minute // No trie completed
+	noTrieTimeout       = 20 * time.Minute // No trie completed (reduced from 30 to fail faster)
 	maxRetriesThreshold = 1000             // Excessive retries
 	checkInterval       = 1 * time.Minute  // How often to check
 )
