@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/coretest"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
@@ -340,7 +339,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	internalBlock, ok := internalWrappedBlock.(*chain.BlockWrapper)
 	require.True(ok)
 	require.NoError(serverVM.SetLastAcceptedBlock(internalBlock.Block))
-	require.NoError(serverVM.(*evm.VM).PutLastAcceptedID(internalBlock.ID()))
+	require.NoError(serverVM.PutLastAcceptedID(internalBlock.ID()))
 	require.NoError(serverVM.VersionDB().Commit())
 
 	// initialise [syncerVM] with blank genesis state
