@@ -636,13 +636,8 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 						"retryLimit", retryLimit,
 						"latency", latency.Round(time.Millisecond),
 						"willRetryWithDifferentPeer", attempt < retryLimit-1)
-				} else if err == nil || err.Error() == "" {
-					// Network layer timeout without error context
-					log.Warn("Code request returned nil error (likely timeout in network layer)",
-						"nodeID", nodeID,
-						"attempt", attempt,
-						"latency", latency.Round(time.Millisecond))
 				} else {
+					// Other errors (network failure, validation error, etc.)
 					log.Warn("Code request failed",
 						"nodeID", nodeID,
 						"attempt", attempt,

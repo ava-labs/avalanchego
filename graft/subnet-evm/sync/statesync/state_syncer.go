@@ -485,6 +485,12 @@ func (t *stateSync) doStart(ctx context.Context) error {
 		}()
 
 		codeSyncErr := <-t.codeSyncer.Done()
+
+		// If panic occurred, err is already set - don't overwrite it
+		if err != nil {
+			return err // Return panic error
+		}
+
 		if codeSyncErr != nil {
 			// Context cancelled is expected during shutdown
 			if errors.Is(codeSyncErr, context.Canceled) {
