@@ -210,3 +210,5 @@ tool (
 replace github.com/ava-labs/avalanchego => ../../
 
 replace github.com/ava-labs/avalanchego/graft/evm => ../evm
+
+replace github.com/ava-labs/avalanchego/graft/coreth => ../coreth

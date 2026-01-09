@@ -252,19 +252,6 @@ func (m *manager) GetWarpValidatorSets(
 	return validatorSets, nil
 }
 
-func (m *manager) GetWarpValidatorSet(
-	ctx context.Context,
-	targetHeight uint64,
-	subnetID ids.ID,
-) (validators.WarpSet, error) {
-	vdrSet, err := m.GetValidatorSet(ctx, targetHeight, subnetID)
-	if err != nil {
-		return validators.WarpSet{}, err
-	}
-
-	return validators.FlattenValidatorSet(vdrSet)
-}
-
 func (m *manager) GetValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,

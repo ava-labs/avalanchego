@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	errRemoteMinDelayExcessSet = errors.New("remote min delay excess should be nil")
 	errRemoteMinDelayExcessNil = errors.New("remote min delay excess should not be nil")
+	errRemoteMinDelayExcessSet = errors.New("remote min delay excess should be nil")
 	errIncorrectMinDelayExcess = errors.New("incorrect min delay excess")
 	errParentMinDelayExcessNil = errors.New("parent min delay excess should not be nil")
 )
@@ -48,39 +48,40 @@ func VerifyMinDelayExcess(
 	parent *types.Header,
 	header *types.Header,
 ) error {
-	switch {
-	case config.IsGranite(header.Time):
-		remoteDelayExcess := customtypes.GetHeaderExtra(header).MinDelayExcess
-		if remoteDelayExcess == nil {
-			return fmt.Errorf("%w: %s", errRemoteMinDelayExcessNil, header.Hash())
-		}
-		// By passing in the claimed excess, we ensure that the expected
-		// excess is equal to the claimed excess if it is possible
-		// to have correctly set it to that value. Otherwise, the resulting
-		// value will be as close to the claimed value as possible, but would
-		// not be equal.
-		expectedDelayExcess, err := minDelayExcess(
-			config,
-			parent,
-			remoteDelayExcess,
-		)
-		if err != nil {
-			return fmt.Errorf("calculating expected min delay excess: %w", err)
-		}
+	isGraniteActive := config.IsGranite(header.Time)
+	remoteDelayExcess := customtypes.GetHeaderExtra(header).MinDelayExcess
 
-		if *remoteDelayExcess != expectedDelayExcess {
-			return fmt.Errorf("%w: expected %d, found %d",
-				errIncorrectMinDelayExcess,
-				expectedDelayExcess,
-				*remoteDelayExcess,
-			)
-		}
-	default:
-		// Prior to Granite there was no expected min delay excess.
-		// TODO (ceyonur): this can be removed after Granite is activated.
-		if customtypes.GetHeaderExtra(header).MinDelayExcess != nil {
+	switch {
+	case !isGraniteActive:
+		// Before Granite, min delay excess should not be set.
+		if remoteDelayExcess != nil {
 			return fmt.Errorf("%w: %s", errRemoteMinDelayExcessSet, header.Hash())
 		}
+		return nil
+	case remoteDelayExcess == nil:
+		return fmt.Errorf("%w: %s", errRemoteMinDelayExcessNil, header.Hash())
+	}
+
+	// By passing in the claimed excess, we ensure that the expected
+	// excess is equal to the claimed excess if it is possible
+	// to have correctly set it to that value. Otherwise, the resulting
+	// value will be as close to the claimed value as possible, but would
+	// not be equal.
+	expectedDelayExcess, err := minDelayExcess(
+		config,
+		parent,
+		remoteDelayExcess,
+	)
+	if err != nil {
+		return fmt.Errorf("calculating expected min delay excess: %w", err)
+	}
+
+	if *remoteDelayExcess != expectedDelayExcess {
+		return fmt.Errorf("%w: expected %d, found %d",
+			errIncorrectMinDelayExcess,
+			expectedDelayExcess,
+			*remoteDelayExcess,
+		)
 	}
 	return nil
 }

@@ -24,7 +24,6 @@ const (
 	ValidatorState_GetCurrentHeight_FullMethodName       = "/validatorstate.ValidatorState/GetCurrentHeight"
 	ValidatorState_GetSubnetID_FullMethodName            = "/validatorstate.ValidatorState/GetSubnetID"
 	ValidatorState_GetWarpValidatorSets_FullMethodName   = "/validatorstate.ValidatorState/GetWarpValidatorSets"
-	ValidatorState_GetWarpValidatorSet_FullMethodName    = "/validatorstate.ValidatorState/GetWarpValidatorSet"
 	ValidatorState_GetValidatorSet_FullMethodName        = "/validatorstate.ValidatorState/GetValidatorSet"
 	ValidatorState_GetCurrentValidatorSet_FullMethodName = "/validatorstate.ValidatorState/GetCurrentValidatorSet"
 )
@@ -44,11 +43,6 @@ type ValidatorStateClient interface {
 	// subnets at the requested P-chain height. If a subnet doesn't have a valid
 	// canonical warp validator set, it is omitted from the response.
 	GetWarpValidatorSets(ctx context.Context, in *GetWarpValidatorSetsRequest, opts ...grpc.CallOption) (*GetWarpValidatorSetsResponse, error)
-	// GetWarpValidatorSet returns the canonical warp validator set for the
-	// provided subnet at the requested P-chain height. If the subnet doesn't have
-	// a valid canonical warp validator set, either the returned set will be empty
-	// or an error may occur.
-	GetWarpValidatorSet(ctx context.Context, in *GetWarpValidatorSetRequest, opts ...grpc.CallOption) (*GetWarpValidatorSetResponse, error)
 	// GetValidatorSet returns the weights of the nodeIDs for the provided
 	// subnet at the requested P-chain height.
 	GetValidatorSet(ctx context.Context, in *GetValidatorSetRequest, opts ...grpc.CallOption) (*GetValidatorSetResponse, error)
@@ -105,16 +99,6 @@ func (c *validatorStateClient) GetWarpValidatorSets(ctx context.Context, in *Get
 	return out, nil
 }
 
-func (c *validatorStateClient) GetWarpValidatorSet(ctx context.Context, in *GetWarpValidatorSetRequest, opts ...grpc.CallOption) (*GetWarpValidatorSetResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetWarpValidatorSetResponse)
-	err := c.cc.Invoke(ctx, ValidatorState_GetWarpValidatorSet_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *validatorStateClient) GetValidatorSet(ctx context.Context, in *GetValidatorSetRequest, opts ...grpc.CallOption) (*GetValidatorSetResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetValidatorSetResponse)
@@ -150,11 +134,6 @@ type ValidatorStateServer interface {
 	// subnets at the requested P-chain height. If a subnet doesn't have a valid
 	// canonical warp validator set, it is omitted from the response.
 	GetWarpValidatorSets(context.Context, *GetWarpValidatorSetsRequest) (*GetWarpValidatorSetsResponse, error)
-	// GetWarpValidatorSet returns the canonical warp validator set for the
-	// provided subnet at the requested P-chain height. If the subnet doesn't have
-	// a valid canonical warp validator set, either the returned set will be empty
-	// or an error may occur.
-	GetWarpValidatorSet(context.Context, *GetWarpValidatorSetRequest) (*GetWarpValidatorSetResponse, error)
 	// GetValidatorSet returns the weights of the nodeIDs for the provided
 	// subnet at the requested P-chain height.
 	GetValidatorSet(context.Context, *GetValidatorSetRequest) (*GetValidatorSetResponse, error)
@@ -182,9 +161,6 @@ func (UnimplementedValidatorStateServer) GetSubnetID(context.Context, *GetSubnet
 }
 func (UnimplementedValidatorStateServer) GetWarpValidatorSets(context.Context, *GetWarpValidatorSetsRequest) (*GetWarpValidatorSetsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetWarpValidatorSets not implemented")
-}
-func (UnimplementedValidatorStateServer) GetWarpValidatorSet(context.Context, *GetWarpValidatorSetRequest) (*GetWarpValidatorSetResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetWarpValidatorSet not implemented")
 }
 func (UnimplementedValidatorStateServer) GetValidatorSet(context.Context, *GetValidatorSetRequest) (*GetValidatorSetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetValidatorSet not implemented")
@@ -285,24 +261,6 @@ func _ValidatorState_GetWarpValidatorSets_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ValidatorState_GetWarpValidatorSet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetWarpValidatorSetRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ValidatorStateServer).GetWarpValidatorSet(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ValidatorState_GetWarpValidatorSet_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ValidatorStateServer).GetWarpValidatorSet(ctx, req.(*GetWarpValidatorSetRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _ValidatorState_GetValidatorSet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetValidatorSetRequest)
 	if err := dec(in); err != nil {
@@ -361,10 +319,6 @@ var ValidatorState_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetWarpValidatorSets",
 			Handler:    _ValidatorState_GetWarpValidatorSets_Handler,
-		},
-		{
-			MethodName: "GetWarpValidatorSet",
-			Handler:    _ValidatorState_GetWarpValidatorSet_Handler,
 		},
 		{
 			MethodName: "GetValidatorSet",

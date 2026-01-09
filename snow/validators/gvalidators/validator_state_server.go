@@ -67,21 +67,6 @@ func (s *Server) GetWarpValidatorSets(ctx context.Context, req *pb.GetWarpValida
 	}, nil
 }
 
-func (s *Server) GetWarpValidatorSet(ctx context.Context, req *pb.GetWarpValidatorSetRequest) (*pb.GetWarpValidatorSetResponse, error) {
-	subnetID, err := ids.ToID(req.SubnetId)
-	if err != nil {
-		return nil, err
-	}
-	validatorSet, err := s.state.GetWarpValidatorSet(ctx, req.Height, subnetID)
-	if err != nil {
-		return nil, err
-	}
-	return &pb.GetWarpValidatorSetResponse{
-		TotalWeight: validatorSet.TotalWeight,
-		Validators:  warpValidatorsToProto(validatorSet.Validators),
-	}, nil
-}
-
 func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetRequest) (*pb.GetValidatorSetResponse, error) {
 	subnetID, err := ids.ToID(req.SubnetId)
 	if err != nil {
