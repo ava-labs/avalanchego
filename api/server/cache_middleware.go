@@ -30,6 +30,10 @@ const (
 
 	// MaxResponseSize is the maximum size of a response to cache (10MB)
 	MaxResponseSize = 10 * 1024 * 1024
+
+	// MaxParamSizeForCanonicalization is the max param size for JSON canonicalization (100KB)
+	// Larger params skip canonicalization to avoid excessive allocations
+	MaxParamSizeForCanonicalization = 100 * 1024
 )
 
 // RPCCacheConfig contains configuration for the RPC cache
@@ -179,17 +183,26 @@ func (rc *rpcCache) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Read request body
-		body, err := io.ReadAll(r.Body)
+		// Read request body with size limit (BUG #26 fix)
+		// Limit to MaxResponseSize to prevent DoS via large request bodies
+		limitedReader := io.LimitReader(r.Body, MaxResponseSize+1)
+		body, err := io.ReadAll(limitedReader)
 		// Always restore body (BUG #5 fix)
 		r.Body = io.NopCloser(bytes.NewBuffer(body))
 		if err != nil {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// Reject oversized requests (BUG #26 fix)
+		if len(body) > MaxResponseSize {
+			http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 
-		// Detect batch requests (BUG #9 fix)
-		if len(body) > 0 && body[0] == '[' {
+		// Detect batch requests with whitespace handling (BUG #9 and #27 fix)
+		// JSON allows leading whitespace, so trim before checking
+		trimmed := bytes.TrimLeft(body, " \t\n\r")
+		if len(trimmed) > 0 && trimmed[0] == '[' {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -217,8 +230,9 @@ func (rc *rpcCache) Middleware(next http.Handler) http.Handler {
 			paramStr := string(rpcReq.Params)
 			if paramStr == "null" || paramStr == "{}" {
 				rpcReq.Params = json.RawMessage("[]")
-			} else {
-				// Canonicalize JSON to handle whitespace variations (BUG #18 fix)
+			} else if len(rpcReq.Params) <= MaxParamSizeForCanonicalization {
+				// Canonicalize JSON to handle whitespace variations (BUG #18 and #29 fix)
+				// Only for reasonably-sized params to avoid excessive allocations
 				var params interface{}
 				if err := json.Unmarshal(rpcReq.Params, &params); err == nil {
 					if canonical, err := json.Marshal(params); err == nil {
@@ -231,6 +245,7 @@ func (rc *rpcCache) Middleware(next http.Handler) http.Handler {
 				}
 				// If unmarshal fails, use original params (likely not valid JSON)
 			}
+			// Params > 100KB skip canonicalization (use original, BUG #29 fix)
 		}
 
 		// Generate cache key
@@ -243,13 +258,11 @@ func (rc *rpcCache) Middleware(next http.Handler) http.Handler {
 			responseCopy := make([]byte, len(entry.response))
 			copy(responseCopy, entry.response)
 
-			// Restore cached headers (BUG #16 and #21 fix)
-			// Clone to prevent sharing slices with cache
-			for k, v := range entry.headers {
-				// Deep copy the slice values
-				values := make([]string, len(v))
-				copy(values, v)
-				w.Header()[k] = values
+			// Restore cached headers (BUG #16, #21, #28 fix)
+			// Use Clone() for efficient deep copy
+			restoredHeaders := entry.headers.Clone()
+			for k, v := range restoredHeaders {
+				w.Header()[k] = v
 			}
 			w.Header().Set("X-Cache", "HIT")
 			w.WriteHeader(entry.status)

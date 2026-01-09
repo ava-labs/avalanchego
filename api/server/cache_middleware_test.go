@@ -5,6 +5,8 @@ package server
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -749,4 +751,133 @@ func TestRPCCache_HeadersIndependent(t *testing.T) {
 	// Should not be affected by modification above
 	thirdHeaders := rec3.Header()["X-Multi"]
 	require.Equal([]string{"value1", "value2"}, thirdHeaders, "Headers should be independent, not sharing slices")
+}
+
+// Test for BUG #26 fix: Request body size limit (DoS protection)
+func TestRPCCache_RequestSizeLimit(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"result":"ok"}`))
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	// Create oversized request (> MaxResponseSize)
+	largeParams := make([]byte, MaxResponseSize+1000)
+	for i := range largeParams {
+		largeParams[i] = 'x'
+	}
+	reqBody := fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_call","params":["%s"],"id":1}`, string(largeParams))
+
+	req := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(reqBody))
+	rec := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec, req)
+
+	// Should reject with 413
+	require.Equal(http.StatusRequestEntityTooLarge, rec.Code, "Oversized requests should be rejected")
+}
+
+// Test for BUG #27 fix: Batch requests with leading whitespace
+func TestRPCCache_BatchRequestWithWhitespace(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	callCount := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"jsonrpc":"2.0","result":"0x1","id":1}]`))
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	testCases := []string{
+		`[{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}]`,        // No whitespace
+		` [{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}]`,       // Leading space
+		`  [{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}]`,      // Multiple spaces
+		"\t[{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}]", // Tab
+		"\n[{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}]", // Newline
+	}
+
+	for i, batchReq := range testCases {
+		req := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(batchReq))
+		rec := httptest.NewRecorder()
+		cachedHandler.ServeHTTP(rec, req)
+		require.Equal(i+1, callCount, "Each batch request should pass through (not cached)")
+	}
+}
+
+// Test for BUG #29 fix: Large params skip canonicalization
+func TestRPCCache_LargeParamsSkipCanonicalization(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	callCount := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"jsonrpc":"2.0","result":"0x123","id":1}`))
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	// Create large params (> 100KB) with different whitespace
+	largeArray := make([]int, 30000) // ~120KB when serialized
+	for i := range largeArray {
+		largeArray[i] = i
+	}
+
+	// First request with compact JSON
+	params1, _ := json.Marshal(largeArray)
+	req1Body := fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_call","params":%s,"id":1}`, string(params1))
+	req1 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(req1Body))
+	rec1 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec1, req1)
+	require.Equal(1, callCount)
+
+	// Second request with indented JSON (different whitespace)
+	params2, _ := json.MarshalIndent(largeArray, "", "  ")
+	req2Body := fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_call","params":%s,"id":1}`, string(params2))
+	req2 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(req2Body))
+	rec2 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec2, req2)
+
+	// Without canonicalization, these will have different cache keys
+	require.Equal(2, callCount, "Large params with different whitespace should not hit same cache (no canonicalization)")
 }
