@@ -45,9 +45,7 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
-const (
-	subnetAName = "warp-subnet-a"
-)
+const subnetAName = "warp-subnet-a"
 
 var (
 	//go:embed genesis.json
