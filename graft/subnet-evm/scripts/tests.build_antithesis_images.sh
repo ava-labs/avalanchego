@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+# NOTE: This script is preserved for backward compatibility.
+# The unified test script is available at the repository root:
+#   task test-build-antithesis-images-subnet-evm
+# or:
+#   ./scripts/tests.build_antithesis_images_subnet_evm.sh
+
 # Validates the construction of the antithesis images by:
 #
 #   1. Building the antithesis test images

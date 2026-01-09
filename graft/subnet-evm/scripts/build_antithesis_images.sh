@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+# NOTE: This script is preserved for backward compatibility.
+# The unified build system is available at the repository root:
+#   task build-antithesis-images-subnet-evm
+# or:
+#   TEST_SETUP=subnet-evm ./scripts/build_antithesis_images.sh
+
 # Builds docker images for antithesis testing.
 
 # e.g.,

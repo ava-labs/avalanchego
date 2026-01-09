@@ -24,7 +24,7 @@ fi
 
 # Build Subnet EVM, which is run as a subprocess
 echo "Building Subnet EVM @ GitCommit: $SUBNET_EVM_COMMIT at $BINARY_PATH"
-go build -ldflags "-X github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm.GitCommit=$SUBNET_EVM_COMMIT $STATIC_LD_FLAGS" -o "$BINARY_PATH" "plugin/"*.go
+(cd "$SUBNET_EVM_PATH" && go build -ldflags "-X github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm.GitCommit=$SUBNET_EVM_COMMIT $STATIC_LD_FLAGS" -o "$BINARY_PATH" ./plugin)
 
 # Symlink to both global and local plugin directories to simplify
 # usage for testing. The local directory should be preferred but the

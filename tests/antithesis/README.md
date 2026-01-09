@@ -19,6 +19,7 @@ enables discovery and reproduction of anomalous behavior.
 | node_health.go                    | Helper to check node health.                                                       |
 | avalanchego/                      | Defines an antithesis test setup for avalanchego's primary chains.                 |
 | xsvm/                             | Defines an antithesis test setup for the xsvm VM.                                  |
+| subnet-evm/                       | Defines an antithesis test setup for the subnet-evm VM.                            |
 
 ## Instrumentation
 
