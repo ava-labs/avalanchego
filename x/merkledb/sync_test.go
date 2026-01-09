@@ -4,10 +4,8 @@
 package merkledb
 
 import (
-	"context"
 	"math/rand"
 	"slices"
-	"sync"
 	"testing"
 	"time"
 
@@ -18,11 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 
 	xsync "github.com/ava-labs/avalanchego/x/sync"
+	"github.com/ava-labs/avalanchego/x/sync/synctest"
 )
 
 var (
@@ -455,21 +453,9 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Allow 1 request to go through before blocking
-	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)
-	updatedRootChan := make(chan struct{}, 1)
-	updatedRootChan <- struct{}{}
-	once := &sync.Once{}
-	actionHandler.AppRequestF = func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-		select {
-		case <-updatedRootChan:
-			// do nothing, allow 1 request to go through
-		default:
-			once.Do(func() {
-				require.NoError(syncer.UpdateSyncTarget(secondSyncRoot))
-			})
-		}
-		return rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
-	}
+	synctest.AddFuncOnIntercept(t, actionHandler, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
+		require.NoError(syncer.UpdateSyncTarget(secondSyncRoot))
+	}, 1)
 
 	require.NoError(syncer.Start(t.Context()))
 	require.NoError(syncer.Wait(t.Context()))
@@ -522,15 +508,10 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
+	synctest.AddFuncOnIntercept(t, actionHandler, rangeProofHandler, func() {
+		require.NoError(m.UpdateSyncTarget(root2))
+	}, 0)
 
-	// Update sync target on first request
-	once := &sync.Once{}
-	actionHandler.AppRequestF = func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-		once.Do(func() {
-			require.NoError(m.UpdateSyncTarget(root2))
-		})
-		return rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
-	}
 	require.NoError(m.Start(ctx))
 	require.NoError(m.Wait(ctx))
 }
