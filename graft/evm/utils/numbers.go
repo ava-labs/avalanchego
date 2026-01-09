@@ -7,11 +7,11 @@ import (
 	"math/big"
 	"time"
 
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TimeToNewUint64(time time.Time) *uint64 {
-	return avalancheutils.PointerTo(uint64(time.Unix()))
+	return utils.PointerTo(uint64(time.Unix()))
 }
 
 func Uint64ToTime(val *uint64) time.Time {
