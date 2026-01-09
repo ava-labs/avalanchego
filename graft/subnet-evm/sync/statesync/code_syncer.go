@@ -7,11 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
@@ -24,6 +28,12 @@ import (
 const (
 	DefaultMaxOutstandingCodeHashes = 10000 // Increased from 5000 to reduce blocking during code sync
 	DefaultNumCodeFetchingWorkers   = 10    // Increased from 5 to improve code fetch throughput
+
+	// Retry configuration for code requests
+	codeRequestInitialDelay = 100 * time.Millisecond
+	codeRequestMaxDelay     = 10 * time.Second
+	codeRequestMaxRetries   = 10
+	codeRequestJitterFactor = 0.3 // 30% jitter
 )
 
 var errFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
@@ -154,7 +164,7 @@ func (c *codeSyncer) work(ctx context.Context) error {
 			// read from the channel, then return.
 			if !ok {
 				if len(codeHashes) > 0 {
-					return c.fulfillCodeRequest(ctx, codeHashes)
+					return c.fulfillCodeRequestWithRetry(ctx, codeHashes)
 				}
 				return nil
 			}
@@ -165,7 +175,7 @@ func (c *codeSyncer) work(ctx context.Context) error {
 			if len(codeHashes) < message.MaxCodeHashesPerRequest {
 				continue
 			}
-			if err := c.fulfillCodeRequest(ctx, codeHashes); err != nil {
+			if err := c.fulfillCodeRequestWithRetry(ctx, codeHashes); err != nil {
 				return err
 			}
 
@@ -173,6 +183,114 @@ func (c *codeSyncer) work(ctx context.Context) error {
 			codeHashes = codeHashes[:0]
 		}
 	}
+}
+
+// exponentialBackoffWithJitter calculates backoff with jitter to prevent thundering herd
+func exponentialBackoffWithJitter(attempt int, initialDelay, maxDelay time.Duration, jitterFactor float64) time.Duration {
+	if attempt < 0 {
+		attempt = 0
+	}
+
+	// Calculate exponential: initialDelay * 2^attempt (capped at 2^10)
+	exp := attempt
+	if exp > 10 {
+		exp = 10
+	}
+
+	delay := initialDelay * time.Duration(1<<exp)
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+
+	// Add jitter: delay * (1 +/- jitterFactor)
+	if jitterFactor > 0 {
+		jitterRange := float64(delay) * jitterFactor
+		jitter := (rand.Float64()*2 - 1) * jitterRange
+		delay = time.Duration(float64(delay) + jitter)
+
+		// Ensure delay is never negative
+		if delay < 0 {
+			delay = initialDelay
+		}
+	}
+
+	return delay
+}
+
+// isCodeRequestFatalError determines if error should trigger immediate failure
+func isCodeRequestFatalError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Fatal: context cancellation
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	// Fatal: database write failures
+	if strings.Contains(err.Error(), "failed to write batch") {
+		return true
+	}
+
+	// All other errors (network, peers) are transient
+	return false
+}
+
+// fulfillCodeRequestWithRetry wraps fulfillCodeRequest with exponential backoff retry logic
+func (c *codeSyncer) fulfillCodeRequestWithRetry(ctx context.Context, codeHashes []common.Hash) error {
+	// Edge case: empty slice should not be retried
+	if len(codeHashes) == 0 {
+		return nil
+	}
+
+	var lastErr error
+
+	for attempt := 0; attempt < codeRequestMaxRetries; attempt++ {
+		if attempt > 0 {
+			// Check context before retry
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
+			// Apply exponential backoff with jitter
+			backoff := exponentialBackoffWithJitter(attempt-1, codeRequestInitialDelay, codeRequestMaxDelay, codeRequestJitterFactor)
+			log.Debug("Retrying code request after backoff",
+				"attempt", attempt,
+				"backoff", backoff,
+				"numHashes", len(codeHashes),
+				"lastErr", lastErr)
+
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		err := c.fulfillCodeRequest(ctx, codeHashes)
+		if err == nil {
+			if attempt > 0 {
+				log.Info("Code request succeeded after retries", "attempts", attempt+1)
+			}
+			return nil
+		}
+
+		lastErr = err
+
+		// Check if fatal error
+		if isCodeRequestFatalError(err) {
+			return fmt.Errorf("fatal code request error: %w", err)
+		}
+
+		// Transient error, continue retrying
+		log.Warn("Code request failed, will retry",
+			"attempt", attempt+1,
+			"maxRetries", codeRequestMaxRetries,
+			"err", err)
+	}
+
+	return fmt.Errorf("code request failed after %d retries: %w", codeRequestMaxRetries, lastErr)
 }
 
 // fulfillCodeRequest sends a request for [codeHashes], writes the result to the database, and

@@ -8,7 +8,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/log"
@@ -16,6 +19,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
+)
+
+const (
+	// Retry configuration for leaf requests
+	leafRequestInitialDelay = 50 * time.Millisecond
+	leafRequestMaxDelay     = 8 * time.Second
+	leafRequestMaxRetries   = 15
+	leafRequestJitterFactor = 0.25 // 25% jitter
 )
 
 var errFailedToFetchLeafs = errors.New("failed to fetch leafs")
@@ -62,6 +73,61 @@ func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, request
 	return syncer
 }
 
+// exponentialBackoffWithJitter calculates backoff with jitter to prevent thundering herd
+func exponentialBackoffWithJitter(attempt int, initialDelay, maxDelay time.Duration, jitterFactor float64) time.Duration {
+	if attempt < 0 {
+		attempt = 0
+	}
+
+	// Calculate exponential: initialDelay * 2^attempt (capped at 2^10)
+	exp := attempt
+	if exp > 10 {
+		exp = 10
+	}
+
+	delay := initialDelay * time.Duration(1<<exp)
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+
+	// Add jitter: delay * (1 +/- jitterFactor)
+	if jitterFactor > 0 {
+		jitterRange := float64(delay) * jitterFactor
+		jitter := (rand.Float64()*2 - 1) * jitterRange
+		delay = time.Duration(float64(delay) + jitter)
+
+		// Ensure delay is never negative
+		if delay < 0 {
+			delay = initialDelay
+		}
+	}
+
+	return delay
+}
+
+// isLeafRequestFatalError determines if error is fatal or transient
+func isLeafRequestFatalError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+
+	// Fatal: context errors
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	// Fatal: invalid range proof (data corruption)
+	if strings.Contains(errStr, "invalid range proof") ||
+		strings.Contains(errStr, "failed to verify range proof") {
+		return true
+	}
+
+	// All other errors (network, timeouts, peers) are transient
+	return false
+}
+
 // workerLoop reads from [c.tasks] and calls [c.syncTask] until [ctx] is finished
 // or [c.tasks] is closed.
 func (c *CallbackLeafSyncer) workerLoop(ctx context.Context) error {
@@ -103,21 +169,74 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 		// Use adaptive request size
 		currentSize := uint16(c.adaptiveSize.Load())
 
-		leafsResponse, err := c.client.GetLeafs(ctx, message.LeafsRequest{
-			Root:     root,
-			Account:  task.Account(),
-			Start:    start,
-			Limit:    currentSize,
-			NodeType: message.StateTrieNode,
-		})
+		var (
+			leafsResponse message.LeafsResponse
+			err           error
+			lastErr       error
+		)
+
+		// Retry loop with exponential backoff + jitter
+		for attempt := 0; attempt < leafRequestMaxRetries; attempt++ {
+			if attempt > 0 {
+				// Apply exponential backoff with jitter
+				backoff := exponentialBackoffWithJitter(
+					attempt-1,
+					leafRequestInitialDelay,
+					leafRequestMaxDelay,
+					leafRequestJitterFactor,
+				)
+
+				log.Debug("Retrying leaf request after backoff",
+					"attempt", attempt,
+					"backoff", backoff,
+					"root", root,
+					"currentSize", currentSize,
+					"lastErr", lastErr)
+
+				select {
+				case <-time.After(backoff):
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+
+			leafsResponse, err = c.client.GetLeafs(ctx, message.LeafsRequest{
+				Root:     root,
+				Account:  task.Account(),
+				Start:    start,
+				Limit:    currentSize,
+				NodeType: message.StateTrieNode,
+			})
+
+			if err == nil {
+				if attempt > 0 {
+					log.Info("Leaf request succeeded after retries", "attempts", attempt+1, "root", root)
+				}
+				break // Success!
+			}
+
+			lastErr = err
+
+			// Check if fatal
+			if isLeafRequestFatalError(err) {
+				return fmt.Errorf("fatal leaf request error: %w", err)
+			}
+
+			log.Warn("Leaf request failed, will retry",
+				"attempt", attempt+1,
+				"maxRetries", leafRequestMaxRetries,
+				"err", err,
+				"currentSize", currentSize)
+		}
+
 		if err != nil {
-			// On failure, reduce request size to improve success rate
+			// Exhausted retries - reduce request size for next task
 			c.consecutiveFailures.Add(1)
 			failures := c.consecutiveFailures.Load()
 			if failures >= 3 && currentSize > 64 {
 				newSize := currentSize / 2
 				if newSize < 64 {
-					newSize = 64 // Minimum request size
+					newSize = 64
 				}
 				c.adaptiveSize.Store(uint32(newSize))
 				log.Debug("Reducing adaptive request size due to failures",
@@ -125,7 +244,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 					"newSize", newSize,
 					"failures", failures)
 			}
-			return fmt.Errorf("%w: %w", errFailedToFetchLeafs, err)
+			return fmt.Errorf("%w after %d retries: %w", errFailedToFetchLeafs, leafRequestMaxRetries, lastErr)
 		}
 
 		// On success, reset failure counter and consider increasing size

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -1399,13 +1400,28 @@ func (m *manager) createSnowmanChain(
 	// This will be populated after the state syncer is created.
 	// We store the unwrapped syncer to access the Restart method even when tracing is enabled.
 	var (
-		stateSyncerRef common.StateSyncer
-		retryRequestID uint32 = 100000 // Start high to avoid conflicts with normal operation
+		stateSyncerRef     common.StateSyncer
+		retryRequestID     uint32 = 100000 // Start high to avoid conflicts with normal operation
+		stateSyncRetryCount atomic.Int32
 	)
 	bootstrapCfg.RequestStateSyncRetry = func(ctx context.Context) error {
+		retryCount := stateSyncRetryCount.Add(1)
+
+		// Limit retries to prevent infinite loop
+		const maxStateSyncRetries = 3
+		if retryCount > maxStateSyncRetries {
+			return fmt.Errorf("state sync retry limit exceeded (%d attempts)", retryCount)
+		}
+
 		if stateSyncerRef == nil {
 			return fmt.Errorf("state syncer not initialized")
 		}
+
+		m.Log.Warn("Retrying state sync after failure/stuck detection",
+			"chainID", chainID,
+			"attempt", retryCount,
+			"maxRetries", maxStateSyncRetries)
+
 		// Cast to access Restart method
 		type restartable interface {
 			Restart(ctx context.Context, startReqID uint32) error
@@ -1413,7 +1429,12 @@ func (m *manager) createSnowmanChain(
 		if rs, ok := stateSyncerRef.(restartable); ok {
 			// Increment request ID for each retry to avoid message conflicts
 			retryRequestID++
-			return rs.Restart(ctx, retryRequestID)
+			err := rs.Restart(ctx, retryRequestID)
+			if err == nil {
+				// Reset counter on successful restart
+				stateSyncRetryCount.Store(0)
+			}
+			return err
 		}
 		return fmt.Errorf("state syncer does not support restart")
 	}

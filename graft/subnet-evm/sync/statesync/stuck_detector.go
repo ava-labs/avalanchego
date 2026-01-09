@@ -12,17 +12,17 @@ import (
 )
 
 const (
-	// Thresholds for stuck detection
-	zeroRateTimeout     = 10 * time.Minute // No leafs fetched
-	noTrieTimeout       = 15 * time.Minute // No trie completed (reduced further for faster detection)
+	// Reduced timeouts to detect stuck state BEFORE 6-minute crash
+	zeroRateTimeout     = 5 * time.Minute  // REDUCED from 10min - No leafs fetched
+	noTrieTimeout       = 8 * time.Minute  // REDUCED from 15min - No trie completed
 	maxRetriesThreshold = 1000             // Excessive retries
-	checkInterval       = 1 * time.Minute  // How often to check
+	checkInterval       = 30 * time.Second // REDUCED from 1min - More frequent checks
 
 	// Progress velocity thresholds
-	minLeafsPerMinute      = 100             // Minimum expected leaf fetch rate
-	slowProgressTimeout    = 10 * time.Minute // How long to tolerate slow progress (reduced from 15)
-	emergencySlowThreshold = 10              // Emergency: < 10 leafs/min
-	emergencySlowTimeout   = 5 * time.Minute // Emergency timeout for critically slow progress
+	minLeafsPerMinute      = 100
+	slowProgressTimeout    = 6 * time.Minute  // REDUCED from 10min - Slow progress tolerance
+	emergencySlowThreshold = 10               // Emergency: < 10 leafs/min
+	emergencySlowTimeout   = 3 * time.Minute  // REDUCED from 5min - Emergency timeout
 )
 
 // StuckDetector monitors state sync progress and detects when sync has stalled.

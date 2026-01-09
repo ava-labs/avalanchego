@@ -8,7 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"runtime/debug"
+	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -103,6 +106,7 @@ type stateSync struct {
 
 	// context cancellation management
 	cancelFunc context.CancelFunc
+	started    atomic.Bool // prevents multiple Start() calls
 }
 
 func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
@@ -291,7 +295,60 @@ func (t *stateSync) storageTrieProducer(ctx context.Context) error {
 	}
 }
 
+// ErrorCategory classifies state sync errors
+type ErrorCategory int
+
+const (
+	ErrorCategoryTransient ErrorCategory = iota // Temporary network/peer issues
+	ErrorCategoryFatal                          // Unrecoverable (DB corruption, invalid state)
+	ErrorCategoryStuck                          // Progress stalled, needs fallback
+)
+
+// categorizeStateSyncError classifies errors to determine appropriate action
+func categorizeStateSyncError(err error) ErrorCategory {
+	if err == nil {
+		return ErrorCategoryTransient
+	}
+
+	errStr := err.Error()
+
+	// Stuck detection
+	if errors.Is(err, errStateSyncStuck) {
+		return ErrorCategoryStuck
+	}
+
+	// Fatal errors (don't fallback, require intervention)
+	if strings.Contains(errStr, "database") && strings.Contains(errStr, "corrupt") {
+		return ErrorCategoryFatal
+	}
+
+	if strings.Contains(errStr, "panic") {
+		return ErrorCategoryFatal
+	}
+
+	// Stuck indicators
+	if strings.Contains(errStr, "too many retries") ||
+		strings.Contains(errStr, "no leafs fetched") ||
+		strings.Contains(errStr, "no trie completed") {
+		return ErrorCategoryStuck
+	}
+
+	// Everything else is transient
+	return ErrorCategoryTransient
+}
+
+// shouldFallbackToBlockSync determines if we should fallback based on error
+func shouldFallbackToBlockSync(err error) bool {
+	category := categorizeStateSyncError(err)
+	return category == ErrorCategoryStuck
+}
+
 func (t *stateSync) Start(ctx context.Context) error {
+	// Prevent multiple Start() calls
+	if !t.started.CompareAndSwap(false, true) {
+		return errors.New("state sync already started")
+	}
+
 	// Create a cancellable context for the sync operations
 	syncCtx, cancel := context.WithCancel(ctx)
 	t.cancelFunc = cancel
@@ -300,21 +357,52 @@ func (t *stateSync) Start(ctx context.Context) error {
 	log.Info("Starting stuck detector for state sync monitoring")
 	t.stuckDetector.Start(syncCtx)
 
+	// Panic recovery wrapper - returns error from panic to errgroup
+	panicRecovery := func(name string) error {
+		if r := recover(); r != nil {
+			log.Error("PANIC in state sync goroutine, triggering fallback",
+				"goroutine", name,
+				"panic", r,
+				"stack", string(debug.Stack()))
+			cancel() // Cancel other goroutines
+			return fmt.Errorf("panic in %s: %v", name, r)
+		}
+		return nil
+	}
+
 	// Start the code syncer and leaf syncer.
 	eg, egCtx := errgroup.WithContext(syncCtx)
 	t.codeSyncer.start(egCtx) // start the code syncer first since the leaf syncer may add code tasks
 	t.syncer.Start(egCtx, t.numWorkers, t.onSyncFailure)
-	eg.Go(func() error {
+
+	// Wrap all goroutines with panic recovery
+	eg.Go(func() (err error) {
+		defer func() {
+			if panicErr := panicRecovery("syncer.Done"); panicErr != nil {
+				err = panicErr
+			}
+		}()
 		if err := <-t.syncer.Done(); err != nil {
 			return err
 		}
 		return t.onSyncComplete()
 	})
-	eg.Go(func() error {
-		err := <-t.codeSyncer.Done()
-		return err
+
+	eg.Go(func() (err error) {
+		defer func() {
+			if panicErr := panicRecovery("codeSyncer.Done"); panicErr != nil {
+				err = panicErr
+			}
+		}()
+		return <-t.codeSyncer.Done()
 	})
-	eg.Go(func() error {
+
+	eg.Go(func() (err error) {
+		defer func() {
+			if panicErr := panicRecovery("storageTrieProducer"); panicErr != nil {
+				err = panicErr
+			}
+		}()
 		return t.storageTrieProducer(egCtx)
 	})
 
@@ -340,6 +428,17 @@ func (t *stateSync) Start(ctx context.Context) error {
 	go func() {
 		err := eg.Wait()
 		t.stuckDetector.Stop() // Stop monitoring when sync completes or fails
+
+		// Categorize error and trigger appropriate fallback
+		if err != nil && !errors.Is(err, context.Canceled) {
+			if shouldFallbackToBlockSync(err) {
+				log.Warn("State sync error requires fallback to block sync",
+					"err", err,
+					"errType", categorizeStateSyncError(err))
+				err = errStateSyncStuck
+			}
+		}
+
 		t.done <- err
 	}()
 	return nil
