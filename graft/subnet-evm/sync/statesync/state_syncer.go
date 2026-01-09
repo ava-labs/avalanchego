@@ -500,6 +500,58 @@ func (t *stateSync) Wait(ctx context.Context) error {
 	return resultErr
 }
 
+// Restart reinitializes the state syncer for a retry attempt after fallback.
+// Called by the reviver mechanism when automatically retrying failed state sync.
+// The startReqID ensures message IDs don't conflict with previous attempts.
+//
+// IMPORTANT: Only call after Start() has completed and Wait() has returned.
+// The concurrency guards (sync.Once, cachedResult) prevent issues from multiple calls.
+// This method recreates all channels and resets all state for a fresh start.
+func (t *stateSync) Restart(ctx context.Context, startReqID uint32) error {
+	// Check if a sync is currently running
+	if t.started.Load() {
+		return errors.New("cannot restart: state sync already running")
+	}
+
+	log.Warn("===========================================")
+	log.Warn("STATE SYNC RESTART REQUESTED BY REVIVER")
+	log.Warn("===========================================",
+		"startReqID", startReqID,
+		"root", t.root.Hex())
+
+	// Reset state for fresh start (all channel closes are guarded by sync.Once)
+	t.started.Store(false)
+	t.waitStarted.Store(false)
+
+	// Create fresh channels (old ones are closed)
+	t.done = make(chan error, 1)
+	t.resultReady = make(chan struct{})
+	t.mainTrieDone = make(chan struct{})
+	t.storageTriesDone = make(chan struct{})
+
+	// Reset the Once guards so channels can be closed again
+	// This is safe because we've verified sync is not running
+	t.mainTrieDoneOnce = sync.Once{}
+	t.segmentsDoneOnce = sync.Once{}
+	t.storageTriesDoneOnce = sync.Once{}
+
+	// Reset stuck detector to monitor the new sync attempt
+	t.stuckDetector = NewStuckDetector(t.stats)
+
+	log.Info("State sync restart initialized, calling Start()...")
+
+	// Start the sync again - this will use the preserved summary
+	err := t.Start(ctx)
+	if err != nil {
+		log.Error("REVIVER: Restart failed during Start()",
+			"err", err)
+		return fmt.Errorf("restart start failed: %w", err)
+	}
+
+	log.Warn("REVIVER: State sync restart initiated successfully")
+	return nil
+}
+
 // addTrieInProgress tracks the root as being currently synced.
 func (t *stateSync) addTrieInProgress(root common.Hash, trie *trieToSync) {
 	t.lock.Lock()

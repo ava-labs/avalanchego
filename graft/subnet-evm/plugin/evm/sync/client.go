@@ -143,9 +143,13 @@ func ErrStateSyncFallback() error {
 	return errStateSyncFallback
 }
 
-// performStateCleanup contains the shared cleanup logic used by both runtime fallback and startup validation.
-// This removes all partial state sync data to allow a fresh start.
-func (client *client) performStateCleanup(ctx context.Context) error {
+// clearSyncProgress clears the in-progress sync data (segments, storage tries, snapshots)
+// while PRESERVING the resumable summary metadata. This allows the reviver mechanism to
+// detect and retry stuck state syncs.
+// Use this for Tier 2 cleanup: when sync is stuck but state is not corrupted.
+func (client *client) clearSyncProgress(ctx context.Context) error {
+	log.Info("Clearing state sync progress (preserving summary for reviver)...")
+
 	// Step 1: Clear all state sync progress markers
 	log.Info("Clearing state sync segments...")
 	if err := customrawdb.ClearAllSyncSegments(client.ChaindDB); err != nil {
@@ -168,7 +172,7 @@ func (client *client) performStateCleanup(ctx context.Context) error {
 	}
 
 	// Step 2: Wipe corrupted snapshot data
-	log.Info("Wiping corrupted snapshot data...")
+	log.Info("Wiping snapshot data...")
 	wipeDone := snapshot.WipeSnapshot(client.ChaindDB, true)
 
 	select {
@@ -186,13 +190,49 @@ func (client *client) performStateCleanup(ctx context.Context) error {
 	// Step 4: Delete snapshot block hash marker
 	customrawdb.DeleteSnapshotBlockHash(client.ChaindDB)
 
-	// Step 5: Clear the ongoing state sync summary
-	log.Info("Clearing state sync metadata...")
+	// CRITICAL: Do NOT clear the ongoing summary - preserve for reviver
+	log.Info("Sync progress cleared successfully (summary preserved for resume)")
+	return nil
+}
+
+// clearSummaryMetadata clears the resumable state sync summary from the database.
+// After calling this, the reviver mechanism will NOT be able to detect resumable state.
+// Only use this when transitioning to permanent block sync (Tier 2 → Tier 3).
+func (client *client) clearSummaryMetadata() error {
+	log.Warn("Clearing state sync summary metadata (reviver will NOT work after this)")
 	if err := client.ClearOngoingSummary(); err != nil {
 		log.Warn("Failed to clear ongoing summary (non-fatal)", "err", err)
+		return err
+	}
+	log.Info("State sync summary cleared - reviver disabled")
+	return nil
+}
+
+// performFullCleanup performs complete state sync cleanup (Tier 3).
+// This removes ALL state sync data including the resumable summary.
+// Use only when state is corrupted or retry limit exceeded.
+// After this, reviver mechanism will NOT work.
+func (client *client) performFullCleanup(ctx context.Context) error {
+	log.Warn("Performing FULL state sync cleanup (reviver will NOT work after this)")
+
+	// Clear progress data
+	if err := client.clearSyncProgress(ctx); err != nil {
+		return err
 	}
 
+	// Clear summary metadata
+	if err := client.clearSummaryMetadata(); err != nil {
+		return err
+	}
+
+	log.Warn("Full cleanup complete - all state sync data removed")
 	return nil
+}
+
+// performStateCleanup is the legacy cleanup function maintained for backwards compatibility.
+// It performs full cleanup (Tier 3). New code should use performFullCleanup() explicitly.
+func (client *client) performStateCleanup(ctx context.Context) error {
+	return client.performFullCleanup(ctx)
 }
 
 // validateStateSyncIntegrity checks if a state sync summary represents complete, valid state.
@@ -306,8 +346,9 @@ func (client *client) GetOngoingSyncStateSummary(ctx context.Context) (block.Sta
 		log.Warn("State sync integrity check failed, cleaning up corrupted data",
 			"error", err)
 
-		// Cleanup the corrupted state
-		if cleanupErr := client.performStateCleanup(ctx); cleanupErr != nil {
+		// Corrupted state requires FULL cleanup (Tier 3) - remove ALL data including summary
+		// This ensures reviver won't try to resume from corrupted state
+		if cleanupErr := client.performFullCleanup(ctx); cleanupErr != nil {
 			// If cleanup failed due to context cancellation, it's safe to return ErrNotFound
 			// since the chain is shutting down anyway
 			if errors.Is(cleanupErr, context.Canceled) || errors.Is(cleanupErr, context.DeadlineExceeded) {
@@ -322,7 +363,7 @@ func (client *client) GetOngoingSyncStateSummary(ctx context.Context) (block.Sta
 			return nil, fmt.Errorf("corrupted state cleanup failed, summary key may remain in DB: %w", cleanupErr)
 		}
 
-		log.Info("Corrupted state cleaned up, will start fresh sync or block sync")
+		log.Info("Corrupted state cleaned up completely (including summary), will start fresh sync or block sync")
 
 		// Return ErrNotFound to tell engine there's no resumable state
 		// This forces the engine to start fresh state sync or fall back to block sync
@@ -591,24 +632,27 @@ func (client *client) syncStateTrie(ctx context.Context, summary message.Syncabl
 	return err
 }
 
-// fallbackToBlockSync clears state sync metadata and corrupted state when stuck is detected at runtime.
-// This function performs a complete automated cleanup to ensure the chain can restart cleanly with block sync.
+// fallbackToBlockSync clears stuck state sync progress while PRESERVING the resumable summary.
+// This allows the reviver mechanism to automatically retry state sync after 30 minutes.
+// Uses Tier 2 cleanup: removes segments/snapshots but keeps summary for reviver.
 // Respects context cancellation to allow graceful shutdown during cleanup.
 func (client *client) fallbackToBlockSync(ctx context.Context) error {
 	log.Warn("===========================================")
-	log.Warn("STATE SYNC STUCK - AUTOMATED SELF-HEALING")
-	log.Warn("Cleaning up corrupted partial state...")
+	log.Warn("STATE SYNC STUCK - PRESERVING RESUMABLE STATE")
+	log.Warn("Clearing corrupted progress, keeping summary for reviver...")
 	log.Warn("===========================================")
 
-	// Perform the shared cleanup logic
-	if err := client.performStateCleanup(ctx); err != nil {
+	// Use Tier 2 cleanup: clear progress but PRESERVE summary for reviver
+	// This is the KEY FIX for reviver - summary must remain for retry to work
+	if err := client.clearSyncProgress(ctx); err != nil {
 		return err
 	}
 
 	log.Warn("===========================================")
-	log.Warn("AUTOMATED CLEANUP COMPLETE")
+	log.Warn("CLEANUP COMPLETE - REVIVER CAN RETRY")
+	log.Warn("Summary preserved for automatic retry in 30 minutes")
 	log.Warn("Chain will continue with block sync")
-	log.Warn("State sync remains available for future use")
+	log.Warn("State sync will be automatically retried by reviver")
 	log.Warn("This is expected behavior, not an error")
 	log.Warn("===========================================")
 	return nil

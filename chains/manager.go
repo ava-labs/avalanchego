@@ -1396,14 +1396,79 @@ func (m *manager) createSnowmanChain(
 		Bootstrapped:                   bootstrapFunc,
 	}
 
-	// RequestStateSyncRetry callback for stuck detector
-	// Note: State sync restart is not currently supported. The stuck detector
-	// will trigger fallback to block sync instead, which is slower but reliable.
-	// This callback is provided for future enhancement.
+	// State sync retry state tracking for reviver mechanism
+	var (
+		stateSyncerRef      common.StateSyncer
+		retryRequestID      uint32 = 100000
+		stateSyncRetryCount atomic.Int32
+	)
+
+	// RequestStateSyncRetry callback - enables automatic state sync retry after fallback
+	// This is called by the bootstrapper when conditions warrant a retry (stuck detection + time passed)
 	bootstrapCfg.RequestStateSyncRetry = func(ctx context.Context) error {
-		m.Log.Warn("State sync restart requested but not supported, will use block sync fallback",
-			"chainID", chainParams.ID)
-		return fmt.Errorf("state sync restart not supported, use block sync fallback")
+		retryCount := stateSyncRetryCount.Add(1)
+
+		const maxStateSyncRetries = 3
+		if retryCount > maxStateSyncRetries {
+			m.Log.Error("REVIVER: Max retry limit exceeded, clearing summary",
+				"chainID", chainParams.ID,
+				"attempts", retryCount,
+				"maxRetries", maxStateSyncRetries)
+
+			// Clear summary so we stop retrying (fall back to block sync permanently)
+			if ssVM, ok := vm.(interface{ ClearOngoingSummary() error }); ok {
+				if err := ssVM.ClearOngoingSummary(); err != nil {
+					m.Log.Warn("Failed to clear summary after max retries", "err", err)
+				}
+			}
+			return fmt.Errorf("state sync retry limit exceeded (%d attempts)", retryCount)
+		}
+
+		m.Log.Warn("===========================================")
+		m.Log.Warn("REVIVER: Attempting state sync retry")
+		m.Log.Warn("===========================================",
+			"chainID", chainParams.ID,
+			"attempt", retryCount,
+			"maxRetries", maxStateSyncRetries)
+
+		// Verify state syncer is initialized
+		if stateSyncerRef == nil {
+			m.Log.Error("REVIVER: State syncer not initialized", "chainID", chainParams.ID)
+			return fmt.Errorf("state syncer not initialized")
+		}
+
+		// Cast to restartable interface
+		type restartable interface {
+			Restart(ctx context.Context, startReqID uint32) error
+		}
+
+		rs, ok := stateSyncerRef.(restartable)
+		if !ok {
+			m.Log.Error("REVIVER: State syncer does not implement Restart()",
+				"chainID", chainParams.ID,
+				"type", fmt.Sprintf("%T", stateSyncerRef))
+			return fmt.Errorf("state syncer does not support restart")
+		}
+
+		// Attempt restart with incremented request ID
+		retryRequestID++
+		err := rs.Restart(ctx, retryRequestID)
+
+		if err != nil {
+			m.Log.Error("REVIVER: Restart failed",
+				"chainID", chainParams.ID,
+				"attempt", retryCount,
+				"err", err)
+			return fmt.Errorf("restart failed: %w", err)
+		}
+
+		m.Log.Warn("===========================================")
+		m.Log.Warn("REVIVER: State sync restarted successfully")
+		m.Log.Warn("===========================================")
+
+		// Reset retry counter on success
+		stateSyncRetryCount.Store(0)
+		return nil
 	}
 
 	var bootstrapper common.BootstrapableEngine
