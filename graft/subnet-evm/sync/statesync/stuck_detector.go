@@ -70,7 +70,7 @@ func (sd *StuckDetector) Start(ctx context.Context) {
 	sd.lastLeafUpdate.Store(now)
 	sd.lastTrieUpdate.Store(now)
 	sd.lastVelocityCheck.Store(now)
-	currentLeafCount := uint64(sd.stats.totalLeafs.Count64())
+	currentLeafCount := uint64(sd.stats.totalLeafs.Snapshot().Count())
 	sd.lastLeafCount.Store(currentLeafCount)
 	sd.lastVelocityCount.Store(currentLeafCount)
 	triesSynced, _ := sd.stats.getProgress()
@@ -120,7 +120,7 @@ func (sd *StuckDetector) monitorLoop(ctx context.Context) {
 					"stuck", stuck,
 					"triesSynced", triesSynced,
 					"triesRemaining", triesRemaining,
-					"totalLeafs", sd.stats.totalLeafs.Count64())
+					"totalLeafs", sd.stats.totalLeafs.Snapshot().Count())
 			}
 
 			if stuck {
@@ -153,7 +153,7 @@ func (sd *StuckDetector) checkIfStuck() bool {
 	now := time.Now()
 
 	// Check 1: Track leaf progress
-	currentLeafCount := uint64(sd.stats.totalLeafs.Count64())
+	currentLeafCount := uint64(sd.stats.totalLeafs.Snapshot().Count())
 	lastLeafCount := sd.lastLeafCount.Load()
 	leafsProgressing := currentLeafCount != lastLeafCount
 

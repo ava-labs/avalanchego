@@ -292,7 +292,7 @@ func (t *stateSync) Start(ctx context.Context) error {
 			log.Warn("Stuck detected, canceling state sync to trigger fallback",
 				"triesSynced", triesSynced,
 				"triesRemaining", triesRemaining,
-				"totalLeafs", t.stats.totalLeafs.Count64())
+				"totalLeafs", t.stats.totalLeafs.Snapshot().Count())
 			cancel() // Cancel sync to trigger fallback
 			return errStateSyncStuck
 		case <-egCtx.Done():
