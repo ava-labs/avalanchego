@@ -1396,8 +1396,12 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// Create a mutable reference for the RequestStateSyncRetry callback
-	// This will be populated after the state syncer is created
-	var stateSyncerRef common.StateSyncer
+	// This will be populated after the state syncer is created.
+	// We store the unwrapped syncer to access the Restart method even when tracing is enabled.
+	var (
+		stateSyncerRef common.StateSyncer
+		retryRequestID uint32 = 100000 // Start high to avoid conflicts with normal operation
+	)
 	bootstrapCfg.RequestStateSyncRetry = func(ctx context.Context) error {
 		if stateSyncerRef == nil {
 			return fmt.Errorf("state syncer not initialized")
@@ -1407,8 +1411,9 @@ func (m *manager) createSnowmanChain(
 			Restart(ctx context.Context, startReqID uint32) error
 		}
 		if rs, ok := stateSyncerRef.(restartable); ok {
-			// Use requestID + 1 to avoid conflicts
-			return rs.Restart(ctx, 1)
+			// Increment request ID for each retry to avoid message conflicts
+			retryRequestID++
+			return rs.Restart(ctx, retryRequestID)
 		}
 		return fmt.Errorf("state syncer does not support restart")
 	}
@@ -1446,12 +1451,13 @@ func (m *manager) createSnowmanChain(
 		bootstrapper.Start,
 	)
 
+	// Populate the state syncer reference BEFORE tracing wraps it
+	// This ensures the callback can access the Restart method even when tracing is enabled
+	stateSyncerRef = stateSyncer
+
 	if m.TracingEnabled {
 		stateSyncer = common.TraceStateSyncer(stateSyncer, m.Tracer)
 	}
-
-	// Populate the state syncer reference for the bootstrapper's retry callback
-	stateSyncerRef = stateSyncer
 
 	h.SetEngineManager(&handler.EngineManager{
 		DAG: nil,

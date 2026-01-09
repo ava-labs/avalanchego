@@ -806,7 +806,7 @@ func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
 // schedulePeriodicStateSyncRetry schedules a check 30 minutes from now to see
 // if we should attempt to retry state sync. This is a self-rescheduling timer
 // that continues until bootstrapping completes or chain is halted.
-// Must be called with Ctx.Lock held.
+// The scheduled callback will acquire Ctx.Lock before executing.
 func (b *Bootstrapper) schedulePeriodicStateSyncRetry() {
 	if b.periodicRetryTimer != nil {
 		b.periodicRetryTimer.Stop()
@@ -827,14 +827,16 @@ func (b *Bootstrapper) schedulePeriodicStateSyncRetry() {
 				zap.Int("missingBlocks", b.missingBlockIDs.Len()),
 				zap.Duration("timeSinceStart", time.Since(b.startTime)))
 
-			if err := b.attemptStateSyncRetry(context.TODO()); err != nil {
+			if err := b.attemptStateSyncRetry(b.Ctx.Context()); err != nil {
 				b.Ctx.Log.Warn("state sync retry failed, continuing with block sync",
 					zap.Error(err))
 			}
 		}
 
-		// Reschedule for next check
-		b.schedulePeriodicStateSyncRetry()
+		// Only reschedule if still bootstrapping (prevents resource leak after successful transition)
+		if b.Ctx.State.Get().State == snow.Bootstrapping {
+			b.schedulePeriodicStateSyncRetry()
+		}
 	})
 }
 

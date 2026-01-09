@@ -128,6 +128,7 @@ func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 // Restart resets the state syncer to allow it to be re-entered after a previous
 // sync completed or failed. This is used when transitioning back from bootstrapping
 // to state syncing at runtime.
+// Must be called with Ctx.Lock held.
 func (ss *stateSyncer) Restart(ctx context.Context, startReqID uint32) error {
 	ss.Ctx.Log.Info("restarting state syncer",
 		zap.Uint32("requestID", startReqID))
