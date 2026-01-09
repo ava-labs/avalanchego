@@ -18,9 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/x/sync/synctest"
 
 	xsync "github.com/ava-labs/avalanchego/x/sync"
-	"github.com/ava-labs/avalanchego/x/sync/synctest"
 )
 
 var (
@@ -453,7 +453,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Allow 1 request to go through before blocking
-	synctest.AddFuncOnIntercept(t, actionHandler, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
+	synctest.AddFuncOnIntercept(actionHandler, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
 		require.NoError(syncer.UpdateSyncTarget(secondSyncRoot))
 	}, 1)
 
@@ -508,7 +508,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
-	synctest.AddFuncOnIntercept(t, actionHandler, rangeProofHandler, func() {
+	synctest.AddFuncOnIntercept(actionHandler, rangeProofHandler, func() {
 		require.NoError(m.UpdateSyncTarget(root2))
 	}, 0)
 

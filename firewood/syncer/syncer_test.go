@@ -162,14 +162,15 @@ func testSyncWithUpdate(t *testing.T, seed int64, clientKeys int, serverKeys int
 	require.NoError(t, err)
 	require.NotNil(t, syncer)
 
-	synctest.AddFuncOnIntercept(t, intercept, NewGetRangeProofHandler(serverDB), func() {
+	synctest.AddFuncOnIntercept(intercept, NewGetRangeProofHandler(serverDB), func() {
 		require.NoError(t, syncer.UpdateSyncTarget(newRoot))
 	}, numRequestsBeforeUpdate)
 
 	require.NoError(t, syncer.Start(ctx))
-	err = syncer.Wait(ctx)
 
-	finalRoot, err := clientDB.Root()
+	err = syncer.Wait(ctx)
+	finalRoot, rootErr := clientDB.Root()
+	require.NoError(t, rootErr)
 	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) || ids.ID(finalRoot) != newRoot {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
 		logDiff(t, serverDB, clientDB)
