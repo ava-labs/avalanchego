@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"sync/atomic"
+	stdatomic "sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -1397,10 +1397,11 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// State sync retry state tracking for reviver mechanism
+	chainID := ctx.ChainID // Capture for closure
 	var (
 		stateSyncerRef      common.StateSyncer
 		retryRequestID      uint32 = 100000
-		stateSyncRetryCount atomic.Int32
+		stateSyncRetryCount stdatomic.Int32
 	)
 
 	// RequestStateSyncRetry callback - enables automatic state sync retry after fallback
@@ -1411,14 +1412,14 @@ func (m *manager) createSnowmanChain(
 		const maxStateSyncRetries = 3
 		if retryCount > maxStateSyncRetries {
 			m.Log.Error("REVIVER: Max retry limit exceeded, clearing summary",
-				"chainID", chainParams.ID,
-				"attempts", retryCount,
-				"maxRetries", maxStateSyncRetries)
+				zap.Stringer("chainID", chainID),
+				zap.Int32("attempts", retryCount),
+				zap.Int("maxRetries", maxStateSyncRetries))
 
 			// Clear summary so we stop retrying (fall back to block sync permanently)
 			if ssVM, ok := vm.(interface{ ClearOngoingSummary() error }); ok {
 				if err := ssVM.ClearOngoingSummary(); err != nil {
-					m.Log.Warn("Failed to clear summary after max retries", "err", err)
+					m.Log.Warn("Failed to clear summary after max retries", zap.Error(err))
 				}
 			}
 			return fmt.Errorf("state sync retry limit exceeded (%d attempts)", retryCount)
@@ -1427,13 +1428,13 @@ func (m *manager) createSnowmanChain(
 		m.Log.Warn("===========================================")
 		m.Log.Warn("REVIVER: Attempting state sync retry")
 		m.Log.Warn("===========================================",
-			"chainID", chainParams.ID,
-			"attempt", retryCount,
-			"maxRetries", maxStateSyncRetries)
+			zap.Stringer("chainID", chainID),
+			zap.Int32("attempt", retryCount),
+			zap.Int("maxRetries", maxStateSyncRetries))
 
 		// Verify state syncer is initialized
 		if stateSyncerRef == nil {
-			m.Log.Error("REVIVER: State syncer not initialized", "chainID", chainParams.ID)
+			m.Log.Error("REVIVER: State syncer not initialized", zap.Stringer("chainID", chainID))
 			return fmt.Errorf("state syncer not initialized")
 		}
 
@@ -1445,8 +1446,8 @@ func (m *manager) createSnowmanChain(
 		rs, ok := stateSyncerRef.(restartable)
 		if !ok {
 			m.Log.Error("REVIVER: State syncer does not implement Restart()",
-				"chainID", chainParams.ID,
-				"type", fmt.Sprintf("%T", stateSyncerRef))
+				zap.Stringer("chainID", chainID),
+				zap.String("type", fmt.Sprintf("%T", stateSyncerRef)))
 			return fmt.Errorf("state syncer does not support restart")
 		}
 
@@ -1456,9 +1457,9 @@ func (m *manager) createSnowmanChain(
 
 		if err != nil {
 			m.Log.Error("REVIVER: Restart failed",
-				"chainID", chainParams.ID,
-				"attempt", retryCount,
-				"err", err)
+				zap.Stringer("chainID", chainID),
+				zap.Int32("attempt", retryCount),
+				zap.Error(err))
 			return fmt.Errorf("restart failed: %w", err)
 		}
 

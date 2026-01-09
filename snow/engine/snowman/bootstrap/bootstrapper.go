@@ -833,7 +833,7 @@ func (b *Bootstrapper) schedulePeriodicStateSyncRetry() {
 				zap.Int("missingBlocks", b.missingBlockIDs.Len()),
 				zap.Duration("timeSinceStart", time.Since(b.startTime)))
 
-			if err := b.attemptStateSyncRetry(b.Ctx.Context()); err != nil {
+			if err := b.attemptStateSyncRetry(context.Background()); err != nil {
 				b.Ctx.Log.Warn("state sync retry failed, continuing with block sync",
 					zap.Error(err))
 			}
@@ -870,13 +870,13 @@ func (b *Bootstrapper) shouldAttemptStateSyncRetry() bool {
 		return false // VM doesn't support state sync
 	}
 
-	enabled, err := ssVM.StateSyncEnabled(b.Ctx.Context())
+	enabled, err := ssVM.StateSyncEnabled(context.Background())
 	if err != nil || !enabled {
 		return false
 	}
 
 	// Check if VM has a summary available
-	_, err = ssVM.GetOngoingSyncStateSummary(b.Ctx.Context())
+	_, err = ssVM.GetOngoingSyncStateSummary(context.Background())
 	// Don't retry if VM doesn't have a resumable summary
 	// Fresh state sync would require network coordination
 	return err == nil
@@ -913,7 +913,7 @@ func (b *Bootstrapper) attemptStateSyncRetry(ctx context.Context) error {
 	// This prevents data loss if the transition fails
 	if err := b.clearUnlocked(); err != nil {
 		b.Ctx.Log.Warn("failed to clear bootstrapper state after successful state sync transition",
-			"error", err)
+			zap.Error(err))
 		// Non-fatal: state sync already started, bootstrap DB cleanup is best-effort
 	}
 

@@ -343,3 +343,217 @@ func BenchmarkRPCCache_Miss(b *testing.B) {
 		cachedHandler.ServeHTTP(rec, req)
 	}
 }
+
+// Test for BUG #9 fix: JSON-RPC batch requests not handled
+func TestRPCCache_BatchRequestNotCached(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	callCount := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"jsonrpc":"2.0","result":"0x1","id":1},{"jsonrpc":"2.0","result":"0x2","id":2}]`))
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	// Batch request (array)
+	batchReq := `[{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":2}]`
+	req1 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(batchReq))
+	rec1 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec1, req1)
+
+	req2 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(batchReq))
+	rec2 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec2, req2)
+
+	require.Equal(2, callCount, "Batch requests should not be cached")
+}
+
+// Test for BUG #13 fix: Missing nil params handling
+func TestRPCCache_NilParamsNormalization(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	callCount := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"jsonrpc":"2.0","result":"0x123","id":1}`))
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	// Request with params:null
+	req1 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"net_version","params":null,"id":1}`))
+	rec1 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec1, req1)
+	require.Equal(1, callCount)
+
+	// Request with params omitted (should generate same cache key)
+	req2 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"net_version","id":1}`))
+	rec2 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec2, req2)
+
+	require.Equal(1, callCount, "nil and missing params should generate same cache key")
+	require.Equal("HIT", rec2.Header().Get("X-Cache"))
+}
+
+// Test for BUG #10 fix: Config validation
+func TestRPCCache_ConfigValidation(t *testing.T) {
+	require := require.New(t)
+
+	// Test invalid size
+	_, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     0, // Invalid
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.Error(err)
+	require.Contains(err.Error(), "cache size must be positive")
+
+	// Test invalid TTL
+	_, err = newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      0, // Invalid
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.Error(err)
+	require.Contains(err.Error(), "cache TTL must be positive")
+}
+
+// Test for BUG #11 fix: Readonly=false should disable caching
+func TestRPCCache_ReadonlyFalseDisablesCaching(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: false, // Disabled
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	callCount := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"jsonrpc":"2.0","result":"0x123","id":1}`))
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	// First request
+	req1 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x0000000000000000000000000000000000000000","latest"],"id":1}`))
+	rec1 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec1, req1)
+
+	// Second request (should NOT be cached when readonly=false)
+	req2 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x0000000000000000000000000000000000000000","latest"],"id":1}`))
+	rec2 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec2, req2)
+
+	require.Equal(2, callCount, "Readonly=false should disable all caching")
+}
+
+// Test for BUG #8 fix: Max response size limit
+func TestRPCCache_MaxResponseSize(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	// Create a large response (exceeds MaxResponseSize)
+	largeResponse := make([]byte, MaxResponseSize+1)
+	for i := range largeResponse {
+		largeResponse[i] = 'x'
+	}
+
+	callCount := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+		w.Write(largeResponse)
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	// First request
+	req1 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_call","params":[],"id":1}`))
+	rec1 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec1, req1)
+
+	// Second request (should NOT be cached due to size)
+	req2 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_call","params":[],"id":1}`))
+	rec2 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec2, req2)
+
+	require.Equal(2, callCount, "Large responses should not be cached")
+}
+
+// Test for BUG #4 fix: WriteHeader called multiple times
+func TestRPCCache_ResponseRecorderMultipleWriteHeader(t *testing.T) {
+	require := require.New(t)
+
+	recorder := &responseRecorder{
+		ResponseWriter: httptest.NewRecorder(),
+		body:           new(bytes.Buffer),
+		statusCode:     http.StatusOK,
+		headerWritten:  false,
+	}
+
+	// First call
+	recorder.WriteHeader(http.StatusOK)
+	require.Equal(http.StatusOK, recorder.statusCode)
+	require.True(recorder.headerWritten)
+
+	// Second call should be ignored
+	recorder.WriteHeader(http.StatusInternalServerError)
+	require.Equal(http.StatusOK, recorder.statusCode, "Second WriteHeader should be ignored")
+}
