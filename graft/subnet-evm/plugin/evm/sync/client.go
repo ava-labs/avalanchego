@@ -362,6 +362,50 @@ func (client *client) ClearOngoingSummary() error {
 	return nil
 }
 
+// DetectAndCleanCorruptedState proactively checks for corrupted state sync data
+// (typically from crashes during sync) and cleans it up if found.
+// This should be called on startup before attempting any state sync operations.
+// Returns nil if no corruption detected or if cleanup succeeded.
+func (client *client) DetectAndCleanCorruptedState(ctx context.Context) error {
+	// Check if there's an ongoing state sync summary
+	summaryBytes, err := client.MetadataDB.Get(stateSyncSummaryKey)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// No ongoing summary - nothing to check
+			return nil
+		}
+		return fmt.Errorf("failed to read ongoing summary during corruption check: %w", err)
+	}
+
+	// Found an ongoing summary - validate its integrity
+	log.Info("Detecting corrupted state sync data on startup")
+
+	if err := client.validateStateSyncIntegrity(ctx, summaryBytes); err != nil {
+		log.Warn("Corrupted state sync data detected, initiating cleanup",
+			"validationError", err)
+
+		// Cleanup the corrupted state
+		if cleanupErr := client.performStateCleanup(ctx); cleanupErr != nil {
+			// If cleanup failed due to context cancellation, propagate the error
+			if errors.Is(cleanupErr, context.Canceled) || errors.Is(cleanupErr, context.DeadlineExceeded) {
+				return cleanupErr
+			}
+
+			// Non-context errors indicate database problems
+			log.Error("CRITICAL: Failed to cleanup corrupted state during startup",
+				"error", cleanupErr)
+			return fmt.Errorf("corrupted state cleanup failed: %w", cleanupErr)
+		}
+
+		log.Info("Successfully cleaned up corrupted state sync data")
+		return nil
+	}
+
+	// State is valid - no cleanup needed
+	log.Debug("State sync data integrity validated successfully")
+	return nil
+}
+
 func (client *client) ParseStateSummary(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 	return client.Parser.Parse(summaryBytes, client.acceptSyncSummary)
 }
