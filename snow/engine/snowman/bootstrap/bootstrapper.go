@@ -176,6 +176,12 @@ func (b *Bootstrapper) Clear(context.Context) error {
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
 
+	return b.clearUnlocked()
+}
+
+// clearUnlocked clears the bootstrap database without acquiring the lock.
+// Must be called with Ctx.Lock held.
+func (b *Bootstrapper) clearUnlocked() error {
 	return database.AtomicClear(b.DB, b.DB)
 }
 
@@ -877,7 +883,7 @@ func (b *Bootstrapper) shouldAttemptStateSyncRetry() bool {
 }
 
 // attemptStateSyncRetry attempts to transition from bootstrapping back to state syncing.
-// This clears bootstrapper state and calls the RequestStateSyncRetry callback.
+// This calls the RequestStateSyncRetry callback and clears bootstrapper state on success.
 // Must be called with Ctx.Lock held.
 func (b *Bootstrapper) attemptStateSyncRetry(ctx context.Context) error {
 	b.lastRetryAttempt = time.Now()
@@ -888,13 +894,8 @@ func (b *Bootstrapper) attemptStateSyncRetry(ctx context.Context) error {
 
 	b.Ctx.Log.Warn("===========================================")
 	b.Ctx.Log.Warn("ATTEMPTING STATE SYNC RETRY FROM BLOCK SYNC")
-	b.Ctx.Log.Warn("Clearing bootstrapper state and restarting state sync...")
+	b.Ctx.Log.Warn("Transitioning to state sync...")
 	b.Ctx.Log.Warn("===========================================")
-
-	// Clear bootstrapper state
-	if err := b.Clear(ctx); err != nil {
-		return fmt.Errorf("failed to clear bootstrapper state: %w", err)
-	}
 
 	// Stop periodic monitoring during transition
 	if b.periodicRetryTimer != nil {
@@ -902,9 +903,18 @@ func (b *Bootstrapper) attemptStateSyncRetry(ctx context.Context) error {
 		b.periodicRetryTimer = nil
 	}
 
-	// Request state sync retry via callback
+	// Request state sync retry via callback FIRST
+	// If this fails, bootstrap DB remains intact and we can continue block sync
 	if err := b.RequestStateSyncRetry(ctx); err != nil {
 		return fmt.Errorf("failed to restart state syncer: %w", err)
+	}
+
+	// Clear bootstrapper state AFTER state sync successfully starts
+	// This prevents data loss if the transition fails
+	if err := b.clearUnlocked(); err != nil {
+		b.Ctx.Log.Warn("failed to clear bootstrapper state after successful state sync transition",
+			"error", err)
+		// Non-fatal: state sync already started, bootstrap DB cleanup is best-effort
 	}
 
 	b.Ctx.Log.Info("State sync retry initiated successfully")
