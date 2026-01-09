@@ -37,9 +37,9 @@ const ParentsToFetch = 256
 var (
 	_ Acceptor = (*client)(nil)
 
-	errSkipSync            = errors.New("skip sync")
-	errCommitCancelled     = errors.New("commit cancelled")
-	errStateSyncFallback   = errors.New("state sync fallback to block sync (not an error)")
+	errSkipSync          = errors.New("skip sync")
+	errCommitCancelled   = errors.New("commit cancelled")
+	errStateSyncFallback = errors.New("state sync fallback to block sync (not an error)")
 
 	stateSyncSummaryKey = []byte("stateSyncSummary")
 )
@@ -180,11 +180,13 @@ func (client *client) DetectAndCleanCorruptedState(ctx context.Context) error {
 		return client.cleanupCorruptedState(ctx)
 	}
 
-	// Check if the state root exists
+	// Check if snapshot root exists (written by ResetToStateSyncedBlock on successful sync)
 	stateRoot := summary.GetBlockRoot()
-	if !rawdb.HasTrieNode(client.ChaindDB, stateRoot) {
-		log.Warn("Found incomplete state trie from previous crash",
-			"stateRoot", stateRoot.Hex(),
+	snapshotRoot := rawdb.ReadSnapshotRoot(client.ChaindDB)
+	if snapshotRoot != stateRoot {
+		log.Warn("Found incomplete state sync from previous crash",
+			"expectedRoot", stateRoot.Hex(),
+			"snapshotRoot", snapshotRoot.Hex(),
 			"blockHash", blockHash.Hex())
 		return client.cleanupCorruptedState(ctx)
 	}

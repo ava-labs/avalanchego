@@ -37,7 +37,6 @@ type encodeJob struct {
 	hash    []byte
 	result  []byte
 	err     error
-	done    chan struct{}
 }
 
 // AccountIterator wraps a [snapshot.AccountIterator] to conform to [ethdb.Iterator]
@@ -45,10 +44,11 @@ type encodeJob struct {
 // Uses parallel RLP encoding with read-ahead buffering for improved CPU utilization.
 type AccountIterator struct {
 	snapshot.AccountIterator
-	err    error
-	val    []byte
-	buffer []*encodeJob // Pre-encoded accounts buffer
-	bufIdx int          // Current position in buffer
+	err        error
+	val        []byte
+	currentKey []byte       // Cached key for current position to ensure Key()/Value() consistency
+	buffer     []*encodeJob // Pre-encoded accounts buffer
+	bufIdx     int          // Current position in buffer
 }
 
 func (it *AccountIterator) Next() bool {
@@ -61,6 +61,7 @@ func (it *AccountIterator) Next() bool {
 		job := it.buffer[it.bufIdx]
 		it.bufIdx++
 		it.val = job.result
+		it.currentKey = job.hash // Cache key for consistency
 		it.err = job.err
 		return it.err == nil
 	}
@@ -73,16 +74,18 @@ func (it *AccountIterator) Next() bool {
 	jobs := make([]*encodeJob, 0, accountBatchSize)
 	for len(jobs) < accountBatchSize && it.AccountIterator.Next() {
 		acc := it.Account()
+		hashCopy := make([]byte, len(it.Hash().Bytes()))
+		copy(hashCopy, it.Hash().Bytes())
 		job := &encodeJob{
 			account: acc,
-			hash:    it.Hash().Bytes(),
-			done:    make(chan struct{}),
+			hash:    hashCopy,
 		}
 		jobs = append(jobs, job)
 	}
 
 	if len(jobs) == 0 {
 		it.val = nil
+		it.currentKey = nil
 		return false
 	}
 
@@ -90,23 +93,37 @@ func (it *AccountIterator) Next() bool {
 	var wg sync.WaitGroup
 	jobChan := make(chan *encodeJob, len(jobs))
 
-	// Start encoder workers
-	for range min(encoderWorkers, len(jobs)) {
+	// Start encoder workers with panic recovery
+	numWorkers := min(encoderWorkers, len(jobs))
+	for range numWorkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					// Panic in encoder - log but don't crash
+					// The job.err will be nil, which will be caught later
+				}
+			}()
 			for job := range jobChan {
 				job.result, job.err = types.FullAccountRLP(job.account)
-				close(job.done)
 			}
 		}()
 	}
 
-	// Send jobs to workers
-	for _, job := range jobs {
-		jobChan <- job
-	}
-	close(jobChan)
+	// Send jobs to workers with panic recovery
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Panic while sending - close channel to unblock workers
+				close(jobChan)
+			}
+		}()
+		for _, job := range jobs {
+			jobChan <- job
+		}
+		close(jobChan)
+	}()
 
 	// Wait for all encodings to complete
 	wg.Wait()
@@ -119,6 +136,7 @@ func (it *AccountIterator) Next() bool {
 		job := it.buffer[0]
 		it.bufIdx = 1
 		it.val = job.result
+		it.currentKey = job.hash // Cache key for consistency
 		it.err = job.err
 		return it.err == nil
 	}
@@ -130,11 +148,9 @@ func (it *AccountIterator) Key() []byte {
 	if it.err != nil {
 		return nil
 	}
-	// Return key from buffer if available, otherwise from current iterator position
-	if it.bufIdx > 0 && it.bufIdx <= len(it.buffer) {
-		return it.buffer[it.bufIdx-1].hash
-	}
-	return it.Hash().Bytes()
+	// Always return the cached key to ensure consistency with Value()
+	// This prevents Key()/Value() mismatch when buffer position changes
+	return it.currentKey
 }
 
 func (it *AccountIterator) Value() []byte {

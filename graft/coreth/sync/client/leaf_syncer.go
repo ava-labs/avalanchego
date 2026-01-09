@@ -79,6 +79,9 @@ func (c *CallbackLeafSyncer) workerLoop(ctx context.Context) error {
 }
 
 // pendingRequest represents a leaf request that has been issued and is awaiting response.
+// The issuer goroutine populates response/err, then sends the request to the pipeline channel.
+// The processor goroutine receives from the pipeline, ensuring happens-before relationship.
+// This guarantees the processor sees all writes made before the channel send.
 type pendingRequest struct {
 	request  message.LeafsRequest
 	response message.LeafsResponse
@@ -126,8 +129,12 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 				},
 			}
 
-			// Issue request asynchronously
+			// Issue request and populate response
 			response, err := c.client.GetLeafs(egCtx, req.request)
+
+			// CRITICAL: Populate req completely BEFORE sending to pipeline.
+			// Channel send/receive provides happens-before guarantee, ensuring
+			// the processor goroutine sees these writes after receiving from channel.
 			req.response = response
 			req.err = err
 
