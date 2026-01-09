@@ -244,10 +244,10 @@ func (p *peerMetricsTracker) selectBestPeer(candidates []ids.NodeID) ids.NodeID 
 
 		// Calculate score: higher is better
 		// Score combines success rate (0-1) and inverse latency
-		// Normalize latency to 0-1 scale where 100ms = 1.0 (excellent), 1s = 0.1 (poor)
+		// Normalize latency using inverse function: lower latency = higher score
 		successRate := m.successRate()
 		latencyMs := float64(m.avgLatency.Milliseconds())
-		latencyScore := 100.0 / (100.0 + latencyMs) // 100ms -> 0.5, 1000ms -> 0.09
+		latencyScore := 100.0 / (100.0 + latencyMs) // 100ms -> 0.5, 1000ms -> 0.09, 10ms -> 0.91
 
 		// Weight: 70% success rate, 30% latency
 		score := 0.7*successRate + 0.3*latencyScore
@@ -552,9 +552,9 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 				// Select best peer based on latency and success rate metrics
 				nodeID = c.metricsTracker.selectBestPeer(candidates)
 				if nodeID == (ids.NodeID{}) {
-					// No peer selected (shouldn't happen), fall back to round-robin
+					// No peer selected (shouldn't happen), fall back to round-robin from candidates
 					nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
-					nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
+					nodeID = candidates[nodeIdx%uint32(len(candidates))]
 				}
 
 				response, err = c.networkClient.SendSyncedAppRequest(requestCtx, nodeID, requestBytes)

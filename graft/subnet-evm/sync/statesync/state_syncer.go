@@ -120,6 +120,12 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		numWorkers = calculateOptimalWorkers()
 		log.Info("Auto-calculated optimal worker count", "workers", numWorkers, "cpuCores", runtime.NumCPU())
 	} else {
+		// Validate configured worker count to prevent excessive resource allocation
+		if numWorkers > 128 {
+			log.Warn("Configured worker count exceeds recommended maximum, capping at 128",
+				"configured", numWorkers, "capped", 128)
+			numWorkers = 128
+		}
 		log.Info("Using configured worker count", "workers", numWorkers)
 	}
 
