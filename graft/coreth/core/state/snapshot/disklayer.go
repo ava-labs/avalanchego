@@ -30,7 +30,6 @@ package snapshot
 import (
 	"bytes"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
@@ -38,7 +37,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 )
@@ -53,10 +51,15 @@ type diskLayer struct {
 	root      common.Hash // Root hash of the base snapshot
 	stale     bool        // Signals that the layer became stale (state progressed)
 
-	genMarker  []byte             // Marker for the state that's indexed during initial layer generation
-	genPending chan struct{}      // Notification channel when generation is done (test synchronicity)
-	genAbort   chan chan struct{} // Notification channel to abort generating the snapshot in this layer
-	genRunning atomic.Bool        // Tracks whether the generator goroutine is actually running
+	genMarker  []byte        // Marker for the state that's indexed during initial layer generation
+	genPending chan struct{} // Notification channel when generation is done (test synchronicity)
+
+	// Generator lifecycle management:
+	// - [cancel] is closed to request termination (broadcast).
+	// - [done] is closed by the generator goroutine on exit.
+	cancel     chan struct{}
+	done       chan struct{}
+	cancelOnce sync.Once
 
 	genStats *generatorStats // Stats for snapshot generation (generation aborted/finished if non-nil)
 
@@ -71,15 +74,11 @@ type diskLayer struct {
 // Reset() in order to not leak memory.
 // OBS: It does not invoke Close on the diskdb
 func (dl *diskLayer) Release() error {
-	log.Info("[LEAK-DEBUG] diskLayer.Release() called", "root", dl.root, "blockHash", dl.blockHash)
-	// Stop any ongoing snapshot generation to prevent it from accessing
-	// the database after it's closed during shutdown
 	dl.stopGeneration()
 
 	if dl.cache != nil {
 		dl.cache.Reset()
 	}
-	log.Info("[LEAK-DEBUG] diskLayer.Release() completed", "root", dl.root, "blockHash", dl.blockHash)
 	return nil
 }
 
@@ -211,11 +210,9 @@ func (dl *diskLayer) Update(blockHash, blockRoot common.Hash, destructs map[comm
 
 // stopGeneration aborts the state snapshot generation if it is currently running.
 func (dl *diskLayer) stopGeneration() {
-	// Check if generation goroutine is actually running.
-	//
-	// Note: genMarker can be nil even when the generator is still running (waiting
-	// for abort signal after completing generation), so we can't rely on genMarker.
-	if !dl.genRunning.Load() {
+	cancel := dl.cancel
+	done := dl.done
+	if cancel == nil || done == nil {
 		return
 	}
 
@@ -227,26 +224,8 @@ func (dl *diskLayer) stopGeneration() {
 		dl.abortStarted = time.Now()
 	}
 
-	// Use write lock to ensure only one goroutine can stop generation at a time,
-	// preventing a race where multiple callers might try to send abort signals.
-	dl.lock.Lock()
-	genAbort := dl.genAbort
-	if genAbort == nil {
-		dl.lock.Unlock()
-		return
-	}
-	// Clear genAbort immediately while holding the lock to prevent other callers
-	// from attempting to use the same channel
-	dl.genAbort = nil
-	dl.lock.Unlock()
-
-	// Perform the channel handshake without holding the lock to avoid deadlocks.
-	abort := make(chan struct{})
-	select {
-	case genAbort <- abort:
-		// Generator received the abort signal, wait for it to respond
-		<-abort
-	case <-time.After(5 * time.Second):
-		log.Error("Snapshot generator did not respond despite being marked as running")
-	}
+	dl.cancelOnce.Do(func() {
+		close(cancel)
+	})
+	<-done
 }

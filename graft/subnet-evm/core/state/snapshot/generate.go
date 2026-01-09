@@ -78,11 +78,12 @@ func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache
 		cache:      newMeteredSnapshotCache(cache * 1024 * 1024),
 		genMarker:  genMarker,
 		genPending: make(chan struct{}),
-		genAbort:   make(chan chan struct{}),
+		cancel:     make(chan struct{}),
+		done:       make(chan struct{}),
 		created:    time.Now(),
 	}
 	go base.generate(stats)
-	log.Info("[LEAK-DEBUG] Starting snapshot generation", "root", root, "blockHash", blockHash)
+	log.Debug("Start snapshot generation", "root", root)
 	return base
 }
 
@@ -126,17 +127,13 @@ func journalProgress(db ethdb.KeyValueWriter, marker []byte, stats *generatorSta
 // progress and returns true.
 func (dl *diskLayer) checkAndFlush(batch ethdb.Batch, stats *generatorStats, currentLocation []byte) bool {
 	// If we've exceeded our batch allowance or termination was requested, flush to disk
-	var abort chan struct{}
-
-	dl.lock.RLock()
-	genAbort := dl.genAbort
-	dl.lock.RUnlock()
-
+	aborting := false
 	select {
-	case abort = <-genAbort:
+	case <-dl.cancel:
+		aborting = true
 	default:
 	}
-	if batch.ValueSize() > ethdb.IdealBatchSize || abort != nil {
+	if batch.ValueSize() > ethdb.IdealBatchSize || aborting {
 		if bytes.Compare(currentLocation, dl.genMarker) < 0 {
 			log.Error("Snapshot generator went backwards",
 				"currentLocation", fmt.Sprintf("%x", currentLocation),
@@ -149,11 +146,7 @@ func (dl *diskLayer) checkAndFlush(batch ethdb.Batch, stats *generatorStats, cur
 
 		if err := batch.Write(); err != nil {
 			log.Error("Failed to flush batch", "err", err)
-			if abort == nil {
-				abort = <-genAbort
-			}
 			dl.genStats = stats
-			close(abort)
 			return true
 		}
 		batch.Reset()
@@ -162,10 +155,9 @@ func (dl *diskLayer) checkAndFlush(batch ethdb.Batch, stats *generatorStats, cur
 		dl.genMarker = currentLocation
 		dl.lock.Unlock()
 
-		if abort != nil {
+		if aborting {
 			stats.Debug("Aborting state snapshot generation", dl.root, currentLocation)
 			dl.genStats = stats
-			close(abort)
 			return true
 		}
 	}
@@ -181,16 +173,13 @@ func (dl *diskLayer) checkAndFlush(batch ethdb.Batch, stats *generatorStats, cur
 // gathering and logging, since the method surfs the blocks as they arrive, often
 // being restarted.
 func (dl *diskLayer) generate(stats *generatorStats) {
-	dl.genRunning.Store(true)
-	defer dl.genRunning.Store(false)
+	if dl.done != nil {
+		defer close(dl.done)
+	}
 
 	// If a database wipe is in operation, wait until it's done
 	if stats.wiping != nil {
 		stats.Info("Wiper running, state snapshotting paused", common.Hash{}, dl.genMarker)
-
-		dl.lock.RLock()
-		genAbort := dl.genAbort
-		dl.lock.RUnlock()
 
 		select {
 		// If wiper is done, resume normal mode of operation
@@ -198,11 +187,10 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			stats.wiping = nil
 			stats.start = time.Now()
 
-		// If generator was aborted during wipe, return
-		case abort := <-genAbort:
+		// If generator was canceled during wipe, return
+		case <-dl.cancel:
 			stats.Debug("Aborting state snapshot generation", dl.root, dl.genMarker)
 			dl.genStats = stats
-			close(abort)
 			return
 		}
 	}
@@ -212,9 +200,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	if err != nil {
 		// The account trie is missing (GC), surf the chain until one becomes available
 		stats.Info("Trie missing, state snapshotting paused", dl.root, dl.genMarker)
-		abort := <-dl.genAbort
 		dl.genStats = stats
-		close(abort)
 		return
 	}
 	stats.Debug("Resuming state snapshot generation", dl.root, dl.genMarker)
@@ -226,9 +212,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	nodeIt, err := accTrie.NodeIterator(accMarker)
 	if err != nil {
 		log.Error("Generator failed to create account iterator", "root", dl)
-		abort := <-dl.genAbort
 		dl.genStats = stats
-		close(abort)
 		return
 	}
 	accIt := trie.NewIterator(nodeIt)
@@ -269,9 +253,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			storeTrie, err := trie.NewStateTrie(storeTrieId, dl.triedb)
 			if err != nil {
 				log.Error("Generator failed to access storage trie", "root", dl.root, "account", accountHash, "stroot", acc.Root, "err", err)
-				abort := <-dl.genAbort
 				dl.genStats = stats
-				close(abort)
 				return
 			}
 			var storeMarker []byte
@@ -281,9 +263,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			nodeIt, err := storeTrie.NodeIterator(storeMarker)
 			if err != nil {
 				log.Error("Generator failed to create storage iterator", "root", dl.root, "account", accountHash, "stroot", acc.Root, "err", err)
-				abort := <-dl.genAbort
 				dl.genStats = stats
-				close(abort)
 				return
 			}
 			storeIt := trie.NewIterator(nodeIt)
@@ -299,9 +279,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			}
 			if err := storeIt.Err; err != nil {
 				log.Error("Generator failed to iterate storage trie", "accroot", dl.root, "acchash", common.BytesToHash(accIt.Key), "stroot", acc.Root, "err", err)
-				abort := <-dl.genAbort
 				dl.genStats = stats
-				close(abort)
 				return
 			}
 		}
@@ -314,9 +292,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	}
 	if err := accIt.Err; err != nil {
 		log.Error("Generator failed to iterate account trie", "root", dl.root, "err", err)
-		abort := <-dl.genAbort
 		dl.genStats = stats
-		close(abort)
 		return
 	}
 	// Snapshot fully generated, set the marker to nil.
@@ -325,9 +301,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	journalProgress(batch, nil, stats)
 	if err := batch.Write(); err != nil {
 		log.Error("Failed to flush batch", "err", err)
-		abort := <-dl.genAbort
 		dl.genStats = stats
-		close(abort)
 		return
 	}
 
@@ -338,19 +312,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	dl.genMarker = nil
 	dl.genStats = stats
 	close(dl.genPending)
-	genAbort := dl.genAbort
-	log.Info("[LEAK-DEBUG] Snapshot generation complete, waiting for abort signal", "root", dl.root, "blockHash", dl.blockHash, "genAbortIsNil", genAbort == nil)
 	dl.lock.Unlock()
-
-	// Someone will be looking for us (via stopGeneration or test cleanup), wait it out.
-	// If genAbort is nil, stopGeneration() already ran and we can exit immediately.
-	if genAbort != nil {
-		abort := <-genAbort
-		close(abort)
-		log.Info("[LEAK-DEBUG] Received abort signal and exiting cleanly", "root", dl.root, "blockHash", dl.blockHash)
-	} else {
-		log.Info("[LEAK-DEBUG] genAbort already nil, exiting immediately", "root", dl.root, "blockHash", dl.blockHash)
-	}
 }
 
 func newMeteredSnapshotCache(size int) *utils.MeteredCache {
