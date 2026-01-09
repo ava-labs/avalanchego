@@ -118,14 +118,13 @@ func (sd *StuckDetector) checkIfStuck() bool {
 		lastUpdate := sd.lastTrieUpdate.Load().(time.Time)
 		trieStuckDuration := now.Sub(lastUpdate)
 
-		// Only consider stuck if BOTH:
-		// 1. No trie completed in 30 minutes
-		// 2. No leafs are being fetched (indicates we're not processing a large trie)
-		if trieStuckDuration > noTrieTimeout && !leafsProgressing {
-			log.Error("Stuck detected: No trie completed in 30 minutes and no leaf progress",
+		// If no trie completed in 30 minutes, something is wrong
+		// Even if leafs are trickling in, a trie should eventually complete
+		if trieStuckDuration > noTrieTimeout {
+			log.Error("Stuck detected: No trie completed in 30 minutes",
 				"triesRemaining", triesRemaining,
 				"trieStuckDuration", trieStuckDuration.Round(time.Second),
-				"leafStuckDuration", leafStuckDuration.Round(time.Second))
+				"leafsProgressing", leafsProgressing)
 			return true
 		}
 	}
