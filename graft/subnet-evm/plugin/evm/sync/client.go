@@ -198,6 +198,7 @@ func (client *client) performStateCleanup(ctx context.Context) error {
 // validateStateSyncIntegrity checks if a state sync summary represents complete, valid state.
 // This is called before resuming a state sync to detect corrupted state from crashes.
 // Returns an error if the state is invalid or incomplete.
+// Respects context cancellation to allow graceful shutdown during validation.
 func (client *client) validateStateSyncIntegrity(ctx context.Context, summaryBytes []byte) error {
 	// Parse the summary (without accepting it - just for validation)
 	summary, err := client.Parser.Parse(summaryBytes, func(s message.Syncable) (block.StateSyncMode, error) {
@@ -205,6 +206,11 @@ func (client *client) validateStateSyncIntegrity(ctx context.Context, summaryByt
 	})
 	if err != nil {
 		return fmt.Errorf("summary parse failed: %w", err)
+	}
+
+	// Check for context cancellation after parse (which can be slow)
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	blockHash := summary.GetBlockHash()
@@ -218,6 +224,11 @@ func (client *client) validateStateSyncIntegrity(ctx context.Context, summaryByt
 			blockHeight, blockHash.Hex())
 	}
 
+	// Check for context cancellation between DB operations
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// Check 2: Does snapshot root match state root?
 	snapshotRoot := rawdb.ReadSnapshotRoot(client.ChaindDB)
 	if snapshotRoot == (common.Hash{}) {
@@ -228,10 +239,20 @@ func (client *client) validateStateSyncIntegrity(ctx context.Context, summaryByt
 			stateRoot.Hex(), snapshotRoot.Hex())
 	}
 
+	// Check for context cancellation between DB operations
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// Check 3: Verify snapshot generation marker exists
 	snapGen := rawdb.ReadSnapshotGenerator(client.ChaindDB)
-	if snapGen == nil {
+	if len(snapGen) == 0 {
 		return fmt.Errorf("snapshot generator marker missing")
+	}
+
+	// Check for context cancellation between DB operations
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	// Check 4: Is snapshot marked as completed?
@@ -287,8 +308,18 @@ func (client *client) GetOngoingSyncStateSummary(ctx context.Context) (block.Sta
 
 		// Cleanup the corrupted state
 		if cleanupErr := client.performStateCleanup(ctx); cleanupErr != nil {
-			log.Error("Failed to cleanup corrupted state", "error", cleanupErr)
-			// Still return ErrNotFound to force fresh start
+			// If cleanup failed due to context cancellation, it's safe to return ErrNotFound
+			// since the chain is shutting down anyway
+			if errors.Is(cleanupErr, context.Canceled) || errors.Is(cleanupErr, context.DeadlineExceeded) {
+				log.Warn("Cleanup interrupted by context cancellation", "error", cleanupErr)
+				return nil, database.ErrNotFound
+			}
+
+			// Non-context errors indicate database problems that require operator intervention
+			// to avoid infinite restart loop where we detect corruption but can't clean it
+			log.Error("CRITICAL: Failed to cleanup corrupted state - manual DB cleanup required",
+				"error", cleanupErr)
+			return nil, fmt.Errorf("corrupted state cleanup failed, summary key may remain in DB: %w", cleanupErr)
 		}
 
 		log.Info("Corrupted state cleaned up, will start fresh sync or block sync")
