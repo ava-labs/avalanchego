@@ -118,6 +118,10 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 
 	// Initialize stuck detector to monitor sync progress
 	ss.stuckDetector = NewStuckDetector(ss.stats)
+	if ss.stuckDetector == nil {
+		return nil, errors.New("failed to create stuck detector")
+	}
+	log.Info("Stuck detector created successfully")
 
 	ss.syncer = syncclient.NewCallbackLeafSyncer(config.Client, ss.segments, config.RequestSize)
 	ss.codeSyncer = newCodeSyncer(CodeSyncerConfig{
@@ -257,6 +261,7 @@ func (t *stateSync) Start(ctx context.Context) error {
 	t.cancelFunc = cancel
 
 	// Start stuck detector to monitor for stalled sync
+	log.Info("Starting stuck detector for state sync monitoring")
 	t.stuckDetector.Start(syncCtx)
 
 	// Start the code syncer and leaf syncer.

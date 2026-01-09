@@ -14,29 +14,32 @@ import (
 const (
 	// Thresholds for stuck detection
 	zeroRateTimeout     = 10 * time.Minute // No leafs fetched
-	noTrieTimeout       = 20 * time.Minute // No trie completed (reduced from 30 to fail faster)
+	noTrieTimeout       = 15 * time.Minute // No trie completed (reduced further for faster detection)
 	maxRetriesThreshold = 1000             // Excessive retries
 	checkInterval       = 1 * time.Minute  // How often to check
 
 	// Progress velocity thresholds
-	minLeafsPerMinute   = 100              // Minimum expected leaf fetch rate
-	slowProgressTimeout = 15 * time.Minute // How long to tolerate slow progress before failing
+	minLeafsPerMinute      = 100             // Minimum expected leaf fetch rate
+	slowProgressTimeout    = 10 * time.Minute // How long to tolerate slow progress (reduced from 15)
+	emergencySlowThreshold = 10              // Emergency: < 10 leafs/min
+	emergencySlowTimeout   = 5 * time.Minute // Emergency timeout for critically slow progress
 )
 
 // StuckDetector monitors state sync progress and detects when sync has stalled.
 // It tracks multiple indicators: leaf fetch rate, trie completion rate, and retry count.
 type StuckDetector struct {
-	stats               *trieSyncStats
-	lastLeafCount       atomic.Uint64
-	lastTrieCount       atomic.Uint64
-	lastLeafUpdate      atomic.Value // time.Time
-	lastTrieUpdate      atomic.Value // time.Time
-	retryCount          atomic.Uint64
-	stuckChan           chan struct{}
-	stopChan            chan struct{}
-	slowProgressStart   atomic.Value // time.Time - when slow progress was first detected
-	lastVelocityCheck   atomic.Value // time.Time
-	lastVelocityCount   atomic.Uint64 // leaf count at last velocity check
+	stats                  *trieSyncStats
+	lastLeafCount          atomic.Uint64
+	lastTrieCount          atomic.Uint64
+	lastLeafUpdate         atomic.Value // time.Time
+	lastTrieUpdate         atomic.Value // time.Time
+	retryCount             atomic.Uint64
+	stuckChan              chan struct{}
+	stopChan               chan struct{}
+	slowProgressStart      atomic.Value // time.Time - when slow progress was first detected
+	emergencySlowStart     atomic.Value // time.Time - when critically slow progress was detected
+	lastVelocityCheck      atomic.Value // time.Time
+	lastVelocityCount      atomic.Uint64 // leaf count at last velocity check
 }
 
 // NewStuckDetector creates a new stuck detector for monitoring state sync progress.
@@ -53,6 +56,15 @@ func NewStuckDetector(stats *trieSyncStats) *StuckDetector {
 
 // Start begins monitoring in a background goroutine.
 func (sd *StuckDetector) Start(ctx context.Context) {
+	if sd == nil {
+		log.Error("CRITICAL: StuckDetector.Start() called on nil detector")
+		return
+	}
+	if sd.stats == nil {
+		log.Error("CRITICAL: StuckDetector.stats is nil")
+		return
+	}
+
 	// Initialize timestamps and counters at start time
 	now := time.Now()
 	sd.lastLeafUpdate.Store(now)
@@ -64,18 +76,54 @@ func (sd *StuckDetector) Start(ctx context.Context) {
 	triesSynced, _ := sd.stats.getProgress()
 	sd.lastTrieCount.Store(uint64(triesSynced))
 
+	log.Info("Stuck detector initialization complete, starting monitor goroutine",
+		"initialLeafCount", currentLeafCount,
+		"initialTriesSynced", triesSynced)
+
 	go sd.monitorLoop(ctx)
 }
 
 // monitorLoop periodically checks for stuck conditions.
 func (sd *StuckDetector) monitorLoop(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("CRITICAL: Stuck detector goroutine panicked", "panic", r)
+		}
+	}()
+
 	ticker := time.NewTicker(checkInterval)
 	defer ticker.Stop()
 
+	log.Info("Stuck detector monitoring started")
+
+	// Check if context is already cancelled
+	select {
+	case <-ctx.Done():
+		log.Warn("Stuck detector context cancelled before first check", "err", ctx.Err())
+		return
+	default:
+		// Context is still active, proceed
+	}
+
+	checkCount := 0
 	for {
 		select {
 		case <-ticker.C:
-			if sd.checkIfStuck() {
+			checkCount++
+			stuck := sd.checkIfStuck()
+
+			// Log status every 5 checks (5 minutes) for visibility
+			if checkCount%5 == 0 {
+				triesSynced, triesRemaining := sd.stats.getProgress()
+				log.Info("Stuck detector status",
+					"checkCount", checkCount,
+					"stuck", stuck,
+					"triesSynced", triesSynced,
+					"triesRemaining", triesRemaining,
+					"totalLeafs", sd.stats.totalLeafs.Count())
+			}
+
+			if stuck {
 				log.Warn("State sync appears stuck, triggering fallback to block sync")
 				select {
 				case sd.stuckChan <- struct{}{}:
@@ -85,8 +133,10 @@ func (sd *StuckDetector) monitorLoop(ctx context.Context) {
 				return
 			}
 		case <-ctx.Done():
+			log.Info("Stuck detector stopped: context cancelled")
 			return
 		case <-sd.stopChan:
+			log.Info("Stuck detector stopped: stop signal")
 			return
 		}
 	}
@@ -94,10 +144,20 @@ func (sd *StuckDetector) monitorLoop(ctx context.Context) {
 
 // checkIfStuck evaluates multiple criteria to detect if state sync has stalled.
 func (sd *StuckDetector) checkIfStuck() bool {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("CRITICAL: checkIfStuck panicked", "panic", r)
+		}
+	}()
+
 	now := time.Now()
 
 	// Check 1: Track leaf progress
 	currentLeafCount := sd.stats.totalLeafs.Count()
+	if currentLeafCount < 0 {
+		log.Error("CRITICAL: Invalid leaf count", "count", currentLeafCount)
+		currentLeafCount = 0
+	}
 	lastLeafCount := sd.lastLeafCount.Load()
 	leafsProgressing := currentLeafCount != lastLeafCount
 
@@ -160,18 +220,56 @@ func (sd *StuckDetector) checkIfStuck() bool {
 			if leafsSinceLastCheck > 0 {
 				leafsPerMinute := float64(leafsSinceLastCheck) / timeSinceLastCheck.Minutes()
 
+				log.Debug("Velocity check",
+					"leafsSinceLastCheck", leafsSinceLastCheck,
+					"timeSinceLastCheck", timeSinceLastCheck.Round(time.Second),
+					"leafsPerMinute", int(leafsPerMinute),
+					"minExpected", minLeafsPerMinute)
+
+				// Emergency check: critically slow progress
+				if leafsPerMinute < emergencySlowThreshold {
+					emergencySlowStart := sd.emergencySlowStart.Load()
+					if emergencySlowStart == nil {
+						sd.emergencySlowStart.Store(now)
+						log.Error("CRITICALLY slow sync progress detected - emergency timer started",
+							"leafsPerMinute", int(leafsPerMinute),
+							"emergencyThreshold", emergencySlowThreshold,
+							"willTriggerIn", emergencySlowTimeout)
+					} else {
+						emergencyDuration := now.Sub(emergencySlowStart.(time.Time))
+						if emergencyDuration > emergencySlowTimeout {
+							log.Error("Stuck detected: CRITICALLY slow progress for extended period",
+								"leafsPerMinute", int(leafsPerMinute),
+								"emergencyThreshold", emergencySlowThreshold,
+								"emergencyDuration", emergencyDuration.Round(time.Second))
+							return true
+						}
+					}
+				} else {
+					// Reset emergency tracking if above critical threshold
+					sd.emergencySlowStart.Store(nil)
+				}
+
+				// Normal slow progress check
 				if leafsPerMinute < minLeafsPerMinute {
 					// Progress is too slow
 					slowProgressStart := sd.slowProgressStart.Load()
 					if slowProgressStart == nil {
 						// First time detecting slow progress
 						sd.slowProgressStart.Store(now)
-						log.Warn("Slow sync progress detected",
+						log.Warn("Slow sync progress detected - starting slow progress timer",
 							"leafsPerMinute", int(leafsPerMinute),
-							"minExpected", minLeafsPerMinute)
+							"minExpected", minLeafsPerMinute,
+							"willTriggerIn", slowProgressTimeout)
 					} else {
 						// Check how long we've been slow
 						slowDuration := now.Sub(slowProgressStart.(time.Time))
+						log.Warn("Slow sync progress continues",
+							"leafsPerMinute", int(leafsPerMinute),
+							"minExpected", minLeafsPerMinute,
+							"slowDuration", slowDuration.Round(time.Second),
+							"timeout", slowProgressTimeout)
+
 						if slowDuration > slowProgressTimeout {
 							log.Error("Stuck detected: Progress too slow for extended period",
 								"leafsPerMinute", int(leafsPerMinute),
@@ -182,8 +280,18 @@ func (sd *StuckDetector) checkIfStuck() bool {
 					}
 				} else {
 					// Progress is acceptable, reset slow progress tracking
-					sd.slowProgressStart.Store(nil)
+					slowProgressStart := sd.slowProgressStart.Load()
+					if slowProgressStart != nil {
+						log.Info("Sync progress recovered to acceptable rate",
+							"leafsPerMinute", int(leafsPerMinute))
+						sd.slowProgressStart.Store(nil)
+					}
 				}
+			} else {
+				// No progress at all - this will be caught by Check 1 (zero rate timeout)
+				log.Debug("No leafs fetched since last velocity check",
+					"lastVelocityCount", lastVelocityCount,
+					"currentLeafCount", currentLeafCount)
 			}
 
 			// Update velocity tracking
