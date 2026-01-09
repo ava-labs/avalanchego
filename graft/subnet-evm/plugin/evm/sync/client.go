@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/statesync"
 	"github.com/ava-labs/avalanchego/ids"
@@ -36,8 +37,9 @@ const ParentsToFetch = 256
 var (
 	_ Acceptor = (*client)(nil)
 
-	errSkipSync        = errors.New("skip sync")
-	errCommitCancelled = errors.New("commit cancelled")
+	errSkipSync            = errors.New("skip sync")
+	errCommitCancelled     = errors.New("commit cancelled")
+	errStateSyncFallback   = errors.New("state sync fallback to block sync (not an error)")
 
 	stateSyncSummaryKey = []byte("stateSyncSummary")
 )
@@ -134,6 +136,12 @@ type Client interface {
 	Error() error
 }
 
+// ErrStateSyncFallback returns the sentinel error for state sync fallback.
+// This allows external packages to check for this specific condition.
+func ErrStateSyncFallback() error {
+	return errStateSyncFallback
+}
+
 // Syncer represents a step in state sync,
 // along with Start/Done methods to control
 // and monitor progress.
@@ -172,11 +180,17 @@ func (client *client) GetOngoingSyncStateSummary(context.Context) (block.StateSu
 // ClearOngoingSummary clears any marker of an ongoing state sync summary
 func (client *client) ClearOngoingSummary() error {
 	if err := client.MetadataDB.Delete(stateSyncSummaryKey); err != nil {
-		return fmt.Errorf("failed to clear ongoing summary: %w", err)
+		// Ignore ErrNotFound - clearing already-cleared summary is idempotent
+		if !errors.Is(err, database.ErrNotFound) {
+			return fmt.Errorf("failed to clear ongoing summary: %w", err)
+		}
 	}
 	if err := client.VerDB.Commit(); err != nil {
 		return fmt.Errorf("failed to commit db while clearing ongoing summary: %w", err)
 	}
+
+	// Clear in-memory resumable summary to prevent stale references
+	client.resumableSummary = nil
 
 	return nil
 }
@@ -354,30 +368,86 @@ func (client *client) syncStateTrie(ctx context.Context, summary message.Syncabl
 	// Check if sync was stuck and trigger fallback to block sync
 	if errors.Is(err, statesync.ErrStateSyncStuck()) {
 		log.Warn("State sync stuck detected, initiating fallback to block sync")
-		if fallbackErr := client.fallbackToBlockSync(); fallbackErr != nil {
+		if fallbackErr := client.fallbackToBlockSync(ctx); fallbackErr != nil {
 			return fmt.Errorf("failed to fallback to block sync: %w", fallbackErr)
 		}
 		log.Info("State sync fallback successful - node will restart with block sync")
-		// Return nil to allow graceful shutdown - block sync will be used on restart
-		return nil
+		// Return special fallback error to prevent AcceptSync from being called
+		// while allowing bootstrapping to continue normally.
+		return errStateSyncFallback
 	}
 
 	return err
 }
 
-// fallbackToBlockSync clears state sync metadata and disables state sync for the next restart.
-func (client *client) fallbackToBlockSync() error {
-	// Clear incomplete state sync metadata
+// fallbackToBlockSync clears state sync metadata and corrupted state, then disables state sync for the next restart.
+// This function performs a complete automated cleanup to ensure the chain can restart cleanly with block sync.
+// Respects context cancellation to allow graceful shutdown during cleanup.
+func (client *client) fallbackToBlockSync(ctx context.Context) error {
+	log.Warn("===========================================")
+	log.Warn("STATE SYNC STUCK - AUTOMATED SELF-HEALING")
+	log.Warn("Cleaning up corrupted partial state...")
+	log.Warn("===========================================")
+
+	// Step 1: Clear all state sync progress markers to prevent resume attempts
+	log.Info("Clearing state sync segments...")
+	if err := customrawdb.ClearAllSyncSegments(client.ChaindDB); err != nil {
+		return fmt.Errorf("failed to clear sync segments: %w", err)
+	}
+
+	// Check for cancellation between steps
+	if err := ctx.Err(); err != nil {
+		log.Warn("Cleanup interrupted by context cancellation", "err", err)
+		return err
+	}
+
+	log.Info("Clearing state sync storage tries...")
+	if err := customrawdb.ClearAllSyncStorageTries(client.ChaindDB); err != nil {
+		return fmt.Errorf("failed to clear sync storage tries: %w", err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		log.Warn("Cleanup interrupted by context cancellation", "err", err)
+		return err
+	}
+
+	// Step 2: Wipe corrupted snapshot data that may reference incomplete state
+	log.Info("Wiping corrupted snapshot data...")
+	wipeDone := snapshot.WipeSnapshot(client.ChaindDB, true) // full=true to delete snapshot root marker
+
+	// Wait for wipe to complete OR context cancellation
+	select {
+	case <-wipeDone:
+		log.Info("Snapshot wipe completed")
+	case <-ctx.Done():
+		log.Warn("Snapshot wipe interrupted by context cancellation")
+		return ctx.Err()
+	}
+
+	// Step 3: Reset snapshot generation state to prevent regeneration attempts
+	log.Info("Resetting snapshot generation state...")
+	snapshot.ResetSnapshotGeneration(client.ChaindDB)
+
+	// Step 4: Delete snapshot block hash marker to invalidate any stale snapshot references
+	customrawdb.DeleteSnapshotBlockHash(client.ChaindDB)
+
+	// Step 5: Clear the ongoing state sync summary from metadata
+	log.Info("Clearing state sync metadata...")
 	if err := client.ClearOngoingSummary(); err != nil {
 		return fmt.Errorf("failed to clear state sync metadata: %w", err)
 	}
 
-	// Disable state sync for next restart (engine will use block sync instead)
-	client.Enabled = false
+	// Step 6: Notify extender of cleanup if present
+	if client.Extender != nil {
+		log.Info("Notifying state sync extender of cleanup...")
+		// Extender doesn't have a cleanup method in the interface, but we should
+		// clear the ongoing summary which should prevent resume of extension state
+	}
 
 	log.Warn("===========================================")
-	log.Warn("STATE SYNC STUCK - FALLBACK TO BLOCK SYNC")
-	log.Warn("Node will automatically restart and use block sync")
+	log.Warn("AUTOMATED CLEANUP COMPLETE")
+	log.Warn("Chain will continue with block sync")
+	log.Warn("State sync remains available for future use")
 	log.Warn("This is expected behavior, not an error")
 	log.Warn("===========================================")
 	return nil

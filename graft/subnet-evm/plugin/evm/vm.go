@@ -789,7 +789,12 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 func (vm *VM) onBootstrapStarted() error {
 	vm.bootstrapped.Set(false)
 	if err := vm.Client.Error(); err != nil {
-		return err
+		// errStateSyncFallback is not a real error - it indicates successful cleanup
+		// after stuck detection, and bootstrapping should continue with block sync.
+		if !errors.Is(err, vmsync.ErrStateSyncFallback()) {
+			return err
+		}
+		log.Info("State sync fallback completed, continuing with block sync")
 	}
 	// After starting bootstrapping, do not attempt to resume a previous state sync.
 	if err := vm.Client.ClearOngoingSummary(); err != nil {
