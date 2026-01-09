@@ -33,6 +33,7 @@ type StuckDetector struct {
 }
 
 // NewStuckDetector creates a new stuck detector for monitoring state sync progress.
+// Must be called before Start() to ensure proper initialization of atomic values.
 func NewStuckDetector(stats *trieSyncStats) *StuckDetector {
 	sd := &StuckDetector{
 		stats:     stats,
@@ -95,13 +96,14 @@ func (sd *StuckDetector) checkIfStuck() bool {
 	}
 
 	// Check 2: No trie completion
-	currentTrieCount := uint64(sd.stats.triesSynced)
+	triesSynced, triesRemaining := sd.stats.getProgress()
+	currentTrieCount := uint64(triesSynced)
 	lastTrieCount := sd.lastTrieCount.Load()
 	if currentTrieCount == lastTrieCount {
 		lastUpdate := sd.lastTrieUpdate.Load().(time.Time)
 		if now.Sub(lastUpdate) > noTrieTimeout {
 			log.Error("Stuck detected: No trie completed in 30 minutes",
-				"triesRemaining", sd.stats.triesRemaining)
+				"triesRemaining", triesRemaining)
 			return true
 		}
 	} else {

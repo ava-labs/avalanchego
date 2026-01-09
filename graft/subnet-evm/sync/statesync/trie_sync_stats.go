@@ -152,6 +152,15 @@ func (t *trieSyncStats) setTriesRemaining(triesRemaining int) {
 	t.triesStartTime = time.Now()
 }
 
+// getProgress returns the current trie sync progress under lock.
+// Returns (triesSynced, triesRemaining) to avoid race conditions.
+func (t *trieSyncStats) getProgress() (int, int) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return t.triesSynced, t.triesRemaining
+}
+
 // roundETA rounds [d] to a minute and chops off the "0s" suffix
 // returns "<1m" if [d] rounds to 0 minutes.
 func roundETA(d time.Duration) string {
