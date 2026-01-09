@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/log"
@@ -35,10 +36,12 @@ type LeafSyncTask interface {
 }
 
 type CallbackLeafSyncer struct {
-	client      LeafClient
-	done        chan error
-	tasks       <-chan LeafSyncTask
-	requestSize uint16
+	client           LeafClient
+	done             chan error
+	tasks            <-chan LeafSyncTask
+	requestSize      uint16
+	adaptiveSize     atomic.Uint32 // Current adaptive request size
+	consecutiveFailures atomic.Uint32
 }
 
 type LeafClient interface {
@@ -49,12 +52,14 @@ type LeafClient interface {
 
 // NewCallbackLeafSyncer creates a new syncer object to perform leaf sync of tries.
 func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, requestSize uint16) *CallbackLeafSyncer {
-	return &CallbackLeafSyncer{
+	syncer := &CallbackLeafSyncer{
 		client:      client,
 		done:        make(chan error),
 		tasks:       tasks,
 		requestSize: requestSize,
 	}
+	syncer.adaptiveSize.Store(uint32(requestSize))
+	return syncer
 }
 
 // workerLoop reads from [c.tasks] and calls [c.syncTask] until [ctx] is finished
@@ -95,15 +100,46 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 			return err
 		}
 
+		// Use adaptive request size
+		currentSize := uint16(c.adaptiveSize.Load())
+
 		leafsResponse, err := c.client.GetLeafs(ctx, message.LeafsRequest{
 			Root:     root,
 			Account:  task.Account(),
 			Start:    start,
-			Limit:    c.requestSize,
+			Limit:    currentSize,
 			NodeType: message.StateTrieNode,
 		})
 		if err != nil {
+			// On failure, reduce request size to improve success rate
+			c.consecutiveFailures.Add(1)
+			failures := c.consecutiveFailures.Load()
+			if failures >= 3 && currentSize > 64 {
+				newSize := currentSize / 2
+				if newSize < 64 {
+					newSize = 64 // Minimum request size
+				}
+				c.adaptiveSize.Store(uint32(newSize))
+				log.Debug("Reducing adaptive request size due to failures",
+					"oldSize", currentSize,
+					"newSize", newSize,
+					"failures", failures)
+			}
 			return fmt.Errorf("%w: %w", errFailedToFetchLeafs, err)
+		}
+
+		// On success, reset failure counter and consider increasing size
+		c.consecutiveFailures.Store(0)
+		if currentSize < c.requestSize {
+			// Gradually increase back to configured max
+			newSize := currentSize * 2
+			if newSize > c.requestSize {
+				newSize = c.requestSize
+			}
+			c.adaptiveSize.Store(uint32(newSize))
+			log.Debug("Increasing adaptive request size after success",
+				"oldSize", currentSize,
+				"newSize", newSize)
 		}
 
 		// resize [leafsResponse.Keys] and [leafsResponse.Vals] in case

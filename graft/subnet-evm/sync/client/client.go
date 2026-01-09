@@ -32,11 +32,17 @@ import (
 
 const (
 	failedRequestSleepInterval = 10 * time.Millisecond
-	peerBlacklistDuration      = 2 * time.Minute // How long to avoid a peer after consecutive failures
-	maxConsecutiveFailures     = 3               // Consecutive failures before blacklisting
+	peerBlacklistDuration      = 2 * time.Minute  // How long to avoid a peer after consecutive failures
+	maxConsecutiveFailures     = 3                // Consecutive failures before blacklisting
 	perRequestTimeout          = 30 * time.Second // Timeout for individual request attempts
+	maxRetriesPerRequest       = 50               // Maximum retries before giving up on a request
+	retryWarningThreshold      = 20               // Log warning when retries exceed this
 
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
+)
+
+var (
+	errTooManyRetries = errors.New("request failed after too many retries")
 )
 
 // exponentialBackoff calculates exponential backoff delay with a maximum cap.
@@ -381,8 +387,22 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 		numElements  int
 		lastErr      error
 	)
-	// Loop until the context is cancelled or we get a valid response.
+	// Loop until the context is cancelled, we get a valid response, or hit retry limit
 	for attempt := 0; ; attempt++ {
+		// Check retry limit to prevent infinite loops
+		if attempt >= maxRetriesPerRequest {
+			return nil, fmt.Errorf("%w: %d attempts, last error: %v", errTooManyRetries, attempt, lastErr)
+		}
+
+		// Log warning when approaching retry limit
+		if attempt == retryWarningThreshold {
+			log.Warn("Request retry count high, may be stuck",
+				"attempt", attempt,
+				"maxRetries", maxRetriesPerRequest,
+				"request", request,
+				"lastErr", lastErr)
+		}
+
 		// If the context has finished, return the context error early.
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			if lastErr != nil {
