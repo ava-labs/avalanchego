@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/triedb"
 	"golang.org/x/sync/errgroup"
 
@@ -291,7 +292,7 @@ func (t *stateSync) Start(ctx context.Context) error {
 			log.Warn("Stuck detected, canceling state sync to trigger fallback",
 				"triesSynced", triesSynced,
 				"triesRemaining", triesRemaining,
-				"totalLeafs", t.stats.totalLeafs.Count())
+				"totalLeafs", t.stats.totalLeafs.Count64())
 			cancel() // Cancel sync to trigger fallback
 			return errStateSyncStuck
 		case <-egCtx.Done():
