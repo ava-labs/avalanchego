@@ -70,7 +70,7 @@ func (sd *StuckDetector) Start(ctx context.Context) {
 	sd.lastLeafUpdate.Store(now)
 	sd.lastTrieUpdate.Store(now)
 	sd.lastVelocityCheck.Store(now)
-	currentLeafCount := sd.stats.totalLeafs.Count64()
+	currentLeafCount := uint64(sd.stats.totalLeafs.Count64())
 	sd.lastLeafCount.Store(currentLeafCount)
 	sd.lastVelocityCount.Store(currentLeafCount)
 	triesSynced, _ := sd.stats.getProgress()
@@ -153,11 +153,7 @@ func (sd *StuckDetector) checkIfStuck() bool {
 	now := time.Now()
 
 	// Check 1: Track leaf progress
-	currentLeafCount := sd.stats.totalLeafs.Count64()
-	if currentLeafCount < 0 {
-		log.Error("CRITICAL: Invalid leaf count", "count", currentLeafCount)
-		currentLeafCount = 0
-	}
+	currentLeafCount := uint64(sd.stats.totalLeafs.Count64())
 	lastLeafCount := sd.lastLeafCount.Load()
 	leafsProgressing := currentLeafCount != lastLeafCount
 
@@ -215,7 +211,13 @@ func (sd *StuckDetector) checkIfStuck() bool {
 
 		if timeSinceLastCheck >= checkInterval {
 			lastVelocityCount := sd.lastVelocityCount.Load()
-			leafsSinceLastCheck := currentLeafCount - int64(lastVelocityCount)
+			var leafsSinceLastCheck int64
+			if currentLeafCount >= lastVelocityCount {
+				leafsSinceLastCheck = int64(currentLeafCount - lastVelocityCount)
+			} else {
+				// Handle counter overflow or reset
+				leafsSinceLastCheck = 0
+			}
 
 			if leafsSinceLastCheck > 0 {
 				leafsPerMinute := float64(leafsSinceLastCheck) / timeSinceLastCheck.Minutes()
@@ -296,7 +298,7 @@ func (sd *StuckDetector) checkIfStuck() bool {
 
 			// Update velocity tracking
 			sd.lastVelocityCheck.Store(now)
-			sd.lastVelocityCount.Store(uint64(currentLeafCount))
+			sd.lastVelocityCount.Store(currentLeafCount)
 		}
 	}
 
