@@ -71,8 +71,9 @@ type codeSyncer struct {
 	codeHashes            chan common.Hash // Channel of incoming code hash requests
 
 	// Used to set terminal error or pass nil to [errChan] if successful.
-	errOnce sync.Once
-	errChan chan error
+	errOnce    sync.Once
+	errChan    chan error
+	notifyOnce sync.Once // Ensures notifyAccountTrieCompleted is only called once
 
 	// Passed in details from the context used to start the codeSyncer
 	cancel context.CancelFunc
@@ -381,8 +382,11 @@ func (c *codeSyncer) addCode(codeHashes []common.Hash) error {
 // code hashes from syncing the account trie, so it only needs to complete its outstanding
 // work.
 // Note: this allows the worker threads to exit and return a nil error.
+// This method is safe to call multiple times (idempotent).
 func (c *codeSyncer) notifyAccountTrieCompleted() {
-	close(c.codeHashes)
+	c.notifyOnce.Do(func() {
+		close(c.codeHashes)
+	})
 }
 
 // addHashesToQueue adds [codeHashes] to the queue and blocks until it is able to do so.

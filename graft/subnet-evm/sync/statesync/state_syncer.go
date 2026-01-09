@@ -105,8 +105,14 @@ type stateSync struct {
 	stuckDetector      *StuckDetector // monitors for stalled sync and triggers fallback
 
 	// context cancellation management
-	cancelFunc context.CancelFunc
-	started    atomic.Bool // prevents multiple Start() calls
+	cancelFunc            context.CancelFunc
+	started               atomic.Bool    // prevents multiple Start() calls
+	waitStarted           atomic.Bool    // prevents multiple Wait() calls
+	cachedResult          atomic.Value   // stores *error from first Wait() call for reuse
+	resultReady           chan struct{}  // closed when cachedResult is available
+	mainTrieDoneOnce      sync.Once      // ensures mainTrieDone channel is closed only once
+	segmentsDoneOnce      sync.Once      // ensures segments channel is closed only once
+	storageTriesDoneOnce  sync.Once      // ensures storageTriesDone channel is closed only once
 }
 
 func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
@@ -154,6 +160,7 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		mainTrieDone:     make(chan struct{}),
 		storageTriesDone: make(chan struct{}),
 		done:             make(chan error, 1),
+		resultReady:      make(chan struct{}),
 	}
 
 	// Initialize stuck detector to monitor sync progress
@@ -202,8 +209,10 @@ func (t *stateSync) onStorageTrieFinished(root common.Hash) error {
 	if numInProgress == 0 {
 		select {
 		case <-t.storageTriesDone:
-			// when the last storage trie finishes, close the segments channel
-			close(t.segments)
+			// when the last storage trie finishes, close the segments channel (safe to call multiple times)
+			t.segmentsDoneOnce.Do(func() {
+				close(t.segments)
+			})
 		default:
 		}
 	}
@@ -221,8 +230,10 @@ func (t *stateSync) onMainTrieFinished() error {
 	}
 	t.stats.setTriesRemaining(numStorageTries)
 
-	// mark the main trie done
-	close(t.mainTrieDone)
+	// mark the main trie done (safe to call multiple times)
+	t.mainTrieDoneOnce.Do(func() {
+		close(t.mainTrieDone)
+	})
 	_, err = t.removeTrieInProgress(t.root)
 	return err
 }
@@ -261,7 +272,9 @@ func (t *stateSync) storageTrieProducer(ctx context.Context) error {
 		}
 		// If there are no storage tries, then root will be the empty hash on the first pass.
 		if root == (common.Hash{}) && !more {
-			close(t.segments)
+			t.segmentsDoneOnce.Do(func() {
+				close(t.segments)
+			})
 			return nil
 		}
 
@@ -284,7 +297,9 @@ func (t *stateSync) storageTrieProducer(ctx context.Context) error {
 		}
 		t.addTrieInProgress(root, storageTrie)
 		if !more {
-			close(t.storageTriesDone)
+			t.storageTriesDoneOnce.Do(func() {
+				close(t.storageTriesDone)
+			})
 		}
 		// start syncing after tracking the trie as in progress
 		storageTrie.startSyncing()
@@ -450,14 +465,39 @@ func (t *stateSync) Wait(ctx context.Context) error {
 		return errWaitBeforeStart
 	}
 
+	// Check if Wait() was already called - return cached result
+	if !t.waitStarted.CompareAndSwap(false, true) {
+		// Another goroutine already called Wait() - wait for result to be ready
+		<-t.resultReady // Block until first Wait() completes and closes this channel
+
+		// Now safe to load cached result
+		result := t.cachedResult.Load()
+		if result == nil {
+			return errors.New("internal error: resultReady closed but cachedResult is nil")
+		}
+
+		// Safe type assertion with comma-ok pattern
+		errPtr, ok := result.(*error)
+		if !ok {
+			return errors.New("internal error: cachedResult has wrong type")
+		}
+		return *errPtr
+	}
+
+	var resultErr error
 	select {
 	case err := <-t.done:
-		return err
+		resultErr = err
 	case <-ctx.Done():
 		t.cancelFunc() // cancel the sync operations if the context is done
 		<-t.done       // wait for the sync operations to finish
-		return ctx.Err()
+		resultErr = ctx.Err()
 	}
+
+	// Cache the result for future Wait() calls and signal they can proceed
+	t.cachedResult.Store(&resultErr)
+	close(t.resultReady) // Signal that result is now available
+	return resultErr
 }
 
 // addTrieInProgress tracks the root as being currently synced.

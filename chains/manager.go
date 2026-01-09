@@ -1396,47 +1396,14 @@ func (m *manager) createSnowmanChain(
 		Bootstrapped:                   bootstrapFunc,
 	}
 
-	// Create a mutable reference for the RequestStateSyncRetry callback
-	// This will be populated after the state syncer is created.
-	// We store the unwrapped syncer to access the Restart method even when tracing is enabled.
-	var (
-		stateSyncerRef     common.StateSyncer
-		retryRequestID     uint32 = 100000 // Start high to avoid conflicts with normal operation
-		stateSyncRetryCount atomic.Int32
-	)
+	// RequestStateSyncRetry callback for stuck detector
+	// Note: State sync restart is not currently supported. The stuck detector
+	// will trigger fallback to block sync instead, which is slower but reliable.
+	// This callback is provided for future enhancement.
 	bootstrapCfg.RequestStateSyncRetry = func(ctx context.Context) error {
-		retryCount := stateSyncRetryCount.Add(1)
-
-		// Limit retries to prevent infinite loop
-		const maxStateSyncRetries = 3
-		if retryCount > maxStateSyncRetries {
-			return fmt.Errorf("state sync retry limit exceeded (%d attempts)", retryCount)
-		}
-
-		if stateSyncerRef == nil {
-			return fmt.Errorf("state syncer not initialized")
-		}
-
-		m.Log.Warn("Retrying state sync after failure/stuck detection",
-			"chainID", chainParams.ID,
-			"attempt", retryCount,
-			"maxRetries", maxStateSyncRetries)
-
-		// Cast to access Restart method
-		type restartable interface {
-			Restart(ctx context.Context, startReqID uint32) error
-		}
-		if rs, ok := stateSyncerRef.(restartable); ok {
-			// Increment request ID for each retry to avoid message conflicts
-			retryRequestID++
-			err := rs.Restart(ctx, retryRequestID)
-			if err == nil {
-				// Reset counter on successful restart
-				stateSyncRetryCount.Store(0)
-			}
-			return err
-		}
-		return fmt.Errorf("state syncer does not support restart")
+		m.Log.Warn("State sync restart requested but not supported, will use block sync fallback",
+			"chainID", chainParams.ID)
+		return fmt.Errorf("state sync restart not supported, use block sync fallback")
 	}
 
 	var bootstrapper common.BootstrapableEngine
