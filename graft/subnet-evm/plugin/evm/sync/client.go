@@ -143,79 +143,8 @@ func ErrStateSyncFallback() error {
 	return errStateSyncFallback
 }
 
-// DetectAndCleanCorruptedState checks for incomplete state sync data from previous crashes
-// and automatically cleans it up. This handles cases where the chain crashed during state sync,
-// leaving partial data that prevents restart.
-func (client *client) DetectAndCleanCorruptedState(ctx context.Context) error {
-	// Check if there's an ongoing state sync summary
-	summaryBytes, err := client.MetadataDB.Get(stateSyncSummaryKey)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			// No ongoing summary - nothing to clean
-			return nil
-		}
-		return fmt.Errorf("failed to check for ongoing summary: %w", err)
-	}
-
-	// Found an ongoing summary - check if state sync actually completed
-	summary, err := client.Parser.Parse(summaryBytes, func(s message.Syncable) (block.StateSyncMode, error) {
-		// Don't actually start sync - just parse to validate
-		return block.StateSyncSkipped, nil
-	})
-	if err != nil {
-		log.Warn("Found corrupted state sync summary, will clean up", "err", err)
-		// Can't parse summary - definitely corrupted, clean it up
-		return client.cleanupCorruptedState(ctx)
-	}
-
-	// Check if the synced block actually exists in the chain
-	blockHash := summary.GetBlockHash()
-	blockHeight := summary.Height()
-
-	block := rawdb.ReadBlock(client.ChaindDB, blockHash, blockHeight)
-	if block == nil {
-		log.Warn("Found incomplete state sync data from previous crash",
-			"expectedBlock", blockHash.Hex(),
-			"height", blockHeight)
-		return client.cleanupCorruptedState(ctx)
-	}
-
-	// Check if snapshot root exists (written by ResetToStateSyncedBlock on successful sync)
-	stateRoot := summary.GetBlockRoot()
-	snapshotRoot := rawdb.ReadSnapshotRoot(client.ChaindDB)
-	if snapshotRoot != stateRoot {
-		log.Warn("Found incomplete state sync from previous crash",
-			"expectedRoot", stateRoot.Hex(),
-			"snapshotRoot", snapshotRoot.Hex(),
-			"blockHash", blockHash.Hex())
-		return client.cleanupCorruptedState(ctx)
-	}
-
-	// State appears valid - no cleanup needed
-	log.Debug("Resumable state sync data appears valid", "block", blockHash.Hex())
-	return nil
-}
-
-// cleanupCorruptedState performs the same cleanup as fallbackToBlockSync but for startup recovery
-func (client *client) cleanupCorruptedState(ctx context.Context) error {
-	log.Warn("===========================================")
-	log.Warn("CORRUPTED STATE DETECTED - AUTO CLEANUP")
-	log.Warn("Cleaning up partial state from previous crash...")
-	log.Warn("===========================================")
-
-	// Reuse the same cleanup logic from fallbackToBlockSync
-	if err := client.performStateCleanup(ctx); err != nil {
-		return fmt.Errorf("failed to cleanup corrupted state: %w", err)
-	}
-
-	log.Warn("===========================================")
-	log.Warn("STARTUP CLEANUP COMPLETE")
-	log.Warn("Chain will start fresh with block sync")
-	log.Warn("===========================================")
-	return nil
-}
-
-// performStateCleanup contains the shared cleanup logic used by both runtime fallback and startup recovery
+// performStateCleanup contains the shared cleanup logic used by both runtime fallback and startup validation.
+// This removes all partial state sync data to allow a fresh start.
 func (client *client) performStateCleanup(ctx context.Context) error {
 	// Step 1: Clear all state sync progress markers
 	log.Info("Clearing state sync segments...")
@@ -266,6 +195,61 @@ func (client *client) performStateCleanup(ctx context.Context) error {
 	return nil
 }
 
+// validateStateSyncIntegrity checks if a state sync summary represents complete, valid state.
+// This is called before resuming a state sync to detect corrupted state from crashes.
+// Returns an error if the state is invalid or incomplete.
+func (client *client) validateStateSyncIntegrity(ctx context.Context, summaryBytes []byte) error {
+	// Parse the summary (without accepting it - just for validation)
+	summary, err := client.Parser.Parse(summaryBytes, func(s message.Syncable) (block.StateSyncMode, error) {
+		return block.StateSyncSkipped, nil // Just parse, don't accept
+	})
+	if err != nil {
+		return fmt.Errorf("summary parse failed: %w", err)
+	}
+
+	blockHash := summary.GetBlockHash()
+	blockHeight := summary.Height()
+	stateRoot := summary.GetBlockRoot()
+
+	// Check 1: Does the synced block exist in chainDB?
+	block := rawdb.ReadBlock(client.ChaindDB, blockHash, blockHeight)
+	if block == nil {
+		return fmt.Errorf("synced block not found in chainDB: height=%d hash=%s",
+			blockHeight, blockHash.Hex())
+	}
+
+	// Check 2: Does snapshot root match state root?
+	snapshotRoot := rawdb.ReadSnapshotRoot(client.ChaindDB)
+	if snapshotRoot == (common.Hash{}) {
+		return fmt.Errorf("snapshot root is empty/missing")
+	}
+	if snapshotRoot != stateRoot {
+		return fmt.Errorf("snapshot root mismatch: expected=%s got=%s",
+			stateRoot.Hex(), snapshotRoot.Hex())
+	}
+
+	// Check 3: Verify snapshot generation marker exists
+	snapGen := rawdb.ReadSnapshotGenerator(client.ChaindDB)
+	if snapGen == nil {
+		return fmt.Errorf("snapshot generator marker missing")
+	}
+
+	// Check 4: Is snapshot marked as completed?
+	// If recovery number exists and is > 0, snapshot generation is still in progress
+	recovering := rawdb.ReadSnapshotRecoveryNumber(client.ChaindDB)
+	if recovering != nil && *recovering > 0 {
+		return fmt.Errorf("snapshot recovery still in progress: %d accounts remaining", *recovering)
+	}
+
+	log.Debug("State sync integrity checks passed",
+		"blockHeight", blockHeight,
+		"blockHash", blockHash.Hex(),
+		"stateRoot", stateRoot.Hex(),
+		"snapshotRoot", snapshotRoot.Hex())
+
+	return nil
+}
+
 // Syncer represents a step in state sync,
 // along with Start/Done methods to control
 // and monitor progress.
@@ -282,8 +266,9 @@ func (client *client) StateSyncEnabled(context.Context) (bool, error) {
 
 // GetOngoingSyncStateSummary returns a state summary that was previously started
 // and not finished, and sets [resumableSummary] if one was found.
-// Returns [database.ErrNotFound] if no ongoing summary is found or if [client.skipResume] is true.
-func (client *client) GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error) {
+// Returns [database.ErrNotFound] if no ongoing summary is found, if [client.skipResume] is true,
+// or if the ongoing summary fails integrity validation (indicating corrupted state from a crash).
+func (client *client) GetOngoingSyncStateSummary(ctx context.Context) (block.StateSummary, error) {
 	if client.SkipResume {
 		return nil, database.ErrNotFound
 	}
@@ -293,10 +278,37 @@ func (client *client) GetOngoingSyncStateSummary(context.Context) (block.StateSu
 		return nil, err // includes the [database.ErrNotFound] case
 	}
 
+	// Validate state integrity before resuming - detects corrupted state from crashes
+	log.Info("Found ongoing state sync summary, validating integrity before resume")
+
+	if err := client.validateStateSyncIntegrity(ctx, summaryBytes); err != nil {
+		log.Warn("State sync integrity check failed, cleaning up corrupted data",
+			"error", err)
+
+		// Cleanup the corrupted state
+		if cleanupErr := client.performStateCleanup(ctx); cleanupErr != nil {
+			log.Error("Failed to cleanup corrupted state", "error", cleanupErr)
+			// Still return ErrNotFound to force fresh start
+		}
+
+		log.Info("Corrupted state cleaned up, will start fresh sync or block sync")
+
+		// Return ErrNotFound to tell engine there's no resumable state
+		// This forces the engine to start fresh state sync or fall back to block sync
+		return nil, database.ErrNotFound
+	}
+
+	// State is valid, parse and return
 	summary, err := client.Parser.Parse(summaryBytes, client.acceptSyncSummary)
 	if err != nil {
+		log.Error("Failed to parse validated summary", "error", err)
 		return nil, fmt.Errorf("failed to parse saved state sync summary to SyncSummary: %w", err)
 	}
+
+	log.Info("State sync integrity validated, safe to resume",
+		"blockHeight", summary.Height(),
+		"blockHash", summary.GetBlockHash().Hex())
+
 	client.resumableSummary = summary
 	return summary, nil
 }
