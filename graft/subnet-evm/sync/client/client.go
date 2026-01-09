@@ -556,12 +556,25 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 					candidates = c.stateSyncNodes
 				}
 
-				// Select best peer based on latency and success rate metrics
-				nodeID = c.metricsTracker.selectBestPeer(candidates)
-				if nodeID == (ids.NodeID{}) {
-					// No peer selected (shouldn't happen), fall back to round-robin from candidates
+				// For code requests, use aggressive round-robin rotation to quickly try different peers
+				// since we've observed peers accepting requests but not responding (timeout)
+				if isCodeRequest {
+					// Force round-robin rotation for code requests to avoid stuck peers
 					nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
 					nodeID = candidates[nodeIdx%uint32(len(candidates))]
+					if attempt == 0 {
+						log.Debug("Code request - using round-robin peer selection",
+							"peer", nodeID,
+							"numCandidates", len(candidates))
+					}
+				} else {
+					// For other requests, use best peer based on latency and success rate metrics
+					nodeID = c.metricsTracker.selectBestPeer(candidates)
+					if nodeID == (ids.NodeID{}) {
+						// No peer selected (shouldn't happen), fall back to round-robin from candidates
+						nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
+						nodeID = candidates[nodeIdx%uint32(len(candidates))]
+					}
 				}
 
 				response, err = c.networkClient.SendSyncedAppRequest(requestCtx, nodeID, requestBytes)
@@ -578,7 +591,24 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 				c.metricsTracker.recordRequest(nodeID, time.Since(start), false) // Record failed request
 			}
 			ctx = append(ctx, "attempt", attempt, "request", request, "err", err)
-			log.Debug("request failed, retrying", ctx...)
+
+			// Enhanced logging for code requests to diagnose peer issues
+			if isCodeRequest {
+				if err == nil || err.Error() == "" {
+					log.Warn("Code request timeout - peer not responding",
+						"nodeID", nodeID,
+						"attempt", attempt,
+						"latency", time.Since(start))
+				} else {
+					log.Warn("Code request failed, retrying with different peer",
+						"nodeID", nodeID,
+						"attempt", attempt,
+						"err", err)
+				}
+			} else {
+				log.Debug("request failed, retrying", ctx...)
+			}
+
 			metric.IncFailed()
 			c.networkClient.TrackBandwidth(nodeID, 0)
 			// Use exponential backoff to avoid wasting time on repeatedly failing peers

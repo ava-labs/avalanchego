@@ -23,6 +23,9 @@ const (
 	slowProgressTimeout    = 6 * time.Minute  // REDUCED from 10min - Slow progress tolerance
 	emergencySlowThreshold = 10               // Emergency: < 10 leafs/min
 	emergencySlowTimeout   = 3 * time.Minute  // REDUCED from 5min - Emergency timeout
+
+	// Code sync specific timeouts (even faster since code sync failures are peer-related)
+	codeSyncZeroProgressTimeout = 2 * time.Minute // Faster detection for code sync phase
 )
 
 // StuckDetector monitors state sync progress and detects when sync has stalled.
@@ -41,6 +44,8 @@ type StuckDetector struct {
 	emergencySlowStart     atomic.Value // *time.Time - when critically slow progress was detected (nil = not slow)
 	lastVelocityCheck      atomic.Value // *time.Time
 	lastVelocityCount      atomic.Uint64 // leaf count at last velocity check
+	codeSyncPhaseStart     atomic.Value  // *time.Time - when code sync phase started (nil = not in code sync)
+	inCodeSyncPhase        atomic.Bool   // true if currently in code sync phase
 }
 
 // NewStuckDetector creates a new stuck detector for monitoring state sync progress.
@@ -223,6 +228,34 @@ func (sd *StuckDetector) checkIfStuck() bool {
 		return true
 	}
 
+	// Check 3.5: Code sync phase timeout (faster detection for peer unavailability)
+	if sd.inCodeSyncPhase.Load() {
+		codeSyncStartPtr := sd.codeSyncPhaseStart.Load()
+		if codeSyncStartPtr != nil {
+			codeSyncStart := codeSyncStartPtr.(*time.Time)
+			if codeSyncStart != nil {
+				codeSyncDuration := now.Sub(*codeSyncStart)
+
+				// If in code sync phase and no progress for 2 minutes, likely peers don't have data
+				if !leafsProgressing && codeSyncDuration > codeSyncZeroProgressTimeout {
+					log.Error("Stuck detected: Code sync phase timeout - peers likely don't have code data",
+						"codeSyncDuration", codeSyncDuration.Round(time.Second),
+						"timeout", codeSyncZeroProgressTimeout,
+						"lastLeafCount", currentLeafCount)
+					return true
+				}
+
+				// Log progress during code sync
+				if codeSyncDuration > 30*time.Second {
+					log.Debug("Code sync in progress",
+						"duration", codeSyncDuration.Round(time.Second),
+						"leafsProgressing", leafsProgressing,
+						"timeout", codeSyncZeroProgressTimeout)
+				}
+			}
+		}
+	}
+
 	// Check 4: Progress velocity - is progress happening but too slowly?
 	lastVelocityCheckPtr := sd.lastVelocityCheck.Load().(*time.Time)
 	if lastVelocityCheckPtr != nil {
@@ -338,6 +371,25 @@ func (sd *StuckDetector) RecordRetry() {
 // ResetRetries resets the retry counter. Should be called after a successful request.
 func (sd *StuckDetector) ResetRetries() {
 	sd.retryCount.Store(0)
+}
+
+// EnterCodeSyncPhase marks the beginning of code sync phase for faster stuck detection.
+// Code sync failures (peers not having data) should be detected faster than trie sync issues.
+func (sd *StuckDetector) EnterCodeSyncPhase() {
+	if sd.inCodeSyncPhase.CompareAndSwap(false, true) {
+		now := time.Now()
+		sd.codeSyncPhaseStart.Store(&now)
+		log.Info("Entered code sync phase - using faster stuck detection",
+			"timeout", codeSyncZeroProgressTimeout)
+	}
+}
+
+// ExitCodeSyncPhase marks the end of code sync phase.
+func (sd *StuckDetector) ExitCodeSyncPhase() {
+	if sd.inCodeSyncPhase.CompareAndSwap(true, false) {
+		sd.codeSyncPhaseStart.Store((*time.Time)(nil))
+		log.Info("Exited code sync phase")
+	}
 }
 
 // StuckChannel returns a channel that will receive a signal when stuck is detected.

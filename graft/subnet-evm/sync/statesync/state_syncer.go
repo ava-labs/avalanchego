@@ -495,6 +495,29 @@ func (t *stateSync) doStart(ctx context.Context) error {
 		}
 	})
 
+	// Monitor for code sync phase to enable faster stuck detection
+	eg.Go(func() error {
+		// Wait for main trie and storage tries to complete
+		select {
+		case <-t.mainTrieDone:
+			// Main trie done, now wait for storage tries
+			select {
+			case <-t.storageTriesDone:
+				// Both done, now primarily in code sync phase
+				t.stuckDetector.EnterCodeSyncPhase()
+			case <-egCtx.Done():
+				return nil
+			}
+		case <-egCtx.Done():
+			return nil
+		}
+
+		// Wait for completion or cancellation
+		<-egCtx.Done()
+		t.stuckDetector.ExitCodeSyncPhase()
+		return nil
+	})
+
 	// The errgroup wait will take care of returning the first error that occurs, or returning
 	// nil if all finish without an error.
 	go func() {
