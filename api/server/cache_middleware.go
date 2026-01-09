@@ -52,6 +52,7 @@ func DefaultRPCCacheConfig() RPCCacheConfig {
 
 type cacheEntry struct {
 	response  []byte
+	headers   http.Header
 	timestamp time.Time
 	status    int
 }
@@ -209,9 +210,19 @@ func (rc *rpcCache) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Normalize nil params (BUG #13 fix)
-		if len(rpcReq.Params) == 0 || string(rpcReq.Params) == "null" {
+		// Normalize nil/empty params (BUG #13 and #19 fix)
+		paramStr := string(rpcReq.Params)
+		if len(rpcReq.Params) == 0 || paramStr == "null" || paramStr == "{}" {
 			rpcReq.Params = json.RawMessage("[]")
+		} else {
+			// Canonicalize JSON to handle whitespace variations (BUG #18 fix)
+			var params interface{}
+			if err := json.Unmarshal(rpcReq.Params, &params); err == nil {
+				if canonical, err := json.Marshal(params); err == nil {
+					rpcReq.Params = canonical
+				}
+				// If marshal fails, use original params
+			}
 		}
 
 		// Generate cache key
@@ -224,7 +235,10 @@ func (rc *rpcCache) Middleware(next http.Handler) http.Handler {
 			responseCopy := make([]byte, len(entry.response))
 			copy(responseCopy, entry.response)
 
-			w.Header().Set("Content-Type", "application/json")
+			// Restore cached headers (BUG #16 fix)
+			for k, v := range entry.headers {
+				w.Header()[k] = v
+			}
 			w.Header().Set("X-Cache", "HIT")
 			w.WriteHeader(entry.status)
 			// Log write errors (BUG #6 fix)
@@ -253,8 +267,15 @@ func (rc *rpcCache) Middleware(next http.Handler) http.Handler {
 		if recorder.statusCode == http.StatusOK {
 			// Check max response size (BUG #8 fix)
 			if len(responseBytes) <= MaxResponseSize {
+				// Capture headers (BUG #16 fix)
+				headers := make(http.Header)
+				for k, v := range recorder.Header() {
+					headers[k] = v
+				}
+
 				rc.put(cacheKey, &cacheEntry{
 					response:  responseBytes,
+					headers:   headers,
 					timestamp: time.Now(),
 					status:    recorder.statusCode,
 				})

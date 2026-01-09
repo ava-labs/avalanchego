@@ -557,3 +557,138 @@ func TestRPCCache_ResponseRecorderMultipleWriteHeader(t *testing.T) {
 	recorder.WriteHeader(http.StatusInternalServerError)
 	require.Equal(http.StatusOK, recorder.statusCode, "Second WriteHeader should be ignored")
 }
+
+// Test for BUG #16 fix: Response headers cached
+func TestRPCCache_HeadersCached(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	callCount := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Custom-Header", "test-value")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"jsonrpc":"2.0","result":"0x123","id":1}`))
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	// First request (cache MISS)
+	req1 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x0000000000000000000000000000000000000000","latest"],"id":1}`))
+	rec1 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec1, req1)
+
+	require.Equal(1, callCount)
+	require.Equal("MISS", rec1.Header().Get("X-Cache"))
+	require.Equal("test-value", rec1.Header().Get("X-Custom-Header"))
+
+	// Second request (cache HIT)
+	req2 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x0000000000000000000000000000000000000000","latest"],"id":1}`))
+	rec2 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec2, req2)
+
+	require.Equal(1, callCount, "Second request should hit cache")
+	require.Equal("HIT", rec2.Header().Get("X-Cache"))
+	require.Equal("test-value", rec2.Header().Get("X-Custom-Header"), "Custom header should be cached")
+	require.Equal("application/json", rec2.Header().Get("Content-Type"), "Content-Type should be cached")
+}
+
+// Test for BUG #18 fix: JSON whitespace normalization
+func TestRPCCache_JSONWhitespaceNormalization(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	callCount := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"jsonrpc":"2.0","result":"0x123","id":1}`))
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	// Request with whitespace
+	req1 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_call","params":[1, 2, 3],"id":1}`))
+	rec1 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec1, req1)
+	require.Equal(1, callCount)
+
+	// Request without whitespace (should hit same cache)
+	req2 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_call","params":[1,2,3],"id":1}`))
+	rec2 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec2, req2)
+
+	require.Equal(1, callCount, "Whitespace variations should hit same cache")
+	require.Equal("HIT", rec2.Header().Get("X-Cache"))
+}
+
+// Test for BUG #19 fix: Empty object normalization
+func TestRPCCache_EmptyObjectNormalization(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	callCount := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"jsonrpc":"2.0","result":"0x123","id":1}`))
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	// Request with empty object
+	req1 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"net_version","params":{},"id":1}`))
+	rec1 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec1, req1)
+	require.Equal(1, callCount)
+
+	// Request with empty array (should hit same cache)
+	req2 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"net_version","params":[],"id":1}`))
+	rec2 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec2, req2)
+
+	require.Equal(1, callCount, "Empty object and empty array should hit same cache")
+	require.Equal("HIT", rec2.Header().Get("X-Cache"))
+
+	// Request with null params (should also hit same cache)
+	req3 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"net_version","params":null,"id":1}`))
+	rec3 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec3, req3)
+
+	require.Equal(1, callCount, "Null params should also hit same cache")
+	require.Equal("HIT", rec3.Header().Get("X-Cache"))
+}
