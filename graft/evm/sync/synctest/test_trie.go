@@ -187,7 +187,7 @@ func FillAccounts(
 			acc = onAccount(t, i, key.Address, acc, storageTr)
 			root, nodes, err := storageTr.Commit(false)
 			require.NoError(t, err)
-			if root != types.EmptyRootHash {
+			if root != types.EmptyRootHash && nodes != nil {
 				require.NoError(t, mergedSet.Merge(nodes))
 				acc.Root = root
 			}
@@ -206,7 +206,7 @@ func FillAccounts(
 }
 
 func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.Database, numAccounts int) common.Hash {
-	newRoot, _ := FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
+	newRoot, _ := FillAccounts(t, r, serverDB, types.EmptyRootHash, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
 		codeBytes := make([]byte, 256)
 		_, err := r.Read(codeBytes)
 		require.NoError(t, err, "error reading random code bytes")
