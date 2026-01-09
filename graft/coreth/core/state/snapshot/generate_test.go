@@ -46,12 +46,13 @@ import (
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
+	"go.uber.org/goleak"
 	"golang.org/x/crypto/sha3"
 )
 
 func TestMain(m *testing.M) {
 	customtypes.Register()
-	os.Exit(m.Run())
+	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 
 var testBlockHash = common.HexToHash("0xdeadbeef")
@@ -99,10 +100,10 @@ func testGeneration(t *testing.T, scheme string) {
 	}
 	checkSnapRoot(t, snap, root)
 
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Tests that snapshot generation with existent flat state.
@@ -140,10 +141,10 @@ func testGenerateExistentState(t *testing.T, scheme string) {
 	}
 	checkSnapRoot(t, snap, root)
 
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func checkSnapRoot(t *testing.T, snap *diskLayer, trieRoot common.Hash) {
@@ -355,10 +356,10 @@ func testGenerateExistentStateWithWrongStorage(t *testing.T, scheme string) {
 		t.Errorf("Snapshot generation failed")
 	}
 	checkSnapRoot(t, snap, root)
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Tests that snapshot generation with existent flat state, where the flat state
@@ -418,10 +419,10 @@ func testGenerateExistentStateWithWrongAccounts(t *testing.T, scheme string) {
 	}
 	checkSnapRoot(t, snap, root)
 
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Tests that snapshot generation errors out correctly in case of a missing trie
@@ -458,10 +459,10 @@ func testGenerateCorruptAccountTrie(t *testing.T, scheme string) {
 	case <-time.After(250 * time.Millisecond):
 		// Not generated fast enough, hopefully blocked inside on missing trie node fail
 	}
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Tests that snapshot generation errors out correctly in case of a missing root
@@ -502,10 +503,10 @@ func testGenerateMissingStorageTrie(t *testing.T, scheme string) {
 	case <-time.After(250 * time.Millisecond):
 		// Not generated fast enough, hopefully blocked inside on missing trie node fail
 	}
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Tests that snapshot generation errors out correctly in case of a missing trie
@@ -544,10 +545,10 @@ func testGenerateCorruptStorageTrie(t *testing.T, scheme string) {
 	case <-time.After(250 * time.Millisecond):
 		// Not generated fast enough, hopefully blocked inside on missing trie node fail
 	}
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Tests that snapshot generation when an extra account with storage exists in the snap state.
@@ -609,10 +610,10 @@ func testGenerateWithExtraAccounts(t *testing.T, scheme string) {
 	}
 	checkSnapRoot(t, snap, root)
 
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 	// If we now inspect the snap db, there should exist no extraneous storage items
 	if data := rawdb.ReadStorageSnapshot(helper.diskdb, hashData([]byte("acc-2")), hashData([]byte("b-key-1"))); data != nil {
 		t.Fatalf("expected slot to be removed, got %v", string(data))
@@ -670,10 +671,10 @@ func testGenerateWithManyExtraAccounts(t *testing.T, scheme string) {
 		t.Errorf("Snapshot generation failed")
 	}
 	checkSnapRoot(t, snap, root)
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Tests this case
@@ -718,10 +719,10 @@ func testGenerateWithExtraBeforeAndAfter(t *testing.T, scheme string) {
 		t.Errorf("Snapshot generation failed")
 	}
 	checkSnapRoot(t, snap, root)
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestGenerateWithMalformedSnapdata tests what happes if we have some junk
@@ -757,10 +758,10 @@ func testGenerateWithMalformedSnapdata(t *testing.T, scheme string) {
 		t.Errorf("Snapshot generation failed")
 	}
 	checkSnapRoot(t, snap, root)
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 	// If we now inspect the snap db, there should exist no extraneous storage items
 	if data := rawdb.ReadStorageSnapshot(helper.diskdb, hashData([]byte("acc-2")), hashData([]byte("b-key-1"))); data != nil {
 		t.Fatalf("expected slot to be removed, got %v", string(data))
@@ -792,10 +793,10 @@ func testGenerateFromEmptySnap(t *testing.T, scheme string) {
 		t.Errorf("Snapshot generation failed")
 	}
 	checkSnapRoot(t, snap, root)
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Tests that snapshot generation with existent flat state, where the flat state
@@ -842,10 +843,10 @@ func testGenerateWithIncompleteStorage(t *testing.T, scheme string) {
 		t.Errorf("Snapshot generation failed")
 	}
 	checkSnapRoot(t, snap, root)
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func incKey(key []byte) []byte {
@@ -938,10 +939,10 @@ func testGenerateCompleteSnapshotWithDanglingStorage(t *testing.T, scheme string
 	}
 	checkSnapRoot(t, snap, root)
 
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Tests that snapshot generation with dangling storages. Dangling storage means
@@ -975,8 +976,53 @@ func testGenerateBrokenSnapshotWithDanglingStorage(t *testing.T, scheme string) 
 	}
 	checkSnapRoot(t, snap, root)
 
-	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan struct{})
-	snap.genAbort <- stop
-	<-stop
+	// Stop the generator (if still running) and wait for it to exit.
+	if err := snap.Release(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestReleaseStopsGeneration verifies that Release() properly stops ongoing
+// snapshot generation without hanging. This prevents a race condition during
+// shutdown where the generator could access the database after it's closed.
+//
+// The generator goroutine waits for an abort signal even after completing
+// generation successfully. Without calling stopGeneration(), Release() would
+// leave the generator hanging forever, which could prevent clean shutdown.
+func TestReleaseStopsGeneration(t *testing.T) {
+	testReleaseStopsGeneration(t, rawdb.HashScheme)
+	testReleaseStopsGeneration(t, rawdb.PathScheme)
+}
+
+func testReleaseStopsGeneration(t *testing.T, scheme string) {
+	var helper = newHelper(scheme)
+	stRoot := helper.makeStorageTrie(common.Hash{}, []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, false)
+
+	helper.addTrieAccount("acc-1", &types.StateAccount{Balance: uint256.NewInt(1), Root: stRoot, CodeHash: types.EmptyCodeHash.Bytes()})
+	helper.addTrieAccount("acc-2", &types.StateAccount{Balance: uint256.NewInt(2), Root: types.EmptyRootHash, CodeHash: types.EmptyCodeHash.Bytes()})
+	helper.addTrieAccount("acc-3", &types.StateAccount{Balance: uint256.NewInt(3), Root: stRoot, CodeHash: types.EmptyCodeHash.Bytes()})
+
+	helper.makeStorageTrie(hashData([]byte("acc-1")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
+	helper.makeStorageTrie(hashData([]byte("acc-3")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
+
+	_, snap := helper.CommitAndGenerate()
+
+	select {
+	case <-snap.genPending:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Snapshot generation failed")
+	}
+
+	// Call Release() - this should stop generation gracefully without hanging
+	done := make(chan struct{})
+	go func() {
+		snap.Release()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Release() hung - stopGeneration() was likely not called")
+	}
 }
