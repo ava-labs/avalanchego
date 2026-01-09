@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -86,6 +87,11 @@ type Syncer struct {
 	// lastHeight is the greatest height for which key / values
 	// were last inserted into the [atomicTrie]
 	lastHeight uint64
+
+	// Track sync progress for diagnostics
+	totalKeysReceived   int    // Total number of keys processed
+	lastCommittedRoot   common.Hash // Last committed root for validation
+	commitCount         int    // Number of commits performed
 }
 
 // NewSyncer returns a new syncer instance that will sync the atomic trie from the network.
@@ -168,9 +174,12 @@ func (s *Syncer) onLeafs(ctx context.Context, keys [][]byte, values [][]byte) er
 		return err
 	}
 
+	s.totalKeysReceived += len(keys)
+
 	for i, key := range keys {
 		if len(key) != atomicstate.TrieKeyLength {
-			return fmt.Errorf("unexpected key len (%d) in atomic trie sync", len(key))
+			return fmt.Errorf("unexpected key len (%d) in atomic trie sync at key %d (expected %d)",
+				len(key), i, atomicstate.TrieKeyLength)
 		}
 		// key = height + blockchainID
 		height := binary.BigEndian.Uint64(key[:wrappers.LongLen])
@@ -179,35 +188,48 @@ func (s *Syncer) onLeafs(ctx context.Context, keys [][]byte, values [][]byte) er
 			// the trie at the previous height before adding this key.
 			root, nodes, err := s.trie.Commit(false)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to commit trie at height %d: %w", s.lastHeight, err)
 			}
 			if err := s.atomicTrie.InsertTrie(nodes, root); err != nil {
-				return err
+				return fmt.Errorf("failed to insert trie nodes at height %d: %w", s.lastHeight, err)
 			}
 			// AcceptTrie commits the trieDB and returns [isCommit] as true
 			// if we have reached or crossed a commit interval.
 			isCommit, err := s.atomicTrie.AcceptTrie(s.lastHeight, root)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to accept trie at height %d: %w", s.lastHeight, err)
 			}
+
+			s.commitCount++
+			s.lastCommittedRoot = root
+
 			if isCommit {
 				// Flush pending changes to disk to preserve progress and
 				// free up memory if the trieDB was committed.
 				if err := s.db.Commit(); err != nil {
-					return err
+					return fmt.Errorf("failed to commit database at height %d: %w", s.lastHeight, err)
 				}
+
+				// Log progress every database commit for visibility
+				log.Info("Atomic trie sync progress",
+					"lastHeight", s.lastHeight,
+					"newHeight", height,
+					"committedRoot", root.Hex()[:16]+"...",
+					"targetRoot", s.targetRoot.Hex()[:16]+"...",
+					"totalKeys", s.totalKeysReceived,
+					"commits", s.commitCount)
 			}
 			// Trie must be re-opened after committing (not safe for re-use after commit)
 			trie, err := s.atomicTrie.OpenTrie(root)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to reopen trie after commit at height %d: %w", s.lastHeight, err)
 			}
 			s.trie = trie
 			s.lastHeight = height
 		}
 
 		if err := s.trie.Update(key, values[i]); err != nil {
-			return err
+			return fmt.Errorf("failed to update trie with key at index %d: %w", i, err)
 		}
 	}
 	return nil
@@ -219,23 +241,56 @@ func (s *Syncer) onFinish() error {
 	// commit the trie on finish
 	root, nodes, err := s.trie.Commit(false)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to commit atomic trie: %w", err)
 	}
 	if err := s.atomicTrie.InsertTrie(nodes, root); err != nil {
-		return err
+		return fmt.Errorf("failed to insert trie nodes: %w", err)
 	}
 	if _, err := s.atomicTrie.AcceptTrie(s.targetHeight, root); err != nil {
-		return err
+		return fmt.Errorf("failed to accept trie at height %d: %w", s.targetHeight, err)
 	}
 	if err := s.db.Commit(); err != nil {
-		return err
+		return fmt.Errorf("failed to commit database: %w", err)
 	}
 
-	// the root of the trie should always match the targetRoot  since we already verified the proofs,
-	// here we check the root mainly for correctness of the atomicTrie's pointers and it should never fail.
+	// CRITICAL: Verify the synced root matches the target root.
+	// This validates that all data received from peers was correct and consistent.
+	// If this fails, it indicates:
+	// - Peers provided inconsistent data across multiple requests
+	// - Data corruption during network transmission
+	// - Database corruption during incremental commits
+	// - Race condition in atomic state updates
 	if s.targetRoot != root {
-		return fmt.Errorf("synced root (%s) does not match expected (%s) for atomic trie ", root, s.targetRoot)
+		log.Error("FATAL: Atomic state sync root mismatch detected!",
+			"syncedRoot", root.Hex(),
+			"expectedRoot", s.targetRoot.Hex(),
+			"targetHeight", s.targetHeight,
+			"lastHeight", s.lastHeight,
+			"totalKeys", s.totalKeysReceived,
+			"commits", s.commitCount,
+			"lastCommittedRoot", s.lastCommittedRoot.Hex())
+
+		return fmt.Errorf(
+			"FATAL ERROR! C-Chain atomic state sync failed with root mismatch:\n"+
+				"  - Synced root: %s\n"+
+				"  - Expected root: %s\n"+
+				"  - Target height: %d\n"+
+				"  - Last height processed: %d\n"+
+				"  - Total keys received: %d\n"+
+				"  - Commits performed: %d\n"+
+				"  - Last committed root: %s\n"+
+				"  - This indicates data corruption or peer inconsistency.\n"+
+				"  - RECOMMENDED ACTION: Clear atomic state sync progress and retry from scratch.\n"+
+				"  - If this persists, try different bootstrap peers.",
+			root.Hex(), s.targetRoot.Hex(), s.targetHeight, s.lastHeight,
+			s.totalKeysReceived, s.commitCount, s.lastCommittedRoot.Hex())
 	}
+
+	log.Info("Atomic state sync completed successfully!",
+		"targetHeight", s.targetHeight,
+		"root", root.Hex(),
+		"totalKeys", s.totalKeysReceived,
+		"commits", s.commitCount)
 	return nil
 }
 
