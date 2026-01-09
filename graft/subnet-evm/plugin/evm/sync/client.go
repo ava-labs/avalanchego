@@ -150,6 +150,12 @@ func ErrStateSyncFallback() error {
 func (client *client) clearSyncProgress(ctx context.Context) error {
 	log.Info("Clearing state sync progress (preserving summary for reviver)...")
 
+	// CRITICAL: Mark cleanup as in-progress for crash recovery
+	// If we crash mid-cleanup, on restart we'll detect this marker and complete cleanup
+	if err := customrawdb.MarkCleanupInProgress(client.ChaindDB); err != nil {
+		return fmt.Errorf("failed to mark cleanup in progress: %w", err)
+	}
+
 	// Step 1: Clear all state sync progress markers
 	log.Info("Clearing state sync segments...")
 	if err := customrawdb.ClearAllSyncSegments(client.ChaindDB); err != nil {
@@ -175,9 +181,17 @@ func (client *client) clearSyncProgress(ctx context.Context) error {
 	log.Info("Wiping snapshot data...")
 	wipeDone := snapshot.WipeSnapshot(client.ChaindDB, true)
 
+	// CRITICAL: WipeSnapshot only closes the channel on SUCCESS
+	// If wipe fails (e.g., disk full, I/O error), the channel is never closed
+	// We must detect this with a timeout to avoid hanging forever
+	wipeTimeout := time.After(5 * time.Minute) // Generous timeout for large databases
+
 	select {
 	case <-wipeDone:
-		log.Info("Snapshot wipe completed")
+		log.Info("Snapshot wipe completed successfully")
+	case <-wipeTimeout:
+		log.Error("Snapshot wipe timed out after 5 minutes - likely failed")
+		return fmt.Errorf("snapshot wipe timed out, state may be corrupted")
 	case <-ctx.Done():
 		log.Warn("Snapshot wipe interrupted by context cancellation")
 		return ctx.Err()
@@ -191,6 +205,12 @@ func (client *client) clearSyncProgress(ctx context.Context) error {
 	customrawdb.DeleteSnapshotBlockHash(client.ChaindDB)
 
 	// CRITICAL: Do NOT clear the ongoing summary - preserve for reviver
+
+	// Clear the cleanup-in-progress marker to indicate successful completion
+	if err := customrawdb.ClearCleanupInProgress(client.ChaindDB); err != nil {
+		log.Warn("Failed to clear cleanup marker (non-fatal)", "err", err)
+	}
+
 	log.Info("Sync progress cleared successfully (summary preserved for resume)")
 	return nil
 }
@@ -408,6 +428,21 @@ func (client *client) ClearOngoingSummary() error {
 // This should be called on startup before attempting any state sync operations.
 // Returns nil if no corruption detected or if cleanup succeeded.
 func (client *client) DetectAndCleanCorruptedState(ctx context.Context) error {
+	// CRITICAL: Check for interrupted cleanup from previous crash
+	// If cleanup was interrupted mid-operation, complete it now
+	cleanupInProgress, err := customrawdb.IsCleanupInProgress(client.ChaindDB)
+	if err != nil {
+		return fmt.Errorf("failed to check cleanup marker: %w", err)
+	}
+	if cleanupInProgress {
+		log.Warn("Detected interrupted cleanup from previous crash, completing now...")
+		if err := client.clearSyncProgress(ctx); err != nil {
+			log.Error("Failed to complete interrupted cleanup", "err", err)
+			return fmt.Errorf("failed to complete interrupted cleanup: %w", err)
+		}
+		log.Info("Successfully completed interrupted cleanup")
+	}
+
 	// Check if there's an ongoing state sync summary
 	summaryBytes, err := client.MetadataDB.Get(stateSyncSummaryKey)
 	if err != nil {

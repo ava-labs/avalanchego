@@ -38,6 +38,9 @@ var (
 	// CodeToFetchPrefix is the prefix for code hashes that need to be fetched.
 	// CodeToFetchPrefix + code hash -> empty value tracks the outstanding code hashes we need to fetch.
 	CodeToFetchPrefix = []byte("CP")
+	// cleanupInProgressKey tracks whether cleanup is currently in progress
+	// Used to detect and recover from interrupted cleanup operations (e.g., crash during cleanup)
+	cleanupInProgressKey = []byte("cleanup_in_progress")
 )
 
 // State sync progress key lengths

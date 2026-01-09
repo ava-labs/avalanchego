@@ -222,3 +222,21 @@ func clearPrefix(db ethdb.KeyValueStore, prefix []byte, keyLen int) error {
 	}
 	return batch.Write()
 }
+
+// IsCleanupInProgress checks if a state sync cleanup operation is in progress.
+// Used to detect and recover from interrupted cleanup operations (e.g., crash during cleanup).
+func IsCleanupInProgress(db ethdb.KeyValueReader) (bool, error) {
+	return db.Has(cleanupInProgressKey)
+}
+
+// MarkCleanupInProgress marks that a state sync cleanup operation is starting.
+// This marker is used to detect interrupted cleanup and complete it on restart.
+func MarkCleanupInProgress(db ethdb.KeyValueWriter) error {
+	return db.Put(cleanupInProgressKey, []byte{1})
+}
+
+// ClearCleanupInProgress removes the cleanup-in-progress marker after successful completion.
+// This indicates that cleanup finished successfully and doesn't need to be resumed.
+func ClearCleanupInProgress(db ethdb.KeyValueWriter) error {
+	return db.Delete(cleanupInProgressKey)
+}

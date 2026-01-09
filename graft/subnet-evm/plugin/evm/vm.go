@@ -800,10 +800,11 @@ func (vm *VM) onBootstrapStarted() error {
 		}
 		log.Info("State sync fallback completed, continuing with block sync")
 	}
-	// After starting bootstrapping, do not attempt to resume a previous state sync.
-	if err := vm.Client.ClearOngoingSummary(); err != nil {
-		return err
-	}
+
+	// CRITICAL: Do NOT clear summary here - it must be preserved for reviver
+	// The summary will be cleared in onNormalOperationsStarted() after successful bootstrap
+	// This allows the reviver to detect resumable state and retry state sync if appropriate
+
 	// Ensure snapshots are initialized before bootstrapping (i.e., if state sync is skipped).
 	// Note calling this function has no effect if snapshots are already initialized.
 	vm.blockChain.InitializeSnapshots()
@@ -816,6 +817,19 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return nil
 	}
 	vm.bootstrapped.Set(true)
+
+	// CRITICAL: Clear any remaining state sync summary after successful bootstrap
+	// This prevents stale state sync metadata from causing unwanted retries on next restart
+	// The summary is preserved during fallback to allow reviver to work, but must be
+	// cleaned up once we've successfully bootstrapped via block sync
+	if err := vm.Client.ClearOngoingSummary(); err != nil {
+		log.Warn("Failed to clear state sync summary after bootstrap completion",
+			"err", err)
+		// Don't fail the entire bootstrap for this - just log the warning
+		// The summary will be validated/cleared on next restart if corrupted
+	} else {
+		log.Info("Cleared state sync summary after successful bootstrap completion")
+	}
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel

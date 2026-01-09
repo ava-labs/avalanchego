@@ -102,8 +102,9 @@ type stateSync struct {
 	lock            sync.RWMutex
 	triesInProgress map[common.Hash]*trieToSync
 
-	// Mutex to protect Restart() from concurrent calls
-	restartMutex sync.Mutex
+	// Mutex to protect Start() and Restart() from running concurrently
+	// This prevents race conditions between manual state sync and reviver-triggered restarts
+	syncMutex sync.Mutex
 
 	// track completion and progress of work
 	mainTrieDone       chan struct{}
@@ -146,6 +147,15 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 			numWorkers = 128
 		}
 		log.Info("Using configured worker count", "workers", numWorkers)
+	}
+
+	// CRITICAL: Enforce minimum worker count to prevent deadlock
+	// With numWorkers < 2, if the main trie holds the semaphore, storage tries can't be processed
+	// This causes a deadlock where main trie waits for storage tries, but storage tries can't start
+	if numWorkers < 2 {
+		log.Warn("Worker count too low, enforcing minimum of 2 to prevent deadlock",
+			"configured", numWorkers, "enforced", 2)
+		numWorkers = 2
 	}
 
 	ss := &stateSync{
@@ -374,6 +384,11 @@ func shouldFallbackToBlockSync(err error) bool {
 }
 
 func (t *stateSync) Start(ctx context.Context) error {
+	// CRITICAL: Acquire syncMutex to prevent concurrent Start()/Restart() calls
+	// This ensures mutual exclusion between manual state sync and reviver retries
+	t.syncMutex.Lock()
+	defer t.syncMutex.Unlock()
+
 	// Prevent multiple Start() calls
 	if !t.started.CompareAndSwap(false, true) {
 		return errors.New("state sync already started")
@@ -523,9 +538,10 @@ func (t *stateSync) Wait(ctx context.Context) error {
 // The concurrency guards (sync.Once, cachedResult) prevent issues from multiple calls.
 // This method recreates all channels, workers, and internal state for a fresh start.
 func (t *stateSync) Restart(ctx context.Context, startReqID uint32) error {
-	// Protect against concurrent Restart() calls
-	t.restartMutex.Lock()
-	defer t.restartMutex.Unlock()
+	// CRITICAL: Acquire syncMutex to prevent concurrent Start()/Restart() calls
+	// This ensures mutual exclusion between manual state sync and reviver retries
+	t.syncMutex.Lock()
+	defer t.syncMutex.Unlock()
 
 	// Check if a sync is currently running
 	if t.started.Load() {
@@ -542,7 +558,21 @@ func (t *stateSync) Restart(ctx context.Context, startReqID uint32) error {
 	t.started.Store(false)
 	t.waitStarted.Store(false)
 
-	// Clear cancelFunc from previous run (Start() will create a new one)
+	// CRITICAL: Cancel old context to stop any lingering goroutines
+	// This prevents goroutine leaks from failed previous attempts
+	if t.cancelFunc != nil {
+		log.Info("Cancelling previous state sync context to cleanup goroutines")
+		t.cancelFunc() // Cancel old context first
+
+		// Wait for previous sync to fully cleanup
+		// The done channel will be closed when all goroutines exit
+		select {
+		case <-t.done:
+			log.Info("Previous state sync cleanup completed")
+		case <-time.After(10 * time.Second):
+			log.Warn("Timeout waiting for previous sync cleanup, proceeding anyway")
+		}
+	}
 	t.cancelFunc = nil
 
 	// Recreate all channels (old ones are closed)
