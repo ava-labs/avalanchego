@@ -51,9 +51,6 @@ type TrieDB struct {
 	// and the latest state can be modified at any time.
 	Firewood *ffi.Database
 
-	// kvStore is used for storing recovery information.
-	kvStore ethdb.Database
-
 	// possible temporarily holds proposals created during a trie update.
 	// This is cleared after the update is complete and the proposals have been sent to the database.
 	// It's unexpected for multiple updates to this to occur simultaneously, but a lock is used to ensure safety.
@@ -123,8 +120,8 @@ func DefaultConfig(dir string) TrieDBConfig {
 // BackendConstructor implements the [triedb.DBConstructor] interface.
 // It creates a new Firewood database with the given configuration.
 // Any error during creation will cause the program to exit.
-func (c TrieDBConfig) BackendConstructor(disk ethdb.Database) triedb.DBOverride {
-	db, err := New(c, disk)
+func (c TrieDBConfig) BackendConstructor(ethdb.Database) triedb.DBOverride {
+	db, err := New(c)
 	if err != nil {
 		log.Crit("firewood: creating database", "error", err)
 	}
@@ -133,7 +130,7 @@ func (c TrieDBConfig) BackendConstructor(disk ethdb.Database) triedb.DBOverride 
 
 // New creates a new Firewood database with the given configuration.
 // The database will not be opened on error.
-func New(config TrieDBConfig, disk ethdb.Database) (*TrieDB, error) {
+func New(config TrieDBConfig) (*TrieDB, error) {
 	if err := validateDir(config.DatabaseDir); err != nil {
 		return nil, err
 	}
@@ -165,7 +162,6 @@ func New(config TrieDBConfig, disk ethdb.Database) (*TrieDB, error) {
 	blockHashes[common.Hash{}] = struct{}{}
 	return &TrieDB{
 		Firewood: fw,
-		kvStore:  disk,
 		proposals: proposals{
 			byStateRoot: make(map[common.Hash][]*proposal),
 			tree: &proposal{
