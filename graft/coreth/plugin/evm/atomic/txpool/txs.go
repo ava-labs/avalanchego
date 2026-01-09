@@ -26,7 +26,7 @@ const discardedTxsCacheSize = 50
 //     being built.
 //   - Issued: Issued transactions were included inside of a block built by this
 //     node.
-//   - Discarded: Discarded transactions were previously in the the mempool, but
+//   - Discarded: Discarded transactions were previously in the mempool, but
 //     were then deemed to be invalid. To prevent additional future work, these
 //     transactions may be assumed to be invalid in the future.
 type Txs struct {

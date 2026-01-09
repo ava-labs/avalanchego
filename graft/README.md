@@ -10,7 +10,7 @@ PR-based process of migrating to more permanent locations.
 
 ### Stacked Branches
 
-As with with any changes to a codebase, minimizing review friction is
+As with any changes to a codebase, minimizing review friction is
 essential. While it would be possible to require review of a huge PR
 commit-by-commit, any changes to those commits would need to be
 correlated with their originals and the friction would be

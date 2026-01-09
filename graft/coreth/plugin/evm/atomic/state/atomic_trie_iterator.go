@@ -65,7 +65,7 @@ func (a *atomicTrieIterator) Next() bool {
 		return false
 	}
 
-	// The value in the iterator should be the atomic requests serialized the the codec.
+	// The value in the iterator should be the atomic requests serialized the codec.
 	requests := new(atomic.Requests)
 	if _, err = a.codec.Unmarshal(a.trieIterator.Value, requests); err != nil {
 		a.resetFields(err)
