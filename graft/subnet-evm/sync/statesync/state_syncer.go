@@ -383,7 +383,8 @@ func categorizeStateSyncError(err error) ErrorCategory {
 
 		// Code sync failures with retry exhaustion are retryable (not stuck)
 		if strings.Contains(errStr, "too many retries") ||
-			strings.Contains(errStr, "retry") {
+			strings.Contains(errStr, "retry exhaustion") ||
+			strings.Contains(errStr, " retries") {
 			log.Warn("Code sync retry exhaustion - preserving state for reviver",
 				"error", errStr)
 			return ErrorCategoryRetryable
@@ -821,5 +822,11 @@ func (t *stateSync) getCodeSyncError() error {
 	if errVal == nil {
 		return nil
 	}
-	return errVal.(error)
+	// Safe type assertion with ok check for defensive programming
+	if err, ok := errVal.(error); ok {
+		return err
+	}
+	// Should never happen, but return nil instead of panicking
+	log.Error("BUG: codeSyncErr contains non-error type", "type", fmt.Sprintf("%T", errVal))
+	return nil
 }

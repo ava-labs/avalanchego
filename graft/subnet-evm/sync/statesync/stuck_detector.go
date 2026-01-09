@@ -33,6 +33,7 @@ const (
 type StuckDetector struct {
 	stats                  *trieSyncStats
 	started                atomic.Bool   // prevents multiple Start() calls
+	stopped                atomic.Bool   // prevents multiple Stop() calls / double-close panic
 	lastLeafCount          atomic.Uint64
 	lastTrieCount          atomic.Uint64
 	lastLeafUpdate         atomic.Value // *time.Time
@@ -464,6 +465,9 @@ func (sd *StuckDetector) StuckChannel() <-chan struct{} {
 }
 
 // Stop terminates the monitoring goroutine.
+// Safe to call multiple times - only the first call will close the channel.
 func (sd *StuckDetector) Stop() {
-	close(sd.stopChan)
+	if sd.stopped.CompareAndSwap(false, true) {
+		close(sd.stopChan)
+	}
 }
