@@ -212,8 +212,8 @@ func TestVerifyTime(t *testing.T) {
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				utils.PointerTo(timeMillis-1),          // 1ms delay, meets zero requirement
-				utils.PointerTo[uint64](0), // Parent has zero delay excess
+				utils.PointerTo(timeMillis-1), // 1ms delay, meets zero requirement
+				utils.PointerTo[uint64](0),    // Parent has zero delay excess
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
@@ -226,8 +226,8 @@ func TestVerifyTime(t *testing.T) {
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				utils.PointerTo(timeMillis),            // Same timestamp, zero delay
-				utils.PointerTo[uint64](0), // Parent has zero delay excess
+				utils.PointerTo(timeMillis), // Same timestamp, zero delay
+				utils.PointerTo[uint64](0),  // Parent has zero delay excess
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrMinDelayNotMet,
