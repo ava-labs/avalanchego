@@ -208,7 +208,18 @@ func (dl *diskLayer) Update(blockHash, blockRoot common.Hash, destructs map[comm
 	return newDiffLayer(dl, blockHash, blockRoot, destructs, accounts, storage)
 }
 
-// stopGeneration aborts the state snapshot generation if it is currently running.
+// stopGeneration requests cancellation of any running snapshot generation and
+// blocks until the generator goroutine (if running) has fully terminated.
+//
+// Concurrency guarantees:
+//   - Thread-safe: May be called concurrently from multiple goroutines
+//   - Idempotent: Safe to call multiple times; subsequent calls have no effect
+//   - Blocking: Returns only after the generator goroutine (if any) has exited
+//   - Safe to call at any time, including when no generation is running
+//
+// After return, it is **guaranteed** that:
+//   - The generator goroutine has terminated
+//   - It is safe to proceed with cleanup operations (e.g. closing databases)
 func (dl *diskLayer) stopGeneration() {
 	cancel := dl.cancel
 	done := dl.done
