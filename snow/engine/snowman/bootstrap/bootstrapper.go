@@ -123,6 +123,11 @@ type Bootstrapper struct {
 	onFinished func(ctx context.Context, lastReqID uint32) error
 
 	nonVerifyingParser block.Parser
+
+	// Periodic state sync retry monitoring
+	periodicRetryTimer   *time.Timer
+	periodicRetryEnabled bool
+	lastRetryAttempt     time.Time
 }
 
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
@@ -197,6 +202,9 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	// Set the starting height
 	b.startingHeight = lastAcceptedHeight
 	b.requestID = startReqID
+
+	// Enable periodic retry monitoring
+	b.periodicRetryEnabled = true
 
 	b.tree, err = interval.NewTree(b.DB)
 	if err != nil {
@@ -426,6 +434,12 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.
 		if err := b.process(ctx, blk, nil); err != nil {
 			return err
 		}
+	}
+
+	// Start periodic state sync retry monitoring
+	if b.periodicRetryEnabled && b.periodicRetryTimer == nil {
+		b.Ctx.Log.Info("starting periodic state sync retry monitoring")
+		b.schedulePeriodicStateSyncRetry()
 	}
 
 	return b.tryStartExecuting(ctx)
@@ -789,6 +803,112 @@ func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
 	return nil
 }
 
+// schedulePeriodicStateSyncRetry schedules a check 30 minutes from now to see
+// if we should attempt to retry state sync. This is a self-rescheduling timer
+// that continues until bootstrapping completes or chain is halted.
+// Must be called with Ctx.Lock held.
+func (b *Bootstrapper) schedulePeriodicStateSyncRetry() {
+	if b.periodicRetryTimer != nil {
+		b.periodicRetryTimer.Stop()
+	}
+
+	b.periodicRetryTimer = time.AfterFunc(30*time.Minute, func() {
+		b.Ctx.Lock.Lock()
+		defer b.Ctx.Lock.Unlock()
+
+		// Check if still bootstrapping
+		if b.Ctx.State.Get().State != snow.Bootstrapping || b.Halted() {
+			return
+		}
+
+		// Check if we should attempt state sync retry
+		if b.shouldAttemptStateSyncRetry() {
+			b.Ctx.Log.Info("periodic check: attempting state sync retry",
+				zap.Int("missingBlocks", b.missingBlockIDs.Len()),
+				zap.Duration("timeSinceStart", time.Since(b.startTime)))
+
+			if err := b.attemptStateSyncRetry(context.TODO()); err != nil {
+				b.Ctx.Log.Warn("state sync retry failed, continuing with block sync",
+					zap.Error(err))
+			}
+		}
+
+		// Reschedule for next check
+		b.schedulePeriodicStateSyncRetry()
+	})
+}
+
+// shouldAttemptStateSyncRetry determines if conditions warrant a state sync retry.
+// Must be called with Ctx.Lock held.
+func (b *Bootstrapper) shouldAttemptStateSyncRetry() bool {
+	// Check if RequestStateSyncRetry callback is available
+	if b.RequestStateSyncRetry == nil {
+		return false
+	}
+
+	// Don't retry too frequently
+	if time.Since(b.lastRetryAttempt) < 25*time.Minute {
+		return false
+	}
+
+	// Check if we have a lot of blocks still missing
+	if b.missingBlockIDs.Len() < 1000 {
+		return false // Almost done, stick with block sync
+	}
+
+	// Check if state sync is available on VM
+	ssVM, ok := b.VM.(block.StateSyncableVM)
+	if !ok {
+		return false // VM doesn't support state sync
+	}
+
+	enabled, err := ssVM.StateSyncEnabled(b.Ctx.Context())
+	if err != nil || !enabled {
+		return false
+	}
+
+	// Check if VM has a summary available
+	_, err = ssVM.GetOngoingSyncStateSummary(b.Ctx.Context())
+	// Don't retry if VM doesn't have a resumable summary
+	// Fresh state sync would require network coordination
+	return err == nil
+}
+
+// attemptStateSyncRetry attempts to transition from bootstrapping back to state syncing.
+// This clears bootstrapper state and calls the RequestStateSyncRetry callback.
+// Must be called with Ctx.Lock held.
+func (b *Bootstrapper) attemptStateSyncRetry(ctx context.Context) error {
+	b.lastRetryAttempt = time.Now()
+
+	if b.RequestStateSyncRetry == nil {
+		return fmt.Errorf("RequestStateSyncRetry callback not configured")
+	}
+
+	b.Ctx.Log.Warn("===========================================")
+	b.Ctx.Log.Warn("ATTEMPTING STATE SYNC RETRY FROM BLOCK SYNC")
+	b.Ctx.Log.Warn("Clearing bootstrapper state and restarting state sync...")
+	b.Ctx.Log.Warn("===========================================")
+
+	// Clear bootstrapper state
+	if err := b.Clear(ctx); err != nil {
+		return fmt.Errorf("failed to clear bootstrapper state: %w", err)
+	}
+
+	// Stop periodic monitoring during transition
+	if b.periodicRetryTimer != nil {
+		b.periodicRetryTimer.Stop()
+		b.periodicRetryTimer = nil
+	}
+
+	// Request state sync retry via callback
+	if err := b.RequestStateSyncRetry(ctx); err != nil {
+		return fmt.Errorf("failed to restart state syncer: %w", err)
+	}
+
+	b.Ctx.Log.Info("State sync retry initiated successfully")
+	return nil
+}
+
 func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
@@ -806,6 +926,10 @@ func (b *Bootstrapper) Shutdown(ctx context.Context) error {
 
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
+
+	if b.periodicRetryTimer != nil {
+		b.periodicRetryTimer.Stop()
+	}
 
 	return b.VM.Shutdown(ctx)
 }

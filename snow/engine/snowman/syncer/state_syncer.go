@@ -125,6 +125,42 @@ func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 	return ss.tryStartSyncing(ctx)
 }
 
+// Restart resets the state syncer to allow it to be re-entered after a previous
+// sync completed or failed. This is used when transitioning back from bootstrapping
+// to state syncing at runtime.
+func (ss *stateSyncer) Restart(ctx context.Context, startReqID uint32) error {
+	ss.Ctx.Log.Info("restarting state syncer",
+		zap.Uint32("requestID", startReqID))
+
+	// Reset internal state to allow re-entry
+	ss.started = false
+	ss.requestID = startReqID
+	ss.weightedSummaries = make(map[ids.ID]*weightedSummary)
+	ss.summariesHeights.Clear()
+	ss.uniqueSummariesHeights = nil
+	ss.targetSeeders.Clear()
+	ss.pendingSeeders.Clear()
+	ss.failedSeeders.Clear()
+	ss.targetVoters.Clear()
+	ss.pendingVoters.Clear()
+	ss.failedVoters.Clear()
+	ss.locallyAvailableSummary = nil
+
+	// Update context state
+	ss.Ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
+		State: snow.StateSyncing,
+	})
+
+	// Notify VM of state change
+	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
+		return fmt.Errorf("failed to notify VM of state change: %w", err)
+	}
+
+	// Start state syncing
+	return ss.tryStartSyncing(ctx)
+}
+
 func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if err := ss.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err

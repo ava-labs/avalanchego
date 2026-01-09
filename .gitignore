@@ -70,3 +70,4 @@ __debug_*
 setup-solc_downloads/
 /.claude/*
 claude.md
+/.serena/*

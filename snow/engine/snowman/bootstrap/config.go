@@ -4,6 +4,8 @@
 package bootstrap
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -41,6 +43,12 @@ type Config struct {
 	NonVerifyingParse block.ParseFunc
 
 	Bootstrapped func()
+
+	// RequestStateSyncRetry is an optional callback that the bootstrapper can call
+	// to request transitioning back to state syncing. This enables runtime retry
+	// when block sync is taking too long. Returns nil if retry was successful,
+	// or an error if retry is not possible or failed.
+	RequestStateSyncRetry func(ctx context.Context) error
 
 	common.Haltable
 }

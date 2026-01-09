@@ -1394,6 +1394,25 @@ func (m *manager) createSnowmanChain(
 		VM:                             vm,
 		Bootstrapped:                   bootstrapFunc,
 	}
+
+	// Create a mutable reference for the RequestStateSyncRetry callback
+	// This will be populated after the state syncer is created
+	var stateSyncerRef common.StateSyncer
+	bootstrapCfg.RequestStateSyncRetry = func(ctx context.Context) error {
+		if stateSyncerRef == nil {
+			return fmt.Errorf("state syncer not initialized")
+		}
+		// Cast to access Restart method
+		type restartable interface {
+			Restart(ctx context.Context, startReqID uint32) error
+		}
+		if rs, ok := stateSyncerRef.(restartable); ok {
+			// Use requestID + 1 to avoid conflicts
+			return rs.Restart(ctx, 1)
+		}
+		return fmt.Errorf("state syncer does not support restart")
+	}
+
 	var bootstrapper common.BootstrapableEngine
 	bootstrapper, err = smbootstrap.New(
 		bootstrapCfg,
@@ -1430,6 +1449,9 @@ func (m *manager) createSnowmanChain(
 	if m.TracingEnabled {
 		stateSyncer = common.TraceStateSyncer(stateSyncer, m.Tracer)
 	}
+
+	// Populate the state syncer reference for the bootstrapper's retry callback
+	stateSyncerRef = stateSyncer
 
 	h.SetEngineManager(&handler.EngineManager{
 		DAG: nil,
