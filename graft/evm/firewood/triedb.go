@@ -56,7 +56,7 @@ type TrieDB struct {
 
 	// possible temporarily holds proposals created during a trie update.
 	// This is cleared after the update is complete and the proposals have been sent to the database.
-	// It's unexpected for mulitple updates to this to occur simultaneously, but a lock is used to ensure safety.
+	// It's unexpected for multiple updates to this to occur simultaneously, but a lock is used to ensure safety.
 	possible     map[possibleKey]*proposal
 	possibleLock sync.Mutex
 }
