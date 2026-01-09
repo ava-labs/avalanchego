@@ -1041,6 +1041,7 @@ func (n *Node) initAPIServer() error {
 		apiRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
 		n.Config.HTTPAllowedHosts,
+		server.DefaultRPCCacheConfig(), // Enable RPC caching with defaults
 	)
 	return err
 }

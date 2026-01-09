@@ -88,6 +88,9 @@ type server struct {
 
 	metrics *metrics
 
+	// RPC response cache
+	cache *rpcCache
+
 	// Maps endpoints to handlers
 	router *router
 
@@ -109,8 +112,14 @@ func New(
 	registerer prometheus.Registerer,
 	httpConfig HTTPConfig,
 	allowedHosts []string,
+	cacheConfig RPCCacheConfig,
 ) (Server, error) {
 	m, err := newMetrics(registerer)
+	if err != nil {
+		return nil, err
+	}
+
+	cache, err := newRPCCache(log, cacheConfig, registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +149,7 @@ func New(
 		tracingEnabled:  tracingEnabled,
 		tracer:          tracer,
 		metrics:         m,
+		cache:           cache,
 		router:          router,
 		srv:             httpServer,
 		listener:        listener,
@@ -235,6 +245,10 @@ func (s *server) wrapMiddleware(chainName string, handler http.Handler, ctx *sno
 	}
 	// Apply middleware to reject calls to the handler before the chain finishes bootstrapping
 	handler = rejectMiddleware(handler, ctx)
+	// Apply RPC caching middleware (before metrics so cache hits don't count as calls)
+	if s.cache != nil {
+		handler = s.cache.Middleware(handler)
+	}
 	return s.metrics.wrapHandler(chainName, handler)
 }
 
