@@ -23,9 +23,9 @@ const (
 
 	// InitialDelayExcess represents the initial (≈2000ms) delay excess.
 	// Formula: ConversionRate (2^20) * ln(2000) + 1
-	InitialDelayExcess = 7_970_124
+	InitialDelayExcess DelayExcess = 7_970_124
 
-	maxDelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
+	maxDelayExcess DelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
 )
 
 // DelayExcess represents the excess for delay calculation in the dynamic
@@ -55,7 +55,7 @@ func DesiredDelayExcess(desiredDelay uint64) DelayExcess {
 	// This could be solved directly by calculating D * ln(desired / M)
 	// using floating point math. However, it introduces inaccuracies. So, we
 	// use a binary search to find the closest integer solution.
-	return DelayExcess(sort.Search(maxDelayExcess, func(delayExcessGuess int) bool {
+	return DelayExcess(sort.Search(int(maxDelayExcess), func(delayExcessGuess int) bool {
 		excess := DelayExcess(delayExcessGuess)
 		return excess.Delay() >= desiredDelay
 	}))
