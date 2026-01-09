@@ -42,7 +42,6 @@ var (
 		PushGossipDiscardedCacheSize:                1,
 		PushGossipMaxRegossipFrequency:              time.Second,
 		PushGossipFrequency:                         time.Second,
-		PullGossipPollSize:                          1,
 		PullGossipFrequency:                         time.Second,
 		PullGossipThrottlingPeriod:                  time.Second,
 		PullGossipRequestsPerValidator:              1,

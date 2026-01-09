@@ -5,7 +5,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -74,13 +73,6 @@ func New(
 		return nil, err
 	}
 
-	marshaller := txMarshaller{}
-	txGossipClient := p2pNetwork.NewClient(p2p.TxGossipHandlerID, validators)
-	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
-	if err != nil {
-		return nil, err
-	}
-
 	gossipMempool, err := newGossipMempool(
 		mempool,
 		registerer,
@@ -94,80 +86,41 @@ func New(
 		return nil, err
 	}
 
-	txPushGossiper, err := gossip.NewPushGossiper[*txs.Tx](
-		marshaller,
-		gossipMempool,
-		validators,
-		txGossipClient,
-		txGossipMetrics,
-		gossip.BranchingFactor{
+	systemConfig := gossip.SystemConfig{
+		Log:               log,
+		Registry:          registerer,
+		Namespace:         "tx_gossip",
+		TargetMessageSize: config.TargetGossipSize,
+		ThrottlingPeriod:  config.PullGossipThrottlingPeriod,
+		RequestPeriod:     config.PullGossipFrequency,
+		PushGossipParams: gossip.BranchingFactor{
 			StakePercentage: config.PushGossipPercentStake,
 			Validators:      config.PushGossipNumValidators,
 			Peers:           config.PushGossipNumPeers,
 		},
-		gossip.BranchingFactor{
+		PushRegossipParams: gossip.BranchingFactor{
 			Validators: config.PushRegossipNumValidators,
 			Peers:      config.PushRegossipNumPeers,
 		},
-		config.PushGossipDiscardedCacheSize,
-		config.TargetGossipSize,
-		config.PushGossipMaxRegossipFrequency,
+		DiscardedPushCacheSize: config.PushGossipDiscardedCacheSize,
+		RegossipPeriod:         config.PushGossipMaxRegossipFrequency,
+	}
+	// Set the defaults so that we can use `config.PullGossipFrequency` after
+	// the default has been set.
+	systemConfig.SetDefaults()
+	handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
+		nodeID,
+		p2pNetwork,
+		validators,
+		gossipMempool,
+		txMarshaller{},
+		systemConfig,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	var txPullGossiper gossip.Gossiper = gossip.NewPullGossiper[*txs.Tx](
-		log,
-		marshaller,
-		gossipMempool,
-		txGossipClient,
-		txGossipMetrics,
-		config.PullGossipPollSize,
-	)
-
-	// Gossip requests are only served if a node is a validator
-	txPullGossiper = gossip.ValidatorGossiper{
-		Gossiper:   txPullGossiper,
-		NodeID:     nodeID,
-		Validators: validators,
-	}
-
-	handler := gossip.NewHandler[*txs.Tx](
-		log,
-		marshaller,
-		gossipMempool,
-		txGossipMetrics,
-		config.TargetGossipSize,
-	)
-
-	throttlerHandler, err := p2p.NewDynamicThrottlerHandler(
-		log,
-		handler,
-		validators,
-		config.PullGossipThrottlingPeriod,
-		config.PullGossipRequestsPerValidator,
-		registerer,
-		"tx_gossip",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize throttler handler: %w", err)
-	}
-
-	validatorHandler := p2p.NewValidatorHandler(
-		throttlerHandler,
-		validators,
-		log,
-	)
-
-	// We allow pushing txs between all peers, but only serve gossip requests
-	// from validators
-	txGossipHandler := txGossipHandler{
-		appGossipHandler:  handler,
-		appRequestHandler: validatorHandler,
-	}
-
-	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, txGossipHandler); err != nil {
+	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
 		return nil, err
 	}
 
@@ -187,10 +140,10 @@ func New(
 		log:                       log,
 		mempool:                   gossipMempool,
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
-		txPushGossiper:            txPushGossiper,
+		txPushGossiper:            pushGossiper,
 		txPushGossipFrequency:     config.PushGossipFrequency,
-		txPullGossiper:            txPullGossiper,
-		txPullGossipFrequency:     config.PullGossipFrequency,
+		txPullGossiper:            pullGossiper,
+		txPullGossipFrequency:     systemConfig.RequestPeriod,
 		peers:                     peers,
 	}, nil
 }

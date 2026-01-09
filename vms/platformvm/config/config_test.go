@@ -71,7 +71,6 @@ func TestConfigUnmarshal(t *testing.T) {
 				PushGossipDiscardedCacheSize:                8,
 				PushGossipMaxRegossipFrequency:              9,
 				PushGossipFrequency:                         10,
-				PullGossipPollSize:                          11,
 				PullGossipFrequency:                         12,
 				PullGossipThrottlingPeriod:                  13,
 				PullGossipRequestsPerValidator:              14,

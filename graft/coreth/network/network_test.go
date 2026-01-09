@@ -585,7 +585,7 @@ func TestNetworkRouting(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	network, err := NewNetwork(ctx, sender, networkCodec, 1, prometheus.NewRegistry())
 	require.NoError(err)
-	require.NoError(network.AddHandler(uint64(protocol), handler))
+	require.NoError(network.P2PNetwork().AddHandler(uint64(protocol), handler))
 
 	nodeID := ids.GenerateTestNodeID()
 	foobar := append([]byte{byte(protocol)}, []byte("foobar")...)

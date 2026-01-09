@@ -41,16 +41,14 @@ type ExtensibleVM interface {
 	// SetExtensionConfig sets the configuration for the VM extension
 	// Should be called before any other method and only once
 	SetExtensionConfig(config *Config) error
-	// NewClient returns a client to send messages with for the given protocol
-	NewClient(protocol uint64) *p2p.Client
-	// AddHandler registers a server handler for an application protocol
-	AddHandler(protocol uint64, handler p2p.Handler) error
 	// GetExtendedBlock returns the VMBlock for the given ID or an error if the block is not found
 	GetExtendedBlock(context.Context, ids.ID) (ExtendedBlock, error)
 	// LastAcceptedExtendedBlock returns the last accepted VM block
 	LastAcceptedExtendedBlock() ExtendedBlock
 	// ChainConfig returns the chain config for the VM
 	ChainConfig() *params.ChainConfig
+	// P2PNetwork returns the p2p network
+	P2PNetwork() *p2p.Network
 	// P2PValidators returns the validators for the network
 	P2PValidators() *p2p.Validators
 	// Blockchain returns the blockchain client
