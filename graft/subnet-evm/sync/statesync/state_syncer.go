@@ -84,6 +84,12 @@ type stateSync struct {
 	batchSize int                       // write batches when they reach this size
 	numWorkers int                      // number of concurrent sync workers
 
+	// Config values needed for Restart()
+	client                   syncclient.Client
+	requestSize              uint16
+	maxOutstandingCodeHashes int
+	numCodeFetchingWorkers   int
+
 	segments   chan syncclient.LeafSyncTask   // channel of tasks to sync
 	syncer     *syncclient.CallbackLeafSyncer // performs the sync, looping over each task's range and invoking specified callbacks
 	codeSyncer *codeSyncer                    // manages the asynchronous download and batching of code hashes
@@ -95,6 +101,9 @@ type stateSync struct {
 	// track the tries currently being synced
 	lock            sync.RWMutex
 	triesInProgress map[common.Hash]*trieToSync
+
+	// Mutex to protect Restart() from concurrent calls
+	restartMutex sync.Mutex
 
 	// track completion and progress of work
 	mainTrieDone       chan struct{}
@@ -148,6 +157,12 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		stats:           newTrieSyncStats(),
 		triesInProgress: make(map[common.Hash]*trieToSync),
 		numWorkers:      numWorkers,
+
+		// Store config values for Restart()
+		client:                   config.Client,
+		requestSize:              config.RequestSize,
+		maxOutstandingCodeHashes: config.MaxOutstandingCodeHashes,
+		numCodeFetchingWorkers:   config.NumCodeFetchingWorkers,
 
 		// [triesInProgressSem] is used to keep the number of tries syncing
 		// less than or equal to [numWorkers].
@@ -506,8 +521,12 @@ func (t *stateSync) Wait(ctx context.Context) error {
 //
 // IMPORTANT: Only call after Start() has completed and Wait() has returned.
 // The concurrency guards (sync.Once, cachedResult) prevent issues from multiple calls.
-// This method recreates all channels and resets all state for a fresh start.
+// This method recreates all channels, workers, and internal state for a fresh start.
 func (t *stateSync) Restart(ctx context.Context, startReqID uint32) error {
+	// Protect against concurrent Restart() calls
+	t.restartMutex.Lock()
+	defer t.restartMutex.Unlock()
+
 	// Check if a sync is currently running
 	if t.started.Load() {
 		return errors.New("cannot restart: state sync already running")
@@ -519,29 +538,78 @@ func (t *stateSync) Restart(ctx context.Context, startReqID uint32) error {
 		"startReqID", startReqID,
 		"root", t.root.Hex())
 
-	// Reset state for fresh start (all channel closes are guarded by sync.Once)
+	// Reset atomic state flags
 	t.started.Store(false)
 	t.waitStarted.Store(false)
 
-	// Create fresh channels (old ones are closed)
+	// Clear cancelFunc from previous run (Start() will create a new one)
+	t.cancelFunc = nil
+
+	// Recreate all channels (old ones are closed)
 	t.done = make(chan error, 1)
 	t.resultReady = make(chan struct{})
 	t.mainTrieDone = make(chan struct{})
 	t.storageTriesDone = make(chan struct{})
 
+	// CRITICAL: Recreate segments channel (old one was closed)
+	// Must have same capacity as original (numWorkers * numStorageTrieSegments)
+	t.segments = make(chan syncclient.LeafSyncTask, t.numWorkers*numStorageTrieSegments)
+
+	// CRITICAL: Recreate triesInProgressSem (semaphore may be exhausted from previous run)
+	t.triesInProgressSem = make(chan struct{}, t.numWorkers)
+
 	// Reset the Once guards so channels can be closed again
-	// This is safe because we've verified sync is not running
 	t.mainTrieDoneOnce = sync.Once{}
 	t.segmentsDoneOnce = sync.Once{}
 	t.storageTriesDoneOnce = sync.Once{}
 
-	// Reset stuck detector to monitor the new sync attempt
+	// CRITICAL: Recreate syncer with new segments channel
+	// The old syncer holds a reference to the closed segments channel
+	t.syncer = syncclient.NewCallbackLeafSyncer(t.client, t.segments, t.requestSize)
+
+	// CRITICAL: Recreate codeSyncer to reset its internal state
+	// The old codeSyncer may have stale code hashes or error state
+	t.codeSyncer = newCodeSyncer(CodeSyncerConfig{
+		DB:                       t.db,
+		Client:                   t.client,
+		MaxOutstandingCodeHashes: t.maxOutstandingCodeHashes,
+		NumCodeFetchingWorkers:   t.numCodeFetchingWorkers,
+	})
+
+	// Clear triesInProgress map (stale references from previous run)
+	t.lock.Lock()
+	t.triesInProgress = make(map[common.Hash]*trieToSync)
+	t.lock.Unlock()
+
+	// Reset stats for fresh monitoring of this retry attempt
+	// Stuck detector relies on rate calculations, so we need fresh stats
+	t.stats = newTrieSyncStats()
+
+	// Verify trieQueue root matches (should match because we preserved summary)
+	if err := t.trieQueue.clearIfRootDoesNotMatch(t.root); err != nil {
+		log.Error("REVIVER: trieQueue root mismatch during restart", "err", err)
+		return fmt.Errorf("trieQueue root mismatch: %w", err)
+	}
+
+	// CRITICAL: Recreate mainTrie (old one has stale state)
+	var err error
+	t.mainTrie, err = NewTrieToSync(t, t.root, common.Hash{}, NewMainTrieTask(t))
+	if err != nil {
+		log.Error("REVIVER: Failed to create mainTrie during restart", "err", err)
+		return fmt.Errorf("failed to create mainTrie: %w", err)
+	}
+
+	// Track mainTrie as in progress and start syncing
+	t.addTrieInProgress(t.root, t.mainTrie)
+	t.mainTrie.startSyncing()
+
+	// Reset stuck detector to monitor the new sync attempt (uses fresh stats)
 	t.stuckDetector = NewStuckDetector(t.stats)
 
 	log.Info("State sync restart initialized, calling Start()...")
 
 	// Start the sync again - this will use the preserved summary
-	err := t.Start(ctx)
+	err = t.Start(ctx)
 	if err != nil {
 		log.Error("REVIVER: Restart failed during Start()",
 			"err", err)
