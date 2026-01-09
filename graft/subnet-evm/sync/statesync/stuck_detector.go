@@ -86,35 +86,48 @@ func (sd *StuckDetector) monitorLoop(ctx context.Context) {
 func (sd *StuckDetector) checkIfStuck() bool {
 	now := time.Now()
 
-	// Check 1: Zero leaf rate (no data fetched)
+	// Check 1: Track leaf progress
 	currentLeafCount := sd.stats.totalLeafs.Count()
 	lastLeafCount := sd.lastLeafCount.Load()
-	if currentLeafCount == lastLeafCount {
+	leafsProgressing := currentLeafCount != lastLeafCount
+
+	var leafStuckDuration time.Duration
+	if leafsProgressing {
+		sd.lastLeafCount.Store(currentLeafCount)
+		sd.lastLeafUpdate.Store(now)
+	} else {
 		lastUpdate := sd.lastLeafUpdate.Load().(time.Time)
-		if now.Sub(lastUpdate) > zeroRateTimeout {
+		leafStuckDuration = now.Sub(lastUpdate)
+		if leafStuckDuration > zeroRateTimeout {
 			log.Error("Stuck detected: No leafs fetched in 10 minutes",
 				"lastLeafCount", lastLeafCount)
 			return true
 		}
-	} else {
-		sd.lastLeafCount.Store(currentLeafCount)
-		sd.lastLeafUpdate.Store(now)
 	}
 
-	// Check 2: No trie completion
+	// Check 2: Track trie completion progress
 	triesSynced, triesRemaining := sd.stats.getProgress()
 	currentTrieCount := uint64(triesSynced)
 	lastTrieCount := sd.lastTrieCount.Load()
-	if currentTrieCount == lastTrieCount {
-		lastUpdate := sd.lastTrieUpdate.Load().(time.Time)
-		if now.Sub(lastUpdate) > noTrieTimeout {
-			log.Error("Stuck detected: No trie completed in 30 minutes",
-				"triesRemaining", triesRemaining)
-			return true
-		}
-	} else {
+	triesProgressing := currentTrieCount != lastTrieCount
+
+	if triesProgressing {
 		sd.lastTrieCount.Store(currentTrieCount)
 		sd.lastTrieUpdate.Store(now)
+	} else {
+		lastUpdate := sd.lastTrieUpdate.Load().(time.Time)
+		trieStuckDuration := now.Sub(lastUpdate)
+
+		// Only consider stuck if BOTH:
+		// 1. No trie completed in 30 minutes
+		// 2. No leafs are being fetched (indicates we're not processing a large trie)
+		if trieStuckDuration > noTrieTimeout && !leafsProgressing {
+			log.Error("Stuck detected: No trie completed in 30 minutes and no leaf progress",
+				"triesRemaining", triesRemaining,
+				"trieStuckDuration", trieStuckDuration.Round(time.Second),
+				"leafStuckDuration", leafStuckDuration.Round(time.Second))
+			return true
+		}
 	}
 
 	// Check 3: Excessive retries without progress
