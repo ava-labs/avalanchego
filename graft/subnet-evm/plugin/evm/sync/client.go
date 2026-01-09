@@ -132,6 +132,7 @@ type Client interface {
 
 	// additional methods required by the evm package
 	ClearOngoingSummary() error
+	DetectAndCleanCorruptedState(ctx context.Context) error
 	Shutdown() error
 	Error() error
 }
@@ -140,6 +141,127 @@ type Client interface {
 // This allows external packages to check for this specific condition.
 func ErrStateSyncFallback() error {
 	return errStateSyncFallback
+}
+
+// DetectAndCleanCorruptedState checks for incomplete state sync data from previous crashes
+// and automatically cleans it up. This handles cases where the chain crashed during state sync,
+// leaving partial data that prevents restart.
+func (client *client) DetectAndCleanCorruptedState(ctx context.Context) error {
+	// Check if there's an ongoing state sync summary
+	summaryBytes, err := client.MetadataDB.Get(stateSyncSummaryKey)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// No ongoing summary - nothing to clean
+			return nil
+		}
+		return fmt.Errorf("failed to check for ongoing summary: %w", err)
+	}
+
+	// Found an ongoing summary - check if state sync actually completed
+	summary, err := client.Parser.Parse(summaryBytes, func(s message.Syncable) (block.StateSyncMode, error) {
+		// Don't actually start sync - just parse to validate
+		return block.StateSyncSkipped, nil
+	})
+	if err != nil {
+		log.Warn("Found corrupted state sync summary, will clean up", "err", err)
+		// Can't parse summary - definitely corrupted, clean it up
+		return client.cleanupCorruptedState(ctx)
+	}
+
+	// Check if the synced block actually exists in the chain
+	blockHash := summary.GetBlockHash()
+	blockHeight := summary.Height()
+
+	block := rawdb.ReadBlock(client.ChaindDB, blockHash, blockHeight)
+	if block == nil {
+		log.Warn("Found incomplete state sync data from previous crash",
+			"expectedBlock", blockHash.Hex(),
+			"height", blockHeight)
+		return client.cleanupCorruptedState(ctx)
+	}
+
+	// Check if the state root exists
+	stateRoot := summary.GetBlockRoot()
+	if !rawdb.HasTrieNode(client.ChaindDB, stateRoot) {
+		log.Warn("Found incomplete state trie from previous crash",
+			"stateRoot", stateRoot.Hex(),
+			"blockHash", blockHash.Hex())
+		return client.cleanupCorruptedState(ctx)
+	}
+
+	// State appears valid - no cleanup needed
+	log.Debug("Resumable state sync data appears valid", "block", blockHash.Hex())
+	return nil
+}
+
+// cleanupCorruptedState performs the same cleanup as fallbackToBlockSync but for startup recovery
+func (client *client) cleanupCorruptedState(ctx context.Context) error {
+	log.Warn("===========================================")
+	log.Warn("CORRUPTED STATE DETECTED - AUTO CLEANUP")
+	log.Warn("Cleaning up partial state from previous crash...")
+	log.Warn("===========================================")
+
+	// Reuse the same cleanup logic from fallbackToBlockSync
+	if err := client.performStateCleanup(ctx); err != nil {
+		return fmt.Errorf("failed to cleanup corrupted state: %w", err)
+	}
+
+	log.Warn("===========================================")
+	log.Warn("STARTUP CLEANUP COMPLETE")
+	log.Warn("Chain will start fresh with block sync")
+	log.Warn("===========================================")
+	return nil
+}
+
+// performStateCleanup contains the shared cleanup logic used by both runtime fallback and startup recovery
+func (client *client) performStateCleanup(ctx context.Context) error {
+	// Step 1: Clear all state sync progress markers
+	log.Info("Clearing state sync segments...")
+	if err := customrawdb.ClearAllSyncSegments(client.ChaindDB); err != nil {
+		log.Warn("Failed to clear sync segments (non-fatal)", "err", err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		log.Warn("Cleanup interrupted by context cancellation", "err", err)
+		return err
+	}
+
+	log.Info("Clearing state sync storage tries...")
+	if err := customrawdb.ClearAllSyncStorageTries(client.ChaindDB); err != nil {
+		log.Warn("Failed to clear sync storage tries (non-fatal)", "err", err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		log.Warn("Cleanup interrupted by context cancellation", "err", err)
+		return err
+	}
+
+	// Step 2: Wipe corrupted snapshot data
+	log.Info("Wiping corrupted snapshot data...")
+	wipeDone := snapshot.WipeSnapshot(client.ChaindDB, true)
+
+	select {
+	case <-wipeDone:
+		log.Info("Snapshot wipe completed")
+	case <-ctx.Done():
+		log.Warn("Snapshot wipe interrupted by context cancellation")
+		return ctx.Err()
+	}
+
+	// Step 3: Reset snapshot generation state
+	log.Info("Resetting snapshot generation state...")
+	snapshot.ResetSnapshotGeneration(client.ChaindDB)
+
+	// Step 4: Delete snapshot block hash marker
+	customrawdb.DeleteSnapshotBlockHash(client.ChaindDB)
+
+	// Step 5: Clear the ongoing state sync summary
+	log.Info("Clearing state sync metadata...")
+	if err := client.ClearOngoingSummary(); err != nil {
+		log.Warn("Failed to clear ongoing summary (non-fatal)", "err", err)
+	}
+
+	return nil
 }
 
 // Syncer represents a step in state sync,
@@ -380,7 +502,7 @@ func (client *client) syncStateTrie(ctx context.Context, summary message.Syncabl
 	return err
 }
 
-// fallbackToBlockSync clears state sync metadata and corrupted state, then disables state sync for the next restart.
+// fallbackToBlockSync clears state sync metadata and corrupted state when stuck is detected at runtime.
 // This function performs a complete automated cleanup to ensure the chain can restart cleanly with block sync.
 // Respects context cancellation to allow graceful shutdown during cleanup.
 func (client *client) fallbackToBlockSync(ctx context.Context) error {
@@ -389,59 +511,9 @@ func (client *client) fallbackToBlockSync(ctx context.Context) error {
 	log.Warn("Cleaning up corrupted partial state...")
 	log.Warn("===========================================")
 
-	// Step 1: Clear all state sync progress markers to prevent resume attempts
-	log.Info("Clearing state sync segments...")
-	if err := customrawdb.ClearAllSyncSegments(client.ChaindDB); err != nil {
-		return fmt.Errorf("failed to clear sync segments: %w", err)
-	}
-
-	// Check for cancellation between steps
-	if err := ctx.Err(); err != nil {
-		log.Warn("Cleanup interrupted by context cancellation", "err", err)
+	// Perform the shared cleanup logic
+	if err := client.performStateCleanup(ctx); err != nil {
 		return err
-	}
-
-	log.Info("Clearing state sync storage tries...")
-	if err := customrawdb.ClearAllSyncStorageTries(client.ChaindDB); err != nil {
-		return fmt.Errorf("failed to clear sync storage tries: %w", err)
-	}
-
-	if err := ctx.Err(); err != nil {
-		log.Warn("Cleanup interrupted by context cancellation", "err", err)
-		return err
-	}
-
-	// Step 2: Wipe corrupted snapshot data that may reference incomplete state
-	log.Info("Wiping corrupted snapshot data...")
-	wipeDone := snapshot.WipeSnapshot(client.ChaindDB, true) // full=true to delete snapshot root marker
-
-	// Wait for wipe to complete OR context cancellation
-	select {
-	case <-wipeDone:
-		log.Info("Snapshot wipe completed")
-	case <-ctx.Done():
-		log.Warn("Snapshot wipe interrupted by context cancellation")
-		return ctx.Err()
-	}
-
-	// Step 3: Reset snapshot generation state to prevent regeneration attempts
-	log.Info("Resetting snapshot generation state...")
-	snapshot.ResetSnapshotGeneration(client.ChaindDB)
-
-	// Step 4: Delete snapshot block hash marker to invalidate any stale snapshot references
-	customrawdb.DeleteSnapshotBlockHash(client.ChaindDB)
-
-	// Step 5: Clear the ongoing state sync summary from metadata
-	log.Info("Clearing state sync metadata...")
-	if err := client.ClearOngoingSummary(); err != nil {
-		return fmt.Errorf("failed to clear state sync metadata: %w", err)
-	}
-
-	// Step 6: Notify extender of cleanup if present
-	if client.Extender != nil {
-		log.Info("Notifying state sync extender of cleanup...")
-		// Extender doesn't have a cleanup method in the interface, but we should
-		// clear the ongoing summary which should prevent resume of extension state
 	}
 
 	log.Warn("===========================================")

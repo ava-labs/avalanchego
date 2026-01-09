@@ -29,6 +29,7 @@ const (
 // It tracks multiple indicators: leaf fetch rate, trie completion rate, and retry count.
 type StuckDetector struct {
 	stats                  *trieSyncStats
+	started                atomic.Bool   // prevents multiple Start() calls
 	lastLeafCount          atomic.Uint64
 	lastTrieCount          atomic.Uint64
 	lastLeafUpdate         atomic.Value // *time.Time
@@ -55,6 +56,7 @@ func NewStuckDetector(stats *trieSyncStats) *StuckDetector {
 }
 
 // Start begins monitoring in a background goroutine.
+// Safe to call multiple times - only the first call will start monitoring.
 func (sd *StuckDetector) Start(ctx context.Context) {
 	if sd == nil {
 		log.Error("CRITICAL: StuckDetector.Start() called on nil detector")
@@ -62,6 +64,12 @@ func (sd *StuckDetector) Start(ctx context.Context) {
 	}
 	if sd.stats == nil {
 		log.Error("CRITICAL: StuckDetector.stats is nil")
+		return
+	}
+
+	// Atomically check and set started flag to prevent multiple goroutines
+	if !sd.started.CompareAndSwap(false, true) {
+		log.Warn("StuckDetector.Start() called multiple times - ignoring duplicate call")
 		return
 	}
 
@@ -149,6 +157,12 @@ func (sd *StuckDetector) checkIfStuck() bool {
 			log.Error("CRITICAL: checkIfStuck panicked", "panic", r)
 		}
 	}()
+
+	// Safety check: if Start() was never called, we can't detect stuck state
+	if !sd.started.Load() {
+		log.Warn("checkIfStuck called before Start() - cannot detect stuck state")
+		return false
+	}
 
 	now := time.Now()
 

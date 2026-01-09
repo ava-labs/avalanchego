@@ -788,6 +788,14 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 // onBootstrapStarted marks this VM as bootstrapping
 func (vm *VM) onBootstrapStarted() error {
 	vm.bootstrapped.Set(false)
+
+	// Check for corrupted state from previous crashes BEFORE checking client error.
+	// This handles the case where the chain crashed during state sync, leaving
+	// partial data that would cause "missing block" errors on restart.
+	if err := vm.Client.DetectAndCleanCorruptedState(context.TODO()); err != nil {
+		return fmt.Errorf("failed to detect/clean corrupted state: %w", err)
+	}
+
 	if err := vm.Client.Error(); err != nil {
 		// errStateSyncFallback is not a real error - it indicates successful cleanup
 		// after stuck detection, and bootstrapping should continue with block sync.

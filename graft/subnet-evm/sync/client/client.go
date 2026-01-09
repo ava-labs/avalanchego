@@ -159,6 +159,7 @@ func (p *peerFailureTracker) isBlacklisted(nodeID ids.NodeID) bool {
 }
 
 // peerMetrics tracks performance metrics for a peer
+// All fields are protected by peerMetricsTracker.lock
 type peerMetrics struct {
 	avgLatency     time.Duration // exponential moving average of request latency
 	successCount   int64         // number of successful requests
@@ -166,7 +167,8 @@ type peerMetrics struct {
 	lastUpdateTime time.Time     // last time metrics were updated
 }
 
-// successRate calculates the success rate as a float between 0 and 1
+// successRate calculates the success rate as a float between 0 and 1.
+// Must be called with peerMetricsTracker.lock held (either RLock or Lock).
 func (m *peerMetrics) successRate() float64 {
 	if m.requestCount == 0 {
 		return 1.0 // no data yet, assume good
