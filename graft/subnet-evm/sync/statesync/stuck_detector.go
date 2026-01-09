@@ -192,7 +192,9 @@ func (sd *StuckDetector) checkIfStuck() bool {
 		if lastUpdatePtr != nil {
 			leafStuckDuration = now.Sub(*lastUpdatePtr)
 			if leafStuckDuration > zeroRateTimeout {
-				log.Error("Stuck detected: No leafs fetched in 10 minutes",
+				log.Error("Stuck detected: No leafs fetched in 5 minutes",
+					"leafStuckDuration", leafStuckDuration.Round(time.Second),
+					"timeout", zeroRateTimeout,
 					"lastLeafCount", lastLeafCount)
 				return true
 			}
@@ -214,12 +216,13 @@ func (sd *StuckDetector) checkIfStuck() bool {
 		if lastUpdatePtr != nil {
 			trieStuckDuration := now.Sub(*lastUpdatePtr)
 
-			// If no trie completed in 15 minutes, something is wrong
+			// If no trie completed in 8 minutes, something is wrong
 			// Even if leafs are trickling in, a trie should eventually complete
 			if trieStuckDuration > noTrieTimeout {
-				log.Error("Stuck detected: No trie completed in 15 minutes",
+				log.Error("Stuck detected: No trie completed in 8 minutes",
 					"triesRemaining", triesRemaining,
 					"trieStuckDuration", trieStuckDuration.Round(time.Second),
+					"timeout", noTrieTimeout,
 					"leafsProgressing", leafsProgressing)
 				return true
 			}
