@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
@@ -112,14 +112,14 @@ func headerWithNonZeroFields() (*Header, *HeaderExtra) {
 		Nonce:            BlockNonce{15},
 		BaseFee:          big.NewInt(16),
 		WithdrawalsHash:  &common.Hash{17},
-		BlobGasUsed:      utilstest.PointerTo(uint64(18)),
-		ExcessBlobGas:    utilstest.PointerTo(uint64(19)),
+		BlobGasUsed:      utils.PointerTo[uint64](18),
+		ExcessBlobGas:    utils.PointerTo[uint64](19),
 		ParentBeaconRoot: &common.Hash{20},
 	}
 	extra := &HeaderExtra{
 		BlockGasCost:     big.NewInt(23),
-		TimeMilliseconds: utilstest.PointerTo(uint64(24)),
-		MinDelayExcess:   utilstest.PointerTo(acp226.DelayExcess(25)),
+		TimeMilliseconds: utils.PointerTo[uint64](24),
+		MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(25)),
 	}
 	return WithHeaderExtra(header, extra), extra
 }
