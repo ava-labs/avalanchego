@@ -487,6 +487,13 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 	if err != nil {
 		return nil, err
 	}
+
+	// Detect code requests for special handling
+	var isCodeRequest bool
+	if _, ok := request.(*message.CodeRequest); ok {
+		isCodeRequest = true
+	}
+
 	var (
 		responseIntf interface{}
 		numElements  int

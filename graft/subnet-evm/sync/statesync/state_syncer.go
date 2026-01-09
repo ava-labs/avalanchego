@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -340,6 +341,7 @@ type ErrorCategory int
 
 const (
 	ErrorCategoryTransient ErrorCategory = iota // Temporary network/peer issues
+	ErrorCategoryRetryable                      // Peer unavailability, worth retrying (preserve state for reviver)
 	ErrorCategoryFatal                          // Unrecoverable (DB corruption, invalid state)
 	ErrorCategoryStuck                          // Progress stalled, needs fallback
 )
@@ -352,7 +354,7 @@ func categorizeStateSyncError(err error) ErrorCategory {
 
 	errStr := err.Error()
 
-	// Stuck detection
+	// Stuck detection (explicit)
 	if errors.Is(err, errStateSyncStuck) {
 		return ErrorCategoryStuck
 	}
@@ -366,11 +368,27 @@ func categorizeStateSyncError(err error) ErrorCategory {
 		return ErrorCategoryFatal
 	}
 
-	// Stuck indicators
-	if strings.Contains(errStr, "too many retries") ||
-		strings.Contains(errStr, "no leafs fetched") ||
+	// IMPORTANT: Distinguish code sync failures from other retry exhaustion
+	// Code sync failures are peer-related (peers don't have data), not stuck
+	if strings.Contains(errStr, "too many retries") {
+		if strings.Contains(errStr, "code request") || strings.Contains(errStr, "CodeRequest") {
+			log.Warn("Code sync retry exhaustion detected - preserving state for reviver",
+				"error", errStr)
+			return ErrorCategoryRetryable
+		}
+		// Other retry exhaustion (trie segments, etc.) is stuck
+		return ErrorCategoryStuck
+	}
+
+	// Other stuck indicators
+	if strings.Contains(errStr, "no leafs fetched") ||
 		strings.Contains(errStr, "no trie completed") {
 		return ErrorCategoryStuck
+	}
+
+	// Context cancellation is transient
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return ErrorCategoryTransient
 	}
 
 	// Everything else is transient
@@ -380,7 +398,9 @@ func categorizeStateSyncError(err error) ErrorCategory {
 // shouldFallbackToBlockSync determines if we should fallback based on error
 func shouldFallbackToBlockSync(err error) bool {
 	category := categorizeStateSyncError(err)
-	return category == ErrorCategoryStuck
+	// Fallback for both Stuck and Retryable errors
+	// The key difference: Retryable preserves summary for reviver, Stuck may not
+	return category == ErrorCategoryStuck || category == ErrorCategoryRetryable
 }
 
 func (t *stateSync) Start(ctx context.Context) error {

@@ -266,22 +266,51 @@ func isCodeRequestFatalError(err error) bool {
 }
 
 // fulfillCodeRequestWithRetry wraps fulfillCodeRequest with exponential backoff retry logic
+// and circuit breaker to handle peer failures gracefully
 func (c *codeSyncer) fulfillCodeRequestWithRetry(ctx context.Context, codeHashes []common.Hash) error {
 	// Edge case: empty slice should not be retried
 	if len(codeHashes) == 0 {
 		return nil
 	}
 
-	var lastErr error
+	var (
+		lastErr             error
+		consecutiveFailures int
+		circuitBreakerTripped bool
+	)
 
 	for attempt := 0; attempt < codeRequestMaxRetries; attempt++ {
-		if attempt > 0 {
-			// Check context before retry
+		// Circuit breaker: after 5 consecutive failures, increase backoff to avoid hammering unresponsive peers
+		if consecutiveFailures >= 5 {
+			if !circuitBreakerTripped {
+				log.Warn("Code request circuit breaker tripped - peers not responding",
+					"consecutiveFailures", consecutiveFailures,
+					"numHashes", len(codeHashes))
+				circuitBreakerTripped = true
+			}
+
+			// Higher backoff for circuit breaker mode
+			backoff := exponentialBackoffWithJitter(
+				consecutiveFailures-5,
+				5*time.Second,  // Higher initial delay
+				30*time.Second, // Higher max delay
+				0.5)            // More jitter for better spread
+
+			log.Debug("Circuit breaker active, using extended backoff",
+				"consecutiveFailures", consecutiveFailures,
+				"backoff", backoff)
+
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		} else if attempt > 0 {
+			// Normal retry backoff
 			if err := ctx.Err(); err != nil {
 				return err
 			}
 
-			// Apply exponential backoff with jitter
 			backoff := exponentialBackoffWithJitter(attempt-1, codeRequestInitialDelay, codeRequestMaxDelay, codeRequestJitterFactor)
 			log.Debug("Retrying code request after backoff",
 				"attempt", attempt,
@@ -298,13 +327,17 @@ func (c *codeSyncer) fulfillCodeRequestWithRetry(ctx context.Context, codeHashes
 
 		err := c.fulfillCodeRequest(ctx, codeHashes)
 		if err == nil {
-			if attempt > 0 {
-				log.Info("Code request succeeded after retries", "attempts", attempt+1)
+			if attempt > 0 || circuitBreakerTripped {
+				log.Info("Code request succeeded after retries",
+					"attempts", attempt+1,
+					"circuitBreaker", circuitBreakerTripped,
+					"consecutiveFailures", consecutiveFailures)
 			}
 			return nil
 		}
 
 		lastErr = err
+		consecutiveFailures++
 
 		// Check if fatal error
 		if isCodeRequestFatalError(err) {
@@ -316,11 +349,15 @@ func (c *codeSyncer) fulfillCodeRequestWithRetry(ctx context.Context, codeHashes
 			log.Warn("Code request failed, will retry",
 				"attempt", attempt+1,
 				"maxRetries", codeRequestMaxRetries,
+				"consecutiveFailures", consecutiveFailures,
+				"circuitBreaker", circuitBreakerTripped,
 				"err", err)
 		} else {
 			log.Error("Code request failed on final attempt",
 				"attempt", attempt+1,
 				"maxRetries", codeRequestMaxRetries,
+				"consecutiveFailures", consecutiveFailures,
+				"circuitBreaker", circuitBreakerTripped,
 				"err", err)
 		}
 	}
