@@ -187,8 +187,18 @@ func (c *codeSyncer) work(ctx context.Context) error {
 
 // exponentialBackoffWithJitter calculates backoff with jitter to prevent thundering herd
 func exponentialBackoffWithJitter(attempt int, initialDelay, maxDelay time.Duration, jitterFactor float64) time.Duration {
+	// Validate inputs
 	if attempt < 0 {
 		attempt = 0
+	}
+	if initialDelay <= 0 {
+		initialDelay = 100 * time.Millisecond // Safe default
+	}
+	if maxDelay <= 0 || maxDelay < initialDelay {
+		maxDelay = 10 * time.Second // Safe default
+	}
+	if jitterFactor < 0 || jitterFactor > 1 {
+		jitterFactor = 0.3 // Safe default
 	}
 
 	// Calculate exponential: initialDelay * 2^attempt (capped at 2^10)
@@ -198,7 +208,7 @@ func exponentialBackoffWithJitter(attempt int, initialDelay, maxDelay time.Durat
 	}
 
 	delay := initialDelay * time.Duration(1<<exp)
-	if delay > maxDelay {
+	if delay > maxDelay || delay < 0 { // Check for overflow
 		delay = maxDelay
 	}
 
@@ -208,9 +218,12 @@ func exponentialBackoffWithJitter(attempt int, initialDelay, maxDelay time.Durat
 		jitter := (rand.Float64()*2 - 1) * jitterRange
 		delay = time.Duration(float64(delay) + jitter)
 
-		// Ensure delay is never negative
-		if delay < 0 {
+		// Clamp to valid range [initialDelay, maxDelay]
+		if delay < initialDelay {
 			delay = initialDelay
+		}
+		if delay > maxDelay {
+			delay = maxDelay
 		}
 	}
 
@@ -283,11 +296,18 @@ func (c *codeSyncer) fulfillCodeRequestWithRetry(ctx context.Context, codeHashes
 			return fmt.Errorf("fatal code request error: %w", err)
 		}
 
-		// Transient error, continue retrying
-		log.Warn("Code request failed, will retry",
-			"attempt", attempt+1,
-			"maxRetries", codeRequestMaxRetries,
-			"err", err)
+		// Transient error - log appropriately based on whether we'll retry
+		if attempt+1 < codeRequestMaxRetries {
+			log.Warn("Code request failed, will retry",
+				"attempt", attempt+1,
+				"maxRetries", codeRequestMaxRetries,
+				"err", err)
+		} else {
+			log.Error("Code request failed on final attempt",
+				"attempt", attempt+1,
+				"maxRetries", codeRequestMaxRetries,
+				"err", err)
+		}
 	}
 
 	return fmt.Errorf("code request failed after %d retries: %w", codeRequestMaxRetries, lastErr)

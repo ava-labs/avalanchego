@@ -75,8 +75,18 @@ func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, request
 
 // exponentialBackoffWithJitter calculates backoff with jitter to prevent thundering herd
 func exponentialBackoffWithJitter(attempt int, initialDelay, maxDelay time.Duration, jitterFactor float64) time.Duration {
+	// Validate inputs
 	if attempt < 0 {
 		attempt = 0
+	}
+	if initialDelay <= 0 {
+		initialDelay = 50 * time.Millisecond // Safe default
+	}
+	if maxDelay <= 0 || maxDelay < initialDelay {
+		maxDelay = 8 * time.Second // Safe default
+	}
+	if jitterFactor < 0 || jitterFactor > 1 {
+		jitterFactor = 0.25 // Safe default
 	}
 
 	// Calculate exponential: initialDelay * 2^attempt (capped at 2^10)
@@ -86,7 +96,7 @@ func exponentialBackoffWithJitter(attempt int, initialDelay, maxDelay time.Durat
 	}
 
 	delay := initialDelay * time.Duration(1<<exp)
-	if delay > maxDelay {
+	if delay > maxDelay || delay < 0 { // Check for overflow
 		delay = maxDelay
 	}
 
@@ -96,9 +106,12 @@ func exponentialBackoffWithJitter(attempt int, initialDelay, maxDelay time.Durat
 		jitter := (rand.Float64()*2 - 1) * jitterRange
 		delay = time.Duration(float64(delay) + jitter)
 
-		// Ensure delay is never negative
-		if delay < 0 {
+		// Clamp to valid range [initialDelay, maxDelay]
+		if delay < initialDelay {
 			delay = initialDelay
+		}
+		if delay > maxDelay {
+			delay = maxDelay
 		}
 	}
 
@@ -222,11 +235,20 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 				return fmt.Errorf("fatal leaf request error: %w", err)
 			}
 
-			log.Warn("Leaf request failed, will retry",
-				"attempt", attempt+1,
-				"maxRetries", leafRequestMaxRetries,
-				"err", err,
-				"currentSize", currentSize)
+			// Transient error - log appropriately based on whether we'll retry
+			if attempt+1 < leafRequestMaxRetries {
+				log.Warn("Leaf request failed, will retry",
+					"attempt", attempt+1,
+					"maxRetries", leafRequestMaxRetries,
+					"err", err,
+					"currentSize", currentSize)
+			} else {
+				log.Error("Leaf request failed on final attempt",
+					"attempt", attempt+1,
+					"maxRetries", leafRequestMaxRetries,
+					"err", err,
+					"currentSize", currentSize)
+			}
 		}
 
 		if err != nil {
