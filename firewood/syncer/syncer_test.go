@@ -180,8 +180,9 @@ func testSyncWithUpdate(t *testing.T, seed int64, clientKeys int, serverKeys int
 }
 
 // generateDB creates a new Firewood database with up to [numKeys] random key/value pairs.
-// The function returned closes the database, waiting on the provided context, if there were no test failures.
+// The database should be closed by the caller.
 // Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
+// Returns the database and its resulting root.
 func generateDB(t *testing.T, r *rand.Rand, numKeys int) (*ffi.Database, ids.ID) {
 	t.Helper()
 	db, err := ffi.New(t.TempDir())
@@ -192,6 +193,9 @@ func generateDB(t *testing.T, r *rand.Rand, numKeys int) (*ffi.Database, ids.ID)
 	return db, root
 }
 
+// fillDB adds up to [numKeys] random key/value pairs to [db].
+// Returns the resulting root of the database.
+// Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
 func fillDB(t *testing.T, r *rand.Rand, db *ffi.Database, numKeys int) ids.ID {
 	if numKeys == 0 {
 		root, err := db.Root()
