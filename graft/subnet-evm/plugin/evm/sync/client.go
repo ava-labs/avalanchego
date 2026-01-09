@@ -116,6 +116,10 @@ type client struct {
 
 	// State Sync results
 	err error
+
+	// Mutex to protect cleanup operations from concurrent execution
+	// Prevents race conditions when multiple goroutines try to clean up simultaneously
+	cleanupMutex sync.Mutex
 }
 
 func NewClient(config *ClientConfig) Client {
@@ -148,6 +152,17 @@ func ErrStateSyncFallback() error {
 // detect and retry stuck state syncs.
 // Use this for Tier 2 cleanup: when sync is stuck but state is not corrupted.
 func (client *client) clearSyncProgress(ctx context.Context) error {
+	// CRITICAL: Acquire cleanup mutex to prevent concurrent cleanup operations
+	// Multiple goroutines could theoretically call fallback simultaneously
+	client.cleanupMutex.Lock()
+	defer client.cleanupMutex.Unlock()
+
+	return client.doClearSyncProgress(ctx)
+}
+
+// doClearSyncProgress is the internal implementation without mutex acquisition.
+// Should only be called while holding cleanupMutex.
+func (client *client) doClearSyncProgress(ctx context.Context) error {
 	log.Info("Clearing state sync progress (preserving summary for reviver)...")
 
 	// CRITICAL: Mark cleanup as in-progress for crash recovery
@@ -206,9 +221,11 @@ func (client *client) clearSyncProgress(ctx context.Context) error {
 
 	// CRITICAL: Do NOT clear the ongoing summary - preserve for reviver
 
-	// Clear the cleanup-in-progress marker to indicate successful completion
+	// CRITICAL: Clear the cleanup-in-progress marker to indicate successful completion
+	// If this fails, cleanup will run again on every restart, wasting resources
 	if err := customrawdb.ClearCleanupInProgress(client.ChaindDB); err != nil {
-		log.Warn("Failed to clear cleanup marker (non-fatal)", "err", err)
+		log.Error("Failed to clear cleanup marker - cleanup will repeat on restart", "err", err)
+		return fmt.Errorf("failed to clear cleanup marker: %w", err)
 	}
 
 	log.Info("Sync progress cleared successfully (summary preserved for resume)")
@@ -233,10 +250,15 @@ func (client *client) clearSummaryMetadata() error {
 // Use only when state is corrupted or retry limit exceeded.
 // After this, reviver mechanism will NOT work.
 func (client *client) performFullCleanup(ctx context.Context) error {
+	// CRITICAL: Acquire cleanup mutex to make full cleanup atomic
+	// This ensures no partial cleanup state if interrupted
+	client.cleanupMutex.Lock()
+	defer client.cleanupMutex.Unlock()
+
 	log.Warn("Performing FULL state sync cleanup (reviver will NOT work after this)")
 
-	// Clear progress data
-	if err := client.clearSyncProgress(ctx); err != nil {
+	// Clear progress data (call internal method to avoid deadlock)
+	if err := client.doClearSyncProgress(ctx); err != nil {
 		return err
 	}
 

@@ -799,11 +799,20 @@ func (vm *VM) onBootstrapStarted() error {
 			return err
 		}
 		log.Info("State sync fallback completed, continuing with block sync")
-	}
 
-	// CRITICAL: Do NOT clear summary here - it must be preserved for reviver
-	// The summary will be cleared in onNormalOperationsStarted() after successful bootstrap
-	// This allows the reviver to detect resumable state and retry state sync if appropriate
+		// CRITICAL: Preserve summary for reviver when falling back
+		// The reviver needs the summary to detect resumable state and retry in 30 minutes
+		// Summary will be cleared in onNormalOperationsStarted() after successful block sync
+		log.Info("Preserving state sync summary for reviver retry mechanism")
+	} else {
+		// State sync succeeded - clear the summary immediately
+		// No need to preserve it since sync completed successfully
+		log.Info("State sync succeeded, clearing summary")
+		if err := vm.Client.ClearOngoingSummary(); err != nil {
+			log.Warn("Failed to clear summary after state sync success (non-fatal)", "err", err)
+			// Don't fail bootstrap for this - summary will be cleaned up later
+		}
+	}
 
 	// Ensure snapshots are initialized before bootstrapping (i.e., if state sync is skipped).
 	// Note calling this function has no effect if snapshots are already initialized.

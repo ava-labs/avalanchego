@@ -394,6 +394,13 @@ func (t *stateSync) Start(ctx context.Context) error {
 		return errors.New("state sync already started")
 	}
 
+	return t.doStart(ctx)
+}
+
+// doStart contains the core Start() logic without mutex acquisition.
+// This method should only be called while holding syncMutex.
+// Separated to allow Restart() to call it without causing deadlock.
+func (t *stateSync) doStart(ctx context.Context) error {
 	// Create a cancellable context for the sync operations
 	syncCtx, cancel := context.WithCancel(ctx)
 	t.cancelFunc = cancel
@@ -548,6 +555,13 @@ func (t *stateSync) Restart(ctx context.Context, startReqID uint32) error {
 		return errors.New("cannot restart: state sync already running")
 	}
 
+	// CRITICAL: Verify Wait() was called before Restart()
+	// Restart() requires that the previous sync completed and Wait() returned
+	// Otherwise we could have abandoned channels with blocked goroutines
+	if !t.waitStarted.Load() {
+		return errors.New("cannot restart: Wait() must be called before Restart()")
+	}
+
 	log.Warn("===========================================")
 	log.Warn("STATE SYNC RESTART REQUESTED BY REVIVER")
 	log.Warn("===========================================",
@@ -636,12 +650,14 @@ func (t *stateSync) Restart(ctx context.Context, startReqID uint32) error {
 	// Reset stuck detector to monitor the new sync attempt (uses fresh stats)
 	t.stuckDetector = NewStuckDetector(t.stats)
 
-	log.Info("State sync restart initialized, calling Start()...")
+	log.Info("State sync restart initialized, calling doStart()...")
 
 	// Start the sync again - this will use the preserved summary
-	err = t.Start(ctx)
+	// CRITICAL: Call doStart() directly (not Start()) to avoid deadlock
+	// We already hold syncMutex, and Start() would try to acquire it again
+	err = t.doStart(ctx)
 	if err != nil {
-		log.Error("REVIVER: Restart failed during Start()",
+		log.Error("REVIVER: Restart failed during doStart()",
 			"err", err)
 		return fmt.Errorf("restart start failed: %w", err)
 	}
