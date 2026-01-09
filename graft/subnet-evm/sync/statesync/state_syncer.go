@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"github.com/ava-labs/libevm/common"
@@ -44,6 +45,22 @@ func ErrStateSyncStuck() error {
 	return errStateSyncStuck
 }
 
+// calculateOptimalWorkers determines the optimal number of sync workers based on available CPU cores.
+// Uses 75% of available cores to leave headroom for other operations (networking, database, etc.).
+// Enforces minimum of 4 workers and maximum of 32 to prevent under/over-utilization.
+func calculateOptimalWorkers() int {
+	cores := runtime.NumCPU()
+	// Use 75% of cores, minimum 4, maximum 32
+	workers := cores * 3 / 4
+	if workers < 4 {
+		workers = 4
+	}
+	if workers > 32 {
+		workers = 32
+	}
+	return workers
+}
+
 type StateSyncerConfig struct {
 	Root                     common.Hash
 	Client                   syncclient.Client
@@ -51,6 +68,7 @@ type StateSyncerConfig struct {
 	BatchSize                int
 	MaxOutstandingCodeHashes int    // Maximum number of code hashes in the code syncer queue
 	NumCodeFetchingWorkers   int    // Number of code syncing threads
+	NumWorkers               int    // Number of concurrent sync workers (0 = auto-calculate based on CPU cores)
 	RequestSize              uint16 // Number of leafs to request from a peer at a time
 }
 
@@ -61,6 +79,7 @@ type stateSync struct {
 	trieDB    *triedb.Database          // trieDB on top of db we are syncing. used to restore any existing tries.
 	snapshot  snapshot.SnapshotIterable // used to access the database we are syncing as a snapshot.
 	batchSize int                       // write batches when they reach this size
+	numWorkers int                      // number of concurrent sync workers
 
 	segments   chan syncclient.LeafSyncTask   // channel of tasks to sync
 	syncer     *syncclient.CallbackLeafSyncer // performs the sync, looping over each task's range and invoking specified callbacks
@@ -95,6 +114,15 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		return nil, errInvalidWorkerConfig
 	}
 
+	// Determine number of workers: use config value if specified, otherwise calculate based on CPU cores
+	numWorkers := config.NumWorkers
+	if numWorkers <= 0 {
+		numWorkers = calculateOptimalWorkers()
+		log.Info("Auto-calculated optimal worker count", "workers", numWorkers, "cpuCores", runtime.NumCPU())
+	} else {
+		log.Info("Using configured worker count", "workers", numWorkers)
+	}
+
 	ss := &stateSync{
 		batchSize:       config.BatchSize,
 		db:              config.DB,
@@ -103,15 +131,16 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		snapshot:        snapshot.NewDiskLayer(config.DB),
 		stats:           newTrieSyncStats(),
 		triesInProgress: make(map[common.Hash]*trieToSync),
+		numWorkers:      numWorkers,
 
 		// [triesInProgressSem] is used to keep the number of tries syncing
-		// less than or equal to [defaultNumWorkers].
-		triesInProgressSem: make(chan struct{}, defaultNumWorkers),
+		// less than or equal to [numWorkers].
+		triesInProgressSem: make(chan struct{}, numWorkers),
 
 		// Each [trieToSync] will have a maximum of [numSegments] segments.
-		// We set the capacity of [segments] such that [defaultNumWorkers]
+		// We set the capacity of [segments] such that [numWorkers]
 		// storage tries can sync concurrently.
-		segments:         make(chan syncclient.LeafSyncTask, defaultNumWorkers*numStorageTrieSegments),
+		segments:         make(chan syncclient.LeafSyncTask, numWorkers*numStorageTrieSegments),
 		mainTrieDone:     make(chan struct{}),
 		storageTriesDone: make(chan struct{}),
 		done:             make(chan error, 1),
@@ -268,7 +297,7 @@ func (t *stateSync) Start(ctx context.Context) error {
 	// Start the code syncer and leaf syncer.
 	eg, egCtx := errgroup.WithContext(syncCtx)
 	t.codeSyncer.start(egCtx) // start the code syncer first since the leaf syncer may add code tasks
-	t.syncer.Start(egCtx, defaultNumWorkers, t.onSyncFailure)
+	t.syncer.Start(egCtx, t.numWorkers, t.onSyncFailure)
 	eg.Go(func() error {
 		if err := <-t.syncer.Done(); err != nil {
 			return err

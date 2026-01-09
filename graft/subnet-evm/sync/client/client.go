@@ -158,6 +158,107 @@ func (p *peerFailureTracker) isBlacklisted(nodeID ids.NodeID) bool {
 	return true
 }
 
+// peerMetrics tracks performance metrics for a peer
+type peerMetrics struct {
+	avgLatency     time.Duration // exponential moving average of request latency
+	successCount   int64         // number of successful requests
+	requestCount   int64         // total number of requests
+	lastUpdateTime time.Time     // last time metrics were updated
+}
+
+// successRate calculates the success rate as a float between 0 and 1
+func (m *peerMetrics) successRate() float64 {
+	if m.requestCount == 0 {
+		return 1.0 // no data yet, assume good
+	}
+	return float64(m.successCount) / float64(m.requestCount)
+}
+
+// peerMetricsTracker tracks performance metrics for all peers to enable intelligent peer selection
+type peerMetricsTracker struct {
+	metrics map[ids.NodeID]*peerMetrics
+	lock    sync.RWMutex
+}
+
+func newPeerMetricsTracker() *peerMetricsTracker {
+	return &peerMetricsTracker{
+		metrics: make(map[ids.NodeID]*peerMetrics),
+	}
+}
+
+// recordRequest records the latency and outcome of a request
+func (p *peerMetricsTracker) recordRequest(nodeID ids.NodeID, latency time.Duration, success bool) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	m, exists := p.metrics[nodeID]
+	if !exists {
+		m = &peerMetrics{
+			avgLatency:     latency,
+			successCount:   0,
+			requestCount:   0,
+			lastUpdateTime: time.Now(),
+		}
+		p.metrics[nodeID] = m
+	}
+
+	// Update exponential moving average: new_avg = 0.7 * old_avg + 0.3 * new_value
+	// This gives more weight to recent measurements while smoothing out spikes
+	const alpha = 0.3
+	m.avgLatency = time.Duration(float64(m.avgLatency)*(1-alpha) + float64(latency)*alpha)
+
+	m.requestCount++
+	if success {
+		m.successCount++
+	}
+	m.lastUpdateTime = time.Now()
+}
+
+// selectBestPeer selects the peer with the best combination of low latency and high success rate
+// from the provided list of candidate peers. Returns the zero NodeID if no suitable peer found.
+func (p *peerMetricsTracker) selectBestPeer(candidates []ids.NodeID) ids.NodeID {
+	if len(candidates) == 0 {
+		return ids.NodeID{}
+	}
+
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	var bestPeer ids.NodeID
+	var bestScore float64 = -1
+
+	for _, nodeID := range candidates {
+		m, exists := p.metrics[nodeID]
+		if !exists {
+			// No metrics for this peer yet - consider it as a candidate with neutral score
+			// This ensures new peers get tried
+			score := 0.5
+			if score > bestScore {
+				bestScore = score
+				bestPeer = nodeID
+			}
+			continue
+		}
+
+		// Calculate score: higher is better
+		// Score combines success rate (0-1) and inverse latency
+		// Normalize latency to 0-1 scale where 100ms = 1.0 (excellent), 1s = 0.1 (poor)
+		successRate := m.successRate()
+		latencyMs := float64(m.avgLatency.Milliseconds())
+		latencyScore := 100.0 / (100.0 + latencyMs) // 100ms -> 0.5, 1000ms -> 0.09
+
+		// Weight: 70% success rate, 30% latency
+		score := 0.7*successRate + 0.3*latencyScore
+
+		if score > bestScore {
+			bestScore = score
+			bestPeer = nodeID
+		}
+	}
+
+	return bestPeer
+}
+
 type client struct {
 	networkClient    network.SyncedNetworkClient
 	codec            codec.Manager
@@ -166,6 +267,7 @@ type client struct {
 	stats            stats.ClientSyncerStats
 	blockParser      EthBlockParser
 	peerTracker      *peerFailureTracker
+	metricsTracker   *peerMetricsTracker // tracks latency and success rate for intelligent peer selection
 }
 
 type ClientConfig struct {
@@ -188,6 +290,7 @@ func NewClient(config *ClientConfig) *client {
 		stateSyncNodes: config.StateSyncNodeIDs,
 		blockParser:    config.BlockParser,
 		peerTracker:    newPeerFailureTracker(),
+		metricsTracker: newPeerMetricsTracker(),
 	}
 }
 
@@ -429,21 +532,27 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			if len(c.stateSyncNodes) == 0 {
 				response, nodeID, err = c.networkClient.SendSyncedAppRequestAny(requestCtx, StateSyncVersion, requestBytes)
 			} else {
-				// Round-robin through static peers, skipping blacklisted ones
-				tried := 0
-				for tried < len(c.stateSyncNodes) {
-					nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
-					nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
-
-					if !c.peerTracker.isBlacklisted(nodeID) {
-						break
+				// Intelligent peer selection: prefer peers with low latency and high success rate
+				// Build list of non-blacklisted peers
+				candidates := make([]ids.NodeID, 0, len(c.stateSyncNodes))
+				for _, peer := range c.stateSyncNodes {
+					if !c.peerTracker.isBlacklisted(peer) {
+						candidates = append(candidates, peer)
 					}
-					tried++
 				}
 
-				// If all peers are blacklisted, use the next one anyway (stale blacklist)
-				if tried >= len(c.stateSyncNodes) {
-					log.Debug("all static peers blacklisted, using next peer anyway", "numPeers", len(c.stateSyncNodes))
+				// If all peers are blacklisted, use all peers (stale blacklist recovery)
+				if len(candidates) == 0 {
+					log.Debug("all static peers blacklisted, using all peers anyway", "numPeers", len(c.stateSyncNodes))
+					candidates = c.stateSyncNodes
+				}
+
+				// Select best peer based on latency and success rate metrics
+				nodeID = c.metricsTracker.selectBestPeer(candidates)
+				if nodeID == (ids.NodeID{}) {
+					// No peer selected (shouldn't happen), fall back to round-robin
+					nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
+					nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
 				}
 
 				response, err = c.networkClient.SendSyncedAppRequest(requestCtx, nodeID, requestBytes)
@@ -457,6 +566,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			if nodeID != ids.EmptyNodeID {
 				ctx = append(ctx, "nodeID", nodeID)
 				c.peerTracker.recordFailure(nodeID)
+				c.metricsTracker.recordRequest(nodeID, time.Since(start), false) // Record failed request
 			}
 			ctx = append(ctx, "attempt", attempt, "request", request, "err", err)
 			log.Debug("request failed, retrying", ctx...)
@@ -473,6 +583,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 				log.Debug("could not validate response, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
 				c.networkClient.TrackBandwidth(nodeID, 0)
 				c.peerTracker.recordFailure(nodeID)
+				c.metricsTracker.recordRequest(nodeID, time.Since(start), false) // Record failed validation
 				metric.IncFailed()
 				metric.IncInvalidResponse()
 				continue
@@ -481,6 +592,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			bandwidth := float64(len(response)) / (time.Since(start).Seconds() + epsilon)
 			c.networkClient.TrackBandwidth(nodeID, bandwidth)
 			c.peerTracker.recordSuccess(nodeID)
+			c.metricsTracker.recordRequest(nodeID, time.Since(start), true) // Record successful request
 			metric.IncSucceeded()
 			metric.IncReceived(int64(numElements))
 			return responseIntf, nil
