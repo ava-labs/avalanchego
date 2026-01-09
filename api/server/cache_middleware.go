@@ -211,17 +211,25 @@ func (rc *rpcCache) Middleware(next http.Handler) http.Handler {
 		}
 
 		// Normalize nil/empty params (BUG #13 and #19 fix)
-		paramStr := string(rpcReq.Params)
-		if len(rpcReq.Params) == 0 || paramStr == "null" || paramStr == "{}" {
+		if len(rpcReq.Params) == 0 {
 			rpcReq.Params = json.RawMessage("[]")
 		} else {
-			// Canonicalize JSON to handle whitespace variations (BUG #18 fix)
-			var params interface{}
-			if err := json.Unmarshal(rpcReq.Params, &params); err == nil {
-				if canonical, err := json.Marshal(params); err == nil {
-					rpcReq.Params = canonical
+			paramStr := string(rpcReq.Params)
+			if paramStr == "null" || paramStr == "{}" {
+				rpcReq.Params = json.RawMessage("[]")
+			} else {
+				// Canonicalize JSON to handle whitespace variations (BUG #18 fix)
+				var params interface{}
+				if err := json.Unmarshal(rpcReq.Params, &params); err == nil {
+					if canonical, err := json.Marshal(params); err == nil {
+						rpcReq.Params = canonical
+					} else {
+						rc.log.Debug("failed to marshal canonical JSON, using original",
+							zap.String("method", rpcReq.Method),
+							zap.Error(err))
+					}
 				}
-				// If marshal fails, use original params
+				// If unmarshal fails, use original params (likely not valid JSON)
 			}
 		}
 
@@ -235,9 +243,13 @@ func (rc *rpcCache) Middleware(next http.Handler) http.Handler {
 			responseCopy := make([]byte, len(entry.response))
 			copy(responseCopy, entry.response)
 
-			// Restore cached headers (BUG #16 fix)
+			// Restore cached headers (BUG #16 and #21 fix)
+			// Clone to prevent sharing slices with cache
 			for k, v := range entry.headers {
-				w.Header()[k] = v
+				// Deep copy the slice values
+				values := make([]string, len(v))
+				copy(values, v)
+				w.Header()[k] = values
 			}
 			w.Header().Set("X-Cache", "HIT")
 			w.WriteHeader(entry.status)
@@ -267,14 +279,15 @@ func (rc *rpcCache) Middleware(next http.Handler) http.Handler {
 		if recorder.statusCode == http.StatusOK {
 			// Check max response size (BUG #8 fix)
 			if len(responseBytes) <= MaxResponseSize {
-				// Capture headers (BUG #16 fix)
-				headers := make(http.Header)
-				for k, v := range recorder.Header() {
-					headers[k] = v
-				}
+				// Capture headers with deep copy (BUG #16 and #20 fix)
+				headers := recorder.Header().Clone()
+
+				// Copy response bytes to prevent modifications (BUG #25 fix)
+				responseCopy := make([]byte, len(responseBytes))
+				copy(responseCopy, responseBytes)
 
 				rc.put(cacheKey, &cacheEntry{
-					response:  responseBytes,
+					response:  responseCopy,
 					headers:   headers,
 					timestamp: time.Now(),
 					status:    recorder.statusCode,

@@ -692,3 +692,61 @@ func TestRPCCache_EmptyObjectNormalization(t *testing.T) {
 	require.Equal(1, callCount, "Null params should also hit same cache")
 	require.Equal("HIT", rec3.Header().Get("X-Cache"))
 }
+
+// Test for BUG #20 and #21 fix: Headers deep-copied (no shared slices)
+func TestRPCCache_HeadersIndependent(t *testing.T) {
+	require := require.New(t)
+
+	cache, err := newRPCCache(
+		logging.NoLog{},
+		RPCCacheConfig{
+			Enabled:  true,
+			Size:     100,
+			TTL:      1 * time.Minute,
+			Readonly: true,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("X-Multi", "value1")
+		w.Header().Add("X-Multi", "value2")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"result":"ok"}`))
+	})
+
+	cachedHandler := cache.Middleware(handler)
+
+	// First request - cache MISS
+	req1 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_call","params":[],"id":1}`))
+	rec1 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec1, req1)
+
+	originalHeaders := rec1.Header()["X-Multi"]
+	require.Equal([]string{"value1", "value2"}, originalHeaders)
+
+	// Second request - cache HIT
+	req2 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_call","params":[],"id":1}`))
+	rec2 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec2, req2)
+
+	cachedHeaders := rec2.Header()["X-Multi"]
+	require.Equal([]string{"value1", "value2"}, cachedHeaders)
+	require.Equal("HIT", rec2.Header().Get("X-Cache"))
+
+	// Verify headers are independent (no shared slices)
+	// Modify the cached header
+	if len(cachedHeaders) > 0 {
+		cachedHeaders[0] = "MODIFIED"
+	}
+
+	// Third request - should still have original values
+	req3 := httptest.NewRequest(http.MethodPost, "/ext/bc/C/rpc", bytes.NewBufferString(`{"jsonrpc":"2.0","method":"eth_call","params":[],"id":1}`))
+	rec3 := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec3, req3)
+
+	// Should not be affected by modification above
+	thirdHeaders := rec3.Header()["X-Multi"]
+	require.Equal([]string{"value1", "value2"}, thirdHeaders, "Headers should be independent, not sharing slices")
+}
