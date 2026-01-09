@@ -79,13 +79,15 @@ type nodeConfig struct {
 type Node struct {
 	t *testing.T
 
+	// Value set in [context.Context] to for debugging purposes
+	id int
 	// TODO make the upstream Node context aware so that we can wire add
 	//  debugging context for conditional breakpoints
 	n   *avalanchenode.Node
 	dir string
 }
 
-func newNode(t *testing.T, cfg nodeConfig) *Node {
+func newNode(t *testing.T, cfg nodeConfig, id int) *Node {
 	fs := config.BuildFlagSet()
 
 	// TODO this should not respect env vars
@@ -164,6 +166,7 @@ func newNode(t *testing.T, cfg nodeConfig) *Node {
 
 	return &Node{
 		t:   t,
+		id: id,
 		n:   n,
 		dir: dir,
 	}
@@ -269,7 +272,7 @@ func Accept(
 	inMsg, err := mc.Parse(outMsg.Bytes, ids.GenerateTestNodeID(), func() {})
 	require.NoError(t, err)
 
-	n.n.HandleMessage(t.Context(), inMsg)
+	n.n.HandleMessage(context.WithValue(t.Context(), DebugKey, n.id), inMsg)
 }
 
 func AwaitAcceptance[T block.ChainVM](

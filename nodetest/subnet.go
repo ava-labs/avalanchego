@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nodetest
@@ -30,6 +30,8 @@ import (
 
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 )
+
+const DebugKey = "nodetest-id"
 
 type Subnet[T block.ChainVM] struct {
 	SubnetID   ids.ID
@@ -99,7 +101,7 @@ func NewSubnet[T block.ChainVM](
 
 			nodeCfg.StakingPort = uint16(10_000 + i)
 
-			node := newNode(t, nodeCfg)
+			node := newNode(t, nodeCfg, i)
 			nodes[i] = node
 
 			vms[i] = &vmFactory[T]{factory: factory}
@@ -120,7 +122,11 @@ func NewSubnet[T block.ChainVM](
 
 	for _, n := range nodes {
 		eg.Go(func() error {
-			return n.Run(egCtx)
+			t.Log("starting node", n.ID(), "with debug key", DebugKey, n.id)
+			// Provide a context with a some debug context so we can set conditional
+			// breakpoints
+			nodeCtx := context.WithValue(egCtx, DebugKey, n.id)
+			return n.Run(nodeCtx)
 		})
 	}
 
