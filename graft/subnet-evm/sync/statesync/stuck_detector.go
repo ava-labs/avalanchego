@@ -40,14 +40,20 @@ func NewStuckDetector(stats *trieSyncStats) *StuckDetector {
 		stuckChan: make(chan struct{}, 1),
 		stopChan:  make(chan struct{}),
 	}
-	now := time.Now()
-	sd.lastLeafUpdate.Store(now)
-	sd.lastTrieUpdate.Store(now)
+	// Timestamps will be initialized in Start() to avoid timing issues
 	return sd
 }
 
 // Start begins monitoring in a background goroutine.
 func (sd *StuckDetector) Start(ctx context.Context) {
+	// Initialize timestamps and counters at start time
+	now := time.Now()
+	sd.lastLeafUpdate.Store(now)
+	sd.lastTrieUpdate.Store(now)
+	sd.lastLeafCount.Store(sd.stats.totalLeafs.Count())
+	triesSynced, _ := sd.stats.getProgress()
+	sd.lastTrieCount.Store(uint64(triesSynced))
+
 	go sd.monitorLoop(ctx)
 }
 
