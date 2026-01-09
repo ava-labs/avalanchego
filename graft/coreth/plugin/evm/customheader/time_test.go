@@ -140,7 +140,7 @@ func TestVerifyTime(t *testing.T) {
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),
-				utils.PointerTo(acp226.InitialDelayExcess),
+				utils.PointerTo[uint64](acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeader(timeSeconds-1, nil), // Pre-Granite parent
 			extraConfig:  extras.TestGraniteChainConfig,
@@ -150,12 +150,12 @@ func TestVerifyTime(t *testing.T) {
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),
-				utils.PointerTo(acp226.InitialDelayExcess),
+				utils.PointerTo[uint64](acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
 				utils.PointerTo(timeMillis-2000), // 2000 ms is the exact initial delay
-				utils.PointerTo(acp226.InitialDelayExcess),
+				utils.PointerTo[uint64](acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
@@ -164,12 +164,12 @@ func TestVerifyTime(t *testing.T) {
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),
-				utils.PointerTo(acp226.InitialDelayExcess),
+				utils.PointerTo[uint64](acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
 				utils.PointerTo(timeMillis-1999), // 1 ms less than required
-				utils.PointerTo(acp226.InitialDelayExcess),
+				utils.PointerTo[uint64](acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrMinDelayNotMet,
@@ -179,12 +179,12 @@ func TestVerifyTime(t *testing.T) {
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds+5, // 5 seconds in future
 				utils.PointerTo(timeMillis+5000),
-				utils.PointerTo(acp226.InitialDelayExcess),
+				utils.PointerTo[uint64](acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
 				utils.PointerTo(timeMillis-2000),
-				utils.PointerTo(acp226.InitialDelayExcess),
+				utils.PointerTo[uint64](acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
@@ -193,12 +193,12 @@ func TestVerifyTime(t *testing.T) {
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds+15, // 15 seconds in future, exceeds MaxFutureBlockTime
 				utils.PointerTo(timeMillis+15000),
-				utils.PointerTo(acp226.InitialDelayExcess),
+				utils.PointerTo[uint64](acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
 				utils.PointerTo(timeMillis-2000),
-				utils.PointerTo(acp226.InitialDelayExcess),
+				utils.PointerTo[uint64](acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrBlockTooFarInFuture,
@@ -208,12 +208,12 @@ func TestVerifyTime(t *testing.T) {
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),
-				utils.PointerTo(acp226.DelayExcess(0)),
+				utils.PointerTo[uint64](0),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis-1),          // 1ms delay, meets zero requirement
-				utils.PointerTo(acp226.DelayExcess(0)), // Parent has zero delay excess
+				utils.PointerTo[uint64](0), // Parent has zero delay excess
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
@@ -222,12 +222,12 @@ func TestVerifyTime(t *testing.T) {
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),
-				utils.PointerTo(acp226.DelayExcess(0)),
+				utils.PointerTo[uint64](0),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),            // Same timestamp, zero delay
-				utils.PointerTo(acp226.DelayExcess(0)), // Parent has zero delay excess
+				utils.PointerTo[uint64](0), // Parent has zero delay excess
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrMinDelayNotMet,
@@ -338,14 +338,14 @@ func generateHeader(timeSeconds uint64, timeMilliseconds *uint64) *types.Header 
 	)
 }
 
-func generateHeaderWithMinDelayExcessAndTime(timeSeconds uint64, timeMilliseconds *uint64, minDelayExcess *acp226.DelayExcess) *types.Header {
+func generateHeaderWithMinDelayExcessAndTime(timeSeconds uint64, timeMilliseconds *uint64, minDelayExcess *uint64) *types.Header {
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			Time: timeSeconds,
 		},
 		&customtypes.HeaderExtra{
 			TimeMilliseconds: timeMilliseconds,
-			MinDelayExcess:   minDelayExcess,
+			MinDelayExcess:   (*acp226.DelayExcess)(minDelayExcess),
 		},
 	)
 }

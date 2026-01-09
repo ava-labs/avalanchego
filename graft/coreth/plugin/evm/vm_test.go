@@ -2150,19 +2150,19 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 			name:                   "granite_first_block_initial_delay_excess",
 			fork:                   upgradetest.Granite,
 			desiredMinDelay:        nil,
-			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess),
+			expectedMinDelayExcess: utils.PointerTo(acp226.DelayExcess(acp226.InitialDelayExcess)),
 		},
 		{
 			name:                   "granite_with_excessive_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
 			desiredMinDelay:        utils.PointerTo[uint64](4000),
-			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
+			expectedMinDelayExcess: utils.PointerTo(acp226.DelayExcess(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff)),
 		},
 		{
 			name:                   "granite_with_zero_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
 			desiredMinDelay:        utils.PointerTo[uint64](0),
-			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
+			expectedMinDelayExcess: utils.PointerTo(acp226.DelayExcess(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff)),
 		},
 	}
 
