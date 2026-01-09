@@ -46,6 +46,11 @@ type StuckDetector struct {
 	lastVelocityCount      atomic.Uint64 // leaf count at last velocity check
 	codeSyncPhaseStart     atomic.Value  // *time.Time - when code sync phase started (nil = not in code sync)
 	inCodeSyncPhase        atomic.Bool   // true if currently in code sync phase
+
+	// Track storage tries waiting for code sync (specific failure mode)
+	// Enables faster stuck detection when storage is complete but code sync failing
+	storageTriesWaitingStart atomic.Value // *time.Time - when storage tries started waiting for code
+	storageTriesWaiting      atomic.Bool  // true if storage tries are waiting for code sync
 }
 
 // NewStuckDetector creates a new stuck detector for monitoring state sync progress.
@@ -256,6 +261,46 @@ func (sd *StuckDetector) checkIfStuck() bool {
 		}
 	}
 
+	// Check 3.6: Storage tries waiting for code sync timeout
+	// This is a specific failure mode where storage tries completed but can't commit
+	// because code sync is failing. We use a faster timeout (3 min) because we know
+	// storage is complete and only code sync is blocking.
+	if sd.storageTriesWaiting.Load() {
+		waitingStartPtr := sd.storageTriesWaitingStart.Load()
+		if waitingStartPtr != nil {
+			waitingStart := waitingStartPtr.(*time.Time)
+			if waitingStart != nil {
+				waitingDuration := now.Sub(*waitingStart)
+
+				// Faster timeout: 3 minutes (vs 5-8 min general timeout)
+				// We know storage is done, so this is purely a code sync issue
+				const storageWaitingTimeout = 3 * time.Minute
+
+				if !leafsProgressing && waitingDuration > storageWaitingTimeout {
+					triesSynced, triesRemaining := sd.stats.getProgress()
+					log.Error("Stuck detected: Storage tries blocked by code sync failures",
+						"waitingDuration", waitingDuration.Round(time.Second),
+						"timeout", storageWaitingTimeout,
+						"triesSynced", triesSynced,
+						"triesRemaining", triesRemaining,
+						"lastLeafCount", currentLeafCount)
+					return true
+				}
+
+				// Log waiting status every minute to show we're monitoring
+				if waitingDuration.Truncate(time.Minute) != (waitingDuration - 30*time.Second).Truncate(time.Minute) {
+					triesSynced, triesRemaining := sd.stats.getProgress()
+					log.Warn("Storage tries still waiting for code sync",
+						"duration", waitingDuration.Round(time.Second),
+						"timeout", storageWaitingTimeout,
+						"triesSynced", triesSynced,
+						"triesRemaining", triesRemaining,
+						"leafsProgressing", leafsProgressing)
+				}
+			}
+		}
+	}
+
 	// Check 4: Progress velocity - is progress happening but too slowly?
 	lastVelocityCheckPtr := sd.lastVelocityCheck.Load().(*time.Time)
 	if lastVelocityCheckPtr != nil {
@@ -389,6 +434,27 @@ func (sd *StuckDetector) ExitCodeSyncPhase() {
 	if sd.inCodeSyncPhase.CompareAndSwap(true, false) {
 		sd.codeSyncPhaseStart.Store((*time.Time)(nil))
 		log.Info("Exited code sync phase")
+	}
+}
+
+// NotifyStorageTriesWaitingForCode indicates storage tries are waiting for code sync.
+// This enables faster stuck detection for the specific failure mode where storage completes
+// but code sync is failing due to peer unavailability.
+func (sd *StuckDetector) NotifyStorageTriesWaitingForCode() {
+	if sd.storageTriesWaiting.CompareAndSwap(false, true) {
+		now := time.Now()
+		sd.storageTriesWaitingStart.Store(&now)
+		log.Warn("Storage tries waiting for code sync - enabling faster stuck detection",
+			"timeout", 3*time.Minute)
+	}
+}
+
+// ClearStorageTriesWaiting clears the storage tries waiting state.
+// Called when code sync completes or sync is cancelled.
+func (sd *StuckDetector) ClearStorageTriesWaiting() {
+	if sd.storageTriesWaiting.CompareAndSwap(true, false) {
+		sd.storageTriesWaitingStart.Store((*time.Time)(nil))
+		log.Info("Storage tries no longer waiting for code sync")
 	}
 }
 

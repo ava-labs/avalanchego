@@ -124,6 +124,11 @@ type stateSync struct {
 	mainTrieDoneOnce      sync.Once      // ensures mainTrieDone channel is closed only once
 	segmentsDoneOnce      sync.Once      // ensures segments channel is closed only once
 	storageTriesDoneOnce  sync.Once      // ensures storageTriesDone channel is closed only once
+
+	// Code sync error tracking for reviver retry
+	// Allows storage tries to complete even when code sync fails
+	codeSyncErr    atomic.Value // stores *error from code sync
+	codeSyncFailed atomic.Bool  // true if code sync failed but storage completed
 }
 
 func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
@@ -370,13 +375,28 @@ func categorizeStateSyncError(err error) ErrorCategory {
 
 	// IMPORTANT: Distinguish code sync failures from other retry exhaustion
 	// Code sync failures are peer-related (peers don't have data), not stuck
-	if strings.Contains(errStr, "too many retries") {
-		if strings.Contains(errStr, "code request") || strings.Contains(errStr, "CodeRequest") {
-			log.Warn("Code sync retry exhaustion detected - preserving state for reviver",
+	// Check for code sync specific error patterns first, before general retry exhaustion
+	if strings.Contains(errStr, "code request") ||
+		strings.Contains(errStr, "CodeRequest") ||
+		strings.Contains(errStr, "code sync") ||
+		strings.Contains(errStr, "code hashes") {
+
+		// Code sync failures with retry exhaustion are retryable (not stuck)
+		if strings.Contains(errStr, "too many retries") ||
+			strings.Contains(errStr, "retry") {
+			log.Warn("Code sync retry exhaustion - preserving state for reviver",
 				"error", errStr)
 			return ErrorCategoryRetryable
 		}
-		// Other retry exhaustion (trie segments, etc.) is stuck
+
+		// Other code sync errors (timeouts, peer unavailable, etc.) are also retryable
+		log.Warn("Code sync error detected - preserving state for reviver",
+			"error", errStr)
+		return ErrorCategoryRetryable
+	}
+
+	// Other retry exhaustion (trie segments, etc.) is stuck, not retryable
+	if strings.Contains(errStr, "too many retries") {
 		return ErrorCategoryStuck
 	}
 
@@ -455,14 +475,35 @@ func (t *stateSync) doStart(ctx context.Context) error {
 	eg.Go(func() (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Error("PANIC in codeSyncer.Done goroutine, triggering fallback",
+				log.Error("PANIC in codeSyncer.Done goroutine",
 					"panic", r,
 					"stack", string(debug.Stack()))
-				cancel() // Cancel other goroutines
+				// Don't cancel - let storage tries finish, but still fail the sync
+				// Panics are programming bugs, not "code unavailable" scenarios
 				err = fmt.Errorf("panic in codeSyncer.Done: %v", r)
 			}
 		}()
-		return <-t.codeSyncer.Done()
+
+		codeSyncErr := <-t.codeSyncer.Done()
+		if codeSyncErr != nil {
+			// Context cancelled is expected during shutdown
+			if errors.Is(codeSyncErr, context.Canceled) {
+				return codeSyncErr
+			}
+
+			// Code sync failure is NOT fatal - storage tries don't need code to complete
+			// Storage tries only contain key-value pairs, code can be synced later
+			log.Warn("Code sync failed but allowing storage tries to complete",
+				"err", codeSyncErr,
+				"triesSynced", t.stats.getProgress())
+
+			// Store the error for potential retry by reviver
+			t.storeCodeSyncError(codeSyncErr)
+			return nil // Don't fail entire sync
+		}
+
+		log.Info("Code sync completed successfully")
+		return nil
 	})
 
 	eg.Go(func() (err error) {
@@ -505,6 +546,9 @@ func (t *stateSync) doStart(ctx context.Context) error {
 			case <-t.storageTriesDone:
 				// Both done, now primarily in code sync phase
 				t.stuckDetector.EnterCodeSyncPhase()
+				// Notify that storage tries are waiting for code sync to complete
+				// This enables faster stuck detection if code sync fails
+				t.stuckDetector.NotifyStorageTriesWaitingForCode()
 			case <-egCtx.Done():
 				return nil
 			}
@@ -515,6 +559,7 @@ func (t *stateSync) doStart(ctx context.Context) error {
 		// Wait for completion or cancellation
 		<-egCtx.Done()
 		t.stuckDetector.ExitCodeSyncPhase()
+		t.stuckDetector.ClearStorageTriesWaiting()
 		return nil
 	})
 
@@ -746,4 +791,29 @@ func (t *stateSync) onSyncFailure(error) error {
 		}
 	}
 	return nil
+}
+
+// storeCodeSyncError stores a code sync error for potential retry by the reviver.
+// This allows storage tries to complete even when code sync fails, with the error
+// preserved for a subsequent retry attempt.
+func (t *stateSync) storeCodeSyncError(err error) {
+	if err != nil {
+		// Store error first, then set flag (ordering matters for concurrent access)
+		t.codeSyncErr.Store(err)
+		t.codeSyncFailed.Store(true)
+		log.Warn("Code sync error stored for potential reviver retry", "err", err)
+	}
+}
+
+// getCodeSyncError retrieves the stored code sync error, if any.
+// Returns nil if no code sync error was stored.
+func (t *stateSync) getCodeSyncError() error {
+	if !t.codeSyncFailed.Load() {
+		return nil
+	}
+	errVal := t.codeSyncErr.Load()
+	if errVal == nil {
+		return nil
+	}
+	return errVal.(error)
 }

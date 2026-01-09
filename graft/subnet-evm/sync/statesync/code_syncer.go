@@ -164,17 +164,49 @@ func (c *codeSyncer) addCodeToFetchFromDBToQueue() error {
 func (c *codeSyncer) work(ctx context.Context) error {
 	codeHashes := make([]common.Hash, 0, message.MaxCodeHashesPerRequest)
 
+	// Track progress for better observability
+	var (
+		totalRequests   int
+		successRequests int
+		failedRequests  int
+		totalCodeHashes int
+	)
+
 	for {
 		select {
 		case <-ctx.Done(): // If ctx is done, set the error to the ctx error since work has been cancelled.
+			// Log final stats before returning
+			if totalRequests > 0 {
+				log.Info("Code sync worker exiting",
+					"totalRequests", totalRequests,
+					"successRequests", successRequests,
+					"failedRequests", failedRequests,
+					"totalCodeHashes", totalCodeHashes,
+					"successRate", fmt.Sprintf("%.1f%%",
+						100.0*float64(successRequests)/float64(totalRequests)))
+			}
 			return ctx.Err()
 		case codeHash, ok := <-c.codeHashes:
 			// If there are no more [codeHashes], fulfill a last code request for any [codeHashes] previously
 			// read from the channel, then return.
 			if !ok {
 				if len(codeHashes) > 0 {
-					return c.fulfillCodeRequestWithRetry(ctx, codeHashes)
+					totalRequests++
+					err := c.fulfillCodeRequestWithRetry(ctx, codeHashes)
+					if err != nil {
+						failedRequests++
+						return err
+					}
+					successRequests++
+					totalCodeHashes += len(codeHashes)
 				}
+
+				// Log final stats
+				log.Info("Code sync completed",
+					"totalRequests", totalRequests,
+					"successRequests", successRequests,
+					"failedRequests", failedRequests,
+					"totalCodeHashes", totalCodeHashes)
 				return nil
 			}
 
@@ -184,8 +216,22 @@ func (c *codeSyncer) work(ctx context.Context) error {
 			if len(codeHashes) < message.MaxCodeHashesPerRequest {
 				continue
 			}
+
+			totalRequests++
 			if err := c.fulfillCodeRequestWithRetry(ctx, codeHashes); err != nil {
+				failedRequests++
 				return err
+			}
+			successRequests++
+			totalCodeHashes += len(codeHashes)
+
+			// Log progress every 10 requests for visibility
+			if totalRequests%10 == 0 {
+				log.Debug("Code sync progress",
+					"requests", totalRequests,
+					"success", successRequests,
+					"failed", failedRequests,
+					"codeHashes", totalCodeHashes)
 			}
 
 			// Reset the codeHashes array

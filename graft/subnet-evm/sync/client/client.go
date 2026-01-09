@@ -38,6 +38,15 @@ const (
 	maxRetriesPerRequest       = 50               // Maximum retries before giving up on a request
 	retryWarningThreshold      = 20               // Log warning when retries exceed this
 
+	// Code request specific tuning
+	// Code requests have different timeout/retry characteristics because:
+	// 1. Code data can be larger than trie leafs
+	// 2. Peer unavailability is more common (not all peers have all contracts)
+	// 3. Failures should be detected faster since storage doesn't depend on code
+	codeRequestTimeout           = 45 * time.Second // Longer timeout for large code (vs 30s)
+	codeRequestMaxRetries        = 30               // Fewer retries: 30 × 45s = 22.5 min (vs 50 × 30s = 25 min)
+	codeRequestBlacklistDuration = 5 * time.Minute  // Longer blacklist for unresponsive code peers
+
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
 
@@ -499,19 +508,32 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 		numElements  int
 		lastErr      error
 	)
+
+	// Adaptive retry limit based on request type
+	// Code requests use fewer retries to fail faster (storage doesn't depend on code)
+	retryLimit := maxRetriesPerRequest
+	warningThreshold := retryWarningThreshold
+	if isCodeRequest {
+		retryLimit = codeRequestMaxRetries
+		warningThreshold = codeRequestMaxRetries * 2 / 3 // Warn at 2/3 of limit (20/30)
+	}
+
 	// Loop until the context is cancelled, we get a valid response, or hit retry limit
 	for attempt := 0; ; attempt++ {
+
 		// Check retry limit to prevent infinite loops
-		if attempt >= maxRetriesPerRequest {
-			return nil, fmt.Errorf("%w: %d attempts, last error: %v", errTooManyRetries, attempt, lastErr)
+		if attempt >= retryLimit {
+			return nil, fmt.Errorf("%w: %d attempts (limit: %d), last error: %v",
+				errTooManyRetries, attempt, retryLimit, lastErr)
 		}
 
 		// Log warning when approaching retry limit
-		if attempt == retryWarningThreshold {
+		if attempt == warningThreshold {
 			log.Warn("Request retry count high, may be stuck",
 				"attempt", attempt,
-				"maxRetries", maxRetriesPerRequest,
-				"request", request,
+				"maxRetries", retryLimit,
+				"requestType", fmt.Sprintf("%T", request),
+				"isCodeRequest", isCodeRequest,
 				"lastErr", lastErr)
 		}
 
@@ -533,9 +555,14 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 		)
 
 		// Create a per-request timeout context to prevent hanging on slow peers
+		// Use adaptive timeout based on request type
 		// Use an anonymous function to ensure cancel() is called after each request
 		func() {
-			requestCtx, cancel := context.WithTimeout(ctx, perRequestTimeout)
+			timeout := perRequestTimeout
+			if isCodeRequest {
+				timeout = codeRequestTimeout // 45s for code (larger data)
+			}
+			requestCtx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
 
 			if len(c.stateSyncNodes) == 0 {
@@ -594,16 +621,33 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 
 			// Enhanced logging for code requests to diagnose peer issues
 			if isCodeRequest {
-				if err == nil || err.Error() == "" {
-					log.Warn("Code request timeout - peer not responding",
+				// Detect timeout vs other errors for better diagnostics
+				isTimeout := errors.Is(err, context.DeadlineExceeded) ||
+					(err != nil && (err.Error() == "" ||
+						bytes.Contains([]byte(err.Error()), []byte("timeout")) ||
+						bytes.Contains([]byte(err.Error()), []byte("deadline"))))
+
+				latency := time.Since(start)
+
+				if isTimeout {
+					log.Warn("Code request timeout - peer accepted but didn't respond",
 						"nodeID", nodeID,
 						"attempt", attempt,
-						"latency", time.Since(start))
+						"retryLimit", retryLimit,
+						"latency", latency.Round(time.Millisecond),
+						"willRetryWithDifferentPeer", attempt < retryLimit-1)
+				} else if err == nil || err.Error() == "" {
+					// Network layer timeout without error context
+					log.Warn("Code request returned nil error (likely timeout in network layer)",
+						"nodeID", nodeID,
+						"attempt", attempt,
+						"latency", latency.Round(time.Millisecond))
 				} else {
-					log.Warn("Code request failed, retrying with different peer",
+					log.Warn("Code request failed",
 						"nodeID", nodeID,
 						"attempt", attempt,
-						"err", err)
+						"err", err,
+						"errType", fmt.Sprintf("%T", err))
 				}
 			} else {
 				log.Debug("request failed, retrying", ctx...)
