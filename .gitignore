@@ -68,3 +68,4 @@ __debug_*
 
 # solc downloads from setup-solc GitHub Action
 setup-solc_downloads/
+/.claude/settings.local.json
