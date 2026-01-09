@@ -168,11 +168,14 @@ func testSyncWithUpdate(t *testing.T, seed int64, clientKeys int, serverKeys int
 
 	require.NoError(t, syncer.Start(ctx))
 	err = syncer.Wait(ctx)
-	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
+
+	finalRoot, err := clientDB.Root()
+	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) || ids.ID(finalRoot) != newRoot {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
 		logDiff(t, serverDB, clientDB)
 	}
 	require.NoError(t, err)
+	require.Equal(t, newRoot, ids.ID(finalRoot))
 }
 
 // generateDB creates a new Firewood database with up to [numKeys] random key/value pairs.
