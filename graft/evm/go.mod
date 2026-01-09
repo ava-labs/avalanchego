@@ -7,7 +7,7 @@ require (
 	github.com/ava-labs/avalanchego v1.14.1-0.20251120155522-df4a8e531761
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18
 	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
-	github.com/gorilla/rpc v1.2.1
+	github.com/gorilla/rpc v1.2.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/stretchr/testify v1.11.1
 )

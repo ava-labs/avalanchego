@@ -431,7 +431,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 		{
 			name:            "unexpected multiple data files when MaxDataFileSize is max uint64",
 			blockHeights:    []uint64{0, 1, 2},
-			maxDataFileSize: utils.PointerTo(uint64(math.MaxUint64)), // Single file mode
+			maxDataFileSize: utils.PointerTo[uint64](math.MaxUint64), // Single file mode
 			blockSize:       512,                                     // 512 bytes per block
 			setupCorruption: func(store *Database, _ [][]byte) error {
 				// Manually create a second data file to simulate corruption
