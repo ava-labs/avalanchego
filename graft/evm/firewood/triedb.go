@@ -134,12 +134,6 @@ func (c TrieDBConfig) BackendConstructor(disk ethdb.Database) triedb.DBOverride 
 // New creates a new Firewood database with the given configuration.
 // The database will not be opened on error.
 func New(config TrieDBConfig, disk ethdb.Database) (*TrieDB, error) {
-	height := ReadCommittedHeight(disk)
-	blockHashes, err := ReadCommittedBlockHashes(disk)
-	if err != nil {
-		return nil, err
-	}
-
 	if err := validateDir(config.DatabaseDir); err != nil {
 		return nil, err
 	}
@@ -167,6 +161,8 @@ func New(config TrieDBConfig, disk ethdb.Database) (*TrieDB, error) {
 		return nil, err
 	}
 
+	blockHashes := make(map[common.Hash]struct{})
+	blockHashes[common.Hash{}] = struct{}{}
 	return &TrieDB{
 		Firewood: fw,
 		kvStore:  disk,
@@ -176,7 +172,7 @@ func New(config TrieDBConfig, disk ethdb.Database) (*TrieDB, error) {
 				proposalMeta: &proposalMeta{
 					root:        common.Hash(intialRoot),
 					blockHashes: blockHashes,
-					height:      height,
+					height:      0,
 				},
 			},
 		},
@@ -202,6 +198,17 @@ func validateDir(dir string) error {
 	}
 
 	return nil
+}
+
+// SetHashAndHeight sets the committed block hashes and height in memory.
+// This must be called at startup to initialize the in-memory state, unless
+// explicitly committing a genesis block.
+func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
+	t.Lock()
+	defer t.Unlock()
+	clear(t.tree.blockHashes)
+	t.tree.blockHashes[blockHash] = struct{}{}
+	t.tree.height = height
 }
 
 // Scheme returns the scheme of the database.
@@ -392,14 +399,6 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	// On success, we should remove all children of the committed proposal.
 	// They will never be committed.
 	t.cleanupCommittedProposal(p)
-
-	// Update the committed block hashes and height on disk to enable recovery.
-	if err := WriteCommittedBlockHashes(t.kvStore, p.blockHashes); err != nil {
-		return err
-	}
-	if err := WriteCommittedHeight(t.kvStore, p.height); err != nil {
-		return err
-	}
 	return nil
 }
 
