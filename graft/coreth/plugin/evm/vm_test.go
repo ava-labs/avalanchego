@@ -2218,36 +2218,25 @@ func TestInspectDatabases(t *testing.T) {
 // Querying for the nonce of the zero address at various heights is sufficient
 // as this succeeds only if the EVM has the matching trie at each height.
 func TestArchivalQueries(t *testing.T) {
-	// Setting the state history to 5 means that we keep around only the 5 latest
-	// tries in memory. By creating numBlocks (10), we'll have:
-	//	- Tries 0-5: on-disk
-	// 	- Tries 6-10: in-memory
-	tests := []struct {
-		name   string
-		scheme string
-	}{
-		{
-			name:   "firewood",
-			scheme: customrawdb.FirewoodScheme,
-		},
-		{
-			name:   "hashdb",
-			scheme: rawdb.HashScheme,
-		},
-	}
+	schemes := []string{customrawdb.FirewoodScheme, rawdb.HashScheme}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
 			require := require.New(t)
 			ctx := t.Context()
 
 			vm := newDefaultTestVM()
+
+			// Setting the state history to 5 means that we keep around only the
+			// 5 latest tries in memory. By creating numBlocks (10), we'll have:
+			//	- Tries 0-5: on-disk
+			// 	- Tries 6-10: in-memory
 			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 				ConfigJSON: `{
 					"pruning-enabled": false,
 					"state-history": 5
 				}`,
-				Scheme: tt.scheme,
+				Scheme: scheme,
 			})
 
 			numBlocks := 10
