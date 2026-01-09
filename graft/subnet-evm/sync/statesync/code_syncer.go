@@ -25,6 +25,14 @@ import (
 	statesyncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 )
 
+var (
+	// Thread-safe random source for jitter calculation
+	// Note: Go 1.20+ global rand is auto-seeded and has internal locking,
+	// but we use a dedicated source to avoid contention with other code
+	rngMu sync.Mutex
+	rng   = rand.New(rand.NewSource(time.Now().UnixNano()))
+)
+
 const (
 	DefaultMaxOutstandingCodeHashes = 10000 // Increased from 5000 to reduce blocking during code sync
 	DefaultNumCodeFetchingWorkers   = 10    // Increased from 5 to improve code fetch throughput
@@ -215,7 +223,13 @@ func exponentialBackoffWithJitter(attempt int, initialDelay, maxDelay time.Durat
 	// Add jitter: delay * (1 +/- jitterFactor)
 	if jitterFactor > 0 {
 		jitterRange := float64(delay) * jitterFactor
-		jitter := (rand.Float64()*2 - 1) * jitterRange
+
+		// Thread-safe random number generation
+		rngMu.Lock()
+		randVal := rng.Float64()
+		rngMu.Unlock()
+
+		jitter := (randVal*2 - 1) * jitterRange
 		delay = time.Duration(float64(delay) + jitter)
 
 		// Clamp to valid range [initialDelay, maxDelay]

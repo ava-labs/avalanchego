@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -19,6 +20,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
+)
+
+var (
+	// Thread-safe random source for jitter calculation
+	// Note: Go 1.20+ global rand is auto-seeded and has internal locking,
+	// but we use a dedicated source to avoid contention with other code
+	leafRngMu sync.Mutex
+	leafRng   = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 const (
@@ -103,7 +112,13 @@ func exponentialBackoffWithJitter(attempt int, initialDelay, maxDelay time.Durat
 	// Add jitter: delay * (1 +/- jitterFactor)
 	if jitterFactor > 0 {
 		jitterRange := float64(delay) * jitterFactor
-		jitter := (rand.Float64()*2 - 1) * jitterRange
+
+		// Thread-safe random number generation
+		leafRngMu.Lock()
+		randVal := leafRng.Float64()
+		leafRngMu.Unlock()
+
+		jitter := (randVal*2 - 1) * jitterRange
 		delay = time.Duration(float64(delay) + jitter)
 
 		// Clamp to valid range [initialDelay, maxDelay]

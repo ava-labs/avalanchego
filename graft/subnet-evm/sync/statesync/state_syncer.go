@@ -357,41 +357,37 @@ func (t *stateSync) Start(ctx context.Context) error {
 	log.Info("Starting stuck detector for state sync monitoring")
 	t.stuckDetector.Start(syncCtx)
 
-	// Panic recovery wrapper - returns error from panic to errgroup
-	panicRecovery := func(name string) error {
-		if r := recover(); r != nil {
-			log.Error("PANIC in state sync goroutine, triggering fallback",
-				"goroutine", name,
-				"panic", r,
-				"stack", string(debug.Stack()))
-			cancel() // Cancel other goroutines
-			return fmt.Errorf("panic in %s: %v", name, r)
-		}
-		return nil
-	}
-
 	// Start the code syncer and leaf syncer.
 	eg, egCtx := errgroup.WithContext(syncCtx)
 	t.codeSyncer.start(egCtx) // start the code syncer first since the leaf syncer may add code tasks
 	t.syncer.Start(egCtx, t.numWorkers, t.onSyncFailure)
 
 	// Wrap all goroutines with panic recovery
+	// CRITICAL: recover() must be called directly in defer, not in a helper function
 	eg.Go(func() (err error) {
 		defer func() {
-			if panicErr := panicRecovery("syncer.Done"); panicErr != nil {
-				err = panicErr
+			if r := recover(); r != nil {
+				log.Error("PANIC in syncer.Done goroutine, triggering fallback",
+					"panic", r,
+					"stack", string(debug.Stack()))
+				cancel() // Cancel other goroutines
+				err = fmt.Errorf("panic in syncer.Done: %v", r)
 			}
 		}()
-		if err := <-t.syncer.Done(); err != nil {
-			return err
+		if syncErr := <-t.syncer.Done(); syncErr != nil {
+			return syncErr
 		}
 		return t.onSyncComplete()
 	})
 
 	eg.Go(func() (err error) {
 		defer func() {
-			if panicErr := panicRecovery("codeSyncer.Done"); panicErr != nil {
-				err = panicErr
+			if r := recover(); r != nil {
+				log.Error("PANIC in codeSyncer.Done goroutine, triggering fallback",
+					"panic", r,
+					"stack", string(debug.Stack()))
+				cancel() // Cancel other goroutines
+				err = fmt.Errorf("panic in codeSyncer.Done: %v", r)
 			}
 		}()
 		return <-t.codeSyncer.Done()
@@ -399,8 +395,12 @@ func (t *stateSync) Start(ctx context.Context) error {
 
 	eg.Go(func() (err error) {
 		defer func() {
-			if panicErr := panicRecovery("storageTrieProducer"); panicErr != nil {
-				err = panicErr
+			if r := recover(); r != nil {
+				log.Error("PANIC in storageTrieProducer goroutine, triggering fallback",
+					"panic", r,
+					"stack", string(debug.Stack()))
+				cancel() // Cancel other goroutines
+				err = fmt.Errorf("panic in storageTrieProducer: %v", r)
 			}
 		}()
 		return t.storageTrieProducer(egCtx)

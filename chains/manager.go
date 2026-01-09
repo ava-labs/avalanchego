@@ -1418,7 +1418,7 @@ func (m *manager) createSnowmanChain(
 		}
 
 		m.Log.Warn("Retrying state sync after failure/stuck detection",
-			"chainID", chainID,
+			"chainID", chainParams.ID,
 			"attempt", retryCount,
 			"maxRetries", maxStateSyncRetries)
 
