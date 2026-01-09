@@ -357,8 +357,9 @@ func (client *client) syncStateTrie(ctx context.Context, summary message.Syncabl
 		if fallbackErr := client.fallbackToBlockSync(); fallbackErr != nil {
 			return fmt.Errorf("failed to fallback to block sync: %w", fallbackErr)
 		}
-		// Return the stuck error to signal chain manager to restart with block sync
-		return err
+		log.Info("State sync fallback successful - node will restart with block sync")
+		// Return nil to allow graceful shutdown - block sync will be used on restart
+		return nil
 	}
 
 	return err
@@ -374,7 +375,11 @@ func (client *client) fallbackToBlockSync() error {
 	// Disable state sync for next restart (engine will use block sync instead)
 	client.Enabled = false
 
-	log.Info("State sync disabled, node will use block sync on next restart")
+	log.Warn("===========================================")
+	log.Warn("STATE SYNC STUCK - FALLBACK TO BLOCK SYNC")
+	log.Warn("Node will automatically restart and use block sync")
+	log.Warn("This is expected behavior, not an error")
+	log.Warn("===========================================")
 	return nil
 }
 
