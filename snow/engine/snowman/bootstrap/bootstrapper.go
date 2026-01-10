@@ -45,8 +45,9 @@ const (
 	minimumLogInterval = 5 * time.Second
 
 	// maxParallelFetches is the maximum number of concurrent GetAncestors requests
-	// OPTIMIZATION: Parallel block fetching pipeline for 10-20x speedup
-	maxParallelFetches = 100
+	// OPTIMIZATION: Parallel block fetching pipeline for faster sync
+	// Increased from 100 to 200 for better throughput with limited peers
+	maxParallelFetches = 200
 
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
