@@ -11,8 +11,8 @@ set -euo pipefail
 # TEST_SETUP=xsvm IMAGE_PREFIX=<registry>/<repo> IMAGE_TAG=latest ./scripts/build_antithesis_images.sh # Specify a prefix to enable image push and use a specific tag
 
 TEST_SETUP="${TEST_SETUP:-}"
-if [[ "${TEST_SETUP}" != "avalanchego" && "${TEST_SETUP}" != "xsvm" ]]; then
-  echo "TEST_SETUP must be set. Valid values are 'avalanchego' or 'xsvm'"
+if [[ "${TEST_SETUP}" != "avalanchego" && "${TEST_SETUP}" != "xsvm" && "${TEST_SETUP}" != "subnet-evm" ]]; then
+  echo "TEST_SETUP must be set. Valid values are 'avalanchego', 'xsvm', or 'subnet-evm'"
   exit 255
 fi
 
@@ -69,7 +69,7 @@ if [[ "${TEST_SETUP}" == "avalanchego" ]]; then
                                 "${AVALANCHE_PATH}/build/antithesis/avalanchego"
 
   build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY:-}"
-else
+elif [[ "${TEST_SETUP}" == "xsvm" ]]; then
   build_builder_image_for_avalanchego
 
   # Only build the avalanchego node image to use as the base for the xsvm image. Provide an empty
@@ -88,4 +88,28 @@ else
                                 "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVAGO_PLUGIN_DIR=${AVALANCHE_PATH}/build/plugins"
 
   build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${AVALANCHE_PATH}/vms/example/xsvm/Dockerfile"
+elif [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
+  build_builder_image_for_avalanchego
+
+  # Build subnet-evm builder image
+  echo "Building subnet-evm builder image"
+  build_antithesis_builder_image "${GO_VERSION}" "antithesis-subnet-evm-builder:${IMAGE_TAG}" "${AVALANCHE_PATH}" "${AVALANCHE_PATH}"
+
+  # Build avalanchego node image as base (local-only)
+  NODE_ONLY=1
+  build_antithesis_images_for_avalanchego avalanchego "" "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY}"
+
+  # Build required binaries for subnet-evm test setup
+  echo "Building binaries required for configuring the ${TEST_SETUP} test setup"
+  "${AVALANCHE_PATH}"/scripts/build.sh
+  "${AVALANCHE_PATH}"/graft/subnet-evm/scripts/build.sh
+
+  echo "Generating compose configuration for ${TEST_SETUP}"
+  gen_antithesis_compose_config "${IMAGE_TAG}" \
+    "${AVALANCHE_PATH}/tests/antithesis/subnet-evm/gencomposeconfig" \
+    "${AVALANCHE_PATH}/build/antithesis/subnet-evm" \
+    "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVAGO_PLUGIN_DIR=${AVALANCHE_PATH}/build/plugins"
+
+  build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" \
+    "${AVALANCHE_PATH}/graft/subnet-evm/Dockerfile"
 fi
