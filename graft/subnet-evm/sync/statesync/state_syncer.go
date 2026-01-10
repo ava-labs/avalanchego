@@ -21,6 +21,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 
 	syncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 )
@@ -620,7 +621,23 @@ func (t *stateSync) doStart(ctx context.Context) error {
 				log.Warn("State sync error requires fallback to block sync",
 					"err", err,
 					"errType", categorizeStateSyncError(err))
+
+				// Persist state sync failure to enable resume from block sync
+				// This allows the node to recover progress if it restarts during block sync
+				if persistErr := t.persistStateSyncFailure(); persistErr != nil {
+					log.Warn("Failed to persist state sync failure, continuing anyway",
+						"err", persistErr)
+				}
+
 				err = errStateSyncStuck
+			}
+		}
+
+		// On successful completion, clear sync mode markers
+		if err == nil {
+			if clearErr := customrawdb.DeleteSyncMode(t.db); clearErr != nil {
+				log.Warn("Failed to clear sync mode after successful state sync",
+					"err", clearErr)
 			}
 		}
 
@@ -884,5 +901,21 @@ func (t *stateSync) getCodeSyncError() error {
 	}
 	// Should never happen, but return nil instead of panicking
 	log.Error("BUG: codeSyncErr contains non-error type", "type", fmt.Sprintf("%T", errVal))
+	return nil
+}
+
+// persistStateSyncFailure saves state sync progress to enable resumption via block sync.
+// This is called when state sync fails and will fall back to block sync.
+// The persisted data allows the node to recover if it restarts during block sync.
+func (t *stateSync) persistStateSyncFailure() error {
+	// Mark that we're switching to block sync due to state sync failure
+	if err := customrawdb.WriteSyncMode(t.db, "block"); err != nil {
+		return fmt.Errorf("failed to write sync mode: %w", err)
+	}
+
+	// Note: We don't persist a specific height here because state sync
+	// may have partially completed. The block sync will determine the
+	// actual starting point by checking the last accepted block.
+	log.Info("Persisted state sync failure, will resume with block sync")
 	return nil
 }

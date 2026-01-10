@@ -58,6 +58,35 @@ var (
 	syncPerformedKeyLength = len(syncPerformedPrefix) + wrappers.LongLen
 )
 
+// Sync mode switching keys
+var (
+	// syncModeKey stores the current sync mode ("state", "block", or "hybrid")
+	syncModeKey = []byte("sync_mode")
+	// stateSyncLastHeightKey stores the last accepted height from state sync
+	// Used to resume block sync from the correct point after state sync
+	stateSyncLastHeightKey = []byte("state_sync_last_height")
+	// blockSyncProgressKey stores the current block sync progress
+	// Used to resume state sync or switch modes without losing progress
+	blockSyncProgressKey = []byte("block_sync_progress")
+	// modeSwitchHistoryPrefix prefixes mode switch event records
+	// modeSwitchHistoryPrefix + timestamp -> JSON record of mode switch
+	modeSwitchHistoryPrefix = []byte("mode_switch_")
+)
+
+// Missing code tracking for hybrid sync
+var (
+	// missingCodePrefix stores code hashes that failed to sync from network
+	// missingCodePrefix + code hash + block number -> empty marker
+	// Used to track which code needs to be recovered via block execution
+	missingCodePrefix = []byte("missing_code_")
+	// codeRecoveryProgressKey stores the current block height during code recovery
+	codeRecoveryProgressKey = []byte("code_recovery_progress")
+)
+
+var (
+	missingCodeKeyLength = len(missingCodePrefix) + common.HashLength + wrappers.LongLen
+)
+
 var FirewoodScheme = "firewood"
 
 // upgradeConfigKey = upgradeConfigPrefix + hash

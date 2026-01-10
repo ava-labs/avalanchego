@@ -109,6 +109,11 @@ type Bootstrapper struct {
 	// ETA tracker for more accurate time estimates
 	etaTracker *timer.EtaTracker
 
+	// Checkpoint interval in blocks (default: 100,000)
+	checkpointInterval uint64
+	// Next height at which to create a checkpoint
+	nextCheckpointHeight uint64
+
 	// tracks which validators were asked for which containers in which requests
 	outstandingRequests     *bimap.BiMap[common.Request, ids.ID]
 	outstandingRequestTimes map[common.Request]time.Time
@@ -137,6 +142,12 @@ type Bootstrapper struct {
 
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
 	metrics, err := newMetrics(config.Ctx.Registerer)
+	// Set checkpoint interval from config or use default
+	checkpointInterval := config.CheckpointInterval
+	if checkpointInterval == 0 {
+		checkpointInterval = 100000 // Default: 100,000 blocks
+	}
+
 	bs := &Bootstrapper{
 		nonVerifyingParser:          config.NonVerifyingParse,
 		Config:                      config,
@@ -158,6 +169,7 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		onFinished:               onFinished,
 		lastProgressUpdateTime:   time.Now(),
 		etaTracker:               timer.NewEtaTracker(10, 1.2),
+		checkpointInterval:       checkpointInterval,
 	}
 
 	timeout := func() {
@@ -236,6 +248,59 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.missingBlockIDs, err = getMissingBlockIDs(ctx, b.DB, b.nonVerifyingParser, b.tree, b.startingHeight)
 	if err != nil {
 		return fmt.Errorf("failed to initialize missing block IDs: %w", err)
+	}
+
+	// Attempt to restore from checkpoint if available
+	checkpoint, err := interval.GetFetchCheckpoint(b.DB)
+	if err == nil && b.validateCheckpoint(checkpoint) {
+		// Restore progress from checkpoint
+		b.tipHeight = checkpoint.TipHeight
+		b.startingHeight = checkpoint.StartingHeight
+		b.initiallyFetched = checkpoint.NumBlocksFetched
+
+		// Restore ETA tracker samples
+		b.etaTracker.RestoreSamples(checkpoint.ETASamples)
+
+		// Set next checkpoint height with overflow protection
+		nextHeight := checkpoint.Height + b.checkpointInterval
+		if nextHeight < checkpoint.Height {
+			// Overflow detected - height + interval wrapped around
+			// Disable checkpointing (setting to 0 prevents future checkpoint checks)
+			b.nextCheckpointHeight = 0
+			b.Ctx.Log.Warn("checkpoint height overflow, checkpointing disabled",
+				zap.Uint64("checkpointHeight", checkpoint.Height),
+				zap.Uint64("interval", b.checkpointInterval),
+			)
+		} else {
+			b.nextCheckpointHeight = nextHeight
+		}
+
+		numRecovered := uint64(b.tree.Len())
+		b.Ctx.Log.Info("restored bootstrap progress from checkpoint",
+			zap.Uint64("checkpointHeight", checkpoint.Height),
+			zap.Uint64("blocksRecovered", numRecovered),
+			zap.Uint64("tipHeight", b.tipHeight),
+			zap.Duration("checkpointAge", time.Since(checkpoint.Timestamp)),
+		)
+	} else {
+		// No valid checkpoint, start fresh
+		if err != nil && !errors.Is(err, database.ErrNotFound) {
+			b.Ctx.Log.Debug("failed to load checkpoint, starting fresh",
+				zap.Error(err),
+			)
+		}
+		// Initialize first checkpoint at interval with overflow protection
+		nextHeight := b.startingHeight + b.checkpointInterval
+		if nextHeight < b.startingHeight {
+			// Overflow detected - disable checkpointing
+			b.nextCheckpointHeight = 0
+			b.Ctx.Log.Warn("checkpoint height overflow on initialization, checkpointing disabled",
+				zap.Uint64("startingHeight", b.startingHeight),
+				zap.Uint64("interval", b.checkpointInterval),
+			)
+		} else {
+			b.nextCheckpointHeight = nextHeight
+		}
 	}
 
 	return b.tryStartBootstrapping(ctx)
@@ -687,11 +752,30 @@ func (b *Bootstrapper) process(
 		}
 	}
 
+	// Write the batch FIRST before creating checkpoint
+	// This ensures checkpoint is only created after blocks are successfully persisted
 	if err := batch.Write(); err != nil || !foundNewMissingID {
 		return err
 	}
 
 	b.missingBlockIDs.Add(missingBlockID)
+
+	// Create checkpoint AFTER batch is successfully written
+	// This ensures checkpoint reflects actual persisted state
+	// Non-blocking: checkpoint failures don't stop sync
+	if b.nextCheckpointHeight > 0 && numFetched >= b.nextCheckpointHeight-b.startingHeight {
+		if err := b.createCheckpoint(); err != nil {
+			// Log already done in createCheckpoint, continue syncing
+		}
+		// Set next checkpoint height with overflow protection
+		nextHeight := b.nextCheckpointHeight + b.checkpointInterval
+		if nextHeight < b.nextCheckpointHeight {
+			// Overflow detected - disable further checkpointing
+			b.nextCheckpointHeight = 0
+		} else {
+			b.nextCheckpointHeight = nextHeight
+		}
+	}
 	// OPTIMIZATION: Delegate to tryStartExecuting for parallel fetching
 	// instead of serial fetch
 	return b.tryStartExecuting(ctx)
@@ -772,6 +856,17 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 
 	previouslyExecuted := b.executedStateTransitions
 	b.executedStateTransitions = numToExecute
+
+	// Delete checkpoint after successful execution
+	// This prevents stale checkpoint from affecting future syncs
+	if err := interval.DeleteFetchCheckpoint(b.DB); err != nil && !errors.Is(err, database.ErrNotFound) {
+		b.Ctx.Log.Warn("failed to delete checkpoint after execution",
+			zap.Error(err),
+		)
+		// Non-fatal: continue with bootstrapping
+	} else if err == nil {
+		b.Ctx.Log.Debug("checkpoint deleted after successful execution")
+	}
 
 	// Note that executedBlocks < c*previouslyExecuted ( 0 <= c < 1 ) is enforced
 	// so that the bootstrapping process will terminate even as new blocks are
@@ -956,6 +1051,78 @@ func (b *Bootstrapper) attemptStateSyncRetry(ctx context.Context) error {
 
 	b.Ctx.Log.Info("State sync retry initiated successfully")
 	return nil
+}
+
+// createCheckpoint saves the current bootstrap progress to the database.
+// This is a non-blocking operation - failures are logged but don't stop the sync.
+func (b *Bootstrapper) createCheckpoint() error {
+	checkpoint := &interval.FetchCheckpoint{
+		Height:              b.nextCheckpointHeight,
+		TipHeight:           b.tipHeight,
+		StartingHeight:      b.startingHeight,
+		NumBlocksFetched:    uint64(b.tree.Len()),
+		Timestamp:           time.Now(),
+		MissingBlockIDCount: b.missingBlockIDs.Len(),
+		ETASamples:          b.etaTracker.GetSamples(),
+	}
+
+	if err := interval.PutFetchCheckpoint(b.DB, checkpoint); err != nil {
+		b.Ctx.Log.Warn("failed to create checkpoint",
+			zap.Uint64("height", checkpoint.Height),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	b.Ctx.Log.Info("checkpoint created",
+		zap.Uint64("height", checkpoint.Height),
+		zap.Uint64("blocksFetched", checkpoint.NumBlocksFetched),
+		zap.Uint64("tipHeight", checkpoint.TipHeight),
+	)
+
+	return nil
+}
+
+// validateCheckpoint verifies that a checkpoint is consistent and not corrupted.
+func (b *Bootstrapper) validateCheckpoint(checkpoint *interval.FetchCheckpoint) bool {
+	if checkpoint == nil {
+		return false
+	}
+
+	// Check if checkpoint has invalid timestamp (future or too old)
+	age := time.Since(checkpoint.Timestamp)
+	if age < 0 {
+		b.Ctx.Log.Warn("checkpoint has future timestamp, likely clock skew",
+			zap.Time("checkpointTime", checkpoint.Timestamp),
+			zap.Time("currentTime", time.Now()),
+		)
+		return false
+	}
+	if age > time.Hour {
+		b.Ctx.Log.Warn("checkpoint is stale, discarding",
+			zap.Duration("age", age),
+		)
+		return false
+	}
+
+	// Verify height range is reasonable
+	if checkpoint.Height < checkpoint.StartingHeight ||
+		checkpoint.TipHeight < checkpoint.StartingHeight {
+		b.Ctx.Log.Warn("checkpoint has invalid height range",
+			zap.Uint64("checkpointHeight", checkpoint.Height),
+			zap.Uint64("startingHeight", checkpoint.StartingHeight),
+			zap.Uint64("tipHeight", checkpoint.TipHeight),
+		)
+		return false
+	}
+
+	// Verify block count is reasonable
+	if checkpoint.NumBlocksFetched == 0 {
+		b.Ctx.Log.Warn("checkpoint has zero blocks fetched")
+		return false
+	}
+
+	return true
 }
 
 func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {

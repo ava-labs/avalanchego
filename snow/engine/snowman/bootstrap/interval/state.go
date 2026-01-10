@@ -4,24 +4,40 @@
 package interval
 
 import (
+	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 const (
 	intervalPrefixByte byte = iota
 	blockPrefixByte
+	checkpointPrefixByte
 
 	prefixLen = 1
 )
 
 var (
-	intervalPrefix = []byte{intervalPrefixByte}
-	blockPrefix    = []byte{blockPrefixByte}
+	intervalPrefix   = []byte{intervalPrefixByte}
+	blockPrefix      = []byte{blockPrefixByte}
+	checkpointPrefix = []byte{checkpointPrefixByte}
 
 	errInvalidKeyLength = errors.New("invalid key length")
 )
+
+// FetchCheckpoint stores bootstrap FETCH phase progress
+type FetchCheckpoint struct {
+	Height              uint64         `json:"height"`
+	TipHeight           uint64         `json:"tipHeight"`
+	StartingHeight      uint64         `json:"startingHeight"`
+	NumBlocksFetched    uint64         `json:"numBlocksFetched"`
+	Timestamp           time.Time      `json:"timestamp"`
+	MissingBlockIDCount int            `json:"missingBlockIDCount"`
+	ETASamples          []timer.Sample `json:"etaSamples"`
+}
 
 func GetIntervals(db database.Iteratee) ([]*Interval, error) {
 	it := db.NewIteratorWithPrefix(intervalPrefix)
@@ -106,4 +122,38 @@ func DeleteBlock(db database.KeyValueDeleter, height uint64) error {
 func makeBlockKey(height uint64) []byte {
 	blockKey := database.PackUInt64(height)
 	return append(blockPrefix, blockKey...)
+}
+
+// GetFetchCheckpoint retrieves the saved checkpoint from the database
+func GetFetchCheckpoint(db database.KeyValueReader) (*FetchCheckpoint, error) {
+	data, err := db.Get(checkpointPrefix)
+	if err != nil {
+		if err == database.ErrNotFound {
+			// Checkpoint doesn't exist, return nil without error
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var checkpoint FetchCheckpoint
+	if err := json.Unmarshal(data, &checkpoint); err != nil {
+		return nil, err
+	}
+
+	return &checkpoint, nil
+}
+
+// PutFetchCheckpoint saves a checkpoint to the database
+func PutFetchCheckpoint(db database.KeyValueWriter, checkpoint *FetchCheckpoint) error {
+	data, err := json.Marshal(checkpoint)
+	if err != nil {
+		return err
+	}
+
+	return db.Put(checkpointPrefix, data)
+}
+
+// DeleteFetchCheckpoint removes the checkpoint from the database
+func DeleteFetchCheckpoint(db database.KeyValueDeleter) error {
+	return db.Delete(checkpointPrefix)
 }

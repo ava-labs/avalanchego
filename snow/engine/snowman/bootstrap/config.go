@@ -50,5 +50,10 @@ type Config struct {
 	// or an error if retry is not possible or failed.
 	RequestStateSyncRetry func(ctx context.Context) error
 
+	// CheckpointInterval is the number of blocks between checkpoints.
+	// If 0, defaults to 100,000 blocks (~5 hours for most chains).
+	// Set to a very large value (e.g., math.MaxUint64) to effectively disable checkpointing.
+	CheckpointInterval uint64
+
 	common.Haltable
 }

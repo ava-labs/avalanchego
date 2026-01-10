@@ -5,6 +5,7 @@ package customrawdb
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -239,4 +240,155 @@ func MarkCleanupInProgress(db ethdb.KeyValueWriter) error {
 // This indicates that cleanup finished successfully and doesn't need to be resumed.
 func ClearCleanupInProgress(db ethdb.KeyValueWriter) error {
 	return db.Delete(cleanupInProgressKey)
+}
+
+// Sync mode switching accessors
+
+// ReadSyncMode reads the current sync mode from the database.
+// Returns empty string if no mode is set.
+func ReadSyncMode(db ethdb.KeyValueReader) (string, error) {
+	has, err := db.Has(syncModeKey)
+	if err != nil || !has {
+		return "", err
+	}
+	modeBytes, err := db.Get(syncModeKey)
+	if err != nil {
+		return "", err
+	}
+	return string(modeBytes), nil
+}
+
+// WriteSyncMode writes the current sync mode to the database.
+// Mode should be "state", "block", or "hybrid".
+func WriteSyncMode(db ethdb.KeyValueWriter, mode string) error {
+	// Validate mode before writing
+	if mode != "state" && mode != "block" && mode != "hybrid" && mode != "" {
+		return fmt.Errorf("invalid sync mode: %s (must be state, block, or hybrid)", mode)
+	}
+	return db.Put(syncModeKey, []byte(mode))
+}
+
+// DeleteSyncMode removes the sync mode key from the database.
+func DeleteSyncMode(db ethdb.KeyValueWriter) error {
+	return db.Delete(syncModeKey)
+}
+
+// ReadStateSyncLastHeight reads the last height accepted from state sync.
+// Returns 0 if no height is recorded.
+func ReadStateSyncLastHeight(db ethdb.KeyValueReader) (uint64, error) {
+	has, err := db.Has(stateSyncLastHeightKey)
+	if err != nil || !has {
+		return 0, err
+	}
+	heightBytes, err := db.Get(stateSyncLastHeightKey)
+	if err != nil {
+		return 0, err
+	}
+	if len(heightBytes) != 8 {
+		return 0, nil
+	}
+	return binary.BigEndian.Uint64(heightBytes), nil
+}
+
+// WriteStateSyncLastHeight writes the last height accepted from state sync.
+func WriteStateSyncLastHeight(db ethdb.KeyValueWriter, height uint64) error {
+	heightBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(heightBytes, height)
+	return db.Put(stateSyncLastHeightKey, heightBytes)
+}
+
+// ReadBlockSyncProgress reads the current block sync progress.
+// Returns 0 if no progress is recorded.
+func ReadBlockSyncProgress(db ethdb.KeyValueReader) (uint64, error) {
+	has, err := db.Has(blockSyncProgressKey)
+	if err != nil || !has {
+		return 0, err
+	}
+	progressBytes, err := db.Get(blockSyncProgressKey)
+	if err != nil {
+		return 0, err
+	}
+	if len(progressBytes) != 8 {
+		return 0, nil
+	}
+	return binary.BigEndian.Uint64(progressBytes), nil
+}
+
+// WriteBlockSyncProgress writes the current block sync progress.
+func WriteBlockSyncProgress(db ethdb.KeyValueWriter, height uint64) error {
+	progressBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(progressBytes, height)
+	return db.Put(blockSyncProgressKey, progressBytes)
+}
+
+// Missing code tracking accessors
+
+// AddMissingCode marks a code hash as missing (failed to fetch from network).
+// The blockNumber helps with recovery by indicating where to start looking.
+func AddMissingCode(db ethdb.KeyValueWriter, codeHash common.Hash, blockNumber uint64) error {
+	key := make([]byte, missingCodeKeyLength)
+	copy(key, missingCodePrefix)
+	copy(key[len(missingCodePrefix):], codeHash[:])
+	binary.BigEndian.PutUint64(key[len(missingCodePrefix)+common.HashLength:], blockNumber)
+	return db.Put(key, []byte{1})
+}
+
+// HasMissingCode checks if a code hash is marked as missing.
+func HasMissingCode(db ethdb.Iteratee, codeHash common.Hash) (bool, error) {
+	// We need to iterate over all keys with this code hash prefix since we don't know the block number
+	prefix := make([]byte, len(missingCodePrefix)+common.HashLength)
+	copy(prefix, missingCodePrefix)
+	copy(prefix[len(missingCodePrefix):], codeHash[:])
+
+	it := db.NewIterator(prefix, nil)
+	defer it.Release()
+
+	return it.Next(), it.Error()
+}
+
+// DeleteMissingCode removes the missing code marker after successful recovery.
+func DeleteMissingCode(db ethdb.KeyValueWriter, codeHash common.Hash, blockNumber uint64) error {
+	key := make([]byte, missingCodeKeyLength)
+	copy(key, missingCodePrefix)
+	copy(key[len(missingCodePrefix):], codeHash[:])
+	binary.BigEndian.PutUint64(key[len(missingCodePrefix)+common.HashLength:], blockNumber)
+	return db.Delete(key)
+}
+
+// GetMissingCodeHashes returns all missing code hashes with their associated block numbers.
+func GetMissingCodeHashes(db ethdb.Iteratee) (map[common.Hash]uint64, error) {
+	it := db.NewIterator(missingCodePrefix, nil)
+	defer it.Release()
+
+	result := make(map[common.Hash]uint64)
+	for it.Next() {
+		key := it.Key()
+		if len(key) != missingCodeKeyLength {
+			continue
+		}
+
+		codeHash := common.BytesToHash(key[len(missingCodePrefix) : len(missingCodePrefix)+common.HashLength])
+		blockNumber := binary.BigEndian.Uint64(key[len(missingCodePrefix)+common.HashLength:])
+
+		// If we have multiple entries for the same hash, keep the lowest block number
+		if existing, exists := result[codeHash]; !exists || blockNumber < existing {
+			result[codeHash] = blockNumber
+		}
+	}
+
+	return result, it.Error()
+}
+
+// GetMissingCodeCount returns the number of distinct missing code hashes.
+func GetMissingCodeCount(db ethdb.Iteratee) (int, error) {
+	missingCode, err := GetMissingCodeHashes(db)
+	if err != nil {
+		return 0, err
+	}
+	return len(missingCode), nil
+}
+
+// ClearMissingCode removes all missing code markers.
+func ClearMissingCode(db ethdb.KeyValueStore) error {
+	return clearPrefix(db, missingCodePrefix, missingCodeKeyLength)
 }

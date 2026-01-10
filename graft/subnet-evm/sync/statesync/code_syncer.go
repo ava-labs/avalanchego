@@ -75,6 +75,12 @@ type codeSyncer struct {
 	errChan    chan error
 	notifyOnce sync.Once // Ensures notifyAccountTrieCompleted is only called once
 
+	// Partial failure tracking for hybrid sync
+	// Allows storage tries to complete even when some code cannot be fetched
+	partialFailure     bool                       // True if some (but not all) code failed to sync
+	missingCodeHashes  map[common.Hash]struct{}   // Code hashes that failed to sync
+	missingCodeLock    sync.Mutex                 // Protects missingCodeHashes
+
 	// Passed in details from the context used to start the codeSyncer
 	cancel context.CancelFunc
 	done   <-chan struct{}
@@ -87,6 +93,7 @@ func newCodeSyncer(config CodeSyncerConfig) *codeSyncer {
 		codeHashes:            make(chan common.Hash, config.MaxOutstandingCodeHashes),
 		outstandingCodeHashes: set.NewSet[ids.ID](0),
 		errChan:               make(chan error, 1),
+		missingCodeHashes:     make(map[common.Hash]struct{}),
 	}
 }
 
@@ -399,16 +406,30 @@ func (c *codeSyncer) fulfillCodeRequestWithRetry(ctx context.Context, codeHashes
 				"circuitBreaker", circuitBreakerTripped,
 				"err", err)
 		} else {
-			log.Error("Code request failed on final attempt",
+			log.Warn("Code request failed on final attempt, marking as missing for hybrid recovery",
 				"attempt", attempt+1,
 				"maxRetries", codeRequestMaxRetries,
 				"consecutiveFailures", consecutiveFailures,
 				"circuitBreaker", circuitBreakerTripped,
+				"numHashes", len(codeHashes),
 				"err", err)
 		}
 	}
 
-	return fmt.Errorf("code request failed after %d retries: %w", codeRequestMaxRetries, lastErr)
+	// GRACEFUL DEGRADATION: Instead of failing the entire sync, mark these
+	// code hashes as missing and allow the sync to continue.
+	// This enables hybrid mode where state sync completes and code is recovered via block execution.
+	if err := c.markCodeAsMissing(codeHashes); err != nil {
+		// If we can't mark code as missing, that's a serious database error
+		return fmt.Errorf("failed to mark code as missing after %d retries: %w", codeRequestMaxRetries, err)
+	}
+
+	log.Info("Marked code hashes as missing, will continue with hybrid sync",
+		"numMissingHashes", len(codeHashes),
+		"totalMissing", len(c.missingCodeHashes))
+
+	// Return nil to allow sync to continue (not a fatal error)
+	return nil
 }
 
 // fulfillCodeRequest sends a request for [codeHashes], writes the result to the database, and
@@ -483,6 +504,63 @@ func (c *codeSyncer) addHashesToQueue(codeHashes []common.Hash) error {
 		}
 	}
 	return nil
+}
+
+// markCodeAsMissing marks code hashes as missing after failed network fetch.
+// Removes them from CodeToFetch queue and adds them to missing code tracking.
+// This enables hybrid sync mode where state sync completes and code is recovered later.
+func (c *codeSyncer) markCodeAsMissing(codeHashes []common.Hash) error {
+	batch := c.DB.NewBatch()
+
+	// Lock to update both outstanding hashes and missing code tracking
+	c.lock.Lock()
+	c.missingCodeLock.Lock()
+
+	for _, codeHash := range codeHashes {
+		// Remove from CodeToFetch since we're giving up on network fetch
+		customrawdb.DeleteCodeToFetch(batch, codeHash)
+		c.outstandingCodeHashes.Remove(ids.ID(codeHash))
+
+		// Add to missing code tracking (blockNumber 0 means we don't know where it was created)
+		if err := customrawdb.AddMissingCode(batch, codeHash, 0); err != nil {
+			c.missingCodeLock.Unlock()
+			c.lock.Unlock()
+			return fmt.Errorf("failed to add missing code marker: %w", err)
+		}
+
+		// Track in memory for stats
+		c.missingCodeHashes[codeHash] = struct{}{}
+	}
+
+	// Mark that we had partial failure (some code missing but sync can continue)
+	if len(c.missingCodeHashes) > 0 {
+		c.partialFailure = true
+	}
+
+	c.missingCodeLock.Unlock()
+	c.lock.Unlock()
+
+	// Write batch to persist missing code markers
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("failed to write missing code batch: %w", err)
+	}
+
+	return nil
+}
+
+// hasPartialFailure returns true if some (but not all) code failed to sync.
+// This indicates hybrid mode where state sync completed but code recovery is needed.
+func (c *codeSyncer) hasPartialFailure() bool {
+	c.missingCodeLock.Lock()
+	defer c.missingCodeLock.Unlock()
+	return c.partialFailure
+}
+
+// getMissingCodeCount returns the number of code hashes that failed to sync.
+func (c *codeSyncer) getMissingCodeCount() int {
+	c.missingCodeLock.Lock()
+	defer c.missingCodeLock.Unlock()
+	return len(c.missingCodeHashes)
 }
 
 // setError sets the error to the first error that occurs and adds it to the error channel.
