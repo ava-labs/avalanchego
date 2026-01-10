@@ -126,6 +126,16 @@ func (b *Bootstrapper) Clear(context.Context) error {
 	return b.TxBlocked.Commit()
 }
 
+// HasProgress returns true if there are fetched vertices/transactions from a
+// previous bootstrapping run that would be lost if Clear is called.
+func (b *Bootstrapper) HasProgress(context.Context) (bool, error) {
+	// Check if there are any pending vertex or transaction jobs
+	// JobsWithMissing embeds *Jobs, so PendingJobs() is promoted
+	vtxPending := b.VtxBlocked.PendingJobs()
+	txPending := b.TxBlocked.PendingJobs()
+	return vtxPending > 0 || txPending > 0, nil
+}
+
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID].
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.

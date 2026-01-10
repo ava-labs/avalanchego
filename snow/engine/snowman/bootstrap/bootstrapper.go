@@ -190,6 +190,17 @@ func (b *Bootstrapper) clearUnlocked() error {
 	return database.AtomicClear(b.DB, b.DB)
 }
 
+// HasProgress returns true if there are fetched blocks from a previous
+// bootstrapping run that would be lost if Clear is called.
+func (b *Bootstrapper) HasProgress(context.Context) (bool, error) {
+	tree, err := interval.NewTree(b.DB)
+	if err != nil {
+		return false, err
+	}
+	// If the tree has any blocks, we have progress worth preserving
+	return tree.Len() > 0, nil
+}
+
 func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,

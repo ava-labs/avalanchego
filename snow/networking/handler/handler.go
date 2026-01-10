@@ -235,7 +235,26 @@ func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error)
 		return engines.Bootstrapper, nil
 	}
 
-	// drop bootstrap state from previous runs before starting state sync
+	// Check if there's existing bootstrap progress that would be lost
+	hasProgress, err := engines.Bootstrapper.HasProgress(ctx)
+	if err != nil {
+		// If we can't check for progress (e.g., DB error), log warning and
+		// proceed with state sync. This avoids blocking chain startup.
+		h.ctx.Log.Warn("failed to check bootstrap progress, proceeding with state sync",
+			zap.Error(err),
+		)
+		return engines.StateSyncer, engines.Bootstrapper.Clear(ctx)
+	}
+
+	if hasProgress {
+		// Preserve existing bootstrap progress instead of clearing it for state sync.
+		// This is important for subnets with few peers where state sync may fail
+		// and we'd lose days of block sync progress on every restart.
+		h.ctx.Log.Info("preserving existing bootstrap progress, skipping state sync")
+		return engines.Bootstrapper, nil
+	}
+
+	// No existing progress, safe to clear and try state sync
 	return engines.StateSyncer, engines.Bootstrapper.Clear(ctx)
 }
 

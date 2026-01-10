@@ -31,3 +31,10 @@ func (e *tracedBootstrapableEngine) Clear(ctx context.Context) error {
 
 	return e.bootstrapableEngine.Clear(ctx)
 }
+
+func (e *tracedBootstrapableEngine) HasProgress(ctx context.Context) (bool, error) {
+	ctx, span := e.tracer.Start(ctx, "tracedBootstrapableEngine.HasProgress")
+	defer span.End()
+
+	return e.bootstrapableEngine.HasProgress(ctx)
+}
