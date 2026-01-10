@@ -353,7 +353,7 @@ func (sd *StuckDetector) checkIfStuck() bool {
 				} else {
 					// Reset emergency tracking if above critical threshold
 					if sd.emergencySlowStart.Load() != nil {
-						sd.emergencySlowStart = atomic.Value{} // Reset to zero value
+						sd.emergencySlowStart.Store((*time.Time)(nil)) // Atomically reset to nil
 					}
 				}
 
@@ -392,7 +392,7 @@ func (sd *StuckDetector) checkIfStuck() bool {
 					if sd.slowProgressStart.Load() != nil {
 						log.Info("Sync progress recovered to acceptable rate",
 							"leafsPerMinute", int(leafsPerMinute))
-						sd.slowProgressStart = atomic.Value{} // Reset to zero value
+						sd.slowProgressStart.Store((*time.Time)(nil)) // Atomically reset to nil
 					}
 				}
 			} else {

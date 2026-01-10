@@ -44,7 +44,7 @@ const (
 	// 2. Peer unavailability is more common (not all peers have all contracts)
 	// 3. Failures should be detected faster since storage doesn't depend on code
 	codeRequestTimeout           = 45 * time.Second // Longer timeout for large code (vs 30s)
-	codeRequestMaxRetries        = 30               // Fewer retries: 30 × 45s = 22.5 min (vs 50 × 30s = 25 min)
+	codeRequestMaxRetries        = 10               // 10 × 45s = 7.5 min (reduced from 30 to prevent DoS amplification)
 	codeRequestBlacklistDuration = 5 * time.Minute  // Longer blacklist for unresponsive code peers
 
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0

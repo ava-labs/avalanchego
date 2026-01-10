@@ -34,6 +34,10 @@ const (
 	// Request size bounds - prevents misconfiguration
 	minRequestSize = 16    // Too small causes excessive round trips
 	maxRequestSize = 10240 // Too large can cause timeouts and memory issues
+
+	// Reviver retry limits - prevents infinite restart loops
+	// If state sync fails 5 times, something is fundamentally wrong (peer set, network, etc.)
+	maxRestartAttempts = 5
 )
 
 var (
@@ -129,6 +133,9 @@ type stateSync struct {
 	// Allows storage tries to complete even when code sync fails
 	codeSyncErr    atomic.Value // stores *error from code sync
 	codeSyncFailed atomic.Bool  // true if code sync failed but storage completed
+
+	// Reviver retry tracking to prevent infinite loops
+	restartCount atomic.Uint32 // number of times Restart() has been called
 }
 
 func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
@@ -467,7 +474,15 @@ func (t *stateSync) doStart(ctx context.Context) error {
 				err = fmt.Errorf("panic in syncer.Done: %v", r)
 			}
 		}()
-		if syncErr := <-t.syncer.Done(); syncErr != nil {
+
+		syncErr := <-t.syncer.Done()
+
+		// If panic occurred, err is already set - return it immediately
+		if err != nil {
+			return err // Return panic error
+		}
+
+		if syncErr != nil {
 			return syncErr
 		}
 		return t.onSyncComplete()
@@ -498,15 +513,30 @@ func (t *stateSync) doStart(ctx context.Context) error {
 				return codeSyncErr
 			}
 
-			// Code sync failure is NOT fatal - storage tries don't need code to complete
-			// Storage tries only contain key-value pairs, code can be synced later
-			log.Warn("Code sync failed but allowing storage tries to complete",
+			// CRITICAL FIX: Code sync failure MUST prevent final commit
+			//
+			// Storage tries write their batches incrementally (for memory efficiency),
+			// but the main trie batch.Write() at line 277 serves as the atomic "commit marker".
+			// If we return nil here and allow onSyncComplete() to commit the main trie,
+			// the database will be in a committed state with missing contract code.
+			// This breaks contract execution - accounts will reference codeHash for non-existent code.
+			//
+			// By returning an error here:
+			// 1. onSyncComplete() won't be called (main trie batch not written)
+			// 2. Already-fetched storage trie data is preserved in the database
+			// 3. Fallback to block sync is triggered
+			// 4. Reviver can retry and only fetch the missing code (storage tries already exist)
+			//
+			// This is categorized as ErrorCategoryRetryable (not stuck) so reviver will retry.
+			log.Error("Code sync failed - preventing state commit to avoid incomplete state",
 				"err", codeSyncErr,
 				"triesSynced", t.stats.getProgress())
 
-			// Store the error for potential retry by reviver
+			// Store the error for categorization and diagnostics
 			t.storeCodeSyncError(codeSyncErr)
-			return nil // Don't fail entire sync
+
+			// Return wrapped error to prevent commit
+			return fmt.Errorf("code sync failed (state preserved for retry): %w", codeSyncErr)
 		}
 
 		log.Info("Code sync completed successfully")
@@ -523,7 +553,15 @@ func (t *stateSync) doStart(ctx context.Context) error {
 				err = fmt.Errorf("panic in storageTrieProducer: %v", r)
 			}
 		}()
-		return t.storageTrieProducer(egCtx)
+
+		producerErr := t.storageTrieProducer(egCtx)
+
+		// If panic occurred, err is already set - return it immediately
+		if err != nil {
+			return err // Return panic error
+		}
+
+		return producerErr
 	})
 
 	// Monitor for stuck detection alongside sync operations
@@ -644,6 +682,24 @@ func (t *stateSync) Restart(ctx context.Context, startReqID uint32) error {
 	// This ensures mutual exclusion between manual state sync and reviver retries
 	t.syncMutex.Lock()
 	defer t.syncMutex.Unlock()
+
+	// CRITICAL: Check restart count to prevent infinite retry loops
+	// If state sync has failed maxRestartAttempts times, something is fundamentally wrong
+	// (e.g., all peers are unresponsive, network issues, malicious peers withholding data)
+	// Continuing to retry would waste resources and delay fallback to block sync
+	currentRestartCount := t.restartCount.Add(1) // Atomically increment and get new value
+	if currentRestartCount > maxRestartAttempts {
+		log.Error("Reviver restart limit exceeded - giving up on state sync",
+			"restartCount", currentRestartCount,
+			"maxRestartAttempts", maxRestartAttempts,
+			"recommendation", "Node will fallback to block sync")
+		return fmt.Errorf("restart limit exceeded (%d > %d): giving up on state sync",
+			currentRestartCount, maxRestartAttempts)
+	}
+
+	log.Warn("Reviver retry attempt",
+		"restartCount", currentRestartCount,
+		"maxRestartAttempts", maxRestartAttempts)
 
 	// Check if a sync is currently running
 	if t.started.Load() {
