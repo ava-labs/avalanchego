@@ -499,7 +499,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 
 	// Detect code requests for special handling
 	var isCodeRequest bool
-	if _, ok := request.(*message.CodeRequest); ok {
+	if _, ok := request.(message.CodeRequest); ok {
 		isCodeRequest = true
 	}
 
