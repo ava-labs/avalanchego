@@ -237,7 +237,14 @@ func execute(
 			// We specify the starting key of the iterator so that the
 			// underlying database doesn't need to scan over the, potentially
 			// not yet compacted, blocks we just deleted.
-			iterator = interval.GetBlockIteratorWithStart(db, height+1)
+			// Guard against overflow at maximum height (theoretical only - would take 584 billion years to reach)
+			nextHeight := height + 1
+			if nextHeight <= height {
+				// Height overflow detected - we've reached MaxUint64
+				// This should never happen in practice, but guard defensively
+				break
+			}
+			iterator = interval.GetBlockIteratorWithStart(db, nextHeight)
 		}
 
 		if now := time.Now(); now.After(timeOfNextLog) {
