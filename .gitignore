@@ -71,3 +71,6 @@ setup-solc_downloads/
 /.claude/*
 claude.md
 /.serena/*
+
+# Documentation directory for code sync fixes
+docs/

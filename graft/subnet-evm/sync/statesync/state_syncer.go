@@ -82,12 +82,12 @@ type StateSyncerConfig struct {
 
 // stateSync keeps the state of the entire state sync operation.
 type stateSync struct {
-	db        ethdb.Database            // database we are syncing
-	root      common.Hash               // root of the EVM state we are syncing to
-	trieDB    *triedb.Database          // trieDB on top of db we are syncing. used to restore any existing tries.
-	snapshot  snapshot.SnapshotIterable // used to access the database we are syncing as a snapshot.
-	batchSize int                       // write batches when they reach this size
-	numWorkers int                      // number of concurrent sync workers
+	db         ethdb.Database            // database we are syncing
+	root       common.Hash               // root of the EVM state we are syncing to
+	trieDB     *triedb.Database          // trieDB on top of db we are syncing. used to restore any existing tries.
+	snapshot   snapshot.SnapshotIterable // used to access the database we are syncing as a snapshot.
+	batchSize  int                       // write batches when they reach this size
+	numWorkers int                       // number of concurrent sync workers
 
 	// Config values needed for Restart()
 	client                   syncclient.Client
@@ -120,14 +120,14 @@ type stateSync struct {
 	stuckDetector      *StuckDetector // monitors for stalled sync and triggers fallback
 
 	// context cancellation management
-	cancelFunc            context.CancelFunc
-	started               atomic.Bool    // prevents multiple Start() calls
-	waitStarted           atomic.Bool    // prevents multiple Wait() calls
-	cachedResult          atomic.Value   // stores *error from first Wait() call for reuse
-	resultReady           chan struct{}  // closed when cachedResult is available
-	mainTrieDoneOnce      sync.Once      // ensures mainTrieDone channel is closed only once
-	segmentsDoneOnce      sync.Once      // ensures segments channel is closed only once
-	storageTriesDoneOnce  sync.Once      // ensures storageTriesDone channel is closed only once
+	cancelFunc           context.CancelFunc
+	started              atomic.Bool   // prevents multiple Start() calls
+	waitStarted          atomic.Bool   // prevents multiple Wait() calls
+	cachedResult         atomic.Value  // stores *error from first Wait() call for reuse
+	resultReady          chan struct{} // closed when cachedResult is available
+	mainTrieDoneOnce     sync.Once     // ensures mainTrieDone channel is closed only once
+	segmentsDoneOnce     sync.Once     // ensures segments channel is closed only once
+	storageTriesDoneOnce sync.Once     // ensures storageTriesDone channel is closed only once
 
 	// Code sync error tracking for reviver retry
 	// Allows storage tries to complete even when code sync fails

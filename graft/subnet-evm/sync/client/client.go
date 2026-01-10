@@ -115,14 +115,14 @@ type parseResponseFn func(codec codec.Manager, request message.Request, response
 
 // peerFailureTracker tracks consecutive failures per peer for blacklisting
 type peerFailureTracker struct {
-	failures      map[ids.NodeID]int
+	failures       map[ids.NodeID]int
 	blacklistUntil map[ids.NodeID]time.Time
-	lock          sync.RWMutex
+	lock           sync.RWMutex
 }
 
 func newPeerFailureTracker() *peerFailureTracker {
 	return &peerFailureTracker{
-		failures:      make(map[ids.NodeID]int),
+		failures:       make(map[ids.NodeID]int),
 		blacklistUntil: make(map[ids.NodeID]time.Time),
 	}
 }
@@ -651,8 +651,8 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			metric.IncFailed()
 			c.networkClient.TrackBandwidth(nodeID, 0)
 			// Use exponential backoff to avoid wasting time on repeatedly failing peers
-		backoff := exponentialBackoff(attempt, failedRequestSleepInterval)
-		time.Sleep(backoff)
+			backoff := exponentialBackoff(attempt, failedRequestSleepInterval)
+			time.Sleep(backoff)
 			continue
 		} else {
 			responseIntf, numElements, err = parseFn(c.codec, request, response)

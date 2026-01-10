@@ -20,9 +20,9 @@ const (
 
 	// Progress velocity thresholds
 	minLeafsPerMinute      = 100
-	slowProgressTimeout    = 6 * time.Minute  // REDUCED from 10min - Slow progress tolerance
-	emergencySlowThreshold = 10               // Emergency: < 10 leafs/min
-	emergencySlowTimeout   = 3 * time.Minute  // REDUCED from 5min - Emergency timeout
+	slowProgressTimeout    = 6 * time.Minute // REDUCED from 10min - Slow progress tolerance
+	emergencySlowThreshold = 10              // Emergency: < 10 leafs/min
+	emergencySlowTimeout   = 3 * time.Minute // REDUCED from 5min - Emergency timeout
 
 	// Code sync specific timeouts (even faster since code sync failures are peer-related)
 	codeSyncZeroProgressTimeout = 2 * time.Minute // Faster detection for code sync phase
@@ -31,22 +31,22 @@ const (
 // StuckDetector monitors state sync progress and detects when sync has stalled.
 // It tracks multiple indicators: leaf fetch rate, trie completion rate, and retry count.
 type StuckDetector struct {
-	stats                  *trieSyncStats
-	started                atomic.Bool   // prevents multiple Start() calls
-	stopped                atomic.Bool   // prevents multiple Stop() calls / double-close panic
-	lastLeafCount          atomic.Uint64
-	lastTrieCount          atomic.Uint64
-	lastLeafUpdate         atomic.Value // *time.Time
-	lastTrieUpdate         atomic.Value // *time.Time
-	retryCount             atomic.Uint64
-	stuckChan              chan struct{}
-	stopChan               chan struct{}
-	slowProgressStart      atomic.Value // *time.Time - when slow progress was first detected (nil = not slow)
-	emergencySlowStart     atomic.Value // *time.Time - when critically slow progress was detected (nil = not slow)
-	lastVelocityCheck      atomic.Value // *time.Time
-	lastVelocityCount      atomic.Uint64 // leaf count at last velocity check
-	codeSyncPhaseStart     atomic.Value  // *time.Time - when code sync phase started (nil = not in code sync)
-	inCodeSyncPhase        atomic.Bool   // true if currently in code sync phase
+	stats              *trieSyncStats
+	started            atomic.Bool // prevents multiple Start() calls
+	stopped            atomic.Bool // prevents multiple Stop() calls / double-close panic
+	lastLeafCount      atomic.Uint64
+	lastTrieCount      atomic.Uint64
+	lastLeafUpdate     atomic.Value // *time.Time
+	lastTrieUpdate     atomic.Value // *time.Time
+	retryCount         atomic.Uint64
+	stuckChan          chan struct{}
+	stopChan           chan struct{}
+	slowProgressStart  atomic.Value  // *time.Time - when slow progress was first detected (nil = not slow)
+	emergencySlowStart atomic.Value  // *time.Time - when critically slow progress was detected (nil = not slow)
+	lastVelocityCheck  atomic.Value  // *time.Time
+	lastVelocityCount  atomic.Uint64 // leaf count at last velocity check
+	codeSyncPhaseStart atomic.Value  // *time.Time - when code sync phase started (nil = not in code sync)
+	inCodeSyncPhase    atomic.Bool   // true if currently in code sync phase
 
 	// Track storage tries waiting for code sync (specific failure mode)
 	// Enables faster stuck detection when storage is complete but code sync failing
