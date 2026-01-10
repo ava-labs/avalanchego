@@ -1,0 +1,59 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "customtypes",
+    srcs = [
+        "block_ext.go",
+        "gen_header_serializable_json.go",
+        "gen_header_serializable_rlp.go",
+        "hashes_ext.go",
+        "header_ext.go",
+        "libevm.go",
+        "state_account_ext.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vms/evm/acp226",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//rlp",
+    ],
+)
+
+go_test(
+    name = "customtypes_test",
+    srcs = [
+        "aliases_test.go",
+        "block_ext_test.go",
+        "block_test.go",
+        "hashing_test.go",
+        "header_ext_test.go",
+        "rlp_fuzzer_test.go",
+        "types_test.go",
+    ],
+    embed = [":customtypes"],
+    deps = [
+        "//graft/coreth/internal/blocktest",
+        "//graft/coreth/params",
+        "//graft/coreth/utils",
+        "//graft/coreth/utils/utilstest",
+        "//vms/evm/acp226",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
+)

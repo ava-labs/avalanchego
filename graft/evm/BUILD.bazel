@@ -1,0 +1,7 @@
+# Gazelle configuration for evm submodule
+# gazelle:prefix github.com/ava-labs/avalanchego/graft/evm
+
+exports_files([
+    "go.mod",
+    "go.sum",
+])

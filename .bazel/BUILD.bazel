@@ -1,0 +1,7 @@
+# Bazel configuration files.
+# This directory contains patches for external dependencies and build scripts.
+
+exports_files([
+    "workspace_status.sh",
+    "go_version_check.bzl",
+])

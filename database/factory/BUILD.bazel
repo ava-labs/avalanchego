@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "factory",
+    srcs = ["factory.go"],
+    importpath = "github.com/ava-labs/avalanchego/database/factory",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/corruptabledb",
+        "//database/leveldb",
+        "//database/memdb",
+        "//database/pebbledb",
+        "//database/versiondb",
+        "//utils/logging",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)

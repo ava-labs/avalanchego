@@ -1,0 +1,33 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "utilstest",
+    srcs = [
+        "key.go",
+        "pointer.go",
+        "snow.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//snow/snowtest",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//utils/constants",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "utilstest_test",
+    srcs = ["context_test.go"],
+    embed = [":utilstest"],
+    deps = [
+        "//ids",
+        "@com_github_stretchr_testify//require",
+    ],
+)

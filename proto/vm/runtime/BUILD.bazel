@@ -1,0 +1,25 @@
+load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//proto:def.bzl", "go_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+proto_library(
+    name = "manager_proto",
+    srcs = ["runtime.proto"],
+    visibility = ["//visibility:public"],
+    deps = ["@com_google_protobuf//:empty_proto"],
+)
+
+go_proto_library(
+    name = "manager_go_proto",
+    compilers = ["@io_bazel_rules_go//proto:go_grpc_v2"],
+    importpath = "github.com/ava-labs/avalanchego/proto/pb/vm/manager",
+    proto = ":manager_proto",
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "manager",
+    embed = [":manager_go_proto"],
+    importpath = "github.com/ava-labs/avalanchego/proto/pb/vm/manager",
+    visibility = ["//visibility:public"],
+)

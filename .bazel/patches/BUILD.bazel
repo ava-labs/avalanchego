@@ -1,0 +1,3 @@
+# Patches for external dependencies that don't work with Bazel out of the box.
+
+exports_files(glob(["*.patch"]))

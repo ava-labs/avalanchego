@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "corethclient",
+    srcs = ["corethclient.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/ethclient/corethclient",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/ethclient",
+        "//graft/coreth/rpc",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/types",
+    ],
+)

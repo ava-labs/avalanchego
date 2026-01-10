@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "add-primary-validator_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/add-primary-validator",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//api/info",
+        "//genesis",
+        "//ids",
+        "//utils/units",
+        "//vms/platformvm/reward",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "add-primary-validator",
+    embed = [":add-primary-validator_lib"],
+    visibility = ["//visibility:public"],
+)
