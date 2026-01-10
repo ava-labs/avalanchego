@@ -858,6 +858,80 @@ func (n *Node) initDatabase() error {
 	return nil
 }
 
+// createChainDatabase creates a separate database for a specific chain.
+// This enables per-chain database isolation, allowing each chain's data
+// to be independently managed and deleted without affecting other chains.
+//
+// Directory structure:
+//   {dbPath}/{networkID}/{dbVersion}/{chainID}/
+//
+// Returns a metered database instance for the chain.
+func (n *Node) createChainDatabase(chainID ids.ID) (database.Database, error) {
+	// Validate inputs
+	if chainID == ids.Empty {
+		return nil, fmt.Errorf("cannot create database for empty chain ID")
+	}
+
+	// Determine base database folder based on database type
+	var dbFolderName string
+	switch n.Config.DatabaseConfig.Name {
+	case leveldb.Name:
+		dbFolderName = version.CurrentDatabase
+	case pebbledb.Name:
+		dbFolderName = "pebble"
+	default:
+		dbFolderName = "db"
+	}
+
+	// Build per-chain database path:
+	// {dbPath}/{dbFolderName}/{chainID}
+	basePath := filepath.Join(n.Config.DatabaseConfig.Path, dbFolderName)
+	chainDBPath := filepath.Join(basePath, chainID.String())
+
+	// Create metrics registry for this chain's database
+	chainDBMetricName := fmt.Sprintf("db_chain_%s", chainID)
+	dbReg, err := metrics.MakeAndRegister(
+		n.MeterDBMetricsGatherer,
+		chainDBMetricName,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create metrics registry for chain %s: %w", chainID, err)
+	}
+
+	// Create the per-chain database
+	chainDB, err := databasefactory.New(
+		n.Config.DatabaseConfig.Name,
+		chainDBPath,
+		n.Config.DatabaseConfig.ReadOnly,
+		n.Config.DatabaseConfig.Config,
+		dbReg,
+		n.Log,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create database for chain %s at path %s: %w", chainID, chainDBPath, err)
+	}
+
+	// Wrap with meterdb for metrics collection
+	meterDB, err := meterdb.New(dbReg, chainDB)
+	if err != nil {
+		// Close the database we just created before returning error
+		if closeErr := chainDB.Close(); closeErr != nil {
+			n.Log.Error("failed to close chain database after meterdb creation failure",
+				zap.Stringer("chainID", chainID),
+				zap.Error(closeErr),
+			)
+		}
+		return nil, fmt.Errorf("failed to create metered database for chain %s: %w", chainID, err)
+	}
+
+	n.Log.Info("created per-chain database",
+		zap.Stringer("chainID", chainID),
+		zap.String("path", chainDBPath),
+	)
+
+	return meterDB, nil
+}
+
 // Set the node IDs of the peers this node should first connect to
 func (n *Node) initBootstrappers() error {
 	n.bootstrappers = validators.NewManager()
@@ -1132,6 +1206,15 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("failed to initialize subnets: %w", err)
 	}
 
+	// Determine if per-chain database isolation should be used
+	var createChainDBFunc func(ids.ID) (database.Database, error)
+	if n.Config.DatabaseConfig.UsePerChainDatabases {
+		createChainDBFunc = n.createChainDatabase
+		n.Log.Info("per-chain database isolation enabled")
+	} else {
+		n.Log.Info("using legacy shared database with chain ID prefixing")
+	}
+
 	n.chainManager, err = chains.New(
 		&chains.ManagerConfig{
 			SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
@@ -1178,6 +1261,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Tracer:                                  n.tracer,
 			ChainDataDir:                            n.Config.ChainDataDir,
 			Subnets:                                 subnets,
+			CreateChainDB:                           createChainDBFunc,
 		},
 	)
 	if err != nil {

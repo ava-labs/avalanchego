@@ -859,6 +859,12 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 		}
 	}
 
+	// Default to true if not set (per-chain databases enabled by default)
+	usePerChainDatabases := true
+	if v.IsSet(DBUsePerChainDatabasesKey) {
+		usePerChainDatabases = v.GetBool(DBUsePerChainDatabasesKey)
+	}
+
 	return node.DatabaseConfig{
 		Name:     v.GetString(DBTypeKey),
 		ReadOnly: v.GetBool(DBReadOnlyKey),
@@ -866,7 +872,8 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 			getExpandedArg(v, DBPathKey),
 			constants.NetworkName(networkID),
 		),
-		Config: configBytes,
+		Config:               configBytes,
+		UsePerChainDatabases: usePerChainDatabases,
 	}, nil
 }
 

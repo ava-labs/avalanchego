@@ -244,6 +244,12 @@ type ManagerConfig struct {
 	ChainDataDir string
 
 	Subnets *Subnets
+
+	// CreateChainDB creates a per-chain isolated database.
+	// If nil, falls back to shared database (DB field) with chain ID prefixing.
+	// This function enables physical per-chain database separation, allowing
+	// independent management and deletion of each chain's data.
+	CreateChainDB func(chainID ids.ID) (database.Database, error)
 }
 
 type manager struct {
@@ -268,6 +274,11 @@ type manager struct {
 	// Key: Chain's ID
 	// Value: The chain
 	chains map[ids.ID]handler.Handler
+
+	// Per-chain databases that need to be closed on shutdown.
+	// Only populated when using per-chain database isolation (CreateChainDB != nil).
+	// Key: Chain's ID, Value: The chain's database
+	chainDatabases map[ids.ID]database.Database
 
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
@@ -329,6 +340,7 @@ func New(config *ManagerConfig) (Manager, error) {
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
 		chains:                 make(map[ids.ID]handler.Handler),
+		chainDatabases:         make(map[ids.ID]database.Database),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
@@ -648,25 +660,56 @@ func (m *manager) createAvalancheChain(
 	})
 
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
-	meterDBReg, err := metrics.MakeAndRegister(
-		m.MeterDBMetrics,
-		primaryAlias,
-	)
-	if err != nil {
-		return nil, err
+
+	// Create database for this chain.
+	// Use per-chain isolated database if available (CreateChainDB != nil),
+	// otherwise fall back to shared database with chain ID prefixing for backward compatibility.
+	var baseDB database.Database
+	if m.CreateChainDB != nil {
+		// Per-chain database isolation: each chain gets its own physical database directory.
+		// This enables independent management and deletion of each chain's data.
+		chainDB, err := m.CreateChainDB(ctx.ChainID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create per-chain database for chain %s: %w", ctx.ChainID, err)
+		}
+		baseDB = chainDB
+
+		// Track the database for proper cleanup on shutdown
+		m.chainsLock.Lock()
+		m.chainDatabases[ctx.ChainID] = chainDB
+		m.chainsLock.Unlock()
+
+		ctx.Log.Info("using per-chain isolated database",
+			zap.String("chainID", ctx.ChainID.String()),
+		)
+	} else {
+		// Legacy mode: shared database with chain ID prefixing (logical isolation only).
+		// All chains' data is stored in a monolithic database, separated by key prefixes.
+		meterDBReg, err := metrics.MakeAndRegister(
+			m.MeterDBMetrics,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		meterDB, err := meterdb.New(meterDBReg, m.DB)
+		if err != nil {
+			return nil, err
+		}
+
+		baseDB = prefixdb.New(ctx.ChainID[:], meterDB)
+		ctx.Log.Info("using shared database with chain ID prefixing",
+			zap.String("chainID", ctx.ChainID.String()),
+		)
 	}
 
-	meterDB, err := meterdb.New(meterDBReg, m.DB)
-	if err != nil {
-		return nil, err
-	}
-
-	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
-	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
-	vertexDB := prefixdb.New(VertexDBPrefix, prefixDB)
-	vertexBootstrappingDB := prefixdb.New(VertexBootstrappingDBPrefix, prefixDB)
-	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, prefixDB)
-	blockBootstrappingDB := prefixdb.New(BlockBootstrappingDBPrefix, prefixDB)
+	// Create component-specific databases within the chain's database
+	vmDB := prefixdb.New(VMDBPrefix, baseDB)
+	vertexDB := prefixdb.New(VertexDBPrefix, baseDB)
+	vertexBootstrappingDB := prefixdb.New(VertexBootstrappingDBPrefix, baseDB)
+	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, baseDB)
+	blockBootstrappingDB := prefixdb.New(BlockBootstrappingDBPrefix, baseDB)
 
 	avalancheMetrics, err := metrics.MakeAndRegister(
 		m.avalancheGatherer,
@@ -1098,22 +1141,53 @@ func (m *manager) createSnowmanChain(
 	})
 
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
-	meterDBReg, err := metrics.MakeAndRegister(
-		m.MeterDBMetrics,
-		primaryAlias,
-	)
-	if err != nil {
-		return nil, err
+
+	// Create database for this chain.
+	// Use per-chain isolated database if available (CreateChainDB != nil),
+	// otherwise fall back to shared database with chain ID prefixing for backward compatibility.
+	var baseDB database.Database
+	if m.CreateChainDB != nil {
+		// Per-chain database isolation: each chain gets its own physical database directory.
+		// This enables independent management and deletion of each chain's data.
+		chainDB, err := m.CreateChainDB(ctx.ChainID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create per-chain database for chain %s: %w", ctx.ChainID, err)
+		}
+		baseDB = chainDB
+
+		// Track the database for proper cleanup on shutdown
+		m.chainsLock.Lock()
+		m.chainDatabases[ctx.ChainID] = chainDB
+		m.chainsLock.Unlock()
+
+		ctx.Log.Info("using per-chain isolated database",
+			zap.String("chainID", ctx.ChainID.String()),
+		)
+	} else {
+		// Legacy mode: shared database with chain ID prefixing (logical isolation only).
+		// All chains' data is stored in a monolithic database, separated by key prefixes.
+		meterDBReg, err := metrics.MakeAndRegister(
+			m.MeterDBMetrics,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		meterDB, err := meterdb.New(meterDBReg, m.DB)
+		if err != nil {
+			return nil, err
+		}
+
+		baseDB = prefixdb.New(ctx.ChainID[:], meterDB)
+		ctx.Log.Info("using shared database with chain ID prefixing",
+			zap.String("chainID", ctx.ChainID.String()),
+		)
 	}
 
-	meterDB, err := meterdb.New(meterDBReg, m.DB)
-	if err != nil {
-		return nil, err
-	}
-
-	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
-	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
-	bootstrappingDB := prefixdb.New(ChainBootstrappingDBPrefix, prefixDB)
+	// Create component-specific databases within the chain's database
+	vmDB := prefixdb.New(VMDBPrefix, baseDB)
+	bootstrappingDB := prefixdb.New(ChainBootstrappingDBPrefix, baseDB)
 
 	// Passes messages from the consensus engine to the network
 	messageSender, err := sender.New(
@@ -1640,6 +1714,23 @@ func (m *manager) Shutdown() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	m.ManagerConfig.Router.Shutdown(shutdownCtx)
+
+	// Close per-chain databases if using per-chain isolation
+	m.chainsLock.Lock()
+	defer m.chainsLock.Unlock()
+
+	for chainID, db := range m.chainDatabases {
+		if err := db.Close(); err != nil {
+			m.Log.Error("failed to close per-chain database",
+				zap.Stringer("chainID", chainID),
+				zap.Error(err),
+			)
+		} else {
+			m.Log.Info("closed per-chain database",
+				zap.Stringer("chainID", chainID),
+			)
+		}
+	}
 }
 
 // LookupVM returns the ID of the VM associated with an alias

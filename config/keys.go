@@ -50,6 +50,7 @@ const (
 	DBTypeKey                                = "db-type"
 	DBReadOnlyKey                            = "db-read-only"
 	DBPathKey                                = "db-dir"
+	DBUsePerChainDatabasesKey                = "db-use-per-chain-databases"
 	DBConfigFileKey                          = "db-config-file"
 	DBConfigContentKey                       = "db-config-file-content"
 	PublicIPKey                              = "public-ip"

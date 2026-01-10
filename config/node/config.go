@@ -124,6 +124,13 @@ type DatabaseConfig struct {
 
 	// Path to config file
 	Config []byte `json:"-"`
+
+	// UsePerChainDatabases enables physical per-chain database isolation.
+	// When true, each chain gets its own database directory, allowing independent
+	// management and deletion of chain data without affecting other chains.
+	// When false, uses legacy shared database with logical prefixing.
+	// Default: true (per-chain isolation enabled)
+	UsePerChainDatabases bool `json:"usePerChainDatabases"`
 }
 
 // Config contains all of the configurations of an Avalanche node.
