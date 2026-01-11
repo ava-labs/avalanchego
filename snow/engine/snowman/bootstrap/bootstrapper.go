@@ -49,6 +49,13 @@ const (
 	// Increased from 100 to 200 for better throughput with limited peers
 	maxParallelFetches = 200
 
+	// maxGetBlockRetries is the maximum number of retry attempts when fetching
+	// the last accepted block fails due to temporary database inconsistency
+	maxGetBlockRetries = 5
+
+	// getBlockRetryDelay is the initial delay between retry attempts
+	getBlockRetryDelay = 100 * time.Millisecond
+
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
 
@@ -1044,11 +1051,45 @@ func (b *Bootstrapper) getLastAccepted(ctx context.Context) (snowman.Block, erro
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get last accepted ID: %w", err)
 	}
-	lastAccepted, err := b.VM.GetBlock(ctx, lastAcceptedID)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted block %s: %w", lastAcceptedID, err)
+
+	// Retry with exponential backoff to handle temporary database inconsistencies
+	// during heavy write workloads (e.g., LevelDB compaction interference)
+	var lastAccepted snowman.Block
+	retryDelay := getBlockRetryDelay
+	for attempt := 0; attempt < maxGetBlockRetries; attempt++ {
+		lastAccepted, err = b.VM.GetBlock(ctx, lastAcceptedID)
+		if err == nil {
+			if attempt > 0 {
+				b.Ctx.Log.Info("successfully retrieved last accepted block after retry",
+					zap.Int("attempts", attempt+1),
+					zap.Stringer("blockID", lastAcceptedID),
+				)
+			}
+			return lastAccepted, nil
+		}
+
+		// Check if error is a database "not found" error (temporary inconsistency)
+		if !errors.Is(err, database.ErrNotFound) {
+			// Non-retryable error
+			return nil, fmt.Errorf("couldn't get last accepted block %s: %w", lastAcceptedID, err)
+		}
+
+		// Log warning and retry
+		if attempt < maxGetBlockRetries-1 {
+			b.Ctx.Log.Warn("temporary database inconsistency, retrying",
+				zap.Int("attempt", attempt+1),
+				zap.Int("maxRetries", maxGetBlockRetries),
+				zap.Stringer("blockID", lastAcceptedID),
+				zap.Duration("retryDelay", retryDelay),
+				zap.Error(err),
+			)
+			time.Sleep(retryDelay)
+			retryDelay *= 2 // Exponential backoff
+		}
 	}
-	return lastAccepted, nil
+
+	// All retries exhausted
+	return nil, fmt.Errorf("couldn't get last accepted block %s after %d retries: %w", lastAcceptedID, maxGetBlockRetries, err)
 }
 
 func (b *Bootstrapper) Timeout() error {
