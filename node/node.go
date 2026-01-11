@@ -865,12 +865,10 @@ func (n *Node) initDatabase() error {
 // Directory structure:
 //   {dbPath}/{networkID}/{dbVersion}/{chainID}/
 //
+// Note: P-chain uses ids.Empty as its chain ID, which is valid.
+//
 // Returns a metered database instance for the chain.
 func (n *Node) createChainDatabase(chainID ids.ID) (database.Database, error) {
-	// Validate inputs
-	if chainID == ids.Empty {
-		return nil, fmt.Errorf("cannot create database for empty chain ID")
-	}
 
 	// Determine base database folder based on database type
 	var dbFolderName string
@@ -899,6 +897,7 @@ func (n *Node) createChainDatabase(chainID ids.ID) (database.Database, error) {
 	}
 
 	// Create the per-chain database
+	// Note: databasefactory.New already wraps the database with meterdb, so we return it directly
 	chainDB, err := databasefactory.New(
 		n.Config.DatabaseConfig.Name,
 		chainDBPath,
@@ -911,25 +910,12 @@ func (n *Node) createChainDatabase(chainID ids.ID) (database.Database, error) {
 		return nil, fmt.Errorf("couldn't create database for chain %s at path %s: %w", chainID, chainDBPath, err)
 	}
 
-	// Wrap with meterdb for metrics collection
-	meterDB, err := meterdb.New(dbReg, chainDB)
-	if err != nil {
-		// Close the database we just created before returning error
-		if closeErr := chainDB.Close(); closeErr != nil {
-			n.Log.Error("failed to close chain database after meterdb creation failure",
-				zap.Stringer("chainID", chainID),
-				zap.Error(closeErr),
-			)
-		}
-		return nil, fmt.Errorf("failed to create metered database for chain %s: %w", chainID, err)
-	}
-
 	n.Log.Info("created per-chain database",
 		zap.Stringer("chainID", chainID),
 		zap.String("path", chainDBPath),
 	)
 
-	return meterDB, nil
+	return chainDB, nil
 }
 
 // Set the node IDs of the peers this node should first connect to

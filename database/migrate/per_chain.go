@@ -43,10 +43,8 @@ func NewPerChainMigrator(sourceDB database.Database, log logging.Logger) *PerCha
 
 // RegisterChainDB registers a target database for a specific chain.
 // Keys with this chain's prefix will be migrated to this database.
+// Note: P-chain uses ids.Empty as its chain ID, which is valid.
 func (m *PerChainMigrator) RegisterChainDB(chainID ids.ID, targetDB database.Database) error {
-	if chainID == ids.Empty {
-		return fmt.Errorf("cannot register database for empty chain ID")
-	}
 	if targetDB == nil {
 		return fmt.Errorf("target database cannot be nil")
 	}
