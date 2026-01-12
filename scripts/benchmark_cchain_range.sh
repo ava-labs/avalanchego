@@ -21,6 +21,7 @@ set -euo pipefail
 #   Data sources (provide S3 sources OR local paths):
 #     BLOCK_DIR_SRC: S3 object key for blocks (triggers S3 import).
 #     CURRENT_STATE_DIR_SRC: S3 object key for state (triggers S3 import).
+#                            Use "genesis" to start from empty state (block 1).
 #     BLOCK_DIR: Path to local block directory.
 #     CURRENT_STATE_DIR: Path to local current state directory.
 #
@@ -148,7 +149,21 @@ if [[ -n "${CHAOS_MODE:-}" && -n "${TEST_NAME:-}" ]]; then
 fi
 
 # Determine data source: S3 import or local paths
-if [[ -n "${BLOCK_DIR_SRC:-}" && -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
+if [[ -n "${BLOCK_DIR_SRC:-}" && "${CURRENT_STATE_DIR_SRC:-}" == "genesis" ]]; then
+    # S3 blocks + genesis mode (empty state dir)
+    TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
+    EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR:-/tmp/reexec-${TEST_NAME:-custom}-${TIMESTAMP}}"
+    S3_BOOTSTRAP_BUCKET="${S3_BOOTSTRAP_BUCKET:-s3://avalanchego-bootstrap-testing}"
+
+    # Import only blocks
+    echo "=== Importing blocks from S3 (genesis mode) ==="
+    "${SCRIPT_DIR}/copy_dir.sh" "${S3_BOOTSTRAP_BUCKET}/${BLOCK_DIR_SRC}/**" "${EXECUTION_DATA_DIR}/blocks"
+
+    BLOCK_DIR="${EXECUTION_DATA_DIR}/blocks"
+    CURRENT_STATE_DIR="${EXECUTION_DATA_DIR}/current-state"
+    mkdir -p "${CURRENT_STATE_DIR}"
+    echo "=== Created empty state directory for genesis ==="
+elif [[ -n "${BLOCK_DIR_SRC:-}" && -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
     # S3 mode - import data
     TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
     EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR:-/tmp/reexec-${TEST_NAME:-custom}-${TIMESTAMP}}"
@@ -161,7 +176,7 @@ if [[ -n "${BLOCK_DIR_SRC:-}" && -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
     BLOCK_DIR="${EXECUTION_DATA_DIR}/blocks"
     CURRENT_STATE_DIR="${EXECUTION_DATA_DIR}/current-state"
 elif [[ -n "${BLOCK_DIR_SRC:-}" || -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
-    error "Both BLOCK_DIR_SRC and CURRENT_STATE_DIR_SRC must be provided together"
+    error "Both BLOCK_DIR_SRC and CURRENT_STATE_DIR_SRC must be provided together (use 'genesis' for empty state)"
 elif [[ -z "${BLOCK_DIR:-}" || -z "${CURRENT_STATE_DIR:-}" ]]; then
     show_usage
     echo ""
