@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Implements solidity tests.
@@ -9,8 +9,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +18,8 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
 	"github.com/stretchr/testify/require"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
@@ -55,6 +55,9 @@ const (
 )
 
 var (
+	//go:embed genesis.json
+	genesis []byte
+
 	flagVars *e2e.FlagVars
 
 	subnetA, subnetB, cChainSubnetDetails *Subnet
@@ -88,8 +91,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	tc := e2e.NewTestContext()
 	nodes := utils.NewTmpnetNodes(tmpnet.DefaultNodeCount)
-	_, thisFile, _, _ := runtime.Caller(0)
-	genesisPath := filepath.Join(filepath.Dir(thisFile), "genesis.json")
 
 	env := e2e.NewTestEnvironment(
 		tc,
@@ -98,8 +99,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			"subnet-evm-warp-e2e",
 			nodes,
 			tmpnet.FlagsMap{},
-			utils.NewTmpnetSubnet(subnetAName, genesisPath, utils.DefaultChainConfig, nodes...),
-			utils.NewTmpnetSubnet(subnetBName, genesisPath, utils.DefaultChainConfig, nodes...),
+			utils.NewTmpnetSubnet(subnetAName, genesis, utils.DefaultChainConfig, nodes...),
+			utils.NewTmpnetSubnet(subnetBName, genesis, utils.DefaultChainConfig, nodes...),
 		),
 	)
 
@@ -154,33 +155,53 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.Describe("[Warp]", func() {
-	testFunc := func(sendingSubnet *Subnet, receivingSubnet *Subnet) {
-		tc := e2e.NewTestContext()
-		w := newWarpTest(tc.DefaultContext(), sendingSubnet, receivingSubnet)
-
-		log.Info("Sending message from A to B")
-		w.sendMessageFromSendingSubnet()
-
-		log.Info("Aggregating signatures via API")
-		w.aggregateSignaturesViaAPI()
-
-		log.Info("Delivering addressed call payload to receiving subnet")
-		w.deliverAddressedCallToReceivingSubnet()
-
-		log.Info("Delivering block hash payload to receiving subnet")
-		w.deliverBlockHashPayload()
-
-		log.Info("bindings test: verifying warp message and blockchain ID")
-		w.warpBindingsTest()
-
-		log.Info("Executing warp load test")
-		w.warpLoad()
+	type testCombination struct {
+		name            string
+		sendingSubnet   func() *Subnet
+		receivingSubnet func() *Subnet
 	}
-	ginkgo.It("SubnetA -> SubnetB", func() { testFunc(subnetA, subnetB) })
-	ginkgo.It("SubnetA -> SubnetA", func() { testFunc(subnetA, subnetA) })
-	ginkgo.It("SubnetA -> C-Chain", func() { testFunc(subnetA, cChainSubnetDetails) })
-	ginkgo.It("C-Chain -> SubnetA", func() { testFunc(cChainSubnetDetails, subnetA) })
-	ginkgo.It("C-Chain -> C-Chain", func() { testFunc(cChainSubnetDetails, cChainSubnetDetails) })
+
+	testCombinations := []testCombination{
+		{"SubnetA -> SubnetB", func() *Subnet { return subnetA }, func() *Subnet { return subnetB }},
+		{"SubnetA -> SubnetA", func() *Subnet { return subnetA }, func() *Subnet { return subnetA }},
+		{"SubnetA -> C-Chain", func() *Subnet { return subnetA }, func() *Subnet { return cChainSubnetDetails }},
+		{"C-Chain -> SubnetA", func() *Subnet { return cChainSubnetDetails }, func() *Subnet { return subnetA }},
+		{"C-Chain -> C-Chain", func() *Subnet { return cChainSubnetDetails }, func() *Subnet { return cChainSubnetDetails }},
+	}
+
+	for _, combination := range testCombinations {
+		ginkgo.Describe(combination.name, ginkgo.Ordered, func() {
+			var w *warpTest
+
+			ginkgo.BeforeAll(func() {
+				w = newWarpTest(combination.sendingSubnet(), combination.receivingSubnet())
+			})
+
+			ginkgo.It("should send warp message from sending subnet", func() {
+				w.sendMessageFromSendingSubnet()
+			})
+
+			ginkgo.It("should aggregate signatures via API", func() {
+				w.aggregateSignaturesViaAPI()
+			})
+
+			ginkgo.It("should deliver addressed call payload to receiving subnet", func() {
+				w.deliverAddressedCallToReceivingSubnet()
+			})
+
+			ginkgo.It("should deliver block hash payload", func() {
+				w.deliverBlockHashPayload()
+			})
+
+			ginkgo.It("should verify warp bindings", func() {
+				w.warpBindingsTest()
+			})
+
+			ginkgo.It("should handle warp load testing", func() {
+				w.warpLoad()
+			})
+		})
+	}
 })
 
 type warpTest struct {
@@ -212,8 +233,10 @@ type warpTest struct {
 	addressedCallSignedMessage   *avalancheWarp.Message
 }
 
-func newWarpTest(ctx context.Context, sendingSubnet *Subnet, receivingSubnet *Subnet) *warpTest {
+func newWarpTest(sendingSubnet *Subnet, receivingSubnet *Subnet) *warpTest {
 	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	ctx := tc.DefaultContext()
 
 	sendingSubnetFundedKey := sendingSubnet.PreFundedKey
 	receivingSubnetFundedKey := receivingSubnet.PreFundedKey
@@ -288,9 +311,10 @@ func (*warpTest) getBlockHashAndNumberFromTxReceipt(ctx context.Context, client 
 }
 
 func (w *warpTest) sendMessageFromSendingSubnet() {
+	require := require.New(ginkgo.GinkgoT())
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
-	require := require.New(ginkgo.GinkgoT())
+
 	client := w.sendingSubnetClients[0]
 
 	blockHash, blockNumber := w.sendWarpMessageTx(ctx, client)

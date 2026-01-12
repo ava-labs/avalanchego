@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -242,13 +242,13 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 			log.Crit("Chain data directory must be specified for Firewood")
 		}
 
-		config.DBOverride = firewood.Config{
-			ChainDataDir:         c.ChainDataDir,
-			CleanCacheSize:       c.TrieCleanLimit * 1024 * 1024,
-			FreeListCacheEntries: firewood.Defaults.FreeListCacheEntries,
-			Revisions:            uint(c.StateHistory), // must be at least 2
-			ReadCacheStrategy:    ffi.CacheAllReads,
-			ArchiveMode:          !c.Pruning,
+		config.DBOverride = firewood.TrieDBConfig{
+			DatabaseDir:          c.ChainDataDir,
+			CacheSizeBytes:       uint(c.TrieCleanLimit * 1024 * 1024),
+			FreeListCacheEntries: 40_000,               // Firewood default
+			RevisionsInMemory:    uint(c.StateHistory), // must be at least 2
+			CacheStrategy:        ffi.CacheAllReads,
+			Archive:              !c.Pruning,
 		}.BackendConstructor
 	}
 	return config

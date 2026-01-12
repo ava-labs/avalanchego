@@ -1,7 +1,7 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package firewood
+package syncer
 
 import (
 	"bytes"
@@ -70,23 +70,22 @@ func Test_Firewood_Sync(t *testing.T) {
 func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 	ctx := t.Context()
 
-	ffiServer := generateDB(t, serverKeys, seed)
-	serverDB := &database{db: ffiServer}
+	serverDB := generateDB(t, serverKeys, seed)
 	clientDB := generateDB(t, clientKeys, seed+1) // guarantee different data
 	defer func() {
-		require.NoError(t, serverDB.db.Close(ctx))
+		require.NoError(t, serverDB.Close(ctx))
 		require.NoError(t, clientDB.Close(ctx))
 	}()
 
-	root, err := serverDB.GetMerkleRoot(ctx)
+	root, err := serverDB.Root()
 	require.NoError(t, err)
 
-	syncer, err := NewSyncer(
+	syncer, err := New(
 		Config{},
 		clientDB,
-		root,
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(serverDB, rangeProofMarshaler{})),
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(serverDB, rangeProofMarshaler{}, changeProofMarshaler{})),
+		ids.ID(root),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(serverDB)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, syncer)
@@ -95,7 +94,7 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 	err = syncer.Wait(ctx)
 	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
-		logDiff(t, serverDB.db, clientDB)
+		logDiff(t, serverDB, clientDB)
 	}
 	require.NoError(t, err)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -68,8 +68,7 @@ func MakePreState(db ethdb.Database, accounts types.GenesisAlloc, snapshotter bo
 	case rawdb.PathScheme:
 		tconf.DBOverride = pathdb.Defaults.BackendConstructor
 	case customrawdb.FirewoodScheme:
-		cfg := firewood.Defaults
-		cfg.ChainDataDir = tempdir
+		cfg := firewood.DefaultConfig(tempdir)
 		tconf.DBOverride = cfg.BackendConstructor
 	default:
 		panic("unknown trie database scheme" + scheme)
