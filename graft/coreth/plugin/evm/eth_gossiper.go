@@ -29,11 +29,9 @@ import (
 const pendingTxsBuffer = 10
 
 var (
-	_ gossip.Gossipable                    = (*GossipEthTx)(nil)
-	_ gossip.Marshaller[*GossipEthTx]      = (*GossipEthTxMarshaller)(nil)
-	_ gossip.HandlerSet[*GossipEthTx]      = (*GossipEthTxPool)(nil)
-	_ gossip.PullGossiperSet[*GossipEthTx] = (*GossipEthTxPool)(nil)
-	_ gossip.PushGossiperSet               = (*GossipEthTxPool)(nil)
+	_ gossip.Gossipable               = (*GossipEthTx)(nil)
+	_ gossip.Marshaller[*GossipEthTx] = (*GossipEthTxMarshaller)(nil)
+	_ gossip.SystemSet[*GossipEthTx]  = (*GossipEthTxPool)(nil)
 
 	_ eth.PushGossiper = (*EthPushGossiper)(nil)
 )
