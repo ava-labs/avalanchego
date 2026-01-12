@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vmtest
@@ -29,9 +29,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -325,7 +325,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 
 	// make some accounts
 	r := rand.New(rand.NewSource(1))
-	root, accounts := statesynctest.FillAccountsWithOverlappingStorage(t, r, serverVM.Ethereum().BlockChain().TrieDB(), types.EmptyRootHash, 1000, 16)
+	root, accounts := synctest.FillAccountsWithOverlappingStorage(t, r, serverVM.Ethereum().BlockChain().StateCache(), types.EmptyRootHash, 1000, 16)
 
 	// patch serverVM's lastAcceptedBlock to have the new root
 	// and update the vm's state so the trie with accounts will
