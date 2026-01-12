@@ -2,7 +2,10 @@
 
 set -euo pipefail
 
-# Import C-Chain blocks and state from S3
+# Set up C-Chain test data
+#
+# Downloads blocks from S3 and sets up state directory. For genesis execution
+# (block 1), omit CURRENT_STATE_DIR_SRC to create an empty state directory.
 #
 # Required env vars:
 #   BLOCK_DIR_SRC         - S3 object key for blocks (e.g., cchain-mainnet-blocks-200-ldb)

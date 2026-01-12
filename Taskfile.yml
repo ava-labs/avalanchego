@@ -140,9 +140,9 @@ tasks:
     desc: Runs ginkgo against the current working directory
     cmd: ./bin/ginkgo build {{.USER_WORKING_DIR}}
 
-  import-chain-data:
-    desc: Imports the C-Chain block and state data to re-execute.
-    cmd: ./scripts/import_cchain_data.sh
+  setup-chain-data:
+    desc: Sets up C-Chain test data (blocks from S3, state from S3 or empty for genesis).
+    cmd: ./scripts/setup_cchain_data.sh
 
   install-nix:
     desc: Installs nix with an OS-appropriate installer

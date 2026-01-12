@@ -157,7 +157,7 @@ if [[ -n "${BLOCK_DIR_SRC:-}" ]]; then
     BLOCK_DIR_SRC="${BLOCK_DIR_SRC}" \
     CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-}" \
     EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR}" \
-    "${SCRIPT_DIR}/import_cchain_data.sh"
+    "${SCRIPT_DIR}/setup_cchain_data.sh"
 
     BLOCK_DIR="${EXECUTION_DATA_DIR}/blocks"
     CURRENT_STATE_DIR="${EXECUTION_DATA_DIR}/current-state"
