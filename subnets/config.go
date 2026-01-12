@@ -49,6 +49,38 @@ type Config struct {
 	// TODO: Move this flag once the proposervm is configurable on a per-chain
 	// basis.
 	ProposerNumHistoricalBlocks uint64 `json:"proposerNumHistoricalBlocks" yaml:"proposerNumHistoricalBlocks"`
+
+	// RelayerIDs specifies designated relayer node IDs for this subnet.
+	// When set, the node operates in "relayer mode" for this subnet:
+	// - Only these nodes are used for consensus sampling
+	// - Only accepted blocks (not preferences) are followed from chits
+	// This is useful for isolated networks that connect to the L1/primary network
+	// through a small set of relayer nodes.
+	RelayerIDs set.Set[ids.NodeID] `json:"relayerIDs" yaml:"relayerIDs"`
+}
+
+// IsRelayerMode returns true if relayer mode is enabled for this subnet.
+// Relayer mode is enabled when Relayers is non-empty.
+func (c *Config) IsRelayerMode() bool {
+	return len(c.RelayerIDs) > 0
+}
+
+// AdjustForRelayerMode modifies consensus parameters if relayer mode is enabled.
+// If relayer mode is not enabled (no RelayerIDs), this is a no-op.
+//
+// In relayer mode:
+//   - K is set to the number of relayers (sample all relayers)
+//   - AlphaPreference and AlphaConfidence are set to (numRelayers/2)+1 (simple majority)
+//   - Beta remains unchanged to maintain strong finalization guarantees
+func (c *Config) AdjustForRelayerMode() {
+	if !c.IsRelayerMode() {
+		return
+	}
+
+	numRelayers := c.RelayerIDs.Len()
+	c.ConsensusParameters.K = numRelayers
+	c.ConsensusParameters.AlphaPreference = (numRelayers / 2) + 1
+	c.ConsensusParameters.AlphaConfidence = c.ConsensusParameters.AlphaPreference
 }
 
 func (c *Config) Valid() error {

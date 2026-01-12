@@ -3301,3 +3301,142 @@ func TestEngineAcceptedHeight(t *testing.T) {
 	require.Equal(blk1.Height(), h1)
 	require.Equal(blk2.Height(), h2)
 }
+
+// TestEngineRelayerModeVotesForAcceptedBlock verifies that in relayer mode,
+// the engine votes for the acceptedID instead of the preferredID.
+// This ensures the client node follows finalized blocks from relayers.
+func TestEngineRelayerModeVotesForAcceptedBlock(t *testing.T) {
+	require := require.New(t)
+
+	engCfg := DefaultConfig(t)
+	// Use K=2, Alpha=2 for 2 relayers
+	engCfg.Params = snowball.Parameters{
+		K:                     2,
+		AlphaPreference:       2,
+		AlphaConfidence:       2,
+		Beta:                  1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+
+	vals := validators.NewManager()
+	engCfg.Validators = vals
+
+	// Set up 2 relayer validators
+	relayer0 := ids.GenerateTestNodeID()
+	relayer1 := ids.GenerateTestNodeID()
+
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, relayer0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, relayer1, nil, ids.Empty, 1))
+
+	// Enable relayer mode
+	engCfg.RelayerNodeIDs = []ids.NodeID{relayer0, relayer1}
+
+	sender := &enginetest.Sender{T: t}
+	engCfg.Sender = sender
+	sender.Default(true)
+
+	vm := &blocktest.VM{}
+	vm.T = t
+	engCfg.VM = vm
+
+	vm.Default(true)
+	vm.CantSetState = false
+	vm.CantSetPreference = false
+
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		require.Equal(snowmantest.GenesisID, blkID)
+		return snowmantest.Genesis, nil
+	}
+
+	te, err := New(engCfg)
+	require.NoError(err)
+
+	require.NoError(te.Start(t.Context(), 0))
+
+	vm.GetBlockF = nil
+	vm.LastAcceptedF = nil
+
+	// Build a chain: Genesis -> blkA -> blkB -> blkC
+	blkA := snowmantest.BuildChild(snowmantest.Genesis)
+	blkB := snowmantest.BuildChild(blkA)
+	blkC := snowmantest.BuildChild(blkB)
+
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case blkA.ID():
+			return blkA, nil
+		case blkB.ID():
+			return blkB, nil
+		case blkC.ID():
+			return blkC, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	// Issue blkA and start a poll
+	var queryRequestID uint32
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
+		queryRequestID = requestID
+		require.Equal(set.Of(relayer0, relayer1), inVdrs)
+		require.Equal(blkA.ID(), blkID)
+		require.Equal(uint64(1), requestedHeight)
+	}
+
+	require.NoError(te.issue(
+		t.Context(),
+		te.Ctx.NodeID,
+		blkA,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
+
+	// Issue blkB so it's available for voting
+	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, _ ids.ID, _ uint64) {}
+
+	require.NoError(te.issue(
+		t.Context(),
+		te.Ctx.NodeID,
+		blkB,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
+
+	// Now send Chits with preferredID=blkC and acceptedID=blkB
+	// In relayer mode, the engine should vote for blkB (acceptedID), not blkC (preferredID)
+	// Since blkC is not issued yet, if the engine tried to vote for it, it would fail
+
+	// blkC is preferred but not yet accepted by relayers
+	// blkB is the last accepted block by relayers
+	// The engine should use blkB for voting in relayer mode
+
+	// Both relayers vote with preferredID=blkC, acceptedID=blkB
+	require.NoError(te.Chits(t.Context(), relayer0, queryRequestID, blkC.ID(), blkC.ID(), blkB.ID(), blkB.Height()))
+	require.NoError(te.Chits(t.Context(), relayer1, queryRequestID, blkC.ID(), blkC.ID(), blkB.ID(), blkB.Height()))
+
+	// In relayer mode with Beta=1, after 2 votes for blkB (which meets Alpha=2),
+	// blkA and blkB should be accepted (blkA is parent of blkB)
+	require.Equal(snowtest.Accepted, blkA.Status)
+	require.Equal(snowtest.Accepted, blkB.Status)
+	// blkC was never voted on (only blkB was used from acceptedID)
+	require.Equal(snowtest.Undecided, blkC.Status)
+
+	// Verify that acceptedFrontiers tracked the accepted blocks correctly
+	acceptedBlk0, height0, ok := te.acceptedFrontiers.LastAccepted(relayer0)
+	require.True(ok)
+	require.Equal(blkB.ID(), acceptedBlk0)
+	require.Equal(blkB.Height(), height0)
+
+	acceptedBlk1, height1, ok := te.acceptedFrontiers.LastAccepted(relayer1)
+	require.True(ok)
+	require.Equal(blkB.ID(), acceptedBlk1)
+	require.Equal(blkB.Height(), height1)
+}

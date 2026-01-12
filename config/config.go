@@ -10,12 +10,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
@@ -88,6 +90,10 @@ var (
 	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
 	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
+	errInvalidRelayerFormat                   = errors.New("invalid relayer format: expected nodeID=ip:port")
+	errRelayerNodeIDParsing                   = errors.New("couldn't parse relayer node ID")
+	errRelayerIPParsing                       = errors.New("couldn't parse relayer IP")
+	errRelayerConflictsWithBootstrap          = fmt.Errorf("cannot set %q or %q when relayer mode is enabled", BootstrapIPsKey, BootstrapIDsKey)
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
@@ -480,7 +486,7 @@ func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 	return config, nil
 }
 
-func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig, error) {
+func getBootstrapConfig(v *viper.Viper, networkID uint32, relayers map[ids.NodeID]netip.AddrPort) (node.BootstrapConfig, error) {
 	config := node.BootstrapConfig{
 		BootstrapBeaconConnectionTimeout:        v.GetDuration(BootstrapBeaconConnectionTimeoutKey),
 		BootstrapMaxTimeGetAncestors:            v.GetDuration(BootstrapMaxTimeGetAncestorsKey),
@@ -488,17 +494,34 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		BootstrapAncestorsMaxContainersReceived: int(v.GetUint(BootstrapAncestorsMaxContainersReceivedKey)),
 	}
 
-	// TODO: Add a "BootstrappersKey" flag to more clearly enforce ID and IP
-	// length equality.
-	ipsSet := v.IsSet(BootstrapIPsKey)
-	idsSet := v.IsSet(BootstrapIDsKey)
-	if ipsSet && !idsSet {
+	bootstrapIPsSet := v.IsSet(BootstrapIPsKey)
+	bootstrapIDsSet := v.IsSet(BootstrapIDsKey)
+
+	// if relayers are not empty, set them as bootstrappers
+	if len(relayers) > 0 {
+		if bootstrapIPsSet || bootstrapIDsSet {
+			return node.BootstrapConfig{}, errRelayerConflictsWithBootstrap
+		}
+
+		// Set relayers as bootstrappers
+		config.Bootstrappers = make([]genesis.Bootstrapper, 0, len(relayers))
+		for nodeID, ip := range relayers {
+			config.Bootstrappers = append(config.Bootstrappers, genesis.Bootstrapper{
+				ID: nodeID,
+				IP: ip,
+			})
+		}
+		return config, nil
+	}
+
+	// Normal mode: use custom or default bootstrappers
+	if bootstrapIPsSet && !bootstrapIDsSet {
 		return node.BootstrapConfig{}, fmt.Errorf("set %q but didn't set %q", BootstrapIPsKey, BootstrapIDsKey)
 	}
-	if !ipsSet && idsSet {
+	if !bootstrapIPsSet && bootstrapIDsSet {
 		return node.BootstrapConfig{}, fmt.Errorf("set %q but didn't set %q", BootstrapIDsKey, BootstrapIPsKey)
 	}
-	if !ipsSet && !idsSet {
+	if !bootstrapIPsSet && !bootstrapIDsSet {
 		config.Bootstrappers = genesis.SampleBootstrappers(networkID, 5)
 		return config, nil
 	}
@@ -1036,12 +1059,7 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 				return nil, err
 			}
 
-			if config.ConsensusParameters.Alpha != nil {
-				config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
-				config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
-			}
-
-			if err := config.Valid(); err != nil {
+			if err := finalizeSubnetConfig(&config); err != nil {
 				return nil, err
 			}
 		}
@@ -1094,12 +1112,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}
 
-		if config.ConsensusParameters.Alpha != nil {
-			config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
-			config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
-		}
-
-		if err := config.Valid(); err != nil {
+		if err := finalizeSubnetConfig(&config); err != nil {
 			return nil, err
 		}
 
@@ -1110,19 +1123,79 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 }
 
 func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
-	subnetDefaults := getPrimaryNetworkConfig(v)
-	// Allow L1s (other than Primary Network) to use their own throttling mechanisms.
-	subnetDefaults.ProposerMinBlockDelay = 0
-	return subnetDefaults
+	// Note: Default subnet configs don't inherit primary network relayer IDs
+	// Each subnet must configure its own relayers via subnet config JSON
+	return subnets.Config{
+		ConsensusParameters:         getConsensusConfig(v),
+		ValidatorOnly:               false,
+		ProposerMinBlockDelay:       0, // Allow L1s to use their own throttling mechanisms
+		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
+	}
 }
 
-func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
-	return subnets.Config{
+// finalizeSubnetConfig applies the Alpha parameter shorthand, adjusts consensus
+// parameters for relayer mode if enabled, and validates the config.
+func finalizeSubnetConfig(config *subnets.Config) error {
+	if config.ConsensusParameters.Alpha != nil {
+		config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
+		config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
+	}
+	config.AdjustForRelayerMode()
+
+	return config.Valid()
+}
+
+func getPrimaryNetworkConfig(v *viper.Viper, relayerIDs []ids.NodeID) subnets.Config {
+	config := subnets.Config{
 		ConsensusParameters:         getConsensusConfig(v),
 		ValidatorOnly:               false,
 		ProposerMinBlockDelay:       v.GetDuration(ProposerVMMinBlockDelayKey),
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
+		RelayerIDs:                  set.Of(relayerIDs...),
 	}
+	config.AdjustForRelayerMode()
+	return config
+}
+
+func parsePrimaryNetworkRelayers(v *viper.Viper) (map[ids.NodeID]netip.AddrPort, error) {
+	relayersStr := v.GetString(PrimaryNetworkRelayersKey)
+	if relayersStr == "" {
+		return nil, nil
+	}
+
+	// Parse nodeID=ip:port pairs
+	pairs := strings.Split(relayersStr, ",")
+	relayerIPs := make(map[ids.NodeID]netip.AddrPort, len(pairs))
+
+	for _, pair := range pairs {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+
+		// Split by "=" to get nodeID and ip:port
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("%w: %q", errInvalidRelayerFormat, pair)
+		}
+
+		nodeIDStr := strings.TrimSpace(parts[0])
+		ipStr := strings.TrimSpace(parts[1])
+
+		nodeID, err := ids.NodeIDFromString(nodeIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("%w %q: %w", errRelayerNodeIDParsing, nodeIDStr, err)
+		}
+
+		addr, err := netip.ParseAddrPort(ipStr)
+		if err != nil {
+			return nil, fmt.Errorf("%w %q: %w", errRelayerIPParsing, ipStr, err)
+		}
+
+		relayerIPs[nodeID] = addr
+	}
+
+	return relayerIPs, nil
 }
 
 func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
@@ -1351,7 +1424,13 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
 	}
 
-	primaryNetworkConfig := getPrimaryNetworkConfig(v)
+	primaryNetworkRelayers, err := parsePrimaryNetworkRelayers(v)
+	if err != nil {
+		return node.Config{}, fmt.Errorf("couldn't parse primary network relayers: %w", err)
+	}
+
+	primaryNetworkConfig := getPrimaryNetworkConfig(v, maps.Keys(primaryNetworkRelayers))
+
 	if err := primaryNetworkConfig.Valid(); err != nil {
 		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
 	}
@@ -1385,7 +1464,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Bootstrap Configs
-	nodeConfig.BootstrapConfig, err = getBootstrapConfig(v, nodeConfig.NetworkID)
+	nodeConfig.BootstrapConfig, err = getBootstrapConfig(v, nodeConfig.NetworkID, primaryNetworkRelayers)
 	if err != nil {
 		return node.Config{}, err
 	}

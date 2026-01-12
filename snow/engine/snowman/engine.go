@@ -369,6 +369,34 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 	)
 
 	issuedMetric := e.metrics.issued.WithLabelValues(pullGossipSource)
+
+	// In relayer mode, only vote for accepted blocks to prevent premature finalization.
+	// This ensures the client node only follows blocks that have been finalized by
+	// the relayer, not just preferred blocks that could still change.
+	if e.Config.IsRelayerMode() {
+		if err := e.issueFromByID(ctx, nodeID, acceptedID, issuedMetric); err != nil {
+			return err
+		}
+
+		v := &voter{
+			e:               e,
+			nodeID:          nodeID,
+			requestID:       requestID,
+			responseOptions: []ids.ID{acceptedID},
+		}
+
+		var deps []ids.ID
+		if e.canDependOn(acceptedID) {
+			deps = append(deps, acceptedID)
+		}
+
+		if err := e.blocked.Schedule(ctx, v, deps...); err != nil {
+			return err
+		}
+		return e.executeDeferredWork(ctx)
+	}
+
+	// Normal mode: vote for preferred blocks
 	if err := e.issueFromByID(ctx, nodeID, preferredID, issuedMetric); err != nil {
 		return err
 	}

@@ -268,6 +268,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(SybilProtectionEnabledKey, true, "Enables sybil protection. If enabled, Network TLS is required")
 	fs.Uint64(SybilProtectionDisabledWeightKey, 100, "Weight to provide to each peer when sybil protection is disabled")
 	fs.Bool(PartialSyncPrimaryNetworkKey, false, "Only sync the P-chain on the Primary Network. If the node is a Primary Network validator, it will report unhealthy")
+	fs.String(PrimaryNetworkRelayersKey, "", "Comma separated list of relayer nodeID=ip:port pairs for the primary network. When set, the node operates in relayer mode and only follows accepted blocks from these designated relayers. Example: \"NodeID-xxx=1.2.3.4:9651,NodeID-yyy=5.6.7.8:9651\"")
 	// Uptime Requirement
 	fs.Float64(UptimeRequirementKey, genesis.LocalParams.UptimeRequirement, "Fraction of time a validator must be online to receive rewards")
 	// Minimum Stake required to validate the Primary Network

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config/node"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
@@ -723,4 +725,218 @@ func setupViper(configFilePath string) *viper.Viper {
 		log.Fatal(err)
 	}
 	return v
+}
+
+func TestParsePrimaryNetworkRelayers(t *testing.T) {
+	// Valid node IDs for testing
+	nodeID1 := ids.GenerateTestNodeID()
+	nodeID2 := ids.GenerateTestNodeID()
+
+	tests := []struct {
+		name                  string
+		input                 string
+		expectedRelayerIDs    []ids.NodeID
+		expectedBootstrappers []genesis.Bootstrapper
+		expectedErr           error
+	}{
+		{
+			name:                  "empty string - no relayers",
+			input:                 "",
+			expectedRelayerIDs:    nil,
+			expectedBootstrappers: nil,
+		},
+		{
+			name:               "single valid nodeID=ip:port pair",
+			input:              nodeID1.String() + "=127.0.0.1:9651",
+			expectedRelayerIDs: []ids.NodeID{nodeID1},
+			expectedBootstrappers: []genesis.Bootstrapper{
+				{
+					ID: nodeID1,
+					IP: netip.MustParseAddrPort("127.0.0.1:9651"),
+				},
+			},
+		},
+		{
+			name:               "multiple valid pairs",
+			input:              nodeID1.String() + "=127.0.0.1:9651," + nodeID2.String() + "=192.168.1.1:9652",
+			expectedRelayerIDs: []ids.NodeID{nodeID1, nodeID2},
+			expectedBootstrappers: []genesis.Bootstrapper{
+				{
+					ID: nodeID1,
+					IP: netip.MustParseAddrPort("127.0.0.1:9651"),
+				},
+				{
+					ID: nodeID2,
+					IP: netip.MustParseAddrPort("192.168.1.1:9652"),
+				},
+			},
+		},
+		{
+			name:               "whitespace is trimmed",
+			input:              "  " + nodeID1.String() + " = 127.0.0.1:9651 , " + nodeID2.String() + "=192.168.1.1:9652  ",
+			expectedRelayerIDs: []ids.NodeID{nodeID1, nodeID2},
+			expectedBootstrappers: []genesis.Bootstrapper{
+				{
+					ID: nodeID1,
+					IP: netip.MustParseAddrPort("127.0.0.1:9651"),
+				},
+				{
+					ID: nodeID2,
+					IP: netip.MustParseAddrPort("192.168.1.1:9652"),
+				},
+			},
+		},
+		{
+			name:        "nodeID with missing IP",
+			input:       nodeID1.String() + "=",
+			expectedErr: errRelayerIPParsing,
+		},
+		{
+			name:        "IP with missing nodeID",
+			input:       "=127.0.0.1:9651",
+			expectedErr: errRelayerNodeIDParsing,
+		},
+		{
+			name:        "missing equals sign",
+			input:       nodeID1.String(),
+			expectedErr: errInvalidRelayerFormat,
+		},
+		{
+			name:        "invalid nodeID format",
+			input:       "invalid-node-id=127.0.0.1:9651",
+			expectedErr: errRelayerNodeIDParsing,
+		},
+		{
+			name:        "invalid IP format",
+			input:       nodeID1.String() + "=not-an-ip",
+			expectedErr: errRelayerIPParsing,
+		},
+		{
+			name:        "missing port",
+			input:       nodeID1.String() + "=127.0.0.1",
+			expectedErr: errRelayerIPParsing,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			v := setupViperFlags()
+			v.Set(PrimaryNetworkRelayersKey, tt.input)
+
+			config, err := GetNodeConfig(v)
+			require.ErrorIs(err, tt.expectedErr)
+
+			if tt.expectedErr != nil {
+				return
+			}
+
+			// Verify primary network config has the correct relayer IDs
+			primaryConfig, ok := config.SubnetConfigs[constants.PrimaryNetworkID]
+			require.True(ok)
+			require.ElementsMatch(tt.expectedRelayerIDs, primaryConfig.RelayerIDs.List())
+
+			if len(tt.expectedRelayerIDs) > 0 {
+				require.True(primaryConfig.IsRelayerMode())
+				// Verify bootstrappers are set from relayers
+				require.ElementsMatch(tt.expectedBootstrappers, config.Bootstrappers)
+			} else {
+				require.False(primaryConfig.IsRelayerMode())
+			}
+		})
+	}
+}
+
+func TestBootstrapConfigRelayerConflict(t *testing.T) {
+	nodeID := ids.GenerateTestNodeID()
+	relayerConfig := nodeID.String() + "=127.0.0.1:9651"
+
+	tests := []struct {
+		name        string
+		config      map[string]string
+		expectedErr error
+	}{
+		{
+			name: "relayers only - no conflict",
+			config: map[string]string{
+				PrimaryNetworkRelayersKey: relayerConfig,
+			},
+		},
+		{
+			name: "relayers with bootstrap-ips - conflict",
+			config: map[string]string{
+				PrimaryNetworkRelayersKey: relayerConfig,
+				BootstrapIPsKey:           "127.0.0.1:9651",
+			},
+			expectedErr: errRelayerConflictsWithBootstrap,
+		},
+		{
+			name: "relayers with bootstrap-ids - conflict",
+			config: map[string]string{
+				PrimaryNetworkRelayersKey: relayerConfig,
+				BootstrapIDsKey:           nodeID.String(),
+			},
+			expectedErr: errRelayerConflictsWithBootstrap,
+		},
+		{
+			name: "relayers with both bootstrap-ips and bootstrap-ids - conflict",
+			config: map[string]string{
+				PrimaryNetworkRelayersKey: relayerConfig,
+				BootstrapIPsKey:           "127.0.0.1:9651",
+				BootstrapIDsKey:           nodeID.String(),
+			},
+			expectedErr: errRelayerConflictsWithBootstrap,
+		},
+		{
+			name: "no relayers with bootstrap config - no conflict",
+			config: map[string]string{
+				BootstrapIPsKey: "127.0.0.1:9651",
+				BootstrapIDsKey: nodeID.String(),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			v := setupViperFlags()
+			for key, value := range tt.config {
+				v.Set(key, value)
+			}
+
+			_, err := GetNodeConfig(v)
+			require.ErrorIs(err, tt.expectedErr)
+		})
+	}
+}
+
+func TestPrimaryRelayersDoNotAffectSubnetConfigs(t *testing.T) {
+	require := require.New(t)
+
+	subnetID := ids.GenerateTestID()
+
+	nodeID := ids.GenerateTestNodeID()
+
+	// Set up primary network relayers and track a subnet
+	v := setupViperFlags()
+	v.Set(PrimaryNetworkRelayersKey, nodeID.String()+"=127.0.0.1:9651")
+	v.Set(TrackSubnetsKey, subnetID.String())
+
+	// Get node config using the exported function
+	config, err := GetNodeConfig(v)
+	require.NoError(err)
+
+	// Verify primary network config has relayers
+	primaryConfig, ok := config.SubnetConfigs[constants.PrimaryNetworkID]
+	require.True(ok)
+	require.True(primaryConfig.IsRelayerMode(), "primary network should be in relayer mode")
+	require.Equal(1, primaryConfig.RelayerIDs.Len())
+
+	// Verify the subnet config has no relayers (primary network relayers should not leak)
+	subnetConfig, ok := config.SubnetConfigs[subnetID]
+	require.True(ok)
+	require.False(subnetConfig.IsRelayerMode(), "subnet should not inherit primary network relayers")
+	require.Empty(subnetConfig.RelayerIDs, "subnet RelayerIDs should be empty")
 }

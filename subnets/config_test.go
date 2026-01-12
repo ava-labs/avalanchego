@@ -4,6 +4,8 @@
 package subnets
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -57,11 +59,77 @@ func TestValid(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		{
+			name: "valid relayer config",
+			s: Config{
+				ConsensusParameters: validParameters,
+				RelayerIDs: set.Of(
+					ids.GenerateTestNodeID(),
+					ids.GenerateTestNodeID(),
+				),
+			},
+			expectedErr: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.s.Valid()
 			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestRelayerIDsUnmarshal(t *testing.T) {
+	// Generate test node IDs
+	nodeID1 := ids.GenerateTestNodeID()
+	nodeID2 := ids.GenerateTestNodeID()
+
+	tests := []struct {
+		name               string
+		json               string
+		expectedRelayerIDs []ids.NodeID
+		expectedRelayer    bool
+	}{
+		{
+			name:               "empty relayerIDs array",
+			json:               `{"relayerIDs":[]}`,
+			expectedRelayerIDs: nil,
+			expectedRelayer:    false,
+		},
+		{
+			name:               "no relayerIDs field",
+			json:               `{}`,
+			expectedRelayerIDs: nil,
+			expectedRelayer:    false,
+		},
+		{
+			name:               "single relayer ID",
+			json:               fmt.Sprintf(`{"relayerIDs":[%q]}`, nodeID1.String()),
+			expectedRelayerIDs: []ids.NodeID{nodeID1},
+			expectedRelayer:    true,
+		},
+		{
+			name:               "multiple relayer IDs",
+			json:               fmt.Sprintf(`{"relayerIDs":[%q,%q]}`, nodeID1.String(), nodeID2.String()),
+			expectedRelayerIDs: []ids.NodeID{nodeID1, nodeID2},
+			expectedRelayer:    true,
+		},
+		{
+			name:               "same relayer ID twice",
+			json:               fmt.Sprintf(`{"relayerIDs":[%q,%q]}`, nodeID1.String(), nodeID1.String()),
+			expectedRelayerIDs: []ids.NodeID{nodeID1},
+			expectedRelayer:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			var config Config
+			require.NoError(json.Unmarshal([]byte(tt.json), &config))
+			require.ElementsMatch(tt.expectedRelayerIDs, config.RelayerIDs.List())
+			require.Equal(tt.expectedRelayer, config.IsRelayerMode())
 		})
 	}
 }
