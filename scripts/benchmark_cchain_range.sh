@@ -20,7 +20,8 @@ set -euo pipefail
 # Environment variables:
 #   Data sources (provide S3 sources OR local paths):
 #     BLOCK_DIR_SRC: S3 object key for blocks (triggers S3 import).
-#     CURRENT_STATE_DIR_SRC: S3 object key for state. If omitted, starts from genesis (empty state).
+#     CURRENT_STATE_DIR_SRC: S3 object key for state. Optional—if unset, creates
+#                            empty state directory for genesis execution (block 1).
 #     BLOCK_DIR: Path to local block directory.
 #     CURRENT_STATE_DIR: Path to local current state directory.
 #
@@ -148,33 +149,20 @@ if [[ -n "${CHAOS_MODE:-}" && -n "${TEST_NAME:-}" ]]; then
 fi
 
 # Determine data source: S3 import or local paths
-if [[ -n "${BLOCK_DIR_SRC:-}" && -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
-    # S3 mode - import both blocks and state
+if [[ -n "${BLOCK_DIR_SRC:-}" ]]; then
+    # S3 mode - import data (CURRENT_STATE_DIR_SRC is optional; if unset, genesis mode)
     TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
     EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR:-/tmp/reexec-${TEST_NAME:-custom}-${TIMESTAMP}}"
 
     BLOCK_DIR_SRC="${BLOCK_DIR_SRC}" \
-    CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC}" \
+    CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-}" \
     EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR}" \
     "${SCRIPT_DIR}/import_cchain_data.sh"
 
     BLOCK_DIR="${EXECUTION_DATA_DIR}/blocks"
     CURRENT_STATE_DIR="${EXECUTION_DATA_DIR}/current-state"
-elif [[ -n "${BLOCK_DIR_SRC:-}" && -z "${CURRENT_STATE_DIR_SRC:-}" ]]; then
-    # S3 blocks only - genesis mode (empty state dir)
-    TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
-    EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR:-/tmp/reexec-${TEST_NAME:-custom}-${TIMESTAMP}}"
-    S3_BOOTSTRAP_BUCKET="${S3_BOOTSTRAP_BUCKET:-s3://avalanchego-bootstrap-testing}"
-
-    echo "=== Importing blocks from S3 (genesis mode) ==="
-    "${SCRIPT_DIR}/copy_dir.sh" "${S3_BOOTSTRAP_BUCKET}/${BLOCK_DIR_SRC}/**" "${EXECUTION_DATA_DIR}/blocks"
-
-    BLOCK_DIR="${EXECUTION_DATA_DIR}/blocks"
-    CURRENT_STATE_DIR="${EXECUTION_DATA_DIR}/current-state"
-    mkdir -p "${CURRENT_STATE_DIR}"
-    echo "=== Created empty state directory for genesis ==="
-elif [[ -z "${BLOCK_DIR_SRC:-}" && -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
-    error "BLOCK_DIR_SRC is required when CURRENT_STATE_DIR_SRC is provided"
+elif [[ -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
+    error "CURRENT_STATE_DIR_SRC requires BLOCK_DIR_SRC to also be set"
 elif [[ -z "${BLOCK_DIR:-}" || -z "${CURRENT_STATE_DIR:-}" ]]; then
     show_usage
     echo ""
@@ -216,28 +204,6 @@ fi
 echo "Blocks: ${START_BLOCK} - ${END_BLOCK}"
 echo "CONFIG: ${CONFIG:-default}"
 
-RUN_ARGS=()
-CGO_CFLAGS=""
-
-if [[ "${PROFILE:-}" == "true" ]]; then
-  # Build with debug symbols for profiling (pprof, perf, samply, Instruments).
-  # -gcflags="all=-N -l":
-  #   -N: Disable optimizations so variable values are preserved in debugger
-  #   -l: Disable inlining so all function calls appear in stack traces
-  # -ldflags="-compressdwarf=false":
-  #   Keep DWARF debug info uncompressed so profilers can read symbols
-  RUN_ARGS+=('-gcflags=all=-N -l' '-ldflags=-compressdwarf=false')
-
-  # Set CGO flags only for Firewood configs when profiling
-  # -fno-omit-frame-pointer: Preserve frame pointers for stack unwinding
-  # -g: Include debug symbols in C/FFI code (Rust FFI visibility)
-  if [[ "${CONFIG:-}" == firewood* ]]; then
-    # -fno-omit-frame-pointer: Preserve frame pointers for stack unwinding (required for profilers to walk the call stack)
-    # -g: Include debug symbols in C/FFI code (Rust FFI visibility)
-    CGO_CFLAGS="-fno-omit-frame-pointer -g"
-  fi
-fi
-
 echo "=== Running Test ==="
 if [[ -n "${CHAOS_MODE:-}" ]]; then
     go run ./tests/reexecute/chaos \
@@ -249,7 +215,7 @@ if [[ -n "${CHAOS_MODE:-}" ]]; then
         --max-wait-time="${MAX_WAIT_TIME}" \
         --config="${CONFIG}"
 else
-    CGO_CFLAGS="${CGO_CFLAGS}" go run "${RUN_ARGS[@]}" github.com/ava-labs/avalanchego/tests/reexecute/c \
+    go run github.com/ava-labs/avalanchego/tests/reexecute/c \
         --block-dir="${BLOCK_DIR}" \
         --current-state-dir="${CURRENT_STATE_DIR}" \
         ${RUNNER_TYPE:+--runner="${RUNNER_TYPE}"} \
@@ -260,8 +226,7 @@ else
         ${BENCHMARK_OUTPUT_FILE:+--benchmark-output-file="${BENCHMARK_OUTPUT_FILE}"} \
         ${METRICS_SERVER_ENABLED:+--metrics-server-enabled="${METRICS_SERVER_ENABLED}"} \
         ${METRICS_SERVER_PORT:+--metrics-server-port="${METRICS_SERVER_PORT}"} \
-        ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled="${METRICS_COLLECTOR_ENABLED}"} \
-        --pprof # temporarily always enable pprof recording
+        ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled="${METRICS_COLLECTOR_ENABLED}"}
 
         if [[ -n "${PUSH_POST_STATE:-}" ]]; then
             echo "=== Pushing post-state to S3 ==="
