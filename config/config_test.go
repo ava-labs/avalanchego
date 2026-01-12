@@ -749,6 +749,12 @@ func TestParsePrimaryNetworkRelayers(t *testing.T) {
 			name:               "single valid nodeID=ip:port pair",
 			input:              nodeID1.String() + "=127.0.0.1:9651",
 			expectedRelayerIDs: []ids.NodeID{nodeID1},
+			expectedBootstrappers: []genesis.Bootstrapper{
+				{
+					ID: nodeID1,
+					IP: netip.MustParseAddrPort("127.0.0.1:9651"),
+				},
+			},
 		},
 		{
 			name:               "multiple valid pairs",
@@ -829,7 +835,7 @@ func TestParsePrimaryNetworkRelayers(t *testing.T) {
 			// Verify primary network config has the correct relayer IDs
 			primaryConfig, ok := config.SubnetConfigs[constants.PrimaryNetworkID]
 			require.True(ok)
-			require.ElementsMatch(tt.expectedRelayerIDs, primaryConfig.RelayerIDs)
+			require.ElementsMatch(tt.expectedRelayerIDs, primaryConfig.RelayerIDs.List())
 
 			if len(tt.expectedRelayerIDs) > 0 {
 				require.True(primaryConfig.IsRelayerMode())
