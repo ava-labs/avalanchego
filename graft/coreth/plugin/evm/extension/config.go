@@ -44,6 +44,8 @@ type ExtensibleVM interface {
 	SetExtensionConfig(config *Config) error
 	// SetLastAcceptedBlock sets the last accepted block
 	SetLastAcceptedBlock(lastAcceptedBlock snowman.Block) error
+	// PutLastAcceptedID persists the last accepted block ID to the database
+	PutLastAcceptedID(id ids.ID) error
 	// GetExtendedBlock returns the ExtendedBlock for the given ID or an error if the block is not found
 	GetExtendedBlock(context.Context, ids.ID) (ExtendedBlock, error)
 	// LastAcceptedExtendedBlock returns the last accepted VM block
