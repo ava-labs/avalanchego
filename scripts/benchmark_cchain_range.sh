@@ -203,6 +203,28 @@ fi
 echo "Blocks: ${START_BLOCK} - ${END_BLOCK}"
 echo "CONFIG: ${CONFIG:-default}"
 
+RUN_ARGS=()
+CGO_CFLAGS=""
+
+if [[ "${PROFILE:-}" == "true" ]]; then
+  # Build with debug symbols for profiling (pprof, perf, samply, Instruments).
+  # -gcflags="all=-N -l":
+  #   -N: Disable optimizations so variable values are preserved in debugger
+  #   -l: Disable inlining so all function calls appear in stack traces
+  # -ldflags="-compressdwarf=false":
+  #   Keep DWARF debug info uncompressed so profilers can read symbols
+  RUN_ARGS+=('-gcflags=all=-N -l' '-ldflags=-compressdwarf=false')
+
+  # Set CGO flags only for Firewood configs when profiling
+  # -fno-omit-frame-pointer: Preserve frame pointers for stack unwinding
+  # -g: Include debug symbols in C/FFI code (Rust FFI visibility)
+  if [[ "${CONFIG:-}" == firewood* ]]; then
+    # -fno-omit-frame-pointer: Preserve frame pointers for stack unwinding (required for profilers to walk the call stack)
+    # -g: Include debug symbols in C/FFI code (Rust FFI visibility)
+    CGO_CFLAGS="-fno-omit-frame-pointer -g"
+  fi
+fi
+
 echo "=== Running Test ==="
 if [[ -n "${CHAOS_MODE:-}" ]]; then
     go run ./tests/reexecute/chaos \
@@ -214,7 +236,7 @@ if [[ -n "${CHAOS_MODE:-}" ]]; then
         --max-wait-time="${MAX_WAIT_TIME}" \
         --config="${CONFIG}"
 else
-    go run github.com/ava-labs/avalanchego/tests/reexecute/c \
+    CGO_CFLAGS="${CGO_CFLAGS}" go run "${RUN_ARGS[@]}" github.com/ava-labs/avalanchego/tests/reexecute/c \
         --block-dir="${BLOCK_DIR}" \
         --current-state-dir="${CURRENT_STATE_DIR}" \
         ${RUNNER_TYPE:+--runner="${RUNNER_TYPE}"} \
@@ -225,7 +247,8 @@ else
         ${BENCHMARK_OUTPUT_FILE:+--benchmark-output-file="${BENCHMARK_OUTPUT_FILE}"} \
         ${METRICS_SERVER_ENABLED:+--metrics-server-enabled="${METRICS_SERVER_ENABLED}"} \
         ${METRICS_SERVER_PORT:+--metrics-server-port="${METRICS_SERVER_PORT}"} \
-        ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled="${METRICS_COLLECTOR_ENABLED}"}
+        ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled="${METRICS_COLLECTOR_ENABLED}"} \
+        --pprof # temporarily always enable pprof recording
 
         if [[ -n "${PUSH_POST_STATE:-}" ]]; then
             echo "=== Pushing post-state to S3 ==="
