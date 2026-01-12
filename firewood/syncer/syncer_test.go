@@ -165,7 +165,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	require.NotNil(t, syncer)
 
 	synctest.AddFuncOnIntercept(intercept, NewGetRangeProofHandler(serverDB), func() {
-		// Called in separate goroutine, allow graceful cancellation
+		//nolint:testifylint // Called in separate goroutine, allow graceful cancellation
 		if !assert.NoError(t, syncer.UpdateSyncTarget(newRoot)) {
 			cancel()
 		}

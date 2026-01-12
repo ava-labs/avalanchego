@@ -457,6 +457,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 	// Allow 1 request to go through before blocking
 	synctest.AddFuncOnIntercept(actionHandler, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
+		//nolint:testifylint // Called in separate goroutine, allow graceful cancellation
 		if !assert.NoError(t, syncer.UpdateSyncTarget(secondSyncRoot)) {
 			cancel()
 		}
@@ -515,6 +516,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 	synctest.AddFuncOnIntercept(actionHandler, rangeProofHandler, func() {
+		//nolint:testifylint // Called in separate goroutine, allow graceful cancellation
 		if !assert.NoError(t, m.UpdateSyncTarget(root1)) {
 			cancel()
 		}
