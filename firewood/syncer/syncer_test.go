@@ -5,6 +5,7 @@ package syncer
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"math/rand"
 	"testing"
@@ -64,14 +65,14 @@ func Test_Firewood_Sync(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testSync(t, 0, tt.clientSize, tt.serverSize)
+			testSync(t, tt.clientSize, tt.serverSize)
 		})
 	}
 }
 
-func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
+func testSync(t *testing.T, clientKeys int, serverKeys int) {
 	ctx := t.Context()
-	r := rand.New(rand.NewSource(seed))
+	r := rand.New(rand.NewSource(1))
 
 	serverDB, root := generateDB(t, r, serverKeys)
 	clientDB, _ := generateDB(t, r, clientKeys)
@@ -133,25 +134,26 @@ func Test_Firewood_Sync_WithUpdate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testSyncWithUpdate(t, 0, tt.clientSize, tt.serverSize, tt.numRequestsBeforeUpdate)
+			testSyncWithUpdate(t, tt.clientSize, tt.serverSize, tt.numRequestsBeforeUpdate)
 		})
 	}
 }
 
-func testSyncWithUpdate(t *testing.T, seed int64, clientKeys int, serverKeys int, numRequestsBeforeUpdate int) {
-	ctx := t.Context()
-	r := rand.New(rand.NewSource(seed))
+func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequestsBeforeUpdate int) {
+	r := rand.New(rand.NewSource(1))
 
 	serverDB, root := generateDB(t, r, serverKeys)
 	clientDB, _ := generateDB(t, r, clientKeys)
 	defer func() {
-		require.NoError(t, serverDB.Close(ctx))
-		require.NoError(t, clientDB.Close(ctx))
+		require.NoError(t, serverDB.Close(t.Context()))
+		require.NoError(t, clientDB.Close(t.Context()))
 	}()
 	newRoot := fillDB(t, r, serverDB, serverKeys)
 
 	intercept := &p2p.TestHandler{}
 
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel() // cancel on error from UpdateSyncTarget
 	syncer, err := New(
 		Config{},
 		clientDB,
@@ -226,11 +228,9 @@ func fillDB(t *testing.T, r *rand.Rand, db *ffi.Database, numKeys int) ids.ID {
 		vals = append(vals, val)
 	}
 
-	_, err := db.Update(keys, vals)
+	root, err := db.Update(keys, vals)
 	require.NoError(t, err)
 
-	root, err := db.Root()
-	require.NoError(t, err)
 	return ids.ID(root)
 }
 
