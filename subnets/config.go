@@ -65,6 +65,24 @@ func (c *Config) IsRelayerMode() bool {
 	return len(c.RelayerIDs) > 0
 }
 
+// AdjustForRelayerMode modifies consensus parameters if relayer mode is enabled.
+// If relayer mode is not enabled (no RelayerIDs), this is a no-op.
+//
+// In relayer mode:
+//   - K is set to the number of relayers (sample all relayers)
+//   - AlphaPreference and AlphaConfidence are set to (numRelayers/2)+1 (simple majority)
+//   - Beta remains unchanged to maintain strong finalization guarantees
+func (c *Config) AdjustForRelayerMode() {
+	if !c.IsRelayerMode() {
+		return
+	}
+
+	numRelayers := c.RelayerIDs.Len()
+	c.ConsensusParameters.K = numRelayers
+	c.ConsensusParameters.AlphaPreference = (numRelayers / 2) + 1
+	c.ConsensusParameters.AlphaConfidence = c.ConsensusParameters.AlphaPreference
+}
+
 func (c *Config) Valid() error {
 	if err := c.ConsensusParameters.Verify(); err != nil {
 		return fmt.Errorf("consensus %w", err)

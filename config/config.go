@@ -1059,12 +1059,7 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 				return nil, err
 			}
 
-			if config.ConsensusParameters.Alpha != nil {
-				config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
-				config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
-			}
-
-			if err := config.Valid(); err != nil {
+			if err := finalizeSubnetConfig(&config); err != nil {
 				return nil, err
 			}
 		}
@@ -1117,12 +1112,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}
 
-		if config.ConsensusParameters.Alpha != nil {
-			config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
-			config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
-		}
-
-		if err := config.Valid(); err != nil {
+		if err := finalizeSubnetConfig(&config); err != nil {
 			return nil, err
 		}
 
@@ -1143,14 +1133,28 @@ func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 	}
 }
 
+// finalizeSubnetConfig applies the Alpha parameter shorthand, adjusts consensus
+// parameters for relayer mode if enabled, and validates the config.
+func finalizeSubnetConfig(config *subnets.Config) error {
+	if config.ConsensusParameters.Alpha != nil {
+		config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
+		config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
+	}
+	config.AdjustForRelayerMode()
+
+	return config.Valid()
+}
+
 func getPrimaryNetworkConfig(v *viper.Viper, relayerIDs []ids.NodeID) (subnets.Config, error) {
-	return subnets.Config{
+	config := subnets.Config{
 		ConsensusParameters:         getConsensusConfig(v),
 		ValidatorOnly:               false,
 		ProposerMinBlockDelay:       v.GetDuration(ProposerVMMinBlockDelayKey),
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 		RelayerIDs:                  set.Of(relayerIDs...),
-	}, nil
+	}
+	config.AdjustForRelayerMode()
+	return config, nil
 }
 
 func parsePrimaryNetworkRelayers(v *viper.Viper) (map[ids.NodeID]netip.AddrPort, error) {
