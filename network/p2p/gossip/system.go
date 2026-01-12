@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
+const defaultRequestPeriod = time.Second
+
 // SystemConfig provides all the configurations needed to create a gossip
 // system.
 //
@@ -39,7 +41,7 @@ type SystemConfig struct {
 	RegossipPeriod         time.Duration // Defaults to 30 seconds
 }
 
-func (c *SystemConfig) SetDefaults() {
+func (c *SystemConfig) setDefaults() {
 	if c.Log == nil {
 		c.Log = logging.NoLog{}
 	}
@@ -53,7 +55,7 @@ func (c *SystemConfig) SetDefaults() {
 		c.ThrottlingPeriod = time.Hour
 	}
 	if c.RequestPeriod <= 0 {
-		c.RequestPeriod = time.Second
+		c.RequestPeriod = defaultRequestPeriod
 	}
 	if c.PushGossipParams == (BranchingFactor{}) {
 		c.PushGossipParams = BranchingFactor{
@@ -96,7 +98,7 @@ func NewSystem[T Gossipable](
 	*PushGossiper[T],
 	error,
 ) {
-	c.SetDefaults()
+	c.setDefaults()
 
 	metrics, err := NewMetrics(c.Registry, c.Namespace)
 	if err != nil {

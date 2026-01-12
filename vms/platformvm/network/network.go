@@ -86,35 +86,31 @@ func New(
 		return nil, err
 	}
 
-	systemConfig := gossip.SystemConfig{
-		Log:               log,
-		Registry:          registerer,
-		Namespace:         "tx_gossip",
-		TargetMessageSize: config.TargetGossipSize,
-		ThrottlingPeriod:  config.PullGossipThrottlingPeriod,
-		RequestPeriod:     config.PullGossipFrequency,
-		PushGossipParams: gossip.BranchingFactor{
-			StakePercentage: config.PushGossipPercentStake,
-			Validators:      config.PushGossipNumValidators,
-			Peers:           config.PushGossipNumPeers,
-		},
-		PushRegossipParams: gossip.BranchingFactor{
-			Validators: config.PushRegossipNumValidators,
-			Peers:      config.PushRegossipNumPeers,
-		},
-		DiscardedPushCacheSize: config.PushGossipDiscardedCacheSize,
-		RegossipPeriod:         config.PushGossipMaxRegossipFrequency,
-	}
-	// Set the defaults so that we can use `config.PullGossipFrequency` after
-	// the default has been set.
-	systemConfig.SetDefaults()
 	handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 		nodeID,
 		p2pNetwork,
 		validators,
 		gossipMempool,
 		txMarshaller{},
-		systemConfig,
+		gossip.SystemConfig{
+			Log:               log,
+			Registry:          registerer,
+			Namespace:         "tx_gossip",
+			TargetMessageSize: config.TargetGossipSize,
+			ThrottlingPeriod:  config.PullGossipThrottlingPeriod,
+			RequestPeriod:     config.PullGossipFrequency,
+			PushGossipParams: gossip.BranchingFactor{
+				StakePercentage: config.PushGossipPercentStake,
+				Validators:      config.PushGossipNumValidators,
+				Peers:           config.PushGossipNumPeers,
+			},
+			PushRegossipParams: gossip.BranchingFactor{
+				Validators: config.PushRegossipNumValidators,
+				Peers:      config.PushRegossipNumPeers,
+			},
+			DiscardedPushCacheSize: config.PushGossipDiscardedCacheSize,
+			RegossipPeriod:         config.PushGossipMaxRegossipFrequency,
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -143,7 +139,7 @@ func New(
 		txPushGossiper:            pushGossiper,
 		txPushGossipFrequency:     config.PushGossipFrequency,
 		txPullGossiper:            pullGossiper,
-		txPullGossipFrequency:     systemConfig.RequestPeriod,
+		txPullGossipFrequency:     config.PullGossipFrequency,
 		peers:                     peers,
 	}, nil
 }

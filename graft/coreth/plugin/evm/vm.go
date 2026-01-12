@@ -768,32 +768,28 @@ func (vm *VM) initBlockBuilding() error {
 		vm.shutdownWg.Done()
 	}()
 
-	systemConfig := avalanchegossip.SystemConfig{
-		Log:           vm.ctx.Log,
-		Registry:      vm.sdkMetrics,
-		Namespace:     "eth_tx_gossip",
-		RequestPeriod: vm.config.PullGossipFrequency.Duration,
-		PushGossipParams: avalanchegossip.BranchingFactor{
-			StakePercentage: vm.config.PushGossipPercentStake,
-			Validators:      vm.config.PushGossipNumValidators,
-			Peers:           vm.config.PushGossipNumPeers,
-		},
-		PushRegossipParams: avalanchegossip.BranchingFactor{
-			Validators: vm.config.PushRegossipNumValidators,
-			Peers:      vm.config.PushRegossipNumPeers,
-		},
-		RegossipPeriod: vm.config.RegossipFrequency.Duration,
-	}
-	// Set the defaults so that we can use `config.PullGossipFrequency` after
-	// the default has been set.
-	systemConfig.SetDefaults()
 	handler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
 		vm.ctx.NodeID,
 		vm.P2PNetwork(),
 		vm.P2PValidators(),
 		ethTxPool,
 		GossipEthTxMarshaller{},
-		systemConfig,
+		avalanchegossip.SystemConfig{
+			Log:           vm.ctx.Log,
+			Registry:      vm.sdkMetrics,
+			Namespace:     "eth_tx_gossip",
+			RequestPeriod: vm.config.PullGossipFrequency.Duration,
+			PushGossipParams: avalanchegossip.BranchingFactor{
+				StakePercentage: vm.config.PushGossipPercentStake,
+				Validators:      vm.config.PushGossipNumValidators,
+				Peers:           vm.config.PushGossipNumPeers,
+			},
+			PushRegossipParams: avalanchegossip.BranchingFactor{
+				Validators: vm.config.PushRegossipNumValidators,
+				Peers:      vm.config.PushRegossipNumPeers,
+			},
+			RegossipPeriod: vm.config.RegossipFrequency.Duration,
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize eth tx gossip system: %w", err)
@@ -819,7 +815,7 @@ func (vm *VM) initBlockBuilding() error {
 	}()
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.ctx.Log, pullGossiper, systemConfig.RequestPeriod)
+		avalanchegossip.Every(ctx, vm.ctx.Log, pullGossiper, vm.config.PullGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 

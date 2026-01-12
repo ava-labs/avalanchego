@@ -611,9 +611,13 @@ func (p *PushGossiper[_]) updateMetrics(nowUnixNano float64) {
 	p.metrics.trackingLifetimeAverage.Set(averageLifetime)
 }
 
-// Every calls [Gossip] every [frequency] amount of time.
-func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, frequency time.Duration) {
-	ticker := time.NewTicker(frequency)
+// Every calls [Gossip] every [period] amount of time.
+func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, period time.Duration) {
+	if period <= 0 {
+		period = defaultRequestPeriod
+	}
+
+	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 
 	for {
