@@ -259,7 +259,8 @@ func TestUptimeSignatures(t *testing.T) {
 
 	validationID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
-	startTime := uint64(time.Now().Unix())
+	start := time.Now()
+	startTime := uint64(start.Unix())
 
 	getUptimeMessageBytes := func(sourceAddress []byte, vID ids.ID) ([]byte, *avalancheWarp.UnsignedMessage) {
 		uptimePayload, err := messages.NewValidatorUptime(vID, 80)
@@ -302,6 +303,7 @@ func TestUptimeSignatures(t *testing.T) {
 		}
 
 		clk := &mockable.Clock{}
+		clk.Set(start)
 		uptimeTracker, err := uptimetracker.New(
 			validatorState,
 			snowCtx.SubnetID,

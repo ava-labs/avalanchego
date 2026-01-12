@@ -42,10 +42,6 @@ type ExtensibleVM interface {
 	// SetExtensionConfig sets the configuration for the VM extension
 	// Should be called before any other method and only once
 	SetExtensionConfig(config *Config) error
-	// NewClient returns a client to send messages with for the given protocol
-	NewClient(protocol uint64) *p2p.Client
-	// AddHandler registers a server handler for an application protocol
-	AddHandler(protocol uint64, handler p2p.Handler) error
 	// SetLastAcceptedBlock sets the last accepted block
 	SetLastAcceptedBlock(lastAcceptedBlock snowman.Block) error
 	// PutLastAcceptedID persists the last accepted block ID to the database
@@ -56,6 +52,8 @@ type ExtensibleVM interface {
 	LastAcceptedExtendedBlock() ExtendedBlock
 	// ChainConfig returns the chain config for the VM
 	ChainConfig() *params.ChainConfig
+	// P2PNetwork returns the network for the VM
+	P2PNetwork() *p2p.Network
 	// P2PValidators returns the validators for the network
 	P2PValidators() *p2p.Validators
 	// Ethereum returns the Ethereum service
