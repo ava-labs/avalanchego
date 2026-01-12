@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
@@ -49,9 +50,9 @@ func TestBlockGetters(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			header := WithHeaderExtra(&Header{}, test.headerExtra)
+			header := WithHeaderExtra(&types.Header{}, test.headerExtra)
 
-			block := NewBlock(header, nil, nil, nil, blocktest.NewHasher())
+			block := types.NewBlock(header, nil, nil, nil, blocktest.NewHasher())
 
 			blockGasCost := BlockGasCost(block)
 			require.Equal(t, test.wantBlockGasCost, blockGasCost, "BlockGasCost()")
@@ -71,14 +72,14 @@ func TestCopyHeader(t *testing.T) {
 	t.Run("empty_header", func(t *testing.T) {
 		t.Parallel()
 
-		empty := &Header{}
+		empty := &types.Header{}
 
 		headerExtra := &HeaderExtra{}
 		extras.Header.Set(empty, headerExtra)
 
-		cpy := CopyHeader(empty)
+		cpy := types.CopyHeader(empty)
 
-		want := &Header{
+		want := &types.Header{
 			Difficulty: new(big.Int),
 			Number:     new(big.Int),
 		}
@@ -94,7 +95,7 @@ func TestCopyHeader(t *testing.T) {
 
 		header, _ := headerWithNonZeroFields() // the header carries the [HeaderExtra] so we can ignore it
 
-		gotHeader := CopyHeader(header)
+		gotHeader := types.CopyHeader(header)
 		gotExtra := GetHeaderExtra(gotHeader)
 
 		wantHeader, wantExtra := headerWithNonZeroFields()
@@ -107,7 +108,7 @@ func TestCopyHeader(t *testing.T) {
 }
 
 func exportedFieldsPointToDifferentMemory[T interface {
-	Header | HeaderExtra
+	types.Header | HeaderExtra
 }](t *testing.T, original, cpy *T) {
 	t.Helper()
 
