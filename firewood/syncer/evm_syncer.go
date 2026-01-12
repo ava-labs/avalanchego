@@ -5,6 +5,7 @@ package syncer
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
@@ -16,12 +17,14 @@ import (
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
+var _ xsync.DB[*RangeProof, struct{}] = (*evmDB)(nil)
+
 type CodeQueue interface {
 	AddCode(context.Context, []common.Hash) error
 }
 
 type evmDB struct {
-	*database
+	db        *database
 	codeQueue CodeQueue
 }
 
@@ -36,7 +39,7 @@ func NewEVM(
 	return newWithDB(
 		config,
 		&evmDB{
-			database:  &database{db},
+			db:        &database{db},
 			codeQueue: codeQueue,
 		},
 		targetRoot,
@@ -46,7 +49,7 @@ func NewEVM(
 }
 
 func (e *evmDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
-	nextKey, err := e.database.CommitRangeProof(ctx, start, end, proof)
+	nextKey, err := e.db.CommitRangeProof(ctx, start, end, proof)
 	if err != nil {
 		return nextKey, err
 	}
@@ -61,4 +64,32 @@ func (e *evmDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]b
 		return maybe.Nothing[[]byte](), err
 	}
 	return nextKey, nil
+}
+
+func (*evmDB) CommitChangeProof(context.Context, maybe.Maybe[[]byte], struct{}) (maybe.Maybe[[]byte], error) {
+	return maybe.Nothing[[]byte](), errors.New("change proof code hashes not implemented")
+}
+
+func (e *evmDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
+	return e.db.GetMerkleRoot(ctx)
+}
+
+func (e *evmDB) Clear() error {
+	return e.db.Clear()
+}
+
+func (e *evmDB) GetChangeProof(ctx context.Context, startRootID ids.ID, endRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (struct{}, error) {
+	return e.db.GetChangeProof(ctx, startRootID, endRootID, start, end, maxLength)
+}
+
+func (e *evmDB) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error) {
+	return e.db.GetRangeProofAtRoot(ctx, rootID, start, end, maxLength)
+}
+
+func (e *evmDB) VerifyChangeProof(ctx context.Context, proof struct{}, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
+	return e.db.VerifyChangeProof(ctx, proof, start, end, expectedEndRootID, maxLength)
+}
+
+func (e *evmDB) VerifyRangeProof(ctx context.Context, proof *RangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
+	return e.db.VerifyRangeProof(ctx, proof, start, end, expectedEndRootID, maxLength)
 }
