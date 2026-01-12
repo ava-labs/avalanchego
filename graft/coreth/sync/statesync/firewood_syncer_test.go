@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
@@ -106,9 +107,12 @@ func testFirewoodSync(t *testing.T, clientState, serverState state.Database, roo
 	eg.Go(func() error { return firewoodSyncer.Sync(egCtx) })
 
 	require.NoError(t, eg.Wait(), "failure during sync")
+
+	assertFirewoodConsistency(t, root, clientState)
 }
 
 func createDB(t *testing.T) state.Database {
+	t.Helper()
 	diskdb := rawdb.NewMemoryDatabase()
 	config := firewood.DefaultConfig(t.TempDir())
 	db := extstate.NewDatabaseWithConfig(diskdb, &triedb.Config{DBOverride: config.BackendConstructor})
@@ -116,6 +120,20 @@ func createDB(t *testing.T) state.Database {
 		require.NoError(t, db.TrieDB().Close())
 	})
 	return db
+}
+
+func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state.Database) {
+	t.Helper()
+
+	db := dbFromState(t, clientState)
+	gotRoot, err := db.Root()
+	require.NoErrorf(t, err, "%T.Root()", db)
+	require.Equal(t, root, common.Hash(gotRoot), "client DB root does not match expected root")
+
+	it := customrawdb.NewCodeToFetchIterator(clientState.DiskDB())
+	defer it.Release()
+	require.False(t, it.Next(), "expected no remaining code-to-fetch markers after successful sync")
+	require.NoError(t, it.Error())
 }
 
 func dbFromState(t *testing.T, state state.Database) *ffi.Database {

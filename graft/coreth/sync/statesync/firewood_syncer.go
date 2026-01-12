@@ -51,13 +51,18 @@ func (f *firewoodSyncer) Sync(ctx context.Context) error {
 	if err := f.s.Wait(ctx); err != nil {
 		return fmt.Errorf("waiting for syncer: %w", err)
 	}
-	return f.codeQueue.Finalize()
+
+	if err := f.codeQueue.Finalize(); err != nil {
+		return fmt.Errorf("finalizing code queue: %w", err)
+	}
+
+	return nil
 }
 
 func (*firewoodSyncer) ID() string {
-	return "firewood_syncer"
+	return "state_firewood_sync"
 }
 
 func (*firewoodSyncer) Name() string {
-	return "Firewood Syncer"
+	return "Firewood EVM State Syncer"
 }
