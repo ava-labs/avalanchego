@@ -36,6 +36,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -44,7 +45,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/pathdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"

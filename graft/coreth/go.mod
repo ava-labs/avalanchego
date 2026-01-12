@@ -8,7 +8,6 @@ module github.com/ava-labs/avalanchego/graft/coreth
 go 1.24.11
 
 require (
-	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/ava-labs/avalanchego v1.14.1-0.20251120155522-df4a8e531761
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18
@@ -50,6 +49,7 @@ require (
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/StephenButtolph/canoto v0.17.3 // indirect
+	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5 // indirect
