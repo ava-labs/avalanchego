@@ -1145,7 +1145,7 @@ func finalizeSubnetConfig(config *subnets.Config) error {
 	return config.Valid()
 }
 
-func getPrimaryNetworkConfig(v *viper.Viper, relayerIDs []ids.NodeID) (subnets.Config, error) {
+func getPrimaryNetworkConfig(v *viper.Viper, relayerIDs []ids.NodeID) subnets.Config {
 	config := subnets.Config{
 		ConsensusParameters:         getConsensusConfig(v),
 		ValidatorOnly:               false,
@@ -1154,7 +1154,7 @@ func getPrimaryNetworkConfig(v *viper.Viper, relayerIDs []ids.NodeID) (subnets.C
 		RelayerIDs:                  set.Of(relayerIDs...),
 	}
 	config.AdjustForRelayerMode()
-	return config, nil
+	return config
 }
 
 func parsePrimaryNetworkRelayers(v *viper.Viper) (map[ids.NodeID]netip.AddrPort, error) {
@@ -1429,10 +1429,8 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("couldn't parse primary network relayers: %w", err)
 	}
 
-	primaryNetworkConfig, err := getPrimaryNetworkConfig(v, maps.Keys(primaryNetworkRelayers))
-	if err != nil {
-		return node.Config{}, fmt.Errorf("couldn't get primary network config: %w", err)
-	}
+	primaryNetworkConfig := getPrimaryNetworkConfig(v, maps.Keys(primaryNetworkRelayers))
+
 	if err := primaryNetworkConfig.Valid(); err != nil {
 		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
 	}

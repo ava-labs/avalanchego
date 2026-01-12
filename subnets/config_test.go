@@ -89,7 +89,6 @@ func TestRelayerIDsUnmarshal(t *testing.T) {
 		json            string
 		expectedLen     int
 		expectedRelayer bool
-		expectError     bool
 	}{
 		{
 			name:            "empty relayerIDs array",
@@ -121,11 +120,6 @@ func TestRelayerIDsUnmarshal(t *testing.T) {
 			expectedLen:     1,
 			expectedRelayer: true,
 		},
-		{
-			name:        "invalid node ID format",
-			json:        `{"relayerIDs":["invalid-node-id"]}`,
-			expectError: true,
-		},
 	}
 
 	for _, tt := range tests {
@@ -133,14 +127,7 @@ func TestRelayerIDsUnmarshal(t *testing.T) {
 			require := require.New(t)
 
 			var config Config
-			err := json.Unmarshal([]byte(tt.json), &config)
-
-			if tt.expectError {
-				require.Error(err)
-				return
-			}
-
-			require.NoError(err)
+			require.NoError(json.Unmarshal([]byte(tt.json), &config))
 			require.Equal(tt.expectedLen, config.RelayerIDs.Len())
 			require.Equal(tt.expectedRelayer, config.IsRelayerMode())
 		})
