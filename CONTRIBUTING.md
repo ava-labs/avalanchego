@@ -74,7 +74,7 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
   - if the file `mocks_generate_test.go` does not exist in the package where the interface is located, create it with content (adapt as needed):
 
     ```go
-    // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+    // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
     // See the file LICENSE for licensing terms.
 
     package mypackage
