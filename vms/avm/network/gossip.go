@@ -1,20 +1,16 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
 
 import (
-	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -22,7 +18,6 @@ import (
 )
 
 var (
-	_ p2p.Handler                = (*txGossipHandler)(nil)
 	_ gossip.Set[*txs.Tx]        = (*gossipMempool)(nil)
 	_ gossip.Marshaller[*txs.Tx] = (*txParser)(nil)
 )
@@ -30,30 +25,6 @@ var (
 // bloomChurnMultiplier is the number used to multiply the size of the mempool
 // to determine how large of a bloom filter to create.
 const bloomChurnMultiplier = 3
-
-// txGossipHandler is the handler called when serving gossip messages
-type txGossipHandler struct {
-	p2p.NoOpHandler
-	appGossipHandler  p2p.Handler
-	appRequestHandler p2p.Handler
-}
-
-func (t txGossipHandler) AppGossip(
-	ctx context.Context,
-	nodeID ids.NodeID,
-	gossipBytes []byte,
-) {
-	t.appGossipHandler.AppGossip(ctx, nodeID, gossipBytes)
-}
-
-func (t txGossipHandler) AppRequest(
-	ctx context.Context,
-	nodeID ids.NodeID,
-	deadline time.Time,
-	requestBytes []byte,
-) ([]byte, *common.AppError) {
-	return t.appRequestHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
-}
 
 type txParser struct {
 	parser txs.Parser

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vmtest
@@ -125,9 +125,7 @@ func OverrideSchemeConfig(scheme string, configJSON string) (string, error) {
 	// Set Firewood-specific configuration flags (these will override any existing values)
 	configMap["state-scheme"] = customrawdb.FirewoodScheme
 	configMap["snapshot-cache"] = 0
-	configMap["pruning-enabled"] = true
 	configMap["state-sync-enabled"] = false
-	configMap["metrics-expensive-enabled"] = false
 
 	// Marshal back to JSON
 	result, err := json.Marshal(configMap)

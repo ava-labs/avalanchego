@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
@@ -131,7 +131,7 @@ func NewMetrics(
 		count: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "gossip_count",
+				Name:      "count",
 				Help:      "amount of gossip (n)",
 			},
 			ioTypeLabels,
@@ -139,7 +139,7 @@ func NewMetrics(
 		bytes: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "gossip_bytes",
+				Name:      "bytes",
 				Help:      "amount of gossip (bytes)",
 			},
 			ioTypeLabels,
@@ -147,14 +147,14 @@ func NewMetrics(
 		tracking: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
-				Name:      "gossip_tracking",
+				Name:      "tracking",
 				Help:      "number of gossipables being tracked",
 			},
 			typeLabels,
 		),
 		trackingLifetimeAverage: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "gossip_tracking_lifetime_average",
+			Name:      "tracking_lifetime_average",
 			Help:      "average duration a gossipable has been tracked (ns)",
 		}),
 		topValidators: prometheus.NewGaugeVec(
@@ -611,9 +611,13 @@ func (p *PushGossiper[_]) updateMetrics(nowUnixNano float64) {
 	p.metrics.trackingLifetimeAverage.Set(averageLifetime)
 }
 
-// Every calls [Gossip] every [frequency] amount of time.
-func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, frequency time.Duration) {
-	ticker := time.NewTicker(frequency)
+// Every calls [Gossip] every [period] amount of time.
+func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, period time.Duration) {
+	if period <= 0 {
+		period = defaultRequestPeriod
+	}
+
+	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 
 	for {
