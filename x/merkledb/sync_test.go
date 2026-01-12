@@ -4,12 +4,14 @@
 package merkledb
 
 import (
+	"context"
 	"math/rand"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -435,7 +437,8 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 	actionHandler := &p2p.TestHandler{}
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	syncer, err := xsync.NewSyncer(
 		db,
 		xsync.Config[*RangeProof, *ChangeProof]{
@@ -454,21 +457,24 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 	// Allow 1 request to go through before blocking
 	synctest.AddFuncOnIntercept(actionHandler, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
-		require.NoError(syncer.UpdateSyncTarget(secondSyncRoot))
+		if !assert.NoError(t, syncer.UpdateSyncTarget(secondSyncRoot)) {
+			cancel()
+		}
 	}, 1)
 
-	require.NoError(syncer.Start(t.Context()))
-	require.NoError(syncer.Wait(t.Context()))
+	require.NoError(syncer.Start(ctx))
+	require.NoError(syncer.Wait(ctx))
 	require.NoError(syncer.Error())
 
-	newRoot, err := db.GetMerkleRoot(t.Context())
+	newRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 	require.Equal(secondSyncRoot, newRoot)
 }
 
 func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require := require.New(t)
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -509,7 +515,9 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 	synctest.AddFuncOnIntercept(actionHandler, rangeProofHandler, func() {
-		require.NoError(m.UpdateSyncTarget(root2))
+		if !assert.NoError(t, m.UpdateSyncTarget(root1)) {
+			cancel()
+		}
 	}, 0)
 
 	require.NoError(m.Start(ctx))
