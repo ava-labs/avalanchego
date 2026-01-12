@@ -6,6 +6,7 @@ package snowman
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
@@ -36,4 +37,11 @@ func DefaultConfig(t testing.TB) Config {
 		},
 		Consensus: &snowman.Topological{Factory: snowball.SnowflakeFactory},
 	}
+}
+
+// RelayerModeConfig returns a Config with relayer mode enabled for testing.
+func RelayerModeConfig(t testing.TB) Config {
+	config := DefaultConfig(t)
+	config.RelayerNodeIDs = []ids.NodeID{ids.GenerateTestNodeID()}
+	return config
 }

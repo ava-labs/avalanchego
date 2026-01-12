@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -25,4 +26,16 @@ type Config struct {
 	Params              snowball.Parameters
 	Consensus           snowman.Consensus
 	PartialSync         bool
+
+	// RelayerNodeIDs specifies designated relayer nodes for this chain's subnet.
+	// When set, the engine operates in "relayer mode":
+	// - Only these nodes are used for consensus sampling
+	// - Only accepted blocks (not preferences) are followed from chits
+	RelayerNodeIDs []ids.NodeID
+}
+
+// IsRelayerMode returns true if relayer mode is enabled.
+// Relayer mode is enabled when RelayerNodeIDs is non-empty.
+func (c *Config) IsRelayerMode() bool {
+	return len(c.RelayerNodeIDs) > 0
 }

@@ -49,6 +49,20 @@ type Config struct {
 	// TODO: Move this flag once the proposervm is configurable on a per-chain
 	// basis.
 	ProposerNumHistoricalBlocks uint64 `json:"proposerNumHistoricalBlocks" yaml:"proposerNumHistoricalBlocks"`
+
+	// RelayerIDs specifies designated relayer node IDs for this subnet.
+	// When set, the node operates in "relayer mode" for this subnet:
+	// - Only these nodes are used for consensus sampling
+	// - Only accepted blocks (not preferences) are followed from chits
+	// This is useful for isolated networks that connect to the L1/primary network
+	// through a small set of relayer nodes.
+	RelayerIDs set.Set[ids.NodeID] `json:"relayerIDs" yaml:"relayerIDs"`
+}
+
+// IsRelayerMode returns true if relayer mode is enabled for this subnet.
+// Relayer mode is enabled when Relayers is non-empty.
+func (c *Config) IsRelayerMode() bool {
+	return len(c.RelayerIDs) > 0
 }
 
 func (c *Config) Valid() error {

@@ -834,7 +834,25 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
-	consensusParams := sb.Config().ConsensusParameters
+	subnetCfg = sb.Config()
+	consensusParams := subnetCfg.ConsensusParameters
+
+	// In relayer mode, override validators and consensus params
+	if subnetCfg.IsRelayerMode() {
+		var err error
+		relayerNodeIDs := subnetCfg.RelayerIDs.List()
+		vdrs, bootstrapWeight, consensusParams, err = m.createRelayerValidators(ctx.SubnetID, relayerNodeIDs, consensusParams)
+		if err != nil {
+			return nil, err
+		}
+
+		m.Log.Info("relayer mode enabled for chain",
+			zap.Stringer("chainID", ctx.ChainID),
+			zap.Stringer("subnetID", ctx.SubnetID),
+			zap.Reflect("relayerNodeIDs", relayerNodeIDs),
+		)
+	}
+
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -934,6 +952,7 @@ func (m *manager) createAvalancheChain(
 		ConnectedValidators: connectedValidators,
 		Params:              consensusParams,
 		Consensus:           snowmanConsensus,
+		RelayerNodeIDs:      subnetCfg.RelayerIDs.List(),
 	}
 	var snowmanEngine common.Engine
 	snowmanEngine, err = smeng.New(snowmanEngineConfig)
@@ -1236,7 +1255,25 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
-	consensusParams := sb.Config().ConsensusParameters
+	subnetCfg = sb.Config()
+	consensusParams := subnetCfg.ConsensusParameters
+
+	// In relayer mode, override validators and consensus params
+	if subnetCfg.IsRelayerMode() {
+		var err error
+		relayerNodeIDs := subnetCfg.RelayerIDs.List()
+		vdrs, bootstrapWeight, consensusParams, err = m.createRelayerValidators(ctx.SubnetID, relayerNodeIDs, consensusParams)
+		if err != nil {
+			return nil, err
+		}
+
+		m.Log.Info("relayer mode enabled for chain",
+			zap.Stringer("subnetID", ctx.SubnetID),
+			zap.Stringer("chainID", ctx.ChainID),
+			zap.Reflect("relayerNodeIDs", relayerNodeIDs),
+		)
+	}
+
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -1337,6 +1374,7 @@ func (m *manager) createSnowmanChain(
 		Params:              consensusParams,
 		Consensus:           consensus,
 		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
+		RelayerNodeIDs:      subnetCfg.RelayerIDs.List(),
 	}
 	var engine common.Engine
 	engine, err = smeng.New(engineConfig)
@@ -1577,4 +1615,57 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	}
 	m.vmGatherer[vmID] = vmGatherer
 	return vmGatherer, nil
+}
+
+// createRelayerValidators creates a validator manager containing only the
+// designated relayer nodes and adjusts consensus parameters accordingly.
+// This is used when a subnet is configured in relayer mode.
+//
+// It also validates that all relayer node IDs are actual validators on the
+// Primary Network and logs a warning for any that are not. Non-validator
+// relayers may fail to connect since they won't be discovered through gossip.
+func (m *manager) createRelayerValidators(
+	subnetID ids.ID,
+	relayerNodeIDs []ids.NodeID,
+	consensusParams snowball.Parameters,
+) (validators.Manager, uint64, snowball.Parameters, error) {
+	relayerVdrs := validators.NewManager()
+	for _, nodeID := range relayerNodeIDs {
+		// Get the relayer's validator data from the Primary Network if available.
+		// This provides the public key needed for BLS signature verification.
+		var (
+			pk   *bls.PublicKey
+			txID ids.ID
+		)
+		if vdr, ok := m.Validators.GetValidator(constants.PrimaryNetworkID, nodeID); ok {
+			pk = vdr.PublicKey
+			txID = vdr.TxID
+		} else {
+			m.Log.Warn("relayer node is not a Primary Network validator; connection may fail",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("subnetID", subnetID),
+			)
+		}
+
+		// Each relayer gets equal weight (1) for consensus sampling, regardless of
+		// their actual weight. This ensures all relayers have
+		// equal voting power in relayer mode, where K and Alpha parameters are
+		// adjusted based on the number of relayers, not their stake.
+		if err := relayerVdrs.AddStaker(subnetID, nodeID, pk, txID, 1); err != nil {
+			return nil, 0, snowball.Parameters{}, fmt.Errorf("couldn't add relayer %s to validator set: %w", nodeID, err)
+		}
+	}
+
+	bootstrapWeight, err := relayerVdrs.TotalWeight(subnetID)
+	if err != nil {
+		return nil, 0, snowball.Parameters{}, fmt.Errorf("error while fetching relayer weight for subnet %s: %w", subnetID, err)
+	}
+
+	// Adjust consensus params for relayer count
+	numRelayers := len(relayerNodeIDs)
+	consensusParams.K = numRelayers
+	consensusParams.AlphaPreference = (numRelayers / 2) + 1
+	consensusParams.AlphaConfidence = (numRelayers / 2) + 1
+
+	return relayerVdrs, bootstrapWeight, consensusParams, nil
 }
