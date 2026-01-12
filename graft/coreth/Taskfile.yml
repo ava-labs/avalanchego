@@ -12,7 +12,7 @@ tasks:
 
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
-    cmd: ./scripts/build_test.sh # ci.yml
+    cmd: ./scripts/build_test.sh
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
@@ -54,7 +54,7 @@ tasks:
 
   coverage:
     desc: Display test coverage statistics from coverage.out file
-    cmd: ./scripts/coverage.sh # ci.yml
+    cmd: ./scripts/coverage.sh
 
   generate-codec:
     desc: Generates fjl/gencodec files
