@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config/node"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
@@ -734,40 +735,49 @@ func TestParsePrimaryNetworkRelayers(t *testing.T) {
 	tests := []struct {
 		name                  string
 		input                 string
-		expectedRelayerCount  int
-		expectedBootstrappers []netip.AddrPort
+		expectedRelayerIDs    []ids.NodeID
+		expectedBootstrappers []genesis.Bootstrapper
 		expectedErr           error
 	}{
 		{
 			name:                  "empty string - no relayers",
 			input:                 "",
-			expectedRelayerCount:  0,
+			expectedRelayerIDs:    nil,
 			expectedBootstrappers: nil,
 		},
 		{
-			name:                 "single valid nodeID=ip:port pair",
-			input:                nodeID1.String() + "=127.0.0.1:9651",
-			expectedRelayerCount: 1,
-			expectedBootstrappers: []netip.AddrPort{
-				netip.MustParseAddrPort("127.0.0.1:9651"),
+			name:               "single valid nodeID=ip:port pair",
+			input:              nodeID1.String() + "=127.0.0.1:9651",
+			expectedRelayerIDs: []ids.NodeID{nodeID1},
+		},
+		{
+			name:               "multiple valid pairs",
+			input:              nodeID1.String() + "=127.0.0.1:9651," + nodeID2.String() + "=192.168.1.1:9652",
+			expectedRelayerIDs: []ids.NodeID{nodeID1, nodeID2},
+			expectedBootstrappers: []genesis.Bootstrapper{
+				{
+					ID: nodeID1,
+					IP: netip.MustParseAddrPort("127.0.0.1:9651"),
+				},
+				{
+					ID: nodeID2,
+					IP: netip.MustParseAddrPort("192.168.1.1:9652"),
+				},
 			},
 		},
 		{
-			name:                 "multiple valid pairs",
-			input:                nodeID1.String() + "=127.0.0.1:9651," + nodeID2.String() + "=192.168.1.1:9652",
-			expectedRelayerCount: 2,
-			expectedBootstrappers: []netip.AddrPort{
-				netip.MustParseAddrPort("127.0.0.1:9651"),
-				netip.MustParseAddrPort("192.168.1.1:9652"),
-			},
-		},
-		{
-			name:                 "whitespace is trimmed",
-			input:                "  " + nodeID1.String() + " = 127.0.0.1:9651 , " + nodeID2.String() + "=192.168.1.1:9652  ",
-			expectedRelayerCount: 2,
-			expectedBootstrappers: []netip.AddrPort{
-				netip.MustParseAddrPort("127.0.0.1:9651"),
-				netip.MustParseAddrPort("192.168.1.1:9652"),
+			name:               "whitespace is trimmed",
+			input:              "  " + nodeID1.String() + " = 127.0.0.1:9651 , " + nodeID2.String() + "=192.168.1.1:9652  ",
+			expectedRelayerIDs: []ids.NodeID{nodeID1, nodeID2},
+			expectedBootstrappers: []genesis.Bootstrapper{
+				{
+					ID: nodeID1,
+					IP: netip.MustParseAddrPort("127.0.0.1:9651"),
+				},
+				{
+					ID: nodeID2,
+					IP: netip.MustParseAddrPort("192.168.1.1:9652"),
+				},
 			},
 		},
 		{
@@ -810,31 +820,21 @@ func TestParsePrimaryNetworkRelayers(t *testing.T) {
 			v.Set(PrimaryNetworkRelayersKey, tt.input)
 
 			config, err := GetNodeConfig(v)
+			require.ErrorIs(err, tt.expectedErr)
 
 			if tt.expectedErr != nil {
-				require.ErrorIs(err, tt.expectedErr)
 				return
 			}
-
-			require.NoError(err)
 
 			// Verify primary network config has the correct relayer IDs
 			primaryConfig, ok := config.SubnetConfigs[constants.PrimaryNetworkID]
 			require.True(ok)
-			require.Equal(tt.expectedRelayerCount, primaryConfig.RelayerIDs.Len())
+			require.ElementsMatch(tt.expectedRelayerIDs, primaryConfig.RelayerIDs)
 
-			if tt.expectedRelayerCount > 0 {
+			if len(tt.expectedRelayerIDs) > 0 {
 				require.True(primaryConfig.IsRelayerMode())
 				// Verify bootstrappers are set from relayers
-				require.Len(config.Bootstrappers, tt.expectedRelayerCount)
-				// Check that all expected IPs are present in bootstrappers
-				bootstrapperIPs := make([]netip.AddrPort, 0, len(config.Bootstrappers))
-				for _, b := range config.Bootstrappers {
-					bootstrapperIPs = append(bootstrapperIPs, b.IP)
-				}
-				for _, expectedIP := range tt.expectedBootstrappers {
-					require.Contains(bootstrapperIPs, expectedIP)
-				}
+				require.ElementsMatch(tt.expectedBootstrappers, config.Bootstrappers)
 			} else {
 				require.False(primaryConfig.IsRelayerMode())
 			}
@@ -896,18 +896,12 @@ func TestBootstrapConfigRelayerConflict(t *testing.T) {
 			require := require.New(t)
 
 			v := setupViperFlags()
-			v.Set(NetworkNameKey, constants.UnitTestName)
 			for key, value := range tt.config {
 				v.Set(key, value)
 			}
 
 			_, err := GetNodeConfig(v)
-
-			if tt.expectedErr != nil {
-				require.ErrorIs(err, tt.expectedErr)
-			} else {
-				require.NoError(err)
-			}
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }

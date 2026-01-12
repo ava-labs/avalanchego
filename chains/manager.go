@@ -844,7 +844,7 @@ func (m *manager) createAvalancheChain(
 		m.Log.Info("relayer mode enabled for chain",
 			zap.Stringer("chainID", ctx.ChainID),
 			zap.Stringer("subnetID", ctx.SubnetID),
-			zap.Reflect("relayerNodeIDs", relayerNodeIDs),
+			zap.Stringers("relayerNodeIDs", relayerNodeIDs),
 		)
 	}
 
@@ -1265,7 +1265,7 @@ func (m *manager) createSnowmanChain(
 		m.Log.Info("relayer mode enabled for chain",
 			zap.Stringer("subnetID", ctx.SubnetID),
 			zap.Stringer("chainID", ctx.ChainID),
-			zap.Reflect("relayerNodeIDs", relayerNodeIDs),
+			zap.Stringers("relayerNodeIDs", relayerNodeIDs),
 		)
 	}
 
@@ -1627,7 +1627,7 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 // in the config package via subnets.Config.AdjustForRelayerMode().
 //
 // It also validates that all relayer node IDs are actual validators on the
-// Primary Network and logs a warning for any that are not. Non-validator
+// subnet and logs a warning for any that are not. Non-validator
 // relayers may fail to connect since they won't be discovered through gossip.
 func (m *manager) createRelayerValidators(
 	subnetID ids.ID,
@@ -1635,17 +1635,17 @@ func (m *manager) createRelayerValidators(
 ) (validators.Manager, error) {
 	relayerVdrs := validators.NewManager()
 	for _, nodeID := range relayerNodeIDs {
-		// Get the relayer's validator data from the Primary Network if available.
+		// Get the relayer's validator data if available.
 		// This provides the public key needed for BLS signature verification.
 		var (
 			pk   *bls.PublicKey
 			txID ids.ID
 		)
-		if vdr, ok := m.Validators.GetValidator(constants.PrimaryNetworkID, nodeID); ok {
+		if vdr, ok := m.Validators.GetValidator(subnetID, nodeID); ok {
 			pk = vdr.PublicKey
 			txID = vdr.TxID
 		} else {
-			m.Log.Warn("relayer node is not a Primary Network validator; connection may fail",
+			m.Log.Warn("relayer node is not a validator on this subnet",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("subnetID", subnetID),
 			)

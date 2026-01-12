@@ -85,40 +85,40 @@ func TestRelayerIDsUnmarshal(t *testing.T) {
 	nodeID2 := ids.GenerateTestNodeID()
 
 	tests := []struct {
-		name            string
-		json            string
-		expectedLen     int
-		expectedRelayer bool
+		name               string
+		json               string
+		expectedRelayerIDs []ids.NodeID
+		expectedRelayer    bool
 	}{
 		{
-			name:            "empty relayerIDs array",
-			json:            `{"relayerIDs":[]}`,
-			expectedLen:     0,
-			expectedRelayer: false,
+			name:               "empty relayerIDs array",
+			json:               `{"relayerIDs":[]}`,
+			expectedRelayerIDs: nil,
+			expectedRelayer:    false,
 		},
 		{
-			name:            "no relayerIDs field",
-			json:            `{}`,
-			expectedLen:     0,
-			expectedRelayer: false,
+			name:               "no relayerIDs field",
+			json:               `{}`,
+			expectedRelayerIDs: nil,
+			expectedRelayer:    false,
 		},
 		{
-			name:            "single relayer ID",
-			json:            fmt.Sprintf(`{"relayerIDs":[%q]}`, nodeID1.String()),
-			expectedLen:     1,
-			expectedRelayer: true,
+			name:               "single relayer ID",
+			json:               fmt.Sprintf(`{"relayerIDs":[%q]}`, nodeID1.String()),
+			expectedRelayerIDs: []ids.NodeID{nodeID1},
+			expectedRelayer:    true,
 		},
 		{
-			name:            "multiple relayer IDs",
-			json:            fmt.Sprintf(`{"relayerIDs":[%q,%q]}`, nodeID1.String(), nodeID2.String()),
-			expectedLen:     2,
-			expectedRelayer: true,
+			name:               "multiple relayer IDs",
+			json:               fmt.Sprintf(`{"relayerIDs":[%q,%q]}`, nodeID1.String(), nodeID2.String()),
+			expectedRelayerIDs: []ids.NodeID{nodeID1, nodeID2},
+			expectedRelayer:    true,
 		},
 		{
-			name:            "same relayer ID twice",
-			json:            fmt.Sprintf(`{"relayerIDs":[%q,%q]}`, nodeID1.String(), nodeID1.String()),
-			expectedLen:     1,
-			expectedRelayer: true,
+			name:               "same relayer ID twice",
+			json:               fmt.Sprintf(`{"relayerIDs":[%q,%q]}`, nodeID1.String(), nodeID1.String()),
+			expectedRelayerIDs: []ids.NodeID{nodeID1},
+			expectedRelayer:    true,
 		},
 	}
 
@@ -128,7 +128,7 @@ func TestRelayerIDsUnmarshal(t *testing.T) {
 
 			var config Config
 			require.NoError(json.Unmarshal([]byte(tt.json), &config))
-			require.Equal(tt.expectedLen, config.RelayerIDs.Len())
+			require.ElementsMatch(tt.expectedRelayerIDs, config.RelayerIDs.List())
 			require.Equal(tt.expectedRelayer, config.IsRelayerMode())
 		})
 	}
