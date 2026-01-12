@@ -2,6 +2,10 @@
 
 ## Pending (v1.14.2)
 
+### Config
+
+- Removed `pull-gossip-poll-size` from the X-chain and P-chain configs.
+
 ### Fixes
 
 - Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space.

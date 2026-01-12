@@ -7,7 +7,7 @@ When building developing your own blockchain using `subnet-evm`, you may want to
 To build the load simulator, navigate to the base of the simulator directory:
 
 ```bash
-cd $GOPATH/src/github.com/ava-labs/subnet-evm/cmd/simulator
+cd $GOPATH/src/github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator
 ```
 
 Build the simulator:
