@@ -21,7 +21,7 @@ set -euo pipefail
 #   Data sources (provide S3 sources OR local paths):
 #     BLOCK_DIR_SRC: S3 object key for blocks (triggers S3 import).
 #     CURRENT_STATE_DIR_SRC: S3 object key for state. Optional—if unset, creates
-#                            empty state directory for genesis execution (block 1).
+#                            empty state directory for genesis execution.
 #     BLOCK_DIR: Path to local block directory.
 #     CURRENT_STATE_DIR: Path to local current state directory.
 #
