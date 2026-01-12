@@ -153,7 +153,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	intercept := &p2p.TestHandler{}
 
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel() // cancel on error from UpdateSyncTarget
+	defer cancel()
 	syncer, err := New(
 		Config{},
 		clientDB,
@@ -165,7 +165,10 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	require.NotNil(t, syncer)
 
 	synctest.AddFuncOnIntercept(intercept, NewGetRangeProofHandler(serverDB), func() {
-		require.NoError(t, syncer.UpdateSyncTarget(newRoot))
+		// Called in separate goroutine, allow graceful cancellation
+		if !assert.NoError(t, syncer.UpdateSyncTarget(newRoot)) {
+			cancel()
+		}
 	}, numRequestsBeforeUpdate)
 
 	require.NoError(t, syncer.Start(ctx))
@@ -173,7 +176,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	err = syncer.Wait(ctx)
 	finalRoot, rootErr := clientDB.Root()
 	require.NoError(t, rootErr)
-	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) || ids.ID(finalRoot) != newRoot {
+	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
 		logDiff(t, serverDB, clientDB)
 	}
