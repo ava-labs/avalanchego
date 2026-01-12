@@ -581,10 +581,7 @@ func setupPprof(tc tests.TestContext) func() {
 	r := require.New(tc)
 	logger := tests.NewDefaultLogger("pprof")
 
-	cwd, err := os.Getwd()
-	r.NoError(err, "failed to get current working directory")
-
-	profileDir := filepath.Join(cwd, "pprof")
+	profileDir := filepath.Join(os.TempDir(), "pprof")
 	r.NoError(os.MkdirAll(profileDir, perms.ReadWriteExecute), "failed to create profile directory")
 
 	cpuFile, err := os.Create(filepath.Join(profileDir, "cpu.prof"))
