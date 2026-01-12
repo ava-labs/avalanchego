@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
+	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/miner"
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -41,10 +43,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -2208,4 +2210,69 @@ func TestInspectDatabases(t *testing.T) {
 
 	vm.initializeDBs(db)
 	require.NoError(t, vm.inspectDatabases())
+}
+
+// Tests that querying states no longer in memory is still possible when in
+// archival mode.
+//
+// Querying for the nonce of the zero address at various heights is sufficient
+// as this succeeds only if the EVM has the matching trie at each height.
+func TestArchivalQueries(t *testing.T) {
+	schemes := []string{customrawdb.FirewoodScheme, rawdb.HashScheme}
+
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			require := require.New(t)
+			ctx := t.Context()
+
+			vm := newDefaultTestVM()
+
+			// Setting the state history to 5 means that we keep around only the
+			// 5 latest tries in memory. By creating numBlocks (10), we'll have:
+			//	- Tries 0-5: on-disk
+			// 	- Tries 6-10: in-memory
+			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+				ConfigJSON: `{
+					"pruning-enabled": false,
+					"state-history": 5
+				}`,
+				Scheme: scheme,
+			})
+
+			numBlocks := 10
+			for range numBlocks {
+				nonce := vm.txPool.Nonce(vmtest.TestEthAddrs[0])
+				signedTx := newSignedLegacyTx(
+					t,
+					vm.chainConfig,
+					vmtest.TestKeys[0].ToECDSA(),
+					nonce,
+					&common.Address{},
+					big.NewInt(0),
+					21_000,
+					vmtest.InitialBaseFee,
+					nil,
+				)
+				blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
+				require.NoError(err)
+
+				require.NoError(blk.Accept(ctx))
+			}
+
+			handlers, err := vm.CreateHandlers(ctx)
+			require.NoError(err)
+
+			server := httptest.NewServer(handlers[ethRPCEndpoint])
+			t.Cleanup(server.Close)
+
+			client, err := ethclient.Dial(server.URL)
+			require.NoError(err)
+
+			for i := 0; i <= numBlocks; i++ {
+				nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
+				require.NoErrorf(err, "failed to get nonce at block %d", i)
+				require.Zero(nonce)
+			}
+		})
+	}
 }
