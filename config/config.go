@@ -1032,7 +1032,7 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 
 	res := make(map[ids.ID]subnets.Config)
 	for _, subnetID := range subnetIDs {
-		config := getDefaultSubnetConfig(v)
+		config := getPrimaryNetworkConfig(v)
 
 		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
 			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
@@ -1066,7 +1066,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 	// reads subnet config files from a path and given subnetIDs and returns a map.
 	for _, subnetID := range subnetIDs {
 		// Ensure default configuration
-		config := getDefaultSubnetConfig(v)
+		config := getPrimaryNetworkConfig(v)
 		subnetConfigs[subnetID] = config
 
 		if len(subnetConfigPath) == 0 {
@@ -1112,18 +1112,10 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 	return subnetConfigs, nil
 }
 
-func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
-	subnetDefaults := getPrimaryNetworkConfig(v)
-	// Allow L1s (other than Primary Network) to use their own throttling mechanisms.
-	subnetDefaults.ProposerMinBlockDelay = 0
-	return subnetDefaults
-}
-
 func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
 		ConsensusParameters:         getConsensusConfig(v),
 		ValidatorOnly:               false,
-		ProposerMinBlockDelay:       v.GetDuration(ProposerVMMinBlockDelayKey),
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}
 }
@@ -1382,6 +1374,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig
 
+	nodeConfig.ProposerMinBlockDelay = v.GetDuration(ProposerVMMinBlockDelayKey)
 	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Benchlist

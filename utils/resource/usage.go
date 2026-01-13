@@ -124,6 +124,7 @@ func NewManager(
 		processes:            make(map[int]*proc),
 		onClose:              make(chan struct{}),
 		availableDiskBytes:   math.MaxUint64,
+    availableDiskPercent: 100,
 		availableMemoryBytes: math.MaxUint64,
 	}
 
