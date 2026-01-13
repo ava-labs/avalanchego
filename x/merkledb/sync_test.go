@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -456,15 +455,18 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Allow 1 request to go through before blocking
+	var interceptErr error
 	synctest.AddFuncOnIntercept(actionHandler, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
-		//nolint:testifylint // Called in separate goroutine, allow graceful cancellation
-		if !assert.NoError(t, syncer.UpdateSyncTarget(secondSyncRoot)) {
+		interceptErr = syncer.UpdateSyncTarget(secondSyncRoot)
+		if interceptErr != nil {
 			cancel()
 		}
 	}, 1)
 
 	require.NoError(syncer.Start(ctx))
-	require.NoError(syncer.Wait(ctx))
+	err = syncer.Wait(ctx)
+	require.NoError(interceptErr)
+	require.NoError(err)
 	require.NoError(syncer.Error())
 
 	newRoot, err := db.GetMerkleRoot(ctx)
@@ -515,15 +517,19 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
+
+	var interceptErr error
 	synctest.AddFuncOnIntercept(actionHandler, rangeProofHandler, func() {
-		//nolint:testifylint // Called in separate goroutine, allow graceful cancellation
-		if !assert.NoError(t, m.UpdateSyncTarget(root1)) {
+		interceptErr = m.UpdateSyncTarget(root1)
+		if interceptErr != nil {
 			cancel()
 		}
 	}, 0)
 
 	require.NoError(m.Start(ctx))
-	require.NoError(m.Wait(ctx))
+	err = m.Wait(ctx)
+	require.NoError(interceptErr)
+	require.NoError(err)
 }
 
 func generateTrie(t *testing.T, r *rand.Rand, count int) (MerkleDB, error) {

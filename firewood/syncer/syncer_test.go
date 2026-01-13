@@ -164,9 +164,10 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	require.NoError(t, err)
 	require.NotNil(t, syncer)
 
+	var interceptErr error
 	synctest.AddFuncOnIntercept(intercept, NewGetRangeProofHandler(serverDB), func() {
-		//nolint:testifylint // Called in separate goroutine, allow graceful cancellation
-		if !assert.NoError(t, syncer.UpdateSyncTarget(newRoot)) {
+		interceptErr = syncer.UpdateSyncTarget(newRoot)
+		if interceptErr != nil {
 			cancel()
 		}
 	}, numRequestsBeforeUpdate)
@@ -174,13 +175,15 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	require.NoError(t, syncer.Start(ctx))
 
 	err = syncer.Wait(ctx)
-	finalRoot, rootErr := clientDB.Root()
-	require.NoError(t, rootErr)
+	require.NoError(t, interceptErr)
 	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
 		logDiff(t, serverDB, clientDB)
 	}
 	require.NoError(t, err)
+
+	finalRoot, rootErr := clientDB.Root()
+	require.NoError(t, rootErr)
 	require.Equal(t, newRoot, ids.ID(finalRoot))
 }
 
