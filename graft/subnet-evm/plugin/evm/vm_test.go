@@ -3655,11 +3655,11 @@ func TestArchivalQueries(t *testing.T) {
 	//	- Tries 0-5: on-disk
 	// 	- Tries 6-10: in-memory
 	tests := []struct {
-		name   string
+		scheme string
 		config string
 	}{
 		{
-			name: "firewood",
+			scheme: "firewood",
 			config: `{
 				"state-scheme": "firewood",
 				"snapshot-cache": 0,
@@ -3669,7 +3669,7 @@ func TestArchivalQueries(t *testing.T) {
 			}`,
 		},
 		{
-			name: "hashdb",
+			scheme: "hashdb",
 			config: `{
 				"state-scheme": "hash",
 				"pruning-enabled": false,
@@ -3679,11 +3679,14 @@ func TestArchivalQueries(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.scheme, func(t *testing.T) {
 			require := require.New(t)
 			ctx := t.Context()
 
 			vm := newVM(t, testVMConfig{configJSON: tt.config})
+			defer func() {
+				require.NoError(vm.vm.Shutdown(ctx))
+			}()
 
 			numBlocks := 10
 			for range numBlocks {
