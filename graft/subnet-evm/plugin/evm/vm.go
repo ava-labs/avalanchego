@@ -57,7 +57,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/gossip"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client/stats"
@@ -119,11 +118,10 @@ const (
 
 // Define the API endpoints for the VM
 const (
-	adminEndpoint        = "/admin"
-	ethRPCEndpoint       = "/rpc"
-	ethWSEndpoint        = "/ws"
-	validatorsEndpoint   = "/validators"
-	ethTxGossipNamespace = "eth_tx_gossip"
+	adminEndpoint      = "/admin"
+	ethRPCEndpoint     = "/rpc"
+	ethWSEndpoint      = "/ws"
+	validatorsEndpoint = "/validators"
 )
 
 var (
@@ -258,9 +256,8 @@ type VM struct {
 	warpBackend warp.Backend
 
 	// Initialize only sets these if nil so they can be overridden in tests
-	ethTxGossipHandler p2p.Handler
-	ethTxPushGossiper  avalancheUtils.Atomic[*avalanchegossip.PushGossiper[*GossipEthTx]]
-	ethTxPullGossiper  avalanchegossip.Gossiper
+	ethTxPushGossiper avalancheUtils.Atomic[*avalanchegossip.PushGossiper[*GossipEthTx]]
+	ethTxPullGossiper avalanchegossip.Gossiper
 
 	uptimeTracker *uptimetracker.UptimeTracker
 
@@ -498,7 +495,7 @@ func (vm *VM) Initialize(
 
 	// Add p2p warp message warpHandler
 	warpHandler := acp118.NewCachedHandler(meteredCache, vm.warpBackend, vm.ctx.WarpSigner)
-	if err = vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
+	if err = vm.P2PNetwork().AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
 		return err
 	}
 
@@ -835,14 +832,6 @@ func (vm *VM) onNormalOperationsStarted() error {
 		}
 	}()
 
-	// Initialize goroutines related to block building
-	// once we enter normal operation as there is no need to handle mempool gossip before this point.
-	ethTxGossipMarshaller := GossipEthTxMarshaller{}
-	ethTxGossipClient := vm.Network.NewClient(p2p.TxGossipHandlerID)
-	ethTxGossipMetrics, err := avalanchegossip.NewMetrics(vm.sdkMetrics, ethTxGossipNamespace)
-	if err != nil {
-		return fmt.Errorf("failed to initialize eth tx gossip metrics: %w", err)
-	}
 	ethTxPool, err := NewGossipEthTxPool(vm.txPool, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to initialize gossip eth tx pool: %w", err)
@@ -853,33 +842,36 @@ func (vm *VM) onNormalOperationsStarted() error {
 		vm.shutdownWg.Done()
 	}()
 
-	pushGossipParams := avalanchegossip.BranchingFactor{
-		StakePercentage: vm.config.PushGossipPercentStake,
-		Validators:      vm.config.PushGossipNumValidators,
-		Peers:           vm.config.PushGossipNumPeers,
-	}
-	pushRegossipParams := avalanchegossip.BranchingFactor{
-		Validators: vm.config.PushRegossipNumValidators,
-		Peers:      vm.config.PushRegossipNumPeers,
+	handler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
+		vm.ctx.NodeID,
+		vm.P2PNetwork(),
+		vm.P2PValidators(),
+		ethTxPool,
+		GossipEthTxMarshaller{},
+		avalanchegossip.SystemConfig{
+			Log:           vm.ctx.Log,
+			Registry:      vm.sdkMetrics,
+			Namespace:     "eth_tx_gossip",
+			RequestPeriod: vm.config.PullGossipFrequency.Duration,
+			PushGossipParams: avalanchegossip.BranchingFactor{
+				StakePercentage: vm.config.PushGossipPercentStake,
+				Validators:      vm.config.PushGossipNumValidators,
+				Peers:           vm.config.PushGossipNumPeers,
+			},
+			PushRegossipParams: avalanchegossip.BranchingFactor{
+				Validators: vm.config.PushRegossipNumValidators,
+				Peers:      vm.config.PushRegossipNumPeers,
+			},
+			RegossipPeriod: vm.config.RegossipFrequency.Duration,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize gossip system: %w", err)
 	}
 
 	ethTxPushGossiper := vm.ethTxPushGossiper.Get()
 	if ethTxPushGossiper == nil {
-		ethTxPushGossiper, err = avalanchegossip.NewPushGossiper[*GossipEthTx](
-			ethTxGossipMarshaller,
-			ethTxPool,
-			vm.P2PValidators(),
-			ethTxGossipClient,
-			ethTxGossipMetrics,
-			pushGossipParams,
-			pushRegossipParams,
-			config.PushGossipDiscardedElements,
-			config.TxGossipTargetMessageSize,
-			vm.config.RegossipFrequency.Duration,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to initialize eth tx push gossiper: %w", err)
-		}
+		ethTxPushGossiper = pushGossiper
 		vm.ethTxPushGossiper.Set(ethTxPushGossiper)
 	}
 
@@ -891,43 +883,12 @@ func (vm *VM) onNormalOperationsStarted() error {
 	vm.builder.awaitSubmittedTxs()
 	vm.builderLock.Unlock()
 
-	if vm.ethTxGossipHandler == nil {
-		vm.ethTxGossipHandler, err = gossip.NewTxGossipHandler[*GossipEthTx](
-			vm.ctx.Log,
-			ethTxGossipMarshaller,
-			ethTxPool,
-			ethTxGossipMetrics,
-			config.TxGossipTargetMessageSize,
-			config.TxGossipThrottlingPeriod,
-			config.TxGossipRequestsPerPeer,
-			vm.P2PValidators(),
-			vm.sdkMetrics,
-			"eth_tx_gossip",
-		)
-	}
-	if err != nil {
-		return fmt.Errorf("failed to initialize eth tx gossip handler: %w", err)
-	}
-
-	if err := vm.Network.AddHandler(p2p.TxGossipHandlerID, vm.ethTxGossipHandler); err != nil {
+	if err := vm.P2PNetwork().AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
 		return fmt.Errorf("failed to add eth tx gossip handler: %w", err)
 	}
 
 	if vm.ethTxPullGossiper == nil {
-		ethTxPullGossiper := avalanchegossip.NewPullGossiper[*GossipEthTx](
-			vm.ctx.Log,
-			ethTxGossipMarshaller,
-			ethTxPool,
-			ethTxGossipClient,
-			ethTxGossipMetrics,
-			config.TxGossipPollSize,
-		)
-
-		vm.ethTxPullGossiper = avalanchegossip.ValidatorGossiper{
-			Gossiper:   ethTxPullGossiper,
-			NodeID:     vm.ctx.NodeID,
-			Validators: vm.P2PValidators(),
-		}
+		vm.ethTxPullGossiper = pullGossiper
 	}
 
 	vm.shutdownWg.Add(1)
@@ -1205,7 +1166,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}
 
 	if vm.config.WarpAPIEnabled {
-		warpSDKClient := vm.Network.NewClient(p2p.SignatureRequestHandlerID)
+		warpSDKClient := vm.P2PNetwork().NewClient(p2p.SignatureRequestHandlerID, vm.P2PValidators())
 		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)
 
 		if err := handler.RegisterName("warp", warp.NewAPI(vm.ctx, vm.warpBackend, signatureAggregator)); err != nil {
