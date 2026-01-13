@@ -48,17 +48,16 @@ func VerifyMinDelayExcess(
 	parent *types.Header,
 	header *types.Header,
 ) error {
-	isGraniteActive := config.IsGranite(header.Time)
 	remoteDelayExcess := customtypes.GetHeaderExtra(header).MinDelayExcess
 
-	switch {
-	case !isGraniteActive:
-		// Before Granite, min delay excess should not be set.
+	if !config.IsGranite(header.Time) {
 		if remoteDelayExcess != nil {
 			return fmt.Errorf("%w: %s", errRemoteMinDelayExcessSet, header.Hash())
 		}
 		return nil
-	case remoteDelayExcess == nil:
+	}
+
+	if remoteDelayExcess == nil {
 		return fmt.Errorf("%w: %s", errRemoteMinDelayExcessNil, header.Hash())
 	}
 

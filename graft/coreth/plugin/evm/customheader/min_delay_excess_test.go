@@ -144,7 +144,7 @@ func TestVerifyMinDelayExcess(t *testing.T) {
 			name:        "pre_granite_min_delay_excess_set_error",
 			config:      extras.TestFortunaChainConfig,
 			parent:      &types.Header{Time: 1000},
-			header:      generateHeaderWithMinDelayExcess(1001, 500),
+			header:      generateHeaderWithMinDelayExcess(1001, 1000),
 			expectedErr: errRemoteMinDelayExcessSet,
 		},
 		{
