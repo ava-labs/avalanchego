@@ -59,15 +59,15 @@ var current Variant
 // if emulation was initiated outside of this package then [UnknownVariant]
 // will be returned.
 func CurrentVariant() Variant {
-    return current
+	return current
 }
 
 // runWith executes tests with the specified emulation function and variant.
 func runWith(m *testing.M, emulateFn func(func() error) error, variant Variant) int {
 	var code int
 	_ = emulateFn(func() error {
-	    current = variant
-	    defer func() { current = UnknownVariant }()
+		current = variant
+		defer func() { current = UnknownVariant }()
 		code = m.Run()
 		return nil
 	})
