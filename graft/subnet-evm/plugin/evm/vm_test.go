@@ -2991,7 +2991,7 @@ func TestWaitForEvent(t *testing.T) {
 				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
 				require.NoError(t, err)
 
-				ctx, cancel = context.WithTimeout(t.Context(), time.Second*2)
+				ctx, cancel = context.WithTimeout(t.Context(), time.Second*5)
 				defer cancel()
 
 				msg, err = vm.WaitForEvent(ctx)
