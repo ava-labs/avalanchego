@@ -16,7 +16,6 @@ import (
 
 var (
 	errRemoteMinDelayExcessNil = errors.New("remote min delay excess should not be nil")
-	errRemoteMinDelayExcessSet = errors.New("remote min delay excess should be nil")
 	errIncorrectMinDelayExcess = errors.New("incorrect min delay excess")
 	errParentMinDelayExcessNil = errors.New("parent min delay excess should not be nil")
 )
@@ -51,9 +50,6 @@ func VerifyMinDelayExcess(
 	remoteDelayExcess := customtypes.GetHeaderExtra(header).MinDelayExcess
 
 	if !config.IsGranite(header.Time) {
-		if remoteDelayExcess != nil {
-			return fmt.Errorf("%w: %s", errRemoteMinDelayExcessSet, header.Hash())
-		}
 		return nil
 	}
 
