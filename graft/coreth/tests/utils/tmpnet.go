@@ -49,11 +49,6 @@ func NewTmpnetSubnet(name string, genesis []byte, chainConfig map[string]any, no
 		panic(err)
 	}
 
-	preFundedKeys, err := tmpnet.NewPrivateKeys(1)
-	if err != nil {
-		panic(err)
-	}
-
 	return &tmpnet.Subnet{
 		Name: name,
 		Chains: []*tmpnet.Chain{
@@ -61,7 +56,7 @@ func NewTmpnetSubnet(name string, genesis []byte, chainConfig map[string]any, no
 				VMID:         constants.EVMID,
 				Genesis:      genesis,
 				Config:       string(chainConfigBytes),
-				PreFundedKey: preFundedKeys[0],
+				PreFundedKey: tmpnet.HardhatKey,
 			},
 		},
 		ValidatorIDs: validatorIDs,
