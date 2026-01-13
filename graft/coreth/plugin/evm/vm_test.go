@@ -2218,7 +2218,9 @@ func TestInspectDatabases(t *testing.T) {
 // Querying for the nonce of the zero address at various heights is sufficient
 // as this succeeds only if the EVM has the matching trie at each height.
 func TestArchivalQueries(t *testing.T) {
-	for _, scheme := range vmtest.Schemes {
+	schemes := []string{customrawdb.FirewoodScheme, rawdb.HashScheme}
+
+	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
 			require := require.New(t)
 			ctx := t.Context()
@@ -2236,9 +2238,9 @@ func TestArchivalQueries(t *testing.T) {
 				}`,
 				Scheme: scheme,
 			})
-			defer func() {
+			t.Cleanup(func() {
 				require.NoError(vm.Shutdown(ctx))
-			}()
+			})
 
 			numBlocks := 10
 			for range numBlocks {
