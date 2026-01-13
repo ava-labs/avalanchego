@@ -49,7 +49,6 @@ func NewTmpnetSubnet(name string, genesis []byte, chainConfig map[string]any, no
 		panic(err)
 	}
 
-	// Generate a unique prefunded key for this subnet instead of using a hardcoded key
 	preFundedKeys, err := tmpnet.NewPrivateKeys(1)
 	if err != nil {
 		panic(err)
