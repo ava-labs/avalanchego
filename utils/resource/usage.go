@@ -208,7 +208,7 @@ func (m *manager) Shutdown() {
 // getMemoryInfo attempts to get container-aware memory information.
 // In containerized environments (K8s, Docker), it reads cgroup limits directly.
 // Falls back to system-wide memory if cgroup reading fails or returns "max" (no limit).
-func getMemoryInfo(log logging.Logger) (availableBytes uint64, availablePercent uint64, err error) {
+func getMemoryInfo() (availableBytes uint64, availablePercent uint64, err error) {
 	// Try cgroup v2 first (modern containers)
 	if memMax, memCurrent, cgroupErr := readCgroupV2Memory(); cgroupErr == nil {
 		// Successfully read cgroup v2 memory
@@ -324,7 +324,7 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 			)
 		}
 
-		memAvailableBytes, memAvailablePercent, getMemErr := getMemoryInfo(m.log)
+		memAvailableBytes, memAvailablePercent, getMemErr := getMemoryInfo()
 		if getMemErr != nil {
 			m.log.Verbo("failed to lookup resource",
 				zap.String("resource", "system memory"),

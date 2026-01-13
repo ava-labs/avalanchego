@@ -87,9 +87,9 @@ var (
 	errUnmarshalling                          = errors.New("unmarshalling failed")
 	errFileDoesNotExist                       = errors.New("file does not exist")
 	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
-	errDiskSpaceOutOfRange   = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
-	errDiskWarnAfterFatal    = errors.New("warning disk space threshold cannot be greater than fatal threshold")
-	errMemorySpaceOutOfRange = fmt.Errorf("out of range [0,%d]", maxMemorySpaceThreshold)
+	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
+	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
+	errMemorySpaceOutOfRange                  = fmt.Errorf("out of range [0,%d]", maxMemorySpaceThreshold)
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
