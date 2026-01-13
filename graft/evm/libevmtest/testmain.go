@@ -58,14 +58,23 @@ func RunWithAll(m *testing.M, currentVariant *utils.Atomic[Variant]) int {
 	return 0
 }
 
+var current Variant
+
+// CurrentVariant returns the currently emulated EVM variant. Note that
+// if emulation was initiated outside of this package then [UnknownVariant]
+// will be returned.
+func CurrentVariant() Variant {
+    return current
+}
+
 // runWith executes tests with the specified emulation function and variant.
-func runWith(m *testing.M, currentVariant *utils.Atomic[Variant], emulateFn func(func() error) error, variant Variant) int {
+func runWith(m *testing.M, emulateFn func(func() error) error, variant Variant) int {
 	var code int
-	currentVariant.Set(variant)
 	_ = emulateFn(func() error {
+	    current = variant
+	    defer func() { current = UnknownVariant }()
 		code = m.Run()
 		return nil
 	})
-	currentVariant.Set(UnknownVariant)
 	return code
 }
