@@ -5,6 +5,7 @@
 ### Config
 
 - Removed `pull-gossip-poll-size` from the X-chain and P-chain configs.
+- Removed `proposerMinBlockDelay` from subnet configs.
 
 ### Fixes
 
