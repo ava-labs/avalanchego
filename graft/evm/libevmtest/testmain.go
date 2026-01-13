@@ -8,7 +8,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/emulate"
 )
 
@@ -28,16 +27,16 @@ const (
 // Tests are run twice - once with C-Chain types and once with Subnet-EVM types.
 // Both test runs must pass for the overall result to be successful.
 //
-// The currentVariant atomic is set before each test run, allowing tests to check
-// which variant they're running under via currentVariant.Get().
-func RunWithAll(m *testing.M, currentVariant *utils.Atomic[Variant]) int {
+// The current variant is set before each test run, allowing tests to check
+// which variant they're running under via CurrentVariant().
+func RunWithAll(m *testing.M) int {
 	fmt.Println("=== Running tests with both C-Chain and Subnet-EVM ===")
 
 	fmt.Println("--- Running C-Chain variant ---")
-	cchainCode := runWith(m, currentVariant, emulate.CChain, CChainVariant)
+	cchainCode := runWith(m, emulate.CChain, CChainVariant)
 
 	fmt.Println("--- Running Subnet-EVM variant ---")
-	subnetCode := runWith(m, currentVariant, emulate.SubnetEVM, SubnetEVMVariant)
+	subnetCode := runWith(m, emulate.SubnetEVM, SubnetEVMVariant)
 
 	if cchainCode != 0 {
 		fmt.Fprintln(os.Stderr, "C-Chain tests failed")
@@ -51,7 +50,7 @@ func RunWithAll(m *testing.M, currentVariant *utils.Atomic[Variant]) int {
 		fmt.Println("Subnet-EVM tests passed")
 	}
 
-	return cChainCode | subnetCode
+	return cchainCode | subnetCode
 }
 
 var current Variant
