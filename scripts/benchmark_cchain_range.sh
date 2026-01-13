@@ -20,7 +20,8 @@ set -euo pipefail
 # Environment variables:
 #   Data sources (provide S3 sources OR local paths):
 #     BLOCK_DIR_SRC: S3 object key for blocks (triggers S3 import).
-#     CURRENT_STATE_DIR_SRC: S3 object key for state (triggers S3 import).
+#     CURRENT_STATE_DIR_SRC: S3 object key for state. Optional—if unset, creates
+#                            empty state directory for genesis execution.
 #     BLOCK_DIR: Path to local block directory.
 #     CURRENT_STATE_DIR: Path to local current state directory.
 #
@@ -148,20 +149,20 @@ if [[ -n "${CHAOS_MODE:-}" && -n "${TEST_NAME:-}" ]]; then
 fi
 
 # Determine data source: S3 import or local paths
-if [[ -n "${BLOCK_DIR_SRC:-}" && -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
-    # S3 mode - import data
+if [[ -n "${BLOCK_DIR_SRC:-}" ]]; then
+    # S3 mode - import data (CURRENT_STATE_DIR_SRC is optional; if unset, genesis mode)
     TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
     EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR:-/tmp/reexec-${TEST_NAME:-custom}-${TIMESTAMP}}"
 
     BLOCK_DIR_SRC="${BLOCK_DIR_SRC}" \
-    CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC}" \
+    CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-}" \
     EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR}" \
-    "${SCRIPT_DIR}/import_cchain_data.sh"
+    "${SCRIPT_DIR}/setup_cchain_data.sh"
 
     BLOCK_DIR="${EXECUTION_DATA_DIR}/blocks"
     CURRENT_STATE_DIR="${EXECUTION_DATA_DIR}/current-state"
-elif [[ -n "${BLOCK_DIR_SRC:-}" || -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
-    error "Both BLOCK_DIR_SRC and CURRENT_STATE_DIR_SRC must be provided together"
+elif [[ -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
+    error "CURRENT_STATE_DIR_SRC requires BLOCK_DIR_SRC to also be set"
 elif [[ -z "${BLOCK_DIR:-}" || -z "${CURRENT_STATE_DIR:-}" ]]; then
     show_usage
     echo ""

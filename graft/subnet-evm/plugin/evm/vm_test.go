@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/node"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
@@ -2987,7 +2989,7 @@ func TestWaitForEvent(t *testing.T) {
 				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
 				require.NoError(t, err)
 
-				ctx, cancel = context.WithTimeout(t.Context(), time.Second*2)
+				ctx, cancel = context.WithTimeout(t.Context(), time.Second*5)
 				defer cancel()
 
 				msg, err = vm.WaitForEvent(ctx)
@@ -3591,6 +3593,86 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 			headerExtra := customtypes.GetHeaderExtra(ethBlock.Header())
 
 			require.Equal(test.expectedMinDelayExcess, headerExtra.MinDelayExcess, "expected %s, got %s", test.expectedMinDelayExcess, headerExtra.MinDelayExcess)
+		})
+	}
+}
+
+// Tests that querying states no longer in memory is still possible when in
+// archival mode.
+//
+// Querying for the nonce of the zero address at various heights is sufficient
+// as this succeeds only if the EVM has the matching trie at each height.
+func TestArchivalQueries(t *testing.T) {
+	// Setting the state history to 5 means that we keep around only the 5 latest
+	// tries in memory. By creating numBlocks (10), we'll have:
+	//	- Tries 0-5: on-disk
+	// 	- Tries 6-10: in-memory
+	tests := []struct {
+		name   string
+		config string
+	}{
+		{
+			name: "firewood",
+			config: `{
+				"state-scheme": "firewood",
+				"snapshot-cache": 0,
+				"pruning-enabled": false,
+				"state-sync-enabled": false,
+				"state-history": 5
+			}`,
+		},
+		{
+			name: "hashdb",
+			config: `{
+				"state-scheme": "hash",
+				"pruning-enabled": false,
+				"state-history": 5
+			}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := t.Context()
+
+			vm := newVM(t, testVMConfig{configJSON: tt.config})
+
+			numBlocks := 10
+			for range numBlocks {
+				nonce := vm.vm.txPool.Nonce(testEthAddrs[0])
+				signedTx := newSignedLegacyTx(
+					t,
+					vm.vm.chainConfig,
+					testKeys[0].ToECDSA(),
+					nonce,
+					&common.Address{},
+					big.NewInt(0),
+					21_000,
+					big.NewInt(testMinGasPrice),
+					nil,
+				)
+
+				blk, err := IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm.vm)
+				require.NoError(err)
+
+				require.NoError(blk.Accept(ctx))
+			}
+
+			handlers, err := vm.vm.CreateHandlers(ctx)
+			require.NoError(err)
+
+			server := httptest.NewServer(handlers[ethRPCEndpoint])
+			t.Cleanup(server.Close)
+
+			client, err := ethclient.Dial(server.URL)
+			require.NoError(err)
+
+			for i := 0; i <= numBlocks; i++ {
+				nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
+				require.NoErrorf(err, "failed to get nonce at block %d", i)
+				require.Zero(nonce)
+			}
 		})
 	}
 }
