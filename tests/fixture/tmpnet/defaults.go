@@ -47,7 +47,6 @@ func DefaultTmpnetFlags() FlagsMap {
 		// resource-constrained environments that commonly have low disk space and memory.
 		config.SystemTrackerRequiredAvailableDiskSpacePercentageKey: "0",
 		config.SystemTrackerWarningAvailableDiskSpacePercentageKey:  "0",
-		config.SystemTrackerRequiredAvailableMemoryPercentageKey:    "0",
 		config.SystemTrackerWarningAvailableMemoryPercentageKey:     "0",
 	}
 }

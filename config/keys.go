@@ -195,7 +195,6 @@ const (
 	SystemTrackerRequiredAvailableDiskSpacePercentageKey = "system-tracker-disk-required-available-space-percentage"
 	SystemTrackerWarningThresholdAvailableDiskSpaceKey   = "system-tracker-disk-warning-threshold-available-space"
 	SystemTrackerWarningAvailableDiskSpacePercentageKey  = "system-tracker-disk-warning-available-space-percentage"
-	SystemTrackerRequiredAvailableMemoryPercentageKey    = "system-tracker-memory-required-available-percentage"
 	SystemTrackerWarningAvailableMemoryPercentageKey     = "system-tracker-memory-warning-available-percentage"
 	DiskVdrAllocKey                                      = "throttler-inbound-disk-validator-alloc"
 	DiskMaxNonVdrUsageKey                                = "throttler-inbound-disk-max-non-validator-usage"

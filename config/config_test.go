@@ -703,23 +703,13 @@ func TestGetMemoryConfig(t *testing.T) {
 		{
 			name: "valid config",
 			config: map[string]uint64{
-				SystemTrackerWarningAvailableMemoryPercentageKey:  maxMemorySpaceThreshold,
-				SystemTrackerRequiredAvailableMemoryPercentageKey: 1,
+				SystemTrackerWarningAvailableMemoryPercentageKey: maxMemorySpaceThreshold,
 			},
-		},
-		{
-			name: "invalid config - warning less than required",
-			config: map[string]uint64{
-				SystemTrackerWarningAvailableMemoryPercentageKey:  25,
-				SystemTrackerRequiredAvailableMemoryPercentageKey: 30,
-			},
-			expectedErr: errMemoryWarnAfterFatal,
 		},
 		{
 			name: "invalid config - warning too big",
 			config: map[string]uint64{
-				SystemTrackerWarningAvailableMemoryPercentageKey:  maxMemorySpaceThreshold + 1,
-				SystemTrackerRequiredAvailableMemoryPercentageKey: 15,
+				SystemTrackerWarningAvailableMemoryPercentageKey: maxMemorySpaceThreshold + 1,
 			},
 			expectedErr: errMemorySpaceOutOfRange,
 		},

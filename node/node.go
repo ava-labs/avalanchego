@@ -1486,24 +1486,14 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	memoryCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
-		// confirm that the node has enough memory to continue operating
-		// if there is too little memory remaining, first report unhealthy and then shutdown the node
+		// Monitor available memory and report unhealthy if below threshold.
 
 		availableMemoryBytes := n.resourceTracker.MemoryTracker().AvailableMemoryBytes()
 		availableMemoryPercentage := n.resourceTracker.MemoryTracker().AvailableMemoryPercentage()
 
 		var err error
-
-		if availableMemoryPercentage < n.Config.RequiredAvailableMemoryPercentage {
-			n.Log.Fatal("low on available memory. Shutting down...",
-				zap.Uint64("availableMemoryBytes", availableMemoryBytes),
-				zap.Uint64("remainingMemoryPercentage", availableMemoryPercentage),
-				zap.Uint64("requiredMemoryPercentage", n.Config.RequiredAvailableMemoryPercentage),
-			)
-			go n.Shutdown(1)
-			err = fmt.Errorf("remaining available memory percentage (%d%%) is below minimum required available memory percentage (%d%%)", availableMemoryPercentage, n.Config.RequiredAvailableMemoryPercentage)
-		} else if availableMemoryPercentage < n.Config.WarningAvailableMemoryPercentage {
-			err = fmt.Errorf("remaining available memory percentage (%d%%) is below warning threshold available memory percentage (%d%%)", availableMemoryPercentage, n.Config.WarningAvailableMemoryPercentage)
+		if n.Config.WarningAvailableMemoryPercentage > 0 && availableMemoryPercentage < n.Config.WarningAvailableMemoryPercentage {
+			err = fmt.Errorf("remaining available memory percentage (%d%%) is below warning threshold (%d%%)", availableMemoryPercentage, n.Config.WarningAvailableMemoryPercentage)
 		}
 
 		return map[string]interface{}{
