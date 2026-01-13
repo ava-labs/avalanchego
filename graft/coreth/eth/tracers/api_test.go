@@ -430,7 +430,7 @@ func testTraceCall(t *testing.T, scheme string) {
 		{"pc":0,"op":"NUMBER","gas":24946982,"gasCost":2,"depth":1,"stack":[]},
 		{"pc":1,"op":"STOP","gas":24946980,"gasCost":0,"depth":1,"stack":["0x1337"]}]}`,
 		},
-		// Tests issue #4657 where accessing nil block number override panics.
+		// Tests issue #33014 where accessing nil block number override panics.
 		{
 			blockNumber: rpc.BlockNumber(0),
 			call: ethapi.TransactionArgs{
