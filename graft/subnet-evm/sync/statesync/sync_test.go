@@ -418,6 +418,15 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 					require.NoError(t, clientDB.DiskDB().Delete(it.Key()), "failed to delete code hash %x", it.Key()[len(rawdb.CodePrefix):])
 				}
 				require.NoError(t, it.Error(), "error iterating over code hashes")
+
+				// delete code-to-fetch markers to avoid syncer trying to fetch old code
+				codeToFetchIt := customrawdb.NewCodeToFetchIterator(clientDB.DiskDB())
+				defer codeToFetchIt.Release()
+				for codeToFetchIt.Next() {
+					codeHash := common.BytesToHash(codeToFetchIt.Key()[len(customrawdb.CodeToFetchPrefix):])
+					customrawdb.DeleteCodeToFetch(clientDB.DiskDB(), codeHash)
+				}
+				require.NoError(t, codeToFetchIt.Error(), "error iterating over code-to-fetch markers")
 			},
 		},
 		"delete intermediate storage nodes": {
