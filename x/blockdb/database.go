@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -519,8 +518,9 @@ func (s *Database) hasWithoutLock(height BlockHeight) (bool, error) {
 	return true, nil
 }
 
-// Sync flushes underlying writes from the OS buffer cache to disk for
-// data in the range [start, end].
+// Sync calls sync on all data files in the range [start, end],
+// assuming data are written in-order. If no data exists at start or end,
+// nothing is synced.
 func (s *Database) Sync(start, end uint64) error {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
@@ -533,33 +533,29 @@ func (s *Database) Sync(start, end uint64) error {
 		return database.ErrClosed
 	}
 
-	if err := s.indexFile.Sync(); err != nil {
-		return fmt.Errorf("failed to sync index file: %w", err)
+	_, firstIdx, err := s.getDataFileForHeight(start)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	_, lastIdx, err := s.getDataFileForHeight(end)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil
+		}
+		return err
 	}
 
-	var synced set.Set[int]
-	for h := start; h <= end; h++ {
-		entry, err := s.readBlockIndex(h)
+	for idx := firstIdx; idx <= lastIdx; idx++ {
+		f, err := s.getOrOpenDataFile(idx)
 		if err != nil {
-			if errors.Is(err, database.ErrNotFound) {
-				continue
-			}
-			return fmt.Errorf("failed to read block index for height %d: %w", h, err)
+			return fmt.Errorf("failed to open data file %d: %w", idx, err)
 		}
-
-		f, _, idx, err := s.getDataFileAndOffset(entry.Offset)
-		if err != nil {
-			return fmt.Errorf("failed to get data file for height %d: %w", h, err)
-		}
-
-		if synced.Contains(idx) {
-			continue
-		}
-
 		if err := f.Sync(); err != nil {
 			return fmt.Errorf("failed to sync data file %d: %w", idx, err)
 		}
-		synced.Add(idx)
 	}
 
 	return nil
@@ -1191,6 +1187,18 @@ func (s *Database) allocateBlockSpace(totalSize uint32) (writeDataOffset uint64,
 			return actualWriteOffset, nil
 		}
 	}
+}
+
+func (s *Database) getDataFileForHeight(height BlockHeight) (*os.File, int, error) {
+	entry, err := s.readBlockIndex(height)
+	if err != nil {
+		return nil, 0, err
+	}
+	file, _, idx, err := s.getDataFileAndOffset(entry.Offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get data file for height %d: %w", height, err)
+	}
+	return file, idx, nil
 }
 
 func (s *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, int, error) {
