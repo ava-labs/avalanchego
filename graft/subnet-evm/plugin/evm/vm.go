@@ -261,7 +261,7 @@ type VM struct {
 	warpVerifier         *warp.Verifier
 	warpSignatureCache   cache.Cacher[ids.ID, []byte]
 	offchainWarpMessages [][]byte
-	warpAPI              *warp.Service
+	warpService          *warp.Service
 
 	// Initialize only sets these if nil so they can be overridden in tests
 	ethTxGossipHandler p2p.Handler
@@ -491,22 +491,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Create warp API. The signatureAggregator will be set later in CreateHandlers
-	// when the p2p network client becomes available.
-	vm.warpAPI, err = warp.NewService(
-		vm.ctx.NetworkID,
-		vm.ctx.ChainID,
-		vm.ctx.ValidatorState,
-		vm.warpMsgDB,
-		vm.ctx.WarpSigner,
-		vm.warpVerifier,
-		vm.warpSignatureCache,
-		nil, // signatureAggregator is set in CreateHandlers via SetSignatureAggregator
-		vm.offchainWarpMessages,
-	)
-	if err != nil {
-		return err
-	}
 	if err := vm.initializeChain(lastAcceptedHash, vm.ethConfig); err != nil {
 		return err
 	}
@@ -1226,10 +1210,23 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		warpSDKClient := vm.Network.NewClient(p2p.SignatureRequestHandlerID)
 		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)
 
-		// Set the signature aggregator on the existing warpAPI instance
-		vm.warpAPI.SetSignatureAggregator(signatureAggregator)
+		var err error
+		vm.warpService, err = warp.NewService(
+			vm.ctx.NetworkID,
+			vm.ctx.ChainID,
+			vm.ctx.ValidatorState,
+			vm.warpMsgDB,
+			vm.ctx.WarpSigner,
+			vm.warpVerifier,
+			vm.warpSignatureCache,
+			signatureAggregator,
+			vm.offchainWarpMessages,
+		)
+		if err != nil {
+			return nil, err
+		}
 
-		if err := handler.RegisterName("warp", vm.warpAPI); err != nil {
+		if err := handler.RegisterName("warp", vm.warpService); err != nil {
 			return nil, err
 		}
 		enabledAPIs = append(enabledAPIs, "warp")

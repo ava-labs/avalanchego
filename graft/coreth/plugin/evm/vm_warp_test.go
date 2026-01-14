@@ -140,9 +140,9 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 	require.NoError(err)
 
 	// Verify the signature cannot be fetched before the block is accepted
-	_, err = vm.warpAPI.GetMessageSignature(t.Context(), unsignedMessage.ID())
+	_, err = vm.warpService.GetMessageSignature(t.Context(), unsignedMessage.ID())
 	require.ErrorIs(err, warp.ErrMessageNotFound)
-	_, err = vm.warpAPI.GetBlockSignature(t.Context(), blk.ID())
+	_, err = vm.warpService.GetBlockSignature(t.Context(), blk.ID())
 	require.ErrorIs(err, warp.ErrBlockNotFound)
 
 	require.NoError(vm.SetPreference(t.Context(), blk.ID()))
@@ -150,7 +150,7 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 	vm.blockChain.DrainAcceptorQueue()
 
 	// Verify the message signature after accepting the block.
-	rawSignatureBytes, err := vm.warpAPI.GetMessageSignature(t.Context(), unsignedMessage.ID())
+	rawSignatureBytes, err := vm.warpService.GetMessageSignature(t.Context(), unsignedMessage.ID())
 	require.NoError(err)
 	blsSignature, err := bls.SignatureFromBytes(rawSignatureBytes)
 	require.NoError(err)
@@ -167,7 +167,7 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 	require.True(bls.Verify(vm.ctx.PublicKey, blsSignature, unsignedMessage.Bytes()))
 
 	// Verify the blockID will now be signed by the backend and produces a valid signature.
-	rawSignatureBytes, err = vm.warpAPI.GetBlockSignature(t.Context(), blk.ID())
+	rawSignatureBytes, err = vm.warpService.GetBlockSignature(t.Context(), blk.ID())
 	require.NoError(err)
 	blsSignature, err = bls.SignatureFromBytes(rawSignatureBytes)
 	require.NoError(err)
@@ -827,13 +827,13 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 
 	// Add the known message and get its signature to confirm
 	require.NoError(t, vm.warpMsgDB.Add(knownWarpMessage))
-	knownMessageSignature, err := vm.warpAPI.GetMessageSignature(t.Context(), knownWarpMessage.ID())
+	knownMessageSignature, err := vm.warpService.GetMessageSignature(t.Context(), knownWarpMessage.ID())
 	require.NoError(t, err)
 
 	// Setup known block
 	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(t, err)
-	knownBlockSignature, err := vm.warpAPI.GetBlockSignature(t.Context(), lastAcceptedID)
+	knownBlockSignature, err := vm.warpService.GetBlockSignature(t.Context(), lastAcceptedID)
 	require.NoError(t, err)
 
 	type testCase struct {
@@ -938,7 +938,7 @@ func TestClearWarpDB(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, vm.warpMsgDB.Add(unsignedMsg))
 		// ensure that the message was added
-		_, err = vm.warpAPI.GetMessageSignature(t.Context(), unsignedMsg.ID())
+		_, err = vm.warpService.GetMessageSignature(t.Context(), unsignedMsg.ID())
 		require.NoError(t, err)
 		messages = append(messages, unsignedMsg)
 	}
@@ -953,7 +953,7 @@ func TestClearWarpDB(t *testing.T) {
 
 	// check messages are still present
 	for _, message := range messages {
-		bytes, err := vm.warpAPI.GetMessageSignature(t.Context(), message.ID())
+		bytes, err := vm.warpService.GetMessageSignature(t.Context(), message.ID())
 		require.NoError(t, err)
 		require.NotEmpty(t, bytes)
 	}
@@ -972,7 +972,7 @@ func TestClearWarpDB(t *testing.T) {
 
 	// ensure all messages have been deleted
 	for _, message := range messages {
-		_, err := vm.warpAPI.GetMessageSignature(t.Context(), message.ID())
+		_, err := vm.warpService.GetMessageSignature(t.Context(), message.ID())
 		require.ErrorIs(t, err, warp.ErrMessageNotFound)
 	}
 }

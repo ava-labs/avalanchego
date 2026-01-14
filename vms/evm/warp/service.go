@@ -149,12 +149,6 @@ func (s *Service) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexuti
 	return s.signMessage(ctx, unsignedMessage)
 }
 
-// SetSignatureAggregator sets the signature aggregator for the service.
-// This must be called before any aggregate signature methods are used.
-func (s *Service) SetSignatureAggregator(signatureAggregator *acp118.SignatureAggregator) {
-	s.signatureAggregator = signatureAggregator
-}
-
 // GetMessageAggregateSignature fetches the aggregate signature for the requested messageID.
 func (s *Service) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetID ids.ID) (signedMessageBytes hexutil.Bytes, err error) {
 	unsignedMessage, err := s.getMessage(messageID)

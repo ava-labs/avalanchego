@@ -250,11 +250,10 @@ type VM struct {
 
 	// Avalanche Warp Messaging components
 	// Used to serve BLS signatures of warp messages over RPC
-	warpMsgDB            *warp.DB
-	warpVerifier         *warp.Verifier
-	warpSignatureCache   cache.Cacher[ids.ID, []byte]
-	offchainWarpMessages [][]byte
-	warpAPI              *warp.Service
+	warpMsgDB          *warp.DB
+	warpVerifier       *warp.Verifier
+	warpSignatureCache cache.Cacher[ids.ID, []byte]
+	warpService        *warp.Service
 
 	ethTxPushGossiper avalancheUtils.Atomic[*avalanchegossip.PushGossiper[*GossipEthTx]]
 
@@ -434,11 +433,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to create network: %w", err)
 	}
 
-	// Initialize warp backend
-	vm.offchainWarpMessages = make([][]byte, len(vm.config.WarpOffChainMessages))
-	for i, hexMsg := range vm.config.WarpOffChainMessages {
-		vm.offchainWarpMessages[i] = []byte(hexMsg)
-	}
 	warpSignatureCache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
 	meteredCache, err := metercacher.New("warp_signature_cache", vm.sdkMetrics, warpSignatureCache)
 	if err != nil {
@@ -460,22 +454,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Create warp API. The signatureAggregator will be set later in CreateHandlers
-	// when the p2p network client becomes available.
-	vm.warpAPI, err = warp.NewService(
-		vm.ctx.NetworkID,
-		vm.ctx.ChainID,
-		vm.ctx.ValidatorState,
-		vm.warpMsgDB,
-		vm.ctx.WarpSigner,
-		vm.warpVerifier,
-		vm.warpSignatureCache,
-		nil, // signatureAggregator is set in CreateHandlers via SetSignatureAggregator
-		vm.offchainWarpMessages,
-	)
-	if err != nil {
-		return err
-	}
 	if err := vm.initializeChain(lastAcceptedHash); err != nil {
 		return err
 	}
@@ -1100,9 +1078,28 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		warpSDKClient := vm.Network.NewClient(p2p.SignatureRequestHandlerID)
 		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)
 
-		vm.warpAPI.SetSignatureAggregator(signatureAggregator)
+		offchainWarpMessages := make([][]byte, len(vm.config.WarpOffChainMessages))
+		for i, hexMsg := range vm.config.WarpOffChainMessages {
+			offchainWarpMessages[i] = []byte(hexMsg)
+		}
 
-		if err := handler.RegisterName("warp", vm.warpAPI); err != nil {
+		var err error
+		vm.warpService, err = warp.NewService(
+			vm.ctx.NetworkID,
+			vm.ctx.ChainID,
+			vm.ctx.ValidatorState,
+			vm.warpMsgDB,
+			vm.ctx.WarpSigner,
+			vm.warpVerifier,
+			vm.warpSignatureCache,
+			signatureAggregator,
+			offchainWarpMessages,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := handler.RegisterName("warp", vm.warpService); err != nil {
 			return nil, err
 		}
 		enabledAPIs = append(enabledAPIs, "warp")
