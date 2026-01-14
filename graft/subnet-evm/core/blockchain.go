@@ -1015,7 +1015,7 @@ func (bc *BlockChain) stopWithoutSaving() {
 func (bc *BlockChain) Stop() {
 	bc.stopWithoutSaving()
 
-	// Ensure that the entirety of the state snapshot is journaled to disk.
+	// Stop snapshot generation and release resources
 	if bc.snaps != nil {
 		bc.snaps.Release()
 	}
