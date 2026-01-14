@@ -137,7 +137,6 @@ func TestVerifyMinDelayExcess(t *testing.T) {
 			header: &types.Header{
 				Time: 1001,
 			},
-			expectedErr: nil,
 		},
 		{
 			name:   "nil_min_delay_excess_error",
