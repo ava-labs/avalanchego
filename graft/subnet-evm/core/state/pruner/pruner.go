@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -39,7 +39,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -219,7 +219,7 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 
 	// Write marker to DB to indicate offline pruning finished successfully. We write before calling os.RemoveAll
 	// to guarantee that if the node dies midway through pruning, then this will run during RecoverPruning.
-	if err := customrawdb.WriteOfflinePruning(maindb); err != nil {
+	if err := customrawdb.WriteOfflinePruning(maindb, time.Now()); err != nil {
 		return fmt.Errorf("failed to write offline pruning success marker: %w", err)
 	}
 

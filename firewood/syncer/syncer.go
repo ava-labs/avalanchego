@@ -1,7 +1,7 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package firewood
+package syncer
 
 import (
 	"bytes"
@@ -26,7 +26,7 @@ var (
 	defaultSimultaneousWorkLimit = 8
 )
 
-// database wraps a Firewood FFI database to implement the xsync.DB interface.
+// database wraps a Firewood [ffi.Database] to implement the xsync.DB interface.
 type database struct {
 	db *ffi.Database
 }
@@ -38,7 +38,7 @@ type Config struct {
 	Registerer            prometheus.Registerer
 }
 
-func NewSyncer(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
+func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
 	if config.Registerer == nil {
 		config.Registerer = prometheus.NewRegistry()
 	}

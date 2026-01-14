@@ -2,6 +2,10 @@ name: Trigger Antithesis XSVM Setup
 
 on:
   schedule:
+    # When adjusting the schedule and duration of execution, make sure
+    # to check the schedule of other antithesis jobs (trigger-antithesis-*).
+    # The schedules for different test setups should not overlap to avoid 
+    # unintended resource contention.
     - cron: '0 6 * * *' # Every day at 6AM UTC
   workflow_dispatch:
     inputs:

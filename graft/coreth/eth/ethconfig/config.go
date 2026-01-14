@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -36,8 +36,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/eth/gasprice"
 	"github.com/ava-labs/avalanchego/graft/coreth/internal/ethapi"
 	"github.com/ava-labs/avalanchego/graft/coreth/miner"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/params"
 )
 
 // DefaultFullGPOConfig contains default gasprice oracle settings for full node.

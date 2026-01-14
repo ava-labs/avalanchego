@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -28,10 +28,12 @@
 package snapshot
 
 import (
+	"errors"
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
@@ -72,8 +74,12 @@ func TestWipe(t *testing.T) {
 	if items := count(); items != 128 {
 		t.Fatalf("snapshot size mismatch: have %d, want %d", items, 128)
 	}
-	if hash := customrawdb.ReadSnapshotBlockHash(db); hash == (common.Hash{}) {
-		t.Errorf("snapshot block hash marker mismatch: have %#x, want <not-nil>", hash)
+	blockHash, err := customrawdb.ReadSnapshotBlockHash(db)
+	switch {
+	case err != nil:
+		t.Fatalf("failed to read snapshot block hash before wipe: %v", err)
+	case blockHash == (common.Hash{}):
+		t.Fatalf("snapshot block hash is empty before wipe")
 	}
 	if hash := rawdb.ReadSnapshotRoot(db); hash == (common.Hash{}) {
 		t.Errorf("snapshot block root marker mismatch: have %#x, want <not-nil>", hash)
@@ -96,8 +102,14 @@ func TestWipe(t *testing.T) {
 		t.Fatalf("misc item count mismatch: have %d, want %d", items, 1000)
 	}
 
-	if hash := customrawdb.ReadSnapshotBlockHash(db); hash != (common.Hash{}) {
-		t.Errorf("snapshot block hash marker remained after wipe: %#x", hash)
+	// Verify snapshot markers are removed.
+	blockHash, err = customrawdb.ReadSnapshotBlockHash(db)
+	switch {
+	case errors.Is(err, database.ErrNotFound): // Expected: marker was deleted.
+	case err != nil:
+		t.Errorf("unexpected error reading snapshot block hash after wipe: %v", err)
+	case blockHash != (common.Hash{}):
+		t.Errorf("snapshot block hash marker remained after wipe: %#x", blockHash)
 	}
 	if hash := rawdb.ReadSnapshotRoot(db); hash != (common.Hash{}) {
 		t.Errorf("snapshot block root marker remained after wipe: %#x", hash)

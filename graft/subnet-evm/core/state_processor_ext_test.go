@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package core
@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -50,10 +50,10 @@ func TestBadTxAllowListBlock(t *testing.T) {
 			&extras.ChainConfig{
 				FeeConfig: params.DefaultFeeConfig,
 				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: utils.NewUint64(0),
+					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
 				},
 				GenesisPrecompiles: extras.Precompiles{
-					txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(0), nil, nil, nil),
+					txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), nil, nil, nil),
 				},
 			},
 		)

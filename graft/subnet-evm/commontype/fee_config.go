@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package commontype
@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 )
 
 var (
@@ -137,14 +137,14 @@ func (f *FeeConfig) Equal(other *FeeConfig) bool {
 		return false
 	}
 
-	return utils.BigNumEqual(f.GasLimit, other.GasLimit) &&
+	return utils.BigEqual(f.GasLimit, other.GasLimit) &&
 		f.TargetBlockRate == other.TargetBlockRate &&
-		utils.BigNumEqual(f.MinBaseFee, other.MinBaseFee) &&
-		utils.BigNumEqual(f.TargetGas, other.TargetGas) &&
-		utils.BigNumEqual(f.BaseFeeChangeDenominator, other.BaseFeeChangeDenominator) &&
-		utils.BigNumEqual(f.MinBlockGasCost, other.MinBlockGasCost) &&
-		utils.BigNumEqual(f.MaxBlockGasCost, other.MaxBlockGasCost) &&
-		utils.BigNumEqual(f.BlockGasCostStep, other.BlockGasCostStep)
+		utils.BigEqual(f.MinBaseFee, other.MinBaseFee) &&
+		utils.BigEqual(f.TargetGas, other.TargetGas) &&
+		utils.BigEqual(f.BaseFeeChangeDenominator, other.BaseFeeChangeDenominator) &&
+		utils.BigEqual(f.MinBlockGasCost, other.MinBlockGasCost) &&
+		utils.BigEqual(f.MaxBlockGasCost, other.MaxBlockGasCost) &&
+		utils.BigEqual(f.BlockGasCostStep, other.BlockGasCostStep)
 }
 
 // checkByteLens checks byte lengths against common.HashLen (32 bytes) and returns error

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -47,9 +47,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/internal/version"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/triedb/hashdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
@@ -230,13 +230,13 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 			log.Crit("Chain data directory must be specified for Firewood")
 		}
 
-		config.DBOverride = firewood.Config{
-			ChainDataDir:         c.ChainDataDir,
-			CleanCacheSize:       c.TrieCleanLimit * 1024 * 1024,
-			FreeListCacheEntries: firewood.Defaults.FreeListCacheEntries,
-			Revisions:            uint(c.StateHistory), // must be at least 2
-			ReadCacheStrategy:    ffi.CacheAllReads,
-			ArchiveMode:          !c.Pruning,
+		config.DBOverride = firewood.TrieDBConfig{
+			DatabaseDir:          c.ChainDataDir,
+			CacheSizeBytes:       uint(c.TrieCleanLimit * 1024 * 1024),
+			FreeListCacheEntries: 40_000,               // Firewood default
+			RevisionsInMemory:    uint(c.StateHistory), // must be at least 2
+			CacheStrategy:        ffi.CacheAllReads,
+			Archive:              !c.Pruning,
 		}.BackendConstructor
 	}
 	return config

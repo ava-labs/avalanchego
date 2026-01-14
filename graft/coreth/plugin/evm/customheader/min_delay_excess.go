@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package customheader
@@ -95,7 +95,7 @@ func minDelayExcess(
 	parent *types.Header,
 	desiredMinDelayExcess *acp226.DelayExcess,
 ) (acp226.DelayExcess, error) {
-	minDelayExcess := acp226.DelayExcess(acp226.InitialDelayExcess)
+	minDelayExcess := acp226.InitialDelayExcess
 	if config.IsGranite(parent.Time) {
 		// If the parent block was running with ACP-226, we start with the
 		// resulting min delay excess from the parent block.
