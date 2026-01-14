@@ -518,6 +518,18 @@ func (s *Database) hasWithoutLock(height BlockHeight) (bool, error) {
 	return true, nil
 }
 
+func (s *Database) getDataFileIndexForHeight(height BlockHeight) (int, error) {
+	entry, err := s.readBlockIndex(height)
+	if err != nil {
+		return 0, err
+	}
+	_, _, idx, err := s.getDataFileAndOffset(entry.Offset)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get data file index for height %d: %w", height, err)
+	}
+	return idx, nil
+}
+
 // Sync calls sync on all data files in the range [start, end],
 // assuming data are written in-order. If no data exists at start or end,
 // nothing is synced.
@@ -533,14 +545,14 @@ func (s *Database) Sync(start, end uint64) error {
 		return database.ErrClosed
 	}
 
-	_, firstIdx, err := s.getDataFileForHeight(start)
+	firstIdx, err := s.getDataFileIndexForHeight(start)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return nil
 		}
 		return err
 	}
-	_, lastIdx, err := s.getDataFileForHeight(end)
+	lastIdx, err := s.getDataFileIndexForHeight(end)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return nil
@@ -1187,18 +1199,6 @@ func (s *Database) allocateBlockSpace(totalSize uint32) (writeDataOffset uint64,
 			return actualWriteOffset, nil
 		}
 	}
-}
-
-func (s *Database) getDataFileForHeight(height BlockHeight) (*os.File, int, error) {
-	entry, err := s.readBlockIndex(height)
-	if err != nil {
-		return nil, 0, err
-	}
-	file, _, idx, err := s.getDataFileAndOffset(entry.Offset)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get data file for height %d: %w", height, err)
-	}
-	return file, idx, nil
 }
 
 func (s *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, int, error) {
