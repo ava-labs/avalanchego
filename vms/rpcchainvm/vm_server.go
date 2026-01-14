@@ -238,8 +238,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		// Signs warp messages
 		WarpSigner: warpSignerClient,
 
-		// The validator state is cached to avoid the gRPC overhead after
-		// epoching is activated.
+		// The validator state is cached to avoid the gRPC overhead.
 		ValidatorState: validators.NewCachedState(validatorStateClient),
 		// TODO: support remaining snowman++ fields
 
