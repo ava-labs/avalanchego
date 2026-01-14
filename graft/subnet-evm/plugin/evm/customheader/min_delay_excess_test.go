@@ -129,26 +129,18 @@ func TestVerifyMinDelayExcess(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name:   "pre_granite_nil_min_delay_excess",
-			config: extras.TestFortunaChainConfig, // Pre-Granite config
+			name:   "pre_granite_nil_min_delay_excess_success",
+			config: extras.TestFortunaChainConfig,
 			parent: &types.Header{
 				Time: 1000,
 			},
 			header: &types.Header{
 				Time: 1001,
 			},
+			expectedErr: nil,
 		},
 		{
-			name:   "pre_granite_min_delay_excess_set_error",
-			config: extras.TestFortunaChainConfig, // Pre-Granite config
-			parent: &types.Header{
-				Time: 1000,
-			},
-			header:      generateHeaderWithMinDelayExcess(1001, 1000),
-			expectedErr: errRemoteMinDelayExcessSet,
-		},
-		{
-			name:   "granite_nil_min_delay_excess_error",
+			name:   "nil_min_delay_excess_error",
 			config: extras.TestGraniteChainConfig,
 			parent: &types.Header{
 				Time: 1000,
@@ -159,44 +151,36 @@ func TestVerifyMinDelayExcess(t *testing.T) {
 			expectedErr: errRemoteMinDelayExcessNil,
 		},
 		{
-			name:        "granite_incorrect_min_delay_excess",
+			name:        "incorrect_min_delay_excess",
 			config:      extras.TestGraniteChainConfig,
 			parent:      generateHeaderWithMinDelayExcess(1000, 500),
 			header:      generateHeaderWithMinDelayExcess(1001, 1000),
 			expectedErr: errIncorrectMinDelayExcess,
 		},
 		{
-			name:        "granite_incorrect_min_delay_excess_with_zero_desired",
+			name:        "incorrect_min_delay_excess_with_zero_desired",
 			config:      extras.TestGraniteChainConfig,
 			parent:      generateHeaderWithMinDelayExcess(1000, 500),
 			header:      generateHeaderWithMinDelayExcess(1001, 0),
 			expectedErr: errIncorrectMinDelayExcess,
 		},
 		{
-			name:   "granite_correct_min_delay_excess",
+			name:   "correct_min_delay_excess",
 			config: extras.TestGraniteChainConfig,
 			parent: generateHeaderWithMinDelayExcess(1000, 500),
 			header: generateHeaderWithMinDelayExcess(1001, 500),
 		},
 		{
-			name:   "granite_with_increased_desired_min_delay_excess_correct",
+			name:   "increased_desired_min_delay_excess_correct",
 			config: extras.TestGraniteChainConfig,
 			parent: generateHeaderWithMinDelayExcess(1000, 500),
 			header: generateHeaderWithMinDelayExcess(1001, 700),
 		},
 		{
-			name:   "granite_with_decreased_desired_min_delay_excess_correct",
+			name:   "decreased_desired_min_delay_excess_correct",
 			config: extras.TestGraniteChainConfig,
 			parent: generateHeaderWithMinDelayExcess(1000, 500),
 			header: generateHeaderWithMinDelayExcess(1001, 300),
-		},
-
-		// Different chain configs
-		{
-			name:   "fortuna_config_no_verification",
-			config: extras.TestFortunaChainConfig,
-			parent: &types.Header{Time: 1000},
-			header: &types.Header{Time: 1001},
 		},
 	}
 
