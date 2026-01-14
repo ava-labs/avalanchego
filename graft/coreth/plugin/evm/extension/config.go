@@ -7,8 +7,13 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ava-labs/avalanchego/graft/evm/message"
+	synccore "github.com/ava-labs/avalanchego/graft/evm/sync/core"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+	evmtypes "github.com/ava-labs/libevm/core/types"
+
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -18,16 +23,12 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
-	synccommon "github.com/ava-labs/avalanchego/graft/coreth/sync"
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -67,7 +68,7 @@ type ExtensibleVM interface {
 	// VersionDB returns the versioned database for the VM
 	VersionDB() *versiondb.Database
 	// SyncerClient returns the syncer client for the VM
-	SyncerClient() vmsync.Client
+	SyncerClient() synccore.Client
 }
 
 // InnerVM is the interface that must be implemented by the VM
@@ -83,7 +84,7 @@ type InnerVM interface {
 // ExtendedBlock is a block that can be used by the extension
 type ExtendedBlock interface {
 	snowman.Block
-	GetEthBlock() *types.Block
+	GetEthBlock() *evmtypes.Block
 	GetBlockExtension() BlockExtension
 }
 
@@ -140,10 +141,10 @@ type Config struct {
 	// SyncSummaryProvider is the sync summary provider to use
 	// for the VM to be used in syncer.
 	// It's required and should be non-nil
-	SyncSummaryProvider synccommon.SummaryProvider
+	SyncSummaryProvider types.SummaryProvider
 	// SyncExtender can extend the syncer to handle custom sync logic.
 	// It's optional and can be nil
-	SyncExtender synccommon.Extender
+	SyncExtender synccore.Extender
 	// SyncableParser is to parse summary messages from the network.
 	// It's required and should be non-nil
 	SyncableParser message.SyncableParser

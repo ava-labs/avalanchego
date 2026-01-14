@@ -9,17 +9,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/syncclient"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	atomicstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
-	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
 const (
@@ -31,9 +31,9 @@ const (
 )
 
 var (
-	_ sync.Syncer             = (*Syncer)(nil)
+	_ types.Syncer            = (*Syncer)(nil)
 	_ syncclient.LeafSyncTask = (*syncerLeafTask)(nil)
-	_ sync.Finalizer          = (*Syncer)(nil)
+	_ types.Finalizer         = (*Syncer)(nil)
 
 	errTargetHeightRequired = errors.New("target height must be > 0")
 )
