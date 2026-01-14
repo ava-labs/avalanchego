@@ -53,7 +53,7 @@ func NewTmpnetSubnet(name string, genesis []byte, chainConfig map[string]any, no
 		Name: name,
 		Chains: []*tmpnet.Chain{
 			{
-				VMID:         constants.EVMID,
+				VMID:         constants.SubnetEVMID,
 				Genesis:      genesis,
 				Config:       string(chainConfigBytes),
 				PreFundedKey: tmpnet.HardhatKey,
