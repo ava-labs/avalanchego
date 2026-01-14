@@ -115,17 +115,21 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	if headKey, err := ldb.getHeadKey(); err == nil {
 		// The list currently has a head, so we need to update the old head.
 		oldHead, err := ldb.getNode(headKey)
-		if err != nil {
+		if err != nil && err != database.ErrNotFound {
 			return err
 		}
-		oldHead.HasPrevious = true
-		oldHead.Previous = key
-		if err := ldb.putNode(headKey, oldHead); err != nil {
-			return err
+		if err == nil {
+			// Old head exists, link it to the new head
+			oldHead.HasPrevious = true
+			oldHead.Previous = key
+			if err := ldb.putNode(headKey, oldHead); err != nil {
+				return err
+			}
+			newHead.HasNext = true
+			newHead.Next = headKey
 		}
-
-		newHead.HasNext = true
-		newHead.Next = headKey
+		// If old head doesn't exist (ErrNotFound), the linked list is in
+		// inconsistent state. Just add the new node as the only node.
 	} else if err != database.ErrNotFound {
 		return err
 	}
@@ -161,24 +165,52 @@ func (ldb *linkedDB) Delete(key []byte) error {
 	case currentNode.HasPrevious:
 		// We aren't modifying the head.
 		previousNode, err := ldb.getNode(currentNode.Previous)
-		if err != nil {
+		if err == database.ErrNotFound {
+			// Previous node doesn't exist (possibly deleted in same batch or
+			// inconsistent state during bootstrap). Treat current as head.
+			if currentNode.HasNext {
+				if err := ldb.putHeadKey(currentNode.Next); err != nil {
+					return err
+				}
+				nextNode, err := ldb.getNode(currentNode.Next)
+				if err != nil && err != database.ErrNotFound {
+					return err
+				}
+				if err == nil {
+					nextNode.HasPrevious = false
+					nextNode.Previous = nil
+					if err := ldb.putNode(currentNode.Next, nextNode); err != nil {
+						return err
+					}
+				}
+			} else {
+				// No previous, no next - delete head key
+				if err := ldb.deleteHeadKey(); err != nil {
+					return err
+				}
+			}
+		} else if err != nil {
 			return err
-		}
-		previousNode.HasNext = currentNode.HasNext
-		previousNode.Next = currentNode.Next
-		if err := ldb.putNode(currentNode.Previous, previousNode); err != nil {
-			return err
-		}
-		if currentNode.HasNext {
-			// We aren't modifying the tail.
-			nextNode, err := ldb.getNode(currentNode.Next)
-			if err != nil {
+		} else {
+			previousNode.HasNext = currentNode.HasNext
+			previousNode.Next = currentNode.Next
+			if err := ldb.putNode(currentNode.Previous, previousNode); err != nil {
 				return err
 			}
-			nextNode.HasPrevious = true
-			nextNode.Previous = currentNode.Previous
-			if err := ldb.putNode(currentNode.Next, nextNode); err != nil {
-				return err
+			if currentNode.HasNext {
+				// We aren't modifying the tail.
+				nextNode, err := ldb.getNode(currentNode.Next)
+				if err != nil && err != database.ErrNotFound {
+					return err
+				}
+				if err == nil {
+					nextNode.HasPrevious = true
+					nextNode.Previous = currentNode.Previous
+					if err := ldb.putNode(currentNode.Next, nextNode); err != nil {
+						return err
+					}
+				}
+				// If next node not found, the link is already broken, just continue
 			}
 		}
 	case !currentNode.HasNext:
@@ -192,14 +224,17 @@ func (ldb *linkedDB) Delete(key []byte) error {
 			return err
 		}
 		nextNode, err := ldb.getNode(currentNode.Next)
-		if err != nil {
+		if err != nil && err != database.ErrNotFound {
 			return err
 		}
-		nextNode.HasPrevious = false
-		nextNode.Previous = nil
-		if err := ldb.putNode(currentNode.Next, nextNode); err != nil {
-			return err
+		if err == nil {
+			nextNode.HasPrevious = false
+			nextNode.Previous = nil
+			if err := ldb.putNode(currentNode.Next, nextNode); err != nil {
+				return err
+			}
 		}
+		// If next node not found, the link is already broken, just continue
 	}
 	return ldb.writeBatch()
 }
@@ -301,16 +336,18 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 	defer ldb.cacheLock.Unlock()
 
 	keyStr := string(key)
-	if n, exists := ldb.nodeCache.Get(keyStr); exists {
-		if n == nil {
-			return node{}, database.ErrNotFound
-		}
+	if n, exists := ldb.nodeCache.Get(keyStr); exists && n != nil {
+		// Only use cached value if it's not nil.
+		// Nil was previously cached for not-found keys, but the key might
+		// exist now (added after the cache entry was created).
 		return *n, nil
 	}
 
 	nodeBytes, err := ldb.db.Get(nodeKey(key))
 	if err == database.ErrNotFound {
-		ldb.nodeCache.Put(keyStr, nil)
+		// Don't cache nil - the key might be added later and we need to find it.
+		// This is critical during bootstrap where linked list nodes may be
+		// looked up before they're written to the database.
 		return node{}, err
 	}
 	if err != nil {

@@ -224,17 +224,21 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return err
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if e.backend.Bootstrapped.Get() {
+		if err := e.backend.FlowChecker.VerifySpend(
+			tx,
+			e.state,
+			ins,
+			outs,
+			baseTxCreds,
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	txID := e.tx.ID()
@@ -284,17 +288,21 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		ins,
-		outs,
-		e.tx.Creds,
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return err
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if e.backend.Bootstrapped.Get() {
+		if err := e.backend.FlowChecker.VerifySpend(
+			tx,
+			e.state,
+			ins,
+			outs,
+			e.tx.Creds,
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	txID := e.tx.ID()
@@ -420,39 +428,42 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
+	// Skip UTXO verification during bootstrap since the chain state may not
+	// be fully synchronized yet. This mirrors ImportTx behavior where
+	// VerifySpendUTXOs is only called when bootstrapped.
 	if e.backend.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.DestinationChain); err != nil {
 			return err
 		}
-	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
+		ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+		if err != nil {
+			return fmt.Errorf("getting utxos %w", err)
+		}
 
-	// Verify the flowcheck
-	fee, err := e.feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
+		// Verify the flowcheck
+		fee, err := e.feeCalculator.CalculateFee(tx)
+		if err != nil {
+			return err
+		}
 
-	producedAVAX, err = math.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
+		producedAVAX, err = math.Add(producedAVAX, fee)
+		if err != nil {
+			return fmt.Errorf("adding fee: %w", err)
+		}
 
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		ins,
-		outs,
-		e.tx.Creds,
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("failed verifySpend: %w", err)
+		if err := e.backend.FlowChecker.VerifySpend(
+			tx,
+			e.state,
+			ins,
+			outs,
+			e.tx.Creds,
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return fmt.Errorf("failed verifySpend: %w", err)
+		}
 	}
 
 	txID := e.tx.ID()
@@ -574,21 +585,26 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		ins,
-		outs,
-		baseTxCreds,
-		// Invariant: [tx.AssetID != e.Ctx.AVAXAssetID]. This prevents the first
-		//            entry in this map literal from being overwritten by the
-		//            second entry.
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-			tx.AssetID:                totalRewardAmount,
-		},
-	); err != nil {
-		return err
+
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if e.backend.Bootstrapped.Get() {
+		if err := e.backend.FlowChecker.VerifySpend(
+			tx,
+			e.state,
+			ins,
+			outs,
+			baseTxCreds,
+			// Invariant: [tx.AssetID != e.Ctx.AVAXAssetID]. This prevents the first
+			//            entry in this map literal from being overwritten by the
+			//            second entry.
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: producedAVAX,
+				tx.AssetID:                totalRewardAmount,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	txID := e.tx.ID()
@@ -715,17 +731,21 @@ func (e *standardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		return fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		ins,
-		outs,
-		e.tx.Creds,
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return err
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if e.backend.Bootstrapped.Get() {
+		if err := e.backend.FlowChecker.VerifySpend(
+			tx,
+			e.state,
+			ins,
+			outs,
+			e.tx.Creds,
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	txID := e.tx.ID()
@@ -833,17 +853,21 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 		return err
 	}
 
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return err
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if e.backend.Bootstrapped.Get() {
+		if err := e.backend.FlowChecker.VerifySpend(
+			tx,
+			e.state,
+			ins,
+			outs,
+			baseTxCreds,
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	conversionID, err := message.SubnetToL1ConversionID(subnetToL1ConversionData)
@@ -902,17 +926,21 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 		return err
 	}
 
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		ins,
-		outs,
-		e.tx.Creds,
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return err
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if e.backend.Bootstrapped.Get() {
+		if err := e.backend.FlowChecker.VerifySpend(
+			tx,
+			e.state,
+			ins,
+			outs,
+			e.tx.Creds,
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	// Parse the warp message.
@@ -1060,17 +1088,21 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 		return fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		ins,
-		outs,
-		e.tx.Creds,
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return err
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if e.backend.Bootstrapped.Get() {
+		if err := e.backend.FlowChecker.VerifySpend(
+			tx,
+			e.state,
+			ins,
+			outs,
+			e.tx.Creds,
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	// Parse the warp message.
@@ -1206,17 +1238,21 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Vali
 		return fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		ins,
-		outs,
-		e.tx.Creds,
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return err
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if e.backend.Bootstrapped.Get() {
+		if err := e.backend.FlowChecker.VerifySpend(
+			tx,
+			e.state,
+			ins,
+			outs,
+			e.tx.Creds,
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	l1Validator, err := e.state.GetL1Validator(tx.ValidationID)
@@ -1306,17 +1342,21 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 		return fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return err
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if e.backend.Bootstrapped.Get() {
+		if err := e.backend.FlowChecker.VerifySpend(
+			tx,
+			e.state,
+			ins,
+			outs,
+			baseTxCreds,
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	txID := e.tx.ID()

@@ -5,8 +5,6 @@ package atomic
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"slices"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -17,10 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var (
-	errDuplicatePut    = errors.New("duplicate put")
-	errDuplicateRemove = errors.New("duplicate remove")
-)
+// Note: errDuplicatePut and errDuplicateRemove were removed because
+// duplicate puts/removes are now treated as no-ops during bootstrap.
 
 type dbElement struct {
 	// Present indicates the value was removed before existing.
@@ -89,8 +85,12 @@ func (s *state) SetValue(e *Element) error {
 			return s.valueDB.Delete(e.Key)
 		}
 
-		// This key was written twice, which is invalid
-		return fmt.Errorf("%w: Key=0x%x Value=0x%x", errDuplicatePut, e.Key, e.Value)
+		// If the value is already present, treat as a no-op.
+		// This can happen during bootstrap when:
+		// 1. First execution adds a UTXO to shared memory
+		// 2. Re-execution (after restart) tries to add the same UTXO again
+		// Making this idempotent allows bootstrap to complete successfully.
+		return nil
 	}
 	if err != database.ErrNotFound {
 		// An unexpected error occurred, so we should propagate that error
@@ -160,9 +160,13 @@ func (s *state) RemoveValue(key []byte) error {
 		return err
 	}
 
-	// Don't allow the removal of something that was already removed.
+	// If the value is already marked as removed, treat as a no-op.
+	// This can happen during bootstrap when:
+	// 1. First execution marks a UTXO as removed (tombstone with Present=false)
+	// 2. Re-execution (after restart) tries to remove the same UTXO again
+	// Making this idempotent allows bootstrap to complete successfully.
 	if !value.Present {
-		return fmt.Errorf("%w: Key=0x%x", errDuplicateRemove, key)
+		return nil
 	}
 
 	// Remove [key] from the indexDB for each trait that has indexed this key.

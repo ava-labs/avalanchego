@@ -1168,16 +1168,18 @@ func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 		return tx, nil
 	}
 
-	if tx, cached := s.transformedSubnetCache.Get(subnetID); cached {
-		if tx == nil {
-			return nil, database.ErrNotFound
-		}
+	if tx, cached := s.transformedSubnetCache.Get(subnetID); cached && tx != nil {
+		// Only use cached value if it's not nil.
+		// Nil was previously cached for not-found keys, but the key might
+		// exist now (added after the cache entry was created during bootstrap).
 		return tx, nil
 	}
 
 	transformSubnetTxID, err := database.GetID(s.transformedSubnetDB, subnetID[:])
 	if err == database.ErrNotFound {
-		s.transformedSubnetCache.Put(subnetID, nil)
+		// Don't cache nil - the subnet might be transformed later and we need to find it.
+		// This is critical during bootstrap where state may be looked up before
+		// it's written to the database.
 		return nil, database.ErrNotFound
 	}
 	if err != nil {
@@ -1250,15 +1252,22 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
 	}
-	if tx, cached := s.txCache.Get(txID); cached {
-		if tx == nil {
-			return nil, status.Unknown, database.ErrNotFound
-		}
+	if tx, cached := s.txCache.Get(txID); cached && tx != nil {
+		// Only use cached value if it's not nil.
+		// Nil was previously cached for not-found keys, but the key might
+		// exist now (added after the cache entry was created during bootstrap).
 		return tx.tx, tx.status, nil
 	}
 	txBytes, err := s.txDB.Get(txID[:])
 	if err == database.ErrNotFound {
-		s.txCache.Put(txID, nil)
+		// Don't cache nil - the transaction might be added later and we need to find it.
+		// This is critical during bootstrap where transactions may be looked up before
+		// they're written to the database (e.g., when processing RewardValidatorTx).
+		s.ctx.Log.Warn("GetTx: transaction not found in database",
+			zap.Stringer("txID", txID),
+			zap.Int("addedTxsSize", len(s.addedTxs)),
+			zap.Stringer("lastAccepted", s.lastAccepted),
+		)
 		return nil, status.Unknown, database.ErrNotFound
 	} else if err != nil {
 		return nil, status.Unknown, err
@@ -1284,9 +1293,20 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 }
 
 func (s *state) AddTx(tx *txs.Tx, status status.Status) {
-	s.addedTxs[tx.ID()] = &txAndStatus{
+	txID := tx.ID()
+	s.addedTxs[txID] = &txAndStatus{
 		tx:     tx,
 		status: status,
+	}
+
+	// Log when the specific failing validator tx is added
+	if txID.String() == "P7C7WA4SdnEtcrULQrpJvfxGjQpBTKHkbhWXtf9aJLY7WeDZ5" {
+		s.ctx.Log.Info("AddTx: adding target transaction P7C7WA4...",
+			zap.Stringer("txID", txID),
+			zap.Stringer("status", status),
+			zap.Stringer("lastAccepted", s.lastAccepted),
+			zap.Int("addedTxsCount", len(s.addedTxs)),
+		)
 	}
 }
 
@@ -1738,6 +1758,12 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			return err
 		}
 		s.AddTx(vdrTx, status.Committed)
+		s.ctx.Log.Info("syncGenesis: added genesis validator",
+			zap.Stringer("txID", vdrTx.ID()),
+			zap.Stringer("nodeID", staker.NodeID),
+			zap.Time("startTime", staker.StartTime),
+			zap.Time("endTime", staker.EndTime),
+		)
 		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
 	}
 
@@ -2315,6 +2341,8 @@ func (s *state) sync(genesis []byte) error {
 				err,
 			)
 		}
+	} else {
+		s.ctx.Log.Info("database already initialized, skipping genesis init")
 	}
 
 	if err := s.load(); err != nil {
@@ -2327,6 +2355,7 @@ func (s *state) sync(genesis []byte) error {
 }
 
 func (s *state) init(genesisBytes []byte) error {
+	s.ctx.Log.Info("init: initializing genesis state from scratch")
 	// Create the genesis block and save it as being accepted (We don't do
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
@@ -2340,6 +2369,10 @@ func (s *state) init(genesisBytes []byte) error {
 	if err != nil {
 		return err
 	}
+	s.ctx.Log.Info("init: parsed genesis",
+		zap.Stringer("genesisBlockID", genesisBlock.ID()),
+		zap.Int("validatorCount", len(genesis.Validators)),
+	)
 	if err := s.syncGenesis(genesisBlock, genesis); err != nil {
 		return err
 	}
@@ -2348,7 +2381,14 @@ func (s *state) init(genesisBytes []byte) error {
 		return err
 	}
 
-	return s.Commit()
+	s.ctx.Log.Info("init: committing genesis state to database",
+		zap.Int("addedTxs", len(s.addedTxs)),
+	)
+	if err := s.Commit(); err != nil {
+		return err
+	}
+	s.ctx.Log.Info("init: genesis state committed successfully")
+	return nil
 }
 
 func (s *state) AddStatelessBlock(block block.Block) {
@@ -2410,10 +2450,11 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		// Note: Evict is used rather than Put here because blk may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.blockCache.Evict(blkID)
+		// Keep block in cache after writing to database.
+		// This is critical during bootstrap where the next block's Verify()
+		// needs to find the parent block. The cache sizing may be imperfect
+		// due to shared byte slices, but correctness takes priority.
+		s.blockCache.Put(blkID, blk)
 		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
@@ -2425,17 +2466,18 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 	if blk, exists := s.addedBlocks[blockID]; exists {
 		return blk, nil
 	}
-	if blk, cached := s.blockCache.Get(blockID); cached {
-		if blk == nil {
-			return nil, database.ErrNotFound
-		}
-
+	if blk, cached := s.blockCache.Get(blockID); cached && blk != nil {
+		// Only use cached value if it's not nil.
+		// Nil was previously cached for not-found keys, but the key might
+		// exist now (added after the cache entry was created during bootstrap).
 		return blk, nil
 	}
 
 	blkBytes, err := s.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
-		s.blockCache.Put(blockID, nil)
+		// Don't cache nil - the block might be added later and we need to find it.
+		// This is critical during bootstrap where blocks may be looked up before
+		// they're written to the database.
 		return nil, database.ErrNotFound
 	}
 	if err != nil {
@@ -3036,6 +3078,11 @@ func (s *state) writeL1Validators() error {
 }
 
 func (s *state) writeTXs() error {
+	if len(s.addedTxs) > 0 {
+		s.ctx.Log.Info("writeTXs: writing transactions",
+			zap.Int("count", len(s.addedTxs)),
+		)
+	}
 	for txID, txStatus := range s.addedTxs {
 		stx := txBytesAndStatus{
 			Tx:     txStatus.tx.Bytes(),
@@ -3050,13 +3097,25 @@ func (s *state) writeTXs() error {
 		}
 
 		delete(s.addedTxs, txID)
-		// Note: Evict is used rather than Put here because stx may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.txCache.Evict(txID)
+		// Keep tx in cache after writing to database.
+		// This is critical during bootstrap where the next block's Verify()
+		// needs to find staker transactions. The cache sizing may be imperfect
+		// due to shared byte slices, but correctness takes priority.
+		s.txCache.Put(txID, txStatus)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
+		// Log when the specific failing validator tx is written
+		if txID.String() == "P7C7WA4SdnEtcrULQrpJvfxGjQpBTKHkbhWXtf9aJLY7WeDZ5" {
+			s.ctx.Log.Info("writeTXs: writing target transaction P7C7WA4... to database",
+				zap.Stringer("txID", txID),
+				zap.Stringer("status", txStatus.status),
+			)
+		}
+		s.ctx.Log.Debug("writeTXs: wrote transaction",
+			zap.Stringer("txID", txID),
+			zap.Stringer("status", txStatus.status),
+		)
 	}
 	return nil
 }
@@ -3153,10 +3212,11 @@ func (s *state) writeTransformedSubnets() error {
 		txID := tx.ID()
 
 		delete(s.transformedSubnets, subnetID)
-		// Note: Evict is used rather than Put here because tx may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.transformedSubnetCache.Evict(subnetID)
+		// Keep subnet in cache after writing to database.
+		// This is critical during bootstrap where subsequent operations
+		// may need to find transformed subnets. The cache sizing may be imperfect
+		// due to shared byte slices, but correctness takes priority.
+		s.transformedSubnetCache.Put(subnetID, tx)
 		if err := database.PutID(s.transformedSubnetDB, subnetID[:], txID); err != nil {
 			return fmt.Errorf("failed to write transformed subnet: %w", err)
 		}

@@ -371,7 +371,13 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	stakerTx, _, err := e.onCommitState.GetTx(stakerToReward.TxID)
 	if err != nil {
-		return fmt.Errorf("failed to get next removed staker tx: %w", err)
+		return fmt.Errorf("failed to get next removed staker tx %s (nodeID=%s, subnetID=%s, endTime=%s): %w",
+			stakerToReward.TxID,
+			stakerToReward.NodeID,
+			stakerToReward.SubnetID,
+			stakerToReward.EndTime,
+			err,
+		)
 	}
 
 	// Invariant: A [txs.DelegatorTx] does not also implement the

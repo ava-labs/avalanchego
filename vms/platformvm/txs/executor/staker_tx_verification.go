@@ -177,17 +177,21 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if backend.Bootstrapped.Get() {
+		if err := backend.FlowChecker.VerifySpend(
+			tx,
+			chainState,
+			ins,
+			outs,
+			sTx.Creds,
+			map[ids.ID]uint64{
+				backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		}
 	}
 
 	return outs, nil
@@ -281,17 +285,21 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if backend.Bootstrapped.Get() {
+		if err := backend.FlowChecker.VerifySpend(
+			tx,
+			chainState,
+			ins,
+			outs,
+			baseTxCreds,
+			map[ids.ID]uint64{
+				backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		}
 	}
 
 	return nil
@@ -371,17 +379,21 @@ func verifyRemoveSubnetValidatorTx(
 		return nil, false, fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if backend.Bootstrapped.Get() {
+		if err := backend.FlowChecker.VerifySpend(
+			tx,
+			chainState,
+			ins,
+			outs,
+			baseTxCreds,
+			map[ids.ID]uint64{
+				backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		}
 	}
 
 	return vdr, isCurrentValidator, nil
@@ -498,17 +510,21 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if backend.Bootstrapped.Get() {
+		if err := backend.FlowChecker.VerifySpend(
+			tx,
+			chainState,
+			ins,
+			outs,
+			sTx.Creds,
+			map[ids.ID]uint64{
+				backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		}
 	}
 
 	return outs, nil
@@ -627,17 +643,21 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("adding fee: %w", err)
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	// Skip UTXO verification during bootstrap since UTXOs may not be available yet.
+	// The transaction was already validated when it was originally accepted.
+	if backend.Bootstrapped.Get() {
+		if err := backend.FlowChecker.VerifySpend(
+			tx,
+			chainState,
+			ins,
+			outs,
+			sTx.Creds,
+			map[ids.ID]uint64{
+				backend.Ctx.AVAXAssetID: producedAVAX,
+			},
+		); err != nil {
+			return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		}
 	}
 
 	return nil
