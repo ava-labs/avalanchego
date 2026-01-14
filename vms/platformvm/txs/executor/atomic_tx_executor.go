@@ -132,11 +132,11 @@ func (*atomicTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (e *atomicTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+func (e *atomicTxExecutor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (e *atomicTxExecutor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+func (e *atomicTxExecutor) SetAutoRestakeConfigTx(*txs.SetAutoRestakeConfigTx) error {
 	return ErrWrongTxType
 }
 

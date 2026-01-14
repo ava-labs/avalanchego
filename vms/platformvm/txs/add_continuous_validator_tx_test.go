@@ -106,6 +106,31 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 		},
 		{
 			name: "missing period",
+			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
+				return &AddContinuousValidatorTx{
+					BaseTx:          validBaseTx,
+					ValidatorNodeID: ids.GenerateTestNodeID(),
+					StakeOuts: []*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{
+								ID: ids.GenerateTestID(),
+							},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 1,
+							},
+						},
+					},
+					DelegationShares: reward.PercentDenominator,
+					ConfigOwner:      configOwner,
+				}
+			},
+			err: errMissingPeriod,
+		},
+		{
+			name: "missing config owner",
 			txFunc: func(*gomock.Controller) *AddContinuousValidatorTx {
 				return &AddContinuousValidatorTx{
 					BaseTx:          validBaseTx,
@@ -121,9 +146,10 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 						},
 					},
 					DelegationShares: reward.PercentDenominator,
+					Period:           1,
 				}
 			},
-			err: errMissingPeriod,
+			err: errMissingConfigOwner,
 		},
 		{
 			name: "too many shares",
@@ -145,11 +171,14 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares: reward.PercentDenominator + 1,
 				}
 			},
-			err: errTooManyShares,
+			err: errTooManyDelegationShares,
 		},
 		{
 			name: "invalid BaseTx",
-			txFunc: func(*gomock.Controller) *AddContinuousValidatorTx {
+			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
 				return &AddContinuousValidatorTx{
 					BaseTx:          invalidBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -165,6 +194,7 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 						},
 					},
 					DelegationShares: reward.PercentDenominator,
+					ConfigOwner:      configOwner,
 				}
 			},
 			err: avax.ErrWrongNetworkID,
@@ -177,6 +207,9 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 
 				rewardsOwner := fxmock.NewOwner(ctrl)
 				rewardsOwner.EXPECT().Verify().Return(nil).MaxTimes(1)
+
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
 
 				return &AddContinuousValidatorTx{
 					BaseTx:          validBaseTx,
@@ -196,6 +229,7 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					},
 					ValidatorRewardsOwner: invalidRewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
+					ConfigOwner:           configOwner,
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
@@ -209,6 +243,9 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 
 				rewardsOwner := fxmock.NewOwner(ctrl)
 				rewardsOwner.EXPECT().Verify().Return(nil)
+
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
 
 				return &AddContinuousValidatorTx{
 					BaseTx:          validBaseTx,
@@ -228,6 +265,7 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					},
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: invalidRewardsOwner,
+					ConfigOwner:           configOwner,
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
@@ -238,6 +276,9 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
 				rewardsOwner := fxmock.NewOwner(ctrl)
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
 				return &AddContinuousValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -256,6 +297,7 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					},
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
+					ConfigOwner:           configOwner,
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
@@ -267,8 +309,12 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 				rewardsOwner := fxmock.NewOwner(ctrl)
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
 
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
 				stakeOut := avaxmock.NewTransferableOut(ctrl)
 				stakeOut.EXPECT().Verify().Return(dummyErr)
+
 				return &AddContinuousValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -285,6 +331,7 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					},
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
+					ConfigOwner:           configOwner,
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
@@ -295,6 +342,10 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
 				rewardsOwner := fxmock.NewOwner(ctrl)
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
 				assetID := ids.GenerateTestID()
 				return &AddContinuousValidatorTx{
 					BaseTx:          validBaseTx,
@@ -322,6 +373,7 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					},
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
+					ConfigOwner:           configOwner,
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
@@ -332,6 +384,10 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
 				rewardsOwner := fxmock.NewOwner(ctrl)
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
 				return &AddContinuousValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -358,6 +414,7 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					},
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
+					ConfigOwner:           configOwner,
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
@@ -368,7 +425,12 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
 				rewardsOwner := fxmock.NewOwner(ctrl)
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
 				assetID := ids.GenerateTestID()
+
 				return &AddContinuousValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -395,6 +457,7 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					},
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
+					ConfigOwner:           configOwner,
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
@@ -405,6 +468,10 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
 				rewardsOwner := fxmock.NewOwner(ctrl)
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
 				assetID := ids.GenerateTestID()
 				return &AddContinuousValidatorTx{
 					BaseTx:          validBaseTx,
@@ -432,6 +499,7 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					},
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
+					ConfigOwner:           configOwner,
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
@@ -442,7 +510,12 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
 				rewardsOwner := fxmock.NewOwner(ctrl)
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
+				configOwner := fxmock.NewOwner(ctrl)
+				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
+
 				assetID := ids.GenerateTestID()
+
 				return &AddContinuousValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -468,8 +541,9 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 						},
 					},
 					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					DelegationShares:      reward.PercentDenominator,
+					//DelegatorRewardsOwner: rewardsOwner,
+					DelegationShares: reward.PercentDenominator,
+					ConfigOwner:      configOwner,
 				}
 			},
 			err: nil,
@@ -484,7 +558,7 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 			err := tx.SyntacticVerify(ctx)
 			require.ErrorIs(err, tt.err)
 
-			if tt.err == nil {
+			if tx != nil {
 				require.Equal(tt.err == nil, tx.SyntacticallyVerified)
 			}
 		})

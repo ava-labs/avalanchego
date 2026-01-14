@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -25,8 +25,11 @@ var (
 	_ ValidatorTx      = (*AddContinuousValidatorTx)(nil)
 	_ ContinuousStaker = (*AddContinuousValidatorTx)(nil)
 
-	errMissingSigner = errors.New("missing signer")
-	errMissingPeriod = errors.New("missing period")
+	errMissingSigner           = errors.New("missing signer")
+	errMissingPeriod           = errors.New("missing period")
+	errMissingConfigOwner      = errors.New("missing config owner")
+	errTooManyDelegationShares = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
+	errTooManyRestakeShares    = fmt.Errorf("a staker can only restake at most %d shares from rewards", reward.PercentDenominator)
 )
 
 type AddContinuousValidatorTx struct {
@@ -35,9 +38,6 @@ type AddContinuousValidatorTx struct {
 
 	// Node ID of the validator
 	ValidatorNodeID ids.NodeID `serialize:"true" json:"nodeID"`
-
-	// Period (in seconds) of the staking cycle.
-	Period uint64 `serialize:"true" json:"period"`
 
 	// [Signer] is the BLS key for this validator.
 	Signer signer.Signer `serialize:"true" json:"signer"`
@@ -51,6 +51,9 @@ type AddContinuousValidatorTx struct {
 	// Where to send delegation rewards when done validating
 	DelegatorRewardsOwner fx.Owner `serialize:"true" json:"delegationRewardsOwner"`
 
+	// Who is authorized to modify the auto-restake config
+	ConfigOwner fx.Owner `serialize:"true" json:"configOwner"`
+
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has DelegationShares=300,000 then they
 	// take 30% of rewards from delegators
@@ -58,6 +61,16 @@ type AddContinuousValidatorTx struct {
 
 	// Weight of this validator used when sampling
 	Wght uint64 `serialize:"true" json:"weight"`
+
+	// Percentage of rewards to auto-restake at the end of each cycle, expressed in millionths (percentage * 10,000).
+	// Range [0..1_000_000]:
+	//   0         = restake principal only; withdraw 100% of rewards
+	//   300_000   = restake 30% of rewards; withdraw 70%
+	//   1_000_000 = restake 100% of rewards; withdraw 0%
+	AutoRestakeShares uint32 `serialize:"true" json:"autoRestakeShares"`
+
+	// Period is the validation cycle duration, in seconds.
+	Period uint64 `serialize:"true" json:"period"`
 }
 
 func (tx *AddContinuousValidatorTx) NodeID() ids.NodeID {
@@ -93,6 +106,10 @@ func (tx *AddContinuousValidatorTx) PeriodDuration() time.Duration {
 	return time.Duration(tx.Period) * time.Second
 }
 
+func (tx *AddContinuousValidatorTx) AutoRestakeSharesAmount() uint32 {
+	return tx.AutoRestakeShares
+}
+
 func (tx *AddContinuousValidatorTx) Weight() uint64 {
 	return tx.Wght
 }
@@ -117,6 +134,10 @@ func (tx *AddContinuousValidatorTx) DelegationRewardsOwner() fx.Owner {
 	return tx.DelegatorRewardsOwner
 }
 
+func (tx *AddContinuousValidatorTx) Owner() fx.Owner {
+	return tx.ConfigOwner
+}
+
 func (tx *AddContinuousValidatorTx) Shares() uint32 {
 	return tx.DelegationShares
 }
@@ -133,16 +154,21 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	case len(tx.StakeOuts) == 0:
 		return errNoStake
 	case tx.DelegationShares > reward.PercentDenominator:
-		return errTooManyShares
+		return errTooManyDelegationShares
+	case tx.AutoRestakeShares > reward.PercentDenominator:
+		return errTooManyRestakeShares
+	case tx.ConfigOwner == nil:
+		return errMissingConfigOwner
 	case tx.Period == 0:
 		return errMissingPeriod
 	}
 
+	// todo: what if ValidatorRewardsOwner or DelegatorRewardsOwner is nil
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 
-	if err := verify.All(tx.Signer, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner); err != nil {
+	if err := verify.All(tx.Signer, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner, tx.ConfigOwner); err != nil {
 		return fmt.Errorf("failed to verify signer, or rewards owners: %w", err)
 	}
 
@@ -160,7 +186,7 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	stakedAssetID := firstStakeOutput.AssetID()
 	totalStakeWeight := firstStakeOutput.Output().Amount()
 	for _, out := range tx.StakeOuts[1:] {
-		newWeight, err := math.Add(totalStakeWeight, out.Output().Amount())
+		newWeight, err := safemath.Add(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}

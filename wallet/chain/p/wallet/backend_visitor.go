@@ -178,10 +178,14 @@ func (b *backendVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) erro
 }
 
 func (b *backendVisitor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	b.b.setOwner(
+		b.txID,
+		tx.ConfigOwner,
+	)
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+func (b *backendVisitor) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfigTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 

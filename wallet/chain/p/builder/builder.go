@@ -326,16 +326,18 @@ type Builder interface {
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
+		configOwner *secp256k1fx.OutputOwners,
 		shares uint32,
 		period time.Duration,
 		options ...common.Option,
 	) (*txs.AddContinuousValidatorTx, error)
 
-	NewStopContinuousValidatorTx(
+	NewSetAutoRestakeConfigTx(
 		txID ids.ID,
-		signature [bls.SignatureLen]byte,
+		autoRestakeShares *uint32,
+		period *uint64,
 		options ...common.Option,
-	) (*txs.StopContinuousValidatorTx, error)
+	) (*txs.SetAutoRestakeConfigTx, error)
 }
 
 type Backend interface {
@@ -1516,6 +1518,7 @@ func (b *builder) NewAddContinuousValidatorTx(
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	configOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	period time.Duration,
 	options ...common.Option,
@@ -1542,11 +1545,17 @@ func (b *builder) NewAddContinuousValidatorTx(
 	if err != nil {
 		return nil, err
 	}
+	configOwnerComplexity, err := fee.OwnerComplexity(configOwner)
+	if err != nil {
+		return nil, err
+	}
+
 	complexity, err := fee.IntrinsicAddContinuousValidatorTxComplexities.Add(
 		&memoComplexity,
 		&signerComplexity,
 		&validatorOwnerComplexity,
 		&delegatorOwnerComplexity,
+		&configOwnerComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -1575,36 +1584,48 @@ func (b *builder) NewAddContinuousValidatorTx(
 			Memo:         memo,
 		}},
 		ValidatorNodeID:       vdr.NodeID,
-		Period:                uint64(period.Seconds()),
 		Signer:                signer,
 		StakeOuts:             stakeOutputs,
 		ValidatorRewardsOwner: validationRewardsOwner,
 		DelegatorRewardsOwner: delegationRewardsOwner,
+		ConfigOwner:           nil,
 		DelegationShares:      shares,
 		Wght:                  vdr.Wght,
+		AutoRestakeShares:     0,
+		Period:                uint64(period.Seconds()),
 	}
 
 	return tx, b.initCtx(tx)
 }
 
-func (b *builder) NewStopContinuousValidatorTx(
+func (b *builder) NewSetAutoRestakeConfigTx(
 	txID ids.ID,
-	signature [bls.SignatureLen]byte,
+	autoRestakeShares *uint32,
+	period *uint64,
 	options ...common.Option,
-) (*txs.StopContinuousValidatorTx, error) {
-	var (
-		toBurn  = map[ids.ID]uint64{}
-		toStake = map[ids.ID]uint64{}
-		ops     = common.NewOptions(options)
-	)
+) (*txs.SetAutoRestakeConfigTx, error) {
+	toBurn := map[ids.ID]uint64{}
+	toStake := map[ids.ID]uint64{}
+	ops := common.NewOptions(options)
+
+	auth, err := b.authorize(txID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	authComplexity, err := fee.AuthComplexity(auth)
+	if err != nil {
+		return nil, err
+	}
 
 	memo := ops.Memo()
 	memoComplexity := gas.Dimensions{
 		gas.Bandwidth: uint64(len(memo)),
 	}
 
-	complexity, err := fee.IntrinsicStopContinuousValidatorTxComplexities.Add(
+	complexity, err := fee.IntrinsicSetAutoRestakeConfigTx.Add(
 		&memoComplexity,
+		&authComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -1622,7 +1643,7 @@ func (b *builder) NewStopContinuousValidatorTx(
 		return nil, err
 	}
 
-	tx := &txs.StopContinuousValidatorTx{
+	tx := &txs.SetAutoRestakeConfigTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,
 			BlockchainID: constants.PlatformChainID,
@@ -1630,8 +1651,10 @@ func (b *builder) NewStopContinuousValidatorTx(
 			Outs:         outputs,
 			Memo:         memo,
 		}},
-		TxID:          txID,
-		StopSignature: signature,
+		TxID:              txID,
+		Auth:              auth,
+		AutoRestakeShares: autoRestakeShares,
+		Period:            period,
 	}
 	return tx, b.initCtx(tx)
 }

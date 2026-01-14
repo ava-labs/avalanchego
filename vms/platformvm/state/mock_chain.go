@@ -611,17 +611,17 @@ func (mr *MockChainMockRecorder) PutPendingValidator(staker any) *gomock.Call {
 }
 
 // ResetContinuousValidatorCycle mocks base method.
-func (m *MockChain) ResetContinuousValidatorCycle(subnetID ids.ID, nodeID ids.NodeID, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
+func (m *MockChain) ResetContinuousValidatorCycle(validator *Staker, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ResetContinuousValidatorCycle", subnetID, nodeID, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
+	ret := m.ctrl.Call(m, "ResetContinuousValidatorCycle", validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ResetContinuousValidatorCycle indicates an expected call of ResetContinuousValidatorCycle.
-func (mr *MockChainMockRecorder) ResetContinuousValidatorCycle(subnetID, nodeID, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards any) *gomock.Call {
+func (mr *MockChainMockRecorder) ResetContinuousValidatorCycle(validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetContinuousValidatorCycle", reflect.TypeOf((*MockChain)(nil).ResetContinuousValidatorCycle), subnetID, nodeID, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetContinuousValidatorCycle", reflect.TypeOf((*MockChain)(nil).ResetContinuousValidatorCycle), validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
 }
 
 // SetAccruedFees mocks base method.
@@ -720,20 +720,6 @@ func (m *MockChain) SetTimestamp(tm time.Time) {
 func (mr *MockChainMockRecorder) SetTimestamp(tm any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockChain)(nil).SetTimestamp), tm)
-}
-
-// StopContinuousValidator mocks base method.
-func (m *MockChain) StopContinuousValidator(subnetID ids.ID, nodeID ids.NodeID) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StopContinuousValidator", subnetID, nodeID)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// StopContinuousValidator indicates an expected call of StopContinuousValidator.
-func (mr *MockChainMockRecorder) StopContinuousValidator(subnetID, nodeID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopContinuousValidator", reflect.TypeOf((*MockChain)(nil).StopContinuousValidator), subnetID, nodeID)
 }
 
 // UpdateCurrentValidator mocks base method.

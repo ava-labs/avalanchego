@@ -11,18 +11,3 @@ const (
 )
 
 type diffValidatorStatus uint8
-
-func (s diffValidatorStatus) String() string {
-	switch s {
-	case unmodified:
-		return "unmodified"
-	case added:
-		return "added"
-	case deleted:
-		return "deleted"
-	case modified:
-		return "modified"
-	}
-
-	return "invalid validator status"
-}

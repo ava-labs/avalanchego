@@ -223,6 +223,7 @@ var (
 		gas.DBWrite: 6, // write remaining balance utxo + weight diff + deactivated weight diff + public key diff + delete staker + write staker
 	}
 
+	// todo: review this
 	IntrinsicAddContinuousValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.NodeIDLen + // nodeID
@@ -231,17 +232,23 @@ var (
 			wrappers.IntLen + // num stake outs
 			wrappers.IntLen + // validator rewards typeID
 			wrappers.IntLen + // delegator rewards typeID
-			wrappers.IntLen, // delegation shares
-		gas.DBRead:  1, // get staking config // todo @razvan:
-		gas.DBWrite: 3, // put current staker + write weight diff + write pk diff // todo @razvan:
+			wrappers.IntLen + // config owner typeID
+			wrappers.IntLen + // delegation shares
+			wrappers.LongLen + // weight
+			wrappers.IntLen, // autorestake shares
+		gas.DBWrite: 3, // put staker + write weight diff + write pk diff
 	}
 
-	IntrinsicStopContinuousValidatorTxComplexities = gas.Dimensions{
+	// todo: review this
+	IntrinsicSetAutoRestakeConfigTx = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // txID
-			bls.SignatureLen, // signature
-		gas.DBRead:  1, // read staker  // todo @razvan:
-		gas.DBWrite: 1, // write staker // todo @razvan:
+			wrappers.IntLen + // auth typeID
+			wrappers.IntLen + // authCredential typeID
+			wrappers.IntLen + // autorestake shares
+			wrappers.LongLen, // period
+		gas.DBRead:  2, // read tx + read staker
+		gas.DBWrite: 1, // update staker
 	}
 
 	errUnsupportedOutput = errors.New("unsupported output type")
@@ -851,12 +858,12 @@ func (c *complexityVisitor) AddContinuousValidatorTx(tx *txs.AddContinuousValida
 	return err
 }
 
-func (c *complexityVisitor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+func (c *complexityVisitor) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfigTx) error {
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
 	if err != nil {
 		return err
 	}
-	c.output, err = IntrinsicStopContinuousValidatorTxComplexities.Add(&baseTxComplexity)
+	c.output, err = IntrinsicSetAutoRestakeConfigTx.Add(&baseTxComplexity)
 	return err
 }
 

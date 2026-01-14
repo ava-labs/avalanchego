@@ -188,9 +188,9 @@ func (m *txMetrics) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) e
 	return nil
 }
 
-func (m *txMetrics) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+func (m *txMetrics) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfigTx) error {
 	m.numTxs.With(prometheus.Labels{
-		txLabel: "stop_continuous_validator",
+		txLabel: "set_auto_restake_config",
 	}).Inc()
 	return nil
 }

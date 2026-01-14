@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer/signermock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var errCustom = errors.New("custom")
@@ -200,7 +201,7 @@ func TestNewPendingStaker(t *testing.T) {
 	require.ErrorIs(err, errCustom)
 }
 
-func TestValidMutation(t *testing.T) {
+func TestValidateMutation(t *testing.T) {
 	sk, err := localsigner.New()
 	require.NoError(t, err)
 
@@ -279,12 +280,12 @@ func TestValidMutation(t *testing.T) {
 			expectedErr: errImmutableFieldsModified,
 		},
 		{
-			name: "start time too early",
+			name: "mutated owner",
 			mutateFn: func(staker Staker) *Staker {
-				staker.StartTime = staker.EndTime.Add(-1 * time.Second)
+				staker.Owner = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
 				return &staker
 			},
-			expectedErr: errStartTimeTooEarly,
+			expectedErr: errImmutableFieldsModified,
 		},
 		{
 			name: "decreased accrued rewards",
@@ -316,7 +317,7 @@ func TestValidMutation(t *testing.T) {
 				staker.ContinuationPeriod = 10
 				return &staker
 			},
-			expectedErr: errInvalidContinuationPeriod,
+			expectedErr: errContinuationPeriodIsZero,
 		},
 		{
 			name: "valid mutation",
@@ -339,8 +340,8 @@ func TestValidMutation(t *testing.T) {
 
 			require.ErrorIs(
 				test.expectedErr,
-				continuousStaker.ValidMutation(
-					*test.mutateFn(*continuousStaker),
+				continuousStaker.ValidateMutation(
+					test.mutateFn(*continuousStaker),
 				),
 			)
 		})
@@ -359,8 +360,8 @@ func TestValidMutation(t *testing.T) {
 		require := require.New(t)
 
 		require.ErrorIs(
-			errInvalidContinuationPeriod,
-			fixedStaker.ValidMutation(*mutateFn(*fixedStaker)),
+			errContinuationPeriodIsZero,
+			fixedStaker.ValidateMutation(mutateFn(*fixedStaker)),
 		)
 	})
 }

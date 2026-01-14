@@ -243,16 +243,20 @@ func (s *visitor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) err
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, true, txSigners)
+	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+func (s *visitor) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfigTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
-
-	return sign(s.tx, true, txSigners)
+	authSigners, err := s.getAuthSigners(tx.TxID, tx.Auth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, authSigners)
+	return sign(s.tx, txSigners)
 }
 
 func (s *visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
