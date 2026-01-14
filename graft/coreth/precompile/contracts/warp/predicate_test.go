@@ -326,7 +326,7 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 		},
 		GetWarpValidatorSetsF: func(_ context.Context, _ uint64) (map[ids.ID]validators.WarpSet, error) {
 			return map[ids.ID]validators.WarpSet{
-				snowCtx.SubnetID:            warpValidators,
+				snowCtx.SubnetID:           warpValidators,
 				constants.PrimaryNetworkID: warpValidators,
 			}, nil
 		},
