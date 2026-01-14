@@ -164,10 +164,10 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	require.NoError(t, err)
 	require.NotNil(t, syncer)
 
-	var interceptErr error
+	var errIntercept error
 	synctest.AddFuncOnIntercept(intercept, NewGetRangeProofHandler(serverDB), func() {
-		interceptErr = syncer.UpdateSyncTarget(newRoot)
-		if interceptErr != nil {
+		errIntercept = syncer.UpdateSyncTarget(newRoot)
+		if errIntercept != nil {
 			cancel()
 		}
 	}, numRequestsBeforeUpdate)
@@ -175,7 +175,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	require.NoError(t, syncer.Start(ctx))
 
 	err = syncer.Wait(ctx)
-	require.NoError(t, interceptErr)
+	require.NoError(t, errIntercept)
 	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
 		logDiff(t, serverDB, clientDB)

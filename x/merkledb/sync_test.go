@@ -455,17 +455,17 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Allow 1 request to go through before blocking
-	var interceptErr error
+	var errIntercept error
 	synctest.AddFuncOnIntercept(actionHandler, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
-		interceptErr = syncer.UpdateSyncTarget(secondSyncRoot)
-		if interceptErr != nil {
+		errIntercept = syncer.UpdateSyncTarget(secondSyncRoot)
+		if errIntercept != nil {
 			cancel()
 		}
 	}, 1)
 
 	require.NoError(syncer.Start(ctx))
 	err = syncer.Wait(ctx)
-	require.NoError(interceptErr)
+	require.NoError(errIntercept)
 	require.NoError(err)
 	require.NoError(syncer.Error())
 
@@ -518,17 +518,17 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	var interceptErr error
+	var errIntercept error
 	synctest.AddFuncOnIntercept(actionHandler, rangeProofHandler, func() {
-		interceptErr = m.UpdateSyncTarget(root1)
-		if interceptErr != nil {
+		errIntercept = m.UpdateSyncTarget(root1)
+		if errIntercept != nil {
 			cancel()
 		}
 	}, 0)
 
 	require.NoError(m.Start(ctx))
 	err = m.Wait(ctx)
-	require.NoError(interceptErr)
+	require.NoError(errIntercept)
 	require.NoError(err)
 }
 
