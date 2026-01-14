@@ -47,12 +47,11 @@ func VerifyMinDelayExcess(
 	parent *types.Header,
 	header *types.Header,
 ) error {
-	remoteDelayExcess := customtypes.GetHeaderExtra(header).MinDelayExcess
-
 	if !config.IsGranite(header.Time) {
 		return nil
 	}
 
+	remoteDelayExcess := customtypes.GetHeaderExtra(header).MinDelayExcess
 	if remoteDelayExcess == nil {
 		return fmt.Errorf("%w: %s", errRemoteMinDelayExcessNil, header.Hash())
 	}
