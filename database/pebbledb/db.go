@@ -36,14 +36,14 @@ var (
 	errInvalidOperation = errors.New("invalid operation")
 
 	DefaultConfig = Config{
-		CacheSize:                   defaultCacheSize,
-		BytesPerSync:                512 * units.KiB,
-		WALBytesPerSync:             0, // Default to no background syncing.
-		MemTableStopWritesThreshold: 8,
-		MemTableSize:                defaultCacheSize / 4,
-		MaxOpenFiles:                4096,
-		MaxConcurrentCompactions:    1,
-		Sync:                        true,
+		CacheSize:                   8 * units.GiB,  // Optimized for modern systems: 512 MB → 8 GB
+		BytesPerSync:                1 * units.MiB,  // More frequent sync: 512 KB → 1 MB
+		WALBytesPerSync:             0,              // Default to no background syncing.
+		MemTableStopWritesThreshold: 4,              // More aggressive: 8 → 4
+		MemTableSize:                256 * units.MiB, // Larger batches: 128 MB → 256 MB
+		MaxOpenFiles:                16384,          // Better concurrent access: 4096 → 16384
+		MaxConcurrentCompactions:    2,              // Parallel compaction: 1 → 2
+		Sync:                        false,          // Disable fsync for bootstrap performance
 	}
 )
 
