@@ -74,3 +74,6 @@ claude.md
 
 # Documentation directory for code sync fixes
 docs/
+
+# Development scripts
+scripts/dev/
