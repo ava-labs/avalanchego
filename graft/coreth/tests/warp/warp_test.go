@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
+	_ "embed"
+
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/key"
@@ -43,10 +45,15 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
+const subnetAName = "warp-subnet-a"
+
 var (
+	//go:embed genesis.json
+	genesis []byte
+
 	flagVars *e2e.FlagVars
 
-	cChainSubnetDetails *Subnet
+	subnetA, cChainSubnetDetails *Subnet
 
 	testPayload = []byte{1, 2, 3}
 )
@@ -74,7 +81,6 @@ func TestE2E(t *testing.T) {
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
-
 	tc := e2e.NewTestContext()
 	nodes := tmpnet.NewNodesOrPanic(tmpnet.DefaultNodeCount)
 
@@ -85,6 +91,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			"coreth-warp-e2e",
 			nodes,
 			tmpnet.FlagsMap{},
+			utils.NewTmpnetSubnet(subnetAName, genesis, utils.DefaultChainConfig, nodes...),
 		),
 	)
 
@@ -108,6 +115,15 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		validatorURIs[i] = node.URI
 	}
 
+	tmpnetSubnetA := network.GetSubnet(subnetAName)
+	require.NotNil(tmpnetSubnetA)
+	subnetA = &Subnet{
+		SubnetID:      tmpnetSubnetA.SubnetID,
+		BlockchainID:  tmpnetSubnetA.Chains[0].ChainID,
+		PreFundedKey:  tmpnetSubnetA.Chains[0].PreFundedKey.ToECDSA(),
+		ValidatorURIs: validatorURIs,
+	}
+
 	infoClient := info.NewClient(network.Nodes[0].URI)
 	cChainBlockchainID, err := infoClient.GetBlockchainID(tc.DefaultContext(), "C")
 	require.NoError(err)
@@ -128,12 +144,8 @@ var _ = ginkgo.Describe("[Warp]", func() {
 	}
 
 	testCombinations := []testCombination{
-		// TODO: Uncomment these tests when we have a way to run them in CI, currently we should not depend on Subnet-EVM
-		// as Coreth and Subnet-EVM have different release cycles. The problem is that once we update AvalancheGo (protocol version),
-		// we need to update Subnet-EVM to the same protocol version. Until then all Subnet-EVM tests are broken, so it's blocking Coreth development.
-		// It's best to not run these tests until we have a way to run them in CI.
-		// {"SubnetA -> C-Chain", func() *Subnet { return subnetA }, func() *Subnet { return cChainSubnetDetails }},
-		// {"C-Chain -> SubnetA", func() *Subnet { return cChainSubnetDetails }, func() *Subnet { return subnetA }},
+		{"SubnetA -> C-Chain", func() *Subnet { return subnetA }, func() *Subnet { return cChainSubnetDetails }},
+		{"C-Chain -> SubnetA", func() *Subnet { return cChainSubnetDetails }, func() *Subnet { return subnetA }},
 		{"C-Chain -> C-Chain", func() *Subnet { return cChainSubnetDetails }, func() *Subnet { return cChainSubnetDetails }},
 	}
 
