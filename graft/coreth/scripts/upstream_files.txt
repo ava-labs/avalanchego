@@ -11,7 +11,6 @@ node/*
 params/config_test.go
 params/config.go
 params/denomination.go
-params/network_params.go
 params/protocol_params.go
 params/version.go
 plugin/evm/customtypes/block_test.go
@@ -21,7 +20,6 @@ plugin/evm/customtypes/types_test.go
 rpc/*
 signer/*
 tests/*
-triedb/*
 
 !accounts/abi/abi_extra_test.go
 !accounts/abi/bind/bind_extra_test.go
@@ -49,4 +47,3 @@ triedb/*
 !internal/ethapi/api_extra_test.go
 !tests/utils/*
 !tests/warp/*
-!triedb/firewood/*
