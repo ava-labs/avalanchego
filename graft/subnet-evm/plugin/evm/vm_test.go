@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
@@ -67,6 +66,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
@@ -2991,7 +2991,7 @@ func TestWaitForEvent(t *testing.T) {
 				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
 				require.NoError(t, err)
 
-				ctx, cancel = context.WithTimeout(t.Context(), time.Second*2)
+				ctx, cancel = context.WithTimeout(t.Context(), time.Second*5)
 				defer cancel()
 
 				msg, err = vm.WaitForEvent(ctx)
@@ -3685,6 +3685,9 @@ func TestArchivalQueries(t *testing.T) {
 			ctx := t.Context()
 
 			vm := newVM(t, testVMConfig{configJSON: tt.config})
+			t.Cleanup(func() {
+				require.NoError(vm.vm.Shutdown(ctx))
+			})
 
 			numBlocks := 10
 			for range numBlocks {
