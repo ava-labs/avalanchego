@@ -212,8 +212,8 @@ func fillDB(t *testing.T, r *rand.Rand, db *ffi.Database, numKeys int) ids.ID {
 	}
 
 	var (
-		keys      = make([][]byte, numKeys)
-		vals      = make([][]byte, numKeys)
+		keys      = make([][]byte, 0, numKeys)
+		vals      = make([][]byte, 0, numKeys)
 		minLength = 1
 		maxLength = 64
 	)

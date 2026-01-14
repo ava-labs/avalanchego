@@ -437,7 +437,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	actionHandler := &p2p.TestHandler{}
 
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	t.Cleanup(cancel)
 	syncer, err := xsync.NewSyncer(
 		db,
 		xsync.Config[*RangeProof, *ChangeProof]{
