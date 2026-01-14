@@ -3684,6 +3684,9 @@ func TestArchivalQueries(t *testing.T) {
 			ctx := t.Context()
 
 			vm := newVM(t, testVMConfig{configJSON: tt.config})
+			t.Cleanup(func() {
+				require.NoError(vm.vm.Shutdown(ctx))
+			})
 
 			numBlocks := 10
 			for range numBlocks {

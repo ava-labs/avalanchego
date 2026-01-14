@@ -2238,6 +2238,9 @@ func TestArchivalQueries(t *testing.T) {
 				}`,
 				Scheme: scheme,
 			})
+			t.Cleanup(func() {
+				require.NoError(vm.Shutdown(ctx))
+			})
 
 			numBlocks := 10
 			for range numBlocks {
