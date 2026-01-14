@@ -33,15 +33,18 @@ const (
 
 	// DefaultBlockCacheSize is the number of bytes to use for block caching in
 	// leveldb.
-	DefaultBlockCacheSize = 12 * opt.MiB
+	// Optimized for modern systems with sufficient RAM (8 GB cache).
+	DefaultBlockCacheSize = 8 * opt.GiB
 
 	// DefaultWriteBufferSize is the number of bytes to use for buffers in
 	// leveldb.
-	DefaultWriteBufferSize = 12 * opt.MiB
+	// Optimized for bootstrap performance (1 GB, but halved to 512 MB in line 194).
+	DefaultWriteBufferSize = 1 * opt.GiB
 
 	// DefaultHandleCap is the number of files descriptors to cap levelDB to
 	// use.
-	DefaultHandleCap = 1024
+	// Increased for better concurrent access and large databases.
+	DefaultHandleCap = 16384
 
 	// DefaultBitsPerKey is the number of bits to add to the bloom filter per
 	// key.
@@ -188,13 +191,18 @@ type config struct {
 // New returns a wrapped LevelDB object.
 func New(file string, configBytes []byte, log logging.Logger, reg prometheus.Registerer) (database.Database, error) {
 	parsedConfig := config{
-		BlockCacheCapacity:     DefaultBlockCacheSize,
-		DisableSeeksCompaction: true,
-		OpenFilesCacheCapacity: DefaultHandleCap,
-		WriteBuffer:            DefaultWriteBufferSize / 2,
-		FilterBitsPerKey:       DefaultBitsPerKey,
-		MaxManifestFileSize:    DefaultMaxManifestFileSize,
-		MetricUpdateFrequency:  DefaultMetricUpdateFrequency,
+		BlockCacheCapacity:            DefaultBlockCacheSize,
+		DisableSeeksCompaction:        true,
+		OpenFilesCacheCapacity:        DefaultHandleCap,
+		WriteBuffer:                   DefaultWriteBufferSize / 2,
+		FilterBitsPerKey:              DefaultBitsPerKey,
+		MaxManifestFileSize:           DefaultMaxManifestFileSize,
+		MetricUpdateFrequency:         DefaultMetricUpdateFrequency,
+		CompactionL0Trigger:           12,   // Trigger compaction with more L0 files (default: 4)
+		CompactionTableSize:           16 * opt.MiB, // 16 MB table size
+		CompactionTotalSize:           100 * opt.MiB, // 100 MB total size for level
+		CompactionTableSizeMultiplier: 2.0,
+		CompactionTotalSizeMultiplier: 10.0,
 	}
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
