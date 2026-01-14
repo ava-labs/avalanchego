@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesync
+package evmstate
 
 import (
 	"bytes"
@@ -17,11 +17,10 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
-
-	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
 var (
@@ -135,7 +134,7 @@ func (t *trieToSync) loadSegments() error {
 			utils.IncrOne(lastKey)
 			segment.pos = lastKey // syncing will start from this key
 		}
-		log.Debug("statesync: loading segment", "segment", segment)
+		log.Debug("evmstate: loading segment", "segment", segment)
 	}
 	return it.Error()
 }
@@ -174,7 +173,7 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	log.Debug("statesync: segment finished", "segment", t.segments[idx])
+	log.Debug("evmstate: segment finished", "segment", t.segments[idx])
 	t.segmentsDone[idx] = struct{}{}
 	for {
 		if _, ok := t.segmentsDone[t.segmentToHashNext]; !ok {
@@ -325,7 +324,7 @@ func (t *trieToSync) createSegments(ctx context.Context, numSegments int) error 
 		}
 	}
 	t.sync.stats.incTriesSegmented()
-	log.Debug("statesync: trie segmented for parallel sync", "root", t.root, "account", t.account, "segments", len(t.segments))
+	log.Debug("evmstate: trie segmented for parallel sync", "root", t.root, "account", t.account, "segments", len(t.segments))
 	return nil
 }
 

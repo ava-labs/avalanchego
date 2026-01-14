@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesync
+package code
 
 import (
 	"context"
@@ -14,26 +14,25 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
-
-	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
 
 const defaultQueueCapacity = 5000
 
 var (
-	_ syncpkg.Finalizer = (*CodeQueue)(nil)
+	_ types.Finalizer = (*Queue)(nil)
 
 	errFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
 	errFailedToFinalizeCodeQueue    = errors.New("failed to finalize code queue")
 )
 
-// CodeQueue implements the producer side of code fetching.
+// Queue implements the producer side of code fetching.
 // It accepts code hashes, persists durable "to-fetch" markers (idempotent per hash),
 // and enqueues the hashes as-is onto an internal channel consumed by the code syncer.
 // The queue does not perform in-memory deduplication or local-code checks - that is
 // the responsibility of the consumer.
-type CodeQueue struct {
+type Queue struct {
 	db   ethdb.Database
 	quit <-chan struct{}
 
@@ -49,23 +48,23 @@ type CodeQueue struct {
 	capacity int
 }
 
-type CodeQueueOption = options.Option[CodeQueue]
+type QueueOption = options.Option[Queue]
 
 // WithCapacity overrides the queue buffer capacity.
-func WithCapacity(n int) CodeQueueOption {
-	return options.Func[CodeQueue](func(q *CodeQueue) {
+func WithCapacity(n int) QueueOption {
+	return options.Func[Queue](func(q *Queue) {
 		if n > 0 {
 			q.capacity = n
 		}
 	})
 }
 
-// NewCodeQueue creates a new code queue applying optional functional options.
+// NewQueue creates a new code queue applying optional functional options.
 // The `quit` channel, if non-nil, MUST eventually be closed to avoid leaking a
 // goroutine.
-func NewCodeQueue(db ethdb.Database, quit <-chan struct{}, opts ...CodeQueueOption) (*CodeQueue, error) {
+func NewQueue(db ethdb.Database, quit <-chan struct{}, opts ...QueueOption) (*Queue, error) {
 	// Create with defaults, then apply options.
-	q := &CodeQueue{
+	q := &Queue{
 		db:       db,
 		quit:     quit,
 		capacity: defaultQueueCapacity,
@@ -93,11 +92,11 @@ func NewCodeQueue(db ethdb.Database, quit <-chan struct{}, opts ...CodeQueueOpti
 }
 
 // CodeHashes returns the receive-only channel of code hashes to consume.
-func (q *CodeQueue) CodeHashes() <-chan common.Hash {
+func (q *Queue) CodeHashes() <-chan common.Hash {
 	return q.out
 }
 
-func (q *CodeQueue) closeChannelOnce() bool {
+func (q *Queue) closeChannelOnce() bool {
 	var done bool
 	q.closeChanOnce.Do(func() {
 		q.chanLock.Lock()
@@ -118,7 +117,7 @@ func (q *CodeQueue) closeChannelOnce() bool {
 // AddCode persists and enqueues new code hashes.
 // Persists idempotent "to-fetch" markers for all inputs and enqueues them as-is.
 // Returns errAddCodeAfterFinalize after a clean finalize and errFailedToAddCodeHashesToQueue on early quit.
-func (q *CodeQueue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
+func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
 	}
@@ -164,7 +163,7 @@ func (q *CodeQueue) AddCode(ctx context.Context, codeHashes []common.Hash) error
 // Finalize signals that no further code hashes will be added.
 // Waits for in-flight enqueues to complete, then closes the output channel.
 // If the queue was already closed due to early quit, returns errFailedToFinalizeCodeQueue.
-func (q *CodeQueue) Finalize() error {
+func (q *Queue) Finalize() error {
 	if !q.closeChannelOnce() {
 		return errFailedToFinalizeCodeQueue
 	}
@@ -172,7 +171,7 @@ func (q *CodeQueue) Finalize() error {
 }
 
 // init enqueues any persisted code markers found on disk.
-func (q *CodeQueue) init() error {
+func (q *Queue) init() error {
 	// Recover any persisted code markers and enqueue them.
 	// Note: dbCodeHashes are already present as "to-fetch" markers. addCode will
 	// re-persist them, which is a trivial redundancy that happens only on resume

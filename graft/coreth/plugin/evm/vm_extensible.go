@@ -14,9 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+
+	synccore "github.com/ava-labs/avalanchego/graft/coreth/sync/core"
 )
 
 var _ extension.InnerVM = (*VM)(nil)
@@ -86,6 +87,6 @@ func (vm *VM) VersionDB() *versiondb.Database {
 	return vm.versiondb
 }
 
-func (vm *VM) SyncerClient() vmsync.Client {
+func (vm *VM) SyncerClient() synccore.Client {
 	return vm.Client
 }

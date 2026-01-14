@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package vmsync
+package core
 
 import (
 	"context"
@@ -12,8 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-
-	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 )
 
 var errSyncerAlreadyRegistered = errors.New("syncer already registered")
@@ -21,7 +20,7 @@ var errSyncerAlreadyRegistered = errors.New("syncer already registered")
 // SyncerTask represents a single syncer with its name for identification.
 type SyncerTask struct {
 	name   string
-	syncer syncpkg.Syncer
+	syncer types.Syncer
 }
 
 // SyncerRegistry manages a collection of syncers for sequential execution.
@@ -39,7 +38,7 @@ func NewSyncerRegistry() *SyncerRegistry {
 
 // Register adds a syncer to the registry.
 // Returns an error if a syncer with the same name is already registered.
-func (r *SyncerRegistry) Register(syncer syncpkg.Syncer) error {
+func (r *SyncerRegistry) Register(syncer types.Syncer) error {
 	id := syncer.ID()
 	if r.registeredNames[id] {
 		return fmt.Errorf("%w with id '%s'", errSyncerAlreadyRegistered, id)
@@ -111,7 +110,7 @@ func (r *SyncerRegistry) StartAsync(ctx context.Context, summary message.Syncabl
 // Errors are logged but not returned to ensure best-effort cleanup of all syncers.
 func (r *SyncerRegistry) FinalizeAll(summary message.Syncable) {
 	for _, task := range r.syncers {
-		if f, ok := task.syncer.(syncpkg.Finalizer); ok {
+		if f, ok := task.syncer.(types.Finalizer); ok {
 			if err := f.Finalize(); err != nil {
 				log.Error("failed to finalize syncer", "syncer", task.name, "err", err, "summary", summary.GetBlockHash().Hex(), "height", summary.Height())
 			}

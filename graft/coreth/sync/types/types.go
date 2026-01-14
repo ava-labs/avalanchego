@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sync
+package types
 
 import (
 	"context"
@@ -10,9 +10,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-
-	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
 // Syncer is the common interface for all sync operations.

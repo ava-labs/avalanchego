@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package vmsync
+package core
 
 import (
 	"context"
@@ -12,9 +12,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-
-	synccommon "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
 
 var errProviderNotSet = errors.New("provider not set")
@@ -22,7 +21,7 @@ var errProviderNotSet = errors.New("provider not set")
 type server struct {
 	chain *core.BlockChain
 
-	provider         synccommon.SummaryProvider
+	provider         types.SummaryProvider
 	syncableInterval uint64
 }
 
@@ -31,7 +30,7 @@ type Server interface {
 	GetStateSummary(context.Context, uint64) (block.StateSummary, error)
 }
 
-func NewServer(chain *core.BlockChain, provider synccommon.SummaryProvider, syncableInterval uint64) Server {
+func NewServer(chain *core.BlockChain, provider types.SummaryProvider, syncableInterval uint64) Server {
 	return &server{
 		chain:            chain,
 		syncableInterval: syncableInterval,

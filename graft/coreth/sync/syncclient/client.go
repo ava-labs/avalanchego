@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesyncclient
+package syncclient
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/network"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient/stats"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/version"
 
