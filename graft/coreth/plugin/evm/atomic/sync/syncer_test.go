@@ -23,9 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 
-	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 )
 

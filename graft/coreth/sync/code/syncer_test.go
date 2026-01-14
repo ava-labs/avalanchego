@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesync
+package code
 
 import (
 	"context"
@@ -17,10 +17,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
-	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 )
 
@@ -46,7 +46,7 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 
 	// Set up mockClient
 	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB, message.Codec, handlerstats.NewNoopHandlerStats())
-	mockClient := statesyncclient.NewTestClient(message.Codec, nil, codeRequestHandler, nil)
+	mockClient := syncclient.NewTestClient(message.Codec, nil, codeRequestHandler, nil)
 	mockClient.GetCodeIntercept = test.getCodeIntercept
 
 	clientDB := test.clientDB
@@ -54,14 +54,14 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 		clientDB = rawdb.NewMemoryDatabase()
 	}
 
-	codeQueue, err := NewCodeQueue(
+	codeQueue, err := NewQueue(
 		clientDB,
 		make(chan struct{}),
 		WithCapacity(test.queueCapacity),
 	)
 	require.NoError(t, err)
 
-	codeSyncer, err := NewCodeSyncer(
+	codeSyncer, err := NewSyncer(
 		mockClient,
 		clientDB,
 		codeQueue.CodeHashes(),

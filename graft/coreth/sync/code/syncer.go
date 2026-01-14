@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesync
+package code
 
 import (
 	"context"
@@ -15,23 +15,22 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
-
-	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
-	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
 const defaultNumCodeFetchingWorkers = 5
 
-var _ syncpkg.Syncer = (*CodeSyncer)(nil)
+var _ types.Syncer = (*Syncer)(nil)
 
-// CodeSyncer syncs code bytes from the network in a separate thread.
+// Syncer syncs code bytes from the network in a separate thread.
 // It consumes code hashes from a queue and persists code into the DB.
 // Outstanding requests are tracked via durable "to-fetch" markers in the DB for recovery.
 // The syncer performs in-flight deduplication and skips locally-present code before issuing requests.
-type CodeSyncer struct {
+type Syncer struct {
 	db     ethdb.Database
-	client statesyncclient.Client
+	client syncclient.Client
 	// Channel of incoming code hash requests provided by the fetcher.
 	codeHashes <-chan common.Hash
 
@@ -45,17 +44,17 @@ type CodeSyncer struct {
 }
 
 // codeSyncerConfig carries construction-time options for code syncer.
-type codeSyncerConfig struct {
+type syncerConfig struct {
 	numWorkers       int
 	codeHashesPerReq int
 }
 
 // CodeSyncerOption configures CodeSyncer at construction time.
-type CodeSyncerOption = options.Option[codeSyncerConfig]
+type SyncerOption = options.Option[syncerConfig]
 
 // WithNumWorkers overrides the number of concurrent workers.
-func WithNumWorkers(n int) CodeSyncerOption {
-	return options.Func[codeSyncerConfig](func(c *codeSyncerConfig) {
+func WithNumWorkers(n int) SyncerOption {
+	return options.Func[syncerConfig](func(c *syncerConfig) {
 		if n > 0 {
 			c.numWorkers = n
 		}
@@ -65,24 +64,24 @@ func WithNumWorkers(n int) CodeSyncerOption {
 // WithCodeHashesPerRequest sets the best-effort target batch size per request.
 // The final batch may contain fewer than the configured number if insufficient
 // hashes remain when the channel is closed.
-func WithCodeHashesPerRequest(n int) CodeSyncerOption {
-	return options.Func[codeSyncerConfig](func(c *codeSyncerConfig) {
+func WithCodeHashesPerRequest(n int) SyncerOption {
+	return options.Func[syncerConfig](func(c *syncerConfig) {
 		if n > 0 {
 			c.codeHashesPerReq = n
 		}
 	})
 }
 
-// NewCodeSyncer allows external packages (e.g., registry wiring) to create a code syncer
+// NewSyncer allows external packages (e.g., registry wiring) to create a code syncer
 // that consumes hashes from a provided fetcher queue.
-func NewCodeSyncer(client statesyncclient.Client, db ethdb.Database, codeHashes <-chan common.Hash, opts ...CodeSyncerOption) (*CodeSyncer, error) {
-	cfg := codeSyncerConfig{
+func NewSyncer(client syncclient.Client, db ethdb.Database, codeHashes <-chan common.Hash, opts ...SyncerOption) (*Syncer, error) {
+	cfg := syncerConfig{
 		numWorkers:       defaultNumCodeFetchingWorkers,
 		codeHashesPerReq: message.MaxCodeHashesPerRequest,
 	}
 	options.ApplyTo(&cfg, opts...)
 
-	return &CodeSyncer{
+	return &Syncer{
 		db:               db,
 		client:           client,
 		codeHashes:       codeHashes,
@@ -92,19 +91,19 @@ func NewCodeSyncer(client statesyncclient.Client, db ethdb.Database, codeHashes 
 }
 
 // Name returns the human-readable name for this sync task.
-func (*CodeSyncer) Name() string {
+func (*Syncer) Name() string {
 	return "Code Syncer"
 }
 
 // ID returns the stable identifier for this sync task.
-func (*CodeSyncer) ID() string {
+func (*Syncer) ID() string {
 	return "state_code_sync"
 }
 
 // Sync starts the worker thread and populates the code hashes queue with active work.
 // Blocks until all outstanding code requests from a previous sync have been
 // fetched and the code channel has been closed, or the context is cancelled.
-func (c *CodeSyncer) Sync(ctx context.Context) error {
+func (c *Syncer) Sync(ctx context.Context) error {
 	eg, egCtx := errgroup.WithContext(ctx)
 
 	// Start NumCodeFetchingWorkers threads to fetch code from the network.
@@ -117,7 +116,7 @@ func (c *CodeSyncer) Sync(ctx context.Context) error {
 
 // work fulfills any incoming requests from the producer channel by fetching code bytes from the network
 // and fulfilling them by updating the database.
-func (c *CodeSyncer) work(ctx context.Context) error {
+func (c *Syncer) work(ctx context.Context) error {
 	codeHashes := make([]common.Hash, 0, message.MaxCodeHashesPerRequest)
 
 	for {
@@ -176,7 +175,7 @@ func (c *CodeSyncer) work(ctx context.Context) error {
 // marks the work as complete.
 // codeHashes should not be empty or contain duplicate hashes.
 // Returns an error if one is encountered, signaling the worker thread to terminate.
-func (c *CodeSyncer) fulfillCodeRequest(ctx context.Context, codeHashes []common.Hash) error {
+func (c *Syncer) fulfillCodeRequest(ctx context.Context, codeHashes []common.Hash) error {
 	codeByteSlices, err := c.client.GetCode(ctx, codeHashes)
 	if err != nil {
 		return err

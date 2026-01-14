@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesync
+package evmstate
 
 import (
 	"context"
@@ -17,10 +17,10 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
-
-	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
-	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
 const (
@@ -31,9 +31,9 @@ const (
 )
 
 var (
-	_                           syncpkg.Syncer = (*stateSync)(nil)
-	errCodeRequestQueueRequired                = errors.New("code request queue is required")
-	errLeafsRequestSizeRequired                = errors.New("leafs request size must be > 0")
+	_                           types.Syncer = (*stateSync)(nil)
+	errCodeRequestQueueRequired              = errors.New("code request queue is required")
+	errLeafsRequestSizeRequired              = errors.New("leafs request size must be > 0")
 )
 
 // stateSync keeps the state of the entire state sync operation.
@@ -45,7 +45,7 @@ type stateSync struct {
 	batchSize uint                           // write batches when they reach this size
 	segments  chan syncclient.LeafSyncTask   // channel of tasks to sync
 	syncer    *syncclient.CallbackLeafSyncer // performs the sync, looping over each task's range and invoking specified callbacks
-	codeQueue *CodeQueue                     // queue that manages the asynchronous download and batching of code hashes
+	codeQueue *code.Queue                    // queue that manages the asynchronous download and batching of code hashes
 	trieQueue *trieQueue                     // manages a persistent list of storage tries we need to sync and any segments that are created for them
 
 	// track the main account trie specifically to commit its root at the end of the operation
@@ -78,7 +78,7 @@ func WithBatchSize(n uint) SyncerOption {
 	})
 }
 
-func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, codeQueue *CodeQueue, leafsRequestSize uint16, opts ...SyncerOption) (syncpkg.Syncer, error) {
+func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue, leafsRequestSize uint16, opts ...SyncerOption) (types.Syncer, error) {
 	if leafsRequestSize == 0 {
 		return nil, errLeafsRequestSizeRequired
 	}

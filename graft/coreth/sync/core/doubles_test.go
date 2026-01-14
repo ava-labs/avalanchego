@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package vmsync
+package core
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 )
 
 // FuncSyncer adapts a function to the simple Syncer shape used in tests. It is
@@ -25,7 +25,7 @@ func (f FuncSyncer) Sync(ctx context.Context) error { return f.fn(ctx) }
 func (FuncSyncer) Name() string { return "Test Name" }
 func (FuncSyncer) ID() string   { return "test_id" }
 
-var _ syncpkg.Syncer = FuncSyncer{}
+var _ types.Syncer = FuncSyncer{}
 
 // NewBarrierSyncer returns a syncer that signals startedWG.Done() when Sync begins,
 // then blocks until releaseCh is closed (returns nil) or ctx is canceled (returns ctx.Err).
