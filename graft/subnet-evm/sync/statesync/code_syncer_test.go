@@ -13,10 +13,10 @@ import (
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	statesyncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats"
@@ -125,7 +125,7 @@ func TestCodeSyncerAddsInProgressCodeHashes(t *testing.T) {
 	codeHash := crypto.Keccak256Hash(codeBytes)
 	testCodeSyncer(t, codeSyncerTest{
 		setupCodeSyncer: func(c *codeSyncer) {
-			customrawdb.AddCodeToFetch(c.DB, codeHash)
+			require.NoError(t, customrawdb.WriteCodeToFetch(c.DB, codeHash))
 		},
 		codeRequestHashes: nil,
 		codeByteSlices:    [][]byte{codeBytes},
@@ -146,7 +146,7 @@ func TestCodeSyncerAddsMoreInProgressThanQueueSize(t *testing.T) {
 	testCodeSyncer(t, codeSyncerTest{
 		setupCodeSyncer: func(c *codeSyncer) {
 			for _, codeHash := range codeHashes {
-				customrawdb.AddCodeToFetch(c.DB, codeHash)
+				require.NoError(t, customrawdb.WriteCodeToFetch(c.DB, codeHash))
 			}
 			c.codeHashes = make(chan common.Hash, numCodeSlices/2)
 		},
