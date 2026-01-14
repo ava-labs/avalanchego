@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/profiling"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -1444,6 +1445,11 @@ func (n *Node) initHealthAPI() error {
 	err = n.health.RegisterHealthCheck("router", n.chainRouter, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
+	}
+
+	err = n.health.RegisterHealthCheck("memory", &profiling.MemHealthCheck{Logger: n.Log}, health.ApplicationTag)
+	if err != nil {
+		return fmt.Errorf("couldn't register memory health check: %w", err)
 	}
 
 	// TODO: add database health to liveness check
