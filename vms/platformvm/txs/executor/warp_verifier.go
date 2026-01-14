@@ -126,11 +126,11 @@ func (w *warpVerifier) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) er
 	return w.verify(tx.Message)
 }
 
-func (w *warpVerifier) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+func (w *warpVerifier) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
 	return nil
 }
 
-func (w *warpVerifier) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+func (w *warpVerifier) SetAutoRestakeConfigTx(*txs.SetAutoRestakeConfigTx) error {
 	return nil
 }
 

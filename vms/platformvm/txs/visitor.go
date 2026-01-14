@@ -35,6 +35,6 @@ type Visitor interface {
 
 	// ? Transactions:
 	AddContinuousValidatorTx(tx *AddContinuousValidatorTx) error
-	StopContinuousValidatorTx(tx *StopContinuousValidatorTx) error
+	SetAutoRestakeConfigTx(tx *SetAutoRestakeConfigTx) error
 	RewardContinuousValidatorTx(*RewardContinuousValidatorTx) error
 }

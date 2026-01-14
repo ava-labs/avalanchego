@@ -1007,39 +1007,36 @@ func (s *state) PutCurrentValidator(staker *Staker) error {
 }
 
 func (s *state) UpdateCurrentValidator(staker *Staker) error {
-	return s.currentStakers.updateValidator(staker.SubnetID, staker.NodeID, func(validator Staker) (*Staker, error) {
-		return staker, nil
-	})
-}
+	oldValidator, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	if err != nil {
+		return err
+	}
 
-func (s *state) StopContinuousValidator(subnetID ids.ID, nodeID ids.NodeID) error {
-	return s.currentStakers.updateValidator(subnetID, nodeID, func(validator Staker) (*Staker, error) {
-		if validator.ContinuationPeriod == 0 {
-			return nil, errIncompatibleContinuousStaker
-		}
+	if err := oldValidator.ValidateMutation(staker); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
+	}
 
-		validator.ContinuationPeriod = 0
-		return &validator, nil
-	})
+	s.currentStakers.UpdateValidator(staker)
+	return nil
 }
 
 func (s *state) ResetContinuousValidatorCycle(
-	subnetID ids.ID,
-	nodeID ids.NodeID,
+	validator *Staker,
 	weight uint64,
 	potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
 ) error {
-	return s.currentStakers.updateValidator(subnetID, nodeID, func(validator Staker) (*Staker, error) {
-		if validator.ContinuationPeriod == 0 {
-			return nil, errIncompatibleContinuousStaker
-		}
+	// todo: is this ok? check that we dont edit the underlying validator
+	mutatedValidator := *validator
+	if err := (&mutatedValidator).resetContinuousStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards); err != nil {
+		return err
+	}
 
-		if err := validator.resetContinuationStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards); err != nil {
-			return nil, err
-		}
+	if err := validator.ValidateMutation(&mutatedValidator); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
+	}
 
-		return &validator, nil
-	})
+	s.currentStakers.UpdateValidator(&mutatedValidator)
+	return nil
 }
 
 func (s *state) DeleteCurrentValidator(staker *Staker) {
@@ -2712,6 +2709,7 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				weightDiff: weightDiff,
 			}
 			if pk != nil {
+				//	I think both [prevPublicKey] and [newPublicKey] will by [pkBytes]
 				pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 				if diff.validatorStatus != added {
 					change.prevPublicKey = pkBytes
@@ -2844,7 +2842,7 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 		// Record the change in weight and/or public key for each validator.
 		for nodeID, validatorDiff := range validatorDiffs {
 			switch validatorDiff.validatorStatus {
-			case added:
+			case added, modified: // todo: is modified case breaking the invariant from below?
 				staker := validatorDiff.validator
 
 				// The validator is being added.
@@ -2856,10 +2854,9 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 					txID:        staker.TxID,
 					lastUpdated: staker.StartTime,
 
-					UpDuration:      0,
-					LastUpdated:     startTime,
-					StakerStartTime: startTime,
-					//ContinuationPeriod:       uint64(staker.ContinuationPeriod.Seconds()),
+					UpDuration:               0,
+					LastUpdated:              startTime,
+					StakerStartTime:          startTime,
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
 				}

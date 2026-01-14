@@ -1374,13 +1374,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 }
 
 func (e *standardTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
-	if err := verifyAddContinuousValidatorTx(
-		e.backend,
-		e.feeCalculator,
-		e.state,
-		e.tx,
-		tx,
-	); err != nil {
+	if err := verifyAddContinuousValidatorTx(e.backend, e.feeCalculator, e.state, e.tx, tx); err != nil {
 		return err
 	}
 
@@ -1405,17 +1399,21 @@ func (e *standardTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValid
 	return nil
 }
 
-func (e *standardTxExecutor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
-	validator, err := verifyStopContinuousValidatorTx(e.backend, e.state, tx)
+func (e *standardTxExecutor) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfigTx) error {
+	validator, err := verifySetAutoRestakeConfigTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
 	if err != nil {
 		return err
 	}
 
-	if err := e.state.StopContinuousValidator(validator.SubnetID, validator.NodeID); err != nil {
-		return err
+	if tx.AutoRestakeShares != nil {
+		validator.AutoRestakeShares = *tx.AutoRestakeShares
 	}
 
-	return nil
+	if tx.Period != nil {
+		validator.ContinuationPeriod = time.Duration(*tx.Period) * time.Second
+	}
+
+	return e.state.UpdateCurrentValidator(validator)
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].

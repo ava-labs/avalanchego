@@ -60,6 +60,8 @@ type FixedStaker interface {
 type ContinuousStaker interface {
 	Staker
 	PeriodDuration() time.Duration
+	AutoRestakeSharesAmount() uint32
+	Owner() fx.Owner
 }
 
 type ScheduledStaker interface {

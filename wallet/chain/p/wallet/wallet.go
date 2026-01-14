@@ -314,14 +314,16 @@ type Wallet interface {
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
+		configOwner *secp256k1fx.OutputOwners,
 		shares uint32,
 		period time.Duration,
 		options ...common.Option,
 	) (*txs.Tx, error)
 
-	IssueStopContinuousValidatorTx(
+	IssueSetAutoRestakeConfigTx(
 		txID ids.ID,
-		signature [bls.SignatureLen]byte,
+		autoRestakeShares *uint32,
+		period *uint64,
 		options ...common.Option,
 	) (*txs.Tx, error)
 
@@ -628,6 +630,7 @@ func (w *wallet) IssueAddContinuousValidatorTx(
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	configOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	period time.Duration,
 	options ...common.Option,
@@ -638,6 +641,7 @@ func (w *wallet) IssueAddContinuousValidatorTx(
 		assetID,
 		validationRewardsOwner,
 		delegationRewardsOwner,
+		configOwner,
 		shares,
 		period,
 		options...,
@@ -648,14 +652,16 @@ func (w *wallet) IssueAddContinuousValidatorTx(
 	return w.IssueUnsignedTx(utx, options...)
 }
 
-func (w *wallet) IssueStopContinuousValidatorTx(
+func (w *wallet) IssueSetAutoRestakeConfigTx(
 	txID ids.ID,
-	signature [bls.SignatureLen]byte,
+	autoRestakeShares *uint32,
+	period *uint64,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewStopContinuousValidatorTx(
+	utx, err := w.builder.NewSetAutoRestakeConfigTx(
 		txID,
-		signature,
+		autoRestakeShares,
+		period,
 		options...,
 	)
 	if err != nil {

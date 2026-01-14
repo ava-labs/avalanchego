@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -959,23 +958,30 @@ func verifyAddContinuousValidatorTx(
 		)
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("getting utxos %w", err)
+	}
 
 	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return fmt.Errorf("adding fee: %w", err)
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
-		tx.Ins,
+		ins,
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: fee,
+			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -984,11 +990,13 @@ func verifyAddContinuousValidatorTx(
 	return nil
 }
 
-// verifyStopContinuousValidatorTx carries out the validation for an StopContinuousValidatorTx.
-func verifyStopContinuousValidatorTx(
+// verifySetAutoRestakeConfigTx carries out the validation for an AutoRestakeConfigTx.
+func verifySetAutoRestakeConfigTx(
 	backend *Backend,
+	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	tx *txs.StopContinuousValidatorTx,
+	sTx *txs.Tx,
+	tx *txs.SetAutoRestakeConfigTx,
 ) (*state.Staker, error) {
 	var (
 		currentTimestamp = chainState.GetTimestamp()
@@ -1014,7 +1022,25 @@ func verifyStopContinuousValidatorTx(
 
 	continuousStakerTx, ok := stakerTx.Unsigned.(txs.ContinuousStaker)
 	if !ok {
+		// todo: add a test for this
 		return nil, fmt.Errorf("%w: different type %T", ErrInvalidStakerTx, stakerTx.Unsigned)
+	}
+
+	validatorRules, err := getValidatorRules(backend, chainState, continuousStakerTx.SubnetID())
+	if err != nil {
+		return nil, err
+	}
+
+	duration := continuousStakerTx.PeriodDuration()
+
+	switch {
+	case duration < validatorRules.minStakeDuration:
+		// Ensure period length is not too short
+		return nil, ErrStakeTooShort
+
+	case duration > validatorRules.maxStakeDuration:
+		// Ensure period length is not too long
+		return nil, ErrStakeTooLong
 	}
 
 	validator, err := chainState.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
@@ -1023,23 +1049,44 @@ func verifyStopContinuousValidatorTx(
 	}
 
 	if tx.TxID != validator.TxID {
+		// todo: add a test for this
 		// This can happen if a validator restaked with the same public key and node id.
 		// In this case, TxID should be the latest transaction for the continuous validator.
 		return nil, fmt.Errorf("%w: wrong tx id", ErrInvalidStakerTx)
 	}
 
-	// Check stop signature
-	signature, err := bls.SignatureFromBytes(tx.StopSignature[:])
+	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, validator.Owner, tx.Auth)
 	if err != nil {
 		return nil, err
 	}
 
-	if !bls.VerifyProofOfPossession(validator.PublicKey, signature, validator.TxID[:]) {
-		return nil, errUnauthorizedModification
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return nil, fmt.Errorf("getting utxos %w", err)
 	}
 
-	if validator.ContinuationPeriod == 0 {
-		return nil, fmt.Errorf("%w: %s", errContinuousValidatorAlreadyStopped, continuousStakerTx.NodeID())
+	// Verify the flowcheck
+	fee, err := feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return nil, fmt.Errorf("adding fee: %w", err)
+	}
+
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		ins,
+		outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: producedAVAX,
+		},
+	); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	return validator, nil

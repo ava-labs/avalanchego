@@ -130,7 +130,7 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 
 		// todo: move
 		targetCodec.RegisterType(&AddContinuousValidatorTx{}),
-		targetCodec.RegisterType(&StopContinuousValidatorTx{}),
+		targetCodec.RegisterType(&SetAutoRestakeConfigTx{}),
 		targetCodec.RegisterType(&RewardContinuousValidatorTx{}),
 	)
 }

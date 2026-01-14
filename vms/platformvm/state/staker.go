@@ -12,18 +12,18 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
 	_ btree.LessFunc[*Staker] = (*Staker).Less
 
-	errInvalidContinuationPeriod        = fmt.Errorf("continuation period invalid transition")
 	errDecreasedWeight                  = fmt.Errorf("weight decreased")
 	errDecreasedAccruedRewards          = fmt.Errorf("accrued rewards decreased")
 	errDecreasedAccruedDelegateeRewards = fmt.Errorf("accrued delegatee rewards decreased")
+	errContinuationPeriodIsZero         = fmt.Errorf("continuation period is zero")
 	errImmutableFieldsModified          = fmt.Errorf("immutable fields modified")
-	errStartTimeTooEarly                = fmt.Errorf("start time too early")
 )
 
 // Staker contains all information required to represent a validator or
@@ -40,6 +40,13 @@ type Staker struct {
 	PotentialReward         uint64
 	AccruedRewards          uint64
 	AccruedDelegateeRewards uint64
+
+	// Percentage of rewards to auto-restake at the end of each cycle, expressed in millionths (percentage * 10,000).
+	// Range [0..1_000_000]:
+	//   0         = restake principal only; withdraw 100% of rewards
+	//   300_000   = restake 30% of rewards; withdraw 70%
+	//   1_000_000 = restake 100% of rewards; withdraw 0%
+	AutoRestakeShares uint32
 
 	// NextTime is the next time this staker will be moved from a validator set.
 	// If the staker is in the pending validator set, NextTime will equal
@@ -58,6 +65,9 @@ type Staker struct {
 	// ContinuationPeriod > 0  => running continuous staker
 	// ContinuationPeriod == 0 => a stopped continuous staker OR a fixed staker, we don't care since we will stop at EndTime.
 	ContinuationPeriod time.Duration
+
+	// Owner defines who is authorized to modify the auto-restake config.
+	Owner fx.Owner
 }
 
 // A *Staker is considered to be less than another *Staker when:
@@ -99,32 +109,42 @@ func NewCurrentStaker(
 	var (
 		endTime            time.Time
 		continuationPeriod time.Duration
+		autoRestakeShares  uint32
+		owner              fx.Owner
 	)
 
 	switch tTx := staker.(type) {
 	case txs.FixedStaker:
 		endTime = tTx.EndTime()
 		continuationPeriod = 0
+		autoRestakeShares = 0
 
 	case txs.ContinuousStaker:
 		endTime = startTime.Add(tTx.PeriodDuration())
 		continuationPeriod = tTx.PeriodDuration()
+		autoRestakeShares = tTx.AutoRestakeSharesAmount()
+		owner = tTx.Owner()
+
 	default:
 		return nil, fmt.Errorf("unexpected staker tx type: %T", staker)
 	}
 
 	return &Staker{
-		TxID:               txID,
-		NodeID:             staker.NodeID(),
-		PublicKey:          publicKey,
-		SubnetID:           staker.SubnetID(),
-		Weight:             staker.Weight(),
-		StartTime:          startTime,
-		EndTime:            endTime,
-		PotentialReward:    potentialReward,
-		NextTime:           endTime,
-		Priority:           staker.CurrentPriority(),
-		ContinuationPeriod: continuationPeriod,
+		TxID:                    txID,
+		NodeID:                  staker.NodeID(),
+		PublicKey:               publicKey,
+		SubnetID:                staker.SubnetID(),
+		Weight:                  staker.Weight(),
+		StartTime:               startTime,
+		EndTime:                 endTime,
+		PotentialReward:         potentialReward,
+		AccruedRewards:          0,
+		AccruedDelegateeRewards: 0,
+		AutoRestakeShares:       autoRestakeShares,
+		NextTime:                endTime,
+		Priority:                staker.CurrentPriority(),
+		ContinuationPeriod:      continuationPeriod,
+		Owner:                   owner,
 	}, nil
 }
 
@@ -148,10 +168,9 @@ func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) 
 	}, nil
 }
 
-func (s *Staker) ValidMutation(ms Staker) error {
-	if s.ContinuationPeriod != ms.ContinuationPeriod && ms.ContinuationPeriod != 0 {
-		// Only transition allowed for continuation period is setting it to 0.
-		return errInvalidContinuationPeriod
+func (s *Staker) ValidateMutation(ms *Staker) error {
+	if !s.immutableFieldsAreUnmodified(ms) {
+		return errImmutableFieldsModified
 	}
 
 	if s.Weight > ms.Weight {
@@ -169,29 +188,12 @@ func (s *Staker) ValidMutation(ms Staker) error {
 		return errDecreasedAccruedDelegateeRewards
 	}
 
-	if !ms.StartTime.Equal(s.StartTime) && s.EndTime.After(ms.StartTime) {
-		// New [StartTime] should be AFTER the previous [EndTime].
-		return errStartTimeTooEarly
-	}
-
-	if !s.immutableFieldsAreUnmodified(ms) {
-		return errImmutableFieldsModified
-	}
-
 	return nil
 }
 
-func (s *Staker) resetContinuationStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
-	if totalAccruedRewards < s.AccruedRewards {
-		return errDecreasedAccruedRewards
-	}
-
-	if totalAccruedDelegateeRewards < s.AccruedDelegateeRewards {
-		return errDecreasedAccruedDelegateeRewards
-	}
-
-	if weight < s.Weight {
-		return errDecreasedWeight
+func (s *Staker) resetContinuousStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
+	if s.ContinuationPeriod == 0 {
+		return errContinuationPeriodIsZero
 	}
 
 	endTime := s.EndTime.Add(s.ContinuationPeriod)
@@ -206,12 +208,13 @@ func (s *Staker) resetContinuationStakerCycle(weight, potentialReward, totalAccr
 	return nil
 }
 
-func (s Staker) immutableFieldsAreUnmodified(ms Staker) bool {
+func (s Staker) immutableFieldsAreUnmodified(ms *Staker) bool {
 	// Mutable fields: Weight, StartTime, EndTime, PotentialReward, AccruedRewards, AccruedDelegateeRewards, ContinuationPeriod
 	return s.TxID == ms.TxID &&
 		s.NodeID == ms.NodeID &&
 		s.PublicKey.Equals(ms.PublicKey) &&
 		s.SubnetID == ms.SubnetID &&
 		s.NextTime.Equal(ms.NextTime) &&
-		s.Priority == ms.Priority
+		s.Priority == ms.Priority &&
+		s.Owner == ms.Owner
 }

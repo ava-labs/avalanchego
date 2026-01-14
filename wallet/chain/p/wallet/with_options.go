@@ -306,6 +306,7 @@ func (w *withOptions) IssueAddContinuousValidatorTx(
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	configOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	period time.Duration,
 	options ...common.Option,
@@ -316,20 +317,24 @@ func (w *withOptions) IssueAddContinuousValidatorTx(
 		assetID,
 		validationRewardsOwner,
 		delegationRewardsOwner,
+		configOwner,
 		shares,
 		period,
 		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (w *withOptions) IssueStopContinuousValidatorTx(
+func (w *withOptions) IssueSetAutoRestakeConfigTx(
 	txID ids.ID,
-	signature [bls.SignatureLen]byte,
+	autoRestakeShares *uint32,
+	period *uint64,
 	options ...common.Option,
+
 ) (*txs.Tx, error) {
-	return w.wallet.IssueStopContinuousValidatorTx(
+	return w.wallet.IssueSetAutoRestakeConfigTx(
 		txID,
-		signature,
+		autoRestakeShares,
+		period,
 		common.UnionOptions(w.options, options)...,
 	)
 }
