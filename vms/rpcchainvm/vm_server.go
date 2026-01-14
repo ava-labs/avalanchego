@@ -240,7 +240,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 
 		// The validator state is cached to avoid the gRPC overhead after
 		// epoching is activated.
-		ValidatorState: validators.NewCachedState(validatorStateClient, networkUpgrades.GraniteTime),
+		ValidatorState: validators.NewCachedState(validatorStateClient),
 		// TODO: support remaining snowman++ fields
 
 		ChainDataDir: req.ChainDataDir,

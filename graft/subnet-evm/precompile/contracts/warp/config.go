@@ -236,19 +236,19 @@ func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateCon
 		}
 	}
 
-	validatorSet, err := predicateContext.SnowCtx.ValidatorState.GetWarpValidatorSet(
+	validatorSets, err := predicateContext.SnowCtx.ValidatorState.GetWarpValidatorSets(
 		context.TODO(),
 		predicateContext.ProposerVMBlockCtx.PChainHeight,
-		sourceSubnetID,
 	)
 	if err != nil {
-		log.Debug("failed to retrieve canonical validator set",
+		log.Debug("failed to retrieve canonical validator sets",
 			"msgID", warpMsg.ID(),
 			"subnetID", sourceSubnetID,
 			"err", err,
 		)
 		return fmt.Errorf("%w: %w", errCannotRetrieveValidatorSet, err)
 	}
+	validatorSet := validatorSets[sourceSubnetID]
 
 	err = warpMsg.Signature.Verify(
 		&warpMsg.UnsignedMessage,
