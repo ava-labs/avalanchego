@@ -42,4 +42,3 @@ func TestMarshalBlockSyncSummary(t *testing.T) {
 	require.Equal(t, block.StateSyncSkipped, mode)
 	require.True(t, called)
 }
-

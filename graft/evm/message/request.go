@@ -25,4 +25,3 @@ type Request interface {
 func RequestToBytes(codec codec.Manager, request Request) ([]byte, error) {
 	return codec.Marshal(Version, &request)
 }
-

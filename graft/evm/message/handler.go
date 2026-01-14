@@ -43,4 +43,3 @@ func (NoopRequestHandler) HandleBlockRequest(context.Context, ids.NodeID, uint32
 func (NoopRequestHandler) HandleCodeRequest(context.Context, ids.NodeID, uint32, CodeRequest) ([]byte, error) {
 	return nil, nil
 }
-

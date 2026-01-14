@@ -60,4 +60,3 @@ func TestMarshalBlockResponse(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, blockResponse.Blocks, b.Blocks)
 }
-

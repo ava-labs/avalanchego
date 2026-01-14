@@ -73,4 +73,3 @@ func newCodec(skipCount int) codec.Manager {
 
 	return mgr
 }
-

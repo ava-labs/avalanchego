@@ -20,4 +20,3 @@ type SyncableParser interface {
 }
 
 type AcceptImplFn func(Syncable) (block.StateSyncMode, error)
-

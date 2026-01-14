@@ -32,4 +32,3 @@ func (*BlockSyncSummaryParser) Parse(summaryBytes []byte, acceptImpl AcceptImplF
 	summary.acceptImpl = acceptImpl
 	return &summary, nil
 }
-

@@ -77,4 +77,3 @@ type LeafsResponse struct {
 	// The keys for the proof are simply the keccak256 hashes of the values, so they are not included in the response to save bandwidth.
 	ProofVals [][]byte `serialize:"true"`
 }
-

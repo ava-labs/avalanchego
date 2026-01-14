@@ -80,4 +80,3 @@ func (s *BlockSyncSummary) Accept(context.Context) (block.StateSyncMode, error) 
 	}
 	return s.acceptImpl(s)
 }
-
