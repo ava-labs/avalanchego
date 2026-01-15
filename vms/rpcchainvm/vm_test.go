@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -26,7 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
@@ -254,4 +256,42 @@ func TestNewHTTPHandler(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 	require.Equal(http.StatusOK, w.Code)
+}
+
+// TestConvertNetworkUpgrades_AllFieldsHandled ensures that all fields in
+// upgrade.Config are properly handled when converting from the gRPC protobuf message.
+func TestConvertNetworkUpgrades_AllFieldsHandled(t *testing.T) {
+	type networks struct {
+		name      string
+		networkID uint32
+	}
+
+	tests := []networks{
+		{
+			name:      "Mainnet",
+			networkID: constants.MainnetID,
+		},
+		{
+			name:      "Fuji",
+			networkID: constants.FujiID,
+		},
+		{
+			name:      "Local",
+			networkID: constants.LocalID,
+		},
+		{
+			name:      "UnitTest",
+			networkID: constants.UnitTestID,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			wantConfig := upgrade.GetConfig(test.networkID)
+			networkUpgrades := getNetworkUpgrades(wantConfig)
+			gotConfig, err := convertNetworkUpgrades(networkUpgrades)
+			require.NoError(t, err)
+			require.Equal(t, wantConfig, gotConfig, "convertNetworkUpgrades did not return expected config. Update grpcutils! (convertNetworkUpgrades and vm_client.go)")
+		})
+	}
 }

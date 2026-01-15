@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/version"
 )
 

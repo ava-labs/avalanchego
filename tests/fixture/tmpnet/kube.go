@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -43,24 +43,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-// DefaultPodFlags defines common flags for avalanchego nodes running in a pod.
-func DefaultPodFlags(networkName string, dataDir string) map[string]string {
-	return map[string]string{
-		config.DataDirKey:                dataDir,
-		config.NetworkNameKey:            networkName,
-		config.SybilProtectionEnabledKey: "false",
-		config.HealthCheckFreqKey:        "500ms", // Ensure rapid detection of a healthy state
-		config.LogDisplayLevelKey:        logging.Debug.String(),
-		config.LogLevelKey:               logging.Debug.String(),
-		config.HTTPHostKey:               "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for the readiness check
-	}
-}
-
 // NewNodeStatefulSet returns a statefulset for an avalanchego node.
 func NewNodeStatefulSet(
 	name string,
 	generateName bool,
 	imageName string,
+	imagePullPolicy corev1.PullPolicy,
 	containerName string,
 	volumeName string,
 	volumeSize string,
@@ -128,8 +116,9 @@ func NewNodeStatefulSet(
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  containerName,
-							Image: imageName,
+							Name:            containerName,
+							Image:           imageName,
+							ImagePullPolicy: imagePullPolicy,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",

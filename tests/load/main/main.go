@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -224,7 +224,7 @@ func newPrimaryChainConfigsWithFirewood() map[string]tmpnet.ConfigMap {
 	// firewoodConfig represents the minimum configuration required to enable
 	// Firewood in Coreth.
 	//
-	// Ref: https://github.com/ava-labs/coreth/issues/1180
+	// Ref: https://github.com/ava-labs/avalanchego/graft/coreth/issues/1180
 	firewoodConfig := tmpnet.ConfigMap{
 		"state-scheme":       "firewood",
 		"snapshot-cache":     0,

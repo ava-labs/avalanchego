@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
@@ -11,13 +11,22 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-func newTestDatabase(t *testing.T, opts DatabaseConfig) (*Database, func()) {
+func newDatabase(t *testing.T, config DatabaseConfig) *Database {
 	t.Helper()
+
+	db := newHeightIndexDatabase(t, config.WithBlockCacheSize(0))
+	require.IsType(t, &Database{}, db)
+	return db.(*Database)
+}
+
+func newHeightIndexDatabase(t *testing.T, config DatabaseConfig) database.HeightIndex {
+	t.Helper()
+
 	dir := t.TempDir()
-	config := opts
 	if config.IndexDir == "" {
 		config = config.WithIndexDir(dir)
 	}
@@ -25,12 +34,16 @@ func newTestDatabase(t *testing.T, opts DatabaseConfig) (*Database, func()) {
 		config = config.WithDataDir(dir)
 	}
 	db, err := New(config, logging.NoLog{})
-	require.NoError(t, err, "failed to create database")
+	require.NoError(t, err)
+	return db
+}
 
-	cleanup := func() {
-		db.Close()
-	}
-	return db, cleanup
+func newCacheDatabase(t *testing.T, config DatabaseConfig) *cacheDB {
+	t.Helper()
+
+	db := newHeightIndexDatabase(t, config)
+	require.IsType(t, &cacheDB{}, db)
+	return db.(*cacheDB)
 }
 
 // randomBlock generates a random block of size 1KB-50KB.
@@ -62,9 +75,4 @@ func checkDatabaseState(t *testing.T, db *Database, maxHeight uint64) {
 
 	actualMaxHeight := db.maxBlockHeight.Load()
 	require.Equal(t, maxHeight, actualMaxHeight, "maxBlockHeight mismatch")
-}
-
-// Helper function to create a pointer to uint64
-func uint64Ptr(v uint64) *uint64 {
-	return &v
 }

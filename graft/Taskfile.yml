@@ -1,0 +1,19 @@
+# https://taskfile.dev
+# To run on a system without task installed, `../scripts/run_task.sh` will execute it with `go run`.
+# If in the nix dev shell, `task` is available.
+
+version: '3'
+
+# vars:
+  # REPO_MODULE: github.com/ava-labs/REPO_NAME
+
+tasks:
+  default: ../scripts/run_task.sh --list
+
+  # REPO_NAME-rewrite-imports:
+  #   desc: Rewrite imports of out-of-tree REPO_NAME to in-tree REPO_NAME
+  #   cmd: bash ./scripts/rewrite-imports.sh {{.REPO_MODULE}}
+
+  # REPO_NAME-subtree-merge:
+  #   desc: Perform git subtree merge of REPO_NAME into graft/REPO_NAME (commits)
+  #   cmd: bash ./scripts/subtree-merge.sh {{.REPO_MODULE}} master

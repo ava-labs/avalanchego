@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sendertest
@@ -27,7 +27,7 @@ type External struct {
 
 	CantSend bool
 
-	SendF func(msg message.OutboundMessage, config common.SendConfig, subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID]
+	SendF func(msg *message.OutboundMessage, config common.SendConfig, subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID]
 }
 
 // Default set the default callable value to [cant]
@@ -36,7 +36,7 @@ func (s *External) Default(cant bool) {
 }
 
 func (s *External) Send(
-	msg message.OutboundMessage,
+	msg *message.OutboundMessage,
 	config common.SendConfig,
 	subnetID ids.ID,
 	allower subnets.Allower,

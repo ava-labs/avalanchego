@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package memdb
 
 import (
-	"slices"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -31,7 +30,7 @@ func (db *Database) Put(height uint64, data []byte) error {
 		db.data = make(map[uint64][]byte)
 	}
 
-	db.data[height] = slices.Clone(data)
+	db.data[height] = data
 	return nil
 }
 
@@ -48,7 +47,7 @@ func (db *Database) Get(height uint64) ([]byte, error) {
 		return nil, database.ErrNotFound
 	}
 
-	return slices.Clone(data), nil
+	return data, nil
 }
 
 func (db *Database) Has(height uint64) (bool, error) {

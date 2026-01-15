@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
@@ -17,8 +17,7 @@ import (
 func TestDataSplitting(t *testing.T) {
 	// Each data file should have enough space for 2 blocks
 	config := DefaultConfig().WithMaxDataFileSize(1024 * 2.5)
-	store, cleanup := newTestDatabase(t, config)
-	defer cleanup()
+	store := newDatabase(t, config)
 
 	// Override the compressor so we can have fixed size blocks
 	store.compressor = compression.NewNoCompressor()
@@ -54,13 +53,11 @@ func TestDataSplitting(t *testing.T) {
 
 	// reopen and verify all blocks are readable
 	require.NoError(t, store.Close())
-	config = config.WithDataDir(store.config.DataDir).WithIndexDir(store.config.IndexDir)
-	store, err = New(config, store.log)
-	require.NoError(t, err)
-	store.compressor = compression.NewNoCompressor()
-	defer store.Close()
+	dir := store.config.DataDir
+	db := newDatabase(t, config.WithIndexDir(dir).WithDataDir(dir))
+	db.compressor = compression.NewNoCompressor()
 	for i := range numBlocks {
-		readBlock, err := store.Get(uint64(i))
+		readBlock, err := db.Get(uint64(i))
 		require.NoError(t, err)
 		require.Equal(t, blocks[i], readBlock)
 	}
@@ -68,8 +65,7 @@ func TestDataSplitting(t *testing.T) {
 
 func TestDataSplitting_DeletedFile(t *testing.T) {
 	config := DefaultConfig().WithMaxDataFileSize(1024 * 2.5)
-	store, cleanup := newTestDatabase(t, config)
-	defer cleanup()
+	store := newDatabase(t, config)
 
 	// create 5 blocks, 1kb each
 	numBlocks := 5

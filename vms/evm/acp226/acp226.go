@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // ACP-226 implements the dynamic minimum block delay mechanism specified here:
@@ -17,9 +17,9 @@ const (
 
 	// InitialDelayExcess represents the initial (≈2000ms) delay excess.
 	// Formula: ConversionRate (2^20) * ln(2000) + 1
-	InitialDelayExcess = 7_970_124
+	InitialDelayExcess DelayExcess = 7_970_124
 
-	maxDelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
+	maxDelayExcess DelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
 )
 
 // acp226Params is the params used for the acp226 upgrade.

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dynamicip
@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
 var _ Resolver = (*ifConfigResolver)(nil)
@@ -27,11 +28,12 @@ func (r *ifConfigResolver) Resolve(ctx context.Context) (netip.Addr, error) {
 		return netip.Addr{}, err
 	}
 
+	//nolint:bodyclose // body is closed via rpc.CleanlyCloseBody
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return netip.Addr{}, err
 	}
-	defer resp.Body.Close()
+	defer rpc.CleanlyCloseBody(resp.Body)
 
 	ipBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
