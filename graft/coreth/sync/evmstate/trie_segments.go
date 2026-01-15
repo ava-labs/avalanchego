@@ -25,7 +25,7 @@ import (
 
 var (
 	_ leaf.SyncTask = (*trieSegment)(nil)
-	_ fmt.Stringer            = (*trieSegment)(nil)
+	_ fmt.Stringer  = (*trieSegment)(nil)
 )
 
 // trieToSync keeps the state of a single trie syncing

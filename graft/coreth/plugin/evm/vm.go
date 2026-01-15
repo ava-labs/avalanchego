@@ -96,7 +96,7 @@ var (
 	_ block.ChainVM                      = (*VM)(nil)
 	_ block.BuildBlockWithContextChainVM = (*VM)(nil)
 	_ block.StateSyncableVM              = (*VM)(nil)
-	_ client.EthBlockParser          = (*VM)(nil)
+	_ client.EthBlockParser              = (*VM)(nil)
 	_ synccore.BlockAcceptor             = (*VM)(nil)
 )
 

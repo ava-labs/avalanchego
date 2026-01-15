@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
@@ -243,7 +243,7 @@ func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 	require.NoError(syncReEnabledVM.Connected(
 		t.Context(),
 		testSyncVMSetup.serverVM.SnowCtx.NodeID,
-		syncclient.StateSyncVersion,
+		client.StateSyncVersion,
 	))
 
 	enabled, err = syncReEnabledVM.StateSyncEnabled(t.Context())
@@ -397,7 +397,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 		syncerVM.Connected(
 			t.Context(),
 			serverTest.Ctx.NodeID,
-			syncclient.StateSyncVersion,
+			client.StateSyncVersion,
 		),
 	)
 

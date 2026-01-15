@@ -31,9 +31,9 @@ const (
 )
 
 var (
-	_ types.Syncer            = (*Syncer)(nil)
-	_ leaf.SyncTask = (*syncerLeafTask)(nil)
-	_ types.Finalizer         = (*Syncer)(nil)
+	_ types.Syncer    = (*Syncer)(nil)
+	_ leaf.SyncTask   = (*syncerLeafTask)(nil)
+	_ types.Finalizer = (*Syncer)(nil)
 
 	errTargetHeightRequired = errors.New("target height must be > 0")
 )

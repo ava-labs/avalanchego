@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/evmstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
@@ -27,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	blocksync "github.com/ava-labs/avalanchego/graft/coreth/sync/block"
+	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 

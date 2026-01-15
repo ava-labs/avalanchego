@@ -18,9 +18,9 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 )
 
@@ -39,15 +39,15 @@ var (
 
 // stateSync keeps the state of the entire state sync operation.
 type stateSync struct {
-	db        ethdb.Database                 // database we are syncing
-	root      common.Hash                    // root of the EVM state we are syncing to
-	trieDB    *triedb.Database               // trieDB on top of db we are syncing. used to restore any existing tries.
-	snapshot  snapshot.SnapshotIterable      // used to access the database we are syncing as a snapshot.
-	batchSize uint                           // write batches when they reach this size
-	segments  chan leaf.SyncTask   // channel of tasks to sync
-	syncer    *leaf.CallbackSyncer // performs the sync, looping over each task's range and invoking specified callbacks
-	codeQueue *code.Queue                    // queue that manages the asynchronous download and batching of code hashes
-	trieQueue *trieQueue                     // manages a persistent list of storage tries we need to sync and any segments that are created for them
+	db        ethdb.Database            // database we are syncing
+	root      common.Hash               // root of the EVM state we are syncing to
+	trieDB    *triedb.Database          // trieDB on top of db we are syncing. used to restore any existing tries.
+	snapshot  snapshot.SnapshotIterable // used to access the database we are syncing as a snapshot.
+	batchSize uint                      // write batches when they reach this size
+	segments  chan leaf.SyncTask        // channel of tasks to sync
+	syncer    *leaf.CallbackSyncer      // performs the sync, looping over each task's range and invoking specified callbacks
+	codeQueue *code.Queue               // queue that manages the asynchronous download and batching of code hashes
+	trieQueue *trieQueue                // manages a persistent list of storage tries we need to sync and any segments that are created for them
 
 	// track the main account trie specifically to commit its root at the end of the operation
 	mainTrie *trieToSync

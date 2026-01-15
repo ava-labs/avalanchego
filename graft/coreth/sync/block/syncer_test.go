@@ -22,8 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 	ethparams "github.com/ava-labs/libevm/params"
