@@ -61,16 +61,18 @@ show_usage() {
 Usage: $0 [test-name]
 
 Available tests:
-  help                         - Show this help message
+  help                              - Show this help message
 
-  default                      - Quick test run (blocks 101-200, hashdb)
-  hashdb-101-250k              - Blocks 101-250k with hashdb
-  hashdb-archive-101-250k      - Blocks 101-250k with hashdb archive
-  hashdb-33m-33m500k           - Blocks 33m-33.5m with hashdb
-  firewood-101-250k            - Blocks 101-250k with firewood
-  firewood-archive-101-250k    - Blocks 101-250k with firewood archive
-  firewood-33m-33m500k         - Blocks 33m-33.5m with firewood
-  firewood-33m-40m             - Blocks 33m-40m with firewood
+  default                           - Quick test run (blocks 101-200, hashdb)
+  hashdb-101-250k                   - Blocks 101-250k with hashdb
+  hashdb-archive-101-250k           - Blocks 101-250k with hashdb archive
+  hashdb-33m-33m500k                - Blocks 33m-33.5m with hashdb
+  firewood-101-250k                 - Blocks 101-250k with firewood
+  firewood-archive-101-250k         - Blocks 101-250k with firewood archive
+  firewood-33m-33m500k              - Blocks 33m-33.5m with firewood
+  firewood-archive-33m-33m500k      - Blocks 33m-33.5m with firewood archive
+  firewood-33m-40m                  - Blocks 33m-40m with firewood
+  firewood-archive-33m-40m          - Blocks 33m-40m with firewood archive
 EOF
 }
 
@@ -129,12 +131,26 @@ if [[ -n "$TEST_NAME" ]]; then
             END_BLOCK="${END_BLOCK:-33500000}"
             CONFIG="${CONFIG:-firewood}"
             ;;
+        firewood-archive-33m-33m500k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-30m-40m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-archive-33m}"
+            START_BLOCK="${START_BLOCK:-33000001}"
+            END_BLOCK="${END_BLOCK:-33500000}"
+            CONFIG="${CONFIG:-firewood-archive}"
+            ;;
         firewood-33m-40m)
             BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-30m-40m-ldb}"
             CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-33m}"
             START_BLOCK="${START_BLOCK:-33000001}"
             END_BLOCK="${END_BLOCK:-40000000}"
             CONFIG="${CONFIG:-firewood}"
+            ;;
+        firewood-archive-33m-40m)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-30m-40m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-archive-33m}"
+            START_BLOCK="${START_BLOCK:-33000001}"
+            END_BLOCK="${END_BLOCK:-40000000}"
+            CONFIG="${CONFIG:-firewood-archive}"
             ;;
         *)
             error "Unknown test '$TEST_NAME'"
