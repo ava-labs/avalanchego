@@ -42,8 +42,8 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/ethdb"
 
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/pruner"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/pruner"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"

@@ -8,6 +8,7 @@ require (
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18
 	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
 	github.com/gorilla/rpc v1.2.0
+	github.com/holiman/bloomfilter/v2 v2.0.3
 	github.com/holiman/uint256 v1.2.4
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.45.0
@@ -45,7 +46,6 @@ require (
 	github.com/google/renameio/v2 v2.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
-	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect

@@ -37,9 +37,9 @@ import (
 
 	ethparams "github.com/ava-labs/libevm/params"
 
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/pruner"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/pruner"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool/legacypool"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/ethconfig"

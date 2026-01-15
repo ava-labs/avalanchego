@@ -31,7 +31,7 @@ import (
 	"os"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
