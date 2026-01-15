@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/evmstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/ids"
@@ -27,7 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	blocksync "github.com/ava-labs/avalanchego/graft/coreth/sync/block"
-	evmtypes "github.com/ava-labs/libevm/core/types"
+	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 // BlocksToFetch is the number of the block parents the state syncs to.
@@ -49,7 +49,7 @@ var (
 // return *types.Block, which is needed to update chain pointers at the
 // end of the sync operation.
 type EthBlockWrapper interface {
-	GetEthBlock() *evmtypes.Block
+	GetEthBlock() *ethtypes.Block
 }
 
 // BlockAcceptor provides a mechanism to update the last accepted block ID during state synchronization.

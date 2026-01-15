@@ -17,15 +17,15 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 var (
-	_ syncclient.LeafSyncTask = (*trieSegment)(nil)
-	_ fmt.Stringer            = (*trieSegment)(nil)
+	_ leaf.SyncTask = (*trieSegment)(nil)
+	_ fmt.Stringer  = (*trieSegment)(nil)
 )
 
 // trieToSync keeps the state of a single trie syncing

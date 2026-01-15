@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
-	evmtypes "github.com/ava-labs/libevm/core/types"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 var _ types.SummaryProvider = (*SummaryProvider)(nil)
@@ -28,7 +28,7 @@ func (a *SummaryProvider) Initialize(trie *state.AtomicTrie) {
 }
 
 // StateSummaryAtBlock returns the block state summary at [blk] if valid.
-func (a *SummaryProvider) StateSummaryAtBlock(blk *evmtypes.Block) (block.StateSummary, error) {
+func (a *SummaryProvider) StateSummaryAtBlock(blk *ethtypes.Block) (block.StateSummary, error) {
 	height := blk.NumberU64()
 	atomicRoot, err := a.trie.Root(height)
 	if err != nil {

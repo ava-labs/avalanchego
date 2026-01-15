@@ -22,8 +22,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/atomictest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
@@ -218,7 +219,7 @@ func TestSyncerContextCancellation(t *testing.T) {
 
 // setupParallelizationTest creates the common test infrastructure for parallelization tests.
 // It returns the context, mock client, atomic backend, client DB, and root hash for testing.
-func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Context, *syncclient.TestClient, *state.AtomicBackend, *versiondb.Database, common.Hash) {
+func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Context, *client.TestClient, *state.AtomicBackend, *versiondb.Database, common.Hash) {
 	// Create a simple test trie with some data.
 	r := rand.New(rand.NewSource(1))
 	serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
@@ -230,7 +231,7 @@ func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Contex
 }
 
 // runParallelizationTest executes a parallelization test with the given parameters.
-func runParallelizationTest(t *testing.T, ctx context.Context, mockClient *syncclient.TestClient, clientDB *versiondb.Database, atomicBackend *state.AtomicBackend, root common.Hash, targetHeight uint64, numWorkers int) {
+func runParallelizationTest(t *testing.T, ctx context.Context, mockClient *client.TestClient, clientDB *versiondb.Database, atomicBackend *state.AtomicBackend, root common.Hash, targetHeight uint64, numWorkers int) {
 	syncer, err := NewSyncer(mockClient, clientDB, atomicBackend.AtomicTrie(), root, targetHeight)
 	require.NoError(t, err, "NewSyncer()")
 
@@ -274,7 +275,7 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 		}
 
 		err = syncer.Sync(ctx)
-		require.ErrorIs(t, err, syncclient.ErrFailedToFetchLeafs)
+		require.ErrorIs(t, err, leaf.ErrFailedToFetchLeafs)
 
 		require.Equal(t, checkpoint.expectedNumLeavesSynced, int64(numLeaves), "unexpected number of leaves received at checkpoint %d", i)
 		// Replace the target root and height for the next checkpoint
@@ -343,11 +344,11 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 
 // setupTestInfrastructure creates the common test infrastructure components.
 // It returns the context, mock client, atomic backend, and client database.
-func setupTestInfrastructure(t *testing.T, serverTrieDB *triedb.Database) (context.Context, *syncclient.TestClient, *state.AtomicBackend, *versiondb.Database) {
+func setupTestInfrastructure(t *testing.T, serverTrieDB *triedb.Database) (context.Context, *client.TestClient, *state.AtomicBackend, *versiondb.Database) {
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
-	mockClient := syncclient.NewTestClient(
+	mockClient := client.NewTestClient(
 		message.Codec,
 		handlers.NewLeafsRequestHandler(serverTrieDB, state.TrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats()),
 		nil,

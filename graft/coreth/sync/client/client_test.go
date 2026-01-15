@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package syncclient
+package client
 
 import (
 	"bytes"
@@ -27,8 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 
+	clientstats "github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
-	clientstats "github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient/stats"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -94,7 +94,7 @@ func TestGetCode(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			testNetClient := &testNetwork{}
-			stateSyncClient := NewClient(&ClientConfig{
+			stateSyncClient := NewClient(&Config{
 				NetworkClient:    testNetClient,
 				Codec:            message.Codec,
 				Stats:            clientstats.NewNoOpStats(),
@@ -323,7 +323,7 @@ func TestGetBlocks(t *testing.T) {
 			t.Parallel()
 			// Construct client
 			testNetClient := &testNetwork{}
-			stateSyncClient := NewClient(&ClientConfig{
+			stateSyncClient := NewClient(&Config{
 				NetworkClient:    testNetClient,
 				Codec:            message.Codec,
 				Stats:            clientstats.NewNoOpStats(),
@@ -661,7 +661,7 @@ func TestGetLeafs(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			client := NewClient(&ClientConfig{
+			client := NewClient(&Config{
 				NetworkClient:    &testNetwork{},
 				Codec:            message.Codec,
 				Stats:            clientstats.NewNoOpStats(),
@@ -693,7 +693,7 @@ func TestGetLeafsRetries(t *testing.T) {
 	testNetClient := &testNetwork{}
 
 	const maxAttempts = 8
-	client := NewClient(&ClientConfig{
+	client := NewClient(&Config{
 		NetworkClient:    testNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
@@ -751,7 +751,7 @@ func TestStateSyncNodes(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		ids.GenerateTestNodeID(),
 	}
-	client := NewClient(&ClientConfig{
+	client := NewClient(&Config{
 		NetworkClient:    testNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),

@@ -58,9 +58,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient/stats"
 	"github.com/ava-labs/avalanchego/graft/coreth/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
@@ -96,7 +96,7 @@ var (
 	_ block.ChainVM                      = (*VM)(nil)
 	_ block.BuildBlockWithContextChainVM = (*VM)(nil)
 	_ block.StateSyncableVM              = (*VM)(nil)
-	_ syncclient.EthBlockParser          = (*VM)(nil)
+	_ client.EthBlockParser              = (*VM)(nil)
 	_ synccore.BlockAcceptor             = (*VM)(nil)
 )
 
@@ -648,8 +648,8 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		StateSyncDone: vm.stateSyncDone,
 		Chain:         vm.eth,
 		State:         vm.State,
-		Client: syncclient.NewClient(
-			&syncclient.ClientConfig{
+		Client: client.NewClient(
+			&client.Config{
 				NetworkClient:    vm.Network,
 				Codec:            vm.networkCodec,
 				Stats:            stats.NewClientSyncerStats(leafMetricsNames),

@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
@@ -30,7 +30,7 @@ var _ types.Syncer = (*Syncer)(nil)
 // The syncer performs in-flight deduplication and skips locally-present code before issuing requests.
 type Syncer struct {
 	db     ethdb.Database
-	client syncclient.Client
+	client client.Client
 	// Channel of incoming code hash requests provided by the fetcher.
 	codeHashes <-chan common.Hash
 
@@ -74,7 +74,7 @@ func WithCodeHashesPerRequest(n int) SyncerOption {
 
 // NewSyncer allows external packages (e.g., registry wiring) to create a code syncer
 // that consumes hashes from a provided fetcher queue.
-func NewSyncer(client syncclient.Client, db ethdb.Database, codeHashes <-chan common.Hash, opts ...SyncerOption) (*Syncer, error) {
+func NewSyncer(client client.Client, db ethdb.Database, codeHashes <-chan common.Hash, opts ...SyncerOption) (*Syncer, error) {
 	cfg := syncerConfig{
 		numWorkers:       defaultNumCodeFetchingWorkers,
 		codeHashesPerReq: message.MaxCodeHashesPerRequest,

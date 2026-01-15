@@ -13,9 +13,8 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
-
-	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
 )
 
 const blocksPerRequest = 32
@@ -28,13 +27,13 @@ var (
 
 type BlockSyncer struct {
 	db            ethdb.Database
-	client        statesyncclient.Client
+	client        client.Client
 	fromHash      common.Hash
 	fromHeight    uint64
 	blocksToFetch uint64
 }
 
-func NewSyncer(client statesyncclient.Client, db ethdb.Database, fromHash common.Hash, fromHeight uint64, blocksToFetch uint64) (*BlockSyncer, error) {
+func NewSyncer(client client.Client, db ethdb.Database, fromHash common.Hash, fromHeight uint64, blocksToFetch uint64) (*BlockSyncer, error) {
 	if blocksToFetch == 0 {
 		return nil, errBlocksToFetchRequired
 	}

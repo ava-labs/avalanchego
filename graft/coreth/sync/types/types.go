@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -45,7 +45,7 @@ type SummaryProvider interface {
 // Extender is an interface that allows for extending the state sync process.
 type Extender interface {
 	// CreateSyncer creates a syncer instance for the given client, database, and summary.
-	CreateSyncer(client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) (Syncer, error)
+	CreateSyncer(client leaf.Client, verDB *versiondb.Database, summary message.Syncable) (Syncer, error)
 
 	// OnFinishBeforeCommit is called before committing the sync results.
 	OnFinishBeforeCommit(lastAcceptedHeight uint64, summary message.Syncable) error
