@@ -59,14 +59,3 @@ func ParseABI(rawABI string) abi.ABI {
 
 	return parsed
 }
-
-func UnpackInterface[T any](abi abi.ABI, methodName string, input []byte, useStrictMode bool) (T, error) {
-	var result T
-	var err error
-	if useStrictMode {
-		err = abi.UnpackIntoInterface(&result, methodName, input)
-	} else {
-		err = abi.UnpackInputIntoInterface(&result, methodName, input)
-	}
-	return result, err
-}

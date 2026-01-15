@@ -72,7 +72,8 @@ func UnpackMintNativeCoinInput(input []byte, useStrictMode bool) (common.Address
 	if useStrictMode && len(input) != mintInputLen {
 		return common.Address{}, nil, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
 	}
-	inputStruct, err := contract.UnpackInterface[MintNativeCoinInput](NativeMinterABI, "mintNativeCoin", input, useStrictMode)
+	inputStruct := MintNativeCoinInput{}
+	err := NativeMinterABI.UnpackInputIntoInterface(&inputStruct, "mintNativeCoin", input, useStrictMode)
 	if err != nil {
 		return common.Address{}, nil, fmt.Errorf("%w: %w", ErrUnpackInput, err)
 	}

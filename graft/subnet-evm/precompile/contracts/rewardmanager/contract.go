@@ -184,15 +184,7 @@ func PackSetRewardAddress(addr common.Address) ([]byte, error) {
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 // if [useStrictMode] is true, it will return an error if the length of [input] is not divisible by 32
 func UnpackSetRewardAddressInput(input []byte, useStrictMode bool) (common.Address, error) {
-	var (
-		res []any
-		err error
-	)
-	if useStrictMode {
-		res, err = RewardManagerABI.Unpack("setRewardAddress", input)
-	} else {
-		res, err = RewardManagerABI.UnpackInput("setRewardAddress", input)
-	}
+	res, err := RewardManagerABI.UnpackInput("setRewardAddress", input, useStrictMode)
 	if err != nil {
 		return common.Address{}, err
 	}

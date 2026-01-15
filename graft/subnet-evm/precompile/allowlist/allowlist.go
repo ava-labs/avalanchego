@@ -78,8 +78,9 @@ func UnpackModifyAllowListInput(input []byte, r Role, useStrictMode bool) (commo
 	if err != nil {
 		return common.Address{}, err
 	}
-
-	return contract.UnpackInterface[common.Address](AllowListABI, funcName, input, useStrictMode)
+	var modifyAddress common.Address
+	err = AllowListABI.UnpackInputIntoInterface(&modifyAddress, funcName, input, useStrictMode)
+	return modifyAddress, err
 }
 
 // createAllowListRoleSetter returns an execution function for setting the allow list status of the input address argument to [role].
@@ -143,7 +144,9 @@ func UnpackReadAllowListInput(input []byte, useStrictMode bool) (common.Address,
 		return common.Address{}, fmt.Errorf("invalid input length for read allow list: %d", len(input))
 	}
 
-	return contract.UnpackInterface[common.Address](AllowListABI, "readAllowList", input, useStrictMode)
+	var modifyAddress common.Address
+	err := AllowListABI.UnpackInputIntoInterface(&modifyAddress, "readAllowList", input, useStrictMode)
+	return modifyAddress, err
 }
 
 func PackReadAllowListOutput(roleNumber *big.Int) ([]byte, error) {

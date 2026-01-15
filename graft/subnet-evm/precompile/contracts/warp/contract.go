@@ -154,7 +154,8 @@ func getBlockchainID(accessibleState contract.AccessibleState, caller common.Add
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func UnpackGetVerifiedWarpBlockHashInput(input []byte) (uint32, error) {
 	// We don't use strict mode here because it was disabled with Durango.
-	res, err := WarpABI.UnpackInput("getVerifiedWarpBlockHash", input)
+	// Since Warp will be deployed after Durango, we don't need to use strict mode
+	res, err := WarpABI.UnpackInput("getVerifiedWarpBlockHash", input, false)
 	if err != nil {
 		return 0, err
 	}
@@ -196,7 +197,8 @@ func getVerifiedWarpBlockHash(accessibleState contract.AccessibleState, caller c
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func UnpackGetVerifiedWarpMessageInput(input []byte) (uint32, error) {
 	// We don't use strict mode here because it was disabled with Durango.
-	res, err := WarpABI.UnpackInput("getVerifiedWarpMessage", input)
+	// Since Warp will be deployed after Durango, we don't need to use strict mode.
+	res, err := WarpABI.UnpackInput("getVerifiedWarpMessage", input, false)
 	if err != nil {
 		return 0, err
 	}
@@ -241,7 +243,8 @@ func getVerifiedWarpMessage(accessibleState contract.AccessibleState, caller com
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func UnpackSendWarpMessageInput(input []byte) ([]byte, error) {
 	// We don't use strict mode here because it was disabled with Durango.
-	res, err := WarpABI.UnpackInput("sendWarpMessage", input)
+	// Since Warp will be deployed after Durango, we don't need to use strict mode.
+	res, err := WarpABI.UnpackInput("sendWarpMessage", input, false)
 	if err != nil {
 		return []byte{}, err
 	}
