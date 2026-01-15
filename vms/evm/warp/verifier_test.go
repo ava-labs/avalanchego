@@ -259,7 +259,7 @@ func TestHandlerMessageSignature(t *testing.T) {
 	tests := []struct {
 		name          string
 		setupMessage  func(db *DB) *warp.UnsignedMessage
-		wantErrCode   *int32 // nil if no error expected
+		wantErrCode   error
 		wantSignature bool
 		wantMetrics   metricExpectations
 	}{
@@ -288,7 +288,7 @@ func TestHandlerMessageSignature(t *testing.T) {
 				require.NoError(t, err)
 				return msg
 			},
-			wantErrCode: func() *int32 { i := int32(ParseErrCode); return &i }(),
+			wantErrCode: &common.AppError{Code: ParseErrCode},
 			wantMetrics: metricExpectations{
 				messageParseFail: 1,
 				blockVerifyFail:  0,
@@ -303,7 +303,7 @@ func TestHandlerMessageSignature(t *testing.T) {
 			message := tt.setupMessage(setup.db)
 			_, appErr := sendSignatureRequest(t, ctx, setup, message)
 			if tt.wantErrCode != nil {
-				require.Equal(t, *tt.wantErrCode, appErr.Code)
+				require.ErrorIs(t, appErr, tt.wantErrCode)
 			} else {
 				require.Nil(t, appErr)
 			}

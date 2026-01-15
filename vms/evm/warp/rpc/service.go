@@ -29,7 +29,7 @@ var (
 	ErrBlockNotFound   = errors.New("block not found")
 )
 
-// Service introduces snowman specific functionality to the evm.
+// Service provides an RPC interface for warp messaging.
 // It provides caching and orchestration over the core warp primitives.
 type Service struct {
 	networkID      uint32
@@ -94,8 +94,8 @@ func NewService(
 }
 
 // GetMessage returns the Warp message associated with the given messageID.
-func (s *Service) GetMessage(messageID ids.ID) (hexutil.Bytes, error) {
-	message, err := s.getMessage(messageID)
+func (s *Service) GetMessage(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
+	message, err := s.getMessage(ctx, messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message %s: %w", messageID, err)
 	}
@@ -103,7 +103,7 @@ func (s *Service) GetMessage(messageID ids.ID) (hexutil.Bytes, error) {
 }
 
 // getMessage retrieves a message from cache, offchain messages, or database.
-func (s *Service) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
+func (s *Service) getMessage(_ context.Context, messageID ids.ID) (*warp.UnsignedMessage, error) {
 	if msg, ok := s.messageCache.Get(messageID); ok {
 		return msg, nil
 	}
@@ -123,7 +123,7 @@ func (s *Service) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
 
 // GetMessageSignature returns the BLS signature associated with the given messageID.
 func (s *Service) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
-	unsignedMessage, err := s.getMessage(messageID)
+	unsignedMessage, err := s.getMessage(ctx, messageID)
 	if err != nil {
 		return nil, fmt.Errorf("%w %s: %w", ErrMessageNotFound, messageID, err)
 	}
@@ -153,7 +153,7 @@ func (s *Service) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexuti
 
 // GetMessageAggregateSignature fetches the aggregate signature for the requested messageID.
 func (s *Service) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetID ids.ID) (signedMessageBytes hexutil.Bytes, err error) {
-	unsignedMessage, err := s.getMessage(messageID)
+	unsignedMessage, err := s.getMessage(ctx, messageID)
 	if err != nil {
 		return nil, err
 	}

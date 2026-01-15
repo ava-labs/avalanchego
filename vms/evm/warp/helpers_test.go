@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -29,10 +28,15 @@ import (
 )
 
 var (
-	networkID           uint32 = 54321
-	sourceChainID              = ids.GenerateTestID()
-	testSourceAddress          = utils.RandomBytes(20)
-	testPayload                = []byte("test")
+	networkID         uint32 = 54321
+	sourceChainID            = ids.GenerateTestID()
+	testSourceAddress        = []byte{
+		0x01, 0x02, 0x03, 0x04,
+		0x05, 0x06, 0x07, 0x08,
+		0x09, 0x0a, 0x0b, 0x0c,
+		0x0d, 0x0e, 0x0f, 0x10,
+		0x11, 0x12, 0x13, 0x14}
+	testPayload         = []byte("test")
 	testUnsignedMessage *warp.UnsignedMessage
 )
 
