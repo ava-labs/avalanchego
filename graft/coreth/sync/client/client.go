@@ -94,7 +94,7 @@ type EthBlockParser interface {
 	ParseEthBlock(b []byte) (*types.Block, error)
 }
 
-func NewClient(config *Config) *client {
+func New(config *Config) *client {
 	return &client{
 		networkClient:  config.NetworkClient,
 		codec:          config.Codec,

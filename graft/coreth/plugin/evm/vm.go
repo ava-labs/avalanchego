@@ -648,7 +648,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		StateSyncDone: vm.stateSyncDone,
 		Chain:         vm.eth,
 		State:         vm.State,
-		Client: client.NewClient(
+		Client: client.New(
 			&client.Config{
 				NetworkClient:    vm.Network,
 				Codec:            vm.networkCodec,
