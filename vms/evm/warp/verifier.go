@@ -11,13 +11,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -26,105 +23,104 @@ import (
 const (
 	ParseErrCode = iota + 1
 	VerifyErrCode
-
-	codecVersion   = 0
-	maxMessageSize = 24 * units.KiB
 )
 
-var (
-	_ acp118.Verifier = (*acp118Handler)(nil)
-
-	c codec.Manager
-)
-
-func init() {
-	c = codec.NewManager(maxMessageSize)
-	lc := linearcodec.NewDefault()
-
-	err := errors.Join(
-		lc.RegisterType(&ValidatorUptime{}),
-		c.RegisterCodec(codecVersion, lc),
-	)
-	if err != nil {
-		panic(err)
-	}
+// VerifyHandler defines how to handle different an unknown [payload.Payload]
+// that can be signed.
+//
+// TODO: separate [payload.AddressedCall] and [payload.Hash] into different p2p
+// protocols to deprecate this interface.
+type VerifyHandler interface {
+	VerifyBlockHash(ctx context.Context, p *payload.Hash) *common.AppError
+	VerifyUnknown(
+		p payload.Payload,
+		messageParseFail prometheus.Counter,
+	) *common.AppError
 }
 
-// ValidatorUptime is signed when the ValidationID is known and the validator
-// has been up for TotalUptime seconds.
-type ValidatorUptime struct {
-	ValidationID       ids.ID `serialize:"true"`
-	TotalUptimeSeconds uint64 `serialize:"true"` // in seconds
-}
-
-// ParseValidatorUptime converts a slice of bytes into a ValidatorUptime.
-func ParseValidatorUptime(b []byte) (*ValidatorUptime, error) {
-	var msg ValidatorUptime
-	if _, err := c.Unmarshal(b, &msg); err != nil {
-		return nil, err
-	}
-	return &msg, nil
-}
-
-// Bytes returns the binary representation of this payload.
-func (v *ValidatorUptime) Bytes() ([]byte, error) {
-	return c.Marshal(codecVersion, v)
-}
-
-// BlockStore provides access to accepted blocks.
-type BlockStore interface {
+// VM provides access to accepted blocks.
+type VM interface {
 	HasBlock(ctx context.Context, blockID ids.ID) error
 }
 
-// Verifier validates whether a warp message should be signed.
-type Verifier struct {
-	db            *DB
-	blockClient   BlockStore
-	uptimeTracker *uptimetracker.UptimeTracker
+// TODO naming
+var _ VerifyHandler = (*BlockVerifier)(nil)
 
-	messageParseFail        prometheus.Counter
-	addressedCallVerifyFail prometheus.Counter
-	blockVerifyFail         prometheus.Counter
-	uptimeVerifyFail        prometheus.Counter
+type BlockVerifier struct {
+	blockClient     VM
+	blockVerifyFail prometheus.Counter
 }
 
-// NewVerifier creates a new warp message verifier.
-func NewVerifier(
-	db *DB,
-	blockClient BlockStore,
-	uptimeTracker *uptimetracker.UptimeTracker,
-	reg prometheus.Registerer,
-) *Verifier {
-	v := &Verifier{
-		db:            db,
-		blockClient:   blockClient,
-		uptimeTracker: uptimeTracker,
-		messageParseFail: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "warp_backend_message_parse_fail",
-			Help: "Number of warp message parse failures",
-		}),
-		addressedCallVerifyFail: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "warp_backend_addressed_call_verify_fail",
-			Help: "Number of addressed call verification failures",
-		}),
+func NewBlockVerifier(vm VM, r prometheus.Registerer) (*BlockVerifier, error) {
+	b := &BlockVerifier{
+		blockClient: vm,
 		blockVerifyFail: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "warp_backend_block_verify_fail",
 			Help: "Number of block verification failures",
 		}),
-		uptimeVerifyFail: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "warp_backend_uptime_verify_fail",
-			Help: "Number of uptime verification failures",
+	}
+
+	if err := r.Register(b.blockVerifyFail); err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+func (b *BlockVerifier) VerifyBlockHash(
+	ctx context.Context,
+	hash *payload.Hash,
+) *common.AppError {
+	if err := b.blockClient.HasBlock(ctx, hash.Hash); err != nil {
+		b.blockVerifyFail.Inc()
+		return &common.AppError{
+			Code:    VerifyErrCode,
+			Message: fmt.Sprintf("failed to get block %s: %s", hash.Hash, err),
+		}
+	}
+
+	return nil
+}
+
+func (b *BlockVerifier) VerifyUnknown(
+	p payload.Payload,
+	messageParseFail prometheus.Counter,
+) *common.AppError {
+	messageParseFail.Inc()
+	return &common.AppError{
+		Code:    ParseErrCode,
+		Message: fmt.Sprintf("unknown payload type: %T", p),
+	}
+}
+
+// Verifier validates whether a warp message should be signed.
+type Verifier struct {
+	handler VerifyHandler
+	db            *DB
+	uptimeTracker *uptimetracker.UptimeTracker
+	messageParseFail        prometheus.Counter
+}
+
+// NewVerifier creates a new warp message verifier.
+func NewVerifier(
+	handler VerifyHandler,
+	db *DB,
+	r prometheus.Registerer,
+) (*Verifier, error) {
+	v := &Verifier{
+		handler: handler,
+		db:            db,
+		messageParseFail: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "warp_backend_message_parse_fail",
+			Help: "Number of warp message parse failures",
 		}),
 	}
 
-	if reg != nil {
-		reg.MustRegister(v.messageParseFail)
-		reg.MustRegister(v.addressedCallVerifyFail)
-		reg.MustRegister(v.blockVerifyFail)
-		reg.MustRegister(v.uptimeVerifyFail)
+	if err := r.Register(v.messageParseFail); err != nil {
+		return nil, err
 	}
 
-	return v
+	return v, nil
 }
 
 // Verify validates whether a warp message should be signed.
@@ -150,81 +146,14 @@ func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 	}
 
 	switch p := parsed.(type) {
-	case *payload.AddressedCall:
-		return v.verifyOffchainAddressedCall(p)
 	case *payload.Hash:
-		return v.verifyBlockMessage(ctx, p)
+		return v.handler.VerifyBlockHash(ctx, p)
 	default:
-		v.messageParseFail.Inc()
-		return &common.AppError{
-			Code:    ParseErrCode,
-			Message: fmt.Sprintf("unknown payload type: %T", p),
-		}
+		return v.handler.VerifyUnknown(p, v.messageParseFail)
 	}
 }
 
-// verifyBlockMessage returns nil if blockHashPayload contains the ID
-// of an accepted block indicating it should be signed by the VM.
-func (v *Verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *payload.Hash) *common.AppError {
-	blockID := blockHashPayload.Hash
-	if err := v.blockClient.HasBlock(ctx, blockID); err != nil {
-		v.blockVerifyFail.Inc()
-		return &common.AppError{
-			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("failed to get block %s: %s", blockID, err),
-		}
-	}
-
-	return nil
-}
-
-// verifyOffchainAddressedCall verifies the addressed call message
-func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
-	if len(addressedCall.SourceAddress) != 0 {
-		v.addressedCallVerifyFail.Inc()
-		return &common.AppError{
-			Code:    VerifyErrCode,
-			Message: "source address should be empty for offchain addressed messages",
-		}
-	}
-
-	uptimeMsg, err := ParseValidatorUptime(addressedCall.Payload)
-	if err != nil {
-		v.messageParseFail.Inc()
-		return &common.AppError{
-			Code:    ParseErrCode,
-			Message: fmt.Sprintf("failed to parse addressed call message: %s", err),
-		}
-	}
-
-	if err := v.verifyUptimeMessage(uptimeMsg); err != nil {
-		v.uptimeVerifyFail.Inc()
-		return err
-	}
-
-	return nil
-}
-
-func (v *Verifier) verifyUptimeMessage(uptimeMsg *ValidatorUptime) *common.AppError {
-	currentUptime, _, err := v.uptimeTracker.GetUptime(uptimeMsg.ValidationID)
-	if err != nil {
-		return &common.AppError{
-			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("failed to get uptime: %s", err),
-		}
-	}
-
-	currentUptimeSeconds := uint64(currentUptime.Seconds())
-	// verify the current uptime against the total uptime in the message
-	if currentUptimeSeconds < uptimeMsg.TotalUptimeSeconds {
-		return &common.AppError{
-			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("current uptime %d is less than queried uptime %d for validationID %s", currentUptimeSeconds, uptimeMsg.TotalUptimeSeconds, uptimeMsg.ValidationID),
-		}
-	}
-
-	return nil
-}
+var _ acp118.Verifier = (*acp118Handler)(nil)
 
 // acp118Handler supports signing warp messages requested by peers.
 type acp118Handler struct {

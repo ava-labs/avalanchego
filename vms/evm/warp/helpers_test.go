@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -89,7 +89,7 @@ func setupHandler(
 	t *testing.T,
 	ctx context.Context,
 	database database.Database,
-	blockStore BlockStore,
+	blockStore VM,
 	uptimeTracker *uptimetracker.UptimeTracker,
 	networkID uint32,
 	chainID ids.ID,

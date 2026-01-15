@@ -448,7 +448,19 @@ func (vm *VM) Initialize(
 
 	vm.warpMsgDB = warp.NewDB(vm.warpDB)
 	warpMetrics := prometheus.NewRegistry()
-	vm.warpVerifier = warp.NewVerifier(vm.warpMsgDB, vm, nil, warpMetrics)
+	blockVerifier, err := warp.NewBlockVerifier(vm, warpMetrics),
+	if err != nil {
+		return err
+	}
+	vm.warpVerifier, err = warp.NewVerifier(
+		blockVerifier,
+		vm.warpMsgDB,
+		warpMetrics,
+	)
+	if err != nil {
+		return err
+	}
+
 	if err := vm.ctx.Metrics.Register(warpMetricsPrefix, warpMetrics); err != nil {
 		return err
 	}

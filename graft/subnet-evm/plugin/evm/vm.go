@@ -77,7 +77,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
-	"github.com/ava-labs/avalanchego/vms/evm/warp"
+	evmwarp "github.com/ava-labs/avalanchego/vms/evm/warp"
 
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
 	vmsync "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync"
@@ -91,6 +91,7 @@ import (
 	warpRPC "github.com/ava-labs/avalanchego/vms/evm/warp/rpc"
 	ethparams "github.com/ava-labs/libevm/params"
 	avalancheRPC "github.com/gorilla/rpc/v2"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/warp"
 )
 
 var (
@@ -256,8 +257,8 @@ type VM struct {
 
 	// Avalanche Warp Messaging components
 	// Used to serve BLS signatures of warp messages over RPC
-	warpMsgDB          *warp.DB
-	warpVerifier       *warp.Verifier
+	warpMsgDB    *evmwarp.DB
+	warpVerifier *evmwarp.Verifier
 	warpSignatureCache cache.Cacher[ids.ID, []byte]
 	warpService        *warpRPC.Service
 
@@ -476,9 +477,20 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	vm.warpMsgDB = warp.NewDB(vm.warpDB)
+	vm.warpMsgDB = evmwarp.NewDB(vm.warpDB)
 	warpMetrics := prometheus.NewRegistry()
-	vm.warpVerifier = warp.NewVerifier(vm.warpMsgDB, vm, vm.uptimeTracker, warpMetrics)
+	verifier, err := warp.NewVerifier(vm, vm.uptimeTracker, warpMetrics)
+	if err != nil {
+		return err
+	}
+	vm.warpVerifier, err = evmwarp.NewVerifier(
+		verifier,
+		vm.warpMsgDB,
+		warpMetrics,
+	)
+	if err != nil {
+
+	}
 	if err := vm.ctx.Metrics.Register(warpMetricsPrefix, warpMetrics); err != nil {
 		return err
 	}
@@ -490,7 +502,7 @@ func (vm *VM) Initialize(
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
 	// Add p2p warp message warpHandler
-	warpHandler := warp.NewHandler(vm.warpSignatureCache, vm.warpVerifier, vm.ctx.WarpSigner)
+	warpHandler := evmwarp.NewHandler(vm.warpSignatureCache, vm.warpVerifier, vm.ctx.WarpSigner)
 	if err = vm.P2PNetwork().AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
 		return err
 	}
