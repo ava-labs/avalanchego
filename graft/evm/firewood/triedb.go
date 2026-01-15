@@ -51,9 +51,6 @@ type TrieDB struct {
 	// and the latest state can be modified at any time.
 	Firewood *ffi.Database
 
-	// kvStore is used for storing recovery information.
-	kvStore ethdb.Database
-
 	// possible temporarily holds proposals created during a trie update.
 	// This is cleared after the update is complete and the proposals have been sent to the database.
 	// It's unexpected for multiple updates to this to occur simultaneously, but a lock is used to ensure safety.
@@ -123,8 +120,8 @@ func DefaultConfig(dir string) TrieDBConfig {
 // BackendConstructor implements the [triedb.DBConstructor] interface.
 // It creates a new Firewood database with the given configuration.
 // Any error during creation will cause the program to exit.
-func (c TrieDBConfig) BackendConstructor(disk ethdb.Database) triedb.DBOverride {
-	db, err := New(c, disk)
+func (c TrieDBConfig) BackendConstructor(ethdb.Database) triedb.DBOverride {
+	db, err := New(c)
 	if err != nil {
 		log.Crit("firewood: creating database", "error", err)
 	}
@@ -133,13 +130,7 @@ func (c TrieDBConfig) BackendConstructor(disk ethdb.Database) triedb.DBOverride 
 
 // New creates a new Firewood database with the given configuration.
 // The database will not be opened on error.
-func New(config TrieDBConfig, disk ethdb.Database) (*TrieDB, error) {
-	height := ReadCommittedHeight(disk)
-	blockHashes, err := ReadCommittedBlockHashes(disk)
-	if err != nil {
-		return nil, err
-	}
-
+func New(config TrieDBConfig) (*TrieDB, error) {
 	if err := validateDir(config.DatabaseDir); err != nil {
 		return nil, err
 	}
@@ -167,16 +158,17 @@ func New(config TrieDBConfig, disk ethdb.Database) (*TrieDB, error) {
 		return nil, err
 	}
 
+	blockHashes := make(map[common.Hash]struct{})
+	blockHashes[common.Hash{}] = struct{}{}
 	return &TrieDB{
 		Firewood: fw,
-		kvStore:  disk,
 		proposals: proposals{
 			byStateRoot: make(map[common.Hash][]*proposal),
 			tree: &proposal{
 				proposalMeta: &proposalMeta{
 					root:        common.Hash(intialRoot),
 					blockHashes: blockHashes,
-					height:      height,
+					height:      0,
 				},
 			},
 		},
@@ -202,6 +194,17 @@ func validateDir(dir string) error {
 	}
 
 	return nil
+}
+
+// SetHashAndHeight sets the committed block hashes and height in memory.
+// This must be called at startup to initialize the in-memory state, unless
+// explicitly committing a genesis block.
+func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
+	t.Lock()
+	defer t.Unlock()
+	clear(t.tree.blockHashes)
+	t.tree.blockHashes[blockHash] = struct{}{}
+	t.tree.height = height
 }
 
 // Scheme returns the scheme of the database.
@@ -392,14 +395,6 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	// On success, we should remove all children of the committed proposal.
 	// They will never be committed.
 	t.cleanupCommittedProposal(p)
-
-	// Update the committed block hashes and height on disk to enable recovery.
-	if err := WriteCommittedBlockHashes(t.kvStore, p.blockHashes); err != nil {
-		return err
-	}
-	if err := WriteCommittedHeight(t.kvStore, p.height); err != nil {
-		return err
-	}
 	return nil
 }
 
