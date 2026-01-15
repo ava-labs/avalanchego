@@ -37,8 +37,8 @@ func TestCodecSerialization(t *testing.T) {
 		{
 			name: "zero values",
 			msg: &ValidatorUptime{
-				ValidationID: ids.Empty,
-				TotalUptime:  0,
+				ValidationID:       ids.Empty,
+				TotalUptimeSeconds: 0,
 			},
 			wantBytes: []byte{
 				// Codec version (0)
@@ -61,7 +61,7 @@ func TestCodecSerialization(t *testing.T) {
 					0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
 					0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
 				},
-				TotalUptime: 12345,
+				TotalUptimeSeconds: 12345,
 			},
 			wantBytes: []byte{
 				// Codec version (0)
@@ -84,7 +84,7 @@ func TestCodecSerialization(t *testing.T) {
 					0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 					0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				},
-				TotalUptime: ^uint64(0),
+				TotalUptimeSeconds: ^uint64(0),
 			},
 			wantBytes: []byte{
 				// Codec version (0)
@@ -111,7 +111,7 @@ func TestCodecSerialization(t *testing.T) {
 			gotMsg, err := ParseValidatorUptime(tt.wantBytes)
 			require.NoError(err)
 			require.Equal(tt.msg.ValidationID, gotMsg.ValidationID)
-			require.Equal(tt.msg.TotalUptime, gotMsg.TotalUptime)
+			require.Equal(tt.msg.TotalUptimeSeconds, gotMsg.TotalUptimeSeconds)
 		})
 	}
 }
@@ -219,7 +219,7 @@ func TestVerifierBlockMessage(t *testing.T) {
 func TestVerifierMalformedPayload(t *testing.T) {
 	db := memdb.New()
 	messageDB := NewDB(db)
-	v := NewVerifier(messageDB, emptyBlockStore, nil, prometheus.NewRegistry())
+	v := NewVerifier(messageDB, nil, nil, prometheus.NewRegistry())
 
 	invalidPayload := []byte{0xFF, 0xFF, 0xFF, 0xFF}
 	msg, err := warp.NewUnsignedMessage(networkID, sourceChainID, invalidPayload)
@@ -235,7 +235,7 @@ func TestVerifierMalformedPayload(t *testing.T) {
 func TestVerifierMalformedUptimePayload(t *testing.T) {
 	db := memdb.New()
 	messageDB := NewDB(db)
-	v := NewVerifier(messageDB, emptyBlockStore, nil, prometheus.NewRegistry())
+	v := NewVerifier(messageDB, nil, nil, prometheus.NewRegistry())
 
 	invalidUptimeBytes := []byte{0xFF, 0xFF, 0xFF}
 	addressedCall, err := payload.NewAddressedCall([]byte{}, invalidUptimeBytes)
@@ -298,7 +298,7 @@ func TestHandlerMessageSignature(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setup := setupHandler(t, ctx, memdb.New(), emptyBlockStore, nil, snowCtx.NetworkID, snowCtx.ChainID)
+			setup := setupHandler(t, ctx, memdb.New(), nil, nil, snowCtx.NetworkID, snowCtx.ChainID)
 
 			message := tt.setupMessage(setup.db)
 			_, appErr := sendSignatureRequest(t, ctx, setup, message)
@@ -467,11 +467,11 @@ func TestHandlerUptimeSignature(t *testing.T) {
 
 			tt.setupUptimeTracker(uptimeTracker, clk)
 
-			setup := setupHandler(t, ctx, memdb.New(), emptyBlockStore, uptimeTracker, snowCtx.NetworkID, snowCtx.ChainID)
+			setup := setupHandler(t, ctx, memdb.New(), nil, uptimeTracker, snowCtx.NetworkID, snowCtx.ChainID)
 
 			uptimePayload := &ValidatorUptime{
-				ValidationID: tt.validationID,
-				TotalUptime:  requestedUptime,
+				ValidationID:       tt.validationID,
+				TotalUptimeSeconds: requestedUptime,
 			}
 			uptimeBytes, err := uptimePayload.Bytes()
 			require.NoError(t, err)
@@ -499,7 +499,7 @@ func TestHandlerCacheBehavior(t *testing.T) {
 
 	ctx := t.Context()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	setup := setupHandler(t, ctx, memdb.New(), emptyBlockStore, nil, snowCtx.NetworkID, snowCtx.ChainID)
+	setup := setupHandler(t, ctx, memdb.New(), nil, nil, snowCtx.NetworkID, snowCtx.ChainID)
 
 	knownPayload, err := payload.NewAddressedCall([]byte{0, 0, 0}, []byte("test"))
 	require.NoError(t, err)

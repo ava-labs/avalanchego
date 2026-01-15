@@ -53,8 +53,8 @@ func init() {
 // ValidatorUptime is signed when the ValidationID is known and the validator
 // has been up for TotalUptime seconds.
 type ValidatorUptime struct {
-	ValidationID ids.ID `serialize:"true"`
-	TotalUptime  uint64 `serialize:"true"` // in seconds
+	ValidationID       ids.ID `serialize:"true"`
+	TotalUptimeSeconds uint64 `serialize:"true"` // in seconds
 }
 
 // ParseValidatorUptime converts a slice of bytes into a ValidatorUptime.
@@ -76,14 +76,9 @@ type BlockStore interface {
 	HasBlock(ctx context.Context, blockID ids.ID) error
 }
 
-// MessageDB provides access to warp messages.
-type MessageDB interface {
-	Get(ids.ID) (*warp.UnsignedMessage, error)
-}
-
 // Verifier validates whether a warp message should be signed.
 type Verifier struct {
-	db            MessageDB
+	db            *DB
 	blockClient   BlockStore
 	uptimeTracker *uptimetracker.UptimeTracker
 
@@ -95,7 +90,7 @@ type Verifier struct {
 
 // NewVerifier creates a new warp message verifier.
 func NewVerifier(
-	db MessageDB,
+	db *DB,
 	blockClient BlockStore,
 	uptimeTracker *uptimetracker.UptimeTracker,
 	reg prometheus.Registerer,
@@ -221,10 +216,10 @@ func (v *Verifier) verifyUptimeMessage(uptimeMsg *ValidatorUptime) *common.AppEr
 
 	currentUptimeSeconds := uint64(currentUptime.Seconds())
 	// verify the current uptime against the total uptime in the message
-	if currentUptimeSeconds < uptimeMsg.TotalUptime {
+	if currentUptimeSeconds < uptimeMsg.TotalUptimeSeconds {
 		return &common.AppError{
 			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("current uptime %d is less than queried uptime %d for validationID %s", currentUptimeSeconds, uptimeMsg.TotalUptime, uptimeMsg.ValidationID),
+			Message: fmt.Sprintf("current uptime %d is less than queried uptime %d for validationID %s", currentUptimeSeconds, uptimeMsg.TotalUptimeSeconds, uptimeMsg.ValidationID),
 		}
 	}
 

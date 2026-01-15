@@ -39,7 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 
-	warpBackend "github.com/ava-labs/avalanchego/vms/evm/warp"
+	warpRPC "github.com/ava-labs/avalanchego/vms/evm/warp/rpc"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethereum "github.com/ava-labs/libevm"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -351,9 +351,9 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
 
-	warpAPIs := make(map[ids.NodeID]*warpBackend.Client, len(w.sendingSubnetURIs))
+	warpAPIs := make(map[ids.NodeID]*warpRPC.Client, len(w.sendingSubnetURIs))
 	for _, uri := range w.sendingSubnetURIs {
-		client, err := warpBackend.NewClient(uri, w.sendingSubnet.BlockchainID.String())
+		client, err := warpRPC.NewClient(uri, w.sendingSubnet.BlockchainID.String())
 		require.NoError(err)
 
 		infoClient := info.NewClient(uri)
@@ -382,7 +382,7 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	require.NotEmpty(warpValidators)
 
 	// Verify that the signature aggregation matches the results of manually constructing the warp message
-	client, err := warpBackend.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
+	client, err := warpRPC.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
 	require.NoError(err)
 
 	ginkgo.GinkgoLogr.Info("Fetching addressed call aggregate signature via p2p API")
@@ -591,7 +591,7 @@ func (w *warpTest) warpLoad() {
 	require.NoError(warpSendLoader.Execute(ctx))
 	require.NoError(warpSendLoader.ConfirmReachedTip(ctx))
 
-	warpClient, err := warpBackend.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
+	warpClient, err := warpRPC.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
 	require.NoError(err)
 	subnetID := ids.Empty
 	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {

@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/evm/warp"
 )
 
 // StatefulPrecompileConfig defines the interface for a stateful precompile to
@@ -54,14 +54,10 @@ type Predicater interface {
 	VerifyPredicate(predicateContext *PredicateContext, pred predicate.Predicate) error
 }
 
-type WarpMessageWriter interface {
-	Add(unsignedMessage *warp.UnsignedMessage) error
-}
-
 // AcceptContext defines the context passed in to a precompileconfig's Accepter
 type AcceptContext struct {
 	SnowCtx *snow.Context
-	Warp    WarpMessageWriter
+	Warp    *warp.DB
 }
 
 // Accepter is an optional interface for StatefulPrecompiledContracts to implement.

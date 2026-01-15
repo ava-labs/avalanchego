@@ -34,8 +34,6 @@ var (
 	testSourceAddress          = utils.RandomBytes(20)
 	testPayload                = []byte("test")
 	testUnsignedMessage *warp.UnsignedMessage
-
-	emptyBlockStore BlockStore = testBlockStore{}
 )
 
 func init() {
@@ -49,7 +47,6 @@ func init() {
 	}
 }
 
-// testBlockStore implements BlockStore for testing
 type testBlockStore set.Set[ids.ID]
 
 func (t testBlockStore) HasBlock(_ context.Context, blockID ids.ID) error {

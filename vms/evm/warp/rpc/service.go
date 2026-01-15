@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package warp
+package rpc
 
 import (
 	"context"
@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+
+	evmwarp "github.com/ava-labs/avalanchego/vms/evm/warp"
 )
 
 var (
@@ -34,9 +36,9 @@ type Service struct {
 	chainID        ids.ID
 	validatorState validators.State
 
-	db                  *DB
+	db                  *evmwarp.DB
 	signer              warp.Signer
-	verifier            *Verifier
+	verifier            *evmwarp.Verifier
 	signatureAggregator *acp118.SignatureAggregator
 
 	messageCache     *lru.Cache[ids.ID, *warp.UnsignedMessage]
@@ -48,9 +50,9 @@ func NewService(
 	networkID uint32,
 	chainID ids.ID,
 	validatorState validators.State,
-	db *DB,
+	db *evmwarp.DB,
 	signer warp.Signer,
-	verifier *Verifier,
+	verifier *evmwarp.Verifier,
 	signatureCache cache.Cacher[ids.ID, []byte],
 	signatureAggregator *acp118.SignatureAggregator,
 	offChainMessages [][]byte,
@@ -223,7 +225,7 @@ func (s *Service) signMessage(ctx context.Context, unsignedMessage *warp.Unsigne
 	}
 
 	if err := s.verifier.Verify(ctx, unsignedMessage); err != nil {
-		if err.Code == VerifyErrCode {
+		if err.Code == evmwarp.VerifyErrCode {
 			return nil, fmt.Errorf("%w: %w", ErrBlockNotFound, err)
 		}
 		return nil, fmt.Errorf("failed to verify message %s: %w", msgID, err)

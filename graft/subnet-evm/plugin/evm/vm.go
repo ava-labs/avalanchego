@@ -88,6 +88,7 @@ import (
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	avalanchegoprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
+	warpRPC "github.com/ava-labs/avalanchego/vms/evm/warp/rpc"
 	ethparams "github.com/ava-labs/libevm/params"
 	avalancheRPC "github.com/gorilla/rpc/v2"
 )
@@ -255,11 +256,10 @@ type VM struct {
 
 	// Avalanche Warp Messaging components
 	// Used to serve BLS signatures of warp messages over RPC
-	warpMsgDB            *warp.DB
-	warpVerifier         *warp.Verifier
-	warpSignatureCache   cache.Cacher[ids.ID, []byte]
-	offchainWarpMessages [][]byte
-	warpService          *warp.Service
+	warpMsgDB          *warp.DB
+	warpVerifier       *warp.Verifier
+	warpSignatureCache cache.Cacher[ids.ID, []byte]
+	warpService        *warpRPC.Service
 
 	// Initialize only sets these if nil so they can be overridden in tests
 	ethTxPushGossiper avalancheUtils.Atomic[*avalanchegossip.PushGossiper[*GossipEthTx]]
@@ -462,11 +462,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize uptime tracker: %w", err)
 	}
 
-	// Initialize warp backend
-	vm.offchainWarpMessages = make([][]byte, len(vm.config.WarpOffChainMessages))
-	for i, hexMsg := range vm.config.WarpOffChainMessages {
-		vm.offchainWarpMessages[i] = []byte(hexMsg)
-	}
 	warpSignatureCache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
 	meteredCache, err := metercacher.New("warp_signature_cache", vm.sdkMetrics, warpSignatureCache)
 	if err != nil {
@@ -1060,7 +1055,6 @@ func (vm *VM) getBlock(_ context.Context, id ids.ID) (snowman.Block, error) {
 }
 
 // HasBlock returns nil if the block is accepted, or an error otherwise.
-// Implements warp.BlockStore.
 func (vm *VM) HasBlock(ctx context.Context, blkID ids.ID) error {
 	blk, err := vm.GetBlock(ctx, blkID)
 	if err != nil {
@@ -1168,8 +1162,13 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		warpSDKClient := vm.P2PNetwork().NewClient(p2p.SignatureRequestHandlerID, vm.P2PValidators())
 		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)
 
+		offChainWarpMessages := make([][]byte, len(vm.config.WarpOffChainMessages))
+		for i, hexMsg := range vm.config.WarpOffChainMessages {
+			offChainWarpMessages[i] = []byte(hexMsg)
+		}
+
 		var err error
-		vm.warpService, err = warp.NewService(
+		vm.warpService, err = warpRPC.NewService(
 			vm.ctx.NetworkID,
 			vm.ctx.ChainID,
 			vm.ctx.ValidatorState,
@@ -1178,7 +1177,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 			vm.warpVerifier,
 			vm.warpSignatureCache,
 			signatureAggregator,
-			vm.offchainWarpMessages,
+			offChainWarpMessages,
 		)
 		if err != nil {
 			return nil, err

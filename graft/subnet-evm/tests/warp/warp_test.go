@@ -37,12 +37,12 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/evm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 
 	warpContract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	warptestbindings "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp/warptest/bindings"
+	warpRPC "github.com/ava-labs/avalanchego/vms/evm/warp/rpc"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	warpPayload "github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	ethereum "github.com/ava-labs/libevm"
@@ -436,9 +436,9 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
 
-	warpAPIs := make(map[ids.NodeID]*warp.Client, len(w.sendingSubnetURIs))
+	warpAPIs := make(map[ids.NodeID]*warpRPC.Client, len(w.sendingSubnetURIs))
 	for _, uri := range w.sendingSubnetURIs {
-		client, err := warp.NewClient(uri, w.sendingSubnet.BlockchainID.String())
+		client, err := warpRPC.NewClient(uri, w.sendingSubnet.BlockchainID.String())
 		require.NoError(err)
 
 		infoClient := info.NewClient(uri)
@@ -467,7 +467,7 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	require.NotEmpty(warpValidators)
 
 	// Verify that the signature aggregation matches the results of manually constructing the warp message
-	client, err := warp.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
+	client, err := warpRPC.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
 	require.NoError(err)
 
 	log.Info("Fetching addressed call aggregate signature via p2p API")
@@ -736,7 +736,7 @@ func (w *warpTest) warpLoad() {
 	require.NoError(warpSendLoader.Execute(ctx))
 	require.NoError(warpSendLoader.ConfirmReachedTip(ctx))
 
-	warpClient, err := warp.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
+	warpClient, err := warpRPC.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
 	require.NoError(err)
 	subnetID := ids.Empty
 	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {

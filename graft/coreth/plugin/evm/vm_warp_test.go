@@ -50,6 +50,7 @@ import (
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avagoUtils "github.com/ava-labs/avalanchego/utils"
+	warpRPC "github.com/ava-labs/avalanchego/vms/evm/warp/rpc"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -141,9 +142,9 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 
 	// Verify the signature cannot be fetched before the block is accepted
 	_, err = vm.warpService.GetMessageSignature(t.Context(), unsignedMessage.ID())
-	require.ErrorIs(err, warp.ErrMessageNotFound)
+	require.ErrorIs(err, warpRPC.ErrMessageNotFound)
 	_, err = vm.warpService.GetBlockSignature(t.Context(), blk.ID())
-	require.ErrorIs(err, warp.ErrBlockNotFound)
+	require.ErrorIs(err, warpRPC.ErrBlockNotFound)
 
 	require.NoError(vm.SetPreference(t.Context(), blk.ID()))
 	require.NoError(blk.Accept(t.Context()))
@@ -973,6 +974,6 @@ func TestClearWarpDB(t *testing.T) {
 	// ensure all messages have been deleted
 	for _, message := range messages {
 		_, err := vm.warpService.GetMessageSignature(t.Context(), message.ID())
-		require.ErrorIs(t, err, warp.ErrMessageNotFound)
+		require.ErrorIs(t, err, warpRPC.ErrMessageNotFound)
 	}
 }

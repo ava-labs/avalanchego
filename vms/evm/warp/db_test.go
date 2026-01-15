@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -35,47 +36,63 @@ func TestDBAddAndSign(t *testing.T) {
 }
 
 func TestDBGet(t *testing.T) {
-	db := memdb.New()
-	messageDB := NewDB(db)
+	tests := []struct {
+		name    string
+		setup   func(testing.TB, database.Database, *DB)
+		queryID func() ids.ID
+		wantMsg *warp.UnsignedMessage
+		wantErr error
+	}{
+		{
+			name: "existing message",
+			setup: func(t testing.TB, _ database.Database, db *DB) {
+				require.NoError(t, db.Add(testUnsignedMessage))
+			},
+			queryID: testUnsignedMessage.ID,
+			wantMsg: testUnsignedMessage,
+		},
+		{
+			name:    "not found",
+			setup:   func(testing.TB, database.Database, *DB) {},
+			queryID: testUnsignedMessage.ID,
+			wantErr: database.ErrNotFound,
+		},
+		{
+			name: "corrupted data",
+			setup: func(t testing.TB, rawDB database.Database, _ *DB) {
+				msgID := testUnsignedMessage.ID()
+				require.NoError(t, rawDB.Put(msgID[:], []byte{0xFF, 0xFF, 0xFF}))
+			},
+			queryID: testUnsignedMessage.ID,
+			wantErr: codec.ErrUnknownVersion,
+		},
+		{
+			name: "duplicate add",
+			setup: func(t testing.TB, _ database.Database, db *DB) {
+				require.NoError(t, db.Add(testUnsignedMessage))
+				require.NoError(t, db.Add(testUnsignedMessage))
+			},
+			queryID: testUnsignedMessage.ID,
+			wantMsg: testUnsignedMessage,
+		},
+	}
 
-	require.NoError(t, messageDB.Add(testUnsignedMessage))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rawDB := memdb.New()
+			messageDB := NewDB(rawDB)
+			tt.setup(t, rawDB, messageDB)
 
-	gotMsg, err := messageDB.Get(testUnsignedMessage.ID())
-	require.NoError(t, err)
-	require.Equal(t, testUnsignedMessage.Bytes(), gotMsg.Bytes())
-	require.Equal(t, testUnsignedMessage.ID(), gotMsg.ID())
-}
+			got, err := messageDB.Get(tt.queryID())
 
-func TestDBGetNotFound(t *testing.T) {
-	db := memdb.New()
-	messageDB := NewDB(db)
-
-	unknownID := testUnsignedMessage.ID()
-	_, err := messageDB.Get(unknownID)
-	require.ErrorIs(t, err, database.ErrNotFound)
-}
-
-func TestDBGetCorruptedData(t *testing.T) {
-	db := memdb.New()
-	messageDB := NewDB(db)
-
-	corruptedBytes := []byte{0xFF, 0xFF, 0xFF}
-	msgID := testUnsignedMessage.ID()
-	require.NoError(t, db.Put(msgID[:], corruptedBytes))
-
-	msg, err := messageDB.Get(msgID)
-	require.Nil(t, msg)
-	require.ErrorIs(t, err, codec.ErrUnknownVersion)
-}
-
-func TestDBAddDuplicate(t *testing.T) {
-	db := memdb.New()
-	messageDB := NewDB(db)
-
-	require.NoError(t, messageDB.Add(testUnsignedMessage))
-	require.NoError(t, messageDB.Add(testUnsignedMessage))
-
-	gotMsg, err := messageDB.Get(testUnsignedMessage.ID())
-	require.NoError(t, err)
-	require.Equal(t, testUnsignedMessage.Bytes(), gotMsg.Bytes())
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.wantMsg.Bytes(), got.Bytes())
+			require.Equal(t, tt.wantMsg.ID(), got.ID())
+		})
+	}
 }
