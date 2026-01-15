@@ -12,9 +12,9 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/libevm/common"
@@ -184,7 +184,15 @@ func PackSetRewardAddress(addr common.Address) ([]byte, error) {
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 // if [useStrictMode] is true, it will return an error if the length of [input] is not divisible by 32
 func UnpackSetRewardAddressInput(input []byte, useStrictMode bool) (common.Address, error) {
-	res, err := RewardManagerABI.UnpackInput("setRewardAddress", input, useStrictMode)
+	var (
+		res []any
+		err error
+	)
+	if useStrictMode {
+		res, err = RewardManagerABI.Unpack("setRewardAddress", input)
+	} else {
+		res, err = RewardManagerABI.UnpackInput("setRewardAddress", input)
+	}
 	if err != nil {
 		return common.Address{}, err
 	}

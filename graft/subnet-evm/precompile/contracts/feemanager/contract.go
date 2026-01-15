@@ -14,10 +14,10 @@ import (
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
+	"github.com/ava-labs/libevm/accounts/abi"
 )
 
 const (
@@ -187,8 +187,7 @@ func UnpackSetFeeConfigInput(input []byte, useStrictMode bool) (commontype.FeeCo
 	if useStrictMode && len(input) != feeConfigInputLen {
 		return commontype.FeeConfig{}, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
 	}
-	inputStruct := FeeConfigABIStruct{}
-	err := FeeManagerABI.UnpackInputIntoInterface(&inputStruct, "setFeeConfig", input, useStrictMode)
+	inputStruct, err := contract.UnpackInterface[FeeConfigABIStruct](FeeManagerABI, "setFeeConfig", input, useStrictMode)
 	if err != nil {
 		return commontype.FeeConfig{}, fmt.Errorf("%w: %w", ErrUnpackInput, err)
 	}

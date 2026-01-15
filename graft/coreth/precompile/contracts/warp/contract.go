@@ -14,11 +14,11 @@ import (
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/libevm/accounts/abi"
 )
 
 const addWarpMessageBaseGasCost uint64 = 20_000 // Cost of producing and serving a BLS Signature
@@ -154,8 +154,7 @@ func getBlockchainID(accessibleState contract.AccessibleState, caller common.Add
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func UnpackGetVerifiedWarpBlockHashInput(input []byte) (uint32, error) {
 	// We don't use strict mode here because it was disabled with Durango.
-	// Since Warp will be deployed after Durango, we don't need to use strict mode
-	res, err := WarpABI.UnpackInput("getVerifiedWarpBlockHash", input, false)
+	res, err := WarpABI.UnpackInput("getVerifiedWarpBlockHash", input)
 	if err != nil {
 		return 0, err
 	}
@@ -197,8 +196,7 @@ func getVerifiedWarpBlockHash(accessibleState contract.AccessibleState, caller c
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func UnpackGetVerifiedWarpMessageInput(input []byte) (uint32, error) {
 	// We don't use strict mode here because it was disabled with Durango.
-	// Since Warp will be deployed after Durango, we don't need to use strict mode.
-	res, err := WarpABI.UnpackInput("getVerifiedWarpMessage", input, false)
+	res, err := WarpABI.UnpackInput("getVerifiedWarpMessage", input)
 	if err != nil {
 		return 0, err
 	}
@@ -243,8 +241,7 @@ func getVerifiedWarpMessage(accessibleState contract.AccessibleState, caller com
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func UnpackSendWarpMessageInput(input []byte) ([]byte, error) {
 	// We don't use strict mode here because it was disabled with Durango.
-	// Since Warp will be deployed after Durango, we don't need to use strict mode.
-	res, err := WarpABI.UnpackInput("sendWarpMessage", input, false)
+	res, err := WarpABI.UnpackInput("sendWarpMessage", input)
 	if err != nil {
 		return []byte{}, err
 	}

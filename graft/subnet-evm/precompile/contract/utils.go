@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
+	"github.com/ava-labs/libevm/accounts/abi"
 )
 
 // Gas costs for stateful precompiles
@@ -58,4 +58,15 @@ func ParseABI(rawABI string) abi.ABI {
 	}
 
 	return parsed
+}
+
+func UnpackInterface[T any](abi abi.ABI, methodName string, input []byte, useStrictMode bool) (T, error) {
+	var result T
+	var err error
+	if useStrictMode {
+		err = abi.UnpackIntoInterface(&result, methodName, input)
+	} else {
+		err = abi.UnpackInputIntoInterface(&result, methodName, input)
+	}
+	return result, err
 }
