@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package core
@@ -27,7 +27,7 @@ func TestMain(m *testing.M) {
 
 	opts := []goleak.Option{
 		// No good way to shut down these goroutines:
-		goleak.IgnoreTopFunction("github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot.(*diskLayer).generate"),
+		goleak.IgnoreTopFunction("github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot.(*diskLayer).generate"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core.(*txSenderCacher).cache"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/metrics.(*meterArbiter).tick"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/avalanchego/vms/evm/metrics.(*meterArbiter).tick"),

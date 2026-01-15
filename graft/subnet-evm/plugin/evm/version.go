@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -8,8 +8,8 @@ import "fmt"
 var (
 	// GitCommit is set by the build script
 	GitCommit string
-	// Version is the version of Subnet EVM
-	Version string = "v0.8.0"
+	// Version is the version of AvalancheGo/Subnet-EVM
+	Version string = "v1.14.0"
 )
 
 func init() {

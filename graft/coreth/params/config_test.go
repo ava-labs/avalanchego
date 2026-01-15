@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -35,7 +35,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -119,7 +119,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 0,
 			wantErr: &ethparams.ConfigCompatError{
 				What:         "ApricotPhase5 fork block timestamp",
-				StoredTime:   utils.NewUint64(0),
+				StoredTime:   utils.PointerTo[uint64](0),
 				NewTime:      nil,
 				RewindToTime: 0,
 			},
@@ -131,7 +131,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 100,
 			wantErr: &ethparams.ConfigCompatError{
 				What:         "ApricotPhase5 fork block timestamp",
-				StoredTime:   utils.NewUint64(0),
+				StoredTime:   utils.PointerTo[uint64](0),
 				NewTime:      nil,
 				RewindToTime: 0,
 			},
@@ -151,7 +151,7 @@ func TestConfigRules(t *testing.T) {
 		&ChainConfig{},
 		&extras.ChainConfig{
 			NetworkUpgrades: extras.NetworkUpgrades{
-				CortinaBlockTimestamp: utils.NewUint64(500),
+				CortinaBlockTimestamp: utils.PointerTo[uint64](500),
 			},
 		},
 	)

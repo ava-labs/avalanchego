@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txpool
@@ -19,8 +19,7 @@ import (
 )
 
 var (
-	_ gossip.Set[*atomic.Tx]             = (*Mempool)(nil)
-	_ gossip.PullGossiperSet[*atomic.Tx] = (*Mempool)(nil)
+	_ gossip.SystemSet[*atomic.Tx] = (*Mempool)(nil)
 
 	ErrAlreadyKnown    = errors.New("already known")
 	ErrConflict        = errors.New("conflict present")

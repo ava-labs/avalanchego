@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // TODO: move to network
@@ -29,10 +29,9 @@ import (
 const pendingTxsBuffer = 10
 
 var (
-	_ gossip.Gossipable                    = (*GossipEthTx)(nil)
-	_ gossip.Marshaller[*GossipEthTx]      = (*GossipEthTxMarshaller)(nil)
-	_ gossip.Set[*GossipEthTx]             = (*GossipEthTxPool)(nil)
-	_ gossip.PullGossiperSet[*GossipEthTx] = (*GossipEthTxPool)(nil)
+	_ gossip.Gossipable               = (*GossipEthTx)(nil)
+	_ gossip.Marshaller[*GossipEthTx] = (*GossipEthTxMarshaller)(nil)
+	_ gossip.SystemSet[*GossipEthTx]  = (*GossipEthTxPool)(nil)
 
 	_ eth.PushGossiper = (*EthPushGossiper)(nil)
 )
