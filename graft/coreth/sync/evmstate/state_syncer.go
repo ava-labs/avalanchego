@@ -17,11 +17,11 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 )
 
 const (

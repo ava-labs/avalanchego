@@ -17,8 +17,8 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 )
 
 func TestMain(m *testing.M) {

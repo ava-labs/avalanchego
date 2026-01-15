@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats/statstest"
 	"github.com/ava-labs/avalanchego/ids"

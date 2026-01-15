@@ -17,7 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/triedb/hashdb"
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"

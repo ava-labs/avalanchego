@@ -662,5 +662,5 @@ func requireSyncPerformedHeight(t *testing.T, db ethdb.KeyValueStore, expected u
 	t.Helper()
 	latest, err := customrawdb.GetLatestSyncPerformed(db)
 	require.NoError(t, err)
-	require.Equal(t, expected, latest, "sync performed height mismatch: expected %d, got %d", expected, latest)
+	require.Equal(t, expected, latest, "sync performed height mismatch")
 }

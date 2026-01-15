@@ -17,10 +17,10 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncutils"
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/ids"
 )

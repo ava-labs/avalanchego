@@ -18,9 +18,9 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats/statstest"
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 )

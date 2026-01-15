@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		repoRoot, err = e2e.GetRepoRootPath("tests/load")
 		require.NoError(err)
 
-		nodes := utils.NewTmpnetNodes(nodeCount)
+		nodes := tmpnet.NewNodesOrPanic(nodeCount)
 		env = e2e.NewTestEnvironment(
 			tc,
 			flagVars,

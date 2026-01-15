@@ -49,6 +49,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var ErrUnfinalizedData = errors.New("cannot query unfinalized data")
@@ -493,7 +494,7 @@ func (b *EthAPIBackend) PriceOptionsConfig() ethapi.PriceOptionConfig {
 
 func (b *EthAPIBackend) BloomStatus() (uint64, uint64) {
 	sections, _, _ := b.eth.bloomIndexer.Sections()
-	return params.BloomBitsBlocks, sections
+	return ethparams.BloomBitsBlocks, sections
 }
 
 func (b *EthAPIBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {

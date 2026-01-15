@@ -119,6 +119,7 @@ tasks:
       E2E_TARGET: ./graft/coreth/tests/warp
     cmds:
       - cmd: ./scripts/run_task.sh build
+      - cmd: cd graft/subnet-evm && ./scripts/build.sh
       - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
 
   test-e2e-warp-ci: # consolidated test-e2e-warp
@@ -129,4 +130,5 @@ tasks:
       E2E_SERIAL: 1
     cmds:
       - cmd: ./scripts/run_task.sh build-race
+      - cmd: cd graft/subnet-evm && ./scripts/build.sh
       - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}

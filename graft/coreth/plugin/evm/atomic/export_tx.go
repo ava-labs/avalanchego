@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -27,8 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -125,7 +124,7 @@ func (utx *UnsignedExportTx) Verify(
 	if !avax.IsSortedTransferableOutputs(utx.ExportedOutputs, Codec) {
 		return ErrOutputsNotSorted
 	}
-	if rules.IsApricotPhase1 && !avalancheutils.IsSortedAndUnique(utx.Ins) {
+	if rules.IsApricotPhase1 && !utils.IsSortedAndUnique(utx.Ins) {
 		return ErrInputsNotSortedUnique
 	}
 
