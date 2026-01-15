@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 
 	opts := []goleak.Option{
 		// No good way to shut down these goroutines:
-		goleak.IgnoreTopFunction("github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot.(*diskLayer).generate"),
+		goleak.IgnoreTopFunction("github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot.(*diskLayer).generate"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core.(*txSenderCacher).cache"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/metrics.(*meterArbiter).tick"),
 		goleak.IgnoreTopFunction("github.com/syndtr/goleveldb/leveldb.(*DB).mpoolDrain"),
