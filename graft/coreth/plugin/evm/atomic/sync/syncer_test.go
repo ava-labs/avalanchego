@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 
 	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
@@ -71,7 +71,7 @@ func TestSyncerScenarios(t *testing.T) {
 			r := rand.New(rand.NewSource(1))
 			targetHeight := 10 * uint64(testCommitInterval)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-			root, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
+			root, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
 
 			testSyncer(t, serverTrieDB, targetHeight, root, nil, int64(targetHeight), tt.numWorkers)
 		})
@@ -108,7 +108,7 @@ func TestSyncerResumeScenarios(t *testing.T) {
 			targetHeight := 10 * uint64(testCommitInterval)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 			numTrieKeys := int(targetHeight) - 1 // no atomic ops for genesis
-			root, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, numTrieKeys, state.TrieKeyLength)
+			root, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, numTrieKeys, state.TrieKeyLength)
 
 			testSyncer(t, serverTrieDB, targetHeight, root, []atomicSyncTestCheckpoint{
 				{
@@ -152,11 +152,11 @@ func TestSyncerResumeNewRootCheckpointScenarios(t *testing.T) {
 			targetHeight1 := 10 * uint64(testCommitInterval)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 			numTrieKeys1 := int(targetHeight1) - 1 // no atomic ops for genesis
-			root1, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, numTrieKeys1, state.TrieKeyLength)
+			root1, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, numTrieKeys1, state.TrieKeyLength)
 
 			targetHeight2 := 20 * uint64(testCommitInterval)
 			numTrieKeys2 := int(targetHeight2) - 1 // no atomic ops for genesis
-			root2, _, _ := statesynctest.FillTrie(
+			root2, _, _ := synctest.FillIndependentTrie(
 				t, r, numTrieKeys1, numTrieKeys2, state.TrieKeyLength, serverTrieDB, root1,
 			)
 
@@ -222,7 +222,7 @@ func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Contex
 	// Create a simple test trie with some data.
 	r := rand.New(rand.NewSource(1))
 	serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	root, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
+	root, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
 
 	ctx, mockClient, atomicBackend, clientDB := setupTestInfrastructure(t, serverTrieDB)
 
@@ -304,7 +304,7 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 	// are caught here as this will only pass if all trie nodes have been written to the underlying DB
 	atomicTrie := atomicBackend.AtomicTrie()
 	clientTrieDB := atomicTrie.TrieDB()
-	statesynctest.AssertTrieConsistency(t, targetRoot, serverTrieDB, clientTrieDB, nil)
+	synctest.AssertTrieConsistency(t, targetRoot, serverTrieDB, clientTrieDB, nil)
 
 	// check all commit heights are created correctly
 	hasher := trie.NewEmpty(triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil))

@@ -23,12 +23,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/reexecute"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -224,8 +227,19 @@ func benchmarkReexecuteRange(
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
-
-	db, err := leveldb.New(vmDBDir, nil, dbLogger, prometheus.NewRegistry())
+	dbRegistry, err := metrics.MakeAndRegister(
+		prefixGatherer,
+		metric.AppendNamespace(constants.PlatformName, "db"),
+	)
+	r.NoError(err)
+	db, err := leveldb.New(vmDBDir, nil, dbLogger, dbRegistry)
+	r.NoError(err)
+	meterDBRegistry, err := metrics.MakeAndRegister(
+		prefixGatherer,
+		metric.AppendNamespace(constants.PlatformName, "meterdb"),
+	)
+	r.NoError(err)
+	db, err = meterdb.New(meterDBRegistry, db)
 	r.NoError(err)
 	defer func() {
 		log.Info("shutting down DB")

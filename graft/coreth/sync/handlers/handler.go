@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 )
 
 type BlockProvider interface {
