@@ -28,7 +28,7 @@ import (
 
 	synccore "github.com/ava-labs/avalanchego/graft/coreth/sync/core"
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	evmtypes "github.com/ava-labs/libevm/core/types"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 var (
@@ -83,7 +83,7 @@ type InnerVM interface {
 // ExtendedBlock is a block that can be used by the extension
 type ExtendedBlock interface {
 	snowman.Block
-	GetEthBlock() *evmtypes.Block
+	GetEthBlock() *ethtypes.Block
 	GetBlockExtension() BlockExtension
 }
 

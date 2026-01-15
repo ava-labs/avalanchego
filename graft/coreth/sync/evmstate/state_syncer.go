@@ -19,7 +19,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncclient"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 )
 
@@ -43,8 +44,8 @@ type stateSync struct {
 	trieDB    *triedb.Database               // trieDB on top of db we are syncing. used to restore any existing tries.
 	snapshot  snapshot.SnapshotIterable      // used to access the database we are syncing as a snapshot.
 	batchSize uint                           // write batches when they reach this size
-	segments  chan syncclient.LeafSyncTask   // channel of tasks to sync
-	syncer    *syncclient.CallbackLeafSyncer // performs the sync, looping over each task's range and invoking specified callbacks
+	segments  chan leaf.SyncTask   // channel of tasks to sync
+	syncer    *leaf.CallbackSyncer // performs the sync, looping over each task's range and invoking specified callbacks
 	codeQueue *code.Queue                    // queue that manages the asynchronous download and batching of code hashes
 	trieQueue *trieQueue                     // manages a persistent list of storage tries we need to sync and any segments that are created for them
 
@@ -78,7 +79,7 @@ func WithBatchSize(n uint) SyncerOption {
 	})
 }
 
-func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue, leafsRequestSize uint16, opts ...SyncerOption) (types.Syncer, error) {
+func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue, leafsRequestSize uint16, opts ...SyncerOption) (types.Syncer, error) {
 	if leafsRequestSize == 0 {
 		return nil, errLeafsRequestSizeRequired
 	}
@@ -99,7 +100,7 @@ func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, co
 		// Each [trieToSync] will have a maximum of [numSegments] segments.
 		// We set the capacity of [segments] such that [defaultNumWorkers]
 		// storage tries can sync concurrently.
-		segments:         make(chan syncclient.LeafSyncTask, defaultNumWorkers*numStorageTrieSegments),
+		segments:         make(chan leaf.SyncTask, defaultNumWorkers*numStorageTrieSegments),
 		mainTrieDone:     make(chan struct{}),
 		storageTriesDone: make(chan struct{}),
 		batchSize:        ethdb.IdealBatchSize,
@@ -108,7 +109,7 @@ func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, co
 	// Apply functional options.
 	options.ApplyTo(ss, opts...)
 
-	ss.syncer = syncclient.NewCallbackLeafSyncer(client, ss.segments, &syncclient.LeafSyncerConfig{
+	ss.syncer = leaf.NewCallbackSyncer(client, ss.segments, &leaf.SyncerConfig{
 		RequestSize: leafsRequestSize,
 		NumWorkers:  defaultNumWorkers,
 	})
