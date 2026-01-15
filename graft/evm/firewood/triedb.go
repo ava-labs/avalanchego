@@ -39,6 +39,8 @@ var (
 	proposeOnDiskCount     = metrics.GetOrRegisterCounter("firewood/triedb/propose/disk/count", nil)
 	proposeOnProposeCount  = metrics.GetOrRegisterCounter("firewood/triedb/propose/proposal/count", nil)
 	explicitlyDroppedCount = metrics.GetOrRegisterCounter("firewood/triedb/drop/count", nil)
+
+	errNoProposalFound = errors.New("no proposal found")
 )
 
 // TrieDB is a triedb.DBOverride implementation backed by Firewood.
@@ -50,16 +52,10 @@ type TrieDB struct {
 	// This is exported as read-only, with knowledge that the consumer will not close it
 	// and the latest state can be modified at any time.
 	Firewood *ffi.Database
-
-	// possible temporarily holds proposals created during a trie update.
-	// This is cleared after the update is complete and the proposals have been sent to the database.
-	// It's unexpected for multiple updates to this to occur simultaneously, but a lock is used to ensure safety.
-	possible     map[possibleKey]*proposal
-	possibleLock sync.Mutex
 }
 
 type proposals struct {
-	sync.RWMutex
+	sync.Mutex
 
 	byStateRoot map[common.Hash][]*proposal
 	// The proposal tree tracks the structure of the current proposals, and which proposals are children of which.
@@ -67,6 +63,11 @@ type proposals struct {
 	// in the case of duplicate state roots.
 	// The root of the tree is stored here, and represents the top-most layer on disk.
 	tree *proposal
+
+	// possible temporarily holds proposals created during a trie update.
+	// This is cleared after the update is complete and the proposals have been sent to the database.
+	// It's unexpected for multiple updates to this to occur simultaneously, but a lock is used to ensure safety.
+	possible map[possibleKey]*proposal
 }
 
 type possibleKey struct {
@@ -123,7 +124,7 @@ func DefaultConfig(dir string) TrieDBConfig {
 func (c TrieDBConfig) BackendConstructor(ethdb.Database) triedb.DBOverride {
 	db, err := New(c)
 	if err != nil {
-		log.Crit("firewood: creating database", "error", err)
+		log.Crit("creating firewood database", "error", err)
 	}
 	return db
 }
@@ -147,10 +148,10 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 
 	fw, err := ffi.New(path, options...)
 	if err != nil {
-		return nil, fmt.Errorf("opening firewood database: %w", err)
+		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
-	intialRoot, err := fw.Root()
+	initialRoot, err := fw.Root()
 	if err != nil {
 		if closeErr := fw.Close(context.Background()); closeErr != nil {
 			return nil, fmt.Errorf("%w: error while closing: %w", err, closeErr)
@@ -166,16 +167,17 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 			byStateRoot: make(map[common.Hash][]*proposal),
 			tree: &proposal{
 				proposalMeta: &proposalMeta{
-					root:        common.Hash(intialRoot),
+					root:        common.Hash(initialRoot),
 					blockHashes: blockHashes,
 					height:      0,
 				},
 			},
+			possible: make(map[possibleKey]*proposal),
 		},
-		possible: make(map[possibleKey]*proposal),
 	}, nil
 }
 
+// validateDir ensures that the given directory exists and is a directory.
 func validateDir(dir string) error {
 	if dir == "" {
 		return errors.New("chain data directory must be set")
@@ -184,7 +186,7 @@ func validateDir(dir string) error {
 	switch info, err := os.Stat(dir); {
 	case os.IsNotExist(err):
 		log.Info("Database directory not found, creating", "path", dir)
-		if err := os.MkdirAll(dir, 0o750); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("creating database directory: %w", err)
 		}
 	case err != nil:
@@ -252,8 +254,6 @@ func (t *TrieDB) Close() error {
 	p := &t.proposals
 	p.Lock()
 	defer p.Unlock()
-	t.possibleLock.Lock()
-	defer t.possibleLock.Unlock()
 
 	if p.tree == nil {
 		return nil // already closed
@@ -289,8 +289,6 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 	// The rest of the operations except key-value arranging must occur with a lock
 	t.proposals.Lock()
 	defer t.proposals.Unlock()
-	t.possibleLock.Lock()
-	defer t.possibleLock.Unlock()
 
 	p, ok := t.possible[possibleKey{parentBlockHash: parentBlockHash, root: root}]
 	// Now, all unused proposals have no other references, since we didn't store them
@@ -298,11 +296,11 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 	// Any proposals with a different root were mistakenly created, so they can be freed as well.
 	clear(t.possible)
 	if !ok {
-		return fmt.Errorf("no proposal found for block %d, root %s, hash %s", height, root.Hex(), blockHash.Hex())
+		return fmt.Errorf("%w for block %d, root %s, hash %s", errNoProposalFound, height, root.Hex(), blockHash.Hex())
 	}
 
 	// If we have already created an identical proposal, we can skip adding it again.
-	if t.proposals.existsOrTrack(root, blockHash, parentBlockHash) {
+	if t.proposals.exists(root, blockHash, parentBlockHash) {
 		return nil
 	}
 	switch {
@@ -322,10 +320,10 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 	return nil
 }
 
-// Check if this proposal already existsOrTrack.
+// Check if this proposal already exists.
 // During reorgs, we may have already tracked this block hash.
 // Additionally, we may have coincidentally created an identical proposal with a different block hash.
-func (ps *proposals) existsOrTrack(root, block, parentBlock common.Hash) bool {
+func (ps *proposals) exists(root, block, parentBlock common.Hash) bool {
 	proposals, ok := ps.byStateRoot[root]
 	if !ok {
 		return false
@@ -526,10 +524,8 @@ func (t *TrieDB) createProposals(parentRoot common.Hash, keys, values [][]byte) 
 	}
 
 	// Must prevent a simultaneous `Commit`, as it alters the proposal tree/disk state.
-	t.proposals.RLock()
-	defer t.proposals.RUnlock()
-	t.possibleLock.Lock()
-	defer t.possibleLock.Unlock()
+	t.proposals.Lock()
+	defer t.proposals.Unlock()
 
 	var (
 		count int         // number of proposals created.
