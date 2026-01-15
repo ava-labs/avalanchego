@@ -1,2 +1,0 @@
-// TODO(JonathanOppenheimer) 
-// We need to generate bindings and write similiar tests as exist for the other precmpiles

@@ -203,18 +203,18 @@ var (
 	// EmptyACP224FeeConfig represents an empty ACP224 fee config
 	EmptyACP224FeeConfig = ACP224FeeConfig{}
 
-	ErrTargetGasNilACP224              = errors.New("targetGas cannot be nil")
-	ErrMinGasPriceNil                  = errors.New("minGasPrice cannot be nil")
-	ErrMaxCapacityFactorNil            = errors.New("maxCapacityFactor cannot be nil")
-	ErrTimeToDoubleNil                 = errors.New("timeToDouble cannot be nil")
-	ErrTargetGasTooLowACP224           = errors.New("targetGas must be greater than 0")
-	ErrMinGasPriceTooLow               = errors.New("minGasPrice must be greater than 0")
-	ErrMaxCapacityFactorNegative       = errors.New("maxCapacityFactor cannot be negative")
-	ErrTimeToDoubleNegative            = errors.New("timeToDouble cannot be negative")
-	ErrTargetGasExceedsHashLengthACP224         = errors.New("targetGas exceeds hash length")
-	ErrMinGasPriceExceedsHashLength             = errors.New("minGasPrice exceeds hash length")
-	ErrMaxCapacityFactorExceedsHashLength       = errors.New("maxCapacityFactor exceeds hash length")
-	ErrTimeToDoubleExceedsHashLength            = errors.New("timeToDouble exceeds hash length")
+	ErrTargetGasNilACP224                 = errors.New("targetGas cannot be nil")
+	ErrMinGasPriceNil                     = errors.New("minGasPrice cannot be nil")
+	ErrMaxCapacityFactorNil               = errors.New("maxCapacityFactor cannot be nil")
+	ErrTimeToDoubleNil                    = errors.New("timeToDouble cannot be nil")
+	ErrTargetGasTooLowACP224              = errors.New("targetGas must be greater than 0")
+	ErrMinGasPriceTooLow                  = errors.New("minGasPrice must be greater than 0")
+	ErrMaxCapacityFactorNegative          = errors.New("maxCapacityFactor cannot be negative")
+	ErrTimeToDoubleNegative               = errors.New("timeToDouble cannot be negative")
+	ErrTargetGasExceedsHashLengthACP224   = errors.New("targetGas exceeds hash length")
+	ErrMinGasPriceExceedsHashLength       = errors.New("minGasPrice exceeds hash length")
+	ErrMaxCapacityFactorExceedsHashLength = errors.New("maxCapacityFactor exceeds hash length")
+	ErrTimeToDoubleExceedsHashLength      = errors.New("timeToDouble exceeds hash length")
 )
 
 // Verify checks fields of this ACP224FeeConfig to ensure a valid configuration is provided.
