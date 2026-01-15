@@ -302,7 +302,7 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 	}
 
 	// If we have already created an identical proposal, we can skip adding it again.
-	if t.proposals.exists(root, blockHash, parentBlockHash) {
+	if t.proposals.existsOrTrack(root, blockHash, parentBlockHash) {
 		return nil
 	}
 	switch {
@@ -322,10 +322,10 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 	return nil
 }
 
-// Check if this proposal already exists.
+// Check if this proposal already existsOrTrack.
 // During reorgs, we may have already tracked this block hash.
 // Additionally, we may have coincidentally created an identical proposal with a different block hash.
-func (ps *proposals) exists(root, block, parentBlock common.Hash) bool {
+func (ps *proposals) existsOrTrack(root, block, parentBlock common.Hash) bool {
 	proposals, ok := ps.byStateRoot[root]
 	if !ok {
 		return false
