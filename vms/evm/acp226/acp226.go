@@ -27,7 +27,7 @@ var acp226Params = excess.Params{
 	MinValue:       MinDelayMilliseconds, // M
 	ConversionRate: ConversionRate,       // D
 	MaxExcessDiff:  MaxDelayExcessDiff,   // Q
-	MaxExcess:      maxDelayExcess,
+	MaxExcess:      uint64(maxDelayExcess),
 }
 
 // DelayExcess represents the excess for delay calculation in the dynamic
