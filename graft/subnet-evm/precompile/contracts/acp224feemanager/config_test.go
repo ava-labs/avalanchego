@@ -18,13 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var validFeeConfig = commontype.ACP224FeeConfig{
-	TargetGas:         big.NewInt(1000),
-	MinGasPrice:       big.NewInt(1),
-	MaxCapacityFactor: big.NewInt(100),
-	TimeToDouble:      big.NewInt(200),
-}
-
 func TestVerify(t *testing.T) {
 	admins := []common.Address{allowlisttest.TestAdminAddr}
 
@@ -199,7 +192,7 @@ func TestVerify(t *testing.T) {
 			ExpectedError: nil,
 		},
 		"valid fee config": {
-			Config:        acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
+			Config:        acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ValidTestACP224FeeConfig),
 			ExpectedError: nil,
 		},
 	}
@@ -226,23 +219,23 @@ func TestEqual(t *testing.T) {
 			Expected: false,
 		},
 		"non-nil initial config and nil initial config": {
-			Config:   acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
+			Config:   acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ValidTestACP224FeeConfig),
 			Other:    acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 			Expected: false,
 		},
 		"different initial config": {
-			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
+			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ValidTestACP224FeeConfig),
 			Other: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
 				func() *commontype.ACP224FeeConfig {
-					c := validFeeConfig
+					c := commontype.ValidTestACP224FeeConfig
 					c.TargetGas = big.NewInt(123)
 					return &c
 				}()),
 			Expected: false,
 		},
 		"same config": {
-			Config:   acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
-			Other:    acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
+			Config:   acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ValidTestACP224FeeConfig),
+			Other:    acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ValidTestACP224FeeConfig),
 			Expected: true,
 		},
 	}
