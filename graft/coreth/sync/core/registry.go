@@ -17,15 +17,15 @@ import (
 
 var errSyncerAlreadyRegistered = errors.New("syncer already registered")
 
-// SyncerTask represents a single syncer with its name for identification.
-type SyncerTask struct {
+// syncerTask represents a single syncer with its name for identification.
+type syncerTask struct {
 	name   string
 	syncer types.Syncer
 }
 
 // SyncerRegistry manages a collection of syncers for sequential execution.
 type SyncerRegistry struct {
-	syncers         []SyncerTask
+	syncers         []syncerTask
 	registeredNames map[string]bool // Track registered IDs to prevent duplicates.
 }
 
@@ -45,7 +45,7 @@ func (r *SyncerRegistry) Register(syncer types.Syncer) error {
 	}
 
 	r.registeredNames[id] = true
-	r.syncers = append(r.syncers, SyncerTask{syncer.Name(), syncer})
+	r.syncers = append(r.syncers, syncerTask{syncer.Name(), syncer})
 
 	return nil
 }
