@@ -44,8 +44,6 @@ tests/state_test_util.go
 !core/main_test.go
 !core/predicate_check.go
 !core/predicate_check_test.go
-!core/state/snapshot/snapshot_ext.go
-!core/state/trie_prefetcher_extra_test.go
 !core/state_manager_test.go
 !core/state_processor_ext.go
 !core/state_processor_ext_test.go
