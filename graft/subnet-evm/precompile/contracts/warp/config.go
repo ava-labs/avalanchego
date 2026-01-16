@@ -250,7 +250,7 @@ func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateCon
 	}
 	validatorSet, ok := validatorSets[sourceSubnetID]
 	if !ok {
-		return fmt.Errorf("%w: %#x source subnet not found", errCannotRetrieveValidatorSet, sourceSubnetID)
+		return fmt.Errorf("%w: %s source subnet not found", errCannotRetrieveValidatorSet, sourceSubnetID)
 	}
 
 	err = warpMsg.Signature.Verify(

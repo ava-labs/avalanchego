@@ -115,7 +115,7 @@ func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.Uns
 	}
 	validatorSet, ok := validatorSets[subnetID]
 	if !ok {
-		return nil, fmt.Errorf("%w: %#x source subnet not found", errCannotRetrieveValidatorSet, subnetID)
+		return nil, fmt.Errorf("%w: %s source subnet not found", errCannotRetrieveValidatorSet, subnetID)
 	}
 	if len(validatorSet.Validators) == 0 {
 		return nil, fmt.Errorf("%w (SubnetID: %s, Height: %d)", errNoValidators, subnetID, pChainHeight)
