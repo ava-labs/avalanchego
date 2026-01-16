@@ -52,6 +52,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/accounts/keystore"
 	"github.com/ava-labs/libevm/common"
@@ -800,8 +801,8 @@ func TestEstimateGas(t *testing.T) {
 func TestCall(t *testing.T) {
 	// Enable BLOBHASH opcode in Cancun
 	cfg := *params.TestChainConfig
-	cfg.ShanghaiTime = utils.NewUint64(0)
-	cfg.CancunTime = utils.NewUint64(0)
+	cfg.ShanghaiTime = utils.PointerTo[uint64](0)
+	cfg.CancunTime = utils.PointerTo[uint64](0)
 	t.Parallel()
 	// Initialize test accounts
 	var (

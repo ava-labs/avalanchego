@@ -49,6 +49,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
+	"github.com/ava-labs/libevm/params"
 )
 
 var ErrUnfinalizedData = errors.New("cannot query unfinalized data")
