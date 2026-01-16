@@ -69,6 +69,37 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "role",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldRole",
+        "type": "uint256"
+      }
+    ],
+    "name": "RoleSet",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "getFeeConfig",
     "outputs": [
