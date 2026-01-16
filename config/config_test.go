@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -373,7 +373,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 	require.NoError(t, err)
 
 	defaultConfigs := map[ids.ID]subnets.Config{
-		subnetID: getDefaultSubnetConfig(setupViperFlags()),
+		subnetID: getPrimaryNetworkConfig(setupViperFlags()),
 	}
 
 	tests := map[string]struct {
@@ -531,7 +531,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	require.NoError(t, err)
 
 	defaultConfigs := map[ids.ID]subnets.Config{
-		subnetID: getDefaultSubnetConfig(setupViperFlags()),
+		subnetID: getPrimaryNetworkConfig(setupViperFlags()),
 	}
 
 	tests := map[string]struct {
@@ -761,6 +761,57 @@ func TestGetStakingSigner(t *testing.T) {
 			if tt.expectedErr == nil {
 				require.Equal(tt.expectedSignerConfig, config.StakingSignerConfig)
 			}
+		})
+	}
+}
+
+func TestGetDiskSpaceConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      map[string]uint64
+		expectedErr error
+	}{
+		{
+			name:   "empty config",
+			config: map[string]uint64{},
+		},
+		{
+			name: "valid config",
+			config: map[string]uint64{
+				SystemTrackerWarningAvailableDiskSpacePercentageKey:  maxDiskSpaceThreshold,
+				SystemTrackerRequiredAvailableDiskSpacePercentageKey: 1,
+			},
+		},
+		{
+			name: "invalid config - warning less than required",
+			config: map[string]uint64{
+				SystemTrackerWarningAvailableDiskSpacePercentageKey:  25,
+				SystemTrackerRequiredAvailableDiskSpacePercentageKey: 30,
+			},
+			expectedErr: errDiskWarnAfterFatal,
+		},
+		{
+			name: "invalid config - warning too big",
+			config: map[string]uint64{
+				SystemTrackerWarningAvailableDiskSpacePercentageKey:  maxDiskSpaceThreshold + 1,
+				SystemTrackerRequiredAvailableDiskSpacePercentageKey: 15,
+			},
+			expectedErr: errDiskSpaceOutOfRange,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+
+			for key, value := range tt.config {
+				v.Set(key, value)
+			}
+
+			_, err := GetNodeConfig(v)
+
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package resource
@@ -105,11 +105,12 @@ func NewManager(
 	}
 
 	m := &manager{
-		log:                log,
-		processMetrics:     processMetrics,
-		processes:          make(map[int]*proc),
-		onClose:            make(chan struct{}),
-		availableDiskBytes: math.MaxUint64,
+		log:                  log,
+		processMetrics:       processMetrics,
+		processes:            make(map[int]*proc),
+		onClose:              make(chan struct{}),
+		availableDiskBytes:   math.MaxUint64,
+		availableDiskPercent: 100,
 	}
 
 	go m.update(diskPath, frequency, cpuHalflife, diskHalflife)

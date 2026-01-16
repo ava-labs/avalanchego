@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -54,12 +54,17 @@ const (
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
+
+	maxDiskSpaceThreshold = 50
 )
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys = map[string]string{}
+	deprecatedKeys = map[string]string{
+		SystemTrackerRequiredAvailableDiskSpaceKey:         fmt.Sprintf("Use %s instead", SystemTrackerRequiredAvailableDiskSpacePercentageKey),
+		SystemTrackerWarningThresholdAvailableDiskSpaceKey: fmt.Sprintf("Use %s instead", SystemTrackerWarningAvailableDiskSpacePercentageKey),
+	}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
 	errConflictingImplicitACPOpinion          = errors.New("objecting to enabled ACP")
@@ -81,6 +86,8 @@ var (
 	errUnmarshalling                          = errors.New("unmarshalling failed")
 	errFileDoesNotExist                       = errors.New("file does not exist")
 	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
+	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
+	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
 )
 
 func getConsensusParams(v *viper.Viper) *snowball.Parameters {
@@ -1040,7 +1047,7 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 
 	res := make(map[ids.ID]subnets.Config)
 	for _, subnetID := range subnetIDs {
-		config := getDefaultSubnetConfig(v)
+		config := getPrimaryNetworkConfig(v)
 
 		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
 			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
@@ -1075,7 +1082,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 	// reads subnet config files from a path and given subnetIDs and returns a map.
 	for _, subnetID := range subnetIDs {
 		// Ensure default configuration
-		config := getDefaultSubnetConfig(v)
+		config := getPrimaryNetworkConfig(v)
 		subnetConfigs[subnetID] = config
 
 		if len(subnetConfigPath) == 0 {
@@ -1123,18 +1130,10 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 	return subnetConfigs, nil
 }
 
-func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
-	subnetDefaults := getPrimaryNetworkConfig(v)
-	// Allow L1s (other than Primary Network) to use their own throttling mechanisms.
-	subnetDefaults.ProposerMinBlockDelay = 0
-	return subnetDefaults
-}
-
 func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
 		SnowParameters:              getConsensusParams(v),
 		ValidatorOnly:               false,
-		ProposerMinBlockDelay:       v.GetDuration(ProposerVMMinBlockDelayKey),
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}
 }
@@ -1159,17 +1158,25 @@ func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 	}
 }
 
-func getDiskSpaceConfig(v *viper.Viper) (requiredAvailableDiskSpace uint64, warningThresholdAvailableDiskSpace uint64, warningThresholdAvailableDiskSpacePercentage uint64, err error) {
-	requiredAvailableDiskSpace = v.GetUint64(SystemTrackerRequiredAvailableDiskSpaceKey)
-	warningThresholdAvailableDiskSpace = v.GetUint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey)
-	warningThresholdAvailableDiskSpacePercentage = v.GetUint64(SystemTrackerWarnThreshAvailDiskSpacePercentageKey)
+func getDiskSpaceConfig(v *viper.Viper) (
+	requiredAvailableDiskSpacePercentage uint64,
+	warningAvailableDiskSpacePercentage uint64,
+	err error,
+) {
+	var (
+		warnKey     = SystemTrackerWarningAvailableDiskSpacePercentageKey
+		requiredKey = SystemTrackerRequiredAvailableDiskSpacePercentageKey
+
+		warn     = v.GetUint64(warnKey)
+		required = v.GetUint64(requiredKey)
+	)
 	switch {
-	case warningThresholdAvailableDiskSpacePercentage > 50:
-		return 0, 0, 0, fmt.Errorf("%q (%d) must be in [0, 50]", SystemTrackerWarnThreshAvailDiskSpacePercentageKey, warningThresholdAvailableDiskSpacePercentage)
-	case warningThresholdAvailableDiskSpace < requiredAvailableDiskSpace:
-		return 0, 0, 0, fmt.Errorf("%q (%d) < %q (%d)", SystemTrackerWarningThresholdAvailableDiskSpaceKey, warningThresholdAvailableDiskSpace, SystemTrackerRequiredAvailableDiskSpaceKey, requiredAvailableDiskSpace)
+	case warn > maxDiskSpaceThreshold:
+		return 0, 0, fmt.Errorf("%w: %q (%d)", errDiskSpaceOutOfRange, warnKey, warn)
+	case warn < required:
+		return 0, 0, fmt.Errorf("%w: %d < %d", errDiskWarnAfterFatal, warn, required)
 	default:
-		return requiredAvailableDiskSpace, warningThresholdAvailableDiskSpace, warningThresholdAvailableDiskSpacePercentage, nil
+		return required, warn, nil
 	}
 }
 
@@ -1363,6 +1370,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig
 
+	nodeConfig.ProposerMinBlockDelay = v.GetDuration(ProposerVMMinBlockDelayKey)
 	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Benchlist
@@ -1424,7 +1432,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SystemTrackerCPUHalflife = v.GetDuration(SystemTrackerCPUHalflifeKey)
 	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
 
-	nodeConfig.RequiredAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpacePercentage, err = getDiskSpaceConfig(v)
+	nodeConfig.RequiredAvailableDiskSpacePercentage, nodeConfig.WarningAvailableDiskSpacePercentage, err = getDiskSpaceConfig(v)
 	if err != nil {
 		return node.Config{}, err
 	}

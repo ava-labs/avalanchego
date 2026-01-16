@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package statesyncclient
@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 )
 
 var ErrFailedToFetchLeafs = errors.New("failed to fetch leafs")
@@ -37,7 +37,6 @@ type LeafSyncTask interface {
 type LeafSyncerConfig struct {
 	RequestSize uint16 // Number of leafs to request from a peer at a time
 	NumWorkers  int    // Number of workers to process leaf sync tasks
-	OnFailure   func() // Callback for handling errors during sync
 }
 
 type CallbackLeafSyncer struct {
@@ -159,9 +158,5 @@ func (c *CallbackLeafSyncer) Sync(ctx context.Context) error {
 		})
 	}
 
-	err := eg.Wait()
-	if err != nil {
-		c.config.OnFailure()
-	}
-	return err
+	return eg.Wait()
 }

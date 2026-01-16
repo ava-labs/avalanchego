@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package subnets
@@ -6,6 +6,7 @@ package subnets
 import (
 	"errors"
 	"time"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
@@ -35,11 +36,6 @@ type Config struct {
 	SnowParameters    *snowball.Parameters `json:"snowballParameters" yaml:"snowballParameters"`
 	SimplexParameters *simplex.Parameters  `json:"simplexParameters"  yaml:"simplexParameters"`
 
-	// ProposerMinBlockDelay is the minimum delay this node will enforce when
-	// building a snowman++ block.
-	//
-	// TODO: Remove this flag once all VMs throttle their own block production.
-	ProposerMinBlockDelay time.Duration `json:"proposerMinBlockDelay" yaml:"proposerMinBlockDelay"`
 	// ProposerNumHistoricalBlocks is the number of historical snowman++ blocks
 	// this node will index per chain. If set to 0, the node will index all
 	// snowman++ blocks.

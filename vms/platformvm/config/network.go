@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -20,7 +20,6 @@ var DefaultNetwork = Network{
 	PushGossipDiscardedCacheSize:   16384,
 	PushGossipMaxRegossipFrequency: 30 * time.Second,
 	PushGossipFrequency:            500 * time.Millisecond,
-	PullGossipPollSize:             1,
 	PullGossipFrequency:            1500 * time.Millisecond,
 	PullGossipThrottlingPeriod:     time.Hour,
 	// PullGossipRequestsPerValidator = PullGossipThrottlingPeriod / PullGossipFrequency =
@@ -65,9 +64,6 @@ type Network struct {
 	// PushGossipFrequency is how frequently rounds of push gossip are
 	// performed.
 	PushGossipFrequency time.Duration `json:"push-gossip-frequency"`
-	// PullGossipPollSize is the number of validators to sample when performing
-	// a round of pull gossip.
-	PullGossipPollSize int `json:"pull-gossip-poll-size"`
 	// PullGossipFrequency is how frequently rounds of pull gossip are
 	// performed.
 	PullGossipFrequency time.Duration `json:"pull-gossip-frequency"`

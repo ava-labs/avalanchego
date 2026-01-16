@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -32,10 +32,10 @@ func (a *Extender) Initialize(backend *state.AtomicBackend, trie *state.AtomicTr
 func (a *Extender) CreateSyncer(client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) (sync.Syncer, error) {
 	atomicSummary, ok := summary.(*Summary)
 	if !ok {
-		return nil, fmt.Errorf("expected *Summary, got %T", summary)
+		return nil, fmt.Errorf("atomic sync extender: expected *Summary, got %T", summary)
 	}
 
-	return NewSyncer(
+	syncer, err := NewSyncer(
 		client,
 		verDB,
 		a.trie,
@@ -43,6 +43,10 @@ func (a *Extender) CreateSyncer(client syncclient.LeafClient, verDB *versiondb.D
 		atomicSummary.BlockNumber,
 		WithRequestSize(a.requestSize),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("atomic.NewSyncer failed: %w", err)
+	}
+	return syncer, nil
 }
 
 // OnFinishBeforeCommit implements the sync.Extender interface by marking the previously last accepted block for the shared memory cursor.

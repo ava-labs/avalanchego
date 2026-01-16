@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -29,6 +29,13 @@ type Syncer interface {
 	// "state_evm_state_sync", "state_atomic_sync"). Implementations should ensure this is unique and
 	// stable across renames for logging/metrics/deduplication.
 	ID() string
+}
+
+// Finalizer provides a mechanism to perform cleanup operations after a sync operation.
+// This is useful for handling inflight requests, flushing to disk, or other cleanup tasks.
+type Finalizer interface {
+	// Finalize performs any necessary cleanup operations.
+	Finalize() error
 }
 
 // SummaryProvider is an interface for providing state summaries.

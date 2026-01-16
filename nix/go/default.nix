@@ -19,16 +19,16 @@ let
     };
 
   # Update the following to change the version:
-  goVersion = "1.24.9";
+  goVersion = "1.24.12";
   # The sha256 checksums can fetched from https://go.dev/dl/ for new versions.
   goSHA256s = {
-    "linux-amd64" = "5b7899591c2dd6e9da1809fde4a2fad842c45d3f6b9deb235ba82216e31e34a6";
-    "linux-arm64" = "9aa1243d51d41e2f93e895c89c0a2daf7166768c4a4c3ac79db81029d295a540";
-    "darwin-amd64" = "961aa2ae2b97e428d6d8991367e7c98cb403bac54276b8259aead42a0081591c";
-    "darwin-arm64" = "af451b40651d7fb36db1bbbd9c66ddbed28b96d7da48abea50a19f82c6e9d1d6";
+    "linux-amd64" = "bddf8e653c82429aea7aec2520774e79925d4bb929fe20e67ecc00dd5af44c50";
+    "linux-arm64" = "4e02e2979e53b40f3666bba9f7e5ea0b99ea5156e0824b343fd054742c25498d";
+    "darwin-amd64" = "4b9cc6771b56645da35a83a5424ae507f3250829b0d227e75f57b73e72da1f76";
+    "darwin-arm64" = "098d0c039357c3652ec6c97d5451bc4dc24f7cf30ed902373ed9a8134aab2d29";
   };
 
-  targetSystem = parseSystem pkgs.system;
+  targetSystem = parseSystem pkgs.stdenv.hostPlatform.system;
 in
 pkgs.stdenv.mkDerivation {
   name = "go-${goVersion}";
@@ -40,7 +40,7 @@ pkgs.stdenv.mkDerivation {
 
   src = pkgs.fetchurl {
     url = "https://go.dev/dl/go${goVersion}.${targetSystem.goURLPath}.tar.gz";
-    sha256 = goSHA256s.${targetSystem.goURLPath} or (throw "Unsupported system: ${pkgs.system}");
+    sha256 = goSHA256s.${targetSystem.goURLPath} or (throw "Unsupported system: ${pkgs.stdenv.hostPlatform.system}");
   };
 
   # Skip unpacking since we need special handling for the tarball

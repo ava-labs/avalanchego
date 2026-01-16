@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package statesync
@@ -15,10 +15,10 @@ import (
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
@@ -144,7 +144,7 @@ func TestCodeSyncerAddsInProgressCodeHashes(t *testing.T) {
 	codeBytes := utils.RandomBytes(100)
 	codeHash := crypto.Keccak256Hash(codeBytes)
 	clientDB := rawdb.NewMemoryDatabase()
-	customrawdb.AddCodeToFetch(clientDB, codeHash)
+	require.NoError(t, customrawdb.WriteCodeToFetch(clientDB, codeHash))
 	testCodeSyncer(t, codeSyncerTest{
 		clientDB:          clientDB,
 		codeRequestHashes: nil,
@@ -166,7 +166,7 @@ func TestCodeSyncerAddsMoreInProgressThanQueueSize(t *testing.T) {
 
 	db := rawdb.NewMemoryDatabase()
 	for _, codeHash := range codeHashes {
-		customrawdb.AddCodeToFetch(db, codeHash)
+		require.NoError(t, customrawdb.WriteCodeToFetch(db, codeHash))
 	}
 
 	testCodeSyncer(t, codeSyncerTest{

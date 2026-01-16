@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -310,7 +310,7 @@ func TestNewNetwork(t *testing.T) {
 func TestIngressConnCount(t *testing.T) {
 	require := require.New(t)
 
-	emptyHandler := func(context.Context, message.InboundMessage) {}
+	emptyHandler := func(context.Context, *message.InboundMessage) {}
 
 	_, networks, eg := newFullyConnectedTestNetwork(
 		t, []router.InboundHandler{
@@ -361,17 +361,17 @@ func TestIngressConnCount(t *testing.T) {
 func TestSend(t *testing.T) {
 	require := require.New(t)
 
-	received := make(chan message.InboundMessage)
+	received := make(chan *message.InboundMessage)
 	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
 		[]router.InboundHandler{
-			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
 				require.FailNow("unexpected message received")
 			}),
-			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
+			router.InboundHandlerFunc(func(_ context.Context, msg *message.InboundMessage) {
 				received <- msg
 			}),
-			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
 				require.FailNow("unexpected message received")
 			}),
 		},
@@ -395,7 +395,7 @@ func TestSend(t *testing.T) {
 	require.Equal(toSend, sentTo)
 
 	inboundGetMsg := <-received
-	require.Equal(message.GetOp, inboundGetMsg.Op())
+	require.Equal(message.GetOp, inboundGetMsg.Op)
 
 	for _, net := range networks {
 		net.StartClose()
@@ -406,17 +406,17 @@ func TestSend(t *testing.T) {
 func TestSendWithFilter(t *testing.T) {
 	require := require.New(t)
 
-	received := make(chan message.InboundMessage)
+	received := make(chan *message.InboundMessage)
 	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
 		[]router.InboundHandler{
-			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
 				require.FailNow("unexpected message received")
 			}),
-			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
+			router.InboundHandlerFunc(func(_ context.Context, msg *message.InboundMessage) {
 				received <- msg
 			}),
-			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
 				require.FailNow("unexpected message received")
 			}),
 		},
@@ -442,7 +442,7 @@ func TestSendWithFilter(t *testing.T) {
 	require.Contains(sentTo, validNodeID)
 
 	inboundGetMsg := <-received
-	require.Equal(message.GetOp, inboundGetMsg.Op())
+	require.Equal(message.GetOp, inboundGetMsg.Op)
 
 	for _, net := range networks {
 		net.StartClose()
