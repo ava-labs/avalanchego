@@ -21,17 +21,8 @@ import (
 )
 
 const (
-	minFeeConfigFieldKey = iota + 1
-	// add new fields below this
-	// must preserve order of these fields
-	targetGasKey = iota
-	minGasPriceKey
-	maxCapacityFactorKey
-	timeToDoubleKey
-	// add new fields above this
-	numFeeConfigField = iota - 1
-
 	// Gas costs for each function.
+	numFeeConfigField = 4 // targetGas, minGasPrice, maxCapacityFactor, timeToDouble
 	// GetFeeConfigGasCost is the cost to read all fee config fields
 	GetFeeConfigGasCost uint64 = contract.ReadGasCostPerSlot * numFeeConfigField
 	// GetFeeConfigLastChangedAtGasCost is the cost to read the last changed at block number
@@ -49,7 +40,13 @@ var (
 	// Singleton StatefulPrecompiledContract for setting fee configs by permissioned callers.
 	ACP224FeeManagerPrecompile contract.StatefulPrecompiledContract = createACP224FeeManagerPrecompile()
 
-	feeConfigLastChangedAtKey = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
+	// Storage layout uses namespaced keys to prevent collisions with allowlist and other precompile state.
+	// AllowList uses keccak256(address) for role storage, so we use distinct prefixes for fee config.
+	targetGasStorageKey         = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'g'}
+	minGasPriceStorageKey       = common.Hash{'a', 'c', 'p', '2', '2', '4', 'm', 'p'}
+	maxCapacityFactorStorageKey = common.Hash{'a', 'c', 'p', '2', '2', '4', 'm', 'c'}
+	timeToDoubleStorageKey      = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'd'}
+	feeConfigLastChangedAtKey   = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
 
 	ErrCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
 
@@ -86,24 +83,12 @@ func SetACP224FeeManagerAllowListStatus(
 
 // GetStoredFeeConfig returns fee config from contract storage in given state
 func GetStoredFeeConfig(stateDB contract.StateReader, addr common.Address) commontype.ACP224FeeConfig {
-	feeConfig := commontype.ACP224FeeConfig{}
-	for i := minFeeConfigFieldKey; i <= numFeeConfigField; i++ {
-		val := stateDB.GetState(addr, common.Hash{byte(i)})
-		switch i {
-		case targetGasKey:
-			feeConfig.TargetGas = new(big.Int).Set(val.Big())
-		case minGasPriceKey:
-			feeConfig.MinGasPrice = new(big.Int).Set(val.Big())
-		case maxCapacityFactorKey:
-			feeConfig.MaxCapacityFactor = new(big.Int).Set(val.Big())
-		case timeToDoubleKey:
-			feeConfig.TimeToDouble = new(big.Int).Set(val.Big())
-		default:
-			// This should never encounter an unknown fee config key
-			panic(fmt.Sprintf("unknown fee config key: %d", i))
-		}
+	return commontype.ACP224FeeConfig{
+		TargetGas:         stateDB.GetState(addr, targetGasStorageKey).Big(),
+		MinGasPrice:       stateDB.GetState(addr, minGasPriceStorageKey).Big(),
+		MaxCapacityFactor: stateDB.GetState(addr, maxCapacityFactorStorageKey).Big(),
+		TimeToDouble:      stateDB.GetState(addr, timeToDoubleStorageKey).Big(),
 	}
-	return feeConfig
 }
 
 // GetFeeConfigLastChangedAt returns the block number when the fee config was last changed
@@ -119,23 +104,10 @@ func StoreFeeConfig(stateDB contract.StateDB, addr common.Address, feeConfig com
 		return fmt.Errorf("cannot verify fee config: %w", err)
 	}
 
-	for i := minFeeConfigFieldKey; i <= numFeeConfigField; i++ {
-		var input common.Hash
-		switch i {
-		case targetGasKey:
-			input = common.BigToHash(feeConfig.TargetGas)
-		case minGasPriceKey:
-			input = common.BigToHash(feeConfig.MinGasPrice)
-		case maxCapacityFactorKey:
-			input = common.BigToHash(feeConfig.MaxCapacityFactor)
-		case timeToDoubleKey:
-			input = common.BigToHash(feeConfig.TimeToDouble)
-		default:
-			// This should never encounter an unknown fee config key
-			panic(fmt.Sprintf("unknown fee config key: %d", i))
-		}
-		stateDB.SetState(addr, common.Hash{byte(i)}, input)
-	}
+	stateDB.SetState(addr, targetGasStorageKey, common.BigToHash(feeConfig.TargetGas))
+	stateDB.SetState(addr, minGasPriceStorageKey, common.BigToHash(feeConfig.MinGasPrice))
+	stateDB.SetState(addr, maxCapacityFactorStorageKey, common.BigToHash(feeConfig.MaxCapacityFactor))
+	stateDB.SetState(addr, timeToDoubleStorageKey, common.BigToHash(feeConfig.TimeToDouble))
 
 	blockNumber := blockContext.Number()
 	if blockNumber == nil {
