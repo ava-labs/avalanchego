@@ -69,7 +69,6 @@ const (
 	HTTPShutdownWaitKey      = "http-shutdown-wait"
 	HTTPReadTimeoutKey       = "http-read-timeout"
 	HTTPReadHeaderTimeoutKey = "http-read-header-timeout"
-
 	HTTPIdleTimeoutKey                                   = "http-idle-timeout"
 	StateSyncIPsKey                                      = "state-sync-ips"
 	StateSyncIDsKey                                      = "state-sync-ids"
@@ -88,6 +87,8 @@ const (
 	StakingRPCSignerEndpointKey                          = "staking-rpc-signer-endpoint"
 	SybilProtectionEnabledKey                            = "sybil-protection-enabled"
 	SybilProtectionDisabledWeightKey                     = "sybil-protection-disabled-weight"
+  SimplexMaxProposalWaitKey                          = "simplex-max-proposal-wait"
+	SimplexMaxRebroadcastWaitKey                       = "simplex-max-rebroadcast-wait"
 	NetworkInitialTimeoutKey                             = "network-initial-timeout"
 	NetworkMinimumTimeoutKey                             = "network-minimum-timeout"
 	NetworkMaximumTimeoutKey                             = "network-maximum-timeout"

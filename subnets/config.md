@@ -13,8 +13,10 @@ Here is an example of Subnet config file:
 {
   "validatorOnly": false,
   "consensusParameters": {
-    "k": 25,
-    "alpha": 18
+    "snowballParameters": {
+      "k": 25,
+      "alpha": 18
+    }
   }
 }
 ```
@@ -56,24 +58,24 @@ this configuration in order to properly allow a node in the private Subnet.
 
 :::
 
-### Consensus Parameters
+### Consensus Config
 
-Subnet configs supports loading new consensus parameters. JSON keys are
-different from their matching `CLI` keys. These parameters must be grouped under
+Subnet configs supports loading new consensus parameters or even consensus engines(Snowman or Simplex).
+JSON keys are different from their matching `CLI` keys. These parameters must be grouped under
 `consensusParameters` key. The consensus parameters of a Subnet default to the
 same values used for the Primary Network, which are given [CLI Snow Parameters](https://build.avax.network/docs/nodes/configure/configs-flags#snow-parameters).
 
-| CLI Key                          | JSON Key              |
-| :------------------------------- | :-------------------- |
-| --snow-sample-size               | k                     |
-| --snow-quorum-size               | alpha                 |
-| --snow-commit-threshold          | `beta`                |
-| --snow-concurrent-repolls        | concurrentRepolls     |
-| --snow-optimal-processing        | `optimalProcessing`   |
-| --snow-max-processing            | maxOutstandingItems   |
-| --snow-max-time-processing       | maxItemProcessingTime |
-| --snow-avalanche-batch-size      | `batchSize`           |
-| --snow-avalanche-num-parents     | `parentSize`          |
+| CLI Key                      | JSON Key              |
+| :--------------------------- | :-------------------- |
+| --snow-sample-size           | k                     |
+| --snow-quorum-size           | alpha                 |
+| --snow-commit-threshold      | `beta`                |
+| --snow-concurrent-repolls    | concurrentRepolls     |
+| --snow-optimal-processing    | `optimalProcessing`   |
+| --snow-max-processing        | maxOutstandingItems   |
+| --snow-max-time-processing   | maxItemProcessingTime |
+| --snow-avalanche-batch-size  | `batchSize`           |
+| --snow-avalanche-num-parents | `parentSize`          |
 
 ### Gossip Configs
 

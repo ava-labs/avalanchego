@@ -21,7 +21,8 @@ func TestQCDuplicateSigners(t *testing.T) {
 	quorum := simplex.Quorum(len(configs))
 	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
 
-	signer, verifier := NewBLSAuth(configs[0])
+	signer, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	sig, err := signer.Sign(msg)
 	require.NoError(t, err)
 	require.NoError(t, verifier.Verify(msg, sig, configs[0].Ctx.NodeID[:]))
@@ -46,7 +47,8 @@ func TestQCDuplicateSigners(t *testing.T) {
 func TestQCDeserializerInvalidBytes(t *testing.T) {
 	config := newEngineConfig(t, 2)
 
-	_, verifier := NewBLSAuth(config)
+	_, verifier, err := NewBLSAuth(config)
+	require.NoError(t, err)
 	deserializer := QCDeserializer{verifier: &verifier}
 
 	sig, err := config.SignBLS([]byte("message2Sign"))
@@ -118,7 +120,8 @@ func TestSignatureAggregation(t *testing.T) {
 			signers: func() []simplex.Signature {
 				sigs := make([]simplex.Signature, 0, 4)
 				for _, config := range configs {
-					signer, _ := NewBLSAuth(config)
+					signer, _, err := NewBLSAuth(config)
+					require.NoError(t, err)
 					sig, err := signer.Sign(msg)
 					require.NoError(t, err)
 					sigs = append(sigs, simplex.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
@@ -132,7 +135,8 @@ func TestSignatureAggregation(t *testing.T) {
 			signers: func() []simplex.Signature {
 				sigs := make([]simplex.Signature, 0, 2)
 				for i, config := range configs {
-					signer, _ := NewBLSAuth(config)
+					signer, _, err := NewBLSAuth(config)
+					require.NoError(t, err)
 					if i < 2 {
 						sig, err := signer.Sign(msg)
 						require.NoError(t, err)
@@ -148,7 +152,8 @@ func TestSignatureAggregation(t *testing.T) {
 			signers: func() []simplex.Signature {
 				sigs := make([]simplex.Signature, 0, 3)
 				for i, config := range configs {
-					signer, _ := NewBLSAuth(config)
+					signer, _, err := NewBLSAuth(config)
+					require.NoError(t, err)
 					if i < 2 {
 						sig, err := signer.Sign(msg)
 						require.NoError(t, err)
@@ -158,7 +163,8 @@ func TestSignatureAggregation(t *testing.T) {
 
 				// add a signature from a node not in the membership set
 				newConfig := newNetworkConfigs(t, 4)
-				signer, _ := NewBLSAuth(newConfig[0])
+				signer, _, err := NewBLSAuth(newConfig[0])
+				require.NoError(t, err)
 				sig, err := signer.Sign(msg)
 				require.NoError(t, err)
 				sigs = append(sigs, simplex.Signature{Signer: newConfig[0].Ctx.NodeID[:], Value: sig})
@@ -171,7 +177,8 @@ func TestSignatureAggregation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, verifier := NewBLSAuth(configs[0])
+			_, verifier, err := NewBLSAuth(configs[0])
+			require.NoError(t, err)
 			signatureAggregator := SignatureAggregator{verifier: &verifier}
 			qc, err := signatureAggregator.Aggregate(tt.signers)
 			require.ErrorIs(t, err, tt.expectError)
@@ -203,7 +210,8 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 	sigs := make([]simplex.Signature, 0, len(configs))
 
 	for i := range 3 {
-		signer, _ := NewBLSAuth(configs[i])
+		signer, _, err := NewBLSAuth(configs[i])
+		require.NoError(t, err)
 		sig, err := signer.Sign(originalMsg)
 		require.NoError(t, err)
 		sigs = append(sigs, simplex.Signature{
@@ -212,7 +220,8 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 		})
 	}
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	signatureAggregator := SignatureAggregator{verifier: &verifier}
 	qc, err := signatureAggregator.Aggregate(sigs)
 	require.NoError(t, err)
@@ -289,3 +298,4 @@ func TestFilterNodes(t *testing.T) {
 		})
 	}
 }
+

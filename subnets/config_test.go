@@ -5,10 +5,12 @@ package subnets
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -31,9 +33,19 @@ func TestValid(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name: "invalid consensus parameters",
+			name: "deprecated consensus parameters set",
 			s: Config{
-				ConsensusParameters: snowball.Parameters{
+				ConsensusParameters: &snowball.Parameters{
+					K:               2,
+					AlphaPreference: 1,
+				},
+			},
+			expectedErr: ErrDeprecatedConsensusParameters,
+		},
+		{
+			name: "invalid snow consensus parameters",
+			s: Config{
+				SnowParameters: &snowball.Parameters{
 					K:               2,
 					AlphaPreference: 1,
 				},
@@ -43,19 +55,64 @@ func TestValid(t *testing.T) {
 		{
 			name: "invalid allowed node IDs",
 			s: Config{
-				AllowedNodes:        set.Of(ids.GenerateTestNodeID()),
-				ValidatorOnly:       false,
-				ConsensusParameters: validParameters,
+				AllowedNodes:   set.Of(ids.GenerateTestNodeID()),
+				ValidatorOnly:  false,
+				SnowParameters: &validParameters,
 			},
 			expectedErr: errAllowedNodesWhenNotValidatorOnly,
 		},
 		{
-			name: "valid",
+			name: "valid snowball parameters",
 			s: Config{
-				ConsensusParameters: validParameters,
-				ValidatorOnly:       false,
+				SnowParameters: &validParameters,
+				ValidatorOnly:  false,
 			},
 			expectedErr: nil,
+		},
+		{
+			name: "valid simplex parameters",
+			s: Config{
+				SimplexParameters: &simplex.Parameters{
+					MaxProposalWait:    1 * time.Second,
+					MaxRebroadcastWait: 1 * time.Second,
+					InitialValidators:  []simplex.SimplexValidatorInfo{{NodeID: ids.GenerateTestNodeID(), PublicKey: []byte{0x01}}},
+				},
+				ValidatorOnly: false,
+			},
+			expectedErr: nil,
+		},
+		{
+			name:        "no consensus parameters",
+			s:           Config{},
+			expectedErr: errInvalidConsensusConfiguration,
+		},
+		{
+			name: "both consensus parameters set",
+			s: Config{
+				SnowParameters:    &validParameters,
+				SimplexParameters: &simplex.Parameters{},
+			},
+			expectedErr: errInvalidConsensusConfiguration,
+		},
+		{
+			name: "invalid simplex parameters",
+			s: Config{
+				SimplexParameters: &simplex.Parameters{
+					MaxProposalWait:    -1,
+					MaxRebroadcastWait: -10,
+				},
+			},
+			expectedErr: simplex.ErrInvalidParameters,
+		},
+		{
+			name: "empty simplex parameters",
+			s: Config{
+				SimplexParameters: &simplex.Parameters{
+					MaxProposalWait:    0,
+					MaxRebroadcastWait: 0,
+				},
+			},
+			expectedErr: simplex.ErrInvalidParameters,
 		},
 	}
 	for _, tt := range tests {

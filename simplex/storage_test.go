@@ -56,7 +56,8 @@ func TestStorageNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := newEngineConfig(t, 1)
-			_, verifier := NewBLSAuth(config)
+			_, verifier, err := NewBLSAuth(config)
+			require.NoError(t, err)
 			qc := QCDeserializer{
 				verifier: &verifier,
 			}
@@ -79,7 +80,8 @@ func TestStorageRetrieve(t *testing.T) {
 	ctx := t.Context()
 	config := newEngineConfig(t, 4)
 	config.VM = vm
-	_, verifier := NewBLSAuth(config)
+	_, verifier, err := NewBLSAuth(config)
+	require.NoError(t, err)
 	qc := QCDeserializer{
 		verifier: &verifier,
 	}
@@ -137,7 +139,8 @@ func TestStorageIndexFails(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	qc := QCDeserializer{
 		verifier: &verifier,
 	}
@@ -223,7 +226,8 @@ func TestIndexMismatchedChild(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	qc := QCDeserializer{
 		verifier: &verifier,
 	}
@@ -253,7 +257,8 @@ func TestStorageIndexSuccess(t *testing.T) {
 	genesis := newTestBlock(t, newBlockConfig{})
 	configs := newNetworkConfigs(t, 4)
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	qc := QCDeserializer{verifier: &verifier}
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
@@ -301,3 +306,4 @@ func TestStorageIndexSuccess(t *testing.T) {
 
 	require.Equal(t, uint64(numBlocks+1), s.NumBlocks())
 }
+
