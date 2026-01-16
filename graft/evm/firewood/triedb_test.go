@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/stateconf"
-	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -45,19 +44,16 @@ func TestCommitEmptyGenesis(t *testing.T) {
 	root := tr.Hash()
 	require.Equal(t, types.EmptyRootHash, root)
 
-	root, nodes, err := tr.Commit(true)
+	root, _, err = tr.Commit(true)
 	require.NoErrorf(t, err, "%T.Commit()", tr)
 	require.Equal(t, types.EmptyRootHash, root)
-
-	mergedNodes := trienode.NewMergedNodeSet()
-	require.NoErrorf(t, mergedNodes.Merge(nodes), "%T.Merge()", mergedNodes)
 
 	require.NoErrorf(
 		t,
 		triedb.Update(
 			types.EmptyRootHash,
 			types.EmptyRootHash,
-			0, mergedNodes, nil,
+			0, nil, nil,
 			stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1}),
 		),
 		"%T.Update()", triedb,
@@ -96,19 +92,16 @@ func TestAccountPersistence(t *testing.T) {
 	hash := tr.Hash()
 	require.NotEqual(t, types.EmptyRootHash, hash)
 
-	root, nodes, err := tr.Commit(true)
+	root, _, err := tr.Commit(true)
 	require.NoErrorf(t, err, "%T.Commit()", tr)
 	require.Equal(t, hash, root)
-
-	mergedNodes := trienode.NewMergedNodeSet()
-	require.NoErrorf(t, mergedNodes.Merge(nodes), "%T.Merge()", mergedNodes)
 
 	require.NoErrorf(
 		t,
 		triedb.Update(
 			hash,
 			types.EmptyRootHash,
-			0, mergedNodes, nil,
+			0, nil, nil,
 			stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1}),
 		),
 		"%T.Update()", triedb,
@@ -150,19 +143,16 @@ func TestStoragePersistence(t *testing.T) {
 	hash := tr.Hash()
 	require.NotEqual(t, types.EmptyRootHash, hash)
 
-	root, nodes, err := tr.Commit(true)
+	root, _, err := tr.Commit(true)
 	require.NoErrorf(t, err, "%T.Commit()", tr)
 	require.Equal(t, hash, root)
-
-	mergedNodes := trienode.NewMergedNodeSet()
-	require.NoErrorf(t, mergedNodes.Merge(nodes), "%T.Merge()", mergedNodes)
 
 	require.NoErrorf(
 		t,
 		triedb.Update(
 			hash,
 			types.EmptyRootHash,
-			0, mergedNodes, nil,
+			0, nil, nil,
 			stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1}),
 		),
 		"%T.Update()", triedb,
@@ -214,24 +204,19 @@ func TestParallelHashing(t *testing.T) {
 	require.NotEqual(t, hash1, hash2)
 
 	// Commit both tries
-	root1, nodes1, err := tr1.Commit(true)
+	root1, _, err := tr1.Commit(true)
 	require.NoErrorf(t, err, "%T.Commit()", tr1)
 	require.Equal(t, hash1, root1)
-	root2, nodes2, err := tr2.Commit(true)
+	root2, _, err := tr2.Commit(true)
 	require.NoErrorf(t, err, "%T.Commit()", tr2)
 	require.Equal(t, hash2, root2)
-
-	mergedNodes1 := trienode.NewMergedNodeSet()
-	require.NoErrorf(t, mergedNodes1.Merge(nodes1), "%T.Merge()", mergedNodes1)
-	mergedNodes2 := trienode.NewMergedNodeSet()
-	require.NoErrorf(t, mergedNodes2.Merge(nodes2), "%T.Merge()", mergedNodes2)
 
 	require.NoErrorf(
 		t,
 		triedb.Update(
 			hash1,
 			types.EmptyRootHash,
-			0, mergedNodes1, nil,
+			0, nil, nil,
 			stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1}),
 		),
 		"%T.Update()", triedb,
@@ -240,8 +225,50 @@ func TestParallelHashing(t *testing.T) {
 	err = triedb.Update(
 		hash2,
 		types.EmptyRootHash,
-		0, mergedNodes2, nil,
+		0, nil, nil,
 		stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1}),
 	)
 	require.ErrorIsf(t, err, errNoProposalFound, "%T.Update()", triedb)
+}
+
+func TestUpdateWithWrongParameters(t *testing.T) {
+	db := newTestDatabase(t)
+	triedb := db.TrieDB()
+
+	tr, err := db.OpenTrie(types.EmptyRootHash)
+	require.NoErrorf(t, err, "%T.OpenTrie()", db)
+	require.NotNil(t, tr)
+
+	addr := common.HexToAddress("1234")
+	acct := generateAccount(addr)
+	require.NoErrorf(t, tr.UpdateAccount(addr, &acct), "%T.UpdateAccount()", tr)
+
+	hash := tr.Hash()
+	require.NotEqual(t, types.EmptyRootHash, hash)
+
+	root, _, err := tr.Commit(true)
+	require.NoErrorf(t, err, "%T.Commit()", tr)
+	require.Equal(t, hash, root)
+
+	// "Accidentally" provide the wrong height
+	err = triedb.Update(
+		root,
+		types.EmptyRootHash,
+		42, nil, nil,
+		stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1}),
+	)
+	require.ErrorIsf(t, err, errUnexpectedProposalFound, "%T.Update()", triedb)
+
+	// Providing the correct parameters can recover
+	require.NoErrorf(
+		t,
+		triedb.Update(
+			root,
+			types.EmptyRootHash,
+			0, nil, nil,
+			stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1}),
+		),
+		"%T.Update()", triedb,
+	)
+	require.NoErrorf(t, triedb.Commit(root, true), "%T.Commit()", triedb)
 }

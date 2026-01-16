@@ -40,7 +40,8 @@ var (
 	proposeOnProposeCount  = metrics.GetOrRegisterCounter("firewood/triedb/propose/proposal/count", nil)
 	explicitlyDroppedCount = metrics.GetOrRegisterCounter("firewood/triedb/drop/count", nil)
 
-	errNoProposalFound = errors.New("no proposal found")
+	errNoProposalFound         = errors.New("no proposal found")
+	errUnexpectedProposalFound = errors.New("unexpected proposal found")
 )
 
 // TrieDB is a triedb.DBOverride implementation backed by Firewood.
@@ -291,32 +292,33 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 	defer t.proposals.Unlock()
 
 	p, ok := t.possible[possibleKey{parentBlockHash: parentBlockHash, root: root}]
-	// Now, all unused proposals have no other references, since we didn't store them
-	// in the proposal map or tree, so they will be garbage collected.
-	// Any proposals with a different root were mistakenly created, so they can be freed as well.
-	clear(t.possible)
 	if !ok {
 		return fmt.Errorf("%w for block %d, root %s, hash %s", errNoProposalFound, height, root.Hex(), blockHash.Hex())
 	}
 
 	// If we have already created an identical proposal, we can skip adding it again.
 	if t.proposals.exists(root, blockHash, parentBlockHash) {
+		// All unused proposals can be cleared, since we are already tracking an identical one.
+		clear(t.possible)
 		return nil
 	}
 	switch {
 	case p.root != root:
-		return fmt.Errorf("proposal root mismatch, expected %x, got %x", root, p.root)
+		return fmt.Errorf("%w: expected root %#x, got %#x", errUnexpectedProposalFound, root, p.root)
 	case p.parent.root != parent:
-		return fmt.Errorf("parent root mismatch, expected %#x, got %x", parent, p.parent.root)
+		return fmt.Errorf("%w: expected parent root %#x, got %#x", errUnexpectedProposalFound, parent, p.parent.root)
 	case p.height != height:
-		return fmt.Errorf("height mismatch, expected %d, got %d", height, p.height)
+		return fmt.Errorf("%w: expected height %d, got %d", errUnexpectedProposalFound, height, p.height)
 	}
 
 	// Track the proposal context in the tree and map.
 	p.parent.children = append(p.parent.children, p.proposalMeta)
 	t.proposals.byStateRoot[root] = append(t.proposals.byStateRoot[root], p)
 	p.blockHashes[blockHash] = struct{}{}
-
+	// Now, all unused proposals have no other references, since we didn't store them
+	// in the proposal map or tree, so they will be garbage collected.
+	// Any proposals with a different root were mistakenly created, so they can be freed as well.
+	clear(t.possible)
 	return nil
 }
 
