@@ -315,7 +315,8 @@ type Wallet interface {
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
 		configOwner *secp256k1fx.OutputOwners,
-		shares uint32,
+		delegationShares uint32,
+		autoRestakeShares uint32,
 		period time.Duration,
 		options ...common.Option,
 	) (*txs.Tx, error)
@@ -631,7 +632,8 @@ func (w *wallet) IssueAddContinuousValidatorTx(
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	configOwner *secp256k1fx.OutputOwners,
-	shares uint32,
+	delegationShares uint32,
+	autoRestakeShares uint32,
 	period time.Duration,
 	options ...common.Option,
 ) (*txs.Tx, error) {
@@ -642,7 +644,8 @@ func (w *wallet) IssueAddContinuousValidatorTx(
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		configOwner,
-		shares,
+		delegationShares,
+		autoRestakeShares,
 		period,
 		options...,
 	)

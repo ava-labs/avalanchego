@@ -49,6 +49,7 @@ var (
 	errMaxStakeDurationTooLarge          = errors.New("max stake duration must be less than or equal to the global max stake duration")
 	errMissingStartTimePreDurango        = errors.New("staker transactions must have a StartTime pre-Durango")
 	errEtnaUpgradeNotActive              = errors.New("attempting to use an Etna-upgrade feature prior to activation")
+	errHeliconUpgradeNotActive           = errors.New("attempting to use a Helicon-upgrade feature prior to activation")
 	errTransformSubnetTxPostEtna         = errors.New("TransformSubnetTx is not permitted post-Etna")
 	errMaxNumActiveValidators            = errors.New("already at the max number of active validators")
 	errCouldNotLoadSubnetToL1Conversion  = errors.New("could not load subnet conversion")
@@ -1405,12 +1406,12 @@ func (e *standardTxExecutor) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfig
 		return err
 	}
 
-	if tx.AutoRestakeShares != nil {
-		validator.AutoRestakeShares = *tx.AutoRestakeShares
+	if tx.HasAutoRestakeShares {
+		validator.AutoRestakeShares = tx.AutoRestakeShares
 	}
 
-	if tx.Period != nil {
-		validator.ContinuationPeriod = time.Duration(*tx.Period) * time.Second
+	if tx.HasPeriod {
+		validator.ContinuationPeriod = time.Duration(tx.Period) * time.Second
 	}
 
 	return e.state.UpdateCurrentValidator(validator)

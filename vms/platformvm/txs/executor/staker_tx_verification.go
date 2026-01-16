@@ -42,6 +42,8 @@ var (
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
+	ErrMissingStakerTx                 = errors.New("missing staker tx")
+	ErrInvalidStakerTxType             = errors.New("invalid staker tx type")
 	ErrInvalidStakerTx                 = errors.New("invalid staker tx")
 )
 
@@ -869,6 +871,7 @@ func verifyTransferSubnetOwnershipTx(
 	return nil
 }
 
+// todo; test this inside standard_tx_executor
 // verifyAddContinuousValidatorTx carries out the validation for an AddContinuousValidatorTx.
 func verifyAddContinuousValidatorTx(
 	backend *Backend,
@@ -881,8 +884,8 @@ func verifyAddContinuousValidatorTx(
 		currentTimestamp = chainState.GetTimestamp()
 		upgrades         = backend.Config.UpgradeConfig
 	)
-	if !upgrades.IsDurangoActivated(currentTimestamp) { // todo: replace with proper upgrade
-		return ErrDurangoUpgradeNotActive
+	if !upgrades.IsHeliconActivated(currentTimestamp) { // todo: test this
+		return errHeliconUpgradeNotActive
 	}
 
 	// Verify the tx is well-formed
@@ -1002,9 +1005,8 @@ func verifySetAutoRestakeConfigTx(
 		currentTimestamp = chainState.GetTimestamp()
 		upgrades         = backend.Config.UpgradeConfig
 	)
-
-	if !upgrades.IsEtnaActivated(currentTimestamp) { // todo: replace with proper upgrade
-		return nil, errEtnaUpgradeNotActive
+	if !upgrades.IsHeliconActivated(currentTimestamp) { // todo: test this
+		return nil, errHeliconUpgradeNotActive
 	}
 
 	if err := tx.SyntacticVerify(backend.Ctx); err != nil {
@@ -1015,15 +1017,18 @@ func verifySetAutoRestakeConfigTx(
 		return nil, err
 	}
 
+	if !backend.Bootstrapped.Get() { // todo: is this ok?
+		return nil, nil
+	}
+
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get staker tx: %w", err)
+		return nil, ErrMissingStakerTx
 	}
 
 	continuousStakerTx, ok := stakerTx.Unsigned.(txs.ContinuousStaker)
 	if !ok {
-		// todo: add a test for this
-		return nil, fmt.Errorf("%w: different type %T", ErrInvalidStakerTx, stakerTx.Unsigned)
+		return nil, fmt.Errorf("%w: %T", ErrInvalidStakerTxType, stakerTx.Unsigned)
 	}
 
 	validatorRules, err := getValidatorRules(backend, chainState, continuousStakerTx.SubnetID())
@@ -1031,31 +1036,30 @@ func verifySetAutoRestakeConfigTx(
 		return nil, err
 	}
 
-	duration := continuousStakerTx.PeriodDuration()
+	if tx.HasPeriod {
+		duration := time.Duration(tx.Period) * time.Second
+		switch {
+		case duration > 0 && duration < validatorRules.minStakeDuration:
+			return nil, ErrStakeTooShort
 
-	switch {
-	case duration < validatorRules.minStakeDuration:
-		// Ensure period length is not too short
-		return nil, ErrStakeTooShort
-
-	case duration > validatorRules.maxStakeDuration:
-		// Ensure period length is not too long
-		return nil, ErrStakeTooLong
+		case duration > validatorRules.maxStakeDuration:
+			return nil, ErrStakeTooLong
+		}
 	}
 
 	validator, err := chainState.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
 	if err != nil {
+		// todo; add a test for this
 		return nil, fmt.Errorf("failed to get validator %s from state: %w", continuousStakerTx.NodeID(), err)
 	}
 
 	if tx.TxID != validator.TxID {
-		// todo: add a test for this
-		// This can happen if a validator restaked with the same public key and node id.
-		// In this case, TxID should be the latest transaction for the continuous validator.
+		// This can happen if a validator restaked with the same node id.
+		// In this case, TxID should be the latest transaction of the continuous validator.
 		return nil, fmt.Errorf("%w: wrong tx id", ErrInvalidStakerTx)
 	}
 
-	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, validator.Owner, tx.Auth)
+	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, continuousStakerTx.Owner(), tx.Auth)
 	if err != nil {
 		return nil, err
 	}
@@ -1065,7 +1069,6 @@ func verifySetAutoRestakeConfigTx(
 		return nil, fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return nil, err

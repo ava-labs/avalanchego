@@ -36,6 +36,5 @@ func NewByEndTime() TimedHeap {
 }
 
 func (h *byEndTime) Timestamp() time.Time {
-	//return h.Peek().Unsigned.(txs.Staker).EndTime()
-	return time.Time{}
+	return h.Peek().Unsigned.(txs.FixedStaker).EndTime()
 }

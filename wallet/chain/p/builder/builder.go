@@ -327,7 +327,8 @@ type Builder interface {
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
 		configOwner *secp256k1fx.OutputOwners,
-		shares uint32,
+		delegationShares uint32,
+		autoRestakeShares uint32,
 		period time.Duration,
 		options ...common.Option,
 	) (*txs.AddContinuousValidatorTx, error)
@@ -1519,7 +1520,8 @@ func (b *builder) NewAddContinuousValidatorTx(
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	configOwner *secp256k1fx.OutputOwners,
-	shares uint32,
+	delegationShares uint32,
+	autoRestakeShares uint32,
 	period time.Duration,
 	options ...common.Option,
 ) (*txs.AddContinuousValidatorTx, error) {
@@ -1588,10 +1590,10 @@ func (b *builder) NewAddContinuousValidatorTx(
 		StakeOuts:             stakeOutputs,
 		ValidatorRewardsOwner: validationRewardsOwner,
 		DelegatorRewardsOwner: delegationRewardsOwner,
-		ConfigOwner:           nil,
-		DelegationShares:      shares,
+		ConfigOwner:           configOwner,
+		DelegationShares:      delegationShares,
 		Wght:                  vdr.Wght,
-		AutoRestakeShares:     0,
+		AutoRestakeShares:     autoRestakeShares,
 		Period:                uint64(period.Seconds()),
 	}
 
@@ -1643,6 +1645,16 @@ func (b *builder) NewSetAutoRestakeConfigTx(
 		return nil, err
 	}
 
+	var autoRestakeSharesVal uint32
+	if autoRestakeShares != nil {
+		autoRestakeSharesVal = *autoRestakeShares
+	}
+
+	var periodVal uint64
+	if period != nil {
+		periodVal = *period
+	}
+
 	tx := &txs.SetAutoRestakeConfigTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,
@@ -1651,10 +1663,12 @@ func (b *builder) NewSetAutoRestakeConfigTx(
 			Outs:         outputs,
 			Memo:         memo,
 		}},
-		TxID:              txID,
-		Auth:              auth,
-		AutoRestakeShares: autoRestakeShares,
-		Period:            period,
+		TxID:                 txID,
+		Auth:                 auth,
+		AutoRestakeShares:    autoRestakeSharesVal,
+		HasAutoRestakeShares: autoRestakeShares != nil,
+		Period:               periodVal,
+		HasPeriod:            period != nil,
 	}
 	return tx, b.initCtx(tx)
 }

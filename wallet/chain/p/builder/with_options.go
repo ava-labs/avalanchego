@@ -318,7 +318,8 @@ func (w *withOptions) NewAddContinuousValidatorTx(
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	configOwner *secp256k1fx.OutputOwners,
-	shares uint32,
+	delegationShares uint32,
+	autoRestakeShares uint32,
 	period time.Duration,
 	options ...common.Option,
 ) (*txs.AddContinuousValidatorTx, error) {
@@ -329,7 +330,9 @@ func (w *withOptions) NewAddContinuousValidatorTx(
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		configOwner,
-		shares, period,
+		delegationShares,
+		autoRestakeShares,
+		period,
 		common.UnionOptions(w.options, options)...,
 	)
 }

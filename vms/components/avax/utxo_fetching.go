@@ -44,25 +44,6 @@ func GetAllUTXOs(db UTXOReader, addrs set.Set[ids.ShortID]) ([]*UTXO, error) {
 	return utxos, err
 }
 
-//func GetNextOutputIndex(utxos UTXOGetter, txID ids.ID) (uint32, error) {
-//	for i := uint32(0); i < math.MaxUint32; i++ {
-//		utxoID := UTXOID{
-//			TxID:        txID,
-//			OutputIndex: i,
-//		}
-//
-//		_, err := utxos.GetUTXO(utxoID.InputID())
-//		switch {
-//		case errors.Is(err, database.ErrNotFound):
-//			return i, nil
-//		case err != nil:
-//			return 0, err
-//		}
-//	}
-//
-//	panic("output index out of range")
-//}
-
 // GetPaginatedUTXOs returns UTXOs such that at least one of the addresses in
 // [addrs] is referenced.
 //

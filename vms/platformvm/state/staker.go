@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -65,9 +64,6 @@ type Staker struct {
 	// ContinuationPeriod > 0  => running continuous staker
 	// ContinuationPeriod == 0 => a stopped continuous staker OR a fixed staker, we don't care since we will stop at EndTime.
 	ContinuationPeriod time.Duration
-
-	// Owner defines who is authorized to modify the auto-restake config.
-	Owner fx.Owner
 }
 
 // A *Staker is considered to be less than another *Staker when:
@@ -110,7 +106,6 @@ func NewCurrentStaker(
 		endTime            time.Time
 		continuationPeriod time.Duration
 		autoRestakeShares  uint32
-		owner              fx.Owner
 	)
 
 	switch tTx := staker.(type) {
@@ -123,7 +118,6 @@ func NewCurrentStaker(
 		endTime = startTime.Add(tTx.PeriodDuration())
 		continuationPeriod = tTx.PeriodDuration()
 		autoRestakeShares = tTx.AutoRestakeSharesAmount()
-		owner = tTx.Owner()
 
 	default:
 		return nil, fmt.Errorf("unexpected staker tx type: %T", staker)
@@ -144,7 +138,6 @@ func NewCurrentStaker(
 		NextTime:                endTime,
 		Priority:                staker.CurrentPriority(),
 		ContinuationPeriod:      continuationPeriod,
-		Owner:                   owner,
 	}, nil
 }
 
@@ -215,6 +208,5 @@ func (s Staker) immutableFieldsAreUnmodified(ms *Staker) bool {
 		s.PublicKey.Equals(ms.PublicKey) &&
 		s.SubnetID == ms.SubnetID &&
 		s.NextTime.Equal(ms.NextTime) &&
-		s.Priority == ms.Priority &&
-		s.Owner == ms.Owner
+		s.Priority == ms.Priority
 }

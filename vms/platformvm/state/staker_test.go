@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer/signermock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var errCustom = errors.New("custom")
@@ -280,14 +279,6 @@ func TestValidateMutation(t *testing.T) {
 			expectedErr: errImmutableFieldsModified,
 		},
 		{
-			name: "mutated owner",
-			mutateFn: func(staker Staker) *Staker {
-				staker.Owner = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
-				return &staker
-			},
-			expectedErr: errImmutableFieldsModified,
-		},
-		{
 			name: "decreased accrued rewards",
 			mutateFn: func(staker Staker) *Staker {
 				staker.AccruedRewards -= 1
@@ -310,14 +301,6 @@ func TestValidateMutation(t *testing.T) {
 				return &staker
 			},
 			expectedErr: errDecreasedWeight,
-		},
-		{
-			name: "invalid continuation period (continuous staker)",
-			mutateFn: func(staker Staker) *Staker {
-				staker.ContinuationPeriod = 10
-				return &staker
-			},
-			expectedErr: errContinuationPeriodIsZero,
 		},
 		{
 			name: "valid mutation",
@@ -346,24 +329,6 @@ func TestValidateMutation(t *testing.T) {
 			)
 		})
 	}
-
-	// Test the invalid continuation period using a fixed staker.
-	fixedStaker := continuousStaker
-	fixedStaker.ContinuationPeriod = 0
-
-	mutateFn := func(staker Staker) *Staker {
-		staker.ContinuationPeriod = 5
-		return &staker
-	}
-
-	t.Run("invalid continuation period (fixed staker)", func(t *testing.T) {
-		require := require.New(t)
-
-		require.ErrorIs(
-			errContinuationPeriodIsZero,
-			fixedStaker.ValidateMutation(mutateFn(*fixedStaker)),
-		)
-	})
 }
 
 func generateStakerTx(require *require.Assertions) *txs.AddPermissionlessValidatorTx {
