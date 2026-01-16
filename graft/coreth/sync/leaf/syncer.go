@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesyncclient
+package leaf
 
 import (
 	"bytes"
@@ -18,12 +18,12 @@ import (
 
 var ErrFailedToFetchLeafs = errors.New("failed to fetch leafs")
 
-// LeafSyncTask represents a complete task to be completed by the leaf syncer.
-// Note: each LeafSyncTask is processed on its own goroutine and there will
+// SyncTask represents a complete task to be completed by the leaf syncer.
+// Note: each SyncTask is processed on its own goroutine and there will
 // not be concurrent calls to the callback methods. Implementations should return
 // the same value for Root, Account, Start, and NodeType throughout the sync.
 // The value returned by End can change between calls to OnLeafs.
-type LeafSyncTask interface {
+type SyncTask interface {
 	Root() common.Hash                                      // Root of the trie to sync
 	Account() common.Hash                                   // Account hash of the trie to sync (only applicable to storage tries)
 	Start() []byte                                          // Starting key to request new leaves
@@ -34,26 +34,26 @@ type LeafSyncTask interface {
 	OnFinish(ctx context.Context) error                     // Callback when there are no more leaves in the trie to sync or when we reach End()
 }
 
-type LeafSyncerConfig struct {
+type SyncerConfig struct {
 	RequestSize uint16 // Number of leafs to request from a peer at a time
 	NumWorkers  int    // Number of workers to process leaf sync tasks
 }
 
-type CallbackLeafSyncer struct {
-	config *LeafSyncerConfig
-	client LeafClient
-	tasks  <-chan LeafSyncTask
+type CallbackSyncer struct {
+	config *SyncerConfig
+	client Client
+	tasks  <-chan SyncTask
 }
 
-type LeafClient interface {
+type Client interface {
 	// GetLeafs synchronously sends the given request, returning a parsed LeafsResponse or error
 	// Note: this verifies the response including the range proofs.
 	GetLeafs(context.Context, message.LeafsRequest) (message.LeafsResponse, error)
 }
 
-// NewCallbackLeafSyncer creates a new syncer object to perform leaf sync of tries.
-func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, config *LeafSyncerConfig) *CallbackLeafSyncer {
-	return &CallbackLeafSyncer{
+// NewCallbackSyncer creates a new syncer object to perform leaf sync of tries.
+func NewCallbackSyncer(client Client, tasks <-chan SyncTask, config *SyncerConfig) *CallbackSyncer {
+	return &CallbackSyncer{
 		config: config,
 		client: client,
 		tasks:  tasks,
@@ -62,7 +62,7 @@ func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, config 
 
 // workerLoop reads from [c.tasks] and calls [c.syncTask] until [ctx] is finished
 // or [c.tasks] is closed.
-func (c *CallbackLeafSyncer) workerLoop(ctx context.Context) error {
+func (c *CallbackSyncer) workerLoop(ctx context.Context) error {
 	for {
 		select {
 		case task, more := <-c.tasks:
@@ -80,7 +80,7 @@ func (c *CallbackLeafSyncer) workerLoop(ctx context.Context) error {
 
 // syncTask performs [task], requesting the leaves of the trie corresponding to [task.Root]
 // starting at [task.Start] and invoking the callbacks as necessary.
-func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) error {
+func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 	var (
 		root  = task.Root()
 		start = task.Start()
@@ -149,7 +149,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 
 // Start launches [numWorkers] worker goroutines to process LeafSyncTasks from [c.tasks].
 // onFailure is called if the sync completes with an error.
-func (c *CallbackLeafSyncer) Sync(ctx context.Context) error {
+func (c *CallbackSyncer) Sync(ctx context.Context) error {
 	// Start the worker threads with the desired context.
 	eg, egCtx := errgroup.WithContext(ctx)
 	for i := 0; i < c.config.NumWorkers; i++ {

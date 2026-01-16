@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesyncclient
+package client
 
 import (
 	"bytes"
@@ -82,7 +82,7 @@ type client struct {
 	blockParser      EthBlockParser
 }
 
-type ClientConfig struct {
+type Config struct {
 	NetworkClient    network.SyncedNetworkClient
 	Codec            codec.Manager
 	Stats            stats.ClientSyncerStats
@@ -94,7 +94,7 @@ type EthBlockParser interface {
 	ParseEthBlock(b []byte) (*types.Block, error)
 }
 
-func NewClient(config *ClientConfig) *client {
+func New(config *Config) *client {
 	return &client{
 		networkClient:  config.NetworkClient,
 		codec:          config.Codec,
@@ -331,7 +331,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 		metric.UpdateRequestLatency(time.Since(start))
 
 		if err != nil {
-			ctx := make([]interface{}, 0, 8)
+			ctx := make([]any, 0, 8)
 			if nodeID != ids.EmptyNodeID {
 				ctx = append(ctx, "nodeID", nodeID)
 			}

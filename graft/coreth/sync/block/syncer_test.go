@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package blocksync
+package block
 
 import (
 	"context"
@@ -22,9 +22,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 
-	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -144,7 +144,7 @@ func TestBlockSyncer_ContextCancellation(t *testing.T) {
 // testEnvironment provides an abstraction for setting up block syncer tests
 type testEnvironment struct {
 	chainDB ethdb.Database
-	client  *syncclient.TestClient
+	client  *client.TestClient
 	blocks  []*types.Block
 }
 
@@ -196,7 +196,7 @@ func newTestEnvironment(t *testing.T, numBlocks int) *testEnvironment {
 	return &testEnvironment{
 		chainDB: rawdb.NewMemoryDatabase(),
 		blocks:  blocks,
-		client: syncclient.NewTestClient(
+		client: client.NewTestClient(
 			message.Codec,
 			nil,
 			nil,
