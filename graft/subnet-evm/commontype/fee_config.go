@@ -209,8 +209,8 @@ var (
 	ErrTimeToDoubleNil                    = errors.New("timeToDouble cannot be nil")
 	ErrTargetGasTooLowACP224              = errors.New("targetGas must be greater than 0")
 	ErrMinGasPriceTooLow                  = errors.New("minGasPrice must be greater than 0")
-	ErrMaxCapacityFactorNegative          = errors.New("maxCapacityFactor cannot be negative")
-	ErrTimeToDoubleNegative               = errors.New("timeToDouble cannot be negative")
+	ErrMaxCapacityFactorTooLow            = errors.New("maxCapacityFactor must be greater than 0")
+	ErrTimeToDoubleTooLow                 = errors.New("timeToDouble must be greater than 0")
 	ErrTargetGasExceedsHashLengthACP224   = errors.New("targetGas exceeds hash length")
 	ErrMinGasPriceExceedsHashLength       = errors.New("minGasPrice exceeds hash length")
 	ErrMaxCapacityFactorExceedsHashLength = errors.New("maxCapacityFactor exceeds hash length")
@@ -234,13 +234,13 @@ func (a *ACP224FeeConfig) Verify() error {
 	// Check for valid values
 	switch {
 	case a.TargetGas.Cmp(common.Big0) != 1:
-		return fmt.Errorf("%w: targetGas = %d", ErrTargetGasTooLowACP224, a.TargetGas)
+		return ErrTargetGasTooLowACP224
 	case a.MinGasPrice.Cmp(common.Big0) != 1:
-		return fmt.Errorf("%w: minGasPrice = %d", ErrMinGasPriceTooLow, a.MinGasPrice)
-	case a.MaxCapacityFactor.Cmp(common.Big0) == -1:
-		return fmt.Errorf("%w: maxCapacityFactor = %d", ErrMaxCapacityFactorNegative, a.MaxCapacityFactor)
-	case a.TimeToDouble.Cmp(common.Big0) == -1:
-		return fmt.Errorf("%w: timeToDouble = %d", ErrTimeToDoubleNegative, a.TimeToDouble)
+		return ErrMinGasPriceTooLow
+	case a.MaxCapacityFactor.Cmp(common.Big0) != 1:
+		return ErrMaxCapacityFactorTooLow
+	case a.TimeToDouble.Cmp(common.Big0) != 1:
+		return ErrTimeToDoubleTooLow
 	}
 
 	return a.checkByteLens()
