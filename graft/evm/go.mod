@@ -1,6 +1,6 @@
 module github.com/ava-labs/avalanchego/graft/evm
 
-go 1.24.11
+go 1.24.12
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
