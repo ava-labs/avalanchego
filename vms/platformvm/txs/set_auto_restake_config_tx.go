@@ -32,12 +32,14 @@ type SetAutoRestakeConfigTx struct {
 	//   0         = restake principal only; withdraw 100% of rewards
 	//   300_000   = restake 30% of rewards; withdraw 70%
 	//   1_000_000 = restake 100% of rewards; withdraw 0%
-	AutoRestakeShares *uint32 `serialize:"true" json:"autoRestakeShares"`
+	AutoRestakeShares    uint32 `serialize:"true" json:"autoRestakeShares"`
+	HasAutoRestakeShares bool   `serialize:"true" json:"hasAutoRestakeShares"`
 
 	// Optionally update the period for the next cycle (in seconds). Takes effect at cycle end.
 	// If nil, leave unchanged.
 	// If 0, stop at the end of the current cycle and unlock funds.
-	Period *uint64 `serialize:"true" json:"period"`
+	Period    uint64 `serialize:"true" json:"period"`
+	HasPeriod bool   `serialize:"true" json:"hasPeriod"`
 }
 
 func (tx *SetAutoRestakeConfigTx) SyntacticVerify(ctx *snow.Context) error {
@@ -49,9 +51,9 @@ func (tx *SetAutoRestakeConfigTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.TxID == ids.Empty:
 		return errMissingTxID
-	case tx.AutoRestakeShares == nil && tx.Period == nil:
+	case !tx.HasPeriod && !tx.HasAutoRestakeShares:
 		return errNoUpdatedFields
-	case tx.AutoRestakeShares != nil && *tx.AutoRestakeShares > reward.PercentDenominator:
+	case tx.HasAutoRestakeShares && tx.AutoRestakeShares > reward.PercentDenominator:
 		return errTooManyRestakeShares
 	}
 

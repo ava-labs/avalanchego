@@ -46,13 +46,13 @@ type AddContinuousValidatorTx struct {
 	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 
 	// Where to send validation rewards when done validating
-	ValidatorRewardsOwner fx.Owner `serialize:"true" json:"validationRewardsOwner"`
+	ValidatorRewardsOwner fx.Owner `serialize:"true" json:"validationRewardsOwner"` // todo: validate tha this is not empty?
 
 	// Where to send delegation rewards when done validating
-	DelegatorRewardsOwner fx.Owner `serialize:"true" json:"delegationRewardsOwner"`
+	DelegatorRewardsOwner fx.Owner `serialize:"true" json:"delegationRewardsOwner"` // todo: validate tha this is not empty?
 
 	// Who is authorized to modify the auto-restake config
-	ConfigOwner fx.Owner `serialize:"true" json:"configOwner"`
+	ConfigOwner fx.Owner `serialize:"true" json:"configOwner"` // todo: validate tha this is not empty?
 
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has DelegationShares=300,000 then they

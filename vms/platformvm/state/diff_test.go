@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 type nilStateGetter struct{}
@@ -1227,7 +1226,6 @@ func TestDiffResetContinuousValidatorCycle(t *testing.T) {
 		AutoRestakeShares:       100_000,
 		Priority:                txs.PrimaryNetworkValidatorCurrentPriority,
 		ContinuationPeriod:      14 * 24 * time.Hour,
-		Owner:                   &secp256k1fx.OutputOwners{Addrs: []ids.ShortID{ids.GenerateTestShortID()}, Threshold: 1},
 	}
 	require.NoError(d.PutCurrentValidator(continuousValidator))
 

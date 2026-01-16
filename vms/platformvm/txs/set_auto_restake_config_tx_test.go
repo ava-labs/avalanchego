@@ -81,9 +81,10 @@ func TestSetAutoRestakeConfigTxSyntacticVerify(t *testing.T) {
 				autoRestakeShares := uint32(2_000_000)
 
 				return &SetAutoRestakeConfigTx{
-					BaseTx:            validBaseTx,
-					TxID:              ids.GenerateTestID(),
-					AutoRestakeShares: &autoRestakeShares,
+					BaseTx:               validBaseTx,
+					TxID:                 ids.GenerateTestID(),
+					AutoRestakeShares:    autoRestakeShares,
+					HasAutoRestakeShares: true,
 				}
 			},
 			err: errTooManyRestakeShares,
@@ -104,9 +105,10 @@ func TestSetAutoRestakeConfigTxSyntacticVerify(t *testing.T) {
 				autoRestakeShares := uint32(500_000)
 
 				return &SetAutoRestakeConfigTx{
-					BaseTx:            invalidBaseTx,
-					TxID:              ids.GenerateTestID(),
-					AutoRestakeShares: &autoRestakeShares,
+					BaseTx:               invalidBaseTx,
+					TxID:                 ids.GenerateTestID(),
+					AutoRestakeShares:    autoRestakeShares,
+					HasAutoRestakeShares: true,
 				}
 			},
 			err: avax.ErrWrongNetworkID,

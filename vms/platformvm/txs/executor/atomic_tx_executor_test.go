@@ -39,8 +39,8 @@ func TestAtomicExecutorWrongTxTypes(t *testing.T) {
 		&txs.SetL1ValidatorWeightTx{},
 		&txs.IncreaseL1ValidatorBalanceTx{},
 		&txs.DisableL1ValidatorTx{},
-		&txs.StopContinuousValidatorTx{},
 		&txs.AddContinuousValidatorTx{},
+		&txs.SetAutoRestakeConfigTx{},
 		&txs.RewardContinuousValidatorTx{},
 	}
 
