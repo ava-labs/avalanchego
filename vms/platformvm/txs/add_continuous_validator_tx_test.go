@@ -541,9 +541,9 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 						},
 					},
 					ValidatorRewardsOwner: rewardsOwner,
-					//DelegatorRewardsOwner: rewardsOwner,
-					DelegationShares: reward.PercentDenominator,
-					ConfigOwner:      configOwner,
+					DelegatorRewardsOwner: rewardsOwner,
+					DelegationShares:      reward.PercentDenominator,
+					ConfigOwner:           configOwner,
 				}
 			},
 			err: nil,
