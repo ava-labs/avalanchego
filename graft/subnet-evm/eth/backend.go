@@ -35,9 +35,11 @@ import (
 	"sync"
 	"time"
 
+	ethparams "github.com/ava-labs/libevm/params"
+
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/pruner"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/pruner"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool/legacypool"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/ethconfig"
@@ -183,7 +185,7 @@ func New(
 		networkID:         networkID,
 		etherbase:         config.Miner.Etherbase,
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
-		bloomIndexer:      core.NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
+		bloomIndexer:      core.NewBloomIndexer(chainDb, ethparams.BloomBitsBlocks, ethparams.BloomConfirms),
 		settings:          settings,
 		shutdownTracker:   shutdowncheck.NewShutdownTracker(chainDb),
 	}
@@ -386,7 +388,7 @@ func (s *Ethereum) BloomIndexer() *core.ChainIndexer { return s.bloomIndexer }
 // Ethereum protocol implementation.
 func (s *Ethereum) Start() {
 	// Start the bloom bits servicing goroutines
-	s.startBloomHandlers(params.BloomBitsBlocks)
+	s.startBloomHandlers(ethparams.BloomBitsBlocks)
 
 	// Regularly update shutdown marker
 	s.shutdownTracker.Start()
