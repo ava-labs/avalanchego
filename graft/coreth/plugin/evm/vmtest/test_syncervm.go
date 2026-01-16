@@ -339,6 +339,8 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	internalBlock, ok := internalWrappedBlock.(*chain.BlockWrapper)
 	require.True(ok)
 	require.NoError(serverVM.SetLastAcceptedBlock(internalBlock.Block))
+	require.NoError(serverVM.PutLastAcceptedID(internalBlock.ID()))
+	require.NoError(serverVM.VersionDB().Commit())
 
 	// initialise [syncerVM] with blank genesis state
 	// we also override [syncerVM]'s commit interval so the atomic trie works correctly.
@@ -660,5 +662,5 @@ func requireSyncPerformedHeight(t *testing.T, db ethdb.KeyValueStore, expected u
 	t.Helper()
 	latest, err := customrawdb.GetLatestSyncPerformed(db)
 	require.NoError(t, err)
-	require.Equal(t, expected, latest, "sync performed height mismatch: expected %d, got %d", expected, latest)
+	require.Equal(t, expected, latest, "sync performed height mismatch")
 }

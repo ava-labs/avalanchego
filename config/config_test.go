@@ -371,7 +371,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 	require.NoError(t, err)
 
 	defaultConfigs := map[ids.ID]subnets.Config{
-		subnetID: getDefaultSubnetConfig(setupViperFlags()),
+		subnetID: getPrimaryNetworkConfig(setupViperFlags()),
 	}
 
 	tests := map[string]struct {
@@ -457,7 +457,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	require.NoError(t, err)
 
 	defaultConfigs := map[ids.ID]subnets.Config{
-		subnetID: getDefaultSubnetConfig(setupViperFlags()),
+		subnetID: getPrimaryNetworkConfig(setupViperFlags()),
 	}
 
 	tests := map[string]struct {

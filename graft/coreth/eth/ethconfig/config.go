@@ -36,8 +36,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/eth/gasprice"
 	"github.com/ava-labs/avalanchego/graft/coreth/internal/ethapi"
 	"github.com/ava-labs/avalanchego/graft/coreth/miner"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/params"
 )
 
 // DefaultFullGPOConfig contains default gasprice oracle settings for full node.
