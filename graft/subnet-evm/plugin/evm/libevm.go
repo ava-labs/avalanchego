@@ -3,9 +3,7 @@
 
 package evm
 
-import (
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extras"
-)
+import "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extras"
 
 // RegisterAllLibEVMExtras is a convenience wrapper for calling
 // [core.RegisterExtras], [customtypes.Register], and [params.RegisterExtras].

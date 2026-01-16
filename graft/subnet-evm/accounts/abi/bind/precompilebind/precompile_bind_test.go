@@ -694,6 +694,11 @@ func TestPrecompileBind(t *testing.T) {
 	out, err = replacer.CombinedOutput()
 	require.NoError(t, err, "failed to replace binding test dependency to current source tree: %v\n%s", err, out)
 
+	replacer = exec.Command(gocmd, "mod", "edit", "-x", "-require", "github.com/ava-labs/avalanchego/graft/coreth@v0.0.0", "-replace", "github.com/ava-labs/avalanchego/graft/coreth="+filepath.Join(pwd, "..", "..", "..", "..", "..", "coreth"))
+	replacer.Dir = pkg
+	out, err = replacer.CombinedOutput()
+	require.NoError(t, err, "failed to replace binding test dependency to current source tree: %v\n%s", err, out)
+
 	replacer = exec.Command(gocmd, "mod", "edit", "-x", "-require", "github.com/ava-labs/avalanchego@v0.0.0", "-replace", "github.com/ava-labs/avalanchego="+filepath.Join(pwd, "..", "..", "..", "..", "..", ".."))
 	replacer.Dir = pkg
 	out, err = replacer.CombinedOutput()

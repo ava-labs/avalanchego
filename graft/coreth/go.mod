@@ -8,7 +8,6 @@ module github.com/ava-labs/avalanchego/graft/coreth
 go 1.24.12
 
 require (
-	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/ava-labs/avalanchego v1.14.1-antithesis-docker-image-fix
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.18
