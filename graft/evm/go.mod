@@ -10,11 +10,13 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/gorilla/rpc v1.2.0
+	github.com/gorilla/websocket v1.5.0
 	github.com/holiman/bloomfilter/v2 v2.0.3
 	github.com/holiman/uint256 v1.2.4
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.45.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
+	golang.org/x/time v0.12.0
 )
 
 require (
@@ -84,6 +86,7 @@ require (
 	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
+	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect

@@ -45,7 +45,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
