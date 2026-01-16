@@ -106,7 +106,7 @@ func TestVerify(t *testing.T) {
 				MaxCapacityFactor: big.NewInt(-1),
 				TimeToDouble:      big.NewInt(200),
 			}),
-			ExpectedError: commontype.ErrMaxCapacityFactorNegative,
+			ExpectedError: commontype.ErrMaxCapacityFactorTooLow,
 		},
 		"timeToDouble negative": {
 			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ACP224FeeConfig{
@@ -115,7 +115,7 @@ func TestVerify(t *testing.T) {
 				MaxCapacityFactor: big.NewInt(100),
 				TimeToDouble:      big.NewInt(-1),
 			}),
-			ExpectedError: commontype.ErrTimeToDoubleNegative,
+			ExpectedError: commontype.ErrTimeToDoubleTooLow,
 		},
 		// Hash length exceeded tests
 		"targetGas exceeds hash length": {
@@ -173,23 +173,41 @@ func TestVerify(t *testing.T) {
 			}),
 			ExpectedError: nil,
 		},
-		"maxCapacityFactor zero is valid": {
+		"maxCapacityFactor minimum valid value": {
+			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ACP224FeeConfig{
+				TargetGas:         big.NewInt(1000),
+				MinGasPrice:       big.NewInt(1),
+				MaxCapacityFactor: big.NewInt(1),
+				TimeToDouble:      big.NewInt(200),
+			}),
+			ExpectedError: nil,
+		},
+		"timeToDouble minimum valid value": {
+			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ACP224FeeConfig{
+				TargetGas:         big.NewInt(1000),
+				MinGasPrice:       big.NewInt(1),
+				MaxCapacityFactor: big.NewInt(100),
+				TimeToDouble:      big.NewInt(1),
+			}),
+			ExpectedError: nil,
+		},
+		"maxCapacityFactor zero": {
 			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ACP224FeeConfig{
 				TargetGas:         big.NewInt(1000),
 				MinGasPrice:       big.NewInt(1),
 				MaxCapacityFactor: big.NewInt(0),
 				TimeToDouble:      big.NewInt(200),
 			}),
-			ExpectedError: nil,
+			ExpectedError: commontype.ErrMaxCapacityFactorTooLow,
 		},
-		"timeToDouble zero is valid": {
+		"timeToDouble zero": {
 			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ACP224FeeConfig{
 				TargetGas:         big.NewInt(1000),
 				MinGasPrice:       big.NewInt(1),
 				MaxCapacityFactor: big.NewInt(100),
 				TimeToDouble:      big.NewInt(0),
 			}),
-			ExpectedError: nil,
+			ExpectedError: commontype.ErrTimeToDoubleTooLow,
 		},
 		"valid fee config": {
 			Config:        acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ValidTestACP224FeeConfig),
