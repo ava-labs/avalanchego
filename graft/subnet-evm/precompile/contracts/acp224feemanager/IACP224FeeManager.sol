@@ -4,15 +4,15 @@ pragma solidity ^0.8.24;
 import "precompile/allowlist/IAllowList.sol";
 
 /// @title ACP-224 Fee Manager Interface
-/// @notice Interface for managing dynamic gas limit and fee parameters according to ACP-224
+/// @notice Interface for managing dynamic gas limit and fee parameters
 /// @dev Inherits from IAllowList for access control
 interface IACP224FeeManager is IAllowList {
-    /// @notice Configuration parameters for the ACP-224 dynamic fee mechanism
+    /// @notice Configuration parameters for the dynamic fee mechanism
     struct FeeConfig {
         uint256 targetGas; // Target gas consumption per second
         uint256 minGasPrice; // Minimum gas price in wei
         uint256 maxCapacityFactor; // Maximum capacity factor (C = factor * T)
-        uint256 timeToDouble; // Time for gas price to double at max capacity
+        uint256 timeToDouble; // Time in seconds for gas price to double at max capacity
     }
 
     /// @notice Emitted when fee configuration is updated
