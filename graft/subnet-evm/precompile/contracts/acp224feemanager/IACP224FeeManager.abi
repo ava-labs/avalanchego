@@ -1,0 +1,256 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "targetGas",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minGasPrice",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxCapacityFactor",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "timeToDouble",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IACP224FeeManager.FeeConfig",
+        "name": "oldFeeConfig",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "targetGas",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minGasPrice",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxCapacityFactor",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "timeToDouble",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IACP224FeeManager.FeeConfig",
+        "name": "newFeeConfig",
+        "type": "tuple"
+      }
+    ],
+    "name": "FeeConfigUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "role",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldRole",
+        "type": "uint256"
+      }
+    ],
+    "name": "RoleSet",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "getFeeConfig",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "targetGas",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minGasPrice",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxCapacityFactor",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "timeToDouble",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IACP224FeeManager.FeeConfig",
+        "name": "config",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getFeeConfigLastChangedAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "blockNumber",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "readAllowList",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "role",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setAdmin",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setEnabled",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "targetGas",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minGasPrice",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxCapacityFactor",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "timeToDouble",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IACP224FeeManager.FeeConfig",
+        "name": "config",
+        "type": "tuple"
+      }
+    ],
+    "name": "setFeeConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setManager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setNone",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
