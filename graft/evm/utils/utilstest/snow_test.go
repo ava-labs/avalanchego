@@ -25,10 +25,6 @@ func TestNewTestSnowContext(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, validators)
 
-	// Test that we can call GetWarpValidatorSetF without panicking
-	_, err = validatorState.GetWarpValidatorSet(t.Context(), 0, ids.Empty)
-	require.NoError(t, err)
-
 	// Test that we can call GetWarpValidatorSetsF without panicking
 	_, err = validatorState.GetWarpValidatorSets(t.Context(), 0)
 	require.NoError(t, err)
