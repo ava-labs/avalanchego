@@ -424,7 +424,7 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 				defer codeToFetchIt.Release()
 				for codeToFetchIt.Next() {
 					codeHash := common.BytesToHash(codeToFetchIt.Key()[len(customrawdb.CodeToFetchPrefix):])
-					customrawdb.DeleteCodeToFetch(clientDB.DiskDB(), codeHash)
+					require.NoError(t, customrawdb.DeleteCodeToFetch(clientDB.DiskDB(), codeHash), "failed to delete code-to-fetch marker for hash %x", codeHash)
 				}
 				require.NoError(t, codeToFetchIt.Error(), "error iterating over code-to-fetch markers")
 			},
