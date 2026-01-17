@@ -103,17 +103,3 @@ jobs:
           sudo apt -y install qemu-system qemu-user-static
       - name: Check image build
         run: ./scripts/run_task.sh test-build-image
-
-  test_build_antithesis_images:
-    name: Build Antithesis images
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./graft/subnet-evm
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: "graft/subnet-evm/go.mod"
-      - name: Check antithesis image build
-        run: ./scripts/run_task.sh test-build-antithesis-images-ci

@@ -221,6 +221,15 @@ jobs:
       - name: Check image build for xsvm test setup
         shell: bash
         run: ./scripts/run_task.sh test-build-antithesis-images-xsvm
+  test_build_antithesis_subnet_evm_images:
+    name: Build Antithesis subnet-evm images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Check image build for subnet-evm test setup
+        shell: bash
+        run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm
   e2e_bootstrap_monitor:
     name: Run bootstrap monitor e2e tests
     runs-on: ubuntu-latest
