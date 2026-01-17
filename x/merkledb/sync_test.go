@@ -7,7 +7,6 @@ import (
 	"context"
 	"math/rand"
 	"slices"
-	"sync"
 	"testing"
 	"time"
 
@@ -18,9 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/x/sync/synctest"
 
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
@@ -437,7 +436,8 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 	actionHandler := &p2p.TestHandler{}
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
 	syncer, err := xsync.NewSyncer(
 		db,
 		xsync.Config[*RangeProof, *ChangeProof]{
@@ -455,34 +455,29 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Allow 1 request to go through before blocking
-	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)
-	updatedRootChan := make(chan struct{}, 1)
-	updatedRootChan <- struct{}{}
-	once := &sync.Once{}
-	actionHandler.AppRequestF = func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-		select {
-		case <-updatedRootChan:
-			// do nothing, allow 1 request to go through
-		default:
-			once.Do(func() {
-				require.NoError(syncer.UpdateSyncTarget(secondSyncRoot))
-			})
+	var errIntercept error
+	synctest.AddFuncOnIntercept(actionHandler, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
+		errIntercept = syncer.UpdateSyncTarget(secondSyncRoot)
+		if errIntercept != nil {
+			cancel()
 		}
-		return rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
-	}
+	}, 1)
 
-	require.NoError(syncer.Start(t.Context()))
-	require.NoError(syncer.Wait(t.Context()))
+	require.NoError(syncer.Start(ctx))
+	err = syncer.Wait(ctx)
+	require.NoError(errIntercept)
+	require.NoError(err)
 	require.NoError(syncer.Error())
 
-	newRoot, err := db.GetMerkleRoot(t.Context())
+	newRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 	require.Equal(secondSyncRoot, newRoot)
 }
 
 func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require := require.New(t)
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -523,16 +518,18 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// Update sync target on first request
-	once := &sync.Once{}
-	actionHandler.AppRequestF = func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-		once.Do(func() {
-			require.NoError(m.UpdateSyncTarget(root2))
-		})
-		return rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
-	}
+	var errIntercept error
+	synctest.AddFuncOnIntercept(actionHandler, rangeProofHandler, func() {
+		errIntercept = m.UpdateSyncTarget(root1)
+		if errIntercept != nil {
+			cancel()
+		}
+	}, 0)
+
 	require.NoError(m.Start(ctx))
-	require.NoError(m.Wait(ctx))
+	err = m.Wait(ctx)
+	require.NoError(errIntercept)
+	require.NoError(err)
 }
 
 func generateTrie(t *testing.T, r *rand.Rand, count int) (MerkleDB, error) {
