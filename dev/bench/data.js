@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1768605447643,
+  "lastUpdate": 1768615067068,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2819,6 +2819,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-archive-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_accept_ms/ggas",
             "value": 52.31773113621245,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonathan Oppenheimer",
+            "username": "JonathanOppenheimer",
+            "email": "jonathan.oppenheimer@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "43b6c7fd00da84ea827dd5bd4ba385befe0027ad",
+          "message": "refactor: granite cleanup - remove `GetWarpValidatorSet` (#4858)",
+          "timestamp": "2026-01-16T23:39:07Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/43b6c7fd00da84ea827dd5bd4ba385befe0027ad"
+        },
+        "date": 1768615064959,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - mgas/s",
+            "value": 102.40220987865818,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - ms/ggas",
+            "value": 9765.414254096208,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_parse_ms/ggas",
+            "value": 69.67179904931182,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_verify_ms/ggas",
+            "value": 9642.2749436924,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_accept_ms/ggas",
+            "value": 51.46641997503065,
             "unit": "block_accept_ms/ggas"
           }
         ]
