@@ -35,6 +35,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	ethparams "github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/pruner"
@@ -51,7 +52,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/miner"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/node"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/accounts"

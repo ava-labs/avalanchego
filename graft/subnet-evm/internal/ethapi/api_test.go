@@ -42,6 +42,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
@@ -49,7 +50,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/accounts"
