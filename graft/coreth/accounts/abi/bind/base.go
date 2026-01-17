@@ -35,10 +35,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
 	ethereum "github.com/ava-labs/libevm"
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"

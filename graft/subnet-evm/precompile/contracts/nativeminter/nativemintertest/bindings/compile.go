@@ -12,4 +12,4 @@ package bindings
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type NativeMinterTest --abi artifacts/NativeMinterTest.abi --bin artifacts/NativeMinterTest.bin --out gen_nativemintertest_binding.go
 // Step 4: Replace import paths in generated binding to use subnet-evm instead of libevm
 // This is necessary because the libevm bindings package is not compatible with the subnet-evm simulated backend, which is used for testing.
-//go:generate sh -c "sed -i.bak -e 's|github.com/ava-labs/libevm/accounts/abi|github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi|g' -e 's|github.com/ava-labs/libevm/accounts/abi/bind|github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind|g' gen_inativeminter_binding.go gen_nativemintertest_binding.go && rm -f gen_inativeminter_binding.go.bak gen_nativemintertest_binding.go.bak"
+//go:generate sh -c "sed -i.bak -e 's|github.com/ava-labs/libevm/accounts/abi/bind|github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind|g' gen_inativeminter_binding.go gen_nativemintertest_binding.go && rm -f gen_inativeminter_binding.go.bak gen_nativemintertest_binding.go.bak"
