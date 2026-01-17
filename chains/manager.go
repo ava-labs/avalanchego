@@ -263,6 +263,8 @@ type manager struct {
 	// processed.
 	chainCreatorShutdownCh chan struct{}
 	chainCreatorExited     sync.WaitGroup
+	context                context.Context
+	cancelContext          context.CancelFunc
 
 	chainsLock sync.Mutex
 	// Key: Chain's ID
@@ -325,7 +327,11 @@ func New(config *ManagerConfig) (Manager, error) {
 		return nil, err
 	}
 
+	ctx, cancelContext := context.WithCancel(context.Background())
+
 	return &manager{
+		context:                ctx,
+		cancelContext:          cancelContext,
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
 		chains:                 make(map[ids.ID]handler.Handler),
@@ -469,7 +475,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 
 	// Tell the chain to start processing messages.
 	// If the X, P, or C Chain panics, do not attempt to recover
-	chain.Handler.Start(context.TODO(), !m.CriticalChains.Contains(chainParams.ID))
+	chain.Handler.Start(m.context, !m.CriticalChains.Contains(chainParams.ID))
 }
 
 // Create a chain
@@ -1527,6 +1533,7 @@ func (m *manager) Shutdown() {
 	m.Log.Info("shutting down chain manager")
 	m.chainsQueue.Close()
 	close(m.chainCreatorShutdownCh)
+	m.cancelContext()
 	m.chainCreatorExited.Wait()
 	m.ManagerConfig.Router.Shutdown(context.TODO())
 }
