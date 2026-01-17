@@ -20,13 +20,14 @@ import (
 
 var _ state.Trie = (*accountTrie)(nil)
 
-// accountTrie implements state.Trie for managing account states.
-// There are a couple caveats to the current implementation:
-//  1. `Commit` is not used as expected in the state package. The `StorageTrie` doesn't return
-//     values, and we thus rely on the `accountTrie`.
-//  2. The `Hash` method actually creates the proposal, since Firewood cannot calculate
-//     the hash of the trie without committing it. It is immediately dropped, and this
-//     can likely be optimized.
+// accountTrie implements [state.Trie] for managing account states.
+// Although it fulfills the [state.Trie] interface, it has some important differences:
+//  1. [accountTrie.Commit] is not used as expected in the state package. The `StorageTrie` doesn't return
+//     values, and we thus rely on the `accountTrie`. Additionally, no [trienode.NodeSet] is
+//     actually constructed, since Firewood manages nodes internally and the list of changes
+//     is not needed externally.
+//  2. The [accountTrie.Hash] method actually creates the [ffi.Proposal], since Firewood cannot calculate
+//     the hash of the trie without committing it.
 //
 // Note this is not concurrent safe.
 type accountTrie struct {
@@ -172,7 +173,7 @@ func (a *accountTrie) DeleteAccount(addr common.Address) error {
 	// Queue the key for deletion
 	a.dirtyKeys[string(key)] = nil
 	a.updateKeys = append(a.updateKeys, key)
-	a.updateValues = append(a.updateValues, nil) // Nil value indicates deletion
+	a.updateValues = append(a.updateValues, nil) // Must use nil to indicate deletion
 	a.hasChanges = true                          // Mark that there are changes to commit
 	return nil
 }
@@ -188,14 +189,16 @@ func (a *accountTrie) DeleteStorage(addr common.Address, key []byte) error {
 	// Queue the key for deletion
 	a.dirtyKeys[string(combinedKey[:])] = nil
 	a.updateKeys = append(a.updateKeys, combinedKey[:])
-	a.updateValues = append(a.updateValues, nil) // Nil value indicates deletion
+	a.updateValues = append(a.updateValues, nil) // Must use nil to indicate deletion
 	a.hasChanges = true                          // Mark that there are changes to commit
 	return nil
 }
 
 // Hash returns the current hash of the state trie.
-// This will create a proposal and drop it, so it is not efficient to call for each transaction.
+// This will create the necessary proposals to guarantee that the changes can
+// later be committed. All new proposals will be tracked by the [TrieDB].
 // If there are no changes since the last call, the cached root is returned.
+// On error, the zero hash is returned.
 func (a *accountTrie) Hash() common.Hash {
 	hash, err := a.hash()
 	if err != nil {
@@ -208,7 +211,7 @@ func (a *accountTrie) Hash() common.Hash {
 func (a *accountTrie) hash() (common.Hash, error) {
 	// If we haven't already hashed, we need to do so.
 	if a.hasChanges {
-		root, err := a.fw.getProposalHash(a.parentRoot, a.updateKeys, a.updateValues)
+		root, err := a.fw.createProposals(a.parentRoot, a.updateKeys, a.updateValues)
 		if err != nil {
 			return common.Hash{}, err
 		}
@@ -218,51 +221,51 @@ func (a *accountTrie) hash() (common.Hash, error) {
 	return a.root, nil
 }
 
-// Commit returns the new root hash of the trie and a NodeSet containing all modified accounts and storage slots.
-// The format of the NodeSet is different than in go-ethereum's trie implementation due to Firewood's design.
-// This boolean is ignored, as it is a relic of the StateTrie implementation.
+// Commit returns the new root hash of the trie and an empty [trienode.NodeSet].
+// The boolean input is ignored, as it is a relic of the StateTrie implementation.
+// If the changes are not yet already tracked by the [TrieDB], they are created.
 func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 	// Get the hash of the trie.
+	// Ensures all changes are tracked by the Database.
 	hash, err := a.hash()
 	if err != nil {
 		return common.Hash{}, nil, err
 	}
 
-	// Create the NodeSet. This will be sent to `triedb.Update` later.
-	nodeset := trienode.NewNodeSet(common.Hash{})
-	for i, key := range a.updateKeys {
-		nodeset.AddNode(key, &trienode.Node{
-			Blob: a.updateValues[i],
-		})
-	}
-
-	return hash, nodeset, nil
+	set := trienode.NewNodeSet(common.Hash{})
+	return hash, set, nil
 }
 
 // UpdateContractCode implements state.Trie.
-// Contract code is controlled by rawdb, so we don't need to do anything here.
+// Contract code is controlled by `rawdb`, so we don't need to do anything here.
+// This always returns nil.
 func (*accountTrie) UpdateContractCode(common.Address, common.Hash, []byte) error {
 	return nil
 }
 
 // GetKey implements state.Trie.
-// This should not be used, since any user should not be accessing by raw key.
+// Preimages are not yet supported in Firewood.
+// It always returns nil.
 func (*accountTrie) GetKey([]byte) []byte {
 	return nil
 }
 
 // NodeIterator implements state.Trie.
 // Firewood does not support iterating over internal nodes.
+// This always returns an error.
 func (*accountTrie) NodeIterator([]byte) (trie.NodeIterator, error) {
 	return nil, errors.New("NodeIterator not implemented for Firewood")
 }
 
 // Prove implements state.Trie.
-// Firewood does not yet support providing key proofs.
+// Firewood does not support providing key proofs.
+// This always returns an error.
 func (*accountTrie) Prove([]byte, ethdb.KeyValueWriter) error {
 	return errors.New("Prove not implemented for Firewood")
 }
 
+// Copy creates a deep copy of the [accountTrie].
+// The [database.Reader] is shared, since it is read-only.
 func (a *accountTrie) Copy() *accountTrie {
 	// Create a new AccountTrie with the same root and reader
 	newTrie := &accountTrie{

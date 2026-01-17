@@ -34,6 +34,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -386,6 +387,10 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	if root != types.EmptyRootHash {
 		if err := triedb.Commit(root, true); err != nil {
 			panic(fmt.Sprintf("unable to commit genesis block: %v", err))
+		}
+	} else {
+		if t, ok := triedb.Backend().(*firewood.TrieDB); ok {
+			t.SetHashAndHeight(block.Hash(), block.NumberU64())
 		}
 	}
 	return block
