@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math/big"
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
@@ -38,6 +40,8 @@ const (
 var (
 	flagVars *e2e.FlagVars
 
+	devnetConfigPath string
+
 	loadTimeoutArg     time.Duration
 	firewoodEnabledArg bool
 	numWorkersArg      int
@@ -46,6 +50,13 @@ var (
 func init() {
 	flagVars = e2e.RegisterFlags(
 		e2e.WithDefaultNodeCount(defaultNodeCount),
+	)
+
+	flag.StringVar(
+		&devnetConfigPath,
+		"devnet-config-path",
+		"",
+		"the file path for the devnet config",
 	)
 
 	flag.DurationVar(
@@ -77,29 +88,8 @@ func main() {
 
 	require := require.New(tc)
 
-	numNodes, err := flagVars.NodeCount()
-	require.NoError(err, "failed to get node count")
-
-	nodes := tmpnet.NewNodesOrPanic(numNodes)
-
-	keys, err := tmpnet.NewPrivateKeys(numWorkersArg)
-	require.NoError(err)
-
-	primaryChainConfigs := tmpnet.DefaultChainConfigs()
-	if firewoodEnabledArg {
-		primaryChainConfigs = newPrimaryChainConfigsWithFirewood()
-	}
-	network := &tmpnet.Network{
-		Nodes:               nodes,
-		PreFundedKeys:       keys,
-		PrimaryChainConfigs: primaryChainConfigs,
-	}
-
-	e2e.NewTestEnvironment(tc, flagVars, network)
-
 	ctx := tests.DefaultNotifyContext(0, tc.DeferCleanup)
-	wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
-	require.NoError(err)
+	tc.SetDefaultContextParent(ctx)
 
 	registry := prometheus.NewRegistry()
 	metricsServer, err := tests.NewPrometheusServer(registry)
@@ -108,30 +98,35 @@ func main() {
 		require.NoError(metricsServer.Stop())
 	})
 
-	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
-		Targets: []string{metricsServer.Address()},
-		Labels:  network.GetMonitoringLabels(),
-	}, false)
-	require.NoError(err, "failed to generate monitoring config file")
+	var (
+		workers []load.Worker
+		labels  map[string]string
+	)
 
-	tc.DeferCleanup(func() {
-		require.NoError(
-			os.Remove(monitoringConfigFilePath),
-			"failed †o remove monitoring config file",
-		)
-	})
-
-	workers := make([]load.Worker, len(keys))
-	for i := range len(keys) {
-		wsURI := wsURIs[i%len(wsURIs)]
-		client, err := ethclient.Dial(wsURI)
+	if devnetConfigPath != "" {
+		b, err := os.ReadFile(devnetConfigPath)
 		require.NoError(err)
 
-		workers[i] = load.Worker{
-			PrivKey: keys[i].ToECDSA(),
-			Client:  client,
+		var devnetConfig load.NetworkConfig
+		require.NoError(json.Unmarshal(b, &devnetConfig))
+
+		workers = load.ConnectNetwork(tc, devnetConfig)
+
+		networkUUID := uuid.New()
+		labels = map[string]string{
+			"job":               "load-test",
+			"is_ephemeral_node": "false",
+			"chain":             "C",
+			"networkUUID":       networkUUID.String(),
 		}
+	} else {
+		network, wkrs := startNetwork(tc)
+
+		workers = wkrs
+		labels = network.GetMonitoringLabels()
 	}
+
+	startPrometheusMonitoring(tc, labels, metricsServer.Address())
 
 	chainID, err := workers[0].Client.ChainID(ctx)
 	require.NoError(err)
@@ -157,7 +152,75 @@ func main() {
 	)
 	require.NoError(err)
 
+	log.Info("starting load generator")
+
 	generator.Run(ctx, log, loadTimeoutArg, testTimeout)
+}
+
+// startNetwork starts a new network and returns a list of workers who can
+// interact with the network.
+//
+// Customization of the network and the number of workers can be set via flags.
+func startNetwork(tc tests.TestContext) (*tmpnet.Network, []load.Worker) {
+	require := require.New(tc)
+
+	numNodes, err := flagVars.NodeCount()
+	require.NoError(err, "failed to get node count")
+
+	nodes := tmpnet.NewNodesOrPanic(numNodes)
+
+	keys, err := tmpnet.NewPrivateKeys(numWorkersArg)
+	require.NoError(err)
+
+	primaryChainConfigs := tmpnet.DefaultChainConfigs()
+	if firewoodEnabledArg {
+		primaryChainConfigs = newPrimaryChainConfigsWithFirewood()
+	}
+	network := &tmpnet.Network{
+		Nodes:               nodes,
+		PreFundedKeys:       keys,
+		PrimaryChainConfigs: primaryChainConfigs,
+	}
+
+	e2e.NewTestEnvironment(tc, flagVars, network)
+
+	wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
+	require.NoError(err)
+
+	workers := make([]load.Worker, len(keys))
+	for i := range len(keys) {
+		wsURI := wsURIs[i%len(wsURIs)]
+		client, err := ethclient.Dial(wsURI)
+		require.NoError(err)
+
+		// nonce is zero on a new network
+		workers[i] = load.Worker{
+			PrivKey: keys[i].ToECDSA(),
+			Client:  client,
+		}
+	}
+
+	return network, workers
+}
+
+// startPrometheusMonitoring enables Prometheus monitoring for any client-side
+// metrics and registers a cleanup function to remove the monitoring
+// configuration file when the test completes.
+func startPrometheusMonitoring(tc tests.TestContext, labels map[string]string, serverAddress string) {
+	require := require.New(tc)
+
+	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
+		Targets: []string{serverAddress},
+		Labels:  labels,
+	}, false)
+	require.NoError(err, "failed to generate monitoring config file")
+
+	tc.DeferCleanup(func() {
+		require.NoError(
+			os.Remove(monitoringConfigFilePath),
+			"failed to remove monitoring config file",
+		)
+	})
 }
 
 // newTokenContract deploys an instance of an ERC20 token and distributes the
