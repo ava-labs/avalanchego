@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "flags",
+    srcs = [
+        "collector.go",
+        "common.go",
+        "kube_runtime.go",
+        "kubeconfig.go",
+        "process_runtime.go",
+        "runtime.go",
+        "start_network.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//tests/fixture/stacktrace",
+        "//tests/fixture/tmpnet",
+        "@com_github_spf13_cast//:cast",
+        "@com_github_spf13_pflag//:pflag",
+    ],
+)

@@ -68,3 +68,9 @@ __debug_*
 
 # solc downloads from setup-solc GitHub Action
 setup-solc_downloads/
+
+# bazel
+/bazel-avalanchego_maru-bazel
+/bazel-bin
+/bazel-out
+/bazel-testlogs
