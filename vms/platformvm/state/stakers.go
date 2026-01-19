@@ -377,16 +377,14 @@ func (s *diffStakers) PutValidator(staker *Staker) error {
 
 func (s *diffStakers) DeleteValidator(staker *Staker) {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.validatorStatus == added {
-		// This validator was added and immediately removed in this diff. We
-		// treat it as if it was never added.
+	switch validatorDiff.validatorStatus {
+	case added:
 		validatorDiff.validatorStatus = unmodified
 		s.addedOrModifiedStakers.Delete(validatorDiff.validator)
 		validatorDiff.validator = nil
-	} else if validatorDiff.validatorStatus == modified {
+	case modified:
 		delete(s.modifiedStakers, staker.TxID)
 		s.addedOrModifiedStakers.Delete(validatorDiff.validator)
-
 		validatorDiff.validatorStatus = deleted
 		validatorDiff.validator = staker
 		validatorDiff.oldValidator = nil
@@ -394,7 +392,7 @@ func (s *diffStakers) DeleteValidator(staker *Staker) {
 			s.deletedStakers = make(map[ids.ID]*Staker)
 		}
 		s.deletedStakers[staker.TxID] = staker
-	} else {
+	default:
 		validatorDiff.validatorStatus = deleted
 		validatorDiff.validator = staker
 		if s.deletedStakers == nil {
@@ -506,9 +504,6 @@ func (s *diffStakers) GetStakerIterator(parentIterator iterator.Iterator[*Staker
 			iterator.FromTree(s.addedOrModifiedStakers),
 		),
 		func(staker *Staker) bool {
-			if staker == nil {
-				fmt.Println("NIL")
-			}
 			_, ok := s.deletedStakers[staker.TxID]
 			return ok
 		},

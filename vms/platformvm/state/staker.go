@@ -5,7 +5,7 @@ package state
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/google/btree"
@@ -18,10 +18,8 @@ import (
 var (
 	_ btree.LessFunc[*Staker] = (*Staker).Less
 
-	errDecreasedWeight                  = fmt.Errorf("weight decreased")
-	errDecreasedAccruedRewards          = fmt.Errorf("accrued rewards decreased")
-	errDecreasedAccruedDelegateeRewards = fmt.Errorf("accrued delegatee rewards decreased")
-	errImmutableFieldsModified          = fmt.Errorf("immutable fields modified")
+	errDecreasedWeight         = errors.New("weight decreased")
+	errImmutableFieldsModified = errors.New("immutable fields modified")
 )
 
 // Staker contains all information required to represent a validator or
