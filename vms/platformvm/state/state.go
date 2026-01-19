@@ -270,7 +270,7 @@ type State interface {
 	ReindexBlocks(lock sync.Locker, log logging.Logger) error
 
 	// Commit changes to the base database.
-	Commit() error
+	Commit() error // todo: test commit with the new stuff added
 
 	// Returns a batch of unwritten changes that, when written, will commit all
 	// pending changes to the base database.
