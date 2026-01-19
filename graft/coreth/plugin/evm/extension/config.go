@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
-	synccore "github.com/ava-labs/avalanchego/graft/coreth/sync/core"
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -67,7 +67,7 @@ type ExtensibleVM interface {
 	// VersionDB returns the versioned database for the VM
 	VersionDB() *versiondb.Database
 	// SyncerClient returns the syncer client for the VM
-	SyncerClient() synccore.Client
+	SyncerClient() engine.Client
 }
 
 // InnerVM is the interface that must be implemented by the VM

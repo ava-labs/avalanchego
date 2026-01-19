@@ -60,6 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/coreth/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
@@ -82,7 +83,6 @@ import (
 
 	corethlog "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/log"
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	synccore "github.com/ava-labs/avalanchego/graft/coreth/sync/core"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 	utilsrpc "github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -97,7 +97,7 @@ var (
 	_ block.BuildBlockWithContextChainVM = (*VM)(nil)
 	_ block.StateSyncableVM              = (*VM)(nil)
 	_ client.EthBlockParser              = (*VM)(nil)
-	_ synccore.BlockAcceptor             = (*VM)(nil)
+	_ engine.BlockAcceptor               = (*VM)(nil)
 )
 
 const (
@@ -241,8 +241,8 @@ type VM struct {
 
 	logger corethlog.Logger
 	// State sync server and client
-	synccore.Server
-	synccore.Client
+	engine.Server
+	engine.Client
 
 	// Avalanche Warp Messaging backend
 	// Used to serve BLS signatures of warp messages over RPC
@@ -627,7 +627,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	)
 	vm.Network.SetRequestHandler(networkHandler)
 
-	vm.Server = synccore.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval)
+	vm.Server = engine.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval)
 	stateSyncEnabled := vm.stateSyncEnabled(lastAcceptedHeight)
 	// parse nodeIDs from state sync IDs in vm config
 	var stateSyncIDs []ids.NodeID
@@ -644,7 +644,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	}
 
 	// Initialize the state sync client
-	vm.Client = synccore.NewClient(&synccore.ClientConfig{
+	vm.Client = engine.NewClient(&engine.ClientConfig{
 		StateSyncDone: vm.stateSyncDone,
 		Chain:         vm.eth,
 		State:         vm.State,
