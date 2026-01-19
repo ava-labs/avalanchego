@@ -904,20 +904,6 @@ func (mr *MockStateMockRecorder) ReindexBlocks(lock, log any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReindexBlocks", reflect.TypeOf((*MockState)(nil).ReindexBlocks), lock, log)
 }
 
-// ResetContinuousValidatorCycle mocks base method.
-func (m *MockState) ResetContinuousValidatorCycle(validator *Staker, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ResetContinuousValidatorCycle", validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ResetContinuousValidatorCycle indicates an expected call of ResetContinuousValidatorCycle.
-func (mr *MockStateMockRecorder) ResetContinuousValidatorCycle(validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetContinuousValidatorCycle", reflect.TypeOf((*MockState)(nil).ResetContinuousValidatorCycle), validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
-}
-
 // SetAccruedFees mocks base method.
 func (m *MockState) SetAccruedFees(f uint64) {
 	m.ctrl.T.Helper()
