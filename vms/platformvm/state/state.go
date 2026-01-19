@@ -1017,6 +1017,20 @@ func (s *state) PutCurrentValidator(staker *Staker) error {
 	return nil
 }
 
+func (s *state) UpdateCurrentValidator(staker *Staker) error {
+	oldValidator, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	if err != nil {
+		return err
+	}
+
+	if err := oldValidator.ValidateMutation(staker); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
+	}
+
+	s.currentStakers.UpdateValidator(staker)
+	return nil
+}
+
 func (s *state) DeleteCurrentValidator(staker *Staker) {
 	s.currentStakers.DeleteValidator(staker)
 	if staker.SubnetID == constants.PrimaryNetworkID {
@@ -2695,6 +2709,7 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				weightDiff: weightDiff,
 			}
 			if pk != nil {
+				//	I think both [prevPublicKey] and [newPublicKey] will by [pkBytes]
 				pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 				if diff.validatorStatus != added {
 					change.prevPublicKey = pkBytes
@@ -2827,7 +2842,7 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 		// Record the change in weight and/or public key for each validator.
 		for nodeID, validatorDiff := range validatorDiffs {
 			switch validatorDiff.validatorStatus {
-			case added:
+			case added, modified: // todo: is modified case breaking the invariant from below?
 				staker := validatorDiff.validator
 
 				// The validator is being added.

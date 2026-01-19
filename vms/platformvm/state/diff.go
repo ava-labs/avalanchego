@@ -78,6 +78,7 @@ func NewDiff(
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
+
 	return &diff{
 		parentID:                    parentID,
 		stateVersions:               stateVersions,
@@ -267,7 +268,7 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	// validator.
 	newValidator, status := d.currentStakerDiffs.GetValidator(subnetID, nodeID)
 	switch status {
-	case added:
+	case added, modified:
 		return newValidator, nil
 	case deleted:
 		return nil, database.ErrNotFound
@@ -308,6 +309,20 @@ func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, e
 
 func (d *diff) PutCurrentValidator(staker *Staker) error {
 	return d.currentStakerDiffs.PutValidator(staker)
+}
+
+func (d *diff) UpdateCurrentValidator(mutatedValidator *Staker) error {
+	oldValidator, err := d.GetCurrentValidator(mutatedValidator.SubnetID, mutatedValidator.NodeID)
+	if err != nil {
+		return err
+	}
+
+	if err := oldValidator.ValidateMutation(mutatedValidator); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
+	}
+
+	d.currentStakerDiffs.UpdateValidator(oldValidator, mutatedValidator)
+	return nil
 }
 
 func (d *diff) DeleteCurrentValidator(staker *Staker) {
@@ -601,6 +616,10 @@ func (d *diff) Apply(baseState Chain) error {
 				}
 			case deleted:
 				baseState.DeleteCurrentValidator(validatorDiff.validator)
+			case modified:
+				if err := baseState.UpdateCurrentValidator(validatorDiff.validator); err != nil {
+					return err
+				}
 			}
 
 			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
@@ -630,6 +649,8 @@ func (d *diff) Apply(baseState Chain) error {
 				}
 			case deleted:
 				baseState.DeletePendingValidator(validatorDiff.validator)
+			case modified:
+				return fmt.Errorf("pending stakers cannot be modified")
 			}
 
 			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
