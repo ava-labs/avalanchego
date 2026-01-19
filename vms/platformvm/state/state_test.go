@@ -789,6 +789,7 @@ func TestValidatorWeightDiff(t *testing.T) {
 	}
 }
 
+// todo: test that weights are computed properly per subnet, per nodeid and even total weight
 func TestState_ApplyValidatorDiffs(t *testing.T) {
 	require := require.New(t)
 
@@ -2401,6 +2402,84 @@ func TestGetCurrentValidators(t *testing.T) {
 					require.Equalf(l1ValidatorsByVID[currentValidator.ValidationID], currentValidator, "index %d", i)
 				}
 			}
+		})
+	}
+}
+
+func TestStateUpdateValidator(t *testing.T) {
+	tests := []struct {
+		name            string
+		updateValidator func(*Staker)
+		updateState     func(*require.Assertions, State)
+		expectedErr     error
+	}{
+		{
+			name: "invalid mutation",
+			updateValidator: func(validator *Staker) {
+				validator.Weight = 5
+			},
+			expectedErr: ErrInvalidStakerMutation,
+		},
+		{
+			name: "missing validator",
+			updateValidator: func(validator *Staker) {
+				validator.NodeID = ids.GenerateTestNodeID()
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "deleted validator",
+			updateState: func(require *require.Assertions, state State) {
+				currentStakerIterator, err := state.GetCurrentStakerIterator()
+				require.NoError(err)
+				require.True(currentStakerIterator.Next())
+
+				stakerToRemove := currentStakerIterator.Value()
+				currentStakerIterator.Release()
+
+				state.DeleteCurrentValidator(stakerToRemove)
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "valid mutation",
+			updateValidator: func(validator *Staker) {
+				validator.Weight = 15
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			state := newTestState(t, memdb.New())
+
+			blsKey, err := localsigner.New()
+			require.NoError(err)
+
+			currentValidator := &Staker{
+				TxID:      ids.GenerateTestID(),
+				NodeID:    ids.GenerateTestNodeID(),
+				PublicKey: blsKey.PublicKey(),
+				SubnetID:  ids.GenerateTestID(),
+				Weight:    10,
+				StartTime: time.Unix(1, 0),
+				EndTime:   time.Unix(2, 0),
+				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+			}
+			require.NoError(state.PutCurrentValidator(currentValidator))
+
+			if test.updateState != nil {
+				test.updateState(require, state)
+			}
+
+			validator := *currentValidator
+			if test.updateValidator != nil {
+				test.updateValidator(&validator)
+			}
+
+			require.ErrorIs(state.UpdateCurrentValidator(&validator), test.expectedErr)
 		})
 	}
 }
