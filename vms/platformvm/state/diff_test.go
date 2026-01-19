@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -1039,4 +1040,99 @@ func TestDiffStacking(t *testing.T) {
 	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
 	require.Equal(owner3, owner)
+}
+
+func TestDiffUpdateValidatorErrors(t *testing.T) {
+	tests := []struct {
+		name            string
+		updateValidator func(*Staker)
+		updateState     func(*require.Assertions, Diff)
+		expectedErr     error
+	}{
+		{
+			name: "invalid mutation",
+			updateValidator: func(validator *Staker) {
+				validator.Weight = 5
+			},
+			expectedErr: ErrInvalidStakerMutation,
+		},
+		{
+			name: "invalid staker mutation",
+			updateValidator: func(staker *Staker) {
+				staker.Weight -= 1
+			},
+			expectedErr: ErrInvalidStakerMutation,
+		},
+		{
+			name: "staker not found",
+			updateValidator: func(staker *Staker) {
+				staker.NodeID = ids.GenerateTestNodeID()
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "missing validator",
+			updateValidator: func(validator *Staker) {
+				validator.NodeID = ids.GenerateTestNodeID()
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "deleted validator",
+			updateState: func(require *require.Assertions, diff Diff) {
+				currentStakerIterator, err := diff.GetCurrentStakerIterator()
+				require.NoError(err)
+				require.True(currentStakerIterator.Next())
+
+				stakerToRemove := currentStakerIterator.Value()
+				currentStakerIterator.Release()
+
+				diff.DeleteCurrentValidator(stakerToRemove)
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "valid mutation",
+			updateValidator: func(validator *Staker) {
+				validator.Weight = 15
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			state := newTestState(t, memdb.New())
+
+			blsKey, err := localsigner.New()
+			require.NoError(err)
+
+			currentValidator := &Staker{
+				TxID:      ids.GenerateTestID(),
+				NodeID:    ids.GenerateTestNodeID(),
+				PublicKey: blsKey.PublicKey(),
+				SubnetID:  ids.GenerateTestID(),
+				Weight:    10,
+				StartTime: time.Unix(1, 0),
+				EndTime:   time.Unix(2, 0),
+				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+			}
+			require.NoError(state.PutCurrentValidator(currentValidator))
+
+			d, err := NewDiffOn(state)
+			require.NoError(err)
+
+			if test.updateState != nil {
+				test.updateState(require, d)
+			}
+
+			validator := *currentValidator
+			if test.updateValidator != nil {
+				test.updateValidator(&validator)
+			}
+
+			require.ErrorIs(d.UpdateCurrentValidator(&validator), test.expectedErr)
+		})
+	}
 }
