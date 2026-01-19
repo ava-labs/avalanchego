@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package vmsync
+package engine
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
@@ -18,15 +17,17 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/blocksync"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/evmstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
-	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
+	blocksync "github.com/ava-labs/avalanchego/graft/coreth/sync/block"
 	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 // BlocksToFetch is the number of the block parents the state syncs to.
@@ -48,7 +49,7 @@ var (
 // return *types.Block, which is needed to update chain pointers at the
 // end of the sync operation.
 type EthBlockWrapper interface {
-	GetEthBlock() *types.Block
+	GetEthBlock() *ethtypes.Block
 }
 
 // BlockAcceptor provides a mechanism to update the last accepted block ID during state synchronization.
@@ -84,7 +85,7 @@ type ClientConfig struct {
 	Parser message.SyncableParser
 
 	// Extender is an optional extension point for the state sync process, and can be nil.
-	Extender      syncpkg.Extender
+	Extender      types.Extender
 	Client        syncclient.Client
 	StateSyncDone chan struct{}
 
@@ -362,17 +363,17 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		return nil, fmt.Errorf("failed to create block syncer: %w", err)
 	}
 
-	codeQueue, err := statesync.NewCodeQueue(c.config.ChainDB, c.config.StateSyncDone)
+	codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create code queue: %w", err)
 	}
 
-	codeSyncer, err := statesync.NewCodeSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
+	codeSyncer, err := code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create code syncer: %w", err)
 	}
 
-	stateSyncer, err := statesync.NewSyncer(
+	stateSyncer, err := evmstate.NewSyncer(
 		c.config.Client, c.config.ChainDB,
 		summary.GetBlockRoot(),
 		codeQueue, c.config.RequestSize,
@@ -381,7 +382,7 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
 	}
 
-	syncers := []syncpkg.Syncer{blockSyncer, codeSyncer, stateSyncer}
+	syncers := []types.Syncer{blockSyncer, codeSyncer, stateSyncer}
 
 	if c.config.Extender != nil {
 		extenderSyncer, err := c.config.Extender.CreateSyncer(c.config.Client, c.config.VerDB, summary)

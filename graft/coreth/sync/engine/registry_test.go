@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package vmsync
+package engine
 
 import (
 	"context"
@@ -15,12 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
-
-	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
 
-var _ syncpkg.Syncer = (*mockSyncer)(nil)
+var _ types.Syncer = (*mockSyncer)(nil)
 
 // mockSyncer implements [syncpkg.Syncer] for testing.
 type mockSyncer struct {
@@ -44,7 +43,7 @@ func (m *mockSyncer) ID() string   { return m.name }
 // namedSyncer adapts an existing syncer with a provided name to satisfy Syncer with Name().
 type namedSyncer struct {
 	name   string
-	syncer syncpkg.Syncer
+	syncer types.Syncer
 }
 
 func (n *namedSyncer) Sync(ctx context.Context) error { return n.syncer.Sync(ctx) }
