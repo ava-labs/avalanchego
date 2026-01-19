@@ -610,6 +610,20 @@ func (mr *MockChainMockRecorder) PutPendingValidator(staker any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockChain)(nil).PutPendingValidator), staker)
 }
 
+// ResetContinuousValidatorCycle mocks base method.
+func (m *MockChain) ResetContinuousValidatorCycle(validator *Staker, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResetContinuousValidatorCycle", validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResetContinuousValidatorCycle indicates an expected call of ResetContinuousValidatorCycle.
+func (mr *MockChainMockRecorder) ResetContinuousValidatorCycle(validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetContinuousValidatorCycle", reflect.TypeOf((*MockChain)(nil).ResetContinuousValidatorCycle), validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
+}
+
 // SetAccruedFees mocks base method.
 func (m *MockChain) SetAccruedFees(f uint64) {
 	m.ctrl.T.Helper()
