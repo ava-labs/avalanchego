@@ -365,7 +365,7 @@ func (db *Database) Has(key []byte) (bool, error) {
 // Block data deletion is a no-op because [database.HeightIndex] does not support deletion.
 func (db *Database) Delete(key []byte) error {
 	if p, ok := db.parseKey(key); ok {
-		db.logger.Warn(
+		db.logger.Debug(
 			"Deleting block data is a no-op",
 			zap.Uint64("height", p.num),
 			zap.Stringer("hash", p.hash),
