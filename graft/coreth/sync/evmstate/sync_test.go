@@ -22,11 +22,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 

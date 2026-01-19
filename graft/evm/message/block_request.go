@@ -39,3 +39,4 @@ func (b BlockRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID u
 type BlockResponse struct {
 	Blocks [][]byte `serialize:"true"`
 }
+

@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 
 	syncHandlers "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"

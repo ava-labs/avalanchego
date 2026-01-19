@@ -46,3 +46,4 @@ func NewCodeRequest(hashes []common.Hash) CodeRequest {
 type CodeResponse struct {
 	Data [][]byte `serialize:"true"`
 }
+

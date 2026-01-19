@@ -20,8 +20,8 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/network"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client/stats"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/version"

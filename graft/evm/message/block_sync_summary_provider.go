@@ -15,3 +15,4 @@ type BlockSyncSummaryProvider struct{}
 func (*BlockSyncSummaryProvider) StateSummaryAtBlock(blk *types.Block) (block.StateSummary, error) {
 	return NewBlockSyncSummary(blk.Hash(), blk.NumberU64(), blk.Root())
 }
+

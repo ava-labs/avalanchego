@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 )
 

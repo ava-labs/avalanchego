@@ -9,8 +9,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 

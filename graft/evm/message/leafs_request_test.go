@@ -154,3 +154,4 @@ func TestLeafsRequestNodeTypeNotSerialized(t *testing.T) {
 	require.Equal(t, leafsRequestDefault.End, unmarshaled.End)
 	require.Equal(t, leafsRequestDefault.Limit, unmarshaled.Limit)
 }
+
