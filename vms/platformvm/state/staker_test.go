@@ -265,6 +265,22 @@ func TestValidateMutation(t *testing.T) {
 			expectedErr: errImmutableFieldsModified,
 		},
 		{
+			name: "decreased accrued rewards",
+			mutateFn: func(staker Staker) *Staker {
+				staker.AccruedRewards -= 1
+				return &staker
+			},
+			expectedErr: errDecreasedAccruedRewards,
+		},
+		{
+			name: "decreased accrued delegatee rewards",
+			mutateFn: func(staker Staker) *Staker {
+				staker.AccruedDelegateeRewards -= 1
+				return &staker
+			},
+			expectedErr: errDecreasedAccruedDelegateeRewards,
+		},
+		{
 			name: "decreased weight",
 			mutateFn: func(staker Staker) *Staker {
 				staker.Weight -= 1
@@ -279,6 +295,9 @@ func TestValidateMutation(t *testing.T) {
 				staker.StartTime = time.Unix(30, 0)
 				staker.EndTime = time.Unix(40, 0)
 				staker.PotentialReward = 20
+				staker.AccruedRewards = 30
+				staker.AccruedDelegateeRewards = 25
+				staker.ContinuationPeriod = 0
 				return &staker
 			},
 			expectedErr: nil,
@@ -290,8 +309,8 @@ func TestValidateMutation(t *testing.T) {
 
 			require.ErrorIs(
 				test.expectedErr,
-				staker.ValidateMutation(
-					test.mutateFn(*staker),
+				continuousStaker.ValidateMutation(
+					test.mutateFn(*continuousStaker),
 				),
 			)
 		})

@@ -22,6 +22,7 @@ var (
 type Stakers interface {
 	CurrentStakers
 	PendingStakers
+	ContinuousStakers
 }
 
 type CurrentStakers interface {
@@ -106,6 +107,17 @@ type PendingStakers interface {
 	// GetPendingStakerIterator returns stakers in order of their removal from
 	// the pending staker set.
 	GetPendingStakerIterator() (iterator.Iterator[*Staker], error)
+}
+
+type ContinuousStakers interface {
+	// ResetContinuousValidatorCycle is updating the continuous validator fields.
+	//
+	// Invariant: [staker] is currently a CurrentValidator
+	ResetContinuousValidatorCycle(
+		validator *Staker,
+		weight uint64,
+		potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
+	) error
 }
 
 type baseStakers struct {

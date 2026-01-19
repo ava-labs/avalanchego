@@ -269,7 +269,7 @@ type State interface {
 	ReindexBlocks(lock sync.Locker, log logging.Logger) error
 
 	// Commit changes to the base database.
-	Commit() error
+	Commit() error // todo: test commit with the new stuff added
 
 	// Returns a batch of unwritten changes that, when written, will commit all
 	// pending changes to the base database.
@@ -1017,6 +1017,25 @@ func (s *state) UpdateCurrentValidator(staker *Staker) error {
 	}
 
 	s.currentStakers.UpdateValidator(staker)
+	return nil
+}
+
+func (s *state) ResetContinuousValidatorCycle(
+	validator *Staker,
+	weight uint64,
+	potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
+) error {
+	// todo: is this ok? check that we dont edit the underlying validator
+	mutatedValidator := *validator
+	if err := (&mutatedValidator).resetContinuousStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards); err != nil {
+		return err
+	}
+
+	if err := validator.ValidateMutation(&mutatedValidator); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
+	}
+
+	s.currentStakers.UpdateValidator(&mutatedValidator)
 	return nil
 }
 

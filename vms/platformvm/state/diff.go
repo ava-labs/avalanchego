@@ -325,6 +325,24 @@ func (d *diff) UpdateCurrentValidator(mutatedValidator *Staker) error {
 	return nil
 }
 
+func (d *diff) ResetContinuousValidatorCycle(
+	validator *Staker,
+	weight uint64,
+	potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
+) error {
+	mutatedValidator := *validator
+	if err := (&mutatedValidator).resetContinuousStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards); err != nil {
+		return err
+	}
+
+	if err := validator.ValidateMutation(&mutatedValidator); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
+	}
+
+	d.currentStakerDiffs.UpdateValidator(validator, &mutatedValidator)
+	return nil
+}
+
 func (d *diff) DeleteCurrentValidator(staker *Staker) {
 	d.currentStakerDiffs.DeleteValidator(staker)
 }

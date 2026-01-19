@@ -18,22 +18,34 @@ import (
 var (
 	_ btree.LessFunc[*Staker] = (*Staker).Less
 
-	errDecreasedWeight         = errors.New("weight decreased")
-	errImmutableFieldsModified = errors.New("immutable fields modified")
+	errDecreasedWeight                  = fmt.Errorf("weight decreased")
+	errDecreasedAccruedRewards          = fmt.Errorf("accrued rewards decreased")
+	errDecreasedAccruedDelegateeRewards = fmt.Errorf("accrued delegatee rewards decreased")
+	errContinuationPeriodIsZero         = fmt.Errorf("continuation period is zero")
+	errImmutableFieldsModified          = fmt.Errorf("immutable fields modified")
 )
 
 // Staker contains all information required to represent a validator or
 // delegator in the current and pending validator sets.
 // Invariant: Staker's size is bounded to prevent OOM DoS attacks.
 type Staker struct {
-	TxID            ids.ID
-	NodeID          ids.NodeID
-	PublicKey       *bls.PublicKey
-	SubnetID        ids.ID
-	Weight          uint64
-	StartTime       time.Time
-	EndTime         time.Time
-	PotentialReward uint64
+	TxID                    ids.ID
+	NodeID                  ids.NodeID
+	PublicKey               *bls.PublicKey
+	SubnetID                ids.ID
+	Weight                  uint64 // it includes [AccruedRewards] and [AccruedDelegateeRewards]
+	StartTime               time.Time
+	EndTime                 time.Time
+	PotentialReward         uint64
+	AccruedRewards          uint64
+	AccruedDelegateeRewards uint64
+
+	// Percentage of rewards to auto-restake at the end of each cycle, expressed in millionths (percentage * 10,000).
+	// Range [0..1_000_000]:
+	//   0         = restake principal only; withdraw 100% of rewards
+	//   300_000   = restake 30% of rewards; withdraw 70%
+	//   1_000_000 = restake 100% of rewards; withdraw 0%
+	AutoRestakeShares uint32
 
 	// NextTime is the next time this staker will be moved from a validator set.
 	// If the staker is in the pending validator set, NextTime will equal
@@ -47,6 +59,11 @@ type Staker struct {
 	// [priorities.go] and depends on if the stakers are in the pending or
 	// current validator set.
 	Priority txs.Priority
+
+	// ContinuationPeriod is used by continuous stakers.
+	// ContinuationPeriod > 0  => running continuous staker
+	// ContinuationPeriod == 0 => a stopped continuous staker OR a fixed staker, we don't care since we will stop at EndTime.
+	ContinuationPeriod time.Duration
 }
 
 // A *Staker is considered to be less than another *Staker when:
@@ -84,18 +101,43 @@ func NewCurrentStaker(
 	if err != nil {
 		return nil, err
 	}
-	endTime := staker.EndTime()
+
+	var (
+		endTime            time.Time
+		continuationPeriod time.Duration
+		autoRestakeShares  uint32
+	)
+
+	switch tTx := staker.(type) {
+	case txs.FixedStaker:
+		endTime = tTx.EndTime()
+		continuationPeriod = 0
+		autoRestakeShares = 0
+
+	case txs.ContinuousStaker:
+		endTime = startTime.Add(tTx.PeriodDuration())
+		continuationPeriod = tTx.PeriodDuration()
+		autoRestakeShares = tTx.AutoRestakeSharesAmount()
+
+	default:
+		return nil, fmt.Errorf("unexpected staker tx type: %T", staker)
+	}
+
 	return &Staker{
-		TxID:            txID,
-		NodeID:          staker.NodeID(),
-		PublicKey:       publicKey,
-		SubnetID:        staker.SubnetID(),
-		Weight:          staker.Weight(),
-		StartTime:       startTime,
-		EndTime:         endTime,
-		PotentialReward: potentialReward,
-		NextTime:        endTime,
-		Priority:        staker.CurrentPriority(),
+		TxID:                    txID,
+		NodeID:                  staker.NodeID(),
+		PublicKey:               publicKey,
+		SubnetID:                staker.SubnetID(),
+		Weight:                  staker.Weight(),
+		StartTime:               startTime,
+		EndTime:                 endTime,
+		PotentialReward:         potentialReward,
+		AccruedRewards:          0,
+		AccruedDelegateeRewards: 0,
+		AutoRestakeShares:       autoRestakeShares,
+		NextTime:                endTime,
+		Priority:                staker.CurrentPriority(),
+		ContinuationPeriod:      continuationPeriod,
 	}, nil
 }
 
@@ -128,6 +170,33 @@ func (s *Staker) ValidateMutation(ms *Staker) error {
 		// Weight can only increase (by accruing rewards from continuous staking).
 		return errDecreasedWeight
 	}
+
+	if s.AccruedRewards > ms.AccruedRewards {
+		// AccruedRewards can only increase.
+		return errDecreasedAccruedRewards
+	}
+
+	if s.AccruedDelegateeRewards > ms.AccruedDelegateeRewards {
+		// AccruedRewards can only increase.
+		return errDecreasedAccruedDelegateeRewards
+	}
+
+	return nil
+}
+
+func (s *Staker) resetContinuousStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
+	if s.ContinuationPeriod == 0 {
+		return errContinuationPeriodIsZero
+	}
+
+	endTime := s.EndTime.Add(s.ContinuationPeriod)
+
+	s.StartTime = s.EndTime
+	s.EndTime = endTime
+	s.PotentialReward = potentialReward
+	s.AccruedRewards = totalAccruedRewards
+	s.AccruedDelegateeRewards = totalAccruedDelegateeRewards
+	s.Weight = weight
 
 	return nil
 }
