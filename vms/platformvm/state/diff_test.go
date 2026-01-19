@@ -1132,7 +1132,8 @@ func TestDiffUpdateValidatorErrors(t *testing.T) {
 				test.updateValidator(&validator)
 			}
 
-			require.ErrorIs(d.UpdateCurrentValidator(&validator), test.expectedErr)
+			err = d.UpdateCurrentValidator(&validator)
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }
