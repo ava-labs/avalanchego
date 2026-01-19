@@ -132,7 +132,7 @@ func TestBaseStakersUpdateValidator(t *testing.T) {
 	v.UpdateValidator(&mutatedStaker)
 
 	returnedStaker, err := v.GetValidator(staker.SubnetID, staker.NodeID)
-	require.Nil(err)
+	require.NoError(err)
 	require.Equal(&mutatedStaker, returnedStaker)
 }
 
@@ -365,7 +365,7 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(false, weightDiff.Decrease)
+		require.False(weightDiff.Decrease)
 		require.Equal(staker.Weight, weightDiff.Amount)
 	}
 
@@ -375,7 +375,7 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(false, weightDiff.Decrease)
+		require.False(weightDiff.Decrease)
 		require.Equal(staker.Weight+delegator.Weight, weightDiff.Amount)
 	}
 
@@ -385,7 +385,7 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(false, weightDiff.Decrease)
+		require.False(weightDiff.Decrease)
 		require.Equal(mutatedStaker.Weight+delegator.Weight, weightDiff.Amount)
 	}
 
@@ -395,7 +395,7 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(false, weightDiff.Decrease)
+		require.False(weightDiff.Decrease)
 		require.Equal(mutatedStaker.Weight, weightDiff.Amount)
 	}
 
@@ -408,7 +408,7 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(true, weightDiff.Decrease)
+		require.True(weightDiff.Decrease)
 		require.Equal(delegator.Weight, weightDiff.Amount)
 	}
 
@@ -419,7 +419,7 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(true, weightDiff.Decrease)
+		require.True(weightDiff.Decrease)
 		require.Equal(staker.Weight+delegator.Weight, weightDiff.Amount)
 	}
 
@@ -432,7 +432,7 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(true, weightDiff.Decrease)
+		require.True(weightDiff.Decrease)
 		require.Equal(staker.Weight, weightDiff.Amount)
 	}
 
@@ -449,7 +449,7 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(true, weightDiff.Decrease)
+		require.True(weightDiff.Decrease)
 		require.Equal(staker.Weight, weightDiff.Amount)
 	}
 }
@@ -473,7 +473,7 @@ func TestDiffStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(false, weightDiff.Decrease)
+		require.False(weightDiff.Decrease)
 		require.Equal(staker.Weight, weightDiff.Amount)
 	}
 
@@ -483,7 +483,7 @@ func TestDiffStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(false, weightDiff.Decrease)
+		require.False(weightDiff.Decrease)
 		require.Equal(staker.Weight+delegator.Weight, weightDiff.Amount)
 	}
 
@@ -493,7 +493,7 @@ func TestDiffStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(false, weightDiff.Decrease)
+		require.False(weightDiff.Decrease)
 		require.Equal(mutatedStaker.Weight+delegator.Weight, weightDiff.Amount)
 	}
 
@@ -503,7 +503,7 @@ func TestDiffStakersWeightDiff(t *testing.T) {
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
-		require.Equal(false, weightDiff.Decrease)
+		require.False(weightDiff.Decrease)
 		require.Equal(mutatedStaker.Weight, weightDiff.Amount)
 	}
 }

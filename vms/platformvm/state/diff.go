@@ -650,7 +650,7 @@ func (d *diff) Apply(baseState Chain) error {
 			case deleted:
 				baseState.DeletePendingValidator(validatorDiff.validator)
 			case modified:
-				return fmt.Errorf("pending stakers cannot be modified")
+				return errors.New("modifying pending stakers not supported")
 			}
 
 			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
