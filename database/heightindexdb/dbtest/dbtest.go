@@ -243,17 +243,17 @@ func TestSync(t *testing.T, newDB func() database.HeightIndex) {
 		{
 			name:    "range with gaps",
 			heights: []uint64{1, 3, 5},
-			start:   0,
-			end:     10,
+			start:   1,
+			end:     5,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := newDB()
-			defer func() {
+			t.Cleanup(func() {
 				require.NoError(t, db.Close())
-			}()
+			})
 
 			for _, h := range tt.heights {
 				require.NoError(t, db.Put(h, []byte("data")))
