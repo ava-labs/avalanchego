@@ -11,12 +11,11 @@ import (
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/firewood/syncer"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync/types"
-
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
