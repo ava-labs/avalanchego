@@ -1210,6 +1210,7 @@ func (vm *VM) analyzeState() error {
 	cfg := StateAnalysisConfig{
 		OutputDir: vm.config.AnalyzeStateOutputDir,
 		Workers:   vm.config.AnalyzeStateWorkers,
+		Addresses: vm.config.AnalyzeStateAddresses,
 	}
 
 	// Fast counting with snapshot iterators and parallel workers

@@ -142,10 +142,11 @@ type Config struct {
 	InspectDatabase bool `json:"inspect-database"` // Inspects the database on startup if enabled.
 
 	// State Analysis Settings
-	AnalyzeState          bool   `json:"analyze-state"`            // Enable state analysis on startup
-	AnalyzeStateTopN      int    `json:"analyze-state-top-n"`      // Number of top contracts to report (default: 100)
-	AnalyzeStateOutputDir string `json:"analyze-state-output-dir"` // Directory for JSON report output
-	AnalyzeStateWorkers   int    `json:"analyze-state-workers"`    // Number of parallel workers (default: 8)
+	AnalyzeState          bool             `json:"analyze-state"`            // Enable state analysis on startup
+	AnalyzeStateTopN      int              `json:"analyze-state-top-n"`      // Number of top contracts to report (default: 100)
+	AnalyzeStateOutputDir string           `json:"analyze-state-output-dir"` // Directory for JSON report output
+	AnalyzeStateWorkers   int              `json:"analyze-state-workers"`    // Number of parallel workers (default: 8)
+	AnalyzeStateAddresses []common.Address `json:"analyze-state-addresses"`  // Specific addresses to analyze (empty = all)
 
 	// SkipUpgradeCheck disables checking that upgrades must take place before the last
 	// accepted block. Skipping this check is useful when a node operator does not update

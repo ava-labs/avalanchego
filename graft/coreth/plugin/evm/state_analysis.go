@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
@@ -24,9 +26,10 @@ import (
 
 // StateAnalysisConfig holds configuration for state analysis
 type StateAnalysisConfig struct {
-	OutputDir        string        // Directory for JSON output
-	ProgressInterval time.Duration // Interval for progress updates (default 30s)
-	Workers          int           // Number of parallel workers (default: 8)
+	OutputDir        string           // Directory for JSON output
+	ProgressInterval time.Duration    // Interval for progress updates (default 30s)
+	Workers          int              // Number of parallel workers (default: 8)
+	Addresses        []common.Address // Specific addresses to analyze (empty = all)
 }
 
 // RawStateData holds the raw counting results - minimal processing for speed
@@ -179,6 +182,16 @@ func AnalyzeState(bc *core.BlockChain, cfg StateAnalysisConfig) (*RawStateData, 
 		)
 		analyzed := AnalyzeRawData(existing, 100)
 		LogAnalyzedResult(analyzed)
+	}
+
+	// If specific addresses are provided, analyze only those
+	if len(cfg.Addresses) > 0 {
+		log.Info("Analyzing specific addresses",
+			"count", len(cfg.Addresses),
+			"stateRoot", stateRoot.Hex(),
+			"blockNumber", blockNumber,
+		)
+		return analyzeSpecificAddresses(bc, cfg, stateRoot, blockNumber, outputPath, startTime)
 	}
 
 	// Try to use snapshot iterators (faster than trie)
@@ -401,6 +414,95 @@ func countStorageWithSnapshot(snap *snapshot.Tree, accountHash common.Hash) stor
 		stats.bytes += uint64(len(storageIt.Slot()))
 	}
 	return stats
+}
+
+// analyzeSpecificAddresses analyzes only the specified addresses
+func analyzeSpecificAddresses(bc *core.BlockChain, cfg StateAnalysisConfig, stateRoot common.Hash, blockNumber uint64, outputPath string, startTime time.Time) (*RawStateData, error) {
+	result := &RawStateData{
+		Timestamp:   time.Now().UTC().Format(time.RFC3339),
+		StateRoot:   stateRoot.Hex(),
+		BlockNumber: blockNumber,
+		Contracts:   make([]RawContractData, 0, len(cfg.Addresses)),
+	}
+
+	snap := bc.Snapshots()
+	trieDB := bc.TrieDB()
+
+	for i, addr := range cfg.Addresses {
+		// Compute account hash (keccak256 of address)
+		accountHash := crypto.Keccak256Hash(addr.Bytes())
+		result.TotalAccounts++
+
+		var stats storageStats
+
+		// Try snapshot first, fall back to trie
+		if false {
+			log.Info("Using snapshot for storage counting", "address", addr.Hex())
+			stats = countStorageWithSnapshot(snap, accountHash)
+		} else {
+			log.Info("Using trie for storage counting", "address", addr.Hex())
+			// Need to get storage root from account - use state
+			stateDB, stateErr := bc.StateAt(stateRoot)
+			if stateErr != nil {
+				log.Warn("Failed to get state", "err", stateErr, "address", addr.Hex())
+				continue
+			}
+			storageRoot := stateDB.GetStorageRoot(addr)
+			if storageRoot != (common.Hash{}) && storageRoot != types.EmptyRootHash {
+				var countErr error
+				stats, countErr = countStorageWithTrie(trieDB, stateRoot, accountHash, storageRoot)
+				if countErr != nil {
+					log.Warn("Failed to count storage", "err", countErr, "address", addr.Hex())
+					continue
+				}
+			}
+		}
+
+		if stats.slots > 0 {
+			result.AccountsWithStorage++
+			result.TotalStorageSlots += stats.slots
+			result.TotalStorageBytes += stats.bytes
+
+			result.Contracts = append(result.Contracts, RawContractData{
+				AddressHash:  accountHash.Hex(),
+				StorageSlots: stats.slots,
+				StorageBytes: stats.bytes,
+				HasCode:      true, // Assume has code since user specified it
+			})
+
+			log.Info("Analyzed address",
+				"index", i+1,
+				"total", len(cfg.Addresses),
+				"address", addr.Hex(),
+				"slots", stats.slots,
+				"size", formatBytes(stats.bytes),
+			)
+		} else {
+			log.Info("Address has no storage",
+				"index", i+1,
+				"total", len(cfg.Addresses),
+				"address", addr.Hex(),
+			)
+		}
+	}
+
+	result.Complete = true
+	result.AnalysisDurationMs = time.Since(startTime).Milliseconds()
+
+	// Write JSON
+	if err := writeJSON(result, outputPath); err != nil {
+		log.Warn("Failed to write JSON", "err", err)
+	}
+
+	log.Info("Specific address analysis complete",
+		"addressesAnalyzed", len(cfg.Addresses),
+		"withStorage", result.AccountsWithStorage,
+		"totalSlots", result.TotalStorageSlots,
+		"totalSize", formatBytes(result.TotalStorageBytes),
+		"duration", time.Since(startTime).Round(time.Second),
+	)
+
+	return result, nil
 }
 
 // analyzeStateWithTrie is the fallback when snapshots aren't available
