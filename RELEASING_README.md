@@ -29,7 +29,7 @@ All components follow aligned versioning:
 
 ### 1. Preparation
 
-You should always create a relase candidate first, and only if everything is fine, can you create a realse. In this section we create a release candidate `v1.14.1-rc.01. We therefore assign these environment variables to simplify copying instructions:
+You should always create a release candidate first, and only if everything is fine, can you create a release. In this section we create a release candidate `v1.14.1-rc.0`. We therefore assign these environment variables to simplify copying instructions:
 
 ```bash
 export VERSION_RC=v1.14.1-rc.0
