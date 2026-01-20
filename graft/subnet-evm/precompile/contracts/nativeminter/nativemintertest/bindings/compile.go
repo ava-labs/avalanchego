@@ -4,9 +4,9 @@
 package bindings
 
 // Step 1: Compile interface to generate ABI at top level
-//go:generate sh -c "solc -o ../.. --overwrite --abi --base-path ../../../../.. --pretty-json --evm-version cancun ../../INativeMinter.sol"
+//go:generate sh -c "solc -o ../.. --overwrite --abi --base-path ../../../../.. --pretty-json ../../INativeMinter.sol"
 // Step 2: Compile test contracts to generate ABI and bin files
-//go:generate solc -o artifacts --overwrite --abi --bin --base-path ../../../../.. --metadata-hash none  --evm-version cancun NativeMinterTest.sol
+//go:generate solc -o artifacts --overwrite --abi --bin --base-path ../../../../.. --metadata-hash none NativeMinterTest.sol
 // Step 3: Generate Go bindings from the compiled artifacts
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type INativeMinter --abi ../../INativeMinter.abi --bin artifacts/INativeMinter.bin --out gen_inativeminter_binding.go
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type NativeMinterTest --abi artifacts/NativeMinterTest.abi --bin artifacts/NativeMinterTest.bin --out gen_nativemintertest_binding.go

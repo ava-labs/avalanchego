@@ -4,4 +4,4 @@
 package core
 
 // Step 1: Compile TrieStressTest contract to generate ABI and bin files
-//go:generate solc -o . --overwrite --abi --bin --pretty-json --evm-version cancun TrieStressTest.sol
+//go:generate solc -o . --overwrite --abi --bin --pretty-json TrieStressTest.sol

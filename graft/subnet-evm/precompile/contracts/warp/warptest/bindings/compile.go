@@ -5,7 +5,7 @@ package bindings
 
 // Step 1: Compile Solidity contract to generate ABI and bin files
 // Uses base-path to resolve imports from the repo root
-//go:generate solc -o artifacts --overwrite --abi --bin --base-path ../../../../.. --evm-version cancun WarpTest.sol
+//go:generate solc -o artifacts --overwrite --abi --bin --base-path ../../../../.. WarpTest.sol
 // Step 2: Generate Go bindings from the compiled artifacts
 // WarpTest binding includes WarpMessage and WarpBlockHash struct definitions.
 // For event filtering, use the IWarpMessenger binding from the warpbindings package.
