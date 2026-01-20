@@ -57,7 +57,7 @@ jobs:
             [[ "${{ github.event.inputs.with-dependencies }}" =~ libevm=([^,]+) ]] && LIBEVM_REF="${BASH_REMATCH[1]}"
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+              printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s, "firewood-ref": "%s", "libevm-ref": "%s" }] }\n' \
                 "${{ github.event.inputs.test }}" \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
@@ -100,6 +100,10 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
+      - name: Sync Firewood dependency
+        if: matrix.firewood-ref != ''
+        shell: bash
+        run: go run github.com/ava-labs/avalanchego/tests/fixture/polyrepo@6239973c9b sync firewood@${{ matrix.firewood-ref }}
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
