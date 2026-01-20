@@ -46,8 +46,6 @@ git checkout -b "releases/$VERSION_RC"
 
 ### 3. Update Version Files
 
-#### AvalancheGo
-
 1. Update [`version/constants.go`](version/constants.go):
 
    ```go
@@ -69,31 +67,7 @@ git checkout -b "releases/$VERSION_RC"
 
    And update [`version/compatibility.json`](version/compatibility.json) to add the new version.
 
-#### Coreth
-
-Coreth is compiled directly into AvalancheGo - there is no separate release artifact. The version string is informational only (it is used in logs and debugging).
-
-1. Update [`graft/coreth/plugin/evm/version.go`](graft/coreth/plugin/evm/version.go) (optional, for tracking purposes):
-
-   ```go
-   Version string = "v0.15.1"
-   ```
-
-#### Subnet-EVM
-
-1. Update [`graft/subnet-evm/plugin/evm/version.go`](graft/subnet-evm/plugin/evm/version.go):
-
-   ```go
-   Version string = "v1.14.1"  // align with AvalancheGo
-   ```
-
-1. Update [`graft/subnet-evm/compatibility.json`](graft/subnet-evm/compatibility.json):
-
-   ```json
-   "v1.14.1": 45,
-   ```
-
-1. Update [`graft/subnet-evm/README.md`](graft/subnet-evm/README.md) compatibility section.
+**Note:** Coreth and Subnet-EVM versions are automatically derived from `version/constants.go` and do not require manual updates.
 
 ### 4. Commit and Create PR
 
@@ -407,14 +381,6 @@ export NEXT_VERSION=v1.14.2
 
 1. Pat yourself on the back for a job well done
 
-## Version Files Reference
-
-| Component | Version File | Other Files | Notes |
-|-----------|-------------|-------------|-------|
-| AvalancheGo | [`version/constants.go`](version/constants.go) | [`RELEASES.md`](RELEASES.md), [`version/compatibility.json`](version/compatibility.json) | Primary version |
-| Coreth | [`graft/coreth/plugin/evm/version.go`](graft/coreth/plugin/evm/version.go) | | Informational only (no separate release) |
-| Subnet-EVM | [`graft/subnet-evm/plugin/evm/version.go`](graft/subnet-evm/plugin/evm/version.go) | [`graft/subnet-evm/compatibility.json`](graft/subnet-evm/compatibility.json) | Aligned with AvalancheGo |
-
 ## RPC Chain VM Protocol Version
 
 When the protocol version changes:
@@ -431,19 +397,9 @@ When the protocol version changes:
    "45": ["v1.14.1"]
    ```
 
-3. Update [`graft/subnet-evm/compatibility.json`](graft/subnet-evm/compatibility.json):
-
-   ```json
-   "v1.14.1": 45,
-   ```
-
 To verify compatibility:
 
 ```bash
 go test -run ^TestCompatibility$ github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm
 ```
 
-## Historical Notes
-
-- Prior to v1.14.0, Subnet-EVM had independent versioning (v0.8.x and earlier)
-- Coreth has its own version string (v0.x.x) but is compiled into AvalancheGo with no separate release artifact

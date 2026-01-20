@@ -19,6 +19,8 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 
 ### AvalancheGo Compatibility
 
+**Note:** Starting with v1.14.0, Subnet-EVM versions are automatically aligned with AvalancheGo versions. The version is derived from [`version/constants.go`](../../version/constants.go) and no longer requires manual synchronization.
+
 ```text
 [v0.7.0] AvalancheGo@v1.12.0-v1.12.1 (Protocol Version: 38)
 [v0.7.1] AvalancheGo@v1.12.2 (Protocol Version: 39)
@@ -31,6 +33,7 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 [v0.7.8] AvalancheGo@v1.13.4 (Protocol Version: 43)
 [v0.7.9] AvalancheGo@v1.13.5 (Protocol Version: 43)
 [v0.8.0] AvalancheGo@v1.14.0 (Protocol Version: 44)
+[v1.14.1+] Versions aligned with AvalancheGo (automatic)
 ```
 
 ## API

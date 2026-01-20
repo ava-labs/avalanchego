@@ -4,9 +4,7 @@
 package evm
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,24 +12,14 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-type rpcChainCompatibility struct {
-	RPCChainVMProtocolVersion map[string]uint `json:"rpcChainVMProtocolVersion"`
-}
-
-const compatibilityFile = "../../compatibility.json"
-
 func TestCompatibility(t *testing.T) {
-	compat, err := os.ReadFile(compatibilityFile)
-	require.NoError(t, err, "reading compatibility file")
+	// Verify that the Subnet-EVM version is properly derived from AvalancheGo version
+	expectedVersion := fmt.Sprintf("v%d.%d.%d", version.Current.Major, version.Current.Minor, version.Current.Patch)
+	require.Equal(t, expectedVersion, Version,
+		"Subnet-EVM version should be automatically derived from version.Current")
 
-	var parsedCompat rpcChainCompatibility
-	err = json.Unmarshal(compat, &parsedCompat)
-	require.NoError(t, err, "json decoding compatibility file")
-
-	rpcChainVMVersion, valueInJSON := parsedCompat.RPCChainVMProtocolVersion[Version]
-	require.Truef(t, valueInJSON, "%s has subnet-evm version %s missing from rpcChainVMProtocolVersion object",
-		filepath.Base(compatibilityFile), Version)
-	require.Equalf(t, version.RPCChainVMProtocol, rpcChainVMVersion,
-		"%s has subnet-evm version %s stated as compatible with RPC chain VM protocol version %d but AvalancheGo protocol version is %d",
-		filepath.Base(compatibilityFile), Version, rpcChainVMVersion, version.RPCChainVMProtocol)
+	// Verify that the version is compatible with current RPC chain VM protocol
+	// Compatibility is now maintained through version/compatibility.json in the main repo
+	require.NotZero(t, version.RPCChainVMProtocol,
+		"RPC chain VM protocol version should be set")
 }

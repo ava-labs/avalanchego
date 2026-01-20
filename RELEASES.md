@@ -2,6 +2,10 @@
 
 ## Pending (v1.14.2)
 
+### Breaking Changes
+
+- Removed `graft/subnet-evm/compatibility.json` in favor of using a single source of truth in `version/compatibility.json`. External tools (e.g., infra/avacloud) that relied on this file should now use `version/compatibility.json` from the main AvalancheGo repository.
+
 ### Config
 
 - Removed `pull-gossip-poll-size` from the X-chain and P-chain configs.
