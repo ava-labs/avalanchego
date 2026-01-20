@@ -88,7 +88,6 @@ tasks:
     desc: Runs all lint checks in parallel
     deps:
       - lint
-      - shellcheck
       - check-generate-codec
       - check-generate-mocks
       - check-generate-rlp
@@ -98,7 +97,6 @@ tasks:
     desc: Runs all lint checks one-by-one
     cmds:
       - task: lint
-      - task: shellcheck
       - task: check-generate-codec
       - task: check-generate-mocks
       - task: check-generate-rlp
@@ -108,9 +106,7 @@ tasks:
     desc: Run golangci-lint with auto-fix where possible
     cmd: ../evm/scripts/lint_fix.sh
 
-  shellcheck:
-    desc: Run shellcheck static analysis on all shell scripts with version management
-    cmd: ./scripts/shellcheck.sh 
+ 
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
