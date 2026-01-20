@@ -11,9 +11,9 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/ava-labs/avalanchego/graft/evm/log"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/load"
-	"github.com/ava-labs/avalanchego/graft/evm/log"
 
 	gethlog "github.com/ava-labs/libevm/log"
 )

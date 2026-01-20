@@ -44,7 +44,7 @@ type TerminalStringer interface {
 
 func (h *TerminalHandler) format(buf []byte, r slog.Record, usecolor bool) []byte {
 	msg := escapeMessage(r.Message)
-	var color = ""
+	color := ""
 	if usecolor {
 		switch r.Level {
 		case LevelCrit:
@@ -89,7 +89,7 @@ func (h *TerminalHandler) format(buf []byte, r slog.Record, usecolor bool) []byt
 	b.WriteString(msg)
 
 	// try to justify the log output for short messages
-	//length := utf8.RuneCountInString(msg)
+	// length := utf8.RuneCountInString(msg)
 	length := len(msg)
 	if (r.NumAttrs()+len(h.attrs)) > 0 && length < termMsgJust {
 		b.Write(spaces[:termMsgJust-length])
@@ -103,21 +103,21 @@ func (h *TerminalHandler) format(buf []byte, r slog.Record, usecolor bool) []byt
 func (h *TerminalHandler) formatAttributes(buf *bytes.Buffer, r slog.Record, color string) {
 	// tmp is a temporary buffer we use, until bytes.Buffer.AvailableBuffer() (1.21)
 	// can be used.
-	var tmp = make([]byte, 40)
+	tmp := make([]byte, 40)
 	writeAttr := func(attr slog.Attr, _, last bool) {
 		buf.WriteByte(' ')
 
 		if color != "" {
 			buf.WriteString(color)
-			//buf.Write(appendEscapeString(buf.AvailableBuffer(), attr.Key))
+			// buf.Write(appendEscapeString(buf.AvailableBuffer(), attr.Key))
 			buf.Write(appendEscapeString(tmp[:0], attr.Key))
 			buf.WriteString("\x1b[0m=")
 		} else {
-			//buf.Write(appendEscapeString(buf.AvailableBuffer(), attr.Key))
+			// buf.Write(appendEscapeString(buf.AvailableBuffer(), attr.Key))
 			buf.Write(appendEscapeString(tmp[:0], attr.Key))
 			buf.WriteByte('=')
 		}
-		//val := FormatSlogValue(attr.Value, true, buf.AvailableBuffer())
+		// val := FormatSlogValue(attr.Value, true, buf.AvailableBuffer())
 		val := FormatSlogValue(attr.Value, tmp[:0])
 
 		padding := h.fieldPadding[attr.Key]
@@ -132,8 +132,8 @@ func (h *TerminalHandler) formatAttributes(buf *bytes.Buffer, r slog.Record, col
 			buf.Write(spaces[:padding-length])
 		}
 	}
-	var n = 0
-	var nAttrs = len(h.attrs) + r.NumAttrs()
+	n := 0
+	nAttrs := len(h.attrs) + r.NumAttrs()
 	for _, attr := range h.attrs {
 		writeAttr(attr, n == 0, n == nAttrs-1)
 		n++
@@ -151,11 +151,11 @@ func FormatSlogValue(v slog.Value, tmp []byte) (result []byte) {
 	var value any
 	defer func() {
 		if err := recover(); err != nil {
-			if v := reflect.ValueOf(value); v.Kind() == reflect.Ptr && v.IsNil() {
-				result = []byte("<nil>")
-			} else {
+			v := reflect.ValueOf(value)
+			if !(v.Kind() == reflect.Ptr && v.IsNil()) {
 				panic(err)
 			}
+			result = []byte("<nil>")
 		}
 	}()
 
@@ -355,10 +355,10 @@ func writeTimeTermFormat(buf *bytes.Buffer, t time.Time) {
 	buf.WriteByte('-')
 	writePosIntWidth(buf, day, 2)
 	buf.WriteByte('|')
-	hour, min, sec := t.Clock()
+	hour, minute, sec := t.Clock()
 	writePosIntWidth(buf, hour, 2)
 	buf.WriteByte(':')
-	writePosIntWidth(buf, min, 2)
+	writePosIntWidth(buf, minute, 2)
 	buf.WriteByte(':')
 	writePosIntWidth(buf, sec, 2)
 	ns := t.Nanosecond()

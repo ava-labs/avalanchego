@@ -32,19 +32,19 @@ func DiscardHandler() slog.Handler {
 	return &discardHandler{}
 }
 
-func (h *discardHandler) Handle(_ context.Context, r slog.Record) error {
+func (*discardHandler) Handle(context.Context, slog.Record) error {
 	return nil
 }
 
-func (h *discardHandler) Enabled(_ context.Context, level slog.Level) bool {
+func (*discardHandler) Enabled(context.Context, slog.Level) bool {
 	return false
 }
 
-func (h *discardHandler) WithGroup(name string) slog.Handler {
+func (*discardHandler) WithGroup(string) slog.Handler {
 	panic("not implemented")
 }
 
-func (h *discardHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+func (*discardHandler) WithAttrs([]slog.Attr) slog.Handler {
 	return &discardHandler{}
 }
 
@@ -92,7 +92,7 @@ func (h *TerminalHandler) Handle(_ context.Context, r slog.Record) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	buf := h.format(h.buf, r, h.useColor)
-	h.wr.Write(buf)
+	_, _ = h.wr.Write(buf)
 	h.buf = buf[:0]
 	return nil
 }
@@ -101,7 +101,7 @@ func (h *TerminalHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.lvl.Level()
 }
 
-func (h *TerminalHandler) WithGroup(name string) slog.Handler {
+func (*TerminalHandler) WithGroup(string) slog.Handler {
 	panic("not implemented")
 }
 
@@ -116,10 +116,10 @@ func (h *TerminalHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 }
 
 // ResetFieldPadding zeroes the field-padding for all attribute pairs.
-func (t *TerminalHandler) ResetFieldPadding() {
-	t.mu.Lock()
-	t.fieldPadding = make(map[string]int)
-	t.mu.Unlock()
+func (h *TerminalHandler) ResetFieldPadding() {
+	h.mu.Lock()
+	h.fieldPadding = make(map[string]int)
+	h.mu.Unlock()
 }
 
 // JSONHandler returns a handler which prints records in JSON format.
