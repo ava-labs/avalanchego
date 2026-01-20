@@ -100,10 +100,6 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
-      - name: Sync Firewood dependency
-        if: matrix.firewood-ref != ''
-        shell: nix develop --command bash {0}
-        run: go run github.com/ava-labs/avalanchego/tests/fixture/polyrepo@6239973c9b sync firewood@${{ matrix.firewood-ref }}
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:

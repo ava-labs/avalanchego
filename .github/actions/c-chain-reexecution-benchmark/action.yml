@@ -131,6 +131,10 @@ runs:
     - name: Set benchmark output file
       shell: bash
       run: echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.json" >> "$GITHUB_ENV"
+    - name: Sync Firewood dependency
+      if: inputs.firewood-ref != ''
+      shell: nix develop --command bash -x {0}
+      run: go run github.com/ava-labs/avalanchego/tests/fixture/polyrepo@6239973c9b sync firewood@${{ inputs.firewood-ref }}
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
       run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ inputs.test || '' }}"
