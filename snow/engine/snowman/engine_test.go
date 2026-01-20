@@ -1088,7 +1088,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		blockingBlk.ID(),
 		blockingBlk.Height(),
 	))
-	require.Equal(2, te.blocked.NumDependencies())
+	require.Equal(1, te.blocked.NumDependencies())
 
 	queryRequest = nil
 	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {

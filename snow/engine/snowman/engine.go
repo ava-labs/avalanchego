@@ -398,13 +398,10 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 		responseOptions: responseOptions,
 	}
 
-	// Wait until [preferredID] and [preferredIDAtHeight] have been issued to
-	// consensus before applying this chit.
+	// Wait until at least `preferredIDAtHeight` has been issued to consensus
+	// before applying this chit.
 	var deps []ids.ID
-	if e.canDependOn(preferredID) {
-		deps = append(deps, preferredID)
-	}
-	if preferredIDAtHeightShouldBlock {
+	if preferredIDAtHeightShouldBlock || (preferredID == preferredIDAtHeight && e.canDependOn(preferredIDAtHeight)) {
 		deps = append(deps, preferredIDAtHeight)
 	}
 
