@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind/backends"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/libevm/accounts/abi"
 )
 
 func TestMain(m *testing.M) {
