@@ -23,11 +23,11 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	statesyncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats"
@@ -418,6 +418,15 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 					require.NoError(t, clientDB.DiskDB().Delete(it.Key()), "failed to delete code hash %x", it.Key()[len(rawdb.CodePrefix):])
 				}
 				require.NoError(t, it.Error(), "error iterating over code hashes")
+
+				// delete code-to-fetch markers to avoid syncer trying to fetch old code
+				codeToFetchIt := customrawdb.NewCodeToFetchIterator(clientDB.DiskDB())
+				defer codeToFetchIt.Release()
+				for codeToFetchIt.Next() {
+					codeHash := common.BytesToHash(codeToFetchIt.Key()[len(customrawdb.CodeToFetchPrefix):])
+					require.NoError(t, customrawdb.DeleteCodeToFetch(clientDB.DiskDB(), codeHash), "failed to delete code-to-fetch marker for hash %x", codeHash)
+				}
+				require.NoError(t, codeToFetchIt.Error(), "error iterating over code-to-fetch markers")
 			},
 		},
 		"delete intermediate storage nodes": {
@@ -510,7 +519,7 @@ func testSyncerSyncsToNewRoot(t *testing.T, deleteBetweenSyncs func(*testing.T, 
 // Also verifies any code referenced by the EVM state is present in [clientTrieDB] and the hash is correct.
 func assertDBConsistency(t testing.TB, root common.Hash, clientDB state.Database, serverDB state.Database) {
 	numSnapshotAccounts := 0
-	accountIt := customrawdb.IterateAccountSnapshots(clientDB.DiskDB())
+	accountIt := customrawdb.NewAccountSnapshotsIterator(clientDB.DiskDB())
 	defer accountIt.Release()
 	for accountIt.Next() {
 		if !bytes.HasPrefix(accountIt.Key(), rawdb.SnapshotAccountPrefix) || len(accountIt.Key()) != len(rawdb.SnapshotAccountPrefix)+common.HashLength {

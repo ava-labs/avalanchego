@@ -304,16 +304,10 @@ func TestGetWarpValidatorSets(t *testing.T) {
 		require.NoError(err)
 		require.Equal(expected, actual)
 
-		actualPrimaryNetwork, err := m.GetWarpValidatorSet(t.Context(), uint64(height), constants.PrimaryNetworkID)
-		require.NoError(err)
+		actualPrimaryNetwork := actual[constants.PrimaryNetworkID]
 		require.Equal(expected[constants.PrimaryNetworkID], actualPrimaryNetwork)
 
-		actualSubnet, err := m.GetWarpValidatorSet(t.Context(), uint64(height), subnetID)
-		if err != nil {
-			require.NotContains(expected, subnetID)
-			continue
-		}
-
+		actualSubnet := actual[subnetID]
 		// Treat nil and empty slices as the same
 		if len(actualSubnet.Validators) == 0 {
 			actualSubnet.Validators = nil
