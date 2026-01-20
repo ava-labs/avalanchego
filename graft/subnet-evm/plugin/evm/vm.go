@@ -445,7 +445,7 @@ func (vm *VM) Initialize(
 		vm.ethConfig.Miner.Etherbase = constants.BlackholeAddr
 	}
 
-	vm.networkCodec = message.Codec
+	vm.networkCodec = message.SubnetEVMCodec
 	vm.Network, err = network.NewNetwork(vm.ctx, appSender, vm.networkCodec, vm.config.MaxOutboundActiveRequests, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
@@ -1294,8 +1294,8 @@ func (vm *VM) ReadLastAccepted() (common.Hash, uint64, error) {
 func defaultExtensions() *extension.Config {
 	return &extension.Config{
 		Clock:               &mockable.Clock{},
-		SyncSummaryProvider: &message.BlockSyncSummaryProvider{},
-		SyncableParser:      message.NewBlockSyncSummaryParser(),
+		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.SubnetEVMCodec),
+		SyncableParser:      message.NewBlockSyncSummaryParser(message.SubnetEVMCodec),
 	}
 }
 

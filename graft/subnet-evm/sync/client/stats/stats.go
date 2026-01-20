@@ -102,9 +102,9 @@ func (c *clientSyncerStats) GetMetric(msgIntf message.Request) (MessageMetric, e
 	case message.CodeRequest:
 		return c.codeRequestMetric, nil
 	case message.LeafsRequest:
-		metric, ok := c.leafMetrics[msg.NodeType]
+		metric, ok := c.leafMetrics[msg.NodeTypeValue()]
 		if !ok {
-			return nil, fmt.Errorf("invalid leafs request for node type: %T", msg.NodeType)
+			return nil, fmt.Errorf("invalid leafs request for node type: %T", msg.NodeTypeValue())
 		}
 		return metric, nil
 	default:

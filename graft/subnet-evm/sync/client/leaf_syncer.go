@@ -39,6 +39,7 @@ type CallbackLeafSyncer struct {
 	done        chan error
 	tasks       <-chan LeafSyncTask
 	requestSize uint16
+	requestType message.LeafsRequestType
 }
 
 type LeafClient interface {
@@ -48,12 +49,13 @@ type LeafClient interface {
 }
 
 // NewCallbackLeafSyncer creates a new syncer object to perform leaf sync of tries.
-func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, requestSize uint16) *CallbackLeafSyncer {
+func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, requestSize uint16, requestType message.LeafsRequestType) *CallbackLeafSyncer {
 	return &CallbackLeafSyncer{
 		client:      client,
 		done:        make(chan error),
 		tasks:       tasks,
 		requestSize: requestSize,
+		requestType: requestType,
 	}
 }
 
@@ -81,6 +83,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 	var (
 		root  = task.Root()
 		start = task.Start()
+		end   = task.End()
 	)
 
 	if skip, err := task.OnStart(); err != nil {
@@ -95,13 +98,15 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 			return err
 		}
 
-		leafsResponse, err := c.client.GetLeafs(ctx, message.LeafsRequest{
-			Root:     root,
-			Account:  task.Account(),
-			Start:    start,
-			Limit:    c.requestSize,
-			NodeType: message.StateTrieNode,
-		})
+		leafsResponse, err := c.client.GetLeafs(ctx, message.NewLeafsRequest(
+			c.requestType,
+			root,
+			task.Account(),
+			start,
+			end,
+			c.requestSize,
+			message.StateTrieNode,
+		))
 		if err != nil {
 			return fmt.Errorf("%w: %w", errFailedToFetchLeafs, err)
 		}

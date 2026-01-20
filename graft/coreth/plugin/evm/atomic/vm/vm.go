@@ -245,7 +245,7 @@ func (vm *VM) Initialize(
 	atomicTrie := vm.AtomicBackend.AtomicTrie()
 	syncProvider.Initialize(atomicTrie)
 	syncExtender.Initialize(vm.AtomicBackend, atomicTrie, vm.InnerVM.Config().StateSyncRequestSize)
-	leafHandler.Initialize(atomicTrie.TrieDB(), atomicstate.TrieKeyLength, message.Codec)
+	leafHandler.Initialize(atomicTrie.TrieDB(), atomicstate.TrieKeyLength, message.CorethCodec)
 
 	vm.SecpCache = secp256k1.NewRecoverCache(secpCacheSize)
 

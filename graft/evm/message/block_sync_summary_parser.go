@@ -8,18 +8,21 @@ import (
 
 	"github.com/ava-labs/libevm/crypto"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-type BlockSyncSummaryParser struct{}
-
-func NewBlockSyncSummaryParser() *BlockSyncSummaryParser {
-	return &BlockSyncSummaryParser{}
+type BlockSyncSummaryParser struct {
+	codec codec.Manager
 }
 
-func (*BlockSyncSummaryParser) Parse(summaryBytes []byte, acceptImpl AcceptImplFn) (Syncable, error) {
+func NewBlockSyncSummaryParser(c codec.Manager) *BlockSyncSummaryParser {
+	return &BlockSyncSummaryParser{codec: c}
+}
+
+func (p *BlockSyncSummaryParser) Parse(summaryBytes []byte, acceptImpl AcceptImplFn) (Syncable, error) {
 	summary := BlockSyncSummary{}
-	if _, err := Codec.Unmarshal(summaryBytes, &summary); err != nil {
+	if _, err := p.codec.Unmarshal(summaryBytes, &summary); err != nil {
 		return nil, fmt.Errorf("failed to parse syncable summary: %w", err)
 	}
 

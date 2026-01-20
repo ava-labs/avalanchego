@@ -35,8 +35,9 @@ type SyncTask interface {
 }
 
 type SyncerConfig struct {
-	RequestSize uint16 // Number of leafs to request from a peer at a time
-	NumWorkers  int    // Number of workers to process leaf sync tasks
+	RequestSize      uint16                   // Number of leafs to request from a peer at a time
+	NumWorkers       int                      // Number of workers to process leaf sync tasks
+	LeafsRequestType message.LeafsRequestType // Type of leafs request to use
 }
 
 type CallbackSyncer struct {
@@ -84,6 +85,7 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 	var (
 		root  = task.Root()
 		start = task.Start()
+		end   = task.End()
 	)
 
 	if skip, err := task.OnStart(); err != nil {
@@ -98,13 +100,15 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 			return err
 		}
 
-		leafsResponse, err := c.client.GetLeafs(ctx, message.LeafsRequest{
-			Root:     root,
-			Account:  task.Account(),
-			Start:    start,
-			Limit:    c.config.RequestSize,
-			NodeType: task.NodeType(),
-		})
+		leafsResponse, err := c.client.GetLeafs(ctx, message.NewLeafsRequest(
+			c.config.LeafsRequestType,
+			root,
+			task.Account(),
+			start,
+			end,
+			c.config.RequestSize,
+			task.NodeType(),
+		))
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrFailedToFetchLeafs, err)
 		}

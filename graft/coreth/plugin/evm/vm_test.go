@@ -89,8 +89,8 @@ var (
 
 func defaultExtensions() *extension.Config {
 	return &extension.Config{
-		SyncSummaryProvider: &message.BlockSyncSummaryProvider{},
-		SyncableParser:      &message.BlockSyncSummaryParser{},
+		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.CorethCodec),
+		SyncableParser:      message.NewBlockSyncSummaryParser(message.CorethCodec),
 		Clock:               &mockable.Clock{},
 	}
 }

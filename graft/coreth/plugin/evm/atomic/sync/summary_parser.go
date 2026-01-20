@@ -22,7 +22,7 @@ func NewSummaryParser() *summaryParser {
 
 func (*summaryParser) Parse(summaryBytes []byte, acceptImpl message.AcceptImplFn) (message.Syncable, error) {
 	summary := Summary{}
-	if _, err := message.Codec.Unmarshal(summaryBytes, &summary); err != nil {
+	if _, err := message.CorethCodec.Unmarshal(summaryBytes, &summary); err != nil {
 		return nil, fmt.Errorf("failed to parse syncable summary: %w", err)
 	}
 

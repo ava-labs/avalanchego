@@ -32,17 +32,14 @@ var (
 	CorethCodec codec.Manager
 	// SubnetEVMCodec is used for Subnet-EVM state sync messages
 	SubnetEVMCodec codec.Manager
-	// Codec is an alias for CorethCodec for backward compatibility
-	Codec codec.Manager
 )
 
 func init() {
-	CorethCodec = newCodec(corethSkipRegistrations)
-	SubnetEVMCodec = newCodec(subnetEVMSkipRegistrations)
-	Codec = CorethCodec // default to coreth for backward compat
+	CorethCodec = newCodec(corethSkipRegistrations, CorethLeafsRequestType)
+	SubnetEVMCodec = newCodec(subnetEVMSkipRegistrations, SubnetEVMLeafsRequestType)
 }
 
-func newCodec(skipCount int) codec.Manager {
+func newCodec(skipCount int, leafsReqType LeafsRequestType) codec.Manager {
 	mgr := codec.NewManager(maxMessageSize)
 	c := linearcodec.NewDefault()
 
@@ -52,11 +49,13 @@ func newCodec(skipCount int) codec.Manager {
 	// Gossip types and sync summary type removed from codec
 	c.SkipRegistrations(skipCount)
 
+	leafsRequest := NewEmptyLeafsRequest(leafsReqType)
+
 	errs.Add(
 		// state sync types
 		c.RegisterType(BlockRequest{}),
 		c.RegisterType(BlockResponse{}),
-		c.RegisterType(LeafsRequest{}),
+		c.RegisterType(leafsRequest),
 		c.RegisterType(LeafsResponse{}),
 		c.RegisterType(CodeRequest{}),
 		c.RegisterType(CodeResponse{}),

@@ -9,12 +9,16 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 const MaxCodeHashesPerRequest = 5
 
-var _ Request = LeafsRequest{}
+var (
+	_ LeafsRequest = SubnetEVMLeafsRequest{}
+	_ LeafsRequest = CorethLeafsRequest{}
+)
 
 // NodeType outlines the trie that a leaf node belongs to
 // handlers.LeafsRequestHandler uses this information to determine
@@ -26,29 +30,123 @@ const (
 	StateTrieKeyLength = common.HashLength
 )
 
-// LeafsRequest is a request to receive trie leaves at specified Root within Start and End byte range
-// Limit outlines maximum number of leaves to returns starting at Start
-// NodeType outlines which trie to read from state/atomic.
-// NOTE: NodeType is not serialized to maintain backward compatibility with existing nodes.
-// We rely on the single used node type (StateTrieNode).
-type LeafsRequest struct {
+// LeafsRequest defines the interface for leaf sync requests.
+type LeafsRequest interface {
+	Request
+	RootHash() common.Hash
+	AccountHash() common.Hash
+	StartKey() []byte
+	EndKey() []byte
+	LimitValue() uint16
+	NodeTypeValue() NodeType
+}
+
+// LeafsRequestType selects which wire format to use when building leafs requests.
+type LeafsRequestType string
+
+const (
+	CorethLeafsRequestType    LeafsRequestType = "coreth"
+	SubnetEVMLeafsRequestType LeafsRequestType = "subnet-evm"
+)
+
+// SubnetEVMLeafsRequest preserves the original subnet-evm wire format where NodeType is not serialized.
+// NOTE: NodeType is not serialized to maintain backward compatibility with subnet-evm nodes.
+type SubnetEVMLeafsRequest struct {
 	Root     common.Hash `serialize:"true"`
 	Account  common.Hash `serialize:"true"`
 	Start    []byte      `serialize:"true"`
 	End      []byte      `serialize:"true"`
 	Limit    uint16      `serialize:"true"`
-	NodeType NodeType    // Not serialized to avoid breaking changes
+	NodeType NodeType
 }
 
-func (l LeafsRequest) String() string {
-	return fmt.Sprintf(
-		"LeafsRequest(Root=%s, Account=%s, Start=%s, End=%s, Limit=%d, NodeType=%d)",
-		l.Root, l.Account, common.Bytes2Hex(l.Start), common.Bytes2Hex(l.End), l.Limit, l.NodeType,
-	)
+// CorethLeafsRequest preserves the original coreth wire format where NodeType is serialized.
+type CorethLeafsRequest struct {
+	Root     common.Hash `serialize:"true"`
+	Account  common.Hash `serialize:"true"`
+	Start    []byte      `serialize:"true"`
+	End      []byte      `serialize:"true"`
+	Limit    uint16      `serialize:"true"`
+	NodeType NodeType    `serialize:"true"`
 }
 
-func (l LeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
+// NewLeafsRequest builds a leafs request using the requested wire format.
+func NewLeafsRequest(leafReqType LeafsRequestType, root, account common.Hash, start, end []byte, limit uint16, nodeType NodeType) LeafsRequest {
+	switch leafReqType {
+	case SubnetEVMLeafsRequestType:
+		return SubnetEVMLeafsRequest{
+			Root:     root,
+			Account:  account,
+			Start:    start,
+			End:      end,
+			Limit:    limit,
+			NodeType: nodeType,
+		}
+	default:
+		return CorethLeafsRequest{
+			Root:     root,
+			Account:  account,
+			Start:    start,
+			End:      end,
+			Limit:    limit,
+			NodeType: nodeType,
+		}
+	}
+}
+
+func NewEmptyLeafsRequest(leafReqType LeafsRequestType) LeafsRequest {
+	switch leafReqType {
+	case SubnetEVMLeafsRequestType:
+		return SubnetEVMLeafsRequest{}
+	default:
+		return CorethLeafsRequest{}
+	}
+}
+
+func LeafsRequestTypeForCodec(c codec.Manager) LeafsRequestType {
+	switch c {
+	case SubnetEVMCodec:
+		return SubnetEVMLeafsRequestType
+	default:
+		return CorethLeafsRequestType
+	}
+}
+
+func (l SubnetEVMLeafsRequest) String() string {
+	return formatLeafsRequest("LeafsRequest", l.Root, l.Account, l.Start, l.End, l.Limit, l.NodeType)
+}
+
+func (l CorethLeafsRequest) String() string {
+	return formatLeafsRequest("LeafsRequest", l.Root, l.Account, l.Start, l.End, l.Limit, l.NodeType)
+}
+
+func (l SubnetEVMLeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
 	return handler.HandleLeafsRequest(ctx, nodeID, requestID, l)
+}
+
+func (l CorethLeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
+	return handler.HandleLeafsRequest(ctx, nodeID, requestID, l)
+}
+
+func (l SubnetEVMLeafsRequest) RootHash() common.Hash    { return l.Root }
+func (l SubnetEVMLeafsRequest) AccountHash() common.Hash { return l.Account }
+func (l SubnetEVMLeafsRequest) StartKey() []byte         { return l.Start }
+func (l SubnetEVMLeafsRequest) EndKey() []byte           { return l.End }
+func (l SubnetEVMLeafsRequest) LimitValue() uint16       { return l.Limit }
+func (l SubnetEVMLeafsRequest) NodeTypeValue() NodeType  { return l.NodeType }
+
+func (l CorethLeafsRequest) RootHash() common.Hash    { return l.Root }
+func (l CorethLeafsRequest) AccountHash() common.Hash { return l.Account }
+func (l CorethLeafsRequest) StartKey() []byte         { return l.Start }
+func (l CorethLeafsRequest) EndKey() []byte           { return l.End }
+func (l CorethLeafsRequest) LimitValue() uint16       { return l.Limit }
+func (l CorethLeafsRequest) NodeTypeValue() NodeType  { return l.NodeType }
+
+func formatLeafsRequest(prefix string, root common.Hash, account common.Hash, start []byte, end []byte, limit uint16, nodeType NodeType) string {
+	return fmt.Sprintf(
+		"%s(Root=%s, Account=%s, Start=%s, End=%s, Limit=%d, NodeType=%d)",
+		prefix, root, account, common.Bytes2Hex(start), common.Bytes2Hex(end), limit, nodeType,
+	)
 }
 
 // LeafsResponse is a response to a LeafsRequest

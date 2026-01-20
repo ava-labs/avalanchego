@@ -349,14 +349,14 @@ func setupTestInfrastructure(t *testing.T, serverTrieDB *triedb.Database) (conte
 	t.Cleanup(cancel)
 
 	mockClient := client.NewTestClient(
-		message.Codec,
-		handlers.NewLeafsRequestHandler(serverTrieDB, state.TrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats()),
+		message.CorethCodec,
+		handlers.NewLeafsRequestHandler(serverTrieDB, state.TrieKeyLength, nil, message.CorethCodec, handlerstats.NewNoopHandlerStats()),
 		nil,
 		nil,
 	)
 
 	clientDB := versiondb.New(memdb.New())
-	repo, err := state.NewAtomicTxRepository(clientDB, message.Codec, 0)
+	repo, err := state.NewAtomicTxRepository(clientDB, message.CorethCodec, 0)
 	require.NoError(t, err, "NewAtomicTxRepository()")
 
 	atomicBackend, err := state.NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, 0, common.Hash{}, testCommitInterval)

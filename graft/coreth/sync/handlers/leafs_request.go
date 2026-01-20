@@ -78,17 +78,22 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 	startTime := time.Now()
 	lrh.stats.IncLeafsRequest()
 
-	if (len(leafsRequest.End) > 0 && bytes.Compare(leafsRequest.Start, leafsRequest.End) > 0) ||
-		leafsRequest.Root == (common.Hash{}) ||
-		leafsRequest.Root == types.EmptyRootHash ||
-		leafsRequest.Limit == 0 {
+	startKey := leafsRequest.StartKey()
+	endKey := leafsRequest.EndKey()
+	root := leafsRequest.RootHash()
+	limitValue := leafsRequest.LimitValue()
+
+	if (len(endKey) > 0 && bytes.Compare(startKey, endKey) > 0) ||
+		root == (common.Hash{}) ||
+		root == types.EmptyRootHash ||
+		limitValue == 0 {
 		log.Debug("invalid leafs request, dropping request", "nodeID", nodeID, "requestID", requestID, "request", leafsRequest)
 		lrh.stats.IncInvalidLeafsRequest()
 		return nil, nil
 	}
-	if (len(leafsRequest.Start) != 0 && len(leafsRequest.Start) != lrh.trieKeyLength) ||
-		(len(leafsRequest.End) != 0 && len(leafsRequest.End) != lrh.trieKeyLength) {
-		log.Debug("invalid length for leafs request range, dropping request", "startLen", len(leafsRequest.Start), "endLen", len(leafsRequest.End), "expected", lrh.trieKeyLength)
+	if (len(startKey) != 0 && len(startKey) != lrh.trieKeyLength) ||
+		(len(endKey) != 0 && len(endKey) != lrh.trieKeyLength) {
+		log.Debug("invalid length for leafs request range, dropping request", "startLen", len(startKey), "endLen", len(endKey), "expected", lrh.trieKeyLength)
 		lrh.stats.IncInvalidLeafsRequest()
 		return nil, nil
 	}
@@ -97,14 +102,14 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 	// as this information will be necessary to access storage tries when
 	// the trie is path based.
 	// stateRoot := common.Hash{}
-	t, err := trie.New(trie.TrieID(leafsRequest.Root), lrh.trieDB)
+	t, err := trie.New(trie.TrieID(root), lrh.trieDB)
 	if err != nil {
-		log.Debug("error opening trie when processing request, dropping request", "nodeID", nodeID, "requestID", requestID, "root", leafsRequest.Root, "err", err)
+		log.Debug("error opening trie when processing request, dropping request", "nodeID", nodeID, "requestID", requestID, "root", leafsRequest.RootHash(), "err", err)
 		lrh.stats.IncMissingRoot()
 		return nil, nil
 	}
 	// override limit if it is greater than the configured maxLeavesLimit
-	limit := leafsRequest.Limit
+	limit := limitValue
 	if limit > maxLeavesLimit {
 		limit = maxLeavesLimit
 	}
@@ -114,7 +119,7 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 	leafsResponse.Vals = make([][]byte, 0, limit)
 
 	responseBuilder := &responseBuilder{
-		request:   &leafsRequest,
+		request:   leafsRequest,
 		response:  &leafsResponse,
 		t:         t,
 		keyLength: lrh.trieKeyLength,
@@ -155,7 +160,7 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 }
 
 type responseBuilder struct {
-	request   *message.LeafsRequest
+	request   message.LeafsRequest
 	response  *message.LeafsResponse
 	t         *trie.Trie
 	snap      *snapshot.Tree
@@ -182,19 +187,19 @@ func (rb *responseBuilder) handleRequest(ctx context.Context) error {
 
 	if len(rb.response.Keys) < int(rb.limit) {
 		// more indicates whether there are more leaves in the trie
-		more, err := rb.fillFromTrie(ctx, rb.request.End)
+		more, err := rb.fillFromTrie(ctx, rb.request.EndKey())
 		if err != nil {
 			rb.stats.IncTrieError()
 			return err
 		}
-		if len(rb.request.Start) == 0 && !more {
+		if len(rb.request.StartKey()) == 0 && !more {
 			// omit proof via early return
 			return nil
 		}
 	}
 
 	// Generate the proof and add it to the response.
-	proof, err := rb.generateRangeProof(rb.request.Start, rb.response.Keys)
+	proof, err := rb.generateRangeProof(rb.request.StartKey(), rb.response.Keys)
 	if err != nil {
 		rb.stats.IncProofError()
 		return err
@@ -249,7 +254,7 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 	defer proof.Close() // closing memdb does not error
 	if ok {
 		rb.response.Keys, rb.response.Vals = snapKeys, snapVals
-		if len(rb.request.Start) == 0 && !more {
+		if len(rb.request.StartKey()) == 0 && !more {
 			// omit proof via early return
 			rb.stats.IncSnapshotReadSuccess()
 			return true, nil
@@ -350,7 +355,7 @@ func (rb *responseBuilder) verifyRangeProof(keys, vals [][]byte, start []byte, p
 	if len(start) == 0 {
 		start = bytes.Repeat([]byte{0x00}, rb.keyLength)
 	}
-	return trie.VerifyRangeProof(rb.request.Root, start, keys, vals, proof)
+	return trie.VerifyRangeProof(rb.request.RootHash(), start, keys, vals, proof)
 }
 
 // iterateVals returns the values contained in [db]
@@ -394,7 +399,7 @@ func (rb *responseBuilder) isRangeValid(keys, vals [][]byte, hasGap bool) (*memo
 // nextKey returns the nextKey that could potentially be part of the response.
 func (rb *responseBuilder) nextKey() []byte {
 	if len(rb.response.Keys) == 0 {
-		return rb.request.Start
+		return rb.request.StartKey()
 	}
 	nextKey := common.CopyBytes(rb.response.Keys[len(rb.response.Keys)-1])
 	utils.IncrOne(nextKey)
@@ -444,21 +449,21 @@ func (rb *responseBuilder) fillFromTrie(ctx context.Context, end []byte) (bool, 
 func (rb *responseBuilder) readLeafsFromSnapshot(ctx context.Context) ([][]byte, [][]byte, error) {
 	var (
 		snapIt    ethdb.Iterator
-		startHash = common.BytesToHash(rb.request.Start)
+		startHash = common.BytesToHash(rb.request.StartKey())
 		keys      = make([][]byte, 0, rb.limit)
 		vals      = make([][]byte, 0, rb.limit)
 	)
 
 	// Get an iterator into the storage or the main account snapshot.
-	if rb.request.Account == (common.Hash{}) {
+	if rb.request.AccountHash() == (common.Hash{}) {
 		snapIt = &syncutils.AccountIterator{AccountIterator: rb.snap.DiskAccountIterator(startHash)}
 	} else {
-		snapIt = &syncutils.StorageIterator{StorageIterator: rb.snap.DiskStorageIterator(rb.request.Account, startHash)}
+		snapIt = &syncutils.StorageIterator{StorageIterator: rb.snap.DiskStorageIterator(rb.request.AccountHash(), startHash)}
 	}
 	defer snapIt.Release()
 	for snapIt.Next() {
 		// if we're at the end, break this loop
-		if len(rb.request.End) > 0 && bytes.Compare(snapIt.Key(), rb.request.End) > 0 {
+		if len(rb.request.EndKey()) > 0 && bytes.Compare(snapIt.Key(), rb.request.EndKey()) > 0 {
 			break
 		}
 		// If we've returned enough data or run out of time, set the more flag and exit
