@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
@@ -22,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/libevm/accounts/abi"
 )
 
 func TestMain(m *testing.M) {
