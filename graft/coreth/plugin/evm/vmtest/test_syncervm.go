@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vmtest
@@ -28,9 +28,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -46,7 +47,6 @@ import (
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
-	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -87,7 +87,7 @@ func SkipStateSyncTest(t *testing.T, testSetup *SyncTestSetup) {
 		StateSyncMinBlocks: 300, // must be greater than [syncableInterval] to skip sync
 		SyncMode:           block.StateSyncSkipped,
 	}
-	testSyncVMSetup := initSyncServerAndClientVMs(t, test, vmsync.BlocksToFetch, testSetup)
+	testSyncVMSetup := initSyncServerAndClientVMs(t, test, engine.BlocksToFetch, testSetup)
 
 	testSyncerVM(t, testSyncVMSetup, test, testSetup.ExtraSyncerVMTest)
 }
@@ -98,13 +98,13 @@ func StateSyncFromScratchTest(t *testing.T, testSetup *SyncTestSetup) {
 		StateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		SyncMode:           block.StateSyncStatic,
 	}
-	testSyncVMSetup := initSyncServerAndClientVMs(t, test, vmsync.BlocksToFetch, testSetup)
+	testSyncVMSetup := initSyncServerAndClientVMs(t, test, engine.BlocksToFetch, testSetup)
 
 	testSyncerVM(t, testSyncVMSetup, test, testSetup.ExtraSyncerVMTest)
 }
 
 func StateSyncFromScratchExceedParentTest(t *testing.T, testSetup *SyncTestSetup) {
-	numToGen := vmsync.BlocksToFetch + uint64(32)
+	numToGen := engine.BlocksToFetch + uint64(32)
 	test := SyncTestParams{
 		SyncableInterval:   numToGen,
 		StateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
@@ -120,7 +120,7 @@ func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 	require := require.New(t)
 	reqCount := 0
 	test := SyncTestParams{
-		SyncableInterval:   vmsync.BlocksToFetch,
+		SyncableInterval:   engine.BlocksToFetch,
 		StateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		SyncMode:           block.StateSyncStatic,
 		responseIntercept: func(syncerVM extension.InnerVM, nodeID ids.NodeID, requestID uint32, response []byte) {
@@ -142,7 +142,7 @@ func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 		},
 		expectedErr: context.Canceled,
 	}
-	testSyncVMSetup := initSyncServerAndClientVMs(t, test, vmsync.BlocksToFetch, testSetup)
+	testSyncVMSetup := initSyncServerAndClientVMs(t, test, engine.BlocksToFetch, testSetup)
 
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, testSyncVMSetup, test, testSetup.ExtraSyncerVMTest)
@@ -243,7 +243,7 @@ func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 	require.NoError(syncReEnabledVM.Connected(
 		t.Context(),
 		testSyncVMSetup.serverVM.SnowCtx.NodeID,
-		statesyncclient.StateSyncVersion,
+		client.StateSyncVersion,
 	))
 
 	enabled, err = syncReEnabledVM.StateSyncEnabled(t.Context())
@@ -263,7 +263,7 @@ func VMShutdownWhileSyncingTest(t *testing.T, testSetup *SyncTestSetup) {
 	)
 	reqCount := 0
 	test := SyncTestParams{
-		SyncableInterval:   vmsync.BlocksToFetch,
+		SyncableInterval:   engine.BlocksToFetch,
 		StateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		SyncMode:           block.StateSyncStatic,
 		responseIntercept: func(syncerVM extension.InnerVM, nodeID ids.NodeID, requestID uint32, response []byte) {
@@ -281,7 +281,7 @@ func VMShutdownWhileSyncingTest(t *testing.T, testSetup *SyncTestSetup) {
 		},
 		expectedErr: context.Canceled,
 	}
-	testSyncVMSetup = initSyncServerAndClientVMs(t, test, vmsync.BlocksToFetch, testSetup)
+	testSyncVMSetup = initSyncServerAndClientVMs(t, test, engine.BlocksToFetch, testSetup)
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, testSyncVMSetup, test, testSetup.ExtraSyncerVMTest)
 }
@@ -325,7 +325,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 
 	// make some accounts
 	r := rand.New(rand.NewSource(1))
-	root, accounts := statesynctest.FillAccountsWithOverlappingStorage(t, r, serverVM.Ethereum().BlockChain().TrieDB(), types.EmptyRootHash, 1000, 16)
+	root, accounts := synctest.FillAccountsWithOverlappingStorage(t, r, serverVM.Ethereum().BlockChain().StateCache(), types.EmptyRootHash, 1000, 16)
 
 	// patch serverVM's lastAcceptedBlock to have the new root
 	// and update the vm's state so the trie with accounts will
@@ -339,6 +339,8 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	internalBlock, ok := internalWrappedBlock.(*chain.BlockWrapper)
 	require.True(ok)
 	require.NoError(serverVM.SetLastAcceptedBlock(internalBlock.Block))
+	require.NoError(serverVM.PutLastAcceptedID(internalBlock.ID()))
+	require.NoError(serverVM.VersionDB().Commit())
 
 	// initialise [syncerVM] with blank genesis state
 	// we also override [syncerVM]'s commit interval so the atomic trie works correctly.
@@ -395,7 +397,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 		syncerVM.Connected(
 			t.Context(),
 			serverTest.Ctx.NodeID,
-			statesyncclient.StateSyncVersion,
+			client.StateSyncVersion,
 		),
 	)
 
@@ -660,5 +662,5 @@ func requireSyncPerformedHeight(t *testing.T, db ethdb.KeyValueStore, expected u
 	t.Helper()
 	latest, err := customrawdb.GetLatestSyncPerformed(db)
 	require.NoError(t, err)
-	require.Equal(t, expected, latest, "sync performed height mismatch: expected %d, got %d", expected, latest)
+	require.Equal(t, expected, latest, "sync performed height mismatch")
 }

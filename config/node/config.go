@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -177,7 +177,14 @@ type Config struct {
 
 	TrackedSubnets set.Set[ids.ID] `json:"trackedSubnets"`
 
-	SubnetConfigs map[ids.ID]subnets.Config `json:"subnetConfigs"`
+	// ProposerMinBlockDelay is the minimum delay this node will enforce when
+	// building a snowman++ block on the P-chain and the X-chain. All other
+	// chains are expected to perform their own block production throttling.
+	//
+	// TODO: Remove this flag once the P-chain and X-chain throttle their own
+	// block production.
+	ProposerMinBlockDelay time.Duration             `json:"proposerMinBlockDelay"`
+	SubnetConfigs         map[ids.ID]subnets.Config `json:"subnetConfigs"`
 
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 	ChainAliases map[ids.ID][]string           `json:"chainAliases"`

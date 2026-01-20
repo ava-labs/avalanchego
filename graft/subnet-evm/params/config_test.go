@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -35,11 +35,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
@@ -125,7 +125,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 0,
 			wantErr: &ethparams.ConfigCompatError{
 				What:         "SubnetEVM fork block timestamp",
-				StoredTime:   utils.NewUint64(0),
+				StoredTime:   utils.PointerTo[uint64](0),
 				NewTime:      GetExtra(TestPreSubnetEVMChainConfig).NetworkUpgrades.SubnetEVMTimestamp,
 				RewindToTime: 0,
 			},
@@ -137,7 +137,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 100,
 			wantErr: &ethparams.ConfigCompatError{
 				What:         "SubnetEVM fork block timestamp",
-				StoredTime:   utils.NewUint64(0),
+				StoredTime:   utils.PointerTo[uint64](0),
 				NewTime:      GetExtra(TestPreSubnetEVMChainConfig).NetworkUpgrades.SubnetEVMTimestamp,
 				RewindToTime: 0,
 			},
@@ -157,7 +157,7 @@ func TestConfigRules(t *testing.T) {
 		&ChainConfig{},
 		&extras.ChainConfig{
 			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.NewUint64(500),
+				SubnetEVMTimestamp: utils.PointerTo[uint64](500),
 			},
 		},
 	)
@@ -180,7 +180,7 @@ func TestConfigUnmarshalJSON(t *testing.T) {
 	require := require.New(t)
 
 	testRewardManagerConfig := rewardmanager.NewConfig(
-		utils.NewUint64(1671542573),
+		utils.PointerTo[uint64](1671542573),
 		[]common.Address{common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")},
 		nil,
 		nil,
@@ -189,7 +189,7 @@ func TestConfigUnmarshalJSON(t *testing.T) {
 		})
 
 	testContractNativeMinterConfig := nativeminter.NewConfig(
-		utils.NewUint64(0),
+		utils.PointerTo[uint64](0),
 		[]common.Address{common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")},
 		nil,
 		nil,
@@ -249,10 +249,10 @@ func TestActivePrecompiles(t *testing.T) {
 			UpgradeConfig: extras.UpgradeConfig{
 				PrecompileUpgrades: []extras.PrecompileUpgrade{
 					{
-						Config: nativeminter.NewConfig(utils.NewUint64(0), nil, nil, nil, nil), // enable at genesis
+						Config: nativeminter.NewConfig(utils.PointerTo[uint64](0), nil, nil, nil, nil), // enable at genesis
 					},
 					{
-						Config: nativeminter.NewDisableConfig(utils.NewUint64(1)), // disable at timestamp 1
+						Config: nativeminter.NewDisableConfig(utils.PointerTo[uint64](1)), // disable at timestamp 1
 					},
 				},
 			},
@@ -285,8 +285,8 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 				FeeConfig:          DefaultFeeConfig,
 				AllowFeeRecipients: false,
 				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: utils.NewUint64(0),
-					DurangoTimestamp:   utils.NewUint64(0),
+					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+					DurangoTimestamp:   utils.PointerTo[uint64](0),
 				},
 				GenesisPrecompiles: extras.Precompiles{},
 			},
@@ -294,7 +294,7 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 		UpgradeConfig: extras.UpgradeConfig{
 			PrecompileUpgrades: []extras.PrecompileUpgrade{
 				{
-					Config: txallowlist.NewConfig(utils.NewUint64(100), nil, nil, nil),
+					Config: txallowlist.NewConfig(utils.PointerTo[uint64](100), nil, nil, nil),
 				},
 			},
 		},

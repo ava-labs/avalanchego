@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package params
@@ -10,8 +10,8 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -80,11 +80,11 @@ func SetEthUpgrades(c *ChainConfig) error {
 	// We only mark Shanghai and Cancun as enabled if we have marked them as
 	// scheduled.
 	if durango := extra.DurangoBlockTimestamp; durango != nil && *durango < unscheduledActivation {
-		c.ShanghaiTime = utils.NewUint64(*durango)
+		c.ShanghaiTime = utils.PointerTo(*durango)
 	}
 
 	if etna := extra.EtnaTimestamp; etna != nil && *etna < unscheduledActivation {
-		c.CancunTime = utils.NewUint64(*etna)
+		c.CancunTime = utils.PointerTo(*etna)
 	}
 	return nil
 }

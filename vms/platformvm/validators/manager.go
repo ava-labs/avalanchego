@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -250,19 +250,6 @@ func (m *manager) GetWarpValidatorSets(
 		validatorSets[subnetID] = ws
 	}
 	return validatorSets, nil
-}
-
-func (m *manager) GetWarpValidatorSet(
-	ctx context.Context,
-	targetHeight uint64,
-	subnetID ids.ID,
-) (validators.WarpSet, error) {
-	vdrSet, err := m.GetValidatorSet(ctx, targetHeight, subnetID)
-	if err != nil {
-		return validators.WarpSet{}, err
-	}
-
-	return validators.FlattenValidatorSet(vdrSet)
 }
 
 func (m *manager) GetValidatorSet(

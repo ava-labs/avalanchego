@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -238,9 +238,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		// Signs warp messages
 		WarpSigner: warpSignerClient,
 
-		// The validator state is cached to avoid the gRPC overhead after
-		// epoching is activated.
-		ValidatorState: validators.NewCachedState(validatorStateClient, networkUpgrades.GraniteTime),
+		// The validator state is cached to avoid the gRPC overhead.
+		ValidatorState: validators.NewCachedState(validatorStateClient),
 		// TODO: support remaining snowman++ fields
 
 		ChainDataDir: req.ChainDataDir,

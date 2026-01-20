@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -690,6 +690,11 @@ func TestPrecompileBind(t *testing.T) {
 	require.NoError(t, err, "failed to replace binding test dependency to current source tree: %v\n%s", err, out)
 
 	replacer = exec.Command(gocmd, "mod", "edit", "-x", "-require", "github.com/ava-labs/avalanchego/graft/evm@v0.0.0", "-replace", "github.com/ava-labs/avalanchego/graft/evm="+filepath.Join(pwd, "..", "..", "..", "..", "..", "evm"))
+	replacer.Dir = pkg
+	out, err = replacer.CombinedOutput()
+	require.NoError(t, err, "failed to replace binding test dependency to current source tree: %v\n%s", err, out)
+
+	replacer = exec.Command(gocmd, "mod", "edit", "-x", "-require", "github.com/ava-labs/avalanchego@v0.0.0", "-replace", "github.com/ava-labs/avalanchego="+filepath.Join(pwd, "..", "..", "..", "..", "..", ".."))
 	replacer.Dir = pkg
 	out, err = replacer.CombinedOutput()
 	require.NoError(t, err, "failed to replace binding test dependency to current source tree: %v\n%s", err, out)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package customtypes
@@ -10,11 +10,11 @@ import (
 	"unsafe"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
@@ -37,21 +37,21 @@ func TestBlockGetters(t *testing.T) {
 			name: "fields_set",
 			headerExtra: &HeaderExtra{
 				BlockGasCost:     big.NewInt(2),
-				TimeMilliseconds: utils.NewUint64(3),
-				MinDelayExcess:   utilstest.PointerTo(acp226.DelayExcess(4)),
+				TimeMilliseconds: utils.PointerTo[uint64](3),
+				MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
 			},
 			wantBlockGasCost:     big.NewInt(2),
-			wantTimeMilliseconds: utils.NewUint64(3),
-			wantMinDelayExcess:   utilstest.PointerTo(acp226.DelayExcess(4)),
+			wantTimeMilliseconds: utils.PointerTo[uint64](3),
+			wantMinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			header := WithHeaderExtra(&Header{}, test.headerExtra)
+			header := WithHeaderExtra(&types.Header{}, test.headerExtra)
 
-			block := NewBlock(header, nil, nil, nil, blocktest.NewHasher())
+			block := types.NewBlock(header, nil, nil, nil, blocktest.NewHasher())
 
 			blockGasCost := BlockGasCost(block)
 			require.Equal(t, test.wantBlockGasCost, blockGasCost, "BlockGasCost()")
@@ -71,14 +71,14 @@ func TestCopyHeader(t *testing.T) {
 	t.Run("empty_header", func(t *testing.T) {
 		t.Parallel()
 
-		empty := &Header{}
+		empty := &types.Header{}
 
 		headerExtra := &HeaderExtra{}
 		extras.Header.Set(empty, headerExtra)
 
-		cpy := CopyHeader(empty)
+		cpy := types.CopyHeader(empty)
 
-		want := &Header{
+		want := &types.Header{
 			Difficulty: new(big.Int),
 			Number:     new(big.Int),
 		}
@@ -94,7 +94,7 @@ func TestCopyHeader(t *testing.T) {
 
 		header, _ := headerWithNonZeroFields() // the header carries the [HeaderExtra] so we can ignore it
 
-		gotHeader := CopyHeader(header)
+		gotHeader := types.CopyHeader(header)
 		gotExtra := GetHeaderExtra(gotHeader)
 
 		wantHeader, wantExtra := headerWithNonZeroFields()
@@ -107,7 +107,7 @@ func TestCopyHeader(t *testing.T) {
 }
 
 func exportedFieldsPointToDifferentMemory[T interface {
-	Header | HeaderExtra
+	types.Header | HeaderExtra
 }](t *testing.T, original, cpy *T) {
 	t.Helper()
 
