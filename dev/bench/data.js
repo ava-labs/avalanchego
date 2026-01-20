@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1768922904040,
+  "lastUpdate": 1768952866404,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -3242,6 +3242,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
             "value": 62.85059984398499,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Sam Liokumovich",
+            "username": "samliok",
+            "email": "65994425+samliok@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "ac3fab802c5d0d5a5f37636c03aa9e25e20fa08b",
+          "message": "Simplex nits & bug fixes (#4885)",
+          "timestamp": "2026-01-20T21:06:42Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/ac3fab802c5d0d5a5f37636c03aa9e25e20fa08b"
+        },
+        "date": 1768952864166,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-archive-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - mgas/s",
+            "value": 78.65065511019935,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-archive-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - ms/ggas",
+            "value": 12714.452264877838,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-archive-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_parse_ms/ggas",
+            "value": 65.14641595093077,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-archive-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_verify_ms/ggas",
+            "value": 12602.741562067651,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-archive-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_accept_ms/ggas",
+            "value": 45.25260569862037,
             "unit": "block_accept_ms/ggas"
           }
         ]
