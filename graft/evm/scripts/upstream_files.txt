@@ -1,0 +1,4 @@
+core/*
+triedb/*
+
+!core/state/snapshot/snapshot_ext.go

@@ -14,10 +14,11 @@ import (
 	"unsafe"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
@@ -65,7 +66,7 @@ func testHeaderEncodeDecode(
 	encoded, err := encode(input)
 	require.NoError(t, err, "encode")
 
-	gotHeader := new(Header)
+	gotHeader := new(types.Header)
 	err = decode(encoded, gotHeader)
 	require.NoError(t, err, "decode")
 	gotExtra := GetHeaderExtra(gotHeader)
@@ -93,15 +94,15 @@ func TestHeaderWithNonZeroFields(t *testing.T) {
 // NOTE: They can be used to demonstrate that RLP and JSON round-trip encoding
 // can recover all fields, but not that the encoded format is correct. This is
 // very important as the RLP encoding of a [Header] defines its hash.
-func headerWithNonZeroFields() (*Header, *HeaderExtra) {
-	header := &Header{
+func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
+	header := &types.Header{
 		ParentHash:       common.Hash{1},
 		UncleHash:        common.Hash{2},
 		Coinbase:         common.Address{3},
 		Root:             common.Hash{4},
 		TxHash:           common.Hash{5},
 		ReceiptHash:      common.Hash{6},
-		Bloom:            Bloom{7},
+		Bloom:            types.Bloom{7},
 		Difficulty:       big.NewInt(8),
 		Number:           big.NewInt(9),
 		GasLimit:         10,
@@ -109,23 +110,23 @@ func headerWithNonZeroFields() (*Header, *HeaderExtra) {
 		Time:             12,
 		Extra:            []byte{13},
 		MixDigest:        common.Hash{14},
-		Nonce:            BlockNonce{15},
+		Nonce:            types.BlockNonce{15},
 		BaseFee:          big.NewInt(16),
 		WithdrawalsHash:  &common.Hash{17},
-		BlobGasUsed:      utilstest.PointerTo(uint64(18)),
-		ExcessBlobGas:    utilstest.PointerTo(uint64(19)),
+		BlobGasUsed:      utils.PointerTo[uint64](18),
+		ExcessBlobGas:    utils.PointerTo[uint64](19),
 		ParentBeaconRoot: &common.Hash{20},
 	}
 	extra := &HeaderExtra{
 		BlockGasCost:     big.NewInt(23),
-		TimeMilliseconds: utilstest.PointerTo(uint64(24)),
-		MinDelayExcess:   utilstest.PointerTo(acp226.DelayExcess(25)),
+		TimeMilliseconds: utils.PointerTo[uint64](24),
+		MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(25)),
 	}
 	return WithHeaderExtra(header, extra), extra
 }
 
 func allFieldsSet[T interface {
-	Header | HeaderExtra
+	types.Header | HeaderExtra
 }](t *testing.T, x *T, ignoredFields ...string) {
 	// We don't test for nil pointers because we're only confirming that
 	// test-input data is well-formed. A panic due to a dereference will be
@@ -153,9 +154,9 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case common.Address:
 				assertNonZero(t, f)
-			case BlockNonce:
+			case types.BlockNonce:
 				assertNonZero(t, f)
-			case Bloom:
+			case types.Bloom:
 				assertNonZero(t, f)
 			case uint64:
 				assertNonZero(t, f)
@@ -167,11 +168,11 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *[]uint8:
 				assertNonZero(t, f)
-			case *Header:
+			case *types.Header:
 				assertNonZero(t, f)
 			case *acp226.DelayExcess:
 				assertNonZero(t, f)
-			case []uint8, []*Header, Transactions, []*Transaction, Withdrawals, []*Withdrawal:
+			case []uint8, []*types.Header, types.Transactions, []*types.Transaction, types.Withdrawals, []*types.Withdrawal:
 				require.NotEmpty(t, f)
 			default:
 				require.Failf(t, "Field has unsupported type", "Field %q has unsupported type %T", field.Name, f)
@@ -181,8 +182,8 @@ func allFieldsSet[T interface {
 }
 
 func assertNonZero[T interface {
-	common.Hash | common.Address | BlockNonce | uint32 | uint64 | Bloom |
-		*big.Int | *common.Hash | *uint64 | *[]uint8 | *Header | *acp226.DelayExcess
+	common.Hash | common.Address | types.BlockNonce | uint32 | uint64 | types.Bloom |
+		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)

@@ -8,7 +8,6 @@ import (
 	"errors"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -19,16 +18,17 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
-	synccommon "github.com/ava-labs/avalanchego/graft/coreth/sync"
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 var (
@@ -42,18 +42,18 @@ type ExtensibleVM interface {
 	// SetExtensionConfig sets the configuration for the VM extension
 	// Should be called before any other method and only once
 	SetExtensionConfig(config *Config) error
-	// NewClient returns a client to send messages with for the given protocol
-	NewClient(protocol uint64) *p2p.Client
-	// AddHandler registers a server handler for an application protocol
-	AddHandler(protocol uint64, handler p2p.Handler) error
 	// SetLastAcceptedBlock sets the last accepted block
 	SetLastAcceptedBlock(lastAcceptedBlock snowman.Block) error
+	// PutLastAcceptedID persists the last accepted block ID to the database
+	PutLastAcceptedID(id ids.ID) error
 	// GetExtendedBlock returns the ExtendedBlock for the given ID or an error if the block is not found
 	GetExtendedBlock(context.Context, ids.ID) (ExtendedBlock, error)
 	// LastAcceptedExtendedBlock returns the last accepted VM block
 	LastAcceptedExtendedBlock() ExtendedBlock
 	// ChainConfig returns the chain config for the VM
 	ChainConfig() *params.ChainConfig
+	// P2PNetwork returns the network for the VM
+	P2PNetwork() *p2p.Network
 	// P2PValidators returns the validators for the network
 	P2PValidators() *p2p.Validators
 	// Ethereum returns the Ethereum service
@@ -67,7 +67,7 @@ type ExtensibleVM interface {
 	// VersionDB returns the versioned database for the VM
 	VersionDB() *versiondb.Database
 	// SyncerClient returns the syncer client for the VM
-	SyncerClient() vmsync.Client
+	SyncerClient() engine.Client
 }
 
 // InnerVM is the interface that must be implemented by the VM
@@ -83,7 +83,7 @@ type InnerVM interface {
 // ExtendedBlock is a block that can be used by the extension
 type ExtendedBlock interface {
 	snowman.Block
-	GetEthBlock() *types.Block
+	GetEthBlock() *ethtypes.Block
 	GetBlockExtension() BlockExtension
 }
 
@@ -140,10 +140,10 @@ type Config struct {
 	// SyncSummaryProvider is the sync summary provider to use
 	// for the VM to be used in syncer.
 	// It's required and should be non-nil
-	SyncSummaryProvider synccommon.SummaryProvider
+	SyncSummaryProvider types.SummaryProvider
 	// SyncExtender can extend the syncer to handle custom sync logic.
 	// It's optional and can be nil
-	SyncExtender synccommon.Extender
+	SyncExtender types.Extender
 	// SyncableParser is to parse summary messages from the network.
 	// It's required and should be non-nil
 	SyncableParser message.SyncableParser

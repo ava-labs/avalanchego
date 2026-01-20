@@ -11,7 +11,6 @@ node/*
 params/config.go
 params/config_test.go
 params/denomination.go
-params/network_params.go
 params/version.go
 plugin/evm/customtypes/block_test.go
 plugin/evm/customtypes/hashing_test.go
@@ -22,7 +21,6 @@ signer/*
 tests/init.go
 tests/rlp_test_util.go
 tests/state_test_util.go
-triedb/*
 
 !accounts/abi/abi_extra_test.go
 !accounts/abi/bind/bind_extra.go
@@ -46,8 +44,6 @@ triedb/*
 !core/main_test.go
 !core/predicate_check.go
 !core/predicate_check_test.go
-!core/state/snapshot/snapshot_ext.go
-!core/state/trie_prefetcher_extra_test.go
 !core/state_manager_test.go
 !core/state_processor_ext.go
 !core/state_processor_ext_test.go
@@ -57,4 +53,3 @@ triedb/*
 !ethclient/client_interface_test.go
 !internal/ethapi/api_extra.go
 !internal/ethapi/api_extra_test.go
-!triedb/firewood/*
