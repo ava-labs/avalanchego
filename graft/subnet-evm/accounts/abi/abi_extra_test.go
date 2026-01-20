@@ -56,10 +56,6 @@ func TestUnpackInputIntoInterface(t *testing.T) {
 			name:              "Valid input data with extra padding indivisible by 32",
 			extraPaddingBytes: 33,
 		},
-		{
-			name:              "Valid input data with extra padding indivisible by 32, no strict mode",
-			extraPaddingBytes: 33,
-		},
 	} {
 		{
 			t.Run(test.name, func(t *testing.T) {
