@@ -483,8 +483,17 @@ var (
 				require.NoError(t, err)
 				return append(input, []byte{0, 0}...)
 			},
-			SuppliedGas: rewardmanager.SetRewardAddressGasCost,
+			SuppliedGas: rewardmanager.SetRewardAddressGasCost + rewardmanager.RewardAddressChangedEventGasCost,
 			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
+				address, isFeeRecipients := rewardmanager.GetStoredRewardAddress(state)
+				require.Equal(t, rewardAddress, address)
+				require.False(t, isFeeRecipients)
+
+				logs := state.Logs()
+				assertRewardAddressChanged(t, logs, allowlisttest.TestEnabledAddr, common.Address{}, rewardAddress)
+			},
 		},
 	}
 )
