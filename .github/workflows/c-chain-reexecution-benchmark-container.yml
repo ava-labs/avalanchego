@@ -131,3 +131,11 @@ jobs:
           path: ${{ github.workspace }}/benchmark-output.txt
           retention-days: 30
           if-no-files-found: error
+      - name: Upload pprof data
+        if: matrix.firewood-ref != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pprof
+          path: ${{ github.workspace }}/pprof/
+          retention-days: 30
+          if-no-files-found: warn

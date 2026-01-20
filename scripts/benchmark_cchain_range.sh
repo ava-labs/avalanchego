@@ -162,8 +162,11 @@ echo "=== C-Chain Re-execution: ${TEST_NAME:-custom} ==="
 echo "Blocks: ${START_BLOCK} - ${END_BLOCK}"
 echo "Config: ${CONFIG:-default}"
 
+mkdir -p pprof
+
 echo "=== Running re-execution ==="
-go run github.com/ava-labs/avalanchego/tests/reexecute/c \
+time go run github.com/ava-labs/avalanchego/tests/reexecute/c \
+  --pprof-dir="./pprof" \
   --block-dir="${BLOCK_DIR}" \
   --current-state-dir="${CURRENT_STATE_DIR}" \
   ${RUNNER_TYPE:+--runner="${RUNNER_TYPE}"} \
