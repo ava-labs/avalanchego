@@ -409,6 +409,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		"invalid snowball consensus parameters": {
 			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{
+				"validatorOnly": true,
 				"snowballParameters": {
 					"k": 111,
 					"alphaPreference": 1234

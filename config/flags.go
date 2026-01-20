@@ -318,7 +318,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// Simplex Consensus
 	fs.Duration(SimplexMaxProposalWaitKey, simplex.DefaultParameters.MaxProposalWait, "Time to wait for a block to undergo consensus before failing over so a different node will propose a block")
-	fs.Duration(SimplexMaxRebroadcastWaitKey, simplex.DefaultParameters.MaxRebroadcastWait, "ime to retry message transmission in case of network instability")
+	fs.Duration(SimplexMaxRebroadcastWaitKey, simplex.DefaultParameters.MaxRebroadcastWait, "Time to retry message transmission in case of network instability")
 
 	// ProposerVM
 	fs.Bool(ProposerVMUseCurrentHeightKey, false, "Have the ProposerVM always report the last accepted P-chain block height")

@@ -306,4 +306,3 @@ func TestStorageIndexSuccess(t *testing.T) {
 
 	require.Equal(t, uint64(numBlocks+1), s.NumBlocks())
 }
-

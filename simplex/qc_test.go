@@ -298,4 +298,3 @@ func TestFilterNodes(t *testing.T) {
 		})
 	}
 }
-
