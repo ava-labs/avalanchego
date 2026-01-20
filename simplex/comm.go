@@ -85,6 +85,11 @@ func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
 		return
 	}
 
+	if outboundMsg == nil {
+		c.logger.Debug("Outbound message is nil")
+		return
+	}
+
 	dest, err := ids.ToNodeID(destination)
 	if err != nil {
 		c.logger.Error("Failed to convert destination NodeID", zap.Error(err))
