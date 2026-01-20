@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesync
+package evmstate
 
 import (
 	"bytes"
@@ -23,12 +23,13 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
-	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 )
 
@@ -57,17 +58,17 @@ func testSync(t *testing.T, test syncTest) {
 
 	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverDB.TrieDB(), message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
-	mockClient := statesyncclient.NewTestClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
+	mockClient := client.NewTestClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
 	// Set intercept functions for the mock client
 	mockClient.GetLeafsIntercept = test.GetLeafsIntercept
 	mockClient.GetCodeIntercept = test.GetCodeIntercept
 
 	// Create the code fetcher.
-	fetcher, err := NewCodeQueue(clientEthDB, make(chan struct{}))
+	fetcher, err := code.NewQueue(clientEthDB, make(chan struct{}))
 	require.NoError(t, err, "failed to create code fetcher")
 
 	// Create the consumer code syncer.
-	codeSyncer, err := NewCodeSyncer(mockClient, clientEthDB, fetcher.CodeHashes())
+	codeSyncer, err := code.NewSyncer(mockClient, clientEthDB, fetcher.CodeHashes())
 	require.NoError(t, err, "failed to create code syncer")
 
 	// Create the state syncer.
@@ -421,6 +422,15 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 					require.NoError(t, clientDB.DiskDB().Delete(it.Key()), "failed to delete code hash %x", it.Key()[len(rawdb.CodePrefix):])
 				}
 				require.NoError(t, it.Error(), "error iterating over code hashes")
+
+				// delete code-to-fetch markers to avoid syncer trying to fetch old code
+				codeToFetchIt := customrawdb.NewCodeToFetchIterator(clientDB.DiskDB())
+				defer codeToFetchIt.Release()
+				for codeToFetchIt.Next() {
+					codeHash := common.BytesToHash(codeToFetchIt.Key()[len(customrawdb.CodeToFetchPrefix):])
+					require.NoError(t, customrawdb.DeleteCodeToFetch(clientDB.DiskDB(), codeHash), "failed to delete code-to-fetch marker for hash %x", codeHash)
+				}
+				require.NoError(t, codeToFetchIt.Error(), "error iterating over code-to-fetch markers")
 			},
 		},
 		"delete intermediate storage nodes": {

@@ -1122,7 +1122,7 @@ func (m *manager) createSnowmanChain(
 
 		// Wrap the validator state with a cached state so that P-chain lookups
 		// are cached.
-		valState = validators.NewCachedState(valState, m.Upgrades.GraniteTime)
+		valState = validators.NewCachedState(valState)
 
 		if m.TracingEnabled {
 			valState = validators.Trace(valState, "platformvm", m.Tracer)
@@ -1141,7 +1141,7 @@ func (m *manager) createSnowmanChain(
 
 		// Wrap the validator state with a cached state so that the P-chain lock
 		// isn't grabbed when lookups are cached.
-		valState = validators.NewCachedState(valState, m.Upgrades.GraniteTime)
+		valState = validators.NewCachedState(valState)
 
 		if !m.ManagerConfig.SybilProtectionEnabled {
 			valState = validators.NewNoValidatorsState(valState)
