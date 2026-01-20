@@ -51,7 +51,7 @@ func NewEVM(
 func (e *evmDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
 	nextKey, err := e.db.CommitRangeProof(ctx, start, end, proof)
 	if err != nil {
-		return nextKey, err
+		return maybe.Nothing[[]byte](), err
 	}
 	var codeHashes []common.Hash //nolint:prealloc // we don't know how many there will be
 	for h, err := range proof.rp.CodeHashes() {

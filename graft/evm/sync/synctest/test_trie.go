@@ -187,7 +187,8 @@ func FillAccounts(
 			acc = onAccount(t, i, key.Address, acc, storageTr)
 			root, nodes, err := storageTr.Commit(false)
 			require.NoError(t, err)
-			if root != types.EmptyRootHash && nodes != nil {
+			// If the storage trie was used, update the account's storage root and pass nodes to TrieDB.
+			if nodes != nil {
 				require.NoError(t, mergedSet.Merge(nodes))
 				acc.Root = root
 			}
