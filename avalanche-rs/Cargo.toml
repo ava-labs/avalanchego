@@ -4,6 +4,8 @@ members = [
     "crates/avalanche-ids",
     "crates/avalanche-codec",
     "crates/avalanche-utils",
+    "crates/avalanche-proto",
+    "crates/avalanche-net",
 ]
 
 [workspace.package]
@@ -18,20 +20,31 @@ rust-version = "1.75"
 avalanche-ids = { path = "crates/avalanche-ids" }
 avalanche-codec = { path = "crates/avalanche-codec" }
 avalanche-utils = { path = "crates/avalanche-utils" }
+avalanche-proto = { path = "crates/avalanche-proto" }
+avalanche-net = { path = "crates/avalanche-net" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 async-trait = "0.1"
+futures = "0.3"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 bytes = "1"
+prost = "0.12"
 
 # Cryptography
 sha2 = "0.10"
 ripemd = "0.1"
 bs58 = "0.5"
+rustls = "0.22"
+tokio-rustls = "0.25"
+x509-parser = "0.16"
+
+# Compression
+zstd = "0.13"
 
 # Error handling
 thiserror = "1"
@@ -46,6 +59,8 @@ hex = "0.4"
 rand = "0.8"
 parking_lot = "0.12"
 chrono = { version = "0.4", features = ["serde"] }
+dashmap = "5"
+tokio-stream = "0.1"
 
 # Testing
 proptest = "1"
