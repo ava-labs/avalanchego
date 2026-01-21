@@ -16,7 +16,7 @@
 #
 # References (from avalanchego/ root):
 #   - avalanchego/graft/.golangci.yml: Shared lint config for graft modules
-#   - avalanchego/tools/go.mod: Avalanchego tools module
+#   - avalanchego/tools/external/go.mod: Avalanchego tools module
 #   - avalanchego/.golangci.yml: Avalanchego lint config
 #   - avalanchego/header.yml: Default license header
 #   - avalanchego/header_upstream.yml: Upstream license header
@@ -51,7 +51,7 @@ source "$SCRIPT_DIR/lint_setup.sh"
 TESTS=${TESTS:-"golangci_lint avalanche_golangci_lint warn_testify_assert license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
-  go tool -modfile=../../tools/go.mod golangci-lint run --config ../.golangci.yml
+  go tool -modfile=../../tools/external/go.mod golangci-lint run --config ../.golangci.yml
 }
 
 function test_avalanche_golangci_lint {
@@ -59,7 +59,7 @@ function test_avalanche_golangci_lint {
     return 0
   fi
 
-  go tool -modfile=../../tools/go.mod golangci-lint run \
+  go tool -modfile=../../tools/external/go.mod golangci-lint run \
   --config "$AVALANCHE_LINT_FILE" \
   || return 1
 }
@@ -77,7 +77,7 @@ function test_license_header {
   if [[ ${#UPSTREAM_FILES[@]} -gt 0 ]]; then
     echo "Running license tool on upstream files with header for upstream..."
     # shellcheck disable=SC2086
-    go tool -modfile=../../tools/go.mod go-license \
+    go tool -modfile=../../tools/external/go.mod go-license \
       --config=../../header_upstream.yml \
       ${_addlicense_flags} \
       "${UPSTREAM_FILES[@]}" \
@@ -87,7 +87,7 @@ function test_license_header {
   if [[ ${#AVALANCHE_FILES[@]} -gt 0 ]]; then
     echo "Running license tool on remaining files with default header..."
     # shellcheck disable=SC2086
-    go tool -modfile=../../tools/go.mod go-license \
+    go tool -modfile=../../tools/external/go.mod go-license \
       --config=../../header.yml \
       ${_addlicense_flags} \
       "${AVALANCHE_FILES[@]}" \

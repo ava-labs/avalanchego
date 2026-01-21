@@ -1,16 +1,16 @@
 module github.com/ava-labs/avalanchego/graft/subnet-evm
 
 // CLI tools intended for invocation with `go tool` should be added to
-// tools/go.mod to avoid polluting the main module's dependencies. See
+// tools/external/go.mod to avoid polluting the main module's dependencies. See
 // CONTRIBUTING.md for more details.
 
 // - Changes to the minimum golang version must also be replicated in:
 //   - go.mod (here)
-//   - tools/go.mod
+//   - tools/external/go.mod
 //   - RELEASES.md
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
-//   - Consider updating the version of golangci-lint (see tools/go.mod)
+//   - Consider updating the version of golangci-lint (see tools/external/go.mod)
 go 1.24.12
 
 require (
@@ -200,7 +200,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-// The following tools are managed here instead of in tools/go.mod
+// The following tools are managed here instead of in tools/external/go.mod
 // because they are already direct dependencies of the main module.
 tool (
 	github.com/ava-labs/libevm/rlp/rlpgen

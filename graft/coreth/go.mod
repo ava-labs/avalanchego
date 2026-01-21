@@ -1,7 +1,7 @@
 module github.com/ava-labs/avalanchego/graft/coreth
 
 // CLI tools intended for invocation with `go tool` should be added to
-// tools/go.mod to avoid polluting the main module's dependencies. See
+// tools/external/go.mod to avoid polluting the main module's dependencies. See
 // CONTRIBUTING.md for more details.
 
 // See ../../go.mod for guidelines on updating the Go version.
@@ -175,7 +175,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-// The following tools are managed here instead of in tools/go.mod
+// The following tools are managed here instead of in tools/external/go.mod
 // because they are already direct dependencies of the main module.
 tool (
 	github.com/ava-labs/libevm/rlp/rlpgen

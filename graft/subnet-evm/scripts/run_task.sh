@@ -6,5 +6,5 @@ set -euo pipefail
 if command -v task > /dev/null 2>&1; then
   exec task "${@}"
 else
-  go tool -modfile=../../tools/go.mod task "${@}"
+  go tool -modfile=../../tools/external/go.mod task "${@}"
 fi

@@ -17,7 +17,7 @@ function test_warn_testify_assert {
   local root_dir
   root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")"; cd .. && pwd)"
   local config_path="${root_dir}/.golangci-warn-assert.yml"
-  local tools_mod="${root_dir}/tools/go.mod"
+  local tools_mod="${root_dir}/tools/external/go.mod"
 
   local args=(
     --config "$config_path"
