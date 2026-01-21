@@ -146,8 +146,11 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())
 	}
+	if metrics.EnabledExpensive {
+		options = append(options, ffi.WithExpensiveMetrics())
+	}
 
-	fw, err := ffi.New(path, options...)
+	fw, err := ffi.New(path, ffi.EthereumNodeHashing, options...)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
@@ -419,7 +422,7 @@ func (ps *proposals) findProposalToCommitWhenLocked(root common.Hash) (*proposal
 }
 
 // createProposal creates a new proposal from the given layer
-func (t *TrieDB) createProposal(parent *proposal, keys, values [][]byte) (*proposal, error) {
+func (t *TrieDB) createProposal(parent *proposal, ops []ffi.BatchOp) (*proposal, error) {
 	propose := t.Firewood.Propose
 	if h := parent.handle; h != nil {
 		propose = h.Propose
@@ -427,7 +430,7 @@ func (t *TrieDB) createProposal(parent *proposal, keys, values [][]byte) (*propo
 	} else {
 		proposeOnDiskCount.Inc(1)
 	}
-	handle, err := propose(keys, values)
+	handle, err := propose(ops)
 	if err != nil {
 		return nil, fmt.Errorf("create proposal from parent root %s: %w", parent.root.Hex(), err)
 	}
@@ -514,16 +517,12 @@ func (ps *proposals) removeProposalFromMap(meta *proposalMeta, drop bool) {
 // createProposals calculates the hash if the set of keys and values are
 // proposed from the given parent root.
 // All proposals created will be tracked for future use.
-func (t *TrieDB) createProposals(parentRoot common.Hash, keys, values [][]byte) (common.Hash, error) {
+func (t *TrieDB) createProposals(parentRoot common.Hash, ops []ffi.BatchOp) (common.Hash, error) {
 	start := time.Now()
 	defer func() {
 		hashTimer.Inc(time.Since(start).Milliseconds())
 		hashCount.Inc(1)
 	}()
-
-	if len(keys) != len(values) {
-		return common.Hash{}, fmt.Errorf("keys and values must have the same length, got %d keys and %d values", len(keys), len(values))
-	}
 
 	// Must prevent a simultaneous `Commit`, as it alters the proposal tree/disk state.
 	t.proposals.Lock()
@@ -535,7 +534,7 @@ func (t *TrieDB) createProposals(parentRoot common.Hash, keys, values [][]byte) 
 	)
 	if t.proposals.tree.root == parentRoot {
 		// Propose from the database root.
-		p, err := t.createProposal(t.proposals.tree, keys, values)
+		p, err := t.createProposal(t.proposals.tree, ops)
 		if err != nil {
 			return common.Hash{}, fmt.Errorf("proposing from root %s: %w", parentRoot.Hex(), err)
 		}
@@ -550,7 +549,7 @@ func (t *TrieDB) createProposals(parentRoot common.Hash, keys, values [][]byte) 
 	// Since we are only using the proposal to find the root hash,
 	// we can use the first proposal found.
 	for _, parent := range t.proposals.byStateRoot[parentRoot] {
-		p, err := t.createProposal(parent, keys, values)
+		p, err := t.createProposal(parent, ops)
 		if err != nil {
 			return common.Hash{}, fmt.Errorf("proposing from root %s: %w", parentRoot.Hex(), err)
 		}

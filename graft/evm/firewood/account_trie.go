@@ -6,6 +6,7 @@ package firewood
 import (
 	"errors"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -31,14 +32,13 @@ var _ state.Trie = (*accountTrie)(nil)
 //
 // Note this is not concurrent safe.
 type accountTrie struct {
-	fw           *TrieDB
-	parentRoot   common.Hash
-	root         common.Hash
-	reader       database.Reader
-	dirtyKeys    map[string][]byte // Store dirty changes
-	updateKeys   [][]byte
-	updateValues [][]byte
-	hasChanges   bool
+	fw         *TrieDB
+	parentRoot common.Hash
+	root       common.Hash
+	reader     database.Reader
+	dirtyKeys  map[string][]byte // Store dirty changes
+	updateOps  []ffi.BatchOp
+	hasChanges bool
 }
 
 func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
@@ -139,8 +139,7 @@ func (a *accountTrie) UpdateAccount(addr common.Address, account *types.StateAcc
 		return err
 	}
 	a.dirtyKeys[string(key)] = data
-	a.updateKeys = append(a.updateKeys, key)
-	a.updateValues = append(a.updateValues, data)
+	a.updateOps = append(a.updateOps, ffi.Put(key, data))
 	a.hasChanges = true // Mark that there are changes to commit
 	return nil
 }
@@ -161,8 +160,7 @@ func (a *accountTrie) UpdateStorage(addr common.Address, key []byte, value []byt
 
 	// Queue the keys and values for later commit
 	a.dirtyKeys[string(combinedKey[:])] = data
-	a.updateKeys = append(a.updateKeys, combinedKey[:])
-	a.updateValues = append(a.updateValues, data)
+	a.updateOps = append(a.updateOps, ffi.Put(combinedKey[:], data))
 	a.hasChanges = true // Mark that there are changes to commit
 	return nil
 }
@@ -172,9 +170,8 @@ func (a *accountTrie) DeleteAccount(addr common.Address) error {
 	key := crypto.Keccak256Hash(addr.Bytes()).Bytes()
 	// Queue the key for deletion
 	a.dirtyKeys[string(key)] = nil
-	a.updateKeys = append(a.updateKeys, key)
-	a.updateValues = append(a.updateValues, nil) // Must use nil to indicate deletion
-	a.hasChanges = true                          // Mark that there are changes to commit
+	a.updateOps = append(a.updateOps, ffi.PrefixDelete(key)) // Remove all storage
+	a.hasChanges = true                                      // Mark that there are changes to commit
 	return nil
 }
 
@@ -188,9 +185,8 @@ func (a *accountTrie) DeleteStorage(addr common.Address, key []byte) error {
 
 	// Queue the key for deletion
 	a.dirtyKeys[string(combinedKey[:])] = nil
-	a.updateKeys = append(a.updateKeys, combinedKey[:])
-	a.updateValues = append(a.updateValues, nil) // Must use nil to indicate deletion
-	a.hasChanges = true                          // Mark that there are changes to commit
+	a.updateOps = append(a.updateOps, ffi.Delete(combinedKey[:]))
+	a.hasChanges = true // Mark that there are changes to commit
 	return nil
 }
 
@@ -211,7 +207,7 @@ func (a *accountTrie) Hash() common.Hash {
 func (a *accountTrie) hash() (common.Hash, error) {
 	// If we haven't already hashed, we need to do so.
 	if a.hasChanges {
-		root, err := a.fw.createProposals(a.parentRoot, a.updateKeys, a.updateValues)
+		root, err := a.fw.createProposals(a.parentRoot, a.updateOps)
 		if err != nil {
 			return common.Hash{}, err
 		}
@@ -269,14 +265,13 @@ func (*accountTrie) Prove([]byte, ethdb.KeyValueWriter) error {
 func (a *accountTrie) Copy() *accountTrie {
 	// Create a new AccountTrie with the same root and reader
 	newTrie := &accountTrie{
-		fw:           a.fw,
-		parentRoot:   a.parentRoot,
-		root:         a.root,
-		reader:       a.reader, // Share the same reader
-		hasChanges:   a.hasChanges,
-		dirtyKeys:    make(map[string][]byte, len(a.dirtyKeys)),
-		updateKeys:   make([][]byte, len(a.updateKeys)),
-		updateValues: make([][]byte, len(a.updateValues)),
+		fw:         a.fw,
+		parentRoot: a.parentRoot,
+		root:       a.root,
+		reader:     a.reader, // Share the same reader
+		hasChanges: a.hasChanges,
+		dirtyKeys:  make(map[string][]byte, len(a.dirtyKeys)),
+		updateOps:  make([]ffi.BatchOp, len(a.updateOps)),
 	}
 
 	// Deep copy dirtyKeys map
@@ -284,11 +279,8 @@ func (a *accountTrie) Copy() *accountTrie {
 		newTrie.dirtyKeys[k] = append([]byte{}, v...)
 	}
 
-	// Deep copy updateKeys and updateValues slices
-	for i := range a.updateKeys {
-		newTrie.updateKeys[i] = append([]byte{}, a.updateKeys[i]...)
-		newTrie.updateValues[i] = append([]byte{}, a.updateValues[i]...)
-	}
+	// Copy updateOps slice
+	newTrie.updateOps = append([]ffi.BatchOp{}, a.updateOps...)
 
 	return newTrie
 }
