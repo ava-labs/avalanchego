@@ -34,7 +34,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -383,18 +382,8 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	if _, err := statedb.Commit(0, false, stateconf.WithTrieDBUpdateOpts(triedbOpt)); err != nil {
 		panic(fmt.Sprintf("unable to commit genesis block to statedb: %v", err))
 	}
-
-	// Firewood requires `Update` and `Commit`, even if the state is empty.
-	_, isFirewood := triedb.Backend().(*firewood.TrieDB)
-	if root == types.EmptyRootHash && isFirewood {
-		// Ensure the Firewood TrieDB is aware of the genesis block.
-		if err := triedb.Update(types.EmptyRootHash, types.EmptyRootHash, 0, nil, nil, triedbOpt); err != nil {
-			panic(fmt.Sprintf("unable to update firewood triedb with genesis block: %v", err))
-		}
-	}
-
 	// Commit newly generated states into disk if it's not empty.
-	if root != types.EmptyRootHash || isFirewood {
+	if root != types.EmptyRootHash {
 		if err := triedb.Commit(root, true); err != nil {
 			panic(fmt.Sprintf("unable to commit genesis block: %v", err))
 		}

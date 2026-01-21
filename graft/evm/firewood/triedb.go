@@ -294,6 +294,13 @@ func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.Mer
 	defer t.proposals.Unlock()
 
 	p, ok := t.possible[possibleKey{parentBlockHash: parentBlockHash, root: root}]
+	// It's possible that we are committing a proposal on top of an empty genesis block in testing.
+	// In this case, we can still find the proposal by looking for the empty block hash
+	if !ok && height == 1 && parent == types.EmptyRootHash {
+		p, ok = t.possible[possibleKey{parentBlockHash: common.Hash{}, root: root}]
+		p.height = 1
+		p.parent.blockHashes[parentBlockHash] = struct{}{}
+	}
 	if !ok {
 		return fmt.Errorf("%w for block %d, root %s, hash %s", errNoProposalFound, height, root.Hex(), blockHash.Hex())
 	}
