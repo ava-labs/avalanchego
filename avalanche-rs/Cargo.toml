@@ -6,6 +6,7 @@ members = [
     "crates/avalanche-utils",
     "crates/avalanche-proto",
     "crates/avalanche-net",
+    "crates/avalanche-db",
 ]
 
 [workspace.package]
@@ -22,6 +23,7 @@ avalanche-codec = { path = "crates/avalanche-codec" }
 avalanche-utils = { path = "crates/avalanche-utils" }
 avalanche-proto = { path = "crates/avalanche-proto" }
 avalanche-net = { path = "crates/avalanche-net" }
+avalanche-db = { path = "crates/avalanche-db" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -61,10 +63,12 @@ parking_lot = "0.12"
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = "5"
 tokio-stream = "0.1"
+lru = "0.12"
 
 # Testing
 proptest = "1"
 criterion = "0.5"
+tokio-test = "0.4"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

@@ -1,0 +1,38 @@
+[package]
+name = "avalanche-db"
+description = "Database layer for Avalanche Rust implementation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# Workspace dependencies
+avalanche-ids = { workspace = true }
+avalanche-codec = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+bytes = { workspace = true }
+
+# Cryptography (for PrefixDB hashing)
+sha2 = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Utilities
+parking_lot = { workspace = true }
+lru = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+tokio-test = { workspace = true }
+
+[lints]
+workspace = true
