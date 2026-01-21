@@ -1,0 +1,71 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/avalanche-ids",
+    "crates/avalanche-codec",
+    "crates/avalanche-utils",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "BSD-3-Clause"
+repository = "https://github.com/ava-labs/avalanche-rs"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Internal crates
+avalanche-ids = { path = "crates/avalanche-ids" }
+avalanche-codec = { path = "crates/avalanche-codec" }
+avalanche-utils = { path = "crates/avalanche-utils" }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytes = "1"
+
+# Cryptography
+sha2 = "0.10"
+ripemd = "0.1"
+bs58 = "0.5"
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utilities
+hex = "0.4"
+rand = "0.8"
+parking_lot = "0.12"
+chrono = { version = "0.4", features = ["serde"] }
+
+# Testing
+proptest = "1"
+criterion = "0.5"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+
+[profile.test]
+opt-level = 1
