@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"context"
@@ -42,52 +41,116 @@ func (t *testVM) HasBlock(_ context.Context, blkID ids.ID) error {
 
 // TestVerifierVerifyBlockHash tests that we are willing to sign payload.Hash
 // messages for accepted blocks
-func TestVerifierVerifyBlockHash(t *testing.T) {
+func TestVerifierVerify(t *testing.T) {
 	tests := []struct {
 		name string
 		vm   testVM
-		hash *warp.UnsignedMessage
-		want *common.AppError
+		offChainMsgs [][]byte
+		msg          *warp.UnsignedMessage
+		want         error
 	}{
 		{
 			name: "non-accepted block",
-			hash: func() *warp.UnsignedMessage {
-				p := &payload.Hash{Hash: ids.ID{1}}
-				warp.NewUnsignedMessage()
+			msg: func() *warp.UnsignedMessage {
+				p, err := payload.NewHash(ids.ID{1})
+				require.NoError(t, err)
 
-				return nil
+				msg, err := warp.NewUnsignedMessage(123, ids.ID{4, 5, 6}, p.Bytes())
+				require.NoError(t, err)
+
+				return msg
 			}(),
-			want: &common.AppError{Code: VerifyErrCode},
+			want: errVerify,
 		},
 		{
 			name: "accepted block",
 			vm:   testVM{blks: set.Of(ids.ID{1})},
-			hash: &payload.Hash{Hash: ids.ID{1}},
+			msg: func() *warp.UnsignedMessage {
+				p, err := payload.NewHash(ids.ID{1})
+				require.NoError(t, err)
+
+				msg, err := warp.NewUnsignedMessage(123, ids.ID{4, 5, 6}, p.Bytes())
+				require.NoError(t, err)
+
+				return msg
+			}(),
+		},
+		{
+			name: "off-chain message",
+			vm:   testVM{},
+			offChainMsgs: [][]byte{
+				func() []byte {
+					p, err := payload.NewAddressedCall([]byte{1, 2, 3}, []byte{4, 5, 6})
+					require.NoError(t, err)
+
+					msg, err := warp.NewUnsignedMessage(123, ids.ID{4, 5, 6}, p.Bytes())
+					require.NoError(t, err)
+
+					return msg.Bytes()
+				}(),
+			},
+			msg: func() *warp.UnsignedMessage {
+				p, err := payload.NewAddressedCall([]byte{1, 2, 3}, []byte{4, 5, 6})
+				require.NoError(t, err)
+
+				msg, err := warp.NewUnsignedMessage(123, ids.ID{4, 5, 6}, p.Bytes())
+				require.NoError(t, err)
+
+				return msg
+			}(),
+		},
+		{
+			name:         "unknown off-chain message",
+			vm:           testVM{},
+			offChainMsgs: [][]byte{},
+			msg: func() *warp.UnsignedMessage {
+				p, err := payload.NewAddressedCall([]byte{1, 2, 3}, []byte{4, 5, 6})
+				require.NoError(t, err)
+
+				msg, err := warp.NewUnsignedMessage(123, ids.ID{4, 5, 6}, p.Bytes())
+				require.NoError(t, err)
+
+				return msg
+			}(),
+			want: errVerify,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			networkID := uint32(123)
+			sourceChainID := ids.ID{4, 5, 6}
+
+			offChainMsgs, err := NewOffChainMessages(
+				networkID,
+				sourceChainID,
+				tt.offChainMsgs,
+			)
+			require.NoError(t, err)
+
+			db := NewDB(memdb.New())
+
 			v, err := NewVerifier(
 				&NoVerifier{},
 				&tt.vm,
-				NewDB(memdb.New()),
+				db,
+				offChainMsgs,
 				prometheus.NewRegistry(),
 			)
 			require.NoError(t, err)
 
-			got := v.Verify(t.Context(), tt.hash)
+			got := v.Verify(t.Context(), tt.msg)
 			require.ErrorIs(t, got, tt.want)
 		})
 	}
 }
 
-// TestBlockVerifierVerifyUnknown tests that all other messages are not signed
-func TestVerifierVerifyUnknown(t *testing.T) {
+// TestNoVerifier_Verify tests that messages are not signed
+func TestNoVerifier_Verify(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload payload.Payload
-		want    *common.AppError
+		want error
 	}{
 		{
 			// payload.Hash is guaranteed to never be passed to this function but
@@ -99,7 +162,7 @@ func TestVerifierVerifyUnknown(t *testing.T) {
 
 				return p
 			}(),
-			want: &common.AppError{Code: ParseErrCode},
+			want: errVerify,
 		},
 		{
 			name: "unknown message",
@@ -111,20 +174,120 @@ func TestVerifierVerifyUnknown(t *testing.T) {
 
 				return p
 			}(),
-			want: &common.AppError{Code: ParseErrCode},
+			want: errVerify,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bv, err := NewBlockVerifier(&testVM{}, prometheus.NewRegistry())
-			require.NoError(t, err)
-
-			got := bv.Verify(
+			v := &NoVerifier{}
+			got := v.Verify(
 				tt.payload,
 				prometheus.NewCounter(prometheus.CounterOpts{}),
 			)
+
 			require.ErrorIs(t, got, tt.want)
+		})
+	}
+}
+
+func TestNewOffChainMessages(t *testing.T) {
+	tests := []struct {
+		name    string
+		msgs    [][]byte
+		wantErr error
+	}{
+		{
+			name: "nil",
+		},
+		{
+			name: "empty",
+			msgs: [][]byte{},
+		},
+		{
+			name: "addressed call",
+			msgs: [][]byte{
+				func() []byte {
+					p, err := payload.NewAddressedCall([]byte{1}, []byte{2})
+					require.NoError(t, err)
+
+					msg, err := warp.NewUnsignedMessage(1, ids.ID{2}, p.Bytes())
+					require.NoError(t, err)
+
+					return msg.Bytes()
+				}(),
+			},
+		},
+		{
+			name: "invalid message",
+			msgs: [][]byte{
+				[]byte("foobar"),
+			},
+			wantErr: errInvalidMessage,
+		},
+		{
+			name: "invalid network id",
+			msgs: [][]byte{
+				func() []byte {
+					p, err := payload.NewAddressedCall([]byte{1}, []byte{2})
+					require.NoError(t, err)
+
+					msg, err := warp.NewUnsignedMessage(0, ids.ID{2}, p.Bytes())
+					require.NoError(t, err)
+
+					return msg.Bytes()
+				}(),
+			},
+			wantErr: errInvalidNetworkID,
+		},
+		{
+			name: "invalid source chain id",
+			msgs: [][]byte{
+				func() []byte {
+					p, err := payload.NewAddressedCall([]byte{1}, []byte{2})
+					require.NoError(t, err)
+
+					msg, err := warp.NewUnsignedMessage(1, ids.ID{0}, p.Bytes())
+					require.NoError(t, err)
+
+					return msg.Bytes()
+				}(),
+			},
+			wantErr: errInvalidSourceChainID,
+		},
+		{
+			name: "hash",
+			msgs: [][]byte{
+				func() []byte {
+					p, err := payload.NewHash(ids.ID{1})
+					require.NoError(t, err)
+
+					msg, err := warp.NewUnsignedMessage(1, ids.ID{2}, p.Bytes())
+					require.NoError(t, err)
+
+					return msg.Bytes()
+				}(),
+			},
+			wantErr: errInvalidPayload,
+		},
+		{
+			name: "invalid payload",
+			msgs: [][]byte{
+				func() []byte {
+					msg, err := warp.NewUnsignedMessage(1, ids.ID{2}, []byte("foobar"))
+					require.NoError(t, err)
+
+					return msg.Bytes()
+				}(),
+			},
+			wantErr: errInvalidPayload,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, gotErr := NewOffChainMessages(1, ids.ID{2}, tt.msgs)
+			require.ErrorIs(t, gotErr, tt.wantErr)
 		})
 	}
 }

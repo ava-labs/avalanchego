@@ -11,17 +11,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-// DB stores and retrieves warp messages from the underlying database.
+// DB persists warp message events derived from logs emitted by the warp
+// precompile.
 type DB struct {
 	db database.Database
 }
 
-// NewDB creates a new warp message database.
+// NewDB creates a new DB.
 func NewDB(db database.Database) *DB {
 	return &DB{db: db}
 }
 
-// Add stores a warp message in the database and cache.
+// Add writes a warp message to the DB.
 func (db *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
 	msgID := unsignedMsg.ID()
 
@@ -32,7 +33,7 @@ func (db *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
 	return nil
 }
 
-// Get retrieves a warp message for the given msgID from the database.
+// Get gets a warp message from the DB.
 func (db *DB) Get(msgID ids.ID) (*warp.UnsignedMessage, error) {
 	unsignedMessageBytes, err := db.db.Get(msgID[:])
 	if err != nil {

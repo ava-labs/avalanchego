@@ -19,10 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
-const (
-	ParseErrCode = iota + 1
-	VerifyErrCode
-)
+var errVerify = errors.New("failed verification")
 
 // VerifyHandler defines how to handle different an unknown [payload.Payload]
 // that can be signed.
@@ -35,13 +32,7 @@ type VerifyHandler interface {
 	Verify(
 		p payload.Payload,
 		messageParseFail prometheus.Counter,
-	) *common.AppError
-}
-
-// VM provides access to accepted blocks.
-type VM interface {
-	// HasBlock returns a non-nil error if `blkID` is accepted.
-	HasBlock(ctx context.Context, blkID ids.ID) error
+	) error
 }
 
 // NoVerifier does not verify any message
@@ -50,21 +41,25 @@ type NoVerifier struct{}
 func (NoVerifier) Verify(
 	p payload.Payload,
 	messageParseFail prometheus.Counter,
-) *common.AppError {
+) error {
 	messageParseFail.Inc()
-	return &common.AppError{
-		Code:    ParseErrCode,
-		Message: fmt.Sprintf("unknown payload type: %T", p),
-	}
+	return fmt.Errorf("%w: unknown message type", errVerify)
+}
+
+// VM provides access to accepted blocks.
+type VM interface {
+	// HasBlock returns a non-nil error if `blkID` is accepted.
+	HasBlock(ctx context.Context, blkID ids.ID) error
 }
 
 // Verifier validates whether a warp message should be signed.
 type Verifier struct {
-	vm              VM
-	handler VerifyHandler
-	db            *DB
-	messageParseFail        prometheus.Counter
-	blockVerifyFail prometheus.Counter
+	vm               VM
+	handler          VerifyHandler
+	db               *DB
+	offChainMsgs     OffChainMessages
+	messageParseFail prometheus.Counter
+	blockVerifyFail  prometheus.Counter
 }
 
 // NewVerifier creates a new warp message verifier.
@@ -72,6 +67,7 @@ func NewVerifier(
 	handler VerifyHandler,
 	vm VM,
 	db *DB,
+	offChainMsgs OffChainMessages,
 	r prometheus.Registerer,
 ) (*Verifier, error) {
 	messageParseFail := prometheus.NewCounter(prometheus.CounterOpts{
@@ -96,36 +92,32 @@ func NewVerifier(
 		vm:               vm,
 		handler:          handler,
 		db:               db,
+		offChainMsgs: offChainMsgs,
 		messageParseFail: messageParseFail,
 		blockVerifyFail:  blockVerifyFail,
 	}, nil
 }
-
-// TODO verify offchain messages :)
 
 // Verify validates whether a warp message should be signed.
 func (v *Verifier) Verify(
 	ctx context.Context,
 	msg *warp.UnsignedMessage,
 ) error {
-	messageID := msg.ID()
-	// Known on-chain messages should be signed
-	if _, err := v.db.Get(messageID); err == nil {
+	_, ok := v.offChainMsgs.Get(msg.ID())
+	if ok {
+		return nil
+	}
+
+	if _, err := v.db.Get(msg.ID()); err == nil {
 		return nil
 	} else if !errors.Is(err, database.ErrNotFound) {
-		return &common.AppError{
-			Code:    ParseErrCode,
-			Message: fmt.Sprintf("failed to get message %s: %s", messageID, err),
-		}
+		return fmt.Errorf("failed to get message %s: %s", msg.ID(), err)
 	}
 
 	parsed, err := payload.Parse(msg.Payload)
 	if err != nil {
 		v.messageParseFail.Inc()
-		return &common.AppError{
-			Code:    ParseErrCode,
-			Message: fmt.Sprintf("failed to parse payload: %s", err),
-		}
+		return fmt.Errorf("%w: failed to parse payload: %w", errVerify, err)
 	}
 
 	hash, ok := parsed.(*payload.Hash)
@@ -135,10 +127,7 @@ func (v *Verifier) Verify(
 
 	if err := v.vm.HasBlock(ctx, hash.Hash); err != nil {
 		v.blockVerifyFail.Inc()
-		return &common.AppError{
-			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("failed to get block %s: %s", hash.Hash, err),
-		}
+		return fmt.Errorf("%w: failed to get block %s: %w", errVerify, hash.Hash, err)
 	}
 
 	return nil
@@ -151,8 +140,18 @@ type acp118Handler struct {
 
 var _ acp118.Verifier = (*acp118Handler)(nil)
 
-func (a *acp118Handler) Verify(ctx context.Context, message *warp.UnsignedMessage, _ []byte) *common.AppError {
-	return a.verifier.Verify(ctx, message)
+func (a *acp118Handler) Verify(
+	ctx context.Context,
+	message *warp.UnsignedMessage,
+	_ []byte,
+) *common.AppError {
+	if err := a.verifier.Verify(ctx, message); err != nil {
+		return &common.AppError{
+			Message: err.Error(),
+		}
+	}
+
+	return nil
 }
 
 // NewHandler returns a handler for signing warp messages requested by peers.

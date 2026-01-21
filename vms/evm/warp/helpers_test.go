@@ -101,7 +101,7 @@ func setupHandler(
 
 	sigCache := lru.NewCache[ids.ID, []byte](100)
 	db := NewDB(database)
-	v, err := NewVerifier(nil, db, prometheus.NewRegistry())
+	v, err := NewVerifier(&NoVerifier{}, nil, db, OffChainMessages{}, prometheus.NewRegistry())
 	require.NoError(t, err)
 
 	handler := NewHandler(sigCache, v, signer)
