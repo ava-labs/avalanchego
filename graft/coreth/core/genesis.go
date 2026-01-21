@@ -344,7 +344,7 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	_, isFirewood := triedb.Backend().(*firewood.TrieDB)
 	if root == types.EmptyRootHash && isFirewood {
 		// Ensure the Firewood TrieDB is aware of the genesis block.
-		if err := triedb.Update(root, common.Hash{}, 0, nil, nil, triedbOpt); err != nil {
+		if err := triedb.Update(types.EmptyRootHash, types.EmptyRootHash, 0, nil, nil, triedbOpt); err != nil {
 			panic(fmt.Sprintf("unable to update firewood triedb with genesis block: %v", err))
 		}
 	}
