@@ -178,6 +178,7 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}
+	gh.log.Trace("sending", zap.Stringers("acceptedIDs", acceptedIDs))
 	gh.sender.SendAccepted(ctx, nodeID, requestID, acceptedIDs)
 	return nil
 }
@@ -203,6 +204,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil
 	}
 
+	gh.log.Trace("sending", zap.Int("num", len(ancestorsBytes)))
 	gh.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
 	gh.sender.SendAncestors(ctx, nodeID, requestID, ancestorsBytes)
 	return nil

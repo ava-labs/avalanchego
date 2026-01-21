@@ -95,6 +95,10 @@ func (hooks) OverrideEVMResetArgs(rules params.Rules, args *vm.EVMResetArgs) *vm
 	return args
 }
 
+func (hooks) PreprocessingGasCharge(tx common.Hash) (uint64, error) {
+	return 0, nil
+}
+
 func wrapStateDB(rules params.Rules, statedb vm.StateDB) vm.StateDB {
 	wrappedStateDB := extstate.New(statedb.(*state.StateDB))
 	if params.GetRulesExtra(rules).IsApricotPhase1 {
