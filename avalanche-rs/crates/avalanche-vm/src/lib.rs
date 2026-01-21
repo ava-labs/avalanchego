@@ -28,11 +28,11 @@ mod error;
 mod state;
 mod vm;
 
-pub use block::{Block, BlockStatus, StatelessBlock};
+pub use block::{Block, BlockStatus, BuildBlockOptions, StatelessBlock};
 pub use context::Context;
 pub use error::{Result, VMError};
 pub use state::{State, StateManager};
-pub use vm::{AppHandler, ChainVM, CommonVM, Connector, CrossChainAppHandler};
+pub use vm::{AppHandler, ChainVM, CommonVM, Connector, CrossChainAppHandler, HealthStatus, Version};
 
 #[cfg(test)]
 mod tests {

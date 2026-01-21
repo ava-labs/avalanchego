@@ -1,0 +1,29 @@
+[package]
+name = "avalanche-api"
+description = "HTTP/JSON-RPC API for Avalanche nodes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+avalanche-ids = { workspace = true }
+avalanche-db = { workspace = true }
+avalanche-vm = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+tokio-test = { workspace = true }
+
+[lints]
+workspace = true

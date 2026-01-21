@@ -89,6 +89,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "avalanche-api"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "avalanche-db",
+ "avalanche-ids",
+ "avalanche-vm",
+ "bytes",
+ "chrono",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-test",
+ "tracing",
+]
+
+[[package]]
 name = "avalanche-codec"
 version = "0.1.0"
 dependencies = [
@@ -827,6 +847,29 @@ name = "pkg-config"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
+
+[[package]]
+name = "platformvm"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "avalanche-codec",
+ "avalanche-db",
+ "avalanche-ids",
+ "avalanche-snow",
+ "avalanche-vm",
+ "bytes",
+ "chrono",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "tokio-test",
+ "tracing",
+]
 
 [[package]]
 name = "powerfmt"

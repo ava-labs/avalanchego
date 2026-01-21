@@ -9,6 +9,8 @@ members = [
     "crates/avalanche-db",
     "crates/avalanche-snow",
     "crates/avalanche-vm",
+    "crates/platformvm",
+    "crates/avalanche-api",
 ]
 
 [workspace.package]
@@ -28,6 +30,8 @@ avalanche-net = { path = "crates/avalanche-net" }
 avalanche-db = { path = "crates/avalanche-db" }
 avalanche-snow = { path = "crates/avalanche-snow" }
 avalanche-vm = { path = "crates/avalanche-vm" }
+platformvm = { path = "crates/platformvm" }
+avalanche-api = { path = "crates/avalanche-api" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
