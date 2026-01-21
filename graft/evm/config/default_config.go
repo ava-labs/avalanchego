@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	avaxutils "github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
 )
 
@@ -112,8 +113,11 @@ func NewDefaultCChainConfig() CChainConfig {
 }
 
 func NewDefaultL1Config() L1Config {
+	cfg := newDefaultCommonConfig()
+	// Subnet EVM defaults to state sync disabled (unlike C-Chain which enables at genesis)
+	cfg.StateSyncEnabled = avaxutils.PointerTo(false)
 	return L1Config{
-		CommonConfig: newDefaultCommonConfig(),
+		CommonConfig: cfg,
 		// Subnet EVM API settings
 		ValidatorsAPIEnabled: true,
 		// Database settings

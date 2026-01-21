@@ -390,7 +390,7 @@ func (vm *VM) Initialize(
 	vm.ethConfig.PopulateMissingTries = vm.config.PopulateMissingTries
 	vm.ethConfig.PopulateMissingTriesParallelism = vm.config.PopulateMissingTriesParallelism
 	vm.ethConfig.AllowMissingTries = vm.config.AllowMissingTries
-	vm.ethConfig.SnapshotDelayInit = *vm.config.StateSyncEnabled
+	vm.ethConfig.SnapshotDelayInit = vm.stateSyncEnabled(lastAcceptedHeight)
 	vm.ethConfig.SnapshotWait = vm.config.SnapshotWait
 	vm.ethConfig.SnapshotVerify = vm.config.SnapshotVerify
 	vm.ethConfig.HistoricalProofQueryWindow = vm.config.HistoricalProofQueryWindow
@@ -415,7 +415,7 @@ func (vm *VM) Initialize(
 		if vm.config.OfflinePruning {
 			return errFirewoodOfflinePruningUnsupported
 		}
-		if *vm.config.StateSyncEnabled {
+		if vm.stateSyncEnabled(lastAcceptedHeight) {
 			return errFirewoodStateSyncUnsupported
 		}
 		if vm.config.PopulateMissingTries != nil {
@@ -682,7 +682,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	vm.Server = vmsync.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval) // parse nodeIDs from state sync IDs in vm config
 	// parse nodeIDs from state sync IDs in vm config
 	var stateSyncIDs []ids.NodeID
-	if *vm.config.StateSyncEnabled && len(vm.config.StateSyncIDs) > 0 {
+	if vm.stateSyncEnabled(lastAcceptedHeight) && len(vm.config.StateSyncIDs) > 0 {
 		nodeIDs := strings.Split(vm.config.StateSyncIDs, ",")
 		stateSyncIDs = make([]ids.NodeID, len(nodeIDs))
 		for i, nodeIDString := range nodeIDs {
@@ -711,7 +711,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				BlockParser:      vm,
 			},
 		),
-		Enabled:            *vm.config.StateSyncEnabled,
+		Enabled:            vm.stateSyncEnabled(lastAcceptedHeight),
 		SkipResume:         vm.config.StateSyncSkipResume,
 		MinBlocks:          vm.config.StateSyncMinBlocks,
 		RequestSize:        vm.config.StateSyncRequestSize,
@@ -726,7 +726,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
 	// sync using a snapshot that has been modified by the node running normal operations.
-	if !*vm.config.StateSyncEnabled {
+	if !vm.stateSyncEnabled(lastAcceptedHeight) {
 		return vm.Client.ClearOngoingSummary()
 	}
 
@@ -1236,6 +1236,16 @@ func (vm *VM) chainConfigExtra() *extras.ChainConfig {
 func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
 	ethrules := vm.chainConfig.Rules(number, params.IsMergeTODO, time)
 	return *params.GetRulesExtra(ethrules)
+}
+
+func (vm *VM) stateSyncEnabled(lastAcceptedHeight uint64) bool {
+	if vm.config.StateSyncEnabled != nil {
+		// if the config is set, use that
+		return *vm.config.StateSyncEnabled
+	}
+
+	// enable state sync by default if the chain is empty.
+	return lastAcceptedHeight == 0
 }
 
 func (vm *VM) startContinuousProfiler() {
