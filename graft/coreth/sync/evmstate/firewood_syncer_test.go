@@ -77,7 +77,8 @@ func TestFirewoodSync(t *testing.T) {
 			assertFirewoodConsistency(t, root, clientState)
 
 			// Code queue should be closed.
-			require.ErrorIs(t, codeQueue.AddCode(t.Context(), []common.Hash{{1}}), code.ErrFailedToAddCodeHashesToQueue)
+			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
+			require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
 		})
 	}
 }
@@ -119,7 +120,8 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 			if tt.cancel {
 				// Trigger cancellation and wait for both syncers to exit.
 				cancel()
-				require.ErrorIs(t, runFirewoodSync(ctx, codeSyncer, firewoodSyncer), context.Canceled)
+				err := runFirewoodSync(ctx, codeSyncer, firewoodSyncer)
+				require.ErrorIs(t, err, context.Canceled)
 			} else {
 				require.NoError(t, runFirewoodSync(ctx, codeSyncer, firewoodSyncer), "failure during sync")
 			}
