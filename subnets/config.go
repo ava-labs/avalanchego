@@ -28,7 +28,7 @@ type Config struct {
 	// ValidatorOnly is enabled.
 	AllowedNodes set.Set[ids.NodeID] `json:"allowedNodes" yaml:"allowedNodes"`
 
-	// Removed: Use either SnowParameters or SimplexParameters instead.
+	// Deprecated: Use either SnowParameters or SimplexParameters instead.
 	ConsensusParameters *snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
 
 	SnowParameters    *snowball.Parameters `json:"snowballParameters" yaml:"snowballParameters"`
@@ -66,16 +66,18 @@ func (c *Config) Valid() error {
 }
 
 func (c *Config) validateConsensusParameters() error {
-	if c.ConsensusParameters != nil {
-		return ErrUnsupportedConsensusParameters
-	}
-
 	if c.SnowParameters != nil && c.SimplexParameters == nil {
 		return c.SnowParameters.Verify()
 	}
 
 	if c.SimplexParameters != nil && c.SnowParameters == nil {
 		return c.SimplexParameters.Verify()
+	}
+
+	// We still allow the deprecated consensus parameters to be set and verified, but will remove this in the future.
+	if c.ConsensusParameters != nil && c.SnowParameters == nil && c.SimplexParameters == nil {
+		c.SnowParameters = c.ConsensusParameters
+		return c.SnowParameters.Verify()
 	}
 
 	return errInvalidConsensusConfiguration
