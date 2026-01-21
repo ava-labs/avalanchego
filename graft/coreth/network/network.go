@@ -354,7 +354,7 @@ func (n *network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reque
 // calculateTimeUntilDeadline calculates the time until deadline and drops it if we missed he deadline to response.
 // This function updates metrics for app requests.
 // This is called by [AppRequest].
-func calculateTimeUntilDeadline(deadline time.Time, n *network) (time.Time, error) {
+func (n *network) timeUntil(deadline time.Time) (time.Time, error) {
 	// calculate how much time is left until the deadline
 	timeTillDeadline := time.Until(deadline)
 	n.timeUntilDeadline.Update(timeTillDeadline)
