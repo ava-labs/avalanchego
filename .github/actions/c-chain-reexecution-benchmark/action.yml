@@ -59,12 +59,6 @@ inputs:
   push-post-state:
     description: 'S3 destination to copy the current-state directory after completing re-execution. If empty, this will be skipped.'
     default: ''
-  libevm-ref:
-    description: 'libevm commit/branch/tag (optional). If provided, updates libevm dependency before benchmark.'
-    default: ''
-  firewood-ref:
-    description: 'Firewood commit/branch/tag (optional). If provided, builds custom firewood and skips benchmark comparison (Firewood tracks separately).'
-    default: ''
   # The following inputs need never be provided by the caller. They
   # default to context values that the action's steps are unable to
   # access directly.
@@ -158,13 +152,17 @@ runs:
         GH_RUN_NUMBER: ${{ inputs.run-number }}
         GH_RUN_ATTEMPT: ${{ inputs.run-attempt }}
         GH_JOB_ID: ${{ inputs.job }}
-        # Required for Nix builds in CI self-hosted runners (e.g., building Firewood via polyrepo)
+        # Required for Nix builds on self-hosted runners
         TMPDIR: /tmp
         NIX_BUILD_TOP: /tmp
-    # Skip when using custom firewood - Firewood downloads the artifact and
-    # publishes to their own gh-pages for tracking
+    - name: Upload Benchmark Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-output
+        path: ${{ env.BENCHMARK_OUTPUT_FILE }}
+        retention-days: 30
+        if-no-files-found: error
     - name: Compare Benchmark Results
-      if: inputs.firewood-ref == ''
       uses: benchmark-action/github-action-benchmark@v1
       with:
         tool: 'customBiggerIsBetter'
