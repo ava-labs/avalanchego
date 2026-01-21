@@ -27,6 +27,8 @@ mod helpers;
 mod linkeddb;
 mod memdb;
 mod prefixdb;
+#[cfg(feature = "rocksdb")]
+mod rocksdb;
 mod versiondb;
 
 pub use error::{DatabaseError, Result};
@@ -34,6 +36,8 @@ pub use helpers::*;
 pub use linkeddb::LinkedDb;
 pub use memdb::MemDb;
 pub use prefixdb::PrefixDb;
+#[cfg(feature = "rocksdb")]
+pub use rocksdb::{RocksDb, RocksDbConfig};
 pub use versiondb::VersionDb;
 
 use std::sync::Arc;
