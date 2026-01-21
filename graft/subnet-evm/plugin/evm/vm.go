@@ -479,12 +479,13 @@ func (vm *VM) Initialize(
 
 	vm.warpMsgDB = evmwarp.NewDB(vm.warpDB)
 	warpMetrics := prometheus.NewRegistry()
-	verifier, err := warp.NewVerifier(vm, vm.uptimeTracker, warpMetrics)
+	verifier, err := warp.NewVerifier(vm.uptimeTracker, warpMetrics)
 	if err != nil {
 		return err
 	}
 	vm.warpVerifier, err = evmwarp.NewVerifier(
 		verifier,
+		vm,
 		vm.warpMsgDB,
 		warpMetrics,
 	)

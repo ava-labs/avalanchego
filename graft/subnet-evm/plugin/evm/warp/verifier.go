@@ -7,7 +7,6 @@ import (
 	evmwarp "github.com/ava-labs/avalanchego/vms/evm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/prometheus/client_golang/prometheus"
-	"context"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"fmt"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
@@ -23,15 +22,15 @@ const (
 	maxMessageSize = 24 * units.KiB
 )
 
-var c codec.Manager
+var codecManager codec.Manager
 
 func init() {
-	c = codec.NewManager(maxMessageSize)
+	codecManager = codec.NewManager(maxMessageSize)
 	lc := linearcodec.NewDefault()
 
 	err := errors.Join(
 		lc.RegisterType(&ValidatorUptime{}),
-		c.RegisterCodec(codecVersion, lc),
+		codecManager.RegisterCodec(codecVersion, lc),
 	)
 	if err != nil {
 		panic(err)
@@ -42,55 +41,47 @@ func init() {
 // has been up for TotalUptime seconds.
 type ValidatorUptime struct {
 	ValidationID       ids.ID `serialize:"true"`
-	TotalUptimeSeconds uint64 `serialize:"true"` // in seconds
+	TotalUptimeSeconds uint64 `serialize:"true"`
 }
 
 // ParseValidatorUptime converts a slice of bytes into a ValidatorUptime.
 func ParseValidatorUptime(b []byte) (*ValidatorUptime, error) {
 	var msg ValidatorUptime
-	if _, err := c.Unmarshal(b, &msg); err != nil {
-		return nil, err
+	if _, err := codecManager.Unmarshal(b, &msg); err != nil {
+		return nil, fmt.Errorf("parsing validator uptime: %w", err)
 	}
 	return &msg, nil
 }
 
-// Bytes returns the binary representation of this payload.
 func (v *ValidatorUptime) Bytes() ([]byte, error) {
-	return c.Marshal(codecVersion, v)
+	return codecManager.Marshal(codecVersion, v)
 }
 
-
-var _ evmwarp.VerifyHandler = (*Verifier)(nil)
 
 type Verifier struct {
 	uptimeTracker *uptimetracker.UptimeTracker
 
-	blockVerifier *evmwarp.BlockVerifier
+	unknownVerifier evmwarp.NoVerifier
 	addressedCallVerifyFail prometheus.Counter
 	uptimeVerifyFail        prometheus.Counter
 }
 
+var _ evmwarp.VerifyHandler = (*Verifier)(nil)
+
 func NewVerifier(
-	vm evmwarp.VM,
 	ut *uptimetracker.UptimeTracker,
 	r prometheus.Registerer,
 ) (*Verifier, error) {
-	blockVerifier, err := evmwarp.NewBlockVerifier(vm, r)
-	if err != nil {
-		return nil, err
-	}
-
 	v := &Verifier{
 		uptimeTracker: ut,
-		blockVerifier: blockVerifier,
 		addressedCallVerifyFail: prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "warp_backend_addressed_call_verify_fail",
-		Help: "Number of addressed call verification failures",
-	}),
+			Name: "warp_backend_addressed_call_verify_fail",
+			Help: "Number of addressed call verification failures",
+		}),
 		uptimeVerifyFail: prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "warp_backend_uptime_verify_fail",
-		Help: "Number of uptime verification failures",
-	}),
+			Name: "warp_backend_uptime_verify_fail",
+			Help: "Number of uptime verification failures",
+		}),
 	}
 
 	if err := r.Register(v.addressedCallVerifyFail); err != nil {
@@ -104,29 +95,15 @@ func NewVerifier(
 	return v, nil
 }
 
-func (v *Verifier) VerifyBlockHash(
-	ctx context.Context,
-	p *payload.Hash,
-) *common.AppError {
-	return v.blockVerifier.VerifyBlockHash(ctx, p)
-}
-
-func (v *Verifier) VerifyUnknown(
+func (v *Verifier) Verify(
 	p payload.Payload,
 	messageParseFail prometheus.Counter,
 ) *common.AppError {
-	ac, ok :=  p.(*payload.AddressedCall)
+	addressedCall, ok := p.(*payload.AddressedCall)
 	if !ok {
-		return v.blockVerifier.VerifyUnknown(p, messageParseFail)
+		return v.unknownVerifier.Verify(p, messageParseFail)
 	}
 
-	return v.verifyOffchainAddressedCall(ac, messageParseFail)
-}
-
-func (v *Verifier) verifyOffchainAddressedCall(
-	addressedCall *payload.AddressedCall,
-	messageParseFail prometheus.Counter,
-) *common.AppError {
 	if len(addressedCall.SourceAddress) != 0 {
 		v.addressedCallVerifyFail.Inc()
 		return &common.AppError{
@@ -144,17 +121,9 @@ func (v *Verifier) verifyOffchainAddressedCall(
 		}
 	}
 
-	if err := v.verifyUptimeMessage(uptimeMsg); err != nil {
-		v.uptimeVerifyFail.Inc()
-		return err
-	}
-
-	return nil
-}
-
-func (v *Verifier) verifyUptimeMessage(uptimeMsg *ValidatorUptime) *common.AppError {
 	currentUptime, _, err := v.uptimeTracker.GetUptime(uptimeMsg.ValidationID)
 	if err != nil {
+		v.uptimeVerifyFail.Inc()
 		return &common.AppError{
 			Code:    evmwarp.VerifyErrCode,
 			Message: fmt.Sprintf("failed to get uptime: %s", err),
@@ -164,6 +133,7 @@ func (v *Verifier) verifyUptimeMessage(uptimeMsg *ValidatorUptime) *common.AppEr
 	currentUptimeSeconds := uint64(currentUptime.Seconds())
 	// verify the current uptime against the total uptime in the message
 	if currentUptimeSeconds < uptimeMsg.TotalUptimeSeconds {
+		v.uptimeVerifyFail.Inc()
 		return &common.AppError{
 			Code:    evmwarp.VerifyErrCode,
 			Message: fmt.Sprintf("current uptime %d is less than queried uptime %d for validationID %s", currentUptimeSeconds, uptimeMsg.TotalUptimeSeconds, uptimeMsg.ValidationID),

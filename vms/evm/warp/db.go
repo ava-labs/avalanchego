@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -18,16 +18,14 @@ type DB struct {
 
 // NewDB creates a new warp message database.
 func NewDB(db database.Database) *DB {
-	return &DB{
-		db: db,
-	}
+	return &DB{db: db}
 }
 
 // Add stores a warp message in the database and cache.
-func (d *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
+func (db *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
 	msgID := unsignedMsg.ID()
 
-	if err := d.db.Put(msgID[:], unsignedMsg.Bytes()); err != nil {
+	if err := db.db.Put(msgID[:], unsignedMsg.Bytes()); err != nil {
 		return fmt.Errorf("failed to put warp message in db: %w", err)
 	}
 
@@ -35,8 +33,8 @@ func (d *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
 }
 
 // Get retrieves a warp message for the given msgID from the database.
-func (d *DB) Get(msgID ids.ID) (*warp.UnsignedMessage, error) {
-	unsignedMessageBytes, err := d.db.Get(msgID[:])
+func (db *DB) Get(msgID ids.ID) (*warp.UnsignedMessage, error) {
+	unsignedMessageBytes, err := db.db.Get(msgID[:])
 	if err != nil {
 		return nil, err
 	}

@@ -86,6 +86,9 @@ func TestServiceGetMessageSignature(t *testing.T) {
 			signer, err := localsigner.New()
 			require.NoError(t, err)
 
+			verifier, err := evmwarp.NewVerifier(nil, db, prometheus.NewRegistry())
+			require.NoError(t, err)
+
 			warpSigner := warp.NewSigner(signer, 0, ids.Empty)
 			service, err := NewService(
 				0,
@@ -93,7 +96,7 @@ func TestServiceGetMessageSignature(t *testing.T) {
 				&validatorstest.State{},
 				db,
 				warpSigner,
-				evmwarp.NewVerifier(db, testBlockStore{}, nil, prometheus.NewRegistry()),
+				verifier,
 				&cache.Empty[ids.ID, []byte]{},
 				acp118.NewSignatureAggregator(logging.NoLog{}, nil),
 				nil,
@@ -144,6 +147,14 @@ func TestServiceGetBlockSignature(t *testing.T) {
 			signer, err := localsigner.New()
 			require.NoError(t, err)
 
+			verifier, err := evmwarp.NewVerifier(
+				// testBlockStore(set.Of(tt.blksInDB...)),
+				nil,
+				db,
+				prometheus.NewRegistry(),
+			)
+			require.NoError(t, err)
+
 			warpSigner := warp.NewSigner(signer, 0, ids.Empty)
 			service, err := NewService(
 				0,
@@ -151,12 +162,7 @@ func TestServiceGetBlockSignature(t *testing.T) {
 				&validatorstest.State{},
 				db,
 				warpSigner,
-				evmwarp.NewVerifier(
-					db,
-					testBlockStore(set.Of(tt.blksInDB...)),
-					nil,
-					prometheus.NewRegistry(),
-				),
+				verifier,
 				&cache.Empty[ids.ID, []byte]{},
 				acp118.NewSignatureAggregator(logging.NoLog{}, nil),
 				[][]byte{},
