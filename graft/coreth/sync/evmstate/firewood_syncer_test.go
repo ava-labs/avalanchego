@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate_test
+package evmstate
 
 import (
 	"context"
@@ -21,10 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/evmstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
@@ -73,7 +70,14 @@ func TestFirewoodSync(t *testing.T) {
 			serverState := createDB(t)
 			root := synctest.FillAccountsWithStorageAndCode(t, r, serverState, tt.serverSize)
 
-			testFirewoodSync(t, clientState, serverState, root)
+			firewoodSyncer, codeSyncer, codeQueue := createSyncers(t, clientState, serverState, root)
+			require.NoError(t, runFirewoodSync(t.Context(), codeSyncer, firewoodSyncer), "failure during sync")
+
+			// Finalization is not necessary, as no errors were encountered during sync.
+			assertFirewoodConsistency(t, root, clientState)
+
+			// Code queue should be closed.
+			require.ErrorIs(t, codeQueue.AddCode(t.Context(), []common.Hash{{1}}), code.ErrFailedToAddCodeHashesToQueue)
 		})
 	}
 }
@@ -103,7 +107,7 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 			serverState := createDB(t)
 			root := synctest.FillAccountsWithStorageAndCode(t, r, serverState, 10)
 
-			codeQueue, firewoodSyncer, codeSyncer := createSyncers(t, clientState, serverState, root)
+			firewoodSyncer, codeSyncer, codeQueue := createSyncers(t, clientState, serverState, root)
 
 			ctx := t.Context()
 			var cancel context.CancelFunc
@@ -121,10 +125,8 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 			}
 
 			// Ensure Finalize is idempotent and that the queue is closed.
-			finalizer, ok := firewoodSyncer.(types.Finalizer)
-			require.True(t, ok, "firewood syncer should implement Finalizer")
-			require.NoError(t, finalizer.Finalize())
-			require.NoError(t, finalizer.Finalize())
+			require.NoError(t, firewoodSyncer.Finalize())
+			require.NoError(t, firewoodSyncer.Finalize())
 
 			// After finalize, the queue should reject new code additions.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
@@ -132,65 +134,8 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 		})
 	}
 }
-func TestFirewoodSyncerRegistryFinalizeScenarios(t *testing.T) {
-	tests := []struct {
-		name   string
-		cancel bool
-	}{
-		{
-			name:   "success finalizes queue",
-			cancel: false,
-		},
-		{
-			name:   "cancel then finalize",
-			cancel: true,
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := rand.New(rand.NewSource(1))
-
-			clientState := createDB(t)
-			_ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, 0)
-
-			serverState := createDB(t)
-			root := synctest.FillAccountsWithStorageAndCode(t, r, serverState, 10)
-
-			codeQueue, firewoodSyncer, codeSyncer := createSyncers(t, clientState, serverState, root)
-
-			registry := engine.NewSyncerRegistry()
-			require.NoError(t, registry.Register(firewoodSyncer))
-			require.NoError(t, registry.Register(codeSyncer))
-
-			summary, err := message.NewBlockSyncSummary(common.HexToHash("0xdeadbeef"), 1, common.HexToHash("0xdeadbeef"))
-			require.NoError(t, err)
-
-			ctx := t.Context()
-			var cancel context.CancelFunc
-			if tt.cancel {
-				ctx, cancel = context.WithCancel(ctx)
-				t.Cleanup(cancel)
-			}
-
-			if tt.cancel {
-				errCh := make(chan error, 1)
-				go func() {
-					errCh <- registry.RunSyncerTasks(ctx, summary)
-				}()
-				cancel()
-				require.ErrorIs(t, <-errCh, context.Canceled)
-			} else {
-				require.NoError(t, registry.RunSyncerTasks(ctx, summary))
-			}
-
-			require.Error(t, codeQueue.AddCode(t.Context(), []common.Hash{{1}}))
-		})
-	}
-}
-
-
-func createSyncers(t *testing.T, clientState, serverState state.Database, root common.Hash) (*code.Queue, types.Syncer, *code.Syncer) {
+func createSyncers(t *testing.T, clientState, serverState state.Database, root common.Hash) (*FirewoodSyncer, *code.Syncer, *code.Queue) {
 	t.Helper()
 	// Create the mock P2P client that serves range proofs and change proofs from the server DB.
 	var (
@@ -210,7 +155,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	require.NoError(t, err, "NewCodeSyncer()")
 
 	// Create the firewood syncer.
-	firewoodSyncer, err := evmstate.NewFirewoodSyncer(
+	firewoodSyncer, err := NewFirewoodSyncer(
 		syncer.Config{},
 		dbFromState(t, clientState),
 		root,
@@ -219,22 +164,14 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 		cHandler,
 	)
 	require.NoError(t, err, "NewFirewoodSyncer()")
-	return codeQueue, firewoodSyncer, codeSyncer
+	return firewoodSyncer, codeSyncer, codeQueue
 }
 
-func runFirewoodSync(ctx context.Context, codeSyncer *code.Syncer, firewoodSyncer types.Syncer) error {
+func runFirewoodSync(ctx context.Context, codeSyncer *code.Syncer, firewoodSyncer *FirewoodSyncer) error {
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.Go(func() error { return codeSyncer.Sync(egCtx) })
 	eg.Go(func() error { return firewoodSyncer.Sync(egCtx) })
 	return eg.Wait()
-}
-
-func testFirewoodSync(t *testing.T, clientState, serverState state.Database, root common.Hash) {
-	codeQueue, firewoodSyncer, codeSyncer := createSyncers(t, clientState, serverState, root)
-	require.NoError(t, runFirewoodSync(t.Context(), codeSyncer, firewoodSyncer), "failure during sync")
-
-	assertFirewoodConsistency(t, root, clientState)
-	require.Error(t, codeQueue.AddCode(t.Context(), []common.Hash{{1}}))
 }
 
 func createDB(t *testing.T) state.Database {

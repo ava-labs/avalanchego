@@ -13,16 +13,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/firewood/syncer"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 
-	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 var (
-	_ syncpkg.Syncer   = (*FirewoodSyncer)(nil)
-	_ syncpkg.Finalizer = (*FirewoodSyncer)(nil)
+	_ types.Syncer    = (*FirewoodSyncer)(nil)
+	_ types.Finalizer = (*FirewoodSyncer)(nil)
 )
 
 type FirewoodSyncer struct {
@@ -32,7 +32,7 @@ type FirewoodSyncer struct {
 	finalizeOnce func() error
 }
 
-func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue *code.Queue, rangeProofClient, changeProofClient *p2p.Client) (syncpkg.Syncer, error) {
+func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue *code.Queue, rangeProofClient, changeProofClient *p2p.Client) (*FirewoodSyncer, error) {
 	s, err := syncer.NewEVM(
 		config,
 		db,
@@ -44,19 +44,12 @@ func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Has
 	if err != nil {
 		return nil, err
 	}
-	fw := &FirewoodSyncer{
+	f := &FirewoodSyncer{
 		s:         s,
 		codeQueue: codeQueue,
 	}
-	fw.finalizeOnce = sync.OnceValue(func() error {
-		// Ensure the syncer stops work and the code queue closes on exit.
-		fw.s.Close()
-		if err := fw.codeQueue.Finalize(); err != nil {
-			return fmt.Errorf("finalizing code queue: %w", err)
-		}
-		return nil
-	})
-	return fw, nil
+	f.finalizeOnce = sync.OnceValue(f.finish)
+	return f, nil
 }
 
 func (f *FirewoodSyncer) Sync(ctx context.Context) error {
@@ -71,14 +64,25 @@ func (f *FirewoodSyncer) Sync(ctx context.Context) error {
 	return f.Finalize()
 }
 
+func (f *FirewoodSyncer) Finalize() error {
+	return f.finalizeOnce()
+}
+
+// finish performs the finalization logic for the FirewoodSyncer inside a [sync.Once].
+// This is linked to the [sync.Once] in the constructor, and should not be called directly.
+func (f *FirewoodSyncer) finish() error {
+	// Ensure the syncer stops work and the code queue closes on exit.
+	f.s.Close()
+	if err := f.codeQueue.Finalize(); err != nil {
+		return fmt.Errorf("finalizing code queue: %w", err)
+	}
+	return nil
+}
+
 func (*FirewoodSyncer) ID() string {
 	return "state_firewood_sync"
 }
 
 func (*FirewoodSyncer) Name() string {
 	return "Firewood EVM State Syncer"
-}
-
-func (f *FirewoodSyncer) Finalize() error {
-	return f.finalizeOnce()
 }
