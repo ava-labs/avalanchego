@@ -9,6 +9,7 @@
 mod codec;
 mod config;
 mod connection;
+mod handshake;
 mod network;
 mod peer;
 mod peer_manager;
@@ -18,6 +19,10 @@ mod version;
 pub use codec::{MessageCodec, MessageFrame};
 pub use config::{NetworkConfig, PeerConfig, TimeoutConfig};
 pub use connection::Connection;
+pub use handshake::{
+    create_claimed_ip_port, HandshakeProtocol, HandshakeResult, CLIENT_NAME, CLIENT_VERSION,
+    MIN_COMPATIBLE_VERSION,
+};
 pub use network::NetworkImpl;
 pub use peer::{PeerInfo, PeerState, SignedIp, UnsignedIp};
 pub use peer_manager::{PeerEvent, PeerManager};

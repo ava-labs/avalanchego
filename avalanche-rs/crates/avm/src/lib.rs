@@ -19,6 +19,7 @@
 
 pub mod asset;
 pub mod block;
+pub mod codec;
 pub mod genesis;
 pub mod state;
 pub mod txs;
