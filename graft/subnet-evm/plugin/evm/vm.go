@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/graft/evm/config"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
@@ -54,7 +55,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/node"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
@@ -184,7 +184,7 @@ type VM struct {
 	// with an efficient caching layer.
 	*chain.State
 
-	config config.Config
+	config config.L1Config
 
 	chainID     *big.Int
 	genesisHash common.Hash
@@ -279,7 +279,7 @@ func (vm *VM) Initialize(
 ) error {
 	vm.ctx = chainCtx
 
-	cfg, deprecateMsg, err := config.GetConfig(configBytes, vm.ctx.NetworkID)
+	cfg, deprecateMsg, err := config.GetConfig(configBytes, vm.ctx.NetworkID, config.NewDefaultL1Config)
 	if err != nil {
 		return fmt.Errorf("failed to get config: %w", err)
 	}
@@ -390,7 +390,7 @@ func (vm *VM) Initialize(
 	vm.ethConfig.PopulateMissingTries = vm.config.PopulateMissingTries
 	vm.ethConfig.PopulateMissingTriesParallelism = vm.config.PopulateMissingTriesParallelism
 	vm.ethConfig.AllowMissingTries = vm.config.AllowMissingTries
-	vm.ethConfig.SnapshotDelayInit = vm.config.StateSyncEnabled
+	vm.ethConfig.SnapshotDelayInit = *vm.config.StateSyncEnabled
 	vm.ethConfig.SnapshotWait = vm.config.SnapshotWait
 	vm.ethConfig.SnapshotVerify = vm.config.SnapshotVerify
 	vm.ethConfig.HistoricalProofQueryWindow = vm.config.HistoricalProofQueryWindow
@@ -415,7 +415,7 @@ func (vm *VM) Initialize(
 		if vm.config.OfflinePruning {
 			return errFirewoodOfflinePruningUnsupported
 		}
-		if vm.config.StateSyncEnabled {
+		if *vm.config.StateSyncEnabled {
 			return errFirewoodStateSyncUnsupported
 		}
 		if vm.config.PopulateMissingTries != nil {
@@ -682,7 +682,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	vm.Server = vmsync.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval) // parse nodeIDs from state sync IDs in vm config
 	// parse nodeIDs from state sync IDs in vm config
 	var stateSyncIDs []ids.NodeID
-	if vm.config.StateSyncEnabled && len(vm.config.StateSyncIDs) > 0 {
+	if *vm.config.StateSyncEnabled && len(vm.config.StateSyncIDs) > 0 {
 		nodeIDs := strings.Split(vm.config.StateSyncIDs, ",")
 		stateSyncIDs = make([]ids.NodeID, len(nodeIDs))
 		for i, nodeIDString := range nodeIDs {
@@ -711,7 +711,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				BlockParser:      vm,
 			},
 		),
-		Enabled:            vm.config.StateSyncEnabled,
+		Enabled:            *vm.config.StateSyncEnabled,
 		SkipResume:         vm.config.StateSyncSkipResume,
 		MinBlocks:          vm.config.StateSyncMinBlocks,
 		RequestSize:        vm.config.StateSyncRequestSize,
@@ -726,7 +726,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
 	// sync using a snapshot that has been modified by the node running normal operations.
-	if !vm.config.StateSyncEnabled {
+	if !*vm.config.StateSyncEnabled {
 		return vm.Client.ClearOngoingSummary()
 	}
 

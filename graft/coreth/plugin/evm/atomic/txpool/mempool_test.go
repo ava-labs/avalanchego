@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/atomictest"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
+	"github.com/ava-labs/avalanchego/graft/evm/config"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 )
@@ -96,13 +96,13 @@ func TestMempoolAddBloomReset(t *testing.T) {
 	require.Equal(maxFeeTx, tx)
 
 	numHashes, numEntries := bloom.OptimalParameters(
-		config.TxGossipBloomMinTargetElements,
-		config.TxGossipBloomTargetFalsePositiveRate,
+		config.DefaultTxGossipBloomMinTargetElements,
+		config.DefaultTxGossipBloomTargetFalsePositiveRate,
 	)
 	txsToAdd := bloom.EstimateCount(
 		numHashes,
 		numEntries,
-		config.TxGossipBloomResetFalsePositiveRate,
+		config.DefaultTxGossipBloomResetFalsePositiveRate,
 	)
 	for fee := range txsToAdd {
 		// Keep increasing the fee to evict older transactions

@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
+	"github.com/ava-labs/avalanchego/graft/evm/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/bloom"
@@ -51,9 +51,9 @@ func NewMempool(
 	verify func(tx *atomic.Tx) error,
 ) (*Mempool, error) {
 	bloom, err := gossip.NewBloomFilter(registerer, "atomic_mempool_bloom_filter",
-		config.TxGossipBloomMinTargetElements,
-		config.TxGossipBloomTargetFalsePositiveRate,
-		config.TxGossipBloomResetFalsePositiveRate,
+		config.DefaultTxGossipBloomMinTargetElements,
+		config.DefaultTxGossipBloomTargetFalsePositiveRate,
+		config.DefaultTxGossipBloomResetFalsePositiveRate,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)

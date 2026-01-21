@@ -4,38 +4,32 @@
 package config
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/spf13/cast"
 )
 
 type (
-	PBool    bool
 	Duration struct {
 		time.Duration
 	}
+
+	PBool bool
 )
 
-// Config ...
-type Config struct {
-	// Airdrop
-	AirdropFile string `json:"airdrop"`
-
+// CommonConfig contains configuration fields shared between CChainConfig and L1Config.
+type CommonConfig struct {
 	// MinDelayTarget is the minimum delay between blocks (in milliseconds) that this node will attempt to use
 	// when creating blocks. If this config is not specified, the node will
 	// default to use the parent block's target delay per second.
 	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
-	// Subnet EVM APIs
-	ValidatorsAPIEnabled bool   `json:"validators-api-enabled"`
-	AdminAPIEnabled      bool   `json:"admin-api-enabled"`
-	AdminAPIDir          string `json:"admin-api-dir"`
-	WarpAPIEnabled       bool   `json:"warp-api-enabled"`
+	// APIs
+	AdminAPIEnabled bool   `json:"admin-api-enabled"`
+	AdminAPIDir     string `json:"admin-api-dir"`
+	WarpAPIEnabled  bool   `json:"warp-api-enabled"`
 
 	// EnabledEthAPIs is a list of Ethereum services that should be enabled
 	// If none is specified, then we use the default list [defaultEnabledAPIs]
@@ -103,22 +97,18 @@ type Config struct {
 	KeystoreInsecureUnlockAllowed bool   `json:"keystore-insecure-unlock-allowed"`
 
 	// Gossip Settings
-	PushGossipPercentStake    float64          `json:"push-gossip-percent-stake"`
-	PushGossipNumValidators   int              `json:"push-gossip-num-validators"`
-	PushGossipNumPeers        int              `json:"push-gossip-num-peers"`
-	PushRegossipNumValidators int              `json:"push-regossip-num-validators"`
-	PushRegossipNumPeers      int              `json:"push-regossip-num-peers"`
-	PushGossipFrequency       Duration         `json:"push-gossip-frequency"`
-	PullGossipFrequency       Duration         `json:"pull-gossip-frequency"`
-	RegossipFrequency         Duration         `json:"regossip-frequency"`
-	PriorityRegossipAddresses []common.Address `json:"priority-regossip-addresses"`
+	PushGossipPercentStake    float64  `json:"push-gossip-percent-stake"`
+	PushGossipNumValidators   int      `json:"push-gossip-num-validators"`
+	PushGossipNumPeers        int      `json:"push-gossip-num-peers"`
+	PushRegossipNumValidators int      `json:"push-regossip-num-validators"`
+	PushRegossipNumPeers      int      `json:"push-regossip-num-peers"`
+	PushGossipFrequency       Duration `json:"push-gossip-frequency"`
+	PullGossipFrequency       Duration `json:"pull-gossip-frequency"`
+	RegossipFrequency         Duration `json:"regossip-frequency"`
 
 	// Log
 	LogLevel      string `json:"log-level"`
 	LogJSONFormat bool   `json:"log-json-format"`
-
-	// Address for Tx Fees (must be empty if not supported by blockchain)
-	FeeRecipient string `json:"feeRecipient"`
 
 	// Offline Pruning Settings
 	OfflinePruning                bool   `json:"offline-pruning-enabled"`
@@ -129,7 +119,8 @@ type Config struct {
 	MaxOutboundActiveRequests int64 `json:"max-outbound-active-requests"`
 
 	// Sync settings
-	StateSyncEnabled         bool   `json:"state-sync-enabled"`
+	// StateSyncEnabled uses a pointer to distinguish false (no state sync) from not set (state sync only at genesis).
+	StateSyncEnabled         *bool  `json:"state-sync-enabled"`
 	StateSyncSkipResume      bool   `json:"state-sync-skip-resume"` // Forces state sync to use the highest available summary block
 	StateSyncServerTrieCache int    `json:"state-sync-server-trie-cache"`
 	StateSyncIDs             string `json:"state-sync-ids"`
@@ -177,109 +168,46 @@ type Config struct {
 	BatchRequestLimit    uint64 `json:"batch-request-limit"`
 	BatchResponseMaxSize uint64 `json:"batch-response-max-size"`
 
-	// Database settings
+	// Database Scheme
+	StateScheme string `json:"state-scheme"`
+}
+
+// CChainConfig contains C-Chain specific configuration.
+type CChainConfig struct {
+	CommonConfig
+
+	// GasTarget is the target gas per second that this node will attempt to use
+	// when creating blocks. If this config is not specified, the node will
+	// default to use the parent block's target gas per second.
+	GasTarget *gas.Gas `json:"gas-target,omitempty"`
+
+	// Price Option Settings (C-Chain specific)
+	PriceOptionSlowFeePercentage uint64 `json:"price-options-slow-fee-percentage"`
+	PriceOptionFastFeePercentage uint64 `json:"price-options-fast-fee-percentage"`
+	PriceOptionMaxTip            uint64 `json:"price-options-max-tip"`
+}
+
+// L1Config contains L1 (subnet-evm) specific configuration.
+type L1Config struct {
+	CommonConfig
+
+	// Airdrop
+	AirdropFile string `json:"airdrop"`
+
+	// Subnet EVM APIs
+	ValidatorsAPIEnabled bool `json:"validators-api-enabled"`
+
+	// Gossip Settings (L1 specific)
+	PriorityRegossipAddresses []common.Address `json:"priority-regossip-addresses"`
+
+	// Address for Tx Fees (must be empty if not supported by blockchain)
+	FeeRecipient string `json:"feeRecipient"`
+
+	// Database settings (L1 specific)
 	UseStandaloneDatabase *PBool `json:"use-standalone-database"`
 	DatabaseConfigContent string `json:"database-config"`
 	DatabaseConfigFile    string `json:"database-config-file"`
 	DatabaseType          string `json:"database-type"`
 	DatabasePath          string `json:"database-path"`
 	DatabaseReadOnly      bool   `json:"database-read-only"`
-
-	// Database Scheme
-	StateScheme string `json:"state-scheme"`
-}
-
-// GetConfig returns a new config object with the default values set and the
-// deprecation message.
-// If configBytes is not empty, it will be unmarshalled into the config object.
-// If the unmarshalling fails, an error is returned.
-// If the config is invalid, an error is returned.
-func GetConfig(configBytes []byte, networkID uint32) (Config, string, error) {
-	config := NewDefaultConfig()
-	if len(configBytes) > 0 {
-		if err := json.Unmarshal(configBytes, &config); err != nil {
-			return Config{}, "", fmt.Errorf("failed to unmarshal config %s: %w", string(configBytes), err)
-		}
-	}
-	if err := config.validate(networkID); err != nil {
-		return Config{}, "", err
-	}
-	// We should deprecate config flags as the first thing, before we do anything else
-	// because this can set old flags to new flags. log the message after we have
-	// initialized the logger.
-	deprecateMsg := config.deprecate()
-	return config, deprecateMsg, nil
-}
-
-// EthAPIs returns an array of strings representing the Eth APIs that should be enabled
-func (c Config) EthAPIs() []string {
-	return c.EnabledEthAPIs
-}
-
-func (d *Duration) UnmarshalJSON(data []byte) (err error) {
-	var v interface{}
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
-	}
-	d.Duration, err = cast.ToDurationE(v)
-	return err
-}
-
-// String implements the stringer interface.
-func (d Duration) String() string {
-	return d.Duration.String()
-}
-
-// String implements the stringer interface.
-func (d Duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Duration.String())
-}
-
-// validate returns an error if this is an invalid config.
-func (c *Config) validate(uint32) error {
-	if c.PopulateMissingTries != nil && (c.OfflinePruning || c.Pruning) {
-		return fmt.Errorf("cannot enable populate missing tries while offline pruning (enabled: %t)/pruning (enabled: %t) are enabled", c.OfflinePruning, c.Pruning)
-	}
-	if c.PopulateMissingTries != nil && c.PopulateMissingTriesParallelism < 1 {
-		return fmt.Errorf("cannot enable populate missing tries without at least one reader (parallelism: %d)", c.PopulateMissingTriesParallelism)
-	}
-
-	if !c.Pruning && c.OfflinePruning {
-		return errors.New("cannot run offline pruning while pruning is disabled")
-	}
-	// If pruning is enabled, the commit interval must be non-zero so the node commits state tries every CommitInterval blocks.
-	if c.Pruning && c.CommitInterval == 0 {
-		return errors.New("cannot use commit interval of 0 with pruning enabled")
-	}
-	if c.Pruning && c.StateHistory == 0 {
-		return errors.New("cannot use state history of 0 with pruning enabled")
-	}
-
-	if c.PushGossipPercentStake < 0 || c.PushGossipPercentStake > 1 {
-		return fmt.Errorf("push-gossip-percent-stake is %f but must be in the range [0, 1]", c.PushGossipPercentStake)
-	}
-	return nil
-}
-
-// deprecate returns a string of deprecation messages for the config.
-// This is used to log a message when the config is loaded and contains deprecated flags.
-// This function should be kept as a placeholder even if it is empty.
-func (*Config) deprecate() string {
-	msg := ""
-
-	return msg
-}
-
-func (p *PBool) String() string {
-	if p == nil {
-		return "nil"
-	}
-	return fmt.Sprintf("%t", *p)
-}
-
-func (p *PBool) Bool() bool {
-	if p == nil {
-		return false
-	}
-	return bool(*p)
 }
