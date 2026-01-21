@@ -302,7 +302,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 
 	s.ctx.Log.Debug("sent message",
 		zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
-		zap.Stringers("nodeIDs", nodeIDs.List()),
+		zap.Stringers("nodeIDs", sentTo.List()),
 		zap.Uint32("requestID", requestID),
 		zap.Uint64s("heights", heights),
 	)
@@ -447,7 +447,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 
 	s.ctx.Log.Debug("sent message",
 		zap.Stringer("messageOp", message.GetAcceptedFrontierOp),
-		zap.Stringers("nodeIDs", nodeIDs.List()),
+		zap.Stringers("nodeIDs", sentTo.List()),
 		zap.Uint32("requestID", requestID),
 	)
 
@@ -593,7 +593,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 
 	s.ctx.Log.Debug("sent message",
 		zap.Stringer("messageOp", message.GetAcceptedOp),
-		zap.Stringers("nodeIDs", nodeIDs.List()),
+		zap.Stringers("nodeIDs", sentTo.List()),
 		zap.Uint32("requestID", requestID),
 		zap.Stringers("containerIDs", containerIDs),
 	)
@@ -1037,7 +1037,7 @@ func (s *sender) SendPushQuery(
 
 	s.ctx.Log.Debug("sent message",
 		zap.Stringer("messageOp", message.PushQueryOp),
-		zap.Stringers("nodeIDs", nodeIDs.List()),
+		zap.Stringers("nodeIDs", sentTo.List()),
 		zap.Uint32("requestID", requestID),
 		zap.Uint64("requestedHeight", requestedHeight),
 	)
@@ -1177,7 +1177,7 @@ func (s *sender) SendPullQuery(
 
 	s.ctx.Log.Debug("sent message",
 		zap.Stringer("messageOp", message.PullQueryOp),
-		zap.Stringers("nodeIDs", nodeIDs.List()),
+		zap.Stringers("nodeIDs", sentTo.List()),
 		zap.Uint32("requestID", requestID),
 		zap.Stringer("containerID", containerID),
 		zap.Uint64("requestedHeight", requestedHeight),
