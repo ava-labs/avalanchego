@@ -39,7 +39,7 @@ func TestHandler(t *testing.T) {
 				msg, err := warp.NewUnsignedMessage(
 					uint32(123),
 					ids.ID{1, 2, 3},
-					[]byte("payload"),
+					[]byte("foobar"),
 				)
 				require.NoError(t, err)
 
@@ -61,7 +61,7 @@ func TestHandler(t *testing.T) {
 				msg, err := warp.NewUnsignedMessage(
 					uint32(123),
 					ids.ID{1, 2, 3},
-					[]byte("payload"),
+					[]byte("foobar"),
 				)
 				require.NoError(t, err)
 
@@ -79,7 +79,7 @@ func TestHandler(t *testing.T) {
 				msg, err := warp.NewUnsignedMessage(
 					uint32(123),
 					ids.ID{1, 2, 3},
-					[]byte("payload"),
+					[]byte("foobar"),
 				)
 				require.NoError(t, err)
 
@@ -103,7 +103,7 @@ func TestHandler(t *testing.T) {
 				msg, err := warp.NewUnsignedMessage(
 					uint32(456),
 					ids.ID{1, 2, 3},
-					[]byte("payload"),
+					[]byte("foobar"),
 				)
 				require.NoError(t, err)
 
@@ -121,7 +121,7 @@ func TestHandler(t *testing.T) {
 				msg, err := warp.NewUnsignedMessage(
 					uint32(123),
 					ids.ID{4, 5, 6},
-					[]byte("payload"),
+					[]byte("foobar"),
 				)
 				require.NoError(t, err)
 
