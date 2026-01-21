@@ -13,6 +13,7 @@ members = [
     "crates/avalanche-api",
     "crates/avm",
     "crates/avalanche-node",
+    "crates/avalanche-crypto",
 ]
 
 [workspace.package]
@@ -36,6 +37,7 @@ platformvm = { path = "crates/platformvm" }
 avalanche-api = { path = "crates/avalanche-api" }
 avm = { path = "crates/avm" }
 avalanche-node = { path = "crates/avalanche-node" }
+avalanche-crypto = { path = "crates/avalanche-crypto" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -51,11 +53,15 @@ prost = "0.12"
 
 # Cryptography
 sha2 = "0.10"
+sha3 = "0.10"
 ripemd = "0.1"
 bs58 = "0.5"
 rustls = "0.22"
 tokio-rustls = "0.25"
 x509-parser = "0.16"
+k256 = { version = "0.13", features = ["ecdsa", "sha256"] }
+blst = "0.3"
+zeroize = { version = "1.7", features = ["derive"] }
 
 # Compression
 zstd = "0.13"

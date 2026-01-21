@@ -8,12 +8,20 @@
 
 mod codec;
 mod config;
+mod connection;
+mod network;
 mod peer;
+mod peer_manager;
+mod tls;
 mod version;
 
 pub use codec::{MessageCodec, MessageFrame};
 pub use config::{NetworkConfig, PeerConfig, TimeoutConfig};
+pub use connection::Connection;
+pub use network::NetworkImpl;
 pub use peer::{PeerInfo, PeerState, SignedIp, UnsignedIp};
+pub use peer_manager::{PeerEvent, PeerManager};
+pub use tls::{node_id_from_cert, TlsConfig};
 pub use version::{Version, AVALANCHE_RS_CLIENT_NAME};
 
 use std::collections::HashSet;

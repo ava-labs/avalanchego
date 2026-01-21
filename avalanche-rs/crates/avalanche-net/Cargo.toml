@@ -27,6 +27,10 @@ prost = { workspace = true }
 rustls = { workspace = true }
 tokio-rustls = { workspace = true }
 x509-parser = { workspace = true }
+rustls-pemfile = "2"
+
+# Crypto
+sha2 = { workspace = true }
 
 # Error handling
 thiserror = { workspace = true }

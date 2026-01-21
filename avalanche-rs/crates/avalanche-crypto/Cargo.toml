@@ -1,0 +1,28 @@
+[package]
+name = "avalanche-crypto"
+description = "Cryptographic primitives for Avalanche (secp256k1, BLS)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+avalanche-ids = { workspace = true }
+k256 = { workspace = true }
+blst = { workspace = true }
+sha2 = { workspace = true }
+sha3 = { workspace = true }
+ripemd = { workspace = true }
+rand = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+hex = { workspace = true }
+zeroize = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+
+[lints]
+workspace = true

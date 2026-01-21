@@ -12,6 +12,10 @@ pub struct NetworkConfig {
     pub node_id: NodeId,
     /// This node's listening address.
     pub listen_addr: SocketAddr,
+    /// Host to listen on.
+    pub listen_host: std::net::IpAddr,
+    /// Staking port.
+    pub staking_port: u16,
     /// Network ID (1 for mainnet, 5 for fuji).
     pub network_id: u32,
     /// Maximum number of inbound connections.
@@ -28,6 +32,10 @@ pub struct NetworkConfig {
     pub allow_private_ips: bool,
     /// Whether to require connecting peers to be validators.
     pub require_validator_to_connect: bool,
+    /// Bootstrap node addresses.
+    pub bootstrap_nodes: Vec<String>,
+    /// Number of peers to gossip to.
+    pub gossip_size: usize,
 }
 
 impl Default for NetworkConfig {
@@ -35,6 +43,8 @@ impl Default for NetworkConfig {
         Self {
             node_id: NodeId::EMPTY,
             listen_addr: "0.0.0.0:9651".parse().unwrap(),
+            listen_host: std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
+            staking_port: 9651,
             network_id: 1, // Mainnet
             max_inbound: 80,
             max_outbound: 20,
@@ -43,6 +53,8 @@ impl Default for NetworkConfig {
             health: HealthConfig::default(),
             allow_private_ips: false,
             require_validator_to_connect: false,
+            bootstrap_nodes: Vec::new(),
+            gossip_size: 10,
         }
     }
 }
