@@ -282,7 +282,7 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 		return n.sdkNetwork.AppRequest(ctx, nodeID, requestID, deadline, request)
 	}
 
-	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n)
+	bufferedDeadline, err := n.timeUntil(deadline)
 	if err != nil {
 		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "err", err)
 		return nil
@@ -351,7 +351,7 @@ func (n *network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reque
 	return handler.OnFailure()
 }
 
-// calculateTimeUntilDeadline calculates the time until deadline and drops it if we missed he deadline to response.
+// timeUntil calculates the time until deadline and drops it if we missed he deadline to response.
 // This function updates metrics for app requests.
 // This is called by [AppRequest].
 func (n *network) timeUntil(deadline time.Time) (time.Time, error) {
