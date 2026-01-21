@@ -39,10 +39,7 @@ func NewTestValidatorState() *validatorstest.State {
 			return subnetID, nil
 		},
 		GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
-			return nil, nil
-		},
-		GetWarpValidatorSetF: func(context.Context, uint64, ids.ID) (validators.WarpSet, error) {
-			return validators.WarpSet{}, nil
+			return map[ids.ID]validators.WarpSet{}, nil
 		},
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
