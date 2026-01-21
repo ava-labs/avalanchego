@@ -57,7 +57,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
