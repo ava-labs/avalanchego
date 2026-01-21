@@ -66,7 +66,6 @@ func (e *evmDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]b
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
-
 	return nextKey, nil
 }
 

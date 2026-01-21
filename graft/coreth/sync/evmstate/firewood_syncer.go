@@ -6,6 +6,7 @@ package evmstate
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
@@ -19,11 +20,16 @@ import (
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
-var _ syncpkg.Syncer = (*firewoodSyncer)(nil)
+var (
+	_ syncpkg.Syncer   = (*FirewoodSyncer)(nil)
+	_ syncpkg.Finalizer = (*FirewoodSyncer)(nil)
+)
 
-type firewoodSyncer struct {
+type FirewoodSyncer struct {
 	s         *xsync.Syncer[*syncer.RangeProof, struct{}]
 	codeQueue *code.Queue
+	// finalizeOnce is initialized in the constructor to make Finalize idempotent.
+	finalizeOnce func() error
 }
 
 func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue *code.Queue, rangeProofClient, changeProofClient *p2p.Client) (syncpkg.Syncer, error) {
@@ -38,13 +44,22 @@ func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Has
 	if err != nil {
 		return nil, err
 	}
-	return &firewoodSyncer{
+	fw := &FirewoodSyncer{
 		s:         s,
 		codeQueue: codeQueue,
-	}, nil
+	}
+	fw.finalizeOnce = sync.OnceValue(func() error {
+		// Ensure the syncer stops work and the code queue closes on exit.
+		fw.s.Close()
+		if err := fw.codeQueue.Finalize(); err != nil {
+			return fmt.Errorf("finalizing code queue: %w", err)
+		}
+		return nil
+	})
+	return fw, nil
 }
 
-func (f *firewoodSyncer) Sync(ctx context.Context) error {
+func (f *FirewoodSyncer) Sync(ctx context.Context) error {
 	if err := f.s.Start(ctx); err != nil {
 		return fmt.Errorf("starting syncer: %w", err)
 	}
@@ -53,17 +68,17 @@ func (f *firewoodSyncer) Sync(ctx context.Context) error {
 		return fmt.Errorf("waiting for syncer: %w", err)
 	}
 
-	if err := f.codeQueue.Finalize(); err != nil {
-		return fmt.Errorf("finalizing code queue: %w", err)
-	}
-
-	return nil
+	return f.Finalize()
 }
 
-func (*firewoodSyncer) ID() string {
+func (*FirewoodSyncer) ID() string {
 	return "state_firewood_sync"
 }
 
-func (*firewoodSyncer) Name() string {
+func (*FirewoodSyncer) Name() string {
 	return "Firewood EVM State Syncer"
+}
+
+func (f *FirewoodSyncer) Finalize() error {
+	return f.finalizeOnce()
 }
