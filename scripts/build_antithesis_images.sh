@@ -110,12 +110,9 @@ else
          AVAGO_PLUGIN_DIR="${AVALANCHE_PATH}/build/plugins" \
          go run ./tests/antithesis/gencomposeconfig)
   else
-    # xsvm and others are in the root module
-    if [[ "${TEST_SETUP}" == "xsvm" ]]; then
-      gencomposeconfig_path="${AVALANCHE_PATH}/tests/antithesis/xsvm/gencomposeconfig"
-    fi
+    # xsvm is in the root module
     gen_antithesis_compose_config "${IMAGE_TAG}" \
-      "${gencomposeconfig_path}" \
+      "${AVALANCHE_PATH}/tests/antithesis/xsvm/gencomposeconfig" \
       "${AVALANCHE_PATH}/build/antithesis/${TEST_SETUP}" \
       "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVAGO_PLUGIN_DIR=${AVALANCHE_PATH}/build/plugins"
   fi
