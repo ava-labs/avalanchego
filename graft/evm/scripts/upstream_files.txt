@@ -3,4 +3,3 @@ core/*
 triedb/*
 
 !core/state/snapshot/snapshot_ext.go
-!rpc/main_test.go
