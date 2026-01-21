@@ -259,29 +259,28 @@ The benchmarks support testing with custom versions of `libevm` and `firewood` d
 
 ### Local Usage
 
-**Prerequisite**: You must be in a nix shell (`nix develop`) to run benchmark tasks (`c-chain-reexecution-*`) .
+**Prerequisite**: You must be in a nix shell (`nix develop`) to run benchmark tasks.
 
-Pass `LIBEVM_REF` and/or `FIREWOOD_REF` to any benchmark task:
+First, set up dependencies using the `setup-reexecution-deps` task, then run the benchmark:
 
 ```bash
 # Test with custom firewood version
-./scripts/run_task.sh c-chain-reexecution-firewood-101-250k FIREWOOD_REF=abc123def
+FIREWOOD_REF=abc123def ./scripts/run_task.sh setup-reexecution-deps
+./scripts/run_task.sh test-cchain-reexecution -- firewood-101-250k
 
 # Test with custom libevm version
-./scripts/run_task.sh c-chain-reexecution-firewood-101-250k LIBEVM_REF=v1.2.3
+LIBEVM_REF=v1.2.3 ./scripts/run_task.sh setup-reexecution-deps
+./scripts/run_task.sh test-cchain-reexecution -- firewood-101-250k
 
 # Test with both custom versions
-./scripts/run_task.sh c-chain-reexecution-firewood-101-250k \
-  FIREWOOD_REF=abc123def \
-  LIBEVM_REF=v1.2.3
+FIREWOOD_REF=abc123def LIBEVM_REF=v1.2.3 ./scripts/run_task.sh setup-reexecution-deps
+./scripts/run_task.sh test-cchain-reexecution -- firewood-101-250k
 ```
-
-**Note**: `FIREWOOD_REF` only takes effect when `CONFIG=firewood`. For hashdb benchmarks, it will be ignored.
 
 ### How It Works
 
 - **`LIBEVM_REF`**: Runs `go get github.com/ava-labs/libevm@<ref>` to update the dependency
-- **`FIREWOOD_REF`**: Uses [polyrepo](../../../scripts/run_polyrepo.sh) to clone, build (via Nix), and configure firewood at the specified ref
+- **`FIREWOOD_REF`**: Uses [polyrepo](../../../scripts/run_polyrepo.sh) to sync firewood at the specified ref
 
 ### CI Usage
 
@@ -370,14 +369,14 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
 ```bash
 # Test with custom firewood commit
 gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
-  -f task=c-chain-reexecution-firewood-101-250k \
+  -f test=firewood-101-250k \
   -f with-dependencies=firewood=abc123def \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f timeout-minutes=60
 
 # Test with custom libevm and firewood
 gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
-  -f task=c-chain-reexecution-firewood-101-250k \
+  -f test=firewood-101-250k \
   -f with-dependencies="firewood=abc123def,libevm=v1.2.3" \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f timeout-minutes=60
@@ -400,7 +399,7 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
 
 ```bash
 gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
-  -f task=c-chain-reexecution-hashdb-101-250k \
+  -f test=hashdb-101-250k \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f push-post-state=s3://avalanchego-bootstrap-testing/cchain-current-state-new/ \
   -f timeout-minutes=60
