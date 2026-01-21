@@ -100,7 +100,7 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 	require.NoError(t, err)
 }
 
-func Test_Firewood_Sync_WithUpdate(t *testing.T) {
+func Test_Firewood_Sync_UpdateSyncTarget(t *testing.T) {
 	tests := []struct {
 		name                    string
 		clientSize              int
@@ -142,49 +142,47 @@ func Test_Firewood_Sync_WithUpdate(t *testing.T) {
 func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequestsBeforeUpdate int) {
 	r := rand.New(rand.NewSource(1))
 
-	serverDB, root := generateDB(t, r, serverKeys)
+	serverDB, firstRoot := generateDB(t, r, serverKeys)
 	clientDB, _ := generateDB(t, r, clientKeys)
 	defer func() {
 		require.NoError(t, serverDB.Close(t.Context()))
 		require.NoError(t, clientDB.Close(t.Context()))
 	}()
-	newRoot := fillDB(t, r, serverDB, serverKeys)
+	wantRoot := fillDB(t, r, serverDB, serverKeys)
 
 	intercept := &p2p.TestHandler{}
 
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
+
 	syncer, err := New(
 		Config{},
 		clientDB,
-		root,
+		firstRoot,
 		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, intercept),
 		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, syncer)
 
-	var errIntercept error
 	synctest.AddFuncOnIntercept(intercept, NewGetRangeProofHandler(serverDB), func() {
-		errIntercept = syncer.UpdateSyncTarget(newRoot)
-		if errIntercept != nil {
-			cancel()
+		err := syncer.UpdateSyncTarget(wantRoot)
+		if err != nil {
+			cancel(err)
 		}
 	}, numRequestsBeforeUpdate)
 
 	require.NoError(t, syncer.Start(ctx))
-
 	err = syncer.Wait(ctx)
-	require.NoError(t, errIntercept)
 	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
 		logDiff(t, serverDB, clientDB)
 	}
 	require.NoError(t, err)
 
-	finalRoot, rootErr := clientDB.Root()
-	require.NoError(t, rootErr)
-	require.Equal(t, newRoot, ids.ID(finalRoot))
+	gotRoot, err := clientDB.Root()
+	require.NoError(t, err)
+	require.Equal(t, wantRoot, ids.ID(gotRoot))
 }
 
 // generateDB creates a new Firewood database with up to [numKeys] random key/value pairs.

@@ -436,8 +436,8 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 	actionHandler := &p2p.TestHandler{}
 
-	ctx, cancel := context.WithCancel(t.Context())
-	t.Cleanup(cancel)
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
 	syncer, err := xsync.NewSyncer(
 		db,
 		xsync.Config[*RangeProof, *ChangeProof]{
@@ -455,17 +455,15 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Allow 1 request to go through before blocking
-	var errIntercept error
 	synctest.AddFuncOnIntercept(actionHandler, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
-		errIntercept = syncer.UpdateSyncTarget(secondSyncRoot)
-		if errIntercept != nil {
-			cancel()
+		err := syncer.UpdateSyncTarget(secondSyncRoot)
+		if err != nil {
+			cancel(err)
 		}
 	}, 1)
 
 	require.NoError(syncer.Start(ctx))
 	err = syncer.Wait(ctx)
-	require.NoError(errIntercept)
 	require.NoError(err)
 	require.NoError(syncer.Error())
 
@@ -476,8 +474,8 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require := require.New(t)
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -518,17 +516,15 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	var errIntercept error
 	synctest.AddFuncOnIntercept(actionHandler, rangeProofHandler, func() {
-		errIntercept = m.UpdateSyncTarget(root1)
-		if errIntercept != nil {
-			cancel()
+		err := m.UpdateSyncTarget(root1)
+		if err != nil {
+			cancel(err)
 		}
 	}, 0)
 
 	require.NoError(m.Start(ctx))
 	err = m.Wait(ctx)
-	require.NoError(errIntercept)
 	require.NoError(err)
 }
 
