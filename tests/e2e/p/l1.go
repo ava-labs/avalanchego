@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -205,7 +205,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		tc.By("connecting to the genesis validator")
 		var (
 			networkID           = env.GetNetwork().GetNetworkID()
-			genesisPeerMessages = buffer.NewUnboundedBlockingDeque[p2pmessage.InboundMessage](1)
+			genesisPeerMessages = buffer.NewUnboundedBlockingDeque[*p2pmessage.InboundMessage](1)
 		)
 		stakingAddress, cancel, err := subnetGenesisNode.GetAccessibleStakingAddress(tc.DefaultContext())
 		require.NoError(err)
@@ -214,11 +214,11 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			tc.DefaultContext(),
 			stakingAddress,
 			networkID,
-			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
+			router.InboundHandlerFunc(func(_ context.Context, m *p2pmessage.InboundMessage) {
 				tc.Log().Info("received a message",
-					zap.Stringer("op", m.Op()),
-					zap.Stringer("message", m.Message()),
-					zap.Stringer("from", m.NodeID()),
+					zap.Stringer("op", m.Op),
+					zap.Stringer("message", m.Message),
+					zap.Stringer("from", m.NodeID),
 				)
 				genesisPeerMessages.PushRight(m)
 			}),
@@ -846,7 +846,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 func wrapWarpSignatureRequest(
 	msg *warp.UnsignedMessage,
 	justification []byte,
-) (p2pmessage.OutboundMessage, error) {
+) (*p2pmessage.OutboundMessage, error) {
 	p2pMessageFactory, err := p2pmessage.NewCreator(
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
@@ -877,10 +877,10 @@ func wrapWarpSignatureRequest(
 }
 
 func findMessage[T any](
-	q buffer.BlockingDeque[p2pmessage.InboundMessage],
-	parser func(p2pmessage.InboundMessage) (T, bool, error),
+	q buffer.BlockingDeque[*p2pmessage.InboundMessage],
+	parser func(*p2pmessage.InboundMessage) (T, bool, error),
 ) (T, bool, error) {
-	var messagesToReprocess []p2pmessage.InboundMessage
+	var messagesToReprocess []*p2pmessage.InboundMessage
 	defer func() {
 		slices.Reverse(messagesToReprocess)
 		for _, msg := range messagesToReprocess {
@@ -908,9 +908,9 @@ func findMessage[T any](
 
 // unwrapWarpSignature assumes the only type of AppResponses that will be
 // received are ACP-118 compliant responses.
-func unwrapWarpSignature(msg p2pmessage.InboundMessage) (*bls.Signature, bool, error) {
+func unwrapWarpSignature(msg *p2pmessage.InboundMessage) (*bls.Signature, bool, error) {
 	var appResponse *p2ppb.AppResponse
-	switch msg := msg.Message().(type) {
+	switch msg := msg.Message.(type) {
 	case *p2ppb.AppResponse:
 		appResponse = msg
 	case *p2ppb.AppError:

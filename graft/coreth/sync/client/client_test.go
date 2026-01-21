@@ -1,7 +1,7 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesyncclient
+package client
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 
 	clientstats "github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
@@ -94,7 +94,7 @@ func TestGetCode(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			testNetClient := &testNetwork{}
-			stateSyncClient := NewClient(&ClientConfig{
+			stateSyncClient := New(&Config{
 				NetworkClient:    testNetClient,
 				Codec:            message.Codec,
 				Stats:            clientstats.NewNoOpStats(),
@@ -323,7 +323,7 @@ func TestGetBlocks(t *testing.T) {
 			t.Parallel()
 			// Construct client
 			testNetClient := &testNetwork{}
-			stateSyncClient := NewClient(&ClientConfig{
+			stateSyncClient := New(&Config{
 				NetworkClient:    testNetClient,
 				Codec:            message.Codec,
 				Stats:            clientstats.NewNoOpStats(),
@@ -376,8 +376,8 @@ func TestGetLeafs(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	largeTrieRoot, largeTrieKeys, _ := statesynctest.GenerateTrie(t, r, trieDB, 100_000, common.HashLength)
-	smallTrieRoot, _, _ := statesynctest.GenerateTrie(t, r, trieDB, leafsLimit, common.HashLength)
+	largeTrieRoot, largeTrieKeys, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100_000, common.HashLength)
+	smallTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, leafsLimit, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 
@@ -661,7 +661,7 @@ func TestGetLeafs(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			client := NewClient(&ClientConfig{
+			client := New(&Config{
 				NetworkClient:    &testNetwork{},
 				Codec:            message.Codec,
 				Stats:            clientstats.NewNoOpStats(),
@@ -687,13 +687,13 @@ func TestGetLeafsRetries(t *testing.T) {
 	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	root, _, _ := statesynctest.GenerateTrie(t, r, trieDB, 100_000, common.HashLength)
+	root, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100_000, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	testNetClient := &testNetwork{}
 
 	const maxAttempts = 8
-	client := NewClient(&ClientConfig{
+	client := New(&Config{
 		NetworkClient:    testNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
@@ -751,7 +751,7 @@ func TestStateSyncNodes(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		ids.GenerateTestNodeID(),
 	}
-	client := NewClient(&ClientConfig{
+	client := New(&Config{
 		NetworkClient:    testNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),

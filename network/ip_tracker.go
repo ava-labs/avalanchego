@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -552,9 +552,10 @@ func (i *ipTracker) updateMostRecentTrackedIP(node *trackedNode, ip *ips.Claimed
 		return
 	}
 
-	i.bloomAdditions[ip.NodeID] = oldCount + 1
-	bloom.Add(i.bloom, ip.GossipID[:], i.bloomSalt)
-	i.bloomMetrics.Count.Inc()
+	if bloom.Add(i.bloom, ip.GossipID[:], i.bloomSalt) {
+		i.bloomAdditions[ip.NodeID] = oldCount + 1
+		i.bloomMetrics.Count.Inc()
+	}
 }
 
 // ResetBloom prunes the current bloom filter. This must be called periodically

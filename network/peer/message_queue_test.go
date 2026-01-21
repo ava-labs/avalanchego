@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -18,7 +18,7 @@ func TestMessageQueue(t *testing.T) {
 
 	expectFail := false
 	q := NewBlockingMessageQueue(
-		SendFailedFunc(func(message.OutboundMessage) {
+		SendFailedFunc(func(*message.OutboundMessage) {
 			require.True(expectFail)
 		}),
 		logging.NoLog{},
@@ -26,7 +26,7 @@ func TestMessageQueue(t *testing.T) {
 	)
 
 	mc := newMessageCreator(t)
-	msgs := []message.OutboundMessage{}
+	msgs := []*message.OutboundMessage{}
 	numToSend := 10
 
 	// Assert that the messages are popped in the same order they were pushed

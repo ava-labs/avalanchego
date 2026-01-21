@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vmtest
@@ -15,12 +15,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	commoneng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -125,9 +125,7 @@ func OverrideSchemeConfig(scheme string, configJSON string) (string, error) {
 	// Set Firewood-specific configuration flags (these will override any existing values)
 	configMap["state-scheme"] = customrawdb.FirewoodScheme
 	configMap["snapshot-cache"] = 0
-	configMap["pruning-enabled"] = true
 	configMap["state-sync-enabled"] = false
-	configMap["metrics-expensive-enabled"] = false
 
 	// Marshal back to JSON
 	result, err := json.Marshal(configMap)

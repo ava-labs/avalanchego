@@ -2,30 +2,18 @@
     "pull_request": {
         "include": [
             {
-                "runner": "ubuntu-latest",
-                "config": "default",
-                "start-block": 101,
-                "end-block": 250000,
-                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
+              "runner": "ubuntu-latest",
+              "test": "hashdb-101-250k",
+              "timeout-minutes": 30
+            },
+            {
+                "runner": "blacksmith-4vcpu-ubuntu-2404",
+                "test": "hashdb-101-250k",
                 "timeout-minutes": 30
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
-                "config": "default",
-                "start-block": 101,
-                "end-block": 250000,
-                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
-                "timeout-minutes": 30
-            },
-            {
-                "runner": "blacksmith-4vcpu-ubuntu-2404",
-                "config": "archive",
-                "start-block": 101,
-                "end-block": 250000,
-                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-archive-100/**",
+                "test": "hashdb-archive-101-250k",
                 "timeout-minutes": 30
             }
         ]

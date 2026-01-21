@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gvalidators
@@ -64,21 +64,6 @@ func (s *Server) GetWarpValidatorSets(ctx context.Context, req *pb.GetWarpValida
 	}
 	return &pb.GetWarpValidatorSetsResponse{
 		ValidatorSets: proto,
-	}, nil
-}
-
-func (s *Server) GetWarpValidatorSet(ctx context.Context, req *pb.GetWarpValidatorSetRequest) (*pb.GetWarpValidatorSetResponse, error) {
-	subnetID, err := ids.ToID(req.SubnetId)
-	if err != nil {
-		return nil, err
-	}
-	validatorSet, err := s.state.GetWarpValidatorSet(ctx, req.Height, subnetID)
-	if err != nil {
-		return nil, err
-	}
-	return &pb.GetWarpValidatorSetResponse{
-		TotalWeight: validatorSet.TotalWeight,
-		Validators:  warpValidatorsToProto(validatorSet.Validators),
 	}, nil
 }
 

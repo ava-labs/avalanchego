@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -22,10 +22,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/atomictest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 
-	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 )
 
@@ -71,7 +72,7 @@ func TestSyncerScenarios(t *testing.T) {
 			r := rand.New(rand.NewSource(1))
 			targetHeight := 10 * uint64(testCommitInterval)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-			root, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
+			root, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
 
 			testSyncer(t, serverTrieDB, targetHeight, root, nil, int64(targetHeight), tt.numWorkers)
 		})
@@ -108,7 +109,7 @@ func TestSyncerResumeScenarios(t *testing.T) {
 			targetHeight := 10 * uint64(testCommitInterval)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 			numTrieKeys := int(targetHeight) - 1 // no atomic ops for genesis
-			root, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, numTrieKeys, state.TrieKeyLength)
+			root, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, numTrieKeys, state.TrieKeyLength)
 
 			testSyncer(t, serverTrieDB, targetHeight, root, []atomicSyncTestCheckpoint{
 				{
@@ -152,11 +153,11 @@ func TestSyncerResumeNewRootCheckpointScenarios(t *testing.T) {
 			targetHeight1 := 10 * uint64(testCommitInterval)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 			numTrieKeys1 := int(targetHeight1) - 1 // no atomic ops for genesis
-			root1, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, numTrieKeys1, state.TrieKeyLength)
+			root1, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, numTrieKeys1, state.TrieKeyLength)
 
 			targetHeight2 := 20 * uint64(testCommitInterval)
 			numTrieKeys2 := int(targetHeight2) - 1 // no atomic ops for genesis
-			root2, _, _ := statesynctest.FillTrie(
+			root2, _, _ := synctest.FillIndependentTrie(
 				t, r, numTrieKeys1, numTrieKeys2, state.TrieKeyLength, serverTrieDB, root1,
 			)
 
@@ -218,11 +219,11 @@ func TestSyncerContextCancellation(t *testing.T) {
 
 // setupParallelizationTest creates the common test infrastructure for parallelization tests.
 // It returns the context, mock client, atomic backend, client DB, and root hash for testing.
-func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Context, *syncclient.TestClient, *state.AtomicBackend, *versiondb.Database, common.Hash) {
+func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Context, *client.TestClient, *state.AtomicBackend, *versiondb.Database, common.Hash) {
 	// Create a simple test trie with some data.
 	r := rand.New(rand.NewSource(1))
 	serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	root, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
+	root, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
 
 	ctx, mockClient, atomicBackend, clientDB := setupTestInfrastructure(t, serverTrieDB)
 
@@ -230,7 +231,7 @@ func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Contex
 }
 
 // runParallelizationTest executes a parallelization test with the given parameters.
-func runParallelizationTest(t *testing.T, ctx context.Context, mockClient *syncclient.TestClient, clientDB *versiondb.Database, atomicBackend *state.AtomicBackend, root common.Hash, targetHeight uint64, numWorkers int) {
+func runParallelizationTest(t *testing.T, ctx context.Context, mockClient *client.TestClient, clientDB *versiondb.Database, atomicBackend *state.AtomicBackend, root common.Hash, targetHeight uint64, numWorkers int) {
 	syncer, err := NewSyncer(mockClient, clientDB, atomicBackend.AtomicTrie(), root, targetHeight)
 	require.NoError(t, err, "NewSyncer()")
 
@@ -274,7 +275,7 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 		}
 
 		err = syncer.Sync(ctx)
-		require.ErrorIs(t, err, syncclient.ErrFailedToFetchLeafs)
+		require.ErrorIs(t, err, leaf.ErrFailedToFetchLeafs)
 
 		require.Equal(t, checkpoint.expectedNumLeavesSynced, int64(numLeaves), "unexpected number of leaves received at checkpoint %d", i)
 		// Replace the target root and height for the next checkpoint
@@ -304,7 +305,7 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 	// are caught here as this will only pass if all trie nodes have been written to the underlying DB
 	atomicTrie := atomicBackend.AtomicTrie()
 	clientTrieDB := atomicTrie.TrieDB()
-	statesynctest.AssertTrieConsistency(t, targetRoot, serverTrieDB, clientTrieDB, nil)
+	synctest.AssertTrieConsistency(t, targetRoot, serverTrieDB, clientTrieDB, nil)
 
 	// check all commit heights are created correctly
 	hasher := trie.NewEmpty(triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil))
@@ -343,11 +344,11 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 
 // setupTestInfrastructure creates the common test infrastructure components.
 // It returns the context, mock client, atomic backend, and client database.
-func setupTestInfrastructure(t *testing.T, serverTrieDB *triedb.Database) (context.Context, *syncclient.TestClient, *state.AtomicBackend, *versiondb.Database) {
+func setupTestInfrastructure(t *testing.T, serverTrieDB *triedb.Database) (context.Context, *client.TestClient, *state.AtomicBackend, *versiondb.Database) {
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
-	mockClient := syncclient.NewTestClient(
+	mockClient := client.NewTestClient(
 		message.Codec,
 		handlers.NewLeafsRequestHandler(serverTrieDB, state.TrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats()),
 		nil,

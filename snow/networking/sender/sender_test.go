@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender_test
@@ -292,13 +292,13 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Send messages to disconnected peers
-	externalSender.SendF = func(message.OutboundMessage, common.SendConfig, ids.ID, subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(*message.OutboundMessage, common.SendConfig, ids.ID, subnets.Allower) set.Set[ids.NodeID] {
 		return nil
 	}
 	sendAll()
 
 	// Send messages to connected peers
-	externalSender.SendF = func(_ message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(_ *message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		return config.NodeIDs
 	}
 	sendAll()
@@ -644,8 +644,8 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 
 	type test struct {
 		name                    string
-		failedMsgF              func(nodeID ids.NodeID) message.InboundMessage
-		assertMsgToMyself       func(require *require.Assertions, msg message.InboundMessage)
+		failedMsgF              func(nodeID ids.NodeID) *message.InboundMessage
+		assertMsgToMyself       func(require *require.Assertions, msg *message.InboundMessage)
 		expectedResponseOp      message.Op
 		setMsgCreatorExpect     func(msgCreator *messagemock.OutboundMsgBuilder)
 		setExternalSenderExpect func(externalSender *sendermock.ExternalSender)
@@ -655,16 +655,16 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 	tests := []test{
 		{
 			name: "GetStateSummaryFrontier",
-			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) *message.InboundMessage {
 				return message.InternalGetStateSummaryFrontierFailed(
 					nodeID,
 					ctx.ChainID,
 					requestID,
 				)
 			},
-			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				require.IsType(&p2ppb.GetStateSummaryFrontier{}, msg.Message())
-				innerMsg := msg.Message().(*p2ppb.GetStateSummaryFrontier)
+			assertMsgToMyself: func(require *require.Assertions, msg *message.InboundMessage) {
+				require.IsType(&p2ppb.GetStateSummaryFrontier{}, msg.Message)
+				innerMsg := msg.Message.(*p2ppb.GetStateSummaryFrontier)
 				require.Equal(ctx.ChainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
@@ -698,16 +698,16 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		},
 		{
 			name: "GetAcceptedStateSummary",
-			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) *message.InboundMessage {
 				return message.InternalGetAcceptedStateSummaryFailed(
 					nodeID,
 					ctx.ChainID,
 					requestID,
 				)
 			},
-			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				require.IsType(&p2ppb.GetAcceptedStateSummary{}, msg.Message())
-				innerMsg := msg.Message().(*p2ppb.GetAcceptedStateSummary)
+			assertMsgToMyself: func(require *require.Assertions, msg *message.InboundMessage) {
+				require.IsType(&p2ppb.GetAcceptedStateSummary{}, msg.Message)
+				innerMsg := msg.Message.(*p2ppb.GetAcceptedStateSummary)
 				require.Equal(ctx.ChainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
@@ -739,16 +739,16 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		},
 		{
 			name: "GetAcceptedFrontier",
-			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) *message.InboundMessage {
 				return message.InternalGetAcceptedFrontierFailed(
 					nodeID,
 					ctx.ChainID,
 					requestID,
 				)
 			},
-			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				require.IsType(&p2ppb.GetAcceptedFrontier{}, msg.Message())
-				innerMsg := msg.Message().(*p2ppb.GetAcceptedFrontier)
+			assertMsgToMyself: func(require *require.Assertions, msg *message.InboundMessage) {
+				require.IsType(&p2ppb.GetAcceptedFrontier{}, msg.Message)
+				innerMsg := msg.Message.(*p2ppb.GetAcceptedFrontier)
 				require.Equal(ctx.ChainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
@@ -778,16 +778,16 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		},
 		{
 			name: "GetAccepted",
-			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) *message.InboundMessage {
 				return message.InternalGetAcceptedFailed(
 					nodeID,
 					ctx.ChainID,
 					requestID,
 				)
 			},
-			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				require.IsType(&p2ppb.GetAccepted{}, msg.Message())
-				innerMsg := msg.Message().(*p2ppb.GetAccepted)
+			assertMsgToMyself: func(require *require.Assertions, msg *message.InboundMessage) {
+				require.IsType(&p2ppb.GetAccepted{}, msg.Message)
+				innerMsg := msg.Message.(*p2ppb.GetAccepted)
 				require.Equal(ctx.ChainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
@@ -869,7 +869,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			// Make sure we send a message to ourselves since [myNodeID]
 			// is in [nodeIDs].
 			router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
-				func(_ context.Context, msg message.InboundMessage) {
+				func(_ context.Context, msg *message.InboundMessage) {
 					// Make sure we're sending ourselves the expected message.
 					tt.assertMsgToMyself(require, msg)
 				},
@@ -899,7 +899,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 
 	type test struct {
 		name                    string
-		assertMsgToMyself       func(require *require.Assertions, msg message.InboundMessage)
+		assertMsgToMyself       func(require *require.Assertions, msg *message.InboundMessage)
 		setMsgCreatorExpect     func(msgCreator *messagemock.OutboundMsgBuilder)
 		setExternalSenderExpect func(externalSender *sendermock.ExternalSender)
 		sendF                   func(require *require.Assertions, sender common.Sender, nodeID ids.NodeID)
@@ -915,9 +915,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					summary,
 				).Return(nil, nil) // Don't care about the message
 			},
-			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				require.IsType(&p2ppb.StateSummaryFrontier{}, msg.Message())
-				innerMsg := msg.Message().(*p2ppb.StateSummaryFrontier)
+			assertMsgToMyself: func(require *require.Assertions, msg *message.InboundMessage) {
+				require.IsType(&p2ppb.StateSummaryFrontier{}, msg.Message)
+				innerMsg := msg.Message.(*p2ppb.StateSummaryFrontier)
 				require.Equal(ctx.ChainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(summary, innerMsg.Summary)
@@ -945,9 +945,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					summaryIDs,
 				).Return(nil, nil) // Don't care about the message
 			},
-			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				require.IsType(&p2ppb.AcceptedStateSummary{}, msg.Message())
-				innerMsg := msg.Message().(*p2ppb.AcceptedStateSummary)
+			assertMsgToMyself: func(require *require.Assertions, msg *message.InboundMessage) {
+				require.IsType(&p2ppb.AcceptedStateSummary{}, msg.Message)
+				innerMsg := msg.Message.(*p2ppb.AcceptedStateSummary)
 				require.Equal(ctx.ChainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				for i, summaryID := range summaryIDs {
@@ -977,9 +977,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					summaryIDs[0],
 				).Return(nil, nil) // Don't care about the message
 			},
-			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				require.IsType(&p2ppb.AcceptedFrontier{}, msg.Message())
-				innerMsg := msg.Message().(*p2ppb.AcceptedFrontier)
+			assertMsgToMyself: func(require *require.Assertions, msg *message.InboundMessage) {
+				require.IsType(&p2ppb.AcceptedFrontier{}, msg.Message)
+				innerMsg := msg.Message.(*p2ppb.AcceptedFrontier)
 				require.Equal(ctx.ChainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(summaryIDs[0][:], innerMsg.ContainerId)
@@ -1007,9 +1007,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					summaryIDs,
 				).Return(nil, nil) // Don't care about the message
 			},
-			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				require.IsType(&p2ppb.Accepted{}, msg.Message())
-				innerMsg := msg.Message().(*p2ppb.Accepted)
+			assertMsgToMyself: func(require *require.Assertions, msg *message.InboundMessage) {
+				require.IsType(&p2ppb.Accepted{}, msg.Message)
+				innerMsg := msg.Message.(*p2ppb.Accepted)
 				require.Equal(ctx.ChainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				for i, summaryID := range summaryIDs {
@@ -1062,7 +1062,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			// Case: sending to ourselves
 			{
 				router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
-					func(_ context.Context, msg message.InboundMessage) {
+					func(_ context.Context, msg *message.InboundMessage) {
 						// Make sure we're sending ourselves the expected message.
 						tt.assertMsgToMyself(require, msg)
 					},
@@ -1096,9 +1096,9 @@ func TestSender_Single_Request(t *testing.T) {
 
 	type test struct {
 		name                    string
-		failedMsgF              func(nodeID ids.NodeID) message.InboundMessage
+		failedMsgF              func(nodeID ids.NodeID) *message.InboundMessage
 		shouldFailMessageToSelf bool
-		assertMsg               func(require *require.Assertions, msg message.InboundMessage)
+		assertMsg               func(require *require.Assertions, msg *message.InboundMessage)
 		expectedResponseOp      message.Op
 		setMsgCreatorExpect     func(msgCreator *messagemock.OutboundMsgBuilder)
 		setExternalSenderExpect func(externalSender *sendermock.ExternalSender, sentTo set.Set[ids.NodeID])
@@ -1109,7 +1109,7 @@ func TestSender_Single_Request(t *testing.T) {
 	tests := []test{
 		{
 			name: "GetAncestors",
-			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) *message.InboundMessage {
 				return message.InternalGetAncestorsFailed(
 					nodeID,
 					ctx.ChainID,
@@ -1118,9 +1118,9 @@ func TestSender_Single_Request(t *testing.T) {
 				)
 			},
 			shouldFailMessageToSelf: false,
-			assertMsg: func(require *require.Assertions, msg message.InboundMessage) {
-				require.IsType(&message.GetAncestorsFailed{}, msg.Message())
-				innerMsg := msg.Message().(*message.GetAncestorsFailed)
+			assertMsg: func(require *require.Assertions, msg *message.InboundMessage) {
+				require.IsType(&message.GetAncestorsFailed{}, msg.Message)
+				innerMsg := msg.Message.(*message.GetAncestorsFailed)
 				require.Equal(ctx.ChainID, innerMsg.ChainID)
 				require.Equal(requestID, innerMsg.RequestID)
 				require.Equal(engineType, innerMsg.EngineType)
@@ -1152,7 +1152,7 @@ func TestSender_Single_Request(t *testing.T) {
 		},
 		{
 			name: "Get",
-			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) *message.InboundMessage {
 				return message.InternalGetFailed(
 					nodeID,
 					ctx.ChainID,
@@ -1160,9 +1160,9 @@ func TestSender_Single_Request(t *testing.T) {
 				)
 			},
 			shouldFailMessageToSelf: true,
-			assertMsg: func(require *require.Assertions, msg message.InboundMessage) {
-				require.IsType(&message.GetFailed{}, msg.Message())
-				innerMsg := msg.Message().(*message.GetFailed)
+			assertMsg: func(require *require.Assertions, msg *message.InboundMessage) {
+				require.IsType(&message.GetFailed{}, msg.Message)
+				innerMsg := msg.Message.(*message.GetFailed)
 				require.Equal(ctx.ChainID, innerMsg.ChainID)
 				require.Equal(requestID, innerMsg.RequestID)
 			},
@@ -1238,7 +1238,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 				if tt.shouldFailMessageToSelf {
 					router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
-						func(_ context.Context, msg message.InboundMessage) {
+						func(_ context.Context, msg *message.InboundMessage) {
 							// Make sure we're sending ourselves the expected message.
 							tt.assertMsg(require, msg)
 						},
@@ -1267,7 +1267,7 @@ func TestSender_Single_Request(t *testing.T) {
 				)
 
 				router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
-					func(_ context.Context, msg message.InboundMessage) {
+					func(_ context.Context, msg *message.InboundMessage) {
 						// Make sure we're sending ourselves the expected message.
 						tt.assertMsg(require, msg)
 					},
@@ -1295,7 +1295,7 @@ func TestSender_Single_Request(t *testing.T) {
 				)
 
 				router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
-					func(_ context.Context, msg message.InboundMessage) {
+					func(_ context.Context, msg *message.InboundMessage) {
 						// Make sure we're sending ourselves the expected message.
 						tt.assertMsg(require, msg)
 					},

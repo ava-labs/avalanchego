@@ -34,6 +34,10 @@ jobs:
       - name: Build the avalanchego binary
         run: ./scripts/run_task.sh build
 
+      - name: Build subnet-evm plugin
+        working-directory: ./graft/subnet-evm
+        run: ./scripts/run_task.sh build "${GITHUB_WORKSPACE}/build/subnet-evm"
+
       - name: Try to get tag from git
         if: "${{ github.event.inputs.tag == '' }}"
         id: get_tag_from_git
@@ -48,8 +52,13 @@ jobs:
           echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
         shell: bash
 
-      - name: Create zip file
+      - name: Create avalanchego zip file
         run: 7z a "avalanchego-macos-${TAG}.zip" build/avalanchego
+        env:
+          TAG: ${{ env.TAG }}
+
+      - name: Create subnet-evm zip file
+        run: 7z a "subnet-evm-macos-${TAG}.zip" build/subnet-evm
         env:
           TAG: ${{ env.TAG }}
 
@@ -65,16 +74,27 @@ jobs:
           role-session-name: githubrolesession
           aws-region: us-east-1
 
-      - name: Upload file to S3
+      - name: Upload avalanchego to S3
         run: aws s3 cp avalanchego-macos-${{ env.TAG }}.zip "s3://${BUCKET}/macos/"
         env:
           BUCKET: ${{ secrets.BUCKET }}
 
-      - name: Save as Github artifact
+      - name: Upload subnet-evm to S3
+        run: aws s3 cp subnet-evm-macos-${{ env.TAG }}.zip "s3://${BUCKET}/macos/"
+        env:
+          BUCKET: ${{ secrets.BUCKET }}
+
+      - name: Save avalanchego as Github artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build
+          name: avalanchego-macos
           path: avalanchego-macos-${{ env.TAG }}.zip
+
+      - name: Save subnet-evm as Github artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: subnet-evm-macos
+          path: subnet-evm-macos-${{ env.TAG }}.zip
 
       - name: Cleanup
         run: |

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -43,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
-	"github.com/ava-labs/avalanchego/graft/coreth/constants"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
@@ -54,18 +53,18 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/gossip"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmerrors"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/coreth/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/warp"
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -80,12 +79,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	corethlog "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/log"
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
-	utilsrpc "github.com/ava-labs/avalanchego/graft/coreth/utils/rpc"
+	utilsrpc "github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
@@ -97,8 +96,8 @@ var (
 	_ block.ChainVM                      = (*VM)(nil)
 	_ block.BuildBlockWithContextChainVM = (*VM)(nil)
 	_ block.StateSyncableVM              = (*VM)(nil)
-	_ statesyncclient.EthBlockParser     = (*VM)(nil)
-	_ vmsync.BlockAcceptor               = (*VM)(nil)
+	_ client.EthBlockParser              = (*VM)(nil)
+	_ engine.BlockAcceptor               = (*VM)(nil)
 )
 
 const (
@@ -117,10 +116,9 @@ const (
 
 // Define the API endpoints for the VM
 const (
-	adminEndpoint        = "/admin"
-	ethRPCEndpoint       = "/rpc"
-	ethWSEndpoint        = "/ws"
-	ethTxGossipNamespace = "eth_tx_gossip"
+	adminEndpoint  = "/admin"
+	ethRPCEndpoint = "/rpc"
+	ethWSEndpoint  = "/ws"
 )
 
 var (
@@ -243,8 +241,8 @@ type VM struct {
 
 	logger corethlog.Logger
 	// State sync server and client
-	vmsync.Server
-	vmsync.Client
+	engine.Server
+	engine.Client
 
 	// Avalanche Warp Messaging backend
 	// Used to serve BLS signatures of warp messages over RPC
@@ -466,7 +464,7 @@ func (vm *VM) Initialize(
 
 	// Add p2p warp message warpHandler
 	warpHandler := acp118.NewCachedHandler(meteredCache, vm.warpBackend, vm.ctx.WarpSigner)
-	if err = vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
+	if err = vm.P2PNetwork().AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
 		return err
 	}
 
@@ -513,12 +511,9 @@ func (vm *VM) initializeMetrics() error {
 		return err
 	}
 
-	if vm.config.MetricsExpensiveEnabled && vm.config.StateScheme == customrawdb.FirewoodScheme {
-		if err := ffi.StartMetrics(); err != nil {
-			return fmt.Errorf("failed to start firewood metrics collection: %w", err)
-		}
-		if err := vm.ctx.Metrics.Register("firewood", ffi.Gatherer{}); err != nil {
-			return fmt.Errorf("failed to register firewood metrics: %w", err)
+	if vm.config.StateScheme == customrawdb.FirewoodScheme {
+		if err := vm.ctx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
+			return fmt.Errorf("registering firewood metrics: %w", err)
 		}
 	}
 	return vm.ctx.Metrics.Register(sdkMetricsPrefix, vm.sdkMetrics)
@@ -632,7 +627,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	)
 	vm.Network.SetRequestHandler(networkHandler)
 
-	vm.Server = vmsync.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval)
+	vm.Server = engine.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval)
 	stateSyncEnabled := vm.stateSyncEnabled(lastAcceptedHeight)
 	// parse nodeIDs from state sync IDs in vm config
 	var stateSyncIDs []ids.NodeID
@@ -649,12 +644,12 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	}
 
 	// Initialize the state sync client
-	vm.Client = vmsync.NewClient(&vmsync.ClientConfig{
+	vm.Client = engine.NewClient(&engine.ClientConfig{
 		StateSyncDone: vm.stateSyncDone,
 		Chain:         vm.eth,
 		State:         vm.State,
-		Client: statesyncclient.NewClient(
-			&statesyncclient.ClientConfig{
+		Client: client.New(
+			&client.Config{
 				NetworkClient:    vm.Network,
 				Codec:            vm.networkCodec,
 				Stats:            stats.NewClientSyncerStats(leafMetricsNames),
@@ -763,12 +758,6 @@ func (vm *VM) initBlockBuilding() error {
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel
 
-	ethTxGossipMarshaller := GossipEthTxMarshaller{}
-	ethTxGossipClient := vm.Network.NewClient(p2p.TxGossipHandlerID)
-	ethTxGossipMetrics, err := avalanchegossip.NewMetrics(vm.sdkMetrics, ethTxGossipNamespace)
-	if err != nil {
-		return fmt.Errorf("failed to initialize eth tx gossip metrics: %w", err)
-	}
 	ethTxPool, err := NewGossipEthTxPool(vm.txPool, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to initialize gossip eth tx pool: %w", err)
@@ -778,32 +767,34 @@ func (vm *VM) initBlockBuilding() error {
 		ethTxPool.Subscribe(ctx)
 		vm.shutdownWg.Done()
 	}()
-	pushGossipParams := avalanchegossip.BranchingFactor{
-		StakePercentage: vm.config.PushGossipPercentStake,
-		Validators:      vm.config.PushGossipNumValidators,
-		Peers:           vm.config.PushGossipNumPeers,
-	}
-	pushRegossipParams := avalanchegossip.BranchingFactor{
-		Validators: vm.config.PushRegossipNumValidators,
-		Peers:      vm.config.PushRegossipNumPeers,
-	}
 
-	ethTxPushGossiper, err := avalanchegossip.NewPushGossiper[*GossipEthTx](
-		ethTxGossipMarshaller,
-		ethTxPool,
+	handler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
+		vm.ctx.NodeID,
+		vm.P2PNetwork(),
 		vm.P2PValidators(),
-		ethTxGossipClient,
-		ethTxGossipMetrics,
-		pushGossipParams,
-		pushRegossipParams,
-		config.PushGossipDiscardedElements,
-		config.TxGossipTargetMessageSize,
-		vm.config.RegossipFrequency.Duration,
+		ethTxPool,
+		GossipEthTxMarshaller{},
+		avalanchegossip.SystemConfig{
+			Log:           vm.ctx.Log,
+			Registry:      vm.sdkMetrics,
+			Namespace:     "eth_tx_gossip",
+			RequestPeriod: vm.config.PullGossipFrequency.Duration,
+			PushGossipParams: avalanchegossip.BranchingFactor{
+				StakePercentage: vm.config.PushGossipPercentStake,
+				Validators:      vm.config.PushGossipNumValidators,
+				Peers:           vm.config.PushGossipNumPeers,
+			},
+			PushRegossipParams: avalanchegossip.BranchingFactor{
+				Validators: vm.config.PushRegossipNumValidators,
+				Peers:      vm.config.PushRegossipNumPeers,
+			},
+			RegossipPeriod: vm.config.RegossipFrequency.Duration,
+		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to initialize eth tx push gossiper: %w", err)
+		return fmt.Errorf("failed to initialize eth tx gossip system: %w", err)
 	}
-	vm.ethTxPushGossiper.Set(ethTxPushGossiper)
+	vm.ethTxPushGossiper.Set(pushGossiper)
 
 	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will not work.
 	vm.builderLock.Lock()
@@ -813,49 +804,18 @@ func (vm *VM) initBlockBuilding() error {
 	vm.builder.awaitSubmittedTxs()
 	vm.builderLock.Unlock()
 
-	ethTxGossipHandler, err := gossip.NewTxGossipHandler[*GossipEthTx](
-		vm.ctx.Log,
-		ethTxGossipMarshaller,
-		ethTxPool,
-		ethTxGossipMetrics,
-		config.TxGossipTargetMessageSize,
-		config.TxGossipThrottlingPeriod,
-		config.TxGossipRequestsPerPeer,
-		vm.P2PValidators(),
-		vm.sdkMetrics,
-		"eth_tx_gossip",
-	)
-	if err != nil {
-		return fmt.Errorf("failed to initialize eth tx gossip handler: %w", err)
-	}
-
-	if err := vm.Network.AddHandler(p2p.TxGossipHandlerID, ethTxGossipHandler); err != nil {
+	if err := vm.P2PNetwork().AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
 		return fmt.Errorf("failed to add eth tx gossip handler: %w", err)
-	}
-
-	ethTxPullGossiper := avalanchegossip.NewPullGossiper[*GossipEthTx](
-		vm.ctx.Log,
-		ethTxGossipMarshaller,
-		ethTxPool,
-		ethTxGossipClient,
-		ethTxGossipMetrics,
-		config.TxGossipPollSize,
-	)
-
-	ethTxPullGossiperWhenValidator := avalanchegossip.ValidatorGossiper{
-		Gossiper:   ethTxPullGossiper,
-		NodeID:     vm.ctx.NodeID,
-		Validators: vm.P2PValidators(),
 	}
 
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.ctx.Log, ethTxPushGossiper, vm.config.PushGossipFrequency.Duration)
+		avalanchegossip.Every(ctx, vm.ctx.Log, pushGossiper, vm.config.PushGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.ctx.Log, ethTxPullGossiperWhenValidator, vm.config.PullGossipFrequency.Duration)
+		avalanchegossip.Every(ctx, vm.ctx.Log, pullGossiper, vm.config.PullGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 
@@ -1081,7 +1041,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}
 
 	if vm.config.WarpAPIEnabled {
-		warpSDKClient := vm.Network.NewClient(p2p.SignatureRequestHandlerID)
+		warpSDKClient := vm.P2PNetwork().NewClient(p2p.SignatureRequestHandlerID, vm.P2PValidators())
 		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)
 
 		if err := handler.RegisterName("warp", warp.NewAPI(vm.ctx, vm.warpBackend, signatureAggregator)); err != nil {

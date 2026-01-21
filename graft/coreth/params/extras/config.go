@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package extras
@@ -10,8 +10,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -20,63 +20,63 @@ var (
 	TestLaunchConfig = &ChainConfig{}
 
 	TestApricotPhase1Config = copyAndSet(TestLaunchConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.ApricotPhase1BlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.ApricotPhase1BlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestApricotPhase2Config = copyAndSet(TestApricotPhase1Config, func(c *ChainConfig) {
-		c.NetworkUpgrades.ApricotPhase2BlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.ApricotPhase2BlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestApricotPhase3Config = copyAndSet(TestApricotPhase2Config, func(c *ChainConfig) {
-		c.NetworkUpgrades.ApricotPhase3BlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.ApricotPhase3BlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestApricotPhase4Config = copyAndSet(TestApricotPhase3Config, func(c *ChainConfig) {
-		c.NetworkUpgrades.ApricotPhase4BlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.ApricotPhase4BlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestApricotPhase5Config = copyAndSet(TestApricotPhase4Config, func(c *ChainConfig) {
-		c.NetworkUpgrades.ApricotPhase5BlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.ApricotPhase5BlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestApricotPhasePre6Config = copyAndSet(TestApricotPhase5Config, func(c *ChainConfig) {
-		c.NetworkUpgrades.ApricotPhasePre6BlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.ApricotPhasePre6BlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestApricotPhase6Config = copyAndSet(TestApricotPhasePre6Config, func(c *ChainConfig) {
-		c.NetworkUpgrades.ApricotPhase6BlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.ApricotPhase6BlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestApricotPhasePost6Config = copyAndSet(TestApricotPhase6Config, func(c *ChainConfig) {
-		c.NetworkUpgrades.ApricotPhasePost6BlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.ApricotPhasePost6BlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestBanffChainConfig = copyAndSet(TestApricotPhasePost6Config, func(c *ChainConfig) {
-		c.NetworkUpgrades.BanffBlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.BanffBlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestCortinaChainConfig = copyAndSet(TestBanffChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.CortinaBlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.CortinaBlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestDurangoChainConfig = copyAndSet(TestCortinaChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.DurangoBlockTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.DurangoBlockTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestEtnaChainConfig = copyAndSet(TestDurangoChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.EtnaTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.EtnaTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestFortunaChainConfig = copyAndSet(TestEtnaChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.FortunaTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.FortunaTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestGraniteChainConfig = copyAndSet(TestFortunaChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.GraniteTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.GraniteTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestHeliconChainConfig = copyAndSet(TestGraniteChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.HeliconTimestamp = utils.NewUint64(0)
+		c.NetworkUpgrades.HeliconTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestChainConfig = copyConfig(TestHeliconChainConfig)
@@ -125,7 +125,7 @@ func (c *ChainConfig) CheckConfigCompatible(newcfg_ *ethparams.ChainConfig, head
 		// Return an error to prevent the chain from starting, just in case.
 		return ethparams.NewTimestampCompatError(
 			fmt.Sprintf("ChainConfig.Hooks() is not of the expected type *extras.ChainConfig, got %T", newcfg_.Hooks()),
-			utils.NewUint64(0),
+			utils.PointerTo[uint64](0),
 			nil,
 		)
 	}

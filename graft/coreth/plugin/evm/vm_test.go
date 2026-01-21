@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,15 +29,14 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
-	"github.com/ava-labs/avalanchego/graft/coreth/constants"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
+	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/miner"
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
@@ -44,18 +44,19 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -80,8 +81,8 @@ var (
 
 	activateCancun = func(cfg *params.ChainConfig) *params.ChainConfig {
 		cpy := *cfg
-		cpy.ShanghaiTime = utils.NewUint64(0)
-		cpy.CancunTime = utils.NewUint64(0)
+		cpy.ShanghaiTime = utils.PointerTo[uint64](0)
+		cpy.CancunTime = utils.PointerTo[uint64](0)
 		return &cpy
 	}
 )
@@ -1012,13 +1013,13 @@ func TestTimeSemanticVerify(t *testing.T) {
 			name:             "Granite with TimeMilliseconds",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: utils.NewUint64(uint64(timestamp.UnixMilli())),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli())),
 		},
 		{
 			name:             "Fortuna with TimeMilliseconds",
 			fork:             upgradetest.Fortuna,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: utils.NewUint64(uint64(timestamp.UnixMilli())),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli())),
 			expectedError:    customheader.ErrTimeMillisecondsBeforeGranite,
 		},
 		{
@@ -1032,14 +1033,14 @@ func TestTimeSemanticVerify(t *testing.T) {
 			name:             "Granite with mismatched TimeMilliseconds",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: utils.NewUint64(uint64(timestamp.UnixMilli()) + 1000),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli()) + 1000),
 			expectedError:    customheader.ErrTimeMillisecondsMismatched,
 		},
 		{
 			name:             "Block too far in the future",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Add(2 * time.Hour).Unix()),
-			timeMilliseconds: utils.NewUint64(uint64(timestamp.Add(2 * time.Hour).UnixMilli())),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.Add(2 * time.Hour).UnixMilli())),
 			expectedError:    customheader.ErrBlockTooFarInFuture,
 		},
 	}
@@ -1104,7 +1105,7 @@ func TestBuildTimeMilliseconds(t *testing.T) {
 		{
 			name:                     "granite_should_have_timestamp_milliseconds",
 			fork:                     upgradetest.Granite,
-			expectedTimeMilliseconds: utils.NewUint64(uint64(buildTime.UnixMilli())),
+			expectedTimeMilliseconds: utils.PointerTo(uint64(buildTime.UnixMilli())),
 		},
 	}
 
@@ -1543,7 +1544,6 @@ func TestWaitForEvent(t *testing.T) {
 		err error
 	}
 
-	fortunaFork := upgradetest.Fortuna
 	for _, testCase := range []struct {
 		name     string
 		Fork     *upgradetest.Fork
@@ -1614,7 +1614,7 @@ func TestWaitForEvent(t *testing.T) {
 				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
 				require.NoError(t, err)
 
-				ctx, cancel = context.WithTimeout(t.Context(), time.Second*2)
+				ctx, cancel = context.WithTimeout(t.Context(), time.Second*5)
 				defer cancel()
 
 				msg, err = vm.WaitForEvent(ctx)
@@ -1708,48 +1708,6 @@ func TestWaitForEvent(t *testing.T) {
 				res := <-results
 				require.NoError(t, res.err)
 				require.Equal(t, commonEng.PendingTxs, res.msg)
-			},
-		},
-		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/avalanchego/graft/coreth/issues/1318)
-		{
-			name: "WaitForEvent does not wait for new block to be built in fortuna",
-			Fork: &fortunaFork,
-			testCase: func(t *testing.T, vm *VM) {
-				t.Parallel()
-				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
-				blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
-				require.NoError(t, err)
-				require.NoError(t, blk.Accept(t.Context()))
-				signedTx = newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 1, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
-
-				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-					require.NoError(t, err)
-				}
-
-				msg, err := vm.WaitForEvent(t.Context())
-				require.NoError(t, err)
-				require.Equal(t, commonEng.PendingTxs, msg)
-			},
-		},
-		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/avalanchego/graft/coreth/issues/1318)
-		{
-			name: "WaitForEvent waits for a delay with a retry in fortuna",
-			Fork: &fortunaFork,
-			testCase: func(t *testing.T, vm *VM) {
-				t.Parallel()
-				lastBuildBlockTime := time.Now()
-				_, err := vm.BuildBlock(t.Context())
-				require.NoError(t, err)
-				// we haven't accepted the previous built block, so this should be a retry
-				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
-				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-					require.NoError(t, err)
-				}
-
-				msg, err := vm.WaitForEvent(t.Context())
-				require.NoError(t, err)
-				require.Equal(t, commonEng.PendingTxs, msg)
-				require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
 			},
 		},
 	} {
@@ -2144,26 +2102,26 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 		{
 			name:                   "pre_granite_min_delay_excess",
 			fork:                   upgradetest.Fortuna,
-			desiredMinDelay:        utils.NewUint64(1000),
+			desiredMinDelay:        utils.PointerTo[uint64](1000),
 			expectedMinDelayExcess: nil,
 		},
 		{
 			name:                   "granite_first_block_initial_delay_excess",
 			fork:                   upgradetest.Granite,
 			desiredMinDelay:        nil,
-			expectedMinDelayExcess: utilstest.PointerTo(acp226.DelayExcess(acp226.InitialDelayExcess)),
+			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess),
 		},
 		{
 			name:                   "granite_with_excessive_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
-			desiredMinDelay:        utils.NewUint64(4000),
-			expectedMinDelayExcess: utilstest.PointerTo(acp226.DelayExcess(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff)),
+			desiredMinDelay:        utils.PointerTo[uint64](4000),
+			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
 		},
 		{
 			name:                   "granite_with_zero_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
-			desiredMinDelay:        utils.NewUint64(0),
-			expectedMinDelayExcess: utilstest.PointerTo(acp226.DelayExcess(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff)),
+			desiredMinDelay:        utils.PointerTo[uint64](0),
+			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
 		},
 	}
 
@@ -2208,4 +2166,72 @@ func TestInspectDatabases(t *testing.T) {
 
 	vm.initializeDBs(db)
 	require.NoError(t, vm.inspectDatabases())
+}
+
+// Tests that querying states no longer in memory is still possible when in
+// archival mode.
+//
+// Querying for the nonce of the zero address at various heights is sufficient
+// as this succeeds only if the EVM has the matching trie at each height.
+func TestArchivalQueries(t *testing.T) {
+	schemes := []string{customrawdb.FirewoodScheme, rawdb.HashScheme}
+
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			require := require.New(t)
+			ctx := t.Context()
+
+			vm := newDefaultTestVM()
+
+			// Setting the state history to 5 means that we keep around only the
+			// 5 latest tries in memory. By creating numBlocks (10), we'll have:
+			//	- Tries 0-5: on-disk
+			// 	- Tries 6-10: in-memory
+			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+				ConfigJSON: `{
+					"pruning-enabled": false,
+					"state-history": 5
+				}`,
+				Scheme: scheme,
+			})
+			t.Cleanup(func() {
+				require.NoError(vm.Shutdown(ctx))
+			})
+
+			numBlocks := 10
+			for range numBlocks {
+				nonce := vm.txPool.Nonce(vmtest.TestEthAddrs[0])
+				signedTx := newSignedLegacyTx(
+					t,
+					vm.chainConfig,
+					vmtest.TestKeys[0].ToECDSA(),
+					nonce,
+					&common.Address{},
+					big.NewInt(0),
+					21_000,
+					vmtest.InitialBaseFee,
+					nil,
+				)
+				blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
+				require.NoError(err)
+
+				require.NoError(blk.Accept(ctx))
+			}
+
+			handlers, err := vm.CreateHandlers(ctx)
+			require.NoError(err)
+
+			server := httptest.NewServer(handlers[ethRPCEndpoint])
+			t.Cleanup(server.Close)
+
+			client, err := ethclient.Dial(server.URL)
+			require.NoError(err)
+
+			for i := 0; i <= numBlocks; i++ {
+				nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
+				require.NoErrorf(err, "failed to get nonce at block %d", i)
+				require.Zero(nonce)
+			}
+		})
+	}
 }

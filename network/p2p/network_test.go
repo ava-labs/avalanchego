@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -574,6 +574,7 @@ func TestPeersSample(t *testing.T) {
 			sampleable := set.Set[ids.NodeID]{}
 			sampleable.Union(tt.connected)
 			sampleable.Difference(tt.disconnected)
+			require.Equal(sampleable.Len(), peers.Len())
 
 			sampled := peers.Sample(tt.limit)
 			require.Len(sampled, min(tt.limit, len(sampleable)))
