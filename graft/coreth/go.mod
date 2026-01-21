@@ -185,5 +185,4 @@ tool (
 replace (
 	github.com/ava-labs/avalanchego => ../../
 	github.com/ava-labs/avalanchego/graft/evm => ../evm
-	github.com/ava-labs/avalanchego/graft/subnet-evm => ../subnet-evm
 )
