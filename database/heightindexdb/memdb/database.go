@@ -62,6 +62,16 @@ func (db *Database) Has(height uint64) (bool, error) {
 	return ok, nil
 }
 
+func (db *Database) Sync(_, _ uint64) error {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+	return nil
+}
+
 func (db *Database) Close() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
