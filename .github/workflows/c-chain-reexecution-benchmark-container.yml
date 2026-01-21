@@ -57,7 +57,7 @@ jobs:
             [[ "${{ github.event.inputs.with-dependencies }}" =~ libevm=([^,]+) ]] && LIBEVM_REF="${BASH_REMATCH[1]}"
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+              printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s, "firewood-ref": "%s", "libevm-ref": "%s" }] }\n' \
                 "${{ github.event.inputs.test }}" \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
@@ -100,6 +100,17 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
+      - name: Install Nix
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup reexecution dependencies
+        if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
+        shell: nix develop --command bash -x {0}
+        run: ./scripts/run_task.sh setup-reexecution-deps
+        env:
+          LIBEVM_REF: ${{ matrix.libevm-ref }}
+          FIREWOOD_REF: ${{ matrix.firewood-ref }}
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
@@ -109,25 +120,13 @@ jobs:
           end-block: ${{ matrix.end-block }}
           block-dir-src: ${{ matrix.block-dir-src }}
           current-state-dir-src: ${{ matrix.current-state-dir-src }}
-          libevm-ref: ${{ matrix.libevm-ref }}
-          firewood-ref: ${{ matrix.firewood-ref }}
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
+          push-github-action-benchmark: ${{ (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master')) && matrix.firewood-ref == '' }}
           aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ${{ github.event.inputs.push-post-state }}
           runner_type: ${{ matrix.runner }}
-      - name: Upload benchmark results
-        # Only upload when using custom firewood - Firewood downloads the artifact
-        # and publishes to their own gh-pages for tracking
-        if: matrix.firewood-ref != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-output
-          path: ${{ github.workspace }}/benchmark-output.txt
-          retention-days: 30
-          if-no-files-found: error
