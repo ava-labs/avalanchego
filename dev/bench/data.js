@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1768952866404,
+  "lastUpdate": 1768962947796,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -3289,6 +3289,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-archive-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_accept_ms/ggas",
             "value": 45.25260569862037,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Draco",
+            "username": "DracoLi",
+            "email": "draco@dracoli.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "3210953f2ffa1d7f3a79930656cd1c25a68a87ac",
+          "message": "feat: add Sync to database.HeightIndex (#4839)",
+          "timestamp": "2026-01-20T23:36:43Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/3210953f2ffa1d7f3a79930656cd1c25a68a87ac"
+        },
+        "date": 1768962945001,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - mgas/s",
+            "value": 96.90662422337414,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - ms/ggas",
+            "value": 10319.21200448542,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_parse_ms/ggas",
+            "value": 65.77318919600168,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_verify_ms/ggas",
+            "value": 10206.420749711566,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-firewood-Runner-avago-runner-m6i-4xlarge-io2-xfast-10ti - block_accept_ms/ggas",
+            "value": 45.67043220726567,
             "unit": "block_accept_ms/ggas"
           }
         ]
