@@ -114,7 +114,7 @@ func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
 
 	var (
 		r         = rand.New(rand.NewSource(seed)) // #nosec G404
-		ops       = make([]ffi.BatchOp, numKeys)
+		ops       = make([]ffi.BatchOp, 0, numKeys)
 		minLength = 1
 		maxLength = 64
 	)
