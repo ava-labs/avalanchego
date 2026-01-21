@@ -36,9 +36,7 @@ func (t *testVM) HasBlock(_ context.Context, blkID ids.ID) error {
 // * test that signatures from rpc are correct
 // * test bad messages
 // * test caching
-// * we don't fail verification - we fail signing
-// 		* looks pretty flimsy
-
+//
 // TestVerifierVerifyBlockHash tests that we are willing to sign payload.Hash
 // messages for accepted blocks
 func TestVerifierVerify(t *testing.T) {
