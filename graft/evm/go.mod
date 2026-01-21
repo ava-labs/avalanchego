@@ -99,8 +99,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace (
-	github.com/ava-labs/avalanchego => ../../
-	github.com/ava-labs/avalanchego/graft/coreth => ../coreth
-	github.com/ava-labs/avalanchego/graft/subnet-evm => ../subnet-evm
-)
+replace github.com/ava-labs/avalanchego => ../../
