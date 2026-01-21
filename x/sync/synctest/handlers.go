@@ -13,7 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-func AddFuncOnIntercept(interceptor *p2p.TestHandler, innerHandler p2p.Handler, fn func(), numToAllow int) {
+func CreateInterceptor(innerHandler p2p.Handler, fn func(), numToAllow int) *p2p.TestHandler {
+	interceptor := &p2p.TestHandler{}
 	count := atomic.Int32{}
 	count.Store(-1)
 	interceptor.AppRequestF = func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
@@ -22,4 +23,5 @@ func AddFuncOnIntercept(interceptor *p2p.TestHandler, innerHandler p2p.Handler, 
 		}
 		return innerHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
 	}
+	return interceptor
 }

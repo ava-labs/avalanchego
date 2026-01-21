@@ -434,11 +434,19 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	)
 	require.NoError(err)
 
-	actionHandler := &p2p.TestHandler{}
-
+	var syncer *xsync.Syncer[*RangeProof, *ChangeProof]
 	ctx, cancel := context.WithCancelCause(t.Context())
 	defer cancel(nil)
-	syncer, err := xsync.NewSyncer(
+
+	// Allow 1 request to go through before blocking
+	actionHandler := synctest.CreateInterceptor(xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
+		err := syncer.UpdateSyncTarget(secondSyncRoot)
+		if err != nil {
+			cancel(err)
+		}
+	}, 1)
+
+	syncer, err = xsync.NewSyncer(
 		db,
 		xsync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
@@ -454,17 +462,8 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(syncer)
 
-	// Allow 1 request to go through before blocking
-	synctest.AddFuncOnIntercept(actionHandler, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
-		err := syncer.UpdateSyncTarget(secondSyncRoot)
-		if err != nil {
-			cancel(err)
-		}
-	}, 1)
-
 	require.NoError(syncer.Start(ctx))
-	err = syncer.Wait(ctx)
-	require.NoError(err)
+	require.NoError(syncer.Wait(ctx))
 	require.NoError(syncer.Error())
 
 	newRoot, err := db.GetMerkleRoot(ctx)
@@ -499,9 +498,14 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)
-	actionHandler := &p2p.TestHandler{}
-	m, err := xsync.NewSyncer(
+	var syncer *xsync.Syncer[*RangeProof, *ChangeProof]
+	actionHandler := synctest.CreateInterceptor(xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
+		err := syncer.UpdateSyncTarget(root1)
+		if err != nil {
+			cancel(err)
+		}
+	}, 0)
+	syncer, err = xsync.NewSyncer(
 		db,
 		xsync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
@@ -516,16 +520,8 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	synctest.AddFuncOnIntercept(actionHandler, rangeProofHandler, func() {
-		err := m.UpdateSyncTarget(root1)
-		if err != nil {
-			cancel(err)
-		}
-	}, 0)
-
-	require.NoError(m.Start(ctx))
-	err = m.Wait(ctx)
-	require.NoError(err)
+	require.NoError(syncer.Start(ctx))
+	require.NoError(syncer.Wait(ctx))
 }
 
 func generateTrie(t *testing.T, r *rand.Rand, count int) (MerkleDB, error) {

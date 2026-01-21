@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/x/sync"
 	"github.com/ava-labs/avalanchego/x/sync/synctest"
@@ -150,27 +149,25 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	}()
 	wantRoot := fillDB(t, r, serverDB, serverKeys)
 
-	intercept := &p2p.TestHandler{}
-
+	var syncer *sync.Syncer[*RangeProof, struct{}]
 	ctx, cancel := context.WithCancelCause(t.Context())
 	defer cancel(nil)
 
-	syncer, err := New(
-		Config{},
-		clientDB,
-		firstRoot,
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, intercept),
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, syncer)
-
-	synctest.AddFuncOnIntercept(intercept, NewGetRangeProofHandler(serverDB), func() {
+	rangeProofHandler := synctest.CreateInterceptor(NewGetRangeProofHandler(serverDB), func() {
 		err := syncer.UpdateSyncTarget(wantRoot)
 		if err != nil {
 			cancel(err)
 		}
 	}, numRequestsBeforeUpdate)
+	syncer, err := New(
+		Config{},
+		clientDB,
+		firstRoot,
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, syncer)
 
 	require.NoError(t, syncer.Start(ctx))
 	err = syncer.Wait(ctx)
