@@ -69,6 +69,7 @@ func (c *Config) validateConsensusParameters() error {
 	if c.ConsensusParameters != nil {
 		return ErrUnsupportedConsensusParameters
 	}
+
 	if c.SnowParameters != nil && c.SimplexParameters == nil {
 		return c.SnowParameters.Verify()
 	}

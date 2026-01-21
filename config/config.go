@@ -1053,7 +1053,7 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 				return nil, err
 			}
 			// support deprecated field, will be removed in future
-			if config.ConsensusParameters != nil {
+			if config.ConsensusParameters != nil && config.SnowParameters == nil {
 				config.SnowParameters = config.ConsensusParameters
 				config.ConsensusParameters = nil
 			}
@@ -1117,7 +1117,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}
 
-		if config.ConsensusParameters != nil {
+		if config.ConsensusParameters != nil && config.SnowParameters == nil {
 			config.SnowParameters = config.ConsensusParameters
 			config.ConsensusParameters = nil
 		}
