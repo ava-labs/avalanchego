@@ -2,12 +2,15 @@
 
 use std::sync::Arc;
 
-use avalanche_db::MemDb;
+use avalanche_db::{Database, MemDb};
 use avalanche_ids::{Id, NodeId};
+use avalanche_vm::{CommonVM, Context};
+use avm::AVM;
 use parking_lot::RwLock;
+use platformvm::PlatformVM;
 use thiserror::Error;
 use tokio::sync::broadcast;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::config::Config;
 
@@ -57,7 +60,11 @@ pub struct Node {
     /// Current state
     state: RwLock<NodeState>,
     /// Database
-    db: Arc<dyn avalanche_db::Database>,
+    db: Arc<dyn Database>,
+    /// Platform VM (P-Chain)
+    pvm: RwLock<Option<PlatformVM>>,
+    /// Asset VM (X-Chain)
+    avm: RwLock<Option<AVM>>,
     /// Shutdown signal
     shutdown_tx: broadcast::Sender<()>,
 }
@@ -93,6 +100,8 @@ impl Node {
             node_id,
             state: RwLock::new(NodeState::Initializing),
             db,
+            pvm: RwLock::new(None),
+            avm: RwLock::new(None),
             shutdown_tx,
         })
     }
@@ -182,22 +191,86 @@ impl Node {
     async fn initialize_chains(&self) -> Result<(), NodeError> {
         info!("Initializing chains...");
 
-        // Initialize P-Chain
+        // Create VM contexts
+        let network_id = self.config.network.network_id;
+
+        // Initialize P-Chain (Platform VM)
         debug!("Initializing P-Chain...");
-        // let pvm = platformvm::PlatformVM::new();
-        // TODO: Initialize P-Chain with genesis
+        let mut pvm = PlatformVM::new();
+        let pchain_ctx = Context {
+            network_id,
+            chain_id: chains::p_chain_id(),
+            node_id: self.node_id,
+            ..Default::default()
+        };
 
-        // Initialize X-Chain
+        // Create P-Chain database prefix
+        let pchain_db = self.db.new_batch();
+        drop(pchain_db); // We'll use the main db for now
+
+        // Default genesis for P-Chain (local testnet)
+        let pchain_genesis = platformvm::genesis::defaults::local_genesis();
+        let pchain_genesis_bytes =
+            serde_json::to_vec(&pchain_genesis).map_err(|e| NodeError::ChainError(e.to_string()))?;
+
+        pvm.initialize(pchain_ctx, self.db.clone(), &pchain_genesis_bytes)
+            .await
+            .map_err(|e| NodeError::ChainError(format!("P-Chain init failed: {}", e)))?;
+
+        *self.pvm.write() = Some(pvm);
+        info!("P-Chain initialized");
+
+        // Initialize X-Chain (Asset VM)
         debug!("Initializing X-Chain...");
-        // let avm = avm::AVM::new();
-        // TODO: Initialize X-Chain with genesis
+        let mut avm = AVM::new();
+        let xchain_ctx = Context {
+            network_id,
+            chain_id: chains::x_chain_id(),
+            node_id: self.node_id,
+            ..Default::default()
+        };
 
-        // Initialize C-Chain
-        debug!("Initializing C-Chain...");
-        // TODO: Initialize C-Chain with EVM
+        // Default genesis for X-Chain (local testnet)
+        let xchain_genesis = avm::genesis::defaults::local_genesis();
+        let xchain_genesis_bytes =
+            serde_json::to_vec(&xchain_genesis).map_err(|e| NodeError::ChainError(e.to_string()))?;
 
-        info!("Chains initialized");
+        avm.initialize(xchain_ctx, self.db.clone(), &xchain_genesis_bytes)
+            .await
+            .map_err(|e| NodeError::ChainError(format!("X-Chain init failed: {}", e)))?;
+
+        *self.avm.write() = Some(avm);
+        info!("X-Chain initialized");
+
+        // Initialize C-Chain (EVM) - placeholder for now
+        debug!("C-Chain initialization skipped (EVM not yet implemented)");
+
+        info!("Primary chains initialized");
         Ok(())
+    }
+
+    /// Returns a reference to the Platform VM.
+    pub fn platform_vm(&self) -> Option<impl std::ops::Deref<Target = PlatformVM> + '_> {
+        let guard = self.pvm.read();
+        if guard.is_some() {
+            Some(parking_lot::RwLockReadGuard::map(guard, |opt| {
+                opt.as_ref().unwrap()
+            }))
+        } else {
+            None
+        }
+    }
+
+    /// Returns a reference to the Asset VM.
+    pub fn asset_vm(&self) -> Option<impl std::ops::Deref<Target = AVM> + '_> {
+        let guard = self.avm.read();
+        if guard.is_some() {
+            Some(parking_lot::RwLockReadGuard::map(guard, |opt| {
+                opt.as_ref().unwrap()
+            }))
+        } else {
+            None
+        }
     }
 
     /// Starts the networking layer.
