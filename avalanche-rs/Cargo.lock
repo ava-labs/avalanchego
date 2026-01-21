@@ -352,6 +352,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "avalanche-codec",
+ "avalanche-crypto",
  "avalanche-db",
  "avalanche-ids",
  "avalanche-snow",

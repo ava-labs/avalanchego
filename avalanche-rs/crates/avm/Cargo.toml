@@ -13,6 +13,7 @@ avalanche-db = { workspace = true }
 avalanche-codec = { workspace = true }
 avalanche-snow = { workspace = true }
 avalanche-vm = { workspace = true }
+avalanche-crypto = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true }

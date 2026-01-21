@@ -14,8 +14,13 @@
 //! - `Vec<T>`: 4-byte length prefix (u32) + elements
 //! - Fixed arrays: elements only (no length prefix)
 
+mod manager;
 mod packer;
 
+pub use manager::{
+    pack_with_type_id, unpack_type_id, Codec, CodecManager, TypeId, TypedPack, TypedUnpack,
+    DEFAULT_CODEC_VERSION, MAX_CODEC_VERSION,
+};
 pub use packer::{PackError, Packer, UnpackError, Unpacker};
 
 /// Maximum string length (u16::MAX = 65535).
