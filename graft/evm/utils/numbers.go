@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utils
@@ -6,13 +6,12 @@ package utils
 import (
 	"math/big"
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
-func NewUint64(val uint64) *uint64 { return &val }
-
 func TimeToNewUint64(time time.Time) *uint64 {
-	unix := uint64(time.Unix())
-	return NewUint64(unix)
+	return utils.PointerTo(uint64(time.Unix()))
 }
 
 func Uint64ToTime(val *uint64) time.Time {

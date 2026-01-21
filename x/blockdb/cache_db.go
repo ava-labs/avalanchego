@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
@@ -74,6 +74,13 @@ func (c *cacheDB) Has(height BlockHeight) (bool, error) {
 		return true, nil
 	}
 	return c.db.Has(height)
+}
+
+func (c *cacheDB) Sync(start, end uint64) error {
+	if c.closed.Load() {
+		return database.ErrClosed
+	}
+	return c.db.Sync(start, end)
 }
 
 func (c *cacheDB) Close() error {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -86,11 +86,7 @@ type Network interface {
 	// Size returns the size of the network in number of connected peers
 	Size() uint32
 
-	// NewClient returns a client to send messages with for the given protocol
-	NewClient(protocol uint64) *p2p.Client
-	// AddHandler registers a server handler for an application protocol
-	AddHandler(protocol uint64, handler p2p.Handler) error
-
+	P2PNetwork() *p2p.Network
 	P2PValidators() *p2p.Validators
 }
 
@@ -496,12 +492,9 @@ func (n *network) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, r
 	return waitingHandler.WaitForResult(ctx)
 }
 
-func (n *network) NewClient(protocol uint64) *p2p.Client {
-	return n.sdkNetwork.NewClient(protocol, n.p2pValidators) // p2pValidators implements NodeSampler
-}
-
-func (n *network) AddHandler(protocol uint64, handler p2p.Handler) error {
-	return n.sdkNetwork.AddHandler(protocol, handler)
+// P2PNetwork returns the p2p network
+func (n *network) P2PNetwork() *p2p.Network {
+	return n.sdkNetwork
 }
 
 // P2PValidators returns the p2p validators

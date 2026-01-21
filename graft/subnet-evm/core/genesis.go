@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -34,13 +34,14 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
@@ -182,14 +183,19 @@ func SetupGenesisBlock(
 	if err := newcfg.CheckConfigForkOrder(); err != nil {
 		return newcfg, common.Hash{}, err
 	}
-	storedcfg := customrawdb.ReadChainConfig(db, stored)
+	var upgradecfg extras.UpgradeConfig
+	storedcfg, err := customrawdb.ReadChainConfig(db, stored, &upgradecfg)
+	if err != nil {
+		return newcfg, common.Hash{}, fmt.Errorf("failed to read stored chain config: %v", err)
+	}
 	// If there is no previously stored chain config, write the chain config to disk.
 	if storedcfg == nil {
 		// Note: this can happen since we did not previously write the genesis block and chain config in the same batch.
 		log.Warn("Found genesis block without chain config")
-		customrawdb.WriteChainConfig(db, stored, newcfg)
+		customrawdb.WriteChainConfig(db, stored, newcfg, params.GetExtra(newcfg).UpgradeConfig)
 		return newcfg, stored, nil
 	}
+	params.GetExtra(storedcfg).UpgradeConfig = upgradecfg
 
 	// Notes on the following line:
 	// - this is needed in coreth to handle the case where existing nodes do not
@@ -226,7 +232,7 @@ func SetupGenesisBlock(
 	}
 	// Required to write the chain config to disk to ensure both the chain config and upgrade bytes are persisted to disk.
 	// Note: this intentionally removes an extra check from upstream.
-	customrawdb.WriteChainConfig(db, stored, newcfg)
+	customrawdb.WriteChainConfig(db, stored, newcfg, params.GetExtra(newcfg).UpgradeConfig)
 	return newcfg, stored, nil
 }
 
@@ -405,7 +411,7 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *triedb.Database) (*types.Blo
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
-	customrawdb.WriteChainConfig(batch, block.Hash(), config)
+	customrawdb.WriteChainConfig(batch, block.Hash(), config, params.GetExtra(config).UpgradeConfig)
 	if err := batch.Write(); err != nil {
 		return nil, fmt.Errorf("failed to write genesis block: %w", err)
 	}

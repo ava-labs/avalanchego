@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utilstest
@@ -24,10 +24,6 @@ func TestNewTestSnowContext(t *testing.T) {
 	validators, err := validatorState.GetValidatorSet(t.Context(), 0, ids.Empty)
 	require.NoError(t, err)
 	require.NotNil(t, validators)
-
-	// Test that we can call GetWarpValidatorSetF without panicking
-	_, err = validatorState.GetWarpValidatorSet(t.Context(), 0, ids.Empty)
-	require.NoError(t, err)
 
 	// Test that we can call GetWarpValidatorSetsF without panicking
 	_, err = validatorState.GetWarpValidatorSets(t.Context(), 0)

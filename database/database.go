@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // For ease of implementation, our database's interface matches Ethereum's
@@ -115,6 +115,10 @@ type HeightIndex interface {
 	//
 	// Returns true even if the stored value is nil or empty.
 	Has(height uint64) (bool, error)
+
+	// Sync flushes underlying writes from the OS buffer cache to disk for
+	// data in the range [start, end].
+	Sync(start, end uint64) error
 
 	// Close closes the database.
 	//

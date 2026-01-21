@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package statesync
@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	syncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 )
@@ -101,7 +101,7 @@ func (t *trieToSync) loadSegments() error {
 		// key immediately prior to the segment we found on disk.
 		// This is because we do not persist the beginning of
 		// the first segment.
-		_, segmentStart := customrawdb.UnpackSyncSegmentKey(it.Key())
+		_, segmentStart := customrawdb.ParseSyncSegmentKey(it.Key())
 		segmentStartPos := binary.BigEndian.Uint16(segmentStart[:wrappers.ShortLen])
 		t.addSegment(prevSegmentStart, addPadding(segmentStartPos-1, 0xff))
 

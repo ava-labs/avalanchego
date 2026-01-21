@@ -7,6 +7,8 @@
         ]
       },
       "locked": {
+        "lastModified": 1,
+        "narHash": "sha256-PPX4of5NK7HA4g4MMT1xYHjgpHYotB+uAA4Oh9sLhpI=",
         "path": "./nix/go",
         "type": "path"
       },

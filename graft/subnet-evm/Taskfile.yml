@@ -12,7 +12,7 @@ tasks:
 
   build:
     desc: Compile Subnet EVM binary with git commit and static linking flags
-    cmd: ./scripts/build.sh # ci.yml
+    cmd: ./scripts/build.sh {{.CLI_ARGS}} 
 
   build-antithesis-images:
     desc: Build Docker images for antithesis testing including avalanchego node and subnet-evm builder images
@@ -28,7 +28,7 @@ tasks:
 
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
-    cmd: ./scripts/build_test.sh # ci.yml
+    cmd: ./scripts/build_test.sh 
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
@@ -70,7 +70,7 @@ tasks:
 
   coverage:
     desc: Display test coverage statistics from coverage.out file
-    cmd: ./scripts/coverage.sh # ci.yml
+    cmd: ./scripts/coverage.sh
 
   generate-codec:
     desc: Generates fjl/gencodec files
@@ -127,7 +127,7 @@ tasks:
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
-    cmd: ./scripts/shellcheck.sh # ci.yml
+    cmd: ./scripts/shellcheck.sh
 
   test-build-antithesis-images:
     desc: Test antithesis images build
@@ -143,11 +143,11 @@ tasks:
 
   test-build-image:
     desc: Test docker image build
-    cmd: bash -x scripts/tests.build_docker_image.sh # ci.yml
+    cmd: bash -x scripts/tests.build_docker_image.sh
 
   test-e2e-load:
     desc: Run end-to-end load tests using Ginkgo test framework
-    cmd: ./scripts/run_ginkgo_load.sh # ci.yml
+    cmd: ./scripts/run_ginkgo_load.sh
 
   test-e2e-load-ci: # consolidated test-e2e-load
     desc: Run E2E load tests with CI setup
