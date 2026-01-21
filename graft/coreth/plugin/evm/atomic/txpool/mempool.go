@@ -271,7 +271,7 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	}
 
 	m.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(m.bloom, m.length()*config.TxGossipBloomChurnMultiplier)
+	reset, err := gossip.ResetBloomFilterIfNeeded(m.bloom, m.length()*config.DefaultTxGossipBloomChurnMultiplier)
 	if err != nil {
 		return err
 	}
