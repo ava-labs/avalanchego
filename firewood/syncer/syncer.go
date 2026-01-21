@@ -138,6 +138,6 @@ func (*database) CommitChangeProof(context.Context, maybe.Maybe[[]byte], struct{
 
 func (db *database) Clear() error {
 	// Prefix delete key of length 0.
-	_, err := db.db.Update([]ffi.BatchOp{ffi.PrefixDelete([]byte{})})
+	_, err := db.db.Update([][]byte{{}}, [][]byte{nil})
 	return err
 }

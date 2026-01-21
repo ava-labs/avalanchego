@@ -104,7 +104,7 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 // Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
 func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
 	t.Helper()
-	db, err := ffi.New(t.TempDir(), ffi.EthereumNodeHashing)
+	db, err := ffi.New(t.TempDir())
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -114,7 +114,8 @@ func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
 
 	var (
 		r         = rand.New(rand.NewSource(seed)) // #nosec G404
-		ops       = make([]ffi.BatchOp, numKeys)
+		keys      = make([][]byte, numKeys)
+		vals      = make([][]byte, numKeys)
 		minLength = 1
 		maxLength = 64
 	)
@@ -131,10 +132,11 @@ func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
 		_, err = r.Read(val)
 		require.NoError(t, err, "read never errors")
 
-		ops = append(ops, ffi.Put(key, val))
+		keys = append(keys, key)
+		vals = append(vals, val)
 	}
 
-	_, err = db.Update(ops)
+	_, err = db.Update(keys, vals)
 	require.NoError(t, err)
 
 	return db
