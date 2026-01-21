@@ -200,8 +200,8 @@ func validateDir(dir string) error {
 }
 
 // SetHashAndHeight sets the committed block hashes and height in memory.
-// This must be called at startup to initialize the in-memory state, unless
-// explicitly committing a genesis block.
+// This must be called at startup to initialize the in-memory state if the
+// database is non-empty (e.g. restart, state sync)
 func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	t.Lock()
 	defer t.Unlock()
@@ -279,6 +279,8 @@ func (t *TrieDB) Close() error {
 // A proposal must have already been created from [accountTrie.Commit] with the same root,
 // parent root, and height.
 // If no such proposal exists, an error will be returned.
+//
+// Unlike for HashDB and PathDB, `Commit` must be called even if if the root is unchanged.
 func (t *TrieDB) Update(root, parent common.Hash, height uint64, _ *trienode.MergedNodeSet, _ *triestate.Set, opts ...stateconf.TrieDBUpdateOption) error {
 	// We require block hashes to be provided for all blocks in production.
 	// However, many tests cannot reasonably provide a block blockHash for genesis, so we allow it to be omitted.
@@ -358,6 +360,8 @@ func (ps *proposals) exists(root, block, parentBlock common.Hash) bool {
 //
 // Afterward, we know that no other proposal at this height can be committed, so we can dereference all
 // children in the the other branches of the proposal tree.
+//
+// Unlike for HashDB and PathDB, `Commit` must be called even if if the root is unchanged.
 func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	start := time.Now()
 	defer func() {
