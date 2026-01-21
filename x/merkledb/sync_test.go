@@ -439,7 +439,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	defer cancel(nil)
 
 	// Allow 1 request to go through before blocking
-	actionHandler := synctest.CreateInterceptor(xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
+	actionHandler := synctest.NewCounterHandler(xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
 		err := syncer.UpdateSyncTarget(secondSyncRoot)
 		if err != nil {
 			cancel(err)
@@ -499,7 +499,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require.NoError(err)
 
 	var syncer *xsync.Syncer[*RangeProof, *ChangeProof]
-	actionHandler := synctest.CreateInterceptor(xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
+	actionHandler := synctest.NewCounterHandler(xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
 		err := syncer.UpdateSyncTarget(root1)
 		if err != nil {
 			cancel(err)

@@ -153,7 +153,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	ctx, cancel := context.WithCancelCause(t.Context())
 	defer cancel(nil)
 
-	rangeProofHandler := synctest.CreateInterceptor(NewGetRangeProofHandler(serverDB), func() {
+	rangeProofHandler := synctest.NewCounterHandler(NewGetRangeProofHandler(serverDB), func() {
 		err := syncer.UpdateSyncTarget(wantRoot)
 		if err != nil {
 			cancel(err)
