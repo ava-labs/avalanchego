@@ -437,7 +437,7 @@ func getNetworkConfig(
 
 func getBenchlistConfig(v *viper.Viper, snowballParameters *snowball.Parameters) (benchlist.Config, error) {
 	if snowballParameters == nil {
-		return benchlist.Config{}, errors.New("pChain snowball parameters must be non-nil")
+		return benchlist.Config{}, errors.New("snowball parameters must be non-nil")
 	}
 	// AlphaConfidence is used here to ensure that benching can't cause a
 	// liveness failure. If AlphaPreference were used, the benchlist may grow to
@@ -1052,9 +1052,14 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
 				return nil, err
 			}
+			// support deprecated field, will be removed in future
+			if config.ConsensusParameters != nil {
+				config.SnowParameters = config.ConsensusParameters
+				config.ConsensusParameters = nil
+			}
 			if config.SimplexParameters != nil {
 				setSimplexDefaults(&config, v)
-			} else if config.SnowParameters != nil && config.SnowParameters.Alpha != nil {
+			} else if config.SnowParameters.Alpha != nil {
 				config.SnowParameters.AlphaPreference = *config.SnowParameters.Alpha
 				config.SnowParameters.AlphaConfidence = config.SnowParameters.AlphaPreference
 			}
@@ -1112,9 +1117,13 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}
 
+		if config.ConsensusParameters != nil {
+			config.SnowParameters = config.ConsensusParameters
+			config.ConsensusParameters = nil
+		}
 		if config.SimplexParameters != nil {
 			setSimplexDefaults(&config, v)
-		} else if config.SnowParameters != nil && config.SnowParameters.Alpha != nil {
+		} else if config.SnowParameters.Alpha != nil {
 			config.SnowParameters.AlphaPreference = *config.SnowParameters.Alpha
 			config.SnowParameters.AlphaConfidence = config.SnowParameters.AlphaPreference
 		}
