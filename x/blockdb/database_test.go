@@ -37,6 +37,38 @@ func TestInterface(t *testing.T) {
 	}
 }
 
+func TestSyncPersistence(t *testing.T) {
+	config := DefaultConfig().WithMaxDataFileSize(250).WithSyncToDisk(false)
+	db := newDatabase(t, config)
+	db.compressor = compression.NewNoCompressor()
+	tempDir := db.config.DataDir
+
+	// Write 4 blocks spanning 2 data files
+	blocks := make(map[uint64][]byte)
+	for h := range uint64(4) {
+		blocks[h] = fixedSizeBlock(t, 100, h)
+		require.NoError(t, db.Put(h, blocks[h]))
+	}
+
+	require.NoError(t, db.Sync(0, 3))
+	require.NoError(t, db.Close())
+
+	// Reopen and verify all data persisted across files
+	hdb, err := New(config.WithDir(tempDir).WithBlockCacheSize(0), logging.NoLog{})
+	require.NoError(t, err)
+	reopenedDB := hdb.(*Database)
+	reopenedDB.compressor = compression.NewNoCompressor()
+	t.Cleanup(func() {
+		require.NoError(t, reopenedDB.Close())
+	})
+
+	for h, expected := range blocks {
+		data, err := reopenedDB.Get(h)
+		require.NoError(t, err)
+		require.Equal(t, expected, data)
+	}
+}
+
 func TestNew_Params(t *testing.T) {
 	tempDir := t.TempDir()
 	tests := []struct {
