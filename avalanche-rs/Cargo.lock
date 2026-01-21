@@ -173,6 +173,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "avalanche-snow"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "avalanche-db",
+ "avalanche-ids",
+ "bytes",
+ "chrono",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tokio-test",
+ "tracing",
+]
+
+[[package]]
 name = "avalanche-utils"
 version = "0.1.0"
 dependencies = [
@@ -185,6 +203,25 @@ dependencies = [
  "thiserror",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "avalanche-vm"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "avalanche-db",
+ "avalanche-ids",
+ "avalanche-snow",
+ "bytes",
+ "chrono",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tokio-test",
+ "tracing",
 ]
 
 [[package]]
