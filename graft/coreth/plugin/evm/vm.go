@@ -1224,7 +1224,8 @@ func (vm *VM) analyzeState() error {
 	if topN <= 0 {
 		topN = 100
 	}
-	analyzed := AnalyzeRawData(rawData, topN)
+	// Pass chaindb to resolve address hashes to actual addresses via preimage lookup
+	analyzed := AnalyzeRawData(rawData, topN, vm.chaindb)
 	LogAnalyzedResult(analyzed)
 
 	return nil

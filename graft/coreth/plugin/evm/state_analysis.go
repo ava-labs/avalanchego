@@ -15,8 +15,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
@@ -180,7 +182,8 @@ func AnalyzeState(bc *core.BlockChain, cfg StateAnalysisConfig) (*RawStateData, 
 			"accounts", existing.TotalAccounts,
 			"slots", existing.TotalStorageSlots,
 		)
-		analyzed := AnalyzeRawData(existing, 100)
+		// Pass nil for db - address resolution will be done in final analysis
+		analyzed := AnalyzeRawData(existing, 100, nil)
 		LogAnalyzedResult(analyzed)
 	}
 
@@ -657,6 +660,7 @@ type AnalyzedResult struct {
 // ContractSummary holds per-contract summary for output
 type ContractSummary struct {
 	AddressHash    string  `json:"address_hash"`
+	Address        string  `json:"address,omitempty"` // Resolved address from preimage (if available)
 	StorageSlots   uint64  `json:"storage_slots"`
 	StorageBytes   uint64  `json:"storage_bytes"`
 	HasCode        bool    `json:"has_code"`
@@ -674,7 +678,8 @@ type TransitionEstimate struct {
 }
 
 // AnalyzeRawData processes raw state data to derive metrics
-func AnalyzeRawData(raw *RawStateData, topN int) *AnalyzedResult {
+// If db is provided, it will attempt to resolve address hashes to actual addresses via preimage lookup
+func AnalyzeRawData(raw *RawStateData, topN int, db ethdb.Database) *AnalyzedResult {
 	result := &AnalyzedResult{
 		RawStateData:        *raw,
 		StorageDistribution: make(map[string]uint64),
@@ -711,8 +716,19 @@ func AnalyzeRawData(raw *RawStateData, topN int) *AnalyzedResult {
 			if raw.TotalStorageBytes > 0 {
 				bytePct = float64(c.StorageBytes) * 100 / float64(raw.TotalStorageBytes)
 			}
+
+			// Try to resolve address from preimage
+			var address string
+			if db != nil {
+				hash := common.HexToHash(c.AddressHash)
+				if preimage := rawdb.ReadPreimage(db, hash); preimage != nil && len(preimage) == 20 {
+					address = common.BytesToAddress(preimage).Hex()
+				}
+			}
+
 			result.TopContracts[i] = ContractSummary{
 				AddressHash:    c.AddressHash,
+				Address:        address,
 				StorageSlots:   c.StorageSlots,
 				StorageBytes:   c.StorageBytes,
 				HasCode:        c.HasCode,
@@ -845,6 +861,7 @@ func LogAnalyzedResult(result *AnalyzedResult) {
 			log.Info("Contract",
 				"rank", i+1,
 				"hash", c.AddressHash,
+				"address", c.Address,
 				"slots", c.StorageSlots,
 				"size", formatBytes(c.StorageBytes),
 				"slotPct", fmt.Sprintf("%.2f%%", c.SlotPercentage),
