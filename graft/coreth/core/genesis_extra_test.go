@@ -35,8 +35,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -68,8 +68,8 @@ func TestGenesisEthUpgrades(t *testing.T) {
 		},
 		&extras.ChainConfig{
 			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
+				ApricotPhase1BlockTimestamp: utils.PointerTo[uint64](0),
+				ApricotPhase2BlockTimestamp: utils.PointerTo[uint64](0),
 			},
 		},
 	)

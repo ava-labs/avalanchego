@@ -19,9 +19,7 @@ import (
 )
 
 var (
-	_ gossip.HandlerSet[*atomic.Tx]      = (*Mempool)(nil)
-	_ gossip.PullGossiperSet[*atomic.Tx] = (*Mempool)(nil)
-	_ gossip.PushGossiperSet             = (*Mempool)(nil)
+	_ gossip.SystemSet[*atomic.Tx] = (*Mempool)(nil)
 
 	ErrAlreadyKnown    = errors.New("already known")
 	ErrConflict        = errors.New("conflict present")

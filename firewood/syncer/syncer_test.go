@@ -186,7 +186,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 // Returns the database and its resulting root.
 func generateDB(t *testing.T, r *rand.Rand, numKeys int) (*ffi.Database, ids.ID) {
 	t.Helper()
-	db, err := ffi.New(t.TempDir())
+	db, err := ffi.New(t.TempDir(), ffi.EthereumNodeHashing)
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -205,8 +205,7 @@ func fillDB(t *testing.T, r *rand.Rand, db *ffi.Database, numKeys int) ids.ID {
 	}
 
 	var (
-		keys      = make([][]byte, 0, numKeys)
-		vals      = make([][]byte, 0, numKeys)
+		ops       = make([]ffi.BatchOp, 0, numKeys)
 		minLength = 1
 		maxLength = 64
 	)
@@ -223,11 +222,10 @@ func fillDB(t *testing.T, r *rand.Rand, db *ffi.Database, numKeys int) ids.ID {
 		_, err = r.Read(val)
 		require.NoError(t, err, "read never errors")
 
-		keys = append(keys, key)
-		vals = append(vals, val)
+		ops = append(ops, ffi.Put(key, val))
 	}
 
-	root, err := db.Update(keys, vals)
+	root, err := db.Update(ops)
 	require.NoError(t, err)
 
 	return ids.ID(root)

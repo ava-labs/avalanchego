@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 )
 
 var (
