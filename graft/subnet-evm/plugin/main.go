@@ -4,8 +4,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/runner"
 	"github.com/ava-labs/avalanchego/version"
@@ -14,6 +12,6 @@ import (
 func main() {
 	evm.RegisterAllLibEVMExtras()
 
-	versionString := fmt.Sprintf("Subnet-EVM/%s [AvalancheGo=%s, rpcchainvm=%d]", version.Current.Semantic(), version.Current, version.RPCChainVMProtocol)
+	versionString := version.Current.SemanticWithCommit(version.GitCommit)
 	runner.Run(versionString)
 }
