@@ -1,6 +1,6 @@
 # Depending on AvalancheGo Modules
 
-AvalancheGo consists of multiple Go modules that are must be consumed
+AvalancheGo consists of multiple Go modules that must be consumed
 together:
 
 | Module | Import Path |

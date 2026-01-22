@@ -4,7 +4,7 @@ This document describes how to create releases for AvalancheGo and its
 submodules.
 
 For the rationale behind this process, see [Multi-Module Release
-Strategy](design/multi-module-release.md).
+Strategy](design/multi_module_release.md).
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ Both release and development tags follow the same core process:
 ### 1. Update Require Directives
 
 ```bash
-./scripts/update_require_directives.sh <version>
+./scripts/run_task.sh tags-set-require-directives -- <version>
 ```
 
 Commit the go.mod changes.
@@ -26,10 +26,9 @@ Commit the go.mod changes.
 ### 2. Create and Push Tags
 
 ```bash
-./scripts/create_release_tags.sh <version>
+./scripts/run_task.sh tags-create -- <version>
+./scripts/run_task.sh tags-push -- <version>
 ```
-
-Push the tags as shown in the script output.
 
 ### 3. Verify
 
@@ -49,30 +48,34 @@ All submodules should resolve to matching versions.
 For official releases, the tagging process is applied to master after
 merging the require directive updates:
 
-1. Create a PR with `./scripts/update_require_directives.sh vX.Y.Z`
+1. Create a PR with `./scripts/run_task.sh tags-set-require-directives -- vX.Y.Z`
 2. Merge to master
-3. From the merge commit, run `./scripts/create_release_tags.sh vX.Y.Z`
-4. Push tags and verify
+3. From the merge commit, run `./scripts/run_task.sh tags-create -- vX.Y.Z`
+4. Run `./scripts/run_task.sh tags-push -- vX.Y.Z` and verify
 
 ## Development Tags
 
 To share work-in-progress without merging to master:
 
-1. On your branch, run `./scripts/update_require_directives.sh v0.0.0-mybranch`
+1. On your branch, run `./scripts/run_task.sh tags-set-require-directives -- v0.0.0-mybranch`
 2. Commit and push to your branch
-3. Run `./scripts/create_release_tags.sh v0.0.0-mybranch`
-4. Push tags
+3. Run `./scripts/run_task.sh tags-create -- v0.0.0-mybranch`
+4. Run `./scripts/run_task.sh tags-push -- v0.0.0-mybranch`
 
 External consumers can then `go get github.com/ava-labs/avalanchego@v0.0.0-mybranch`.
 
-## Script Reference
+## Task Reference
 
-### [`scripts/update_require_directives.sh`](../scripts/update_require_directives.sh)
+### `tags-set-require-directives`
 
 Updates `require` directives in all go.mod files to reference the
 specified version. Version must match `vX.Y.Z` or `vX.Y.Z-suffix`.
 
-### [`scripts/create_release_tags.sh`](../scripts/create_release_tags.sh)
+### `tags-create`
 
-Creates release tags for the main module and all submodules at the
-current commit. Tags are created locally; you must push them separately.
+Creates tags for the main module and all submodules at the current commit.
+
+### `tags-push`
+
+Pushes tags for the main module and all submodules. Set `GIT_REMOTE` to
+override the default remote (`origin`).
