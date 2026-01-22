@@ -354,6 +354,18 @@ tasks:
       NO_RACE: TRUE    # Tests are much faster without race detection
     cmd: bash ./scripts/build_test.sh
 
+  tags-create:
+    desc: Creates tags for avalanchego and submodules
+    cmd: ./scripts/create_tags.sh {{.CLI_ARGS}}
+
+  tags-push:
+    desc: Pushes tags for avalanchego and submodules
+    cmd: ./scripts/push_tags.sh {{.CLI_ARGS}}
+
+  tags-set-require-directives:
+    desc: Updates require directives for avalanchego modules
+    cmd: ./scripts/update_require_directives.sh {{.CLI_ARGS}}
+
   test-upgrade:
     desc: Runs upgrade tests
     cmds:
