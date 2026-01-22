@@ -259,37 +259,35 @@ The benchmarks support testing with custom versions of `libevm` and `firewood` d
 
 ### Local Usage
 
-**Prerequisite**: You must be in a nix shell (`nix develop`) to run benchmark tasks.
+**Prerequisite**: You must be in a nix shell (`nix develop`).
 
-First, set up dependencies using the `setup-reexecution-deps` task, then run the benchmark:
+Use `run_polyrepo.sh` to set up custom dependencies. Either or both can be provided:
+- `LIBEVM_REF=<ref>` env var updates libevm
+- `FIREWOOD_REF=<ref>` env var or `sync firewood@<ref>` arg syncs firewood
 
 ```bash
-# Test with custom firewood version
-FIREWOOD_REF=abc123def ./scripts/run_task.sh setup-reexecution-deps
-./scripts/run_task.sh test-cchain-reexecution -- firewood-101-250k
+# Using env var + polyrepo arg
+LIBEVM_REF=v1.2.3 ./scripts/run_polyrepo.sh sync firewood@abc123def
 
-# Test with custom libevm version
-LIBEVM_REF=v1.2.3 ./scripts/run_task.sh setup-reexecution-deps
-./scripts/run_task.sh test-cchain-reexecution -- firewood-101-250k
+# Or using both as env vars (equivalent)
+LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123def ./scripts/run_polyrepo.sh
 
-# Test with both custom versions
-FIREWOOD_REF=abc123def LIBEVM_REF=v1.2.3 ./scripts/run_task.sh setup-reexecution-deps
+# Then run the benchmark
 ./scripts/run_task.sh test-cchain-reexecution -- firewood-101-250k
 ```
 
-### How It Works
-
-- **`LIBEVM_REF`**: Runs `go get github.com/ava-labs/libevm@<ref>` to update the dependency
-- **`FIREWOOD_REF`**: Uses [polyrepo](../../../scripts/run_polyrepo.sh) to sync firewood at the specified ref
-
 ### CI Usage
 
-For workflow dispatch, use the `with-dependencies` input to specify custom dependency versions:
+Use `with-dependencies` to specify custom versions. Either or both can be provided:
 
-- Single dependency: `-f with-dependencies=firewood=abc123`
-- Multiple dependencies: `-f with-dependencies="firewood=abc123,libevm=v1.2.3"`
+```bash
+gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+  -f test=firewood-101-250k \
+  -f with-dependencies="firewood=abc123,libevm=v1.2.3" \
+  -f runner=blacksmith-4vcpu-ubuntu-2404
+```
 
-See [Trigger Workflow Dispatch with GitHub CLI](#trigger-workflow-dispatch-with-github-cli) for complete examples.
+See [Trigger Workflow Dispatch with GitHub CLI](#trigger-workflow-dispatch-with-github-cli) for more examples.
 
 ## Metrics
 
@@ -366,15 +364,9 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
 
 ### Using Custom Dependency Versions
 
-```bash
-# Test with custom firewood commit
-gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
-  -f test=firewood-101-250k \
-  -f with-dependencies=firewood=abc123def \
-  -f runner=blacksmith-4vcpu-ubuntu-2404 \
-  -f timeout-minutes=60
+Use `with-dependencies` to specify `firewood=<ref>` and/or `libevm=<ref>`:
 
-# Test with custom libevm and firewood
+```bash
 gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
   -f test=firewood-101-250k \
   -f with-dependencies="firewood=abc123def,libevm=v1.2.3" \
