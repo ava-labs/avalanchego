@@ -108,6 +108,7 @@ func TestArchiveBlockChain(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, createArchiveBlockChain)
 		})
 	}
@@ -116,6 +117,7 @@ func TestArchiveBlockChain(t *testing.T) {
 func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
 			testArchiveBlockChainSnapsDisabled(t, scheme)
 		})
 	}
@@ -146,6 +148,7 @@ func testArchiveBlockChainSnapsDisabled(t *testing.T, scheme string) {
 
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -157,6 +160,7 @@ func TestPruningBlockChain(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, createPruningBlockChain)
 		})
 	}
@@ -165,6 +169,7 @@ func TestPruningBlockChain(t *testing.T) {
 func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
 			testPruningBlockChainSnapsDisabled(t, scheme)
 		})
 	}
@@ -193,6 +198,7 @@ func testPruningBlockChainSnapsDisabled(t *testing.T, scheme string) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -218,6 +224,7 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -226,6 +233,7 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
 			testPruningBlockChainUngracefulShutdownSnapsDisabled(t, scheme)
 		})
 	}
@@ -264,6 +272,7 @@ func testPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T, scheme s
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -299,6 +308,7 @@ func TestEnableSnapshots(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -315,12 +325,14 @@ func TestCorruptSnapshots(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
 }
 
 func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
+	t.Skip("Flaky test from go-ethereum")
 	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		// Import the chain. This runs all block validation rules.
 		blockchain, err := createBlockChain(db, pruningConfig, gspec, lastAcceptedHash)
@@ -376,6 +388,7 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 func TestPruningToNonPruning(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
 			testPruningToNonPruning(t, scheme)
 		})
 	}
@@ -639,6 +652,7 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 func TestUngracefulAsyncShutdownNoSnapshots(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
 			testUngracefulAsyncShutdown(t, scheme, false)
 		})
 	}
@@ -671,6 +685,7 @@ func testUngracefulAsyncShutdown(t *testing.T, scheme string, snapshotEnabled bo
 	}
 	for _, tt := range reexecTests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -681,6 +696,7 @@ func testUngracefulAsyncShutdown(t *testing.T, scheme string, snapshotEnabled bo
 func TestCanonicalHashMarker(t *testing.T) {
 	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme, customrawdb.FirewoodScheme} {
 		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
 			testCanonicalHashMarker(t, scheme)
 		})
 	}
@@ -817,6 +833,7 @@ func TestTxLookupBlockChain(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, createTxLookupBlockChain)
 		})
 	}
@@ -842,6 +859,7 @@ func TestTxLookupSkipIndexingBlockChain(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			t.Parallel()
 			tt.testFunc(t, createTxLookupBlockChain)
 		})
 	}

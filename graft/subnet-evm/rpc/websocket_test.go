@@ -93,7 +93,7 @@ func TestWebsocketOriginCheck(t *testing.T) {
 // This test times out occasionally due to context timeout differences with go-ethereum.
 // These differences are not critical, so this test can simply be skipped.
 func TestWebsocketLargeCall(t *testing.T) {
-	t.Skip("Flaky")
+	t.Skip("Flaky test from go-ethereum")
 	t.Parallel()
 
 	var (
@@ -133,7 +133,7 @@ func TestWebsocketLargeCall(t *testing.T) {
 // This test times out occasionally due to context timeout differences with go-ethereum.
 // These differences are not critical, so this test can simply be skipped.
 func TestWebsocketLargeRead(t *testing.T) {
-	t.Skip("Flaky")
+	t.Skip("Flaky test from go-ethereum")
 	t.Parallel()
 
 	var (
@@ -193,6 +193,8 @@ func TestWebsocketLargeRead(t *testing.T) {
 }
 
 func TestWebsocketPeerInfo(t *testing.T) {
+	t.Parallel()
+
 	var (
 		s     = newTestServer()
 		ts    = httptest.NewServer(s.WebsocketHandler([]string{"origin.example.com"}))
@@ -281,7 +283,7 @@ func TestClientWebsocketPing(t *testing.T) {
 // This test is upstream from go-ethereum but is skipped because it is flaky.
 // Error message: call failed: websocket: close 1006 (abnormal closure): unexpected EOF
 func TestClientWebsocketLargeMessage(t *testing.T) {
-	t.Skip("Flaky")
+	t.Skip("Flaky test from go-ethereum")
 	var (
 		srv     = NewServer(0)
 		httpsrv = httptest.NewServer(srv.WebsocketHandler(nil))
