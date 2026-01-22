@@ -31,4 +31,4 @@ for tag in "${TAGS[@]}"; do
 done
 
 echo ""
-echo "Push with: git push origin ${TAGS[*]}"
+echo "Push with: ./scripts/run_task.sh push-tags -- $VERSION"
