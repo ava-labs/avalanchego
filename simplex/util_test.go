@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -51,7 +52,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 		digest := computeDigest(bytes)
 		block.digest = digest
 
-		block.blockTracker = newBlockTracker(block)
+		block.blockTracker = newBlockTracker(block, vm)
 		return block
 	}
 	if config.round == 0 {
@@ -122,6 +123,7 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 			OutboundMsgBuilder: mc,
 			VM:                 newTestVM(),
 			DB:                 memdb.New(),
+			WAL:                wal.NewMemWAL(t),
 			SignBLS:            node.signFunc,
 			Params:             chainParameters,
 		}
