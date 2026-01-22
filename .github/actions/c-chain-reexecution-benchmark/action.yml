@@ -162,10 +162,11 @@ runs:
         path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         if-no-files-found: error
     - name: Compare Benchmark Results
+      if: inputs.push-github-action-benchmark == 'true'
       uses: benchmark-action/github-action-benchmark@v1
       with:
         tool: 'customBiggerIsBetter'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         summary-always: true
         github-token: ${{ inputs.github-token }}
-        auto-push: ${{ inputs.push-github-action-benchmark }}
+        auto-push: true
