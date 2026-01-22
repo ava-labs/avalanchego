@@ -4,10 +4,12 @@
 package config
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/spf13/cast"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
@@ -16,6 +18,25 @@ import (
 // string formats ("1m", "5s") and integer nanoseconds.
 type Duration struct {
 	time.Duration
+}
+
+// MarshalJSON marshals the duration as a JSON string.
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.Duration.String())
+}
+
+func (d *Duration) UnmarshalJSON(data []byte) (err error) {
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	d.Duration, err = cast.ToDurationE(v)
+	return err
+}
+
+// String returns the duration as a string.
+func (d Duration) String() string {
+	return d.Duration.String()
 }
 
 // CommonConfig contains configuration fields shared between CChainConfig and L1Config.

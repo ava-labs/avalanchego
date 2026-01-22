@@ -13,8 +13,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/spf13/cast"
-
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -111,23 +109,4 @@ func (c *CChainConfig) validate(networkID uint32) error {
 // validate checks the L1Config for invalid settings.
 func (c *L1Config) validate(_ uint32) error {
 	return c.CommonConfig.validateCommon()
-}
-
-func (d *Duration) UnmarshalJSON(data []byte) (err error) {
-	var v any
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
-	}
-	d.Duration, err = cast.ToDurationE(v)
-	return err
-}
-
-// String implements the stringer interface.
-func (d Duration) String() string {
-	return d.Duration.String()
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (d Duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Duration.String())
 }
