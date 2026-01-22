@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
+// Duration wraps time.Duration to support JSON unmarshaling from both
+// string formats ("1m", "5s") and integer nanoseconds.
 type Duration struct {
 	time.Duration
 }

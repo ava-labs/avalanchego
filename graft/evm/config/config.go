@@ -68,8 +68,7 @@ func (c *CommonConfig) EthAPIs() []string {
 // This is used to log a message when the config is loaded and contains deprecated flags.
 // This function should be kept as a placeholder even if it is empty.
 func (*CommonConfig) deprecate() string {
-	msg := ""
-	return msg
+	return ""
 }
 
 // validateCommon checks common config fields shared between CChainConfig and L1Config.
