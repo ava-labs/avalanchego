@@ -5,6 +5,7 @@ package firewood
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
@@ -271,16 +272,13 @@ func (a *accountTrie) Copy() *accountTrie {
 		reader:     a.reader, // Share the same reader
 		hasChanges: a.hasChanges,
 		dirtyKeys:  make(map[string][]byte, len(a.dirtyKeys)),
-		updateOps:  make([]ffi.BatchOp, len(a.updateOps)),
+		updateOps:  slices.Clone(a.updateOps), // each ffi.BatchOp is read-only, safe to shallow copy
 	}
 
 	// Deep copy dirtyKeys map
 	for k, v := range a.dirtyKeys {
-		newTrie.dirtyKeys[k] = append([]byte{}, v...)
+		newTrie.dirtyKeys[k] = slices.Clone(v)
 	}
-
-	// Copy updateOps slice
-	newTrie.updateOps = append([]ffi.BatchOp{}, a.updateOps...)
 
 	return newTrie
 }
