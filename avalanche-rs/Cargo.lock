@@ -313,6 +313,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "avalanche-trie"
+version = "0.1.0"
+dependencies = [
+ "avalanche-db",
+ "avalanche-ids",
+ "hex",
+ "parking_lot",
+ "rand 0.8.5",
+ "sha3",
+ "smallvec",
+ "thiserror",
+]
+
+[[package]]
 name = "avalanche-utils"
 version = "0.1.0"
 dependencies = [
@@ -356,6 +370,7 @@ dependencies = [
  "avalanche-db",
  "avalanche-ids",
  "avalanche-snow",
+ "avalanche-trie",
  "avalanche-vm",
  "bytes",
  "chrono",

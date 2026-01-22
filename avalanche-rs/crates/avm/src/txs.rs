@@ -76,6 +76,16 @@ impl BaseTx {
 
         Ok(())
     }
+
+    /// Computes the hash of the unsigned transaction for signature verification.
+    pub fn unsigned_hash(&self) -> [u8; 32] {
+        use sha2::{Digest, Sha256};
+        let bytes = serde_json::to_vec(self).unwrap_or_default();
+        let hash = Sha256::digest(&bytes);
+        let mut result = [0u8; 32];
+        result.copy_from_slice(&hash);
+        result
+    }
 }
 
 /// Transferable output (output with asset ID).
