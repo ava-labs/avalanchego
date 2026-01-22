@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
@@ -201,7 +202,8 @@ func FillAccounts(
 	newRoot, nodes, err := tr.Commit(true)
 	require.NoError(t, err)
 	require.NoError(t, mergedSet.Merge(nodes))
-	require.NoError(t, s.TrieDB().Update(newRoot, root, 0, mergedSet, nil))
+	updateOpts := stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{}) // block hashes required for Firewood
+	require.NoError(t, s.TrieDB().Update(newRoot, root, 0, mergedSet, nil, updateOpts))
 	require.NoError(t, s.TrieDB().Commit(newRoot, false))
 	return newRoot, accounts
 }
