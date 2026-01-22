@@ -160,7 +160,6 @@ runs:
       with:
         name: benchmark-output-${{ inputs.run-id }}-${{ inputs.run-attempt }}-${{ inputs.job }}-${{ inputs.test }}-${{ inputs.runner_type }}
         path: ${{ env.BENCHMARK_OUTPUT_FILE }}
-        retention-days: 30
         if-no-files-found: error
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
