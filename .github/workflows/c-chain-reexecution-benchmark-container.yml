@@ -107,7 +107,7 @@ jobs:
       - name: Setup reexecution dependencies
         if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
         shell: nix develop --command bash -x {0}
-        run: ./scripts/run_task.sh setup-reexecution-deps
+        run: ./scripts/run_polyrepo.sh
         env:
           LIBEVM_REF: ${{ matrix.libevm-ref }}
           FIREWOOD_REF: ${{ matrix.firewood-ref }}

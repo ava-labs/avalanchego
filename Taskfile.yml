@@ -178,23 +178,6 @@ tasks:
     desc: Sets up C-Chain test data (blocks from S3, state from S3 or empty for genesis).
     cmd: ./scripts/setup_cchain_data.sh
 
-  setup-reexecution-deps:
-    desc: Setup custom deps for reexecution benchmarks. Use LIBEVM_REF and/or FIREWOOD_REF env vars.
-    cmds:
-      - cmd: |
-          if [[ -n "${LIBEVM_REF:-}" ]]; then
-            echo "Updating libevm to ${LIBEVM_REF}..."
-            go get "github.com/ava-labs/libevm@${LIBEVM_REF}"
-            go mod tidy
-          fi
-        shell: bash
-      - cmd: |
-          if [[ -n "${FIREWOOD_REF:-}" ]]; then
-            echo "Setting up firewood at ${FIREWOOD_REF}..."
-            ./scripts/run_polyrepo.sh sync firewood@"${FIREWOOD_REF}"
-          fi
-        shell: bash
-
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
     cmd: bash -x ./scripts/tests.e2e.bootstrap_monitor.sh
