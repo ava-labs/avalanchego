@@ -365,7 +365,7 @@ func TestEnableSnapshots(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
+			// Note: Cannot run in parallel due to shared snapLimit variable
 			tt.testFunc(t, create)
 		})
 	}

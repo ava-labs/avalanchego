@@ -117,7 +117,6 @@ func TestArchiveBlockChain(t *testing.T) {
 func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
-			t.Parallel()
 			testArchiveBlockChainSnapsDisabled(t, scheme)
 		})
 	}
@@ -169,7 +168,6 @@ func TestPruningBlockChain(t *testing.T) {
 func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
-			t.Parallel()
 			testPruningBlockChainSnapsDisabled(t, scheme)
 		})
 	}
@@ -308,7 +306,6 @@ func TestEnableSnapshots(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}

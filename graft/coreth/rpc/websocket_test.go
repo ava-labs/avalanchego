@@ -184,8 +184,6 @@ func TestWebsocketLargeRead(t *testing.T) {
 }
 
 func TestWebsocketPeerInfo(t *testing.T) {
-	t.Parallel()
-
 	var (
 		s     = newTestServer()
 		ts    = httptest.NewServer(s.WebsocketHandler([]string{"origin.example.com"}))
