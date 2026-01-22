@@ -51,9 +51,9 @@ func NewMempool(
 	verify func(tx *atomic.Tx) error,
 ) (*Mempool, error) {
 	bloom, err := gossip.NewBloomFilter(registerer, "atomic_mempool_bloom_filter",
-		config.DefaultTxGossipBloomMinTargetElements,
-		config.DefaultTxGossipBloomTargetFalsePositiveRate,
-		config.DefaultTxGossipBloomResetFalsePositiveRate,
+		config.TxGossipBloomMinTargetElements,
+		config.TxGossipBloomTargetFalsePositiveRate,
+		config.TxGossipBloomResetFalsePositiveRate,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
@@ -271,7 +271,7 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	}
 
 	m.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(m.bloom, m.length()*config.DefaultTxGossipBloomChurnMultiplier)
+	reset, err := gossip.ResetBloomFilterIfNeeded(m.bloom, m.length()*config.TxGossipBloomChurnMultiplier)
 	if err != nil {
 		return err
 	}

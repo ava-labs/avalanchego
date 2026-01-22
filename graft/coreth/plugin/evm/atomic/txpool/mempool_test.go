@@ -96,13 +96,13 @@ func TestMempoolAddBloomReset(t *testing.T) {
 	require.Equal(maxFeeTx, tx)
 
 	numHashes, numEntries := bloom.OptimalParameters(
-		config.DefaultTxGossipBloomMinTargetElements,
-		config.DefaultTxGossipBloomTargetFalsePositiveRate,
+		config.TxGossipBloomMinTargetElements,
+		config.TxGossipBloomTargetFalsePositiveRate,
 	)
 	txsToAdd := bloom.EstimateCount(
 		numHashes,
 		numEntries,
-		config.DefaultTxGossipBloomResetFalsePositiveRate,
+		config.TxGossipBloomResetFalsePositiveRate,
 	)
 	for fee := range txsToAdd {
 		// Keep increasing the fee to evict older transactions

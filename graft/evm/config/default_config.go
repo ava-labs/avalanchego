@@ -13,11 +13,15 @@ import (
 )
 
 const (
-	defaultCommitInterval                       = 4096
-	DefaultTxGossipBloomMinTargetElements       = 8 * 1024
-	DefaultTxGossipBloomTargetFalsePositiveRate = 0.01
-	DefaultTxGossipBloomResetFalsePositiveRate  = 0.05
-	DefaultTxGossipBloomChurnMultiplier         = 3
+	defaultCommitInterval = 4096
+
+	// Protocol constants for transaction gossip bloom filters.
+	// These values are fixed across all nodes and cannot be changed without
+	// a coordinated network upgrade.
+	TxGossipBloomMinTargetElements       = 8 * 1024
+	TxGossipBloomTargetFalsePositiveRate = 0.01
+	TxGossipBloomResetFalsePositiveRate  = 0.05
+	TxGossipBloomChurnMultiplier         = 3
 )
 
 // newDefaultCommonConfig returns a CommonConfig with sensible defaults shared by both C-Chain and L1.

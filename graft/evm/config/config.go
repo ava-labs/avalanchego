@@ -1,6 +1,11 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package config provides shared configuration types for EVM-based chains in AvalancheGo.
+//
+//   - CommonConfig: Base configuration shared by all EVM chains (pruning, gossip, APIs, etc.)
+//   - CChainConfig: C-Chain specific configuration (embeds CommonConfig, adds price options)
+//   - L1Config: L1/Subnet-EVM specific configuration (embeds CommonConfig, adds validators API, database settings)
 package config
 
 import (
@@ -10,6 +15,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/spf13/cast"
+)
+
+var (
+	ErrPopulateMissingTriesWithPruning  = errors.New("cannot enable populate missing tries while pruning is enabled")
+	ErrPopulateMissingTriesNoReader     = errors.New("cannot enable populate missing tries without at least one reader")
+	ErrOfflinePruningWithoutPruning     = errors.New("cannot run offline pruning while pruning is disabled")
+	ErrPruningZeroCommitInterval        = errors.New("cannot use commit interval of 0 with pruning enabled")
+	ErrPruningZeroStateHistory          = errors.New("cannot use state history of 0 with pruning enabled")
+	ErrPushGossipPercentStakeOutOfRange = errors.New("push-gossip-percent-stake must be in the range [0, 1]")
 )
 
 // Configurable is the constraint for config types that can be validated and deprecated.
@@ -57,6 +71,32 @@ func (c *CommonConfig) deprecate() string {
 	return msg
 }
 
+// validateCommon checks common config fields shared between CChainConfig and L1Config.
+func (c *CommonConfig) validateCommon() error {
+	if c.PopulateMissingTries != nil && (c.OfflinePruning || c.Pruning) {
+		return ErrPopulateMissingTriesWithPruning
+	}
+	if c.PopulateMissingTries != nil && c.PopulateMissingTriesParallelism < 1 {
+		return ErrPopulateMissingTriesNoReader
+	}
+
+	if !c.Pruning && c.OfflinePruning {
+		return ErrOfflinePruningWithoutPruning
+	}
+	// If pruning is enabled, the commit interval must be non-zero so the node commits state tries every CommitInterval blocks.
+	if c.Pruning && c.CommitInterval == 0 {
+		return ErrPruningZeroCommitInterval
+	}
+	if c.Pruning && c.StateHistory == 0 {
+		return ErrPruningZeroStateHistory
+	}
+
+	if c.PushGossipPercentStake < 0 || c.PushGossipPercentStake > 1 {
+		return fmt.Errorf("%w, got %f", ErrPushGossipPercentStakeOutOfRange, c.PushGossipPercentStake)
+	}
+	return nil
+}
+
 // validate checks the CChainConfig for invalid settings.
 func (c *CChainConfig) validate(networkID uint32) error {
 	// Ensure that non-standard commit interval is not allowed for production networks
@@ -70,58 +110,16 @@ func (c *CChainConfig) validate(networkID uint32) error {
 		}
 	}
 
-	if c.PopulateMissingTries != nil && (c.OfflinePruning || c.Pruning) {
-		return fmt.Errorf("cannot enable populate missing tries while offline pruning (enabled: %t)/pruning (enabled: %t) are enabled", c.OfflinePruning, c.Pruning)
-	}
-	if c.PopulateMissingTries != nil && c.PopulateMissingTriesParallelism < 1 {
-		return fmt.Errorf("cannot enable populate missing tries without at least one reader (parallelism: %d)", c.PopulateMissingTriesParallelism)
-	}
-
-	if !c.Pruning && c.OfflinePruning {
-		return errors.New("cannot run offline pruning while pruning is disabled")
-	}
-	// If pruning is enabled, the commit interval must be non-zero so the node commits state tries every CommitInterval blocks.
-	if c.Pruning && c.CommitInterval == 0 {
-		return errors.New("cannot use commit interval of 0 with pruning enabled")
-	}
-	if c.Pruning && c.StateHistory == 0 {
-		return errors.New("cannot use state history of 0 with pruning enabled")
-	}
-
-	if c.PushGossipPercentStake < 0 || c.PushGossipPercentStake > 1 {
-		return fmt.Errorf("push-gossip-percent-stake is %f but must be in the range [0, 1]", c.PushGossipPercentStake)
-	}
-	return nil
+	return c.CommonConfig.validateCommon()
 }
 
 // validate checks the L1Config for invalid settings.
 func (c *L1Config) validate(networkID uint32) error {
-	if c.PopulateMissingTries != nil && (c.OfflinePruning || c.Pruning) {
-		return fmt.Errorf("cannot enable populate missing tries while offline pruning (enabled: %t)/pruning (enabled: %t) are enabled", c.OfflinePruning, c.Pruning)
-	}
-	if c.PopulateMissingTries != nil && c.PopulateMissingTriesParallelism < 1 {
-		return fmt.Errorf("cannot enable populate missing tries without at least one reader (parallelism: %d)", c.PopulateMissingTriesParallelism)
-	}
-
-	if !c.Pruning && c.OfflinePruning {
-		return errors.New("cannot run offline pruning while pruning is disabled")
-	}
-	// If pruning is enabled, the commit interval must be non-zero so the node commits state tries every CommitInterval blocks.
-	if c.Pruning && c.CommitInterval == 0 {
-		return errors.New("cannot use commit interval of 0 with pruning enabled")
-	}
-	if c.Pruning && c.StateHistory == 0 {
-		return errors.New("cannot use state history of 0 with pruning enabled")
-	}
-
-	if c.PushGossipPercentStake < 0 || c.PushGossipPercentStake > 1 {
-		return fmt.Errorf("push-gossip-percent-stake is %f but must be in the range [0, 1]", c.PushGossipPercentStake)
-	}
-	return nil
+	return c.CommonConfig.validateCommon()
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
-	var v interface{}
+	var v any
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}

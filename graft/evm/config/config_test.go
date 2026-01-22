@@ -276,3 +276,66 @@ func TestGetL1Config(t *testing.T) {
 		})
 	}
 }
+
+// TestCommonValidation verifies that both CChainConfig and L1Config reject the same invalid
+// common configuration inputs. This test ensures the common validation logic stays in sync.
+func TestCommonValidation(t *testing.T) {
+	tests := []struct {
+		name       string
+		configJSON []byte
+		wantErr    error
+	}{
+		{
+			name:       "populate missing tries with pruning enabled",
+			configJSON: []byte(`{"populate-missing-tries": 100, "pruning-enabled": true}`),
+			wantErr:    ErrPopulateMissingTriesWithPruning,
+		},
+		{
+			name:       "populate missing tries with offline pruning enabled",
+			configJSON: []byte(`{"populate-missing-tries": 100, "offline-pruning-enabled": true, "pruning-enabled": true}`),
+			wantErr:    ErrPopulateMissingTriesWithPruning,
+		},
+		{
+			name:       "populate missing tries with zero parallelism",
+			configJSON: []byte(`{"populate-missing-tries": 100, "populate-missing-tries-parallelism": 0, "pruning-enabled": false}`),
+			wantErr:    ErrPopulateMissingTriesNoReader,
+		},
+		{
+			name:       "offline pruning without pruning",
+			configJSON: []byte(`{"offline-pruning-enabled": true, "pruning-enabled": false}`),
+			wantErr:    ErrOfflinePruningWithoutPruning,
+		},
+		{
+			name:       "pruning with zero commit interval",
+			configJSON: []byte(`{"pruning-enabled": true, "commit-interval": 0, "state-history": 32}`),
+			wantErr:    ErrPruningZeroCommitInterval,
+		},
+		{
+			name:       "pruning with zero state history",
+			configJSON: []byte(`{"pruning-enabled": true, "state-history": 0}`),
+			wantErr:    ErrPruningZeroStateHistory,
+		},
+		{
+			name:       "push gossip percent stake below zero",
+			configJSON: []byte(`{"push-gossip-percent-stake": -0.1}`),
+			wantErr:    ErrPushGossipPercentStakeOutOfRange,
+		},
+		{
+			name:       "push gossip percent stake above one",
+			configJSON: []byte(`{"push-gossip-percent-stake": 1.5}`),
+			wantErr:    ErrPushGossipPercentStakeOutOfRange,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+" (CChainConfig)", func(t *testing.T) {
+			_, _, err := GetConfig(tt.configJSON, constants.LocalID, NewDefaultCChainConfig)
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+
+		t.Run(tt.name+" (L1Config)", func(t *testing.T) {
+			_, _, err := GetConfig(tt.configJSON, constants.LocalID, NewDefaultL1Config)
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}

@@ -40,9 +40,9 @@ func NewGossipEthTxPool(mempool *txpool.TxPool, registerer prometheus.Registerer
 	bloom, err := gossip.NewBloomFilter(
 		registerer,
 		"eth_tx_bloom_filter",
-		config.DefaultTxGossipBloomMinTargetElements,
-		config.DefaultTxGossipBloomTargetFalsePositiveRate,
-		config.DefaultTxGossipBloomResetFalsePositiveRate,
+		config.TxGossipBloomMinTargetElements,
+		config.TxGossipBloomTargetFalsePositiveRate,
+		config.TxGossipBloomResetFalsePositiveRate,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
@@ -91,7 +91,7 @@ func (g *GossipEthTxPool) Subscribe(ctx context.Context) {
 			return
 		case pendingTxs := <-g.pendingTxs:
 			g.lock.Lock()
-			optimalElements := (g.mempool.PendingSize(txpool.PendingFilter{}) + len(pendingTxs.Txs)) * config.DefaultTxGossipBloomChurnMultiplier
+			optimalElements := (g.mempool.PendingSize(txpool.PendingFilter{}) + len(pendingTxs.Txs)) * config.TxGossipBloomChurnMultiplier
 			for _, pendingTx := range pendingTxs.Txs {
 				tx := &GossipEthTx{Tx: pendingTx}
 				g.bloom.Add(tx)
