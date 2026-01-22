@@ -6,18 +6,15 @@ package config
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
-type (
-	Duration struct {
-		time.Duration
-	}
-
-	PBool bool
-)
+type Duration struct {
+	time.Duration
+}
 
 // CommonConfig contains configuration fields shared between CChainConfig and L1Config.
 type CommonConfig struct {
@@ -204,7 +201,7 @@ type L1Config struct {
 	FeeRecipient string `json:"feeRecipient"`
 
 	// Database settings (L1 specific)
-	UseStandaloneDatabase *PBool `json:"use-standalone-database"`
+	UseStandaloneDatabase *bool  `json:"use-standalone-database"`
 	DatabaseConfigContent string `json:"database-config"`
 	DatabaseConfigFile    string `json:"database-config-file"`
 	DatabaseType          string `json:"database-type"`

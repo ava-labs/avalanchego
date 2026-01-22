@@ -13,8 +13,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/spf13/cast"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -66,7 +67,7 @@ func (c *CommonConfig) EthAPIs() []string {
 // deprecate returns a string of deprecation messages for the config.
 // This is used to log a message when the config is loaded and contains deprecated flags.
 // This function should be kept as a placeholder even if it is empty.
-func (c *CommonConfig) deprecate() string {
+func (*CommonConfig) deprecate() string {
 	msg := ""
 	return msg
 }
@@ -114,7 +115,7 @@ func (c *CChainConfig) validate(networkID uint32) error {
 }
 
 // validate checks the L1Config for invalid settings.
-func (c *L1Config) validate(networkID uint32) error {
+func (c *L1Config) validate(_ uint32) error {
 	return c.CommonConfig.validateCommon()
 }
 
@@ -135,18 +136,4 @@ func (d Duration) String() string {
 // MarshalJSON implements the json.Marshaler interface.
 func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Duration.String())
-}
-
-func (p *PBool) String() string {
-	if p == nil {
-		return "nil"
-	}
-	return fmt.Sprintf("%t", *p)
-}
-
-func (p *PBool) Bool() bool {
-	if p == nil {
-		return false
-	}
-	return bool(*p)
 }

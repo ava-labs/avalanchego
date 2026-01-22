@@ -6,10 +6,12 @@ package config
 import (
 	"time"
 
+	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
+
 	avaxutils "github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/libevm/common"
 )
 
 const (

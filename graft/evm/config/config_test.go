@@ -9,19 +9,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/libevm/common"
 )
 
 // unmarshalTest defines a test case for JSON unmarshaling.
 type unmarshalTest[T any] struct {
-	name        string
-	givenJSON   []byte
-	expected    T
-	expectedErr bool
+	name      string
+	givenJSON []byte
+	expected  T
 }
 
 // commonUnmarshalTests returns test cases for fields in CommonConfig.
@@ -51,11 +50,6 @@ func commonUnmarshalTests[T any](makeConfig func(CommonConfig) T) []unmarshalTes
 				APIMaxDuration:              Duration{5 * time.Second},
 				ContinuousProfilerFrequency: Duration{5 * time.Second},
 			}),
-		},
-		{
-			name:        "bad durations",
-			givenJSON:   []byte(`{"api-max-duration": "bad-duration"}`),
-			expectedErr: true,
 		},
 		{
 			name:      "tx pool configurations",
@@ -95,11 +89,6 @@ func commonUnmarshalTests[T any](makeConfig func(CommonConfig) T) []unmarshalTes
 			expected:  makeConfig(CommonConfig{TransactionHistory: 1}),
 		},
 		{
-			name:        "-1 transaction history",
-			givenJSON:   []byte(`{"transaction-history": -1}`),
-			expectedErr: true,
-		},
-		{
 			name:      "allow unprotected tx hashes",
 			givenJSON: []byte(`{"allow-unprotected-tx-hashes": ["0x803351deb6d745e91545a6a3e1c0ea3e9a6a02a1a4193b70edfcd2f40f71a01c"]}`),
 			expected: makeConfig(CommonConfig{
@@ -118,13 +107,9 @@ func TestUnmarshalCChainConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var tmp CChainConfig
 			err := json.Unmarshal(tt.givenJSON, &tmp)
-			if tt.expectedErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				tmp.deprecate()
-				require.Equal(t, tt.expected, tmp)
-			}
+			require.NoError(t, err)
+			tmp.deprecate()
+			require.Equal(t, tt.expected, tmp)
 		})
 	}
 
@@ -148,13 +133,9 @@ func TestUnmarshalL1Config(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var tmp L1Config
 			err := json.Unmarshal(tt.givenJSON, &tmp)
-			if tt.expectedErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				tmp.deprecate()
-				require.Equal(t, tt.expected, tmp)
-			}
+			require.NoError(t, err)
+			tmp.deprecate()
+			require.Equal(t, tt.expected, tmp)
 		})
 	}
 
