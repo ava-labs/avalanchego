@@ -247,6 +247,28 @@ type State interface {
 		endHeight uint64,
 	) error
 
+	// GetAggregatedValidatorDiffs returns the aggregated validator changes
+	// between [previousHeight] and [currentHeight] for the given [subnetID].
+	// This reads directly from the diff databases without reconstructing full
+	// validator sets, making it efficient for verifying validator set diff
+	// messages.
+	//
+	// The returned map contains entries for validators that changed between the
+	// two heights. Each entry includes:
+	// - PreviousWeight: weight at previousHeight (0 if added after previousHeight)
+	// - CurrentWeight: weight at currentHeight (0 if removed before currentHeight)
+	// - PublicKey: the validator's public key (may be nil if not available)
+	//
+	// Note: Unlike ApplyValidatorWeightDiffs which goes backwards in time,
+	// this method returns the forward diff (what changed going FROM previousHeight
+	// TO currentHeight).
+	GetAggregatedValidatorDiffs(
+		ctx context.Context,
+		subnetID ids.ID,
+		previousHeight uint64,
+		currentHeight uint64,
+	) (map[ids.NodeID]*AggregatedValidatorDiff, error)
+
 	SetHeight(height uint64)
 
 	// GetCurrentValidators returns subnet and L1 validators for the given
@@ -524,6 +546,16 @@ func (v *ValidatorWeightDiff) addOrSub(sub bool, amount uint64) error {
 		v.Decrease = sub
 	}
 	return nil
+}
+
+// AggregatedValidatorDiff represents the net change for a validator between
+// two P-chain heights. This is used to verify validator set diff messages
+// without reconstructing full validator sets.
+type AggregatedValidatorDiff struct {
+	NodeID         ids.NodeID
+	PublicKey      []byte // Uncompressed BLS public key (96 bytes), nil if unchanged
+	PreviousWeight uint64 // Weight at previous height (0 if validator was added)
+	CurrentWeight  uint64 // Weight at current height (0 if validator was removed)
 }
 
 type txBytesAndStatus struct {
@@ -1683,6 +1715,196 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	// Nodes may see inconsistent public keys for heights before the new public
 	// key index was populated.
 	return diffIter.Error()
+}
+
+func (s *state) GetAggregatedValidatorDiffs(
+	ctx context.Context,
+	subnetID ids.ID,
+	previousHeight uint64,
+	currentHeight uint64,
+) (map[ids.NodeID]*AggregatedValidatorDiff, error) {
+	s.ctx.Log.Debug("GetAggregatedValidatorDiffs called",
+		zap.Stringer("subnetID", subnetID),
+		zap.Uint64("previousHeight", previousHeight),
+		zap.Uint64("currentHeight", currentHeight),
+	)
+
+	// Validate height ordering
+	if currentHeight <= previousHeight {
+		return nil, fmt.Errorf("currentHeight (%d) must be greater than previousHeight (%d)", currentHeight, previousHeight)
+	}
+
+	// Step 1: Read and aggregate weight diffs from database
+	// The database stores diffs in descending height order (currentHeight down to previousHeight+1)
+	// We want changes that happened AFTER previousHeight up to and including currentHeight
+	weightDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
+
+	weightDiffIter := s.validatorWeightDiffsBySubnetIDDB.NewIteratorWithStartAndPrefix(
+		marshalStartDiffKeyBySubnetID(subnetID, currentHeight),
+		subnetID[:],
+	)
+	defer weightDiffIter.Release()
+
+	for weightDiffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		_, parsedHeight, nodeID, err := unmarshalDiffKeyBySubnetID(weightDiffIter.Key())
+		if err != nil {
+			return nil, err
+		}
+
+		// Stop when we've processed all diffs after previousHeight
+		// (diffs at previousHeight represent changes TO that height, not FROM it)
+		if parsedHeight <= previousHeight {
+			break
+		}
+
+		weightDiff, err := unmarshalWeightDiff(weightDiffIter.Value())
+		if err != nil {
+			return nil, err
+		}
+
+		s.ctx.Log.Debug("read weight diff from DB",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint64("height", parsedHeight),
+			zap.Bool("decrease", weightDiff.Decrease),
+			zap.Uint64("amount", weightDiff.Amount),
+		)
+
+		// Aggregate diffs for the same validator across multiple heights
+		// Use the existing ValidatorWeightDiff methods which handle safe math
+		existingDiff, exists := weightDiffs[nodeID]
+		if !exists {
+			weightDiffs[nodeID] = &ValidatorWeightDiff{
+				Decrease: weightDiff.Decrease,
+				Amount:   weightDiff.Amount,
+			}
+		} else {
+			// Use Add/Sub methods for proper aggregation with safe math
+			// Add = weight increased (Decrease=false)
+			// Sub = weight decreased (Decrease=true)
+			if weightDiff.Decrease {
+				if err := existingDiff.Sub(weightDiff.Amount); err != nil {
+					return nil, fmt.Errorf("failed to aggregate weight diff for %s: %w", nodeID, err)
+				}
+			} else {
+				if err := existingDiff.Add(weightDiff.Amount); err != nil {
+					return nil, fmt.Errorf("failed to aggregate weight diff for %s: %w", nodeID, err)
+				}
+			}
+			s.ctx.Log.Debug("aggregated weight diff",
+				zap.Stringer("nodeID", nodeID),
+				zap.Bool("resultDecrease", existingDiff.Decrease),
+				zap.Uint64("resultAmount", existingDiff.Amount),
+			)
+		}
+	}
+
+	if err := weightDiffIter.Error(); err != nil {
+		return nil, err
+	}
+
+	// Step 2: Read public key diffs from database
+	publicKeyDiffs := make(map[ids.NodeID][]byte)
+
+	pkDiffIter := s.validatorPublicKeyDiffsBySubnetIDDB.NewIteratorWithStartAndPrefix(
+		marshalStartDiffKeyBySubnetID(subnetID, currentHeight),
+		subnetID[:],
+	)
+	defer pkDiffIter.Release()
+
+	for pkDiffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		_, parsedHeight, nodeID, err := unmarshalDiffKeyBySubnetID(pkDiffIter.Key())
+		if err != nil {
+			return nil, err
+		}
+
+		if parsedHeight <= previousHeight {
+			break
+		}
+
+		// Only store the first (most recent) public key we encounter for each validator
+		if _, exists := publicKeyDiffs[nodeID]; !exists {
+			pkBytes := pkDiffIter.Value()
+			if len(pkBytes) > 0 {
+				publicKeyDiffs[nodeID] = pkBytes
+			}
+		}
+	}
+
+	if err := pkDiffIter.Error(); err != nil {
+		return nil, err
+	}
+
+	// Step 3: Build the result map
+	// Note: We only return validators that had weight changes.
+	// The diff doesn't contain absolute weights - it contains deltas.
+	// For verification purposes, the caller needs to compare the NET CHANGE:
+	// - Addition: Decrease=false, Amount=currentWeight
+	// - Removal: Decrease=true, Amount=previousWeight
+	// - Modification: delta = currentWeight - previousWeight
+	result := make(map[ids.NodeID]*AggregatedValidatorDiff)
+
+	for nodeID, weightDiff := range weightDiffs {
+		if weightDiff.Amount == 0 {
+			// No net change for this validator (changes canceled out)
+			continue
+		}
+
+		diff := &AggregatedValidatorDiff{
+			NodeID: nodeID,
+		}
+
+		// Store the public key if available
+		if pk, exists := publicKeyDiffs[nodeID]; exists {
+			diff.PublicKey = pk
+		}
+
+		// The weight diff tells us the direction and magnitude of change
+		// For forward direction (previousHeight -> currentHeight):
+		// - If Decrease=true: weight went down, so previousWeight = currentWeight + Amount
+		// - If Decrease=false: weight went up, so currentWeight = previousWeight + Amount
+		//
+		// Since we don't have absolute weights from just the diffs, we store:
+		// - CurrentWeight = Amount if !Decrease (this is the increase amount)
+		// - PreviousWeight = Amount if Decrease (this is the decrease amount)
+		//
+		// The caller should compare:
+		// - For message additions: message.CurrentWeight == diff.CurrentWeight && diff.PreviousWeight == 0
+		// - For message removals: message.PreviousWeight == diff.PreviousWeight && diff.CurrentWeight == 0
+		// - For message modifications: (message.CurrentWeight - message.PreviousWeight) matches the net change
+		if weightDiff.Decrease {
+			// Weight decreased: previousWeight > currentWeight
+			diff.PreviousWeight = weightDiff.Amount
+			diff.CurrentWeight = 0
+		} else {
+			// Weight increased: currentWeight > previousWeight
+			diff.PreviousWeight = 0
+			diff.CurrentWeight = weightDiff.Amount
+		}
+
+		s.ctx.Log.Debug("aggregated diff result",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint64("previousWeight", diff.PreviousWeight),
+			zap.Uint64("currentWeight", diff.CurrentWeight),
+			zap.Bool("hasPublicKey", diff.PublicKey != nil),
+		)
+
+		result[nodeID] = diff
+	}
+
+	s.ctx.Log.Debug("GetAggregatedValidatorDiffs completed",
+		zap.Stringer("subnetID", subnetID),
+		zap.Int("totalDiffs", len(result)),
+	)
+
+	return result, nil
 }
 
 func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
