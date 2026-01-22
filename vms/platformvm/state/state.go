@@ -406,6 +406,16 @@ func (v *ValidatorWeightDiff) add(isNegative bool, amount uint64) error {
 	return nil
 }
 
+// AggregatedValidatorDiff represents the net change for a validator between
+// two P-chain heights. This is used to verify validator set diff messages
+// without reconstructing full validator sets.
+type AggregatedValidatorDiff struct {
+	NodeID         ids.NodeID
+	PublicKey      []byte // Uncompressed BLS public key (96 bytes), nil if unchanged
+	PreviousWeight uint64 // Weight at previous height (0 if validator was added)
+	CurrentWeight  uint64 // Weight at current height (0 if validator was removed)
+}
+
 type txBytesAndStatus struct {
 	Tx     []byte        `serialize:"true"`
 	Status status.Status `serialize:"true"`
