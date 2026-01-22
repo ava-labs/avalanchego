@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -115,7 +115,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	}, nil
 }
 
-func (e *Engine) Start(ctx context.Context, _ uint32) error {
+func (e *Engine) Start(_ context.Context, _ uint32) error {
 	e.logger.Info("Starting simplex engine")
 	err := e.epoch.Start()
 	if err != nil {

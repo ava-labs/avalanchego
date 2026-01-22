@@ -24,9 +24,10 @@ var (
 	_ simplex.Block             = (*Block)(nil)
 	_ simplex.VerifiedBlock     = (*Block)(nil)
 
-	errDigestNotFound       = errors.New("digest not found in block tracker")
-	errMismatchedPrevDigest = errors.New("prev digest does not match block parent")
-	errGenesisVerification  = errors.New("genesis block should not be verified")
+	errDigestNotFound        = errors.New("digest not found in block tracker")
+	errMismatchedPrevDigest  = errors.New("prev digest does not match block parent")
+	errGenesisVerification   = errors.New("genesis block should not be verified")
+	errFailedToParseMetadata = errors.New("failed to parse protocol metadata")
 )
 
 type Block struct {
@@ -132,7 +133,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 
 	md, err := simplex.ProtocolMetadataFromBytes(canotoBlock.Metadata)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
+		return nil, fmt.Errorf("%w: %w", errFailedToParseMetadata, err)
 	}
 
 	vmblock, err := d.parser.ParseBlock(ctx, canotoBlock.InnerBlock)
