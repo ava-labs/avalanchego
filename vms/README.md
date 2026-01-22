@@ -4,7 +4,7 @@
 
 The Avalanche Network is composed of multiple validator sets and blockchains. A validator set defines a group of validators and their specified weights in the consensus process. A subnet is a validator set working together to achieve consensus on a set of blockchains. Every blockchain is validated by one subnet, and one subnet can validate many blockchains.
 
-There is a special subnet inherent to the Avalanche Network called the Primary Network. The Primary Network is validated by every node on the Avalanche network. All subnets' validator sets are required to be a subset of the Primary Network's validator set. That is, if a validator belongs to a subnet then it also belongs to the Primary Network. The Primary Network validates three blockchains that are inherent to the Avalanche Network: the P-Chain, C-Chain, and X-Chain.
+There is a special subnet inherent to the Avalanche Network called the Primary Network. The Primary Network is validated by every node on the Avalanche network. The Primary Network validates three blockchains that are inherent to the Avalanche Network: the P-Chain, C-Chain, and X-Chain.
 
 For each blockchain, consensus is driven by the consensus engine. For each subnet, the P-Chain, or Platform Chain, defines the validator set and the set of blockchains that are validated by the subnet.
 
