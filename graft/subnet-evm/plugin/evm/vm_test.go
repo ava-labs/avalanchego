@@ -259,7 +259,7 @@ func TestVMConfig(t *testing.T) {
 	}).vm
 
 	require.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
-	require.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
+	require.Equal(t, vm.config.EnabledEthAPIs, enabledEthAPIs, "EnabledEthAPIs should be set")
 	require.NoError(t, vm.Shutdown(t.Context()))
 }
 

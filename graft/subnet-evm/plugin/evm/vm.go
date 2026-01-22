@@ -1141,7 +1141,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		handler.SetHTTPBodyLimit(int(vm.config.HTTPBodyLimit))
 	}
 
-	enabledAPIs := vm.config.EthAPIs()
+	enabledAPIs := vm.config.EnabledEthAPIs
 	if err := attachEthService(handler, vm.eth.APIs(), enabledAPIs); err != nil {
 		return nil, err
 	}

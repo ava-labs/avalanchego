@@ -56,23 +56,23 @@ func newDefaultCommonConfig() CommonConfig {
 		RPCTxFeeCap:               100,        // 100 AVAX
 		MetricsExpensiveEnabled:   true,
 		// Default to no maximum API call duration
-		APIMaxDuration: timeToDuration(0),
+		APIMaxDuration: wrapDuration(0),
 		// Default to no maximum WS CPU usage
-		WSCPURefillRate: timeToDuration(0),
+		WSCPURefillRate: wrapDuration(0),
 		// Default to no maximum WS CPU usage
-		WSCPUMaxStored: timeToDuration(0),
+		WSCPUMaxStored: wrapDuration(0),
 		// Default to no maximum on the number of blocks per getLogs request
 		MaxBlocksPerRequest:         0,
-		ContinuousProfilerFrequency: timeToDuration(15 * time.Minute),
+		ContinuousProfilerFrequency: wrapDuration(15 * time.Minute),
 		ContinuousProfilerMaxFiles:  5,
 		PushGossipPercentStake:      .9,
 		PushGossipNumValidators:     100,
 		PushGossipNumPeers:          0,
 		PushRegossipNumValidators:   10,
 		PushRegossipNumPeers:        0,
-		PushGossipFrequency:         timeToDuration(100 * time.Millisecond),
-		PullGossipFrequency:         timeToDuration(1 * time.Second),
-		RegossipFrequency:           timeToDuration(30 * time.Second),
+		PushGossipFrequency:         wrapDuration(100 * time.Millisecond),
+		PullGossipFrequency:         wrapDuration(1 * time.Second),
+		RegossipFrequency:           wrapDuration(30 * time.Second),
 		// Default size (MB) for the offline pruner to use
 		OfflinePruningBloomFilterSize:   uint64(512),
 		LogLevel:                        "info",
@@ -101,7 +101,7 @@ func newDefaultCommonConfig() CommonConfig {
 		TxPoolGlobalSlots:  4096 + 1024, // urgent + floating queue capacity with 4:1 ratio,
 		TxPoolAccountQueue: 64,
 		TxPoolGlobalQueue:  1024,
-		TxPoolLifetime:     timeToDuration(10 * time.Minute),
+		TxPoolLifetime:     wrapDuration(10 * time.Minute),
 		// RPC settings
 		BatchRequestLimit:    1000,
 		BatchResponseMaxSize: 25 * 1000 * 1000, // 25MB
@@ -131,6 +131,6 @@ func NewDefaultL1Config() L1Config {
 	}
 }
 
-func timeToDuration(t time.Duration) Duration {
+func wrapDuration(t time.Duration) Duration {
 	return Duration{t}
 }

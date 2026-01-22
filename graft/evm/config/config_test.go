@@ -105,22 +105,22 @@ func TestUnmarshalCChainConfig(t *testing.T) {
 	})
 	for _, tt := range commonTests {
 		t.Run(tt.name, func(t *testing.T) {
-			var tmp CChainConfig
-			err := json.Unmarshal(tt.givenJSON, &tmp)
+			var cfg CChainConfig
+			err := json.Unmarshal(tt.givenJSON, &cfg)
 			require.NoError(t, err)
-			tmp.deprecate()
-			require.Equal(t, tt.expected, tmp)
+			cfg.deprecate()
+			require.Equal(t, tt.expected, cfg)
 		})
 	}
 
 	// Test C-Chain specific fields
 	t.Run("price option settings", func(t *testing.T) {
-		var tmp CChainConfig
-		err := json.Unmarshal([]byte(`{"price-options-slow-fee-percentage": 90, "price-options-fast-fee-percentage": 110, "price-options-max-tip": 1000}`), &tmp)
+		var cfg CChainConfig
+		err := json.Unmarshal([]byte(`{"price-options-slow-fee-percentage": 90, "price-options-fast-fee-percentage": 110, "price-options-max-tip": 1000}`), &cfg)
 		require.NoError(t, err)
-		require.Equal(t, uint64(90), tmp.PriceOptionSlowFeePercentage)
-		require.Equal(t, uint64(110), tmp.PriceOptionFastFeePercentage)
-		require.Equal(t, uint64(1000), tmp.PriceOptionMaxTip)
+		require.Equal(t, uint64(90), cfg.PriceOptionSlowFeePercentage)
+		require.Equal(t, uint64(110), cfg.PriceOptionFastFeePercentage)
+		require.Equal(t, uint64(1000), cfg.PriceOptionMaxTip)
 	})
 }
 
@@ -131,34 +131,34 @@ func TestUnmarshalL1Config(t *testing.T) {
 	})
 	for _, tt := range commonTests {
 		t.Run(tt.name, func(t *testing.T) {
-			var tmp L1Config
-			err := json.Unmarshal(tt.givenJSON, &tmp)
+			var cfg L1Config
+			err := json.Unmarshal(tt.givenJSON, &cfg)
 			require.NoError(t, err)
-			tmp.deprecate()
-			require.Equal(t, tt.expected, tmp)
+			cfg.deprecate()
+			require.Equal(t, tt.expected, cfg)
 		})
 	}
 
 	// Test L1 specific fields
 	t.Run("airdrop file", func(t *testing.T) {
-		var tmp L1Config
-		err := json.Unmarshal([]byte(`{"airdrop": "/path/to/airdrop.json"}`), &tmp)
+		var cfg L1Config
+		err := json.Unmarshal([]byte(`{"airdrop": "/path/to/airdrop.json"}`), &cfg)
 		require.NoError(t, err)
-		require.Equal(t, "/path/to/airdrop.json", tmp.AirdropFile)
+		require.Equal(t, "/path/to/airdrop.json", cfg.AirdropFile)
 	})
 
 	t.Run("validators api enabled", func(t *testing.T) {
-		var tmp L1Config
-		err := json.Unmarshal([]byte(`{"validators-api-enabled": true}`), &tmp)
+		var cfg L1Config
+		err := json.Unmarshal([]byte(`{"validators-api-enabled": true}`), &cfg)
 		require.NoError(t, err)
-		require.True(t, tmp.ValidatorsAPIEnabled)
+		require.True(t, cfg.ValidatorsAPIEnabled)
 	})
 
 	t.Run("fee recipient", func(t *testing.T) {
-		var tmp L1Config
-		err := json.Unmarshal([]byte(`{"feeRecipient": "0x1234567890123456789012345678901234567890"}`), &tmp)
+		var cfg L1Config
+		err := json.Unmarshal([]byte(`{"feeRecipient": "0x1234567890123456789012345678901234567890"}`), &cfg)
 		require.NoError(t, err)
-		require.Equal(t, "0x1234567890123456789012345678901234567890", tmp.FeeRecipient)
+		require.Equal(t, "0x1234567890123456789012345678901234567890", cfg.FeeRecipient)
 	})
 }
 
@@ -175,7 +175,7 @@ func TestGetCChainConfig(t *testing.T) {
 			networkID:  constants.TestnetID,
 			expected: func(t *testing.T, config CChainConfig) {
 				require.Equal(t, float64(11), config.RPCTxFeeCap)
-				require.Equal(t, []string{"debug"}, config.EthAPIs())
+				require.Equal(t, []string{"debug"}, config.EnabledEthAPIs)
 			},
 		},
 		{
@@ -186,7 +186,7 @@ func TestGetCChainConfig(t *testing.T) {
 				defaultConfig := NewDefaultCChainConfig()
 				require.Equal(t, defaultConfig.PriceOptionMaxTip, config.PriceOptionMaxTip)
 				require.Equal(t, float64(11), config.RPCTxFeeCap)
-				require.Equal(t, []string{"debug"}, config.EthAPIs())
+				require.Equal(t, []string{"debug"}, config.EnabledEthAPIs)
 				require.Equal(t, uint64(100), config.TxPoolPriceLimit)
 			},
 		},
@@ -223,7 +223,7 @@ func TestGetL1Config(t *testing.T) {
 			networkID:  constants.TestnetID,
 			expected: func(t *testing.T, config L1Config) {
 				require.Equal(t, float64(11), config.RPCTxFeeCap)
-				require.Equal(t, []string{"debug"}, config.EthAPIs())
+				require.Equal(t, []string{"debug"}, config.EnabledEthAPIs)
 			},
 		},
 		{
@@ -234,7 +234,7 @@ func TestGetL1Config(t *testing.T) {
 				defaultConfig := NewDefaultL1Config()
 				require.Equal(t, defaultConfig.ValidatorsAPIEnabled, config.ValidatorsAPIEnabled)
 				require.Equal(t, float64(11), config.RPCTxFeeCap)
-				require.Equal(t, []string{"debug"}, config.EthAPIs())
+				require.Equal(t, []string{"debug"}, config.EnabledEthAPIs)
 				require.Equal(t, uint64(100), config.TxPoolPriceLimit)
 			},
 		},

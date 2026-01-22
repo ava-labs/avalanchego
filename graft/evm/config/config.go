@@ -59,11 +59,6 @@ func GetConfig[T any, PT Configurable[T]](configBytes []byte, networkID uint32, 
 	return config, deprecateMsg, nil
 }
 
-// EthAPIs returns the list of Ethereum APIs that should be enabled.
-func (c *CommonConfig) EthAPIs() []string {
-	return c.EnabledEthAPIs
-}
-
 // deprecate returns a string of deprecation messages for the config.
 // This is used to log a message when the config is loaded and contains deprecated flags.
 // This function should be kept as a placeholder even if it is empty.
