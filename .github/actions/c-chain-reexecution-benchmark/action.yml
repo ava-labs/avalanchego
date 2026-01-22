@@ -54,8 +54,8 @@ inputs:
     description: 'GitHub token provided to GitHub Action Benchmark.'
     required: true
   push-github-action-benchmark:
-    description: 'Whether to push the benchmark result to GitHub.'
-    required: true
+    description: 'Whether to run benchmark comparison and push results to GitHub.'
+    default: 'true'
   push-post-state:
     description: 'S3 destination to copy the current-state directory after completing re-execution. If empty, this will be skipped.'
     default: ''
