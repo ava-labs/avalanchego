@@ -60,15 +60,15 @@ func encodeBlockNumber(number uint64) []byte {
 }
 
 func blockHeaderKey(num uint64, hash common.Hash) []byte {
-	return slices.Concat([]byte{evmHeaderPrefix}, encodeBlockNumber(num), hash.Bytes())
+	return slices.Concat([]byte{headerPrefix}, encodeBlockNumber(num), hash.Bytes())
 }
 
 func blockBodyKey(num uint64, hash common.Hash) []byte {
-	return slices.Concat([]byte{evmBlockBodyPrefix}, encodeBlockNumber(num), hash.Bytes())
+	return slices.Concat([]byte{blockBodyPrefix}, encodeBlockNumber(num), hash.Bytes())
 }
 
 func receiptsKey(num uint64, hash common.Hash) []byte {
-	return slices.Concat([]byte{evmReceiptsPrefix}, encodeBlockNumber(num), hash.Bytes())
+	return slices.Concat([]byte{receiptsPrefix}, encodeBlockNumber(num), hash.Bytes())
 }
 
 // blockDBMinHeightKey stores the minimum block height of the
@@ -226,12 +226,12 @@ func (db *Database) InitBlockDBs(minHeight uint64) error {
 // Since the prefixes should never be changed, we can avoid libevm changes by
 // duplicating them here.
 const (
-	evmHeaderPrefix    = 'h'
-	evmBlockBodyPrefix = 'b'
-	evmReceiptsPrefix  = 'r'
+	headerPrefix    = 'h'
+	blockBodyPrefix = 'b'
+	receiptsPrefix  = 'r'
 )
 
-var blockPrefixes = []byte{evmBlockBodyPrefix, evmHeaderPrefix, evmReceiptsPrefix}
+var blockPrefixes = []byte{blockBodyPrefix, headerPrefix, receiptsPrefix}
 
 func parseBlockKey(key []byte) (num uint64, hash common.Hash, ok bool) {
 	// Block keys should have 1 byte prefix + blockNumberSize + 32 bytes for the hash
@@ -279,11 +279,11 @@ func (db *Database) parseKey(key []byte) (*parsedBlockKey, bool) {
 
 	var hdb database.HeightIndex
 	switch key[0] {
-	case evmBlockBodyPrefix:
+	case blockBodyPrefix:
 		hdb = db.bodyDB
-	case evmHeaderPrefix:
+	case headerPrefix:
 		hdb = db.headerDB
-	case evmReceiptsPrefix:
+	case receiptsPrefix:
 		hdb = db.receiptsDB
 	default:
 		return nil, false
