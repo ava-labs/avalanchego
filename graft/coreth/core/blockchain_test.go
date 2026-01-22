@@ -204,7 +204,6 @@ func testPruningBlockChainSnapsDisabled(t *testing.T, scheme string) {
 func TestPruningEmptyCallbacks(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
-			t.Parallel()
 			testPruningEmptyCallbacks(t, scheme)
 		})
 	}
