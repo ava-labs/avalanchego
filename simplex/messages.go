@@ -166,6 +166,9 @@ func newReplicationResponse(
 		if err != nil {
 			return nil, err
 		}
+		if p2pQR == nil {
+			continue
+		}
 		qrs = append(qrs, p2pQR)
 	}
 
@@ -174,6 +177,9 @@ func newReplicationResponse(
 		qr, err := quorumRoundToP2P(latestRound)
 		if err != nil {
 			return nil, err
+		}
+		if qr == nil {
+			return nil, nil
 		}
 		latestQR = qr
 	}

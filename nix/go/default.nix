@@ -21,6 +21,15 @@ let
   # Update the following to change the version:
   goVersion = "1.24.12";
   # The sha256 checksums can fetched from https://go.dev/dl/ for new versions.
+  #
+  # If using a version of nix < 2.25, it will be necessary to manually update the golang flake hash:
+  #
+  #  HASH=$(nix hash path ./nix/go)
+  #  jq --arg hash "$HASH" \
+  #    '.nodes["go-flake"].locked += {"lastModified": 1, "narHash": $hash}' \
+  #    flake.lock > flake.lock.tmp
+  #  mv flake.lock.tmp flake.lock
+  #
   goSHA256s = {
     "linux-amd64" = "bddf8e653c82429aea7aec2520774e79925d4bb929fe20e67ecc00dd5af44c50";
     "linux-arm64" = "4e02e2979e53b40f3666bba9f7e5ea0b99ea5156e0824b343fd054742c25498d";

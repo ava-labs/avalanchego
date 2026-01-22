@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/simplex"
-	"github.com/ava-labs/simplex/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"

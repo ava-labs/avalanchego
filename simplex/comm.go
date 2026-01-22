@@ -55,7 +55,7 @@ func NewComm(config *Config) (*Comm, error) {
 	}
 
 	if !includesOurNodeID {
-		config.Log.Warn("Out node is not a validator for the subnet",
+		config.Log.Warn("Our node is not a validator for the subnet",
 			zap.Stringer("nodeID", config.Ctx.NodeID),
 			zap.Stringer("chainID", config.Ctx.ChainID),
 			zap.Stringer("subnetID", config.Ctx.SubnetID),
@@ -82,6 +82,11 @@ func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
 	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
 	if err != nil {
 		c.logger.Error("Failed creating message", zap.Error(err))
+		return
+	}
+
+	if outboundMsg == nil {
+		c.logger.Debug("Outbound message is nil")
 		return
 	}
 

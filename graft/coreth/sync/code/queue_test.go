@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package statesync
+package code
 
 import (
 	"fmt"
@@ -90,7 +90,7 @@ func TestCodeQueue(t *testing.T) {
 			}
 
 			quit := make(chan struct{})
-			q, err := NewCodeQueue(db, quit)
+			q, err := NewQueue(db, quit)
 			require.NoError(t, err, "NewCodeQueue()")
 
 			recvDone := make(chan struct{})
@@ -128,7 +128,7 @@ func TestCodeQueue(t *testing.T) {
 			require.Emptyf(t, cmp.Diff(tt.want, got), "Diff (-want +got) of values received from %T.CodeHashes()", q)
 
 			t.Run("restart_with_same_db", func(t *testing.T) {
-				q, err := NewCodeQueue(db, nil, WithCapacity(len(tt.want)))
+				q, err := NewQueue(db, nil, WithCapacity(len(tt.want)))
 				require.NoError(t, err, "NewCodeQueue([reused db])")
 				require.NoErrorf(t, q.Finalize(), "%T.Finalize() immediately after creation", q)
 
@@ -155,7 +155,7 @@ func TestCodeQueue(t *testing.T) {
 func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
 	const capacity = 1
 	db := rawdb.NewMemoryDatabase()
-	q, err := NewCodeQueue(db, nil, WithCapacity(capacity))
+	q, err := NewQueue(db, nil, WithCapacity(capacity))
 	require.NoError(t, err, "NewCodeQueue()")
 
 	// Prepare multiple distinct hashes to exceed the buffer and cause AddCode to block on enqueue.
@@ -206,7 +206,7 @@ func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
 
 func TestQuitAndAddCodeRace(t *testing.T) {
 	{
-		q := new(CodeQueue)
+		q := new(Queue)
 		// Before the introduction of these fields, this test would panic.
 		_ = []any{&q.closeChanOnce, &q.chanLock}
 	}
@@ -215,7 +215,7 @@ func TestQuitAndAddCodeRace(t *testing.T) {
 			t.Parallel()
 
 			quit := make(chan struct{})
-			q, err := NewCodeQueue(rawdb.NewMemoryDatabase(), quit)
+			q, err := NewQueue(rawdb.NewMemoryDatabase(), quit)
 			require.NoError(t, err)
 
 			var ready, finished sync.WaitGroup

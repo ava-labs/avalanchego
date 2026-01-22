@@ -40,7 +40,7 @@ func TestValid(t *testing.T) {
 					AlphaPreference: 1,
 				},
 			},
-			expectedErr: ErrDeprecatedConsensusParameters,
+			expectedErr: ErrUnsupportedConsensusParameters,
 		},
 		{
 			name: "invalid snow consensus parameters",

@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package blocksync
+package block
 
 import (
 	"context"
@@ -13,27 +13,27 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 
-	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
-	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 )
 
 const blocksPerRequest = 32
 
 var (
-	_                        syncpkg.Syncer = (*BlockSyncer)(nil)
-	errBlocksToFetchRequired                = errors.New("blocksToFetch must be > 0")
-	errFromHashRequired                     = errors.New("fromHash must be non-zero when fromHeight > 0")
+	_                        types.Syncer = (*BlockSyncer)(nil)
+	errBlocksToFetchRequired              = errors.New("blocksToFetch must be > 0")
+	errFromHashRequired                   = errors.New("fromHash must be non-zero when fromHeight > 0")
 )
 
 type BlockSyncer struct {
 	db            ethdb.Database
-	client        statesyncclient.Client
+	client        client.Client
 	fromHash      common.Hash
 	fromHeight    uint64
 	blocksToFetch uint64
 }
 
-func NewSyncer(client statesyncclient.Client, db ethdb.Database, fromHash common.Hash, fromHeight uint64, blocksToFetch uint64) (*BlockSyncer, error) {
+func NewSyncer(client client.Client, db ethdb.Database, fromHash common.Hash, fromHeight uint64, blocksToFetch uint64) (*BlockSyncer, error) {
 	if blocksToFetch == 0 {
 		return nil, errBlocksToFetchRequired
 	}

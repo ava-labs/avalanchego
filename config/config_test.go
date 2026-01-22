@@ -409,6 +409,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		"invalid snowball consensus parameters": {
 			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{
+				"validatorOnly": true,
 				"snowballParameters": {
 					"k": 111,
 					"alphaPreference": 1234
@@ -432,7 +433,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Nil(given)
 			},
-			expectedErr: subnets.ErrDeprecatedConsensusParameters,
+			expectedErr: subnets.ErrUnsupportedConsensusParameters,
 		},
 		"correct snowball config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",

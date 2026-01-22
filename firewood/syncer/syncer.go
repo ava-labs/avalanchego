@@ -121,9 +121,10 @@ func (db *database) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[
 	return maybe.Some(nextKey), nil
 }
 
-// TODO: implement this method.
+// TODO: Use change proofs to optimize syncing.
+// Returning the sentinel error suggests to the server handler to serve a full range proof instead.
 func (*database) GetChangeProof(context.Context, ids.ID, ids.ID, maybe.Maybe[[]byte], maybe.Maybe[[]byte], int) (struct{}, error) {
-	return struct{}{}, errors.New("change proofs are not implemented")
+	return struct{}{}, xsync.ErrInsufficientHistory
 }
 
 // TODO: implement this method.
@@ -138,6 +139,6 @@ func (*database) CommitChangeProof(context.Context, maybe.Maybe[[]byte], struct{
 
 func (db *database) Clear() error {
 	// Prefix delete key of length 0.
-	_, err := db.db.Update([][]byte{{}}, [][]byte{nil})
+	_, err := db.db.Update([]ffi.BatchOp{ffi.PrefixDelete([]byte{})})
 	return err
 }

@@ -20,7 +20,10 @@ import (
 	warpprecompile "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 )
 
-var errNoValidators = errors.New("cannot aggregate signatures from subnet with no validators")
+var (
+	errNoValidators               = errors.New("cannot aggregate signatures from subnet with no validators")
+	errCannotRetrieveValidatorSet = errors.New("cannot retrieve validator set")
+)
 
 // API introduces snowman specific functionality to the evm
 type API struct {
@@ -106,9 +109,13 @@ func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.Uns
 		return nil, err
 	}
 
-	validatorSet, err := validatorState.GetWarpValidatorSet(ctx, pChainHeight, subnetID)
+	validatorSets, err := validatorState.GetWarpValidatorSets(ctx, pChainHeight)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get validator set: %w", err)
+		return nil, fmt.Errorf("failed to get validator sets: %w", err)
+	}
+	validatorSet, ok := validatorSets[subnetID]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s source subnet not found", errCannotRetrieveValidatorSet, subnetID)
 	}
 	if len(validatorSet.Validators) == 0 {
 		return nil, fmt.Errorf("%w (SubnetID: %s, Height: %d)", errNoValidators, subnetID, pChainHeight)

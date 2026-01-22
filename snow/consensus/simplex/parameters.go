@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -14,8 +14,11 @@ import (
 var ErrInvalidParameters = errors.New("simplex parameters must be valid")
 
 type SimplexValidatorInfo struct {
-	NodeID    ids.NodeID `json:"nodeID"    yaml:"nodeID"`
-	PublicKey []byte     `json:"publicKey" yaml:"publicKey"`
+	NodeID ids.NodeID `json:"nodeID" yaml:"nodeID"`
+
+	// PublicKey is the public key of the validator.
+	// It should be in the compressed public key format.
+	PublicKey []byte `json:"publicKey" yaml:"publicKey"`
 }
 
 type Parameters struct {

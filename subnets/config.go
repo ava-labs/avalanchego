@@ -17,7 +17,7 @@ import (
 var (
 	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
 	errInvalidConsensusConfiguration    = errors.New("consensus config must have either snowball or simplex parameters set")
-	ErrDeprecatedConsensusParameters    = errors.New("consensusParameters is deprecated; use either snowballParameters or simplexParameters instead")
+	ErrUnsupportedConsensusParameters   = errors.New("consensusParameters is deprecated; use either snowballParameters or simplexParameters instead")
 )
 
 type Config struct {
@@ -69,7 +69,7 @@ func (c *Config) Valid() error {
 
 func (c *Config) validateConsensusParameters() error {
 	if c.ConsensusParameters != nil {
-		return ErrDeprecatedConsensusParameters
+		return ErrUnsupportedConsensusParameters
 	}
 
 	if c.SnowParameters != nil && c.SimplexParameters == nil {
