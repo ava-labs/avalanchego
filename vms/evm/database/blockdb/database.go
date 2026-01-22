@@ -28,8 +28,6 @@ var (
 	errInvalidEncodedLength = errors.New("invalid encoded length")
 )
 
-var _ ethdb.Database = (*Database)(nil)
-
 // Database wraps an [ethdb.Database] and routes block headers, bodies, and receipts
 // to separate [database.HeightIndex] databases for blocks at or above the minimum height.
 // All other data uses the underlying [ethdb.Database] directly.
@@ -332,6 +330,8 @@ func (*Database) readBlock(p *parsedBlockKey) ([]byte, error) {
 	return elems[1], nil
 }
 
+// Get retrieves the given key if it's present in the key-value data store.
+// Block data is routed to the height-indexed databases.
 func (db *Database) Get(key []byte) ([]byte, error) {
 	if p, ok := db.parseKey(key); ok {
 		return db.readBlock(p)
@@ -339,6 +339,8 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	return db.Database.Get(key)
 }
 
+// Put inserts the given value into the key-value data store.
+// Block data is routed to the height-indexed databases.
 func (db *Database) Put(key []byte, value []byte) error {
 	if p, ok := db.parseKey(key); ok {
 		return p.writeHashAndData(value)
@@ -346,6 +348,8 @@ func (db *Database) Put(key []byte, value []byte) error {
 	return db.Database.Put(key, value)
 }
 
+// Has retrieves if a key is present in the key-value data store.
+// Block data is routed to the height-indexed databases.
 func (db *Database) Has(key []byte) (bool, error) {
 	p, ok := db.parseKey(key)
 	if !ok {
@@ -375,6 +379,7 @@ func (db *Database) Delete(key []byte) error {
 	return db.Database.Delete(key)
 }
 
+// Close closes the database.
 func (db *Database) Close() error {
 	if !db.heightDBsReady {
 		return db.Database.Close()
@@ -396,6 +401,7 @@ type batch struct {
 	db *Database
 }
 
+// NewBatch creates a write-only key-value store.
 func (db *Database) NewBatch() ethdb.Batch {
 	return &batch{
 		db:    db,
@@ -403,6 +409,7 @@ func (db *Database) NewBatch() ethdb.Batch {
 	}
 }
 
+// NewBatchWithSize creates a write-only key-value store with the given size hint.
 func (db *Database) NewBatchWithSize(size int) ethdb.Batch {
 	return &batch{
 		db:    db,
@@ -410,6 +417,8 @@ func (db *Database) NewBatchWithSize(size int) ethdb.Batch {
 	}
 }
 
+// Put inserts the given value into the key-value data store.
+// Block data is written directly to the height-indexed databases, bypassing the batch.
 func (b *batch) Put(key []byte, value []byte) error {
 	if p, ok := b.db.parseKey(key); ok {
 		return p.writeHashAndData(value)
@@ -417,6 +426,8 @@ func (b *batch) Put(key []byte, value []byte) error {
 	return b.Batch.Put(key, value)
 }
 
+// Delete removes the key from the key-value data store.
+// Block data deletion is a no-op.
 func (b *batch) Delete(key []byte) error {
 	if _, ok := b.db.parseKey(key); ok {
 		return b.db.Delete(key)
