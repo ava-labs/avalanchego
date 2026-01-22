@@ -39,6 +39,7 @@ var (
 
 	ErrCannotEnableBothRewards = errors.New("cannot enable both fee recipients and reward address at the same time")
 	ErrEmptyRewardAddress      = errors.New("reward address cannot be empty")
+	ErrInvalidLen              = errors.New("invalid input length for setting reward address")
 
 	// RewardManagerRawABI contains the raw ABI of RewardManager contract.
 	//go:embed IRewardManager.abi
@@ -184,7 +185,15 @@ func PackSetRewardAddress(addr common.Address) ([]byte, error) {
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 // if [useStrictMode] is true, it will return an error if the length of [input] is not divisible by 32
 func UnpackSetRewardAddressInput(input []byte, useStrictMode bool) (common.Address, error) {
-	res, err := RewardManagerABI.UnpackInput("setRewardAddress", input, useStrictMode)
+	// Solidity does not always pack the input to the correct length, and allows
+	// for extra padding bytes to be added to the end of the input. Therefore, we have removed
+	// this check with Durango. We still need to keep this check for backwards compatibility.
+	// However, as opposed to other precompiles, we only check that the length is divisible by 32,
+	// since historical execution didn't enforce any particular length.
+	if useStrictMode && len(input)%32 != 0 {
+		return common.Address{}, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
+	}
+	res, err := RewardManagerABI.UnpackInput("setRewardAddress", input)
 	if err != nil {
 		return common.Address{}, err
 	}
