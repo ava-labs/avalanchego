@@ -15,8 +15,8 @@ go 1.24.12
 
 require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/avalanchego v1.14.1-antithesis-docker-image-fix
-	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000
+	github.com/ava-labs/avalanchego v0.0.1-maru-test
+	github.com/ava-labs/avalanchego/graft/evm v0.0.1-maru-test
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
 	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -56,7 +56,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/StephenButtolph/canoto v0.17.3 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca // indirect
+	github.com/ava-labs/avalanchego/graft/coreth v0.0.1-maru-test // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5 // indirect

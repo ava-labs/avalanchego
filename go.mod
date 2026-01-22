@@ -29,8 +29,8 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.3
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca
-	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
+	github.com/ava-labs/avalanchego/graft/coreth v0.0.1-maru-test
+	github.com/ava-labs/avalanchego/graft/subnet-evm v0.0.1-maru-test
 	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
@@ -94,7 +94,7 @@ require (
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
-require github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000 // indirect
+require github.com/ava-labs/avalanchego/graft/evm v0.0.1-maru-test // indirect
 
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
