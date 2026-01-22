@@ -106,10 +106,10 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	}
 
 	return &Engine{
-		epoch:                       epoch,
-		blockDeserializer:           blockDeserializer,
-		quorumDeserializer:          qcDeserializer,
-		logger:                      config.Log,
+		epoch:              epoch,
+		blockDeserializer:  blockDeserializer,
+		quorumDeserializer: qcDeserializer,
+		logger:             config.Log,
 
 		tickInterval: getTickInterval(config.Params),
 	}, nil
@@ -192,4 +192,3 @@ func (e *Engine) Shutdown(_ context.Context) error {
 	close(e.shutdown)
 	return nil
 }
-
