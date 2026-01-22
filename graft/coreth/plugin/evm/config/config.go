@@ -147,6 +147,7 @@ type Config struct {
 	AnalyzeStateOutputDir string           `json:"analyze-state-output-dir"` // Directory for JSON report output
 	AnalyzeStateWorkers   int              `json:"analyze-state-workers"`    // Number of parallel workers (default: 8)
 	AnalyzeStateAddresses []common.Address `json:"analyze-state-addresses"`  // Specific addresses to analyze (empty = all)
+	LookupAddressHashes   []common.Hash    `json:"lookup-address-hashes"`    // Resolve these hashes to addresses via preimage lookup (skips analysis)
 
 	// SkipUpgradeCheck disables checking that upgrades must take place before the last
 	// accepted block. Skipping this check is useful when a node operator does not update

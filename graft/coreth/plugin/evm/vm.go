@@ -1207,6 +1207,13 @@ func (vm *VM) PutLastAcceptedID(id ids.ID) error {
 
 // analyzeState performs state analysis for debugging and metrics collection
 func (vm *VM) analyzeState() error {
+	// If hash lookup is requested, just do that and return
+	if len(vm.config.LookupAddressHashes) > 0 {
+		log.Info("Looking up address hashes", "count", len(vm.config.LookupAddressHashes))
+		LookupAddressHashes(vm.chaindb, vm.config.LookupAddressHashes)
+		return nil
+	}
+
 	cfg := StateAnalysisConfig{
 		OutputDir: vm.config.AnalyzeStateOutputDir,
 		Workers:   vm.config.AnalyzeStateWorkers,

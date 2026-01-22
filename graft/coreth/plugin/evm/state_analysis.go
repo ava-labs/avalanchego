@@ -5,6 +5,7 @@ package evm
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -639,6 +640,31 @@ func writeJSON(data *RawStateData, outputPath string) error {
 func WriteRawData(data *RawStateData, outputDir string) error {
 	outputPath := getOutputPath(outputDir, common.HexToHash(data.StateRoot))
 	return writeJSON(data, outputPath)
+}
+
+// LookupAddressHashes resolves account hashes to addresses using preimage database
+// Returns a map of hash -> address (empty string if not found)
+func LookupAddressHashes(db ethdb.Database, hashes []common.Hash) map[common.Hash]common.Address {
+	results := make(map[common.Hash]common.Address)
+
+	for _, hash := range hashes {
+		preimage := rawdb.ReadPreimage(db, hash)
+		if preimage != nil && len(preimage) == 20 {
+			addr := common.BytesToAddress(preimage)
+			results[hash] = addr
+			log.Info("Resolved address hash",
+				"hash", hash.Hex(),
+				"address", addr.Hex(),
+			)
+		} else {
+			log.Warn("Could not resolve address hash",
+				"hash", hash.Hex(),
+				"preimage", hex.EncodeToString(preimage[:]),
+			)
+		}
+	}
+
+	return results
 }
 
 // ============================================================================
