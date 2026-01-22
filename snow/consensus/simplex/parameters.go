@@ -14,7 +14,7 @@ import (
 var ErrInvalidParameters = errors.New("simplex parameters must be valid")
 
 type SimplexValidatorInfo struct {
-	NodeID ids.NodeID `json:"nodeID"    yaml:"nodeID"`
+	NodeID ids.NodeID `json:"nodeID" yaml:"nodeID"`
 
 	// PublicKey is the public key of the validator.
 	// It should be in the compressed public key format.
