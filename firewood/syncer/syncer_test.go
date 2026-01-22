@@ -88,7 +88,6 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
 	)
 	require.NoError(t, err)
-	require.NotNil(t, syncer)
 
 	require.NoError(t, syncer.Start(ctx))
 	err = syncer.Wait(ctx)
@@ -109,25 +108,25 @@ func Test_Firewood_Sync_UpdateSyncTarget(t *testing.T) {
 		{
 			name:                    "finish with stale root",
 			clientSize:              0,
-			serverSize:              1000, // one request
+			serverSize:              sync.DefaultRequestKeyLimit, // one request
 			numRequestsBeforeUpdate: 0,
 		},
 		{
 			name:                    "replace all with stale root",
-			clientSize:              1000,
-			serverSize:              1000, // one request
+			clientSize:              sync.DefaultRequestKeyLimit,
+			serverSize:              sync.DefaultRequestKeyLimit, // one request
 			numRequestsBeforeUpdate: 0,
 		},
 		{
 			name:                    "partial sync then update",
 			clientSize:              0,
-			serverSize:              10_000, // multiple requests
+			serverSize:              5 * sync.DefaultRequestKeyLimit, // multiple requests
 			numRequestsBeforeUpdate: 1,
 		},
 		{
 			name:                    "partial sync with replace then update",
-			clientSize:              5_000,
-			serverSize:              10_000, // multiple requests
+			clientSize:              5 * sync.DefaultRequestKeyLimit,
+			serverSize:              5 * sync.DefaultRequestKeyLimit, // multiple requests
 			numRequestsBeforeUpdate: 1,
 		},
 	}
@@ -167,7 +166,6 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
 	)
 	require.NoError(t, err)
-	require.NotNil(t, syncer)
 
 	require.NoError(t, syncer.Start(ctx))
 	err = syncer.Wait(ctx)
