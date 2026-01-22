@@ -54,8 +54,11 @@ inputs:
     description: 'GitHub token provided to GitHub Action Benchmark.'
     required: true
   push-github-action-benchmark:
-    description: 'Whether to run benchmark comparison and push results to GitHub.'
-    default: 'true'
+    description: 'Whether to push the benchmark result to GitHub.'
+    required: true
+  skip-benchmark-comparison:
+    description: 'Skip benchmark comparison step (required when custom deps modify go.mod).'
+    default: 'false'
   push-post-state:
     description: 'S3 destination to copy the current-state directory after completing re-execution. If empty, this will be skipped.'
     default: ''
@@ -162,11 +165,11 @@ runs:
         path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         if-no-files-found: error
     - name: Compare Benchmark Results
-      if: inputs.push-github-action-benchmark == 'true'
+      if: inputs.skip-benchmark-comparison != 'true'
       uses: benchmark-action/github-action-benchmark@v1
       with:
         tool: 'customBiggerIsBetter'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         summary-always: true
         github-token: ${{ inputs.github-token }}
-        auto-push: true
+        auto-push: ${{ inputs.push-github-action-benchmark }}
