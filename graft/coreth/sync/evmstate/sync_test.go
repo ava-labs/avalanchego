@@ -535,13 +535,12 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB, serverDB stat
 	require.NoError(t, accountIt.Error(), "error iterating over account snapshots")
 	trieAccountLeaves := 0
 
-	synctest.AssertTrieConsistency(t, root, serverDB.TrieDB(), clientDB.TrieDB(), func(key, val []byte) error {
+	synctest.AssertTrieConsistency(t, root, serverDB, clientDB, func(key, val []byte) {
 		trieAccountLeaves++
 		accHash := common.BytesToHash(key)
 		var acc types.StateAccount
-		if err := rlp.DecodeBytes(val, &acc); err != nil {
-			return err
-		}
+		require.NoError(t, rlp.DecodeBytes(val, &acc))
+
 		// check snapshot consistency
 		snapshotVal := rawdb.ReadAccountSnapshot(clientDB.DiskDB(), accHash)
 		expectedSnapshotVal := types.SlimAccountRLP(acc)
@@ -556,7 +555,7 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB, serverDB stat
 			require.Equal(t, codeHash, actualHash)
 		}
 		if acc.Root == types.EmptyRootHash {
-			return nil
+			return
 		}
 
 		storageIt := rawdb.IterateStorageSnapshots(clientDB.DiskDB(), accHash)
@@ -570,15 +569,15 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB, serverDB stat
 		storageTrieLeavesCount := 0
 
 		// check storage trie and storage snapshot consistency
-		synctest.AssertTrieConsistency(t, acc.Root, serverDB.TrieDB(), clientDB.TrieDB(), func(key, val []byte) error {
+		synctest.AssertTrieConsistency(t, acc.Root, serverDB, clientDB, func(key, val []byte) {
 			storageTrieLeavesCount++
 			snapshotVal := rawdb.ReadStorageSnapshot(clientDB.DiskDB(), accHash, common.BytesToHash(key))
 			require.Equal(t, val, snapshotVal)
-			return nil
+			return
 		})
 
 		require.Equal(t, storageTrieLeavesCount, snapshotStorageKeysCount)
-		return nil
+		return
 	})
 
 	// Check that the number of accounts in the snapshot matches the number of leaves in the accounts trie

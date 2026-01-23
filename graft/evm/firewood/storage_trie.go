@@ -4,8 +4,11 @@
 package firewood
 
 import (
+	"errors"
+
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 )
 
@@ -32,6 +35,10 @@ func (*storageTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 // Hash returns an empty hash, as the storage roots are managed internally to Firewood.
 func (*storageTrie) Hash() common.Hash {
 	return common.Hash{}
+}
+
+func (*storageTrie) NodeIterator([]byte) (trie.NodeIterator, error) {
+	return nil, errors.New("storage trie does not support node iteration")
 }
 
 // Copy returns nil, as storage tries do not need to be copied separately.

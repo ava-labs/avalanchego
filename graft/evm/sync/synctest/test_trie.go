@@ -106,10 +106,10 @@ func FillIndependentTrie(t *testing.T, r *rand.Rand, start, numKeys int, keySize
 // non-empty trie at [root]. (all key/value pairs must be equal)
 //
 // This is only safe for HashDB or PathDB, since Firewood doesn't store trie nodes individually.
-func AssertTrieConsistency(t testing.TB, root common.Hash, a, b *triedb.Database, onLeaf func(key, val []byte) error) {
-	trieA, err := trie.New(trie.TrieID(root), a)
+func AssertTrieConsistency(t testing.TB, root common.Hash, a, b state.Database, onLeaf func(key, val []byte)) {
+	trieA, err := a.OpenTrie(root)
 	require.NoError(t, err)
-	trieB, err := trie.New(trie.TrieID(root), b)
+	trieB, err := b.OpenTrie(root)
 	require.NoError(t, err)
 
 	nodeItA, err := trieA.NodeIterator(nil)
@@ -119,20 +119,15 @@ func AssertTrieConsistency(t testing.TB, root common.Hash, a, b *triedb.Database
 	itA := trie.NewIterator(nodeItA)
 	itB := trie.NewIterator(nodeItB)
 
-	count := 0
 	for itA.Next() && itB.Next() {
-		count++
 		require.Equal(t, itA.Key, itB.Key)
 		require.Equal(t, itA.Value, itB.Value)
-		if onLeaf != nil {
-			require.NoError(t, onLeaf(itA.Key, itA.Value))
-		}
+		onLeaf(itA.Key, itA.Value)
 	}
 	require.NoError(t, itA.Err)
 	require.NoError(t, itB.Err)
 	require.False(t, itA.Next())
 	require.False(t, itB.Next())
-	require.Positive(t, count)
 }
 
 // CorruptTrie deletes every [n]th trie node from the trie given by [tr] from the underlying [db].

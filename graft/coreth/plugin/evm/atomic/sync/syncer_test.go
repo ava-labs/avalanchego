@@ -305,7 +305,7 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 	// are caught here as this will only pass if all trie nodes have been written to the underlying DB
 	atomicTrie := atomicBackend.AtomicTrie()
 	clientTrieDB := atomicTrie.TrieDB()
-	synctest.AssertTrieConsistency(t, targetRoot, serverTrieDB, clientTrieDB, nil)
+	compareTries(t, targetRoot, serverTrieDB, clientTrieDB)
 
 	// check all commit heights are created correctly
 	hasher := trie.NewEmpty(triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil))
@@ -363,4 +363,31 @@ func setupTestInfrastructure(t *testing.T, serverTrieDB *triedb.Database) (conte
 	require.NoError(t, err, "NewAtomicBackend()")
 
 	return ctx, mockClient, atomicBackend, clientDB
+}
+
+func compareTries(t *testing.T, root common.Hash, a, b *triedb.Database) {
+	t.Helper()
+	trieA, err := trie.New(trie.TrieID(root), a)
+	require.NoError(t, err)
+	trieB, err := trie.New(trie.TrieID(root), b)
+	require.NoError(t, err)
+
+	nodeItA, err := trieA.NodeIterator(nil)
+	require.NoError(t, err)
+	nodeItB, err := trieB.NodeIterator(nil)
+	require.NoError(t, err)
+	itA := trie.NewIterator(nodeItA)
+	itB := trie.NewIterator(nodeItB)
+
+	count := 0
+	for itA.Next() && itB.Next() {
+		count++
+		require.Equal(t, itA.Key, itB.Key)
+		require.Equal(t, itA.Value, itB.Value)
+	}
+	require.NoError(t, itA.Err)
+	require.NoError(t, itB.Err)
+	require.False(t, itA.Next())
+	require.False(t, itB.Next())
+	require.Positive(t, count)
 }

@@ -248,10 +248,14 @@ func (*accountTrie) GetKey([]byte) []byte {
 }
 
 // NodeIterator implements state.Trie.
-// Firewood does not support iterating over internal nodes.
-// This always returns an error.
-func (*accountTrie) NodeIterator([]byte) (trie.NodeIterator, error) {
-	return nil, errors.New("NodeIterator not implemented for Firewood")
+// It iterates only over account nodes, so all nodes are leaf nodes.
+// The first key yielded will be >= [start].
+func (a *accountTrie) NodeIterator(start []byte) (trie.NodeIterator, error) {
+	r, ok := a.reader.(*reader)
+	if !ok {
+		return nil, errors.New("invalid reader type for account trie")
+	}
+	return newAccountIt(r.revision, start)
 }
 
 // Prove implements state.Trie.

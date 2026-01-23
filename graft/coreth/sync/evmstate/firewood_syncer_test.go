@@ -4,6 +4,7 @@
 package evmstate
 
 import (
+	"bytes"
 	"context"
 	"math/rand"
 	"testing"
@@ -12,7 +13,10 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -74,7 +78,7 @@ func TestFirewoodSync(t *testing.T) {
 			require.NoError(t, runFirewoodSync(t.Context(), codeSyncer, firewoodSyncer), "failure during sync")
 
 			// Finalization is not necessary, as no errors were encountered during sync.
-			assertFirewoodConsistency(t, root, clientState)
+			assertFirewoodConsistency(t, root, clientState, serverState)
 
 			// Code queue should be closed.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
@@ -187,13 +191,24 @@ func createDB(t *testing.T) state.Database {
 	return db
 }
 
-func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state.Database) {
+func assertFirewoodConsistency(t *testing.T, root common.Hash, serverState, clientState state.Database) {
 	t.Helper()
 
-	db := dbFromState(t, clientState)
-	gotRoot, err := db.Root()
-	require.NoErrorf(t, err, "%T.Root()", db)
-	require.Equal(t, root, common.Hash(gotRoot), "client DB root does not match expected root")
+	synctest.AssertTrieConsistency(t, root, clientState, serverState, func(key, val []byte) {
+		var acc types.StateAccount
+		require.NoError(t, rlp.DecodeBytes(val, &acc))
+
+		if bytes.Equal(acc.CodeHash, types.EmptyCodeHash[:]) {
+			return
+		}
+
+		// check code consistency
+		codeHash := common.BytesToHash(acc.CodeHash)
+		code := rawdb.ReadCode(clientState.DiskDB(), codeHash)
+		actualHash := crypto.Keccak256Hash(code)
+		require.NotEmpty(t, code)
+		require.Equal(t, codeHash, actualHash)
+	})
 
 	it := customrawdb.NewCodeToFetchIterator(clientState.DiskDB())
 	defer it.Release()
