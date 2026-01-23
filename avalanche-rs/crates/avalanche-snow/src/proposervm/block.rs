@@ -24,7 +24,7 @@ impl ProposerBlock {
     /// Parses a ProposerBlock from bytes.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         if bytes.is_empty() {
-            return Err(VMError::InvalidBlock("empty block bytes".to_string()));
+            return Err(VMError::InvalidBlock("empty block bytes".to_string()).into());
         }
 
         // Check version byte
@@ -39,7 +39,7 @@ impl ProposerBlock {
                 let block = PostForkBlock::parse(&bytes[1..])?;
                 Ok(ProposerBlock::PostFork(block))
             }
-            v => Err(VMError::InvalidBlock(format!("unknown block version: {}", v))),
+            v => Err(VMError::InvalidBlock(format!("unknown block version: {}", v)).into()),
         }
     }
 
@@ -182,12 +182,12 @@ impl PreForkBlock {
     /// Parses a pre-fork block from bytes (without version byte).
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 40 {
-            return Err(VMError::InvalidBlock("pre-fork block too short".to_string()));
+            return Err(VMError::InvalidBlock("pre-fork block too short".to_string()).into());
         }
 
         let height = u64::from_be_bytes(bytes[0..8].try_into().unwrap());
         let parent_id = Id::from_slice(&bytes[8..40])
-            .map_err(|_| VMError::InvalidBlock("invalid parent ID".to_string()))?;
+            .map_err(|_| -> crate::error::ConsensusError { VMError::InvalidBlock("invalid parent ID".to_string()).into() })?;
         let inner_bytes = bytes[40..].to_vec();
 
         // Recompute full bytes with version
@@ -248,7 +248,7 @@ impl VMBlock for PreForkBlock {
     fn verify(&self) -> Result<()> {
         // Pre-fork blocks have minimal verification
         if self.inner_bytes.is_empty() {
-            return Err(VMError::InvalidBlock("empty inner block".to_string()));
+            return Err(VMError::InvalidBlock("empty inner block".to_string()).into());
         }
         Ok(())
     }
@@ -348,15 +348,15 @@ impl PostForkBlock {
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 68 {
             // 8 + 8 + 32 + 20 = 68 minimum
-            return Err(VMError::InvalidBlock("post-fork block too short".to_string()));
+            return Err(VMError::InvalidBlock("post-fork block too short".to_string()).into());
         }
 
         let timestamp = u64::from_be_bytes(bytes[0..8].try_into().unwrap());
         let pchain_height = u64::from_be_bytes(bytes[8..16].try_into().unwrap());
         let parent_id = Id::from_slice(&bytes[16..48])
-            .map_err(|_| VMError::InvalidBlock("invalid parent ID".to_string()))?;
+            .map_err(|_| -> crate::error::ConsensusError { VMError::InvalidBlock("invalid parent ID".to_string()).into() })?;
         let proposer = NodeId::from_slice(&bytes[48..68])
-            .map_err(|_| VMError::InvalidBlock("invalid proposer ID".to_string()))?;
+            .map_err(|_| -> crate::error::ConsensusError { VMError::InvalidBlock("invalid proposer ID".to_string()).into() })?;
         let inner_bytes = bytes[68..].to_vec();
 
         // Recompute full bytes with version
@@ -436,7 +436,7 @@ impl VMBlock for PostForkBlock {
     fn verify(&self) -> Result<()> {
         // Verify inner block exists
         if self.inner_bytes.is_empty() {
-            return Err(VMError::InvalidBlock("empty inner block".to_string()));
+            return Err(VMError::InvalidBlock("empty inner block".to_string()).into());
         }
 
         // Verify timestamp is not in far future
@@ -449,7 +449,7 @@ impl VMBlock for PostForkBlock {
             return Err(VMError::InvalidBlock(format!(
                 "timestamp {} too far in future (now={})",
                 self.timestamp, now
-            )));
+            )).into());
         }
 
         // Certificate verification would happen here with actual signature verification

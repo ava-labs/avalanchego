@@ -1,5 +1,6 @@
 //! Error types for consensus.
 
+use avalanche_db::DatabaseError;
 use thiserror::Error;
 
 /// Result type for consensus operations.
@@ -75,4 +76,18 @@ pub enum ConsensusError {
     /// VM not initialized
     #[error("VM not initialized")]
     VMNotInitialized,
+
+    /// VM error
+    #[error("VM error: {0}")]
+    VM(String),
+
+    /// Not found error
+    #[error("not found: {0}")]
+    NotFound(String),
+}
+
+impl From<DatabaseError> for ConsensusError {
+    fn from(e: DatabaseError) -> Self {
+        ConsensusError::Database(e.to_string())
+    }
 }

@@ -162,8 +162,8 @@ impl Precompiles {
 
         let hash = B256::from_slice(&padded[0..32]);
         let v = padded[63];
-        let r = B256::from_slice(&padded[64..96]);
-        let s = B256::from_slice(&padded[96..128]);
+        let r = &padded[64..96];
+        let s = &padded[96..128];
 
         // Recovery ID is v - 27
         let recovery_id = match v {
@@ -177,23 +177,13 @@ impl Precompiles {
             }
         };
 
-        // Try to recover
-        let signature = match Signature::from_scalars(
-            k256::FieldBytes::from_slice(r.as_slice()),
-            k256::FieldBytes::from_slice(s.as_slice()),
-        ) {
+        // Try to create signature from r and s
+        let r_bytes: [u8; 32] = r.try_into().unwrap_or([0u8; 32]);
+        let s_bytes: [u8; 32] = s.try_into().unwrap_or([0u8; 32]);
+
+        let signature = match Signature::from_scalars(r_bytes, s_bytes) {
             Ok(sig) => sig,
             Err(_) => {
-                return Ok(PrecompileOutput {
-                    data: Bytes::from(vec![0u8; 32]),
-                    gas_used: GAS_COST,
-                });
-            }
-        };
-
-        let recovery_id = match recovery_id {
-            Some(id) => id,
-            None => {
                 return Ok(PrecompileOutput {
                     data: Bytes::from(vec![0u8; 32]),
                     gas_used: GAS_COST,

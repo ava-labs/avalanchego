@@ -8,11 +8,11 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 use sha2::{Digest, Sha256};
 
-use avalanche_db::{Database, MemoryDB};
+use avalanche_db::{Database, MemDb};
 use avalanche_ids::Id;
 
 use crate::error::Result;
-use crate::vm::VMError;
+use crate::vm::{Block as VMBlock, VMError};
 
 use super::block::ProposerBlock;
 
@@ -83,7 +83,7 @@ impl ProposerState {
 
     /// Creates a proposer state with in-memory database.
     pub fn in_memory() -> Result<Self> {
-        Self::new(Arc::new(MemoryDB::new()))
+        Self::new(Arc::new(MemDb::new()))
     }
 
     /// Returns the genesis block ID.
@@ -167,7 +167,7 @@ impl ProposerState {
         match self.db.get(&height_key)? {
             Some(id_bytes) => {
                 let id = Id::from_slice(&id_bytes)
-                    .map_err(|_| VMError::InvalidBlock("invalid block ID".to_string()))?;
+                    .map_err(|_| -> crate::error::ConsensusError { VMError::InvalidBlock("invalid block ID".to_string()).into() })?;
                 self.height_index.write().insert(height, id);
                 self.get_block(&id)
             }
@@ -183,7 +183,7 @@ impl ProposerState {
 
         let mut key = BLOCK_PREFIX.to_vec();
         key.extend_from_slice(id.as_bytes());
-        self.db.has(&key)
+        Ok(self.db.has(&key)?)
     }
 
     /// Deletes a proposer block.
@@ -221,7 +221,7 @@ impl ProposerState {
     pub fn accept_block(&self, id: &Id) -> Result<()> {
         // Verify block exists
         if !self.has_block(id)? {
-            return Err(VMError::NotFound(format!("block {} not found", id)));
+            return Err(VMError::NotFound(format!("block {} not found", id)).into());
         }
 
         // Update last accepted
@@ -316,14 +316,14 @@ impl BlockMetadata {
     /// Deserializes metadata from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 81 {
-            return Err(VMError::InvalidBlock("metadata too short".to_string()));
+            return Err(VMError::InvalidBlock("metadata too short".to_string()).into());
         }
 
         let id = Id::from_slice(&bytes[0..32])
-            .map_err(|_| VMError::InvalidBlock("invalid ID".to_string()))?;
+            .map_err(|_| -> crate::error::ConsensusError { VMError::InvalidBlock("invalid ID".to_string()).into() })?;
         let height = u64::from_be_bytes(bytes[32..40].try_into().unwrap());
         let parent_id = Id::from_slice(&bytes[40..72])
-            .map_err(|_| VMError::InvalidBlock("invalid parent ID".to_string()))?;
+            .map_err(|_| -> crate::error::ConsensusError { VMError::InvalidBlock("invalid parent ID".to_string()).into() })?;
         let timestamp = u64::from_be_bytes(bytes[72..80].try_into().unwrap());
         let is_post_fork = bytes[80] == 1;
 

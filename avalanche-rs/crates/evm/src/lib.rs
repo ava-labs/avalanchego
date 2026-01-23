@@ -26,7 +26,7 @@ pub use transaction::{
 pub use executor::{BlockContext, ExecutionError, ExecutionOutcome, Executor, ExecutorConfig};
 pub use block::{Block, BlockBuilder, Header, Withdrawal};
 pub use vm::{EvmVM, GenesisAccount, GenesisConfig, VMConfig, VMError, VMState};
-pub use precompiles::{PrecompileRegistry, PrecompileResult, addresses as precompile_addresses};
+pub use precompiles::{Precompiles, PrecompileResult, PrecompileOutput, PrecompileError, addresses as precompile_addresses};
 
 use alloy_primitives::Address;
 

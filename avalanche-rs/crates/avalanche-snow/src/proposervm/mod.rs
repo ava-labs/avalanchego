@@ -183,7 +183,7 @@ impl<V: ChainVM> ProposerVM<V> {
 
         if self.is_post_fork(height, timestamp) {
             // Create post-fork block with proposer info
-            let node_id = self.node_id.ok_or(VMError::NotInitialized)?;
+            let node_id = self.node_id.ok_or(crate::error::ConsensusError::VMNotInitialized)?;
 
             // Calculate P-chain height (simplified - would come from state)
             let pchain_height = height.saturating_sub(1);
@@ -206,7 +206,7 @@ impl<V: ChainVM> ProposerVM<V> {
     }
 
     /// Unwraps a ProposerBlock to get the inner block bytes.
-    fn unwrap_block(&self, block: &ProposerBlock) -> &[u8] {
+    fn unwrap_block<'a>(&self, block: &'a ProposerBlock) -> &'a [u8] {
         match block {
             ProposerBlock::PreFork(b) => b.inner_bytes(),
             ProposerBlock::PostFork(b) => b.inner_bytes(),
@@ -233,7 +233,7 @@ impl<V: ChainVM> ProposerVM<V> {
                     .as_secs();
 
                 if timestamp > now + 10 {
-                    return Err(VMError::InvalidBlock(format!(
+                    return Err(crate::error::ConsensusError::InvalidBlock(format!(
                         "block timestamp {} is in the future (now={})",
                         timestamp, now
                     )));
@@ -254,7 +254,7 @@ impl<V: ChainVM> ProposerVM<V> {
                         if slot < self.config.num_windows {
                             if let Some(expected_proposer) = expected {
                                 if proposer != expected_proposer {
-                                    return Err(VMError::InvalidBlock(format!(
+                                    return Err(crate::error::ConsensusError::InvalidBlock(format!(
                                         "wrong proposer: expected {}, got {}",
                                         expected_proposer, proposer
                                     )));
@@ -279,7 +279,7 @@ impl<V: ChainVM + Send + Sync> CommonVM for ProposerVM<V> {
         genesis_bytes: &[u8],
     ) -> Result<()> {
         if self.initialized {
-            return Err(VMError::AlreadyInitialized);
+            return Err(crate::error::ConsensusError::VMAlreadyInitialized);
         }
 
         info!("Initializing ProposerVM");

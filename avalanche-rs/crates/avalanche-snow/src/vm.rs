@@ -104,7 +104,7 @@ impl std::fmt::Display for Version {
 }
 
 /// VM error types.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum VMError {
     #[error("VM already initialized")]
     AlreadyInitialized,
@@ -112,6 +112,8 @@ pub enum VMError {
     NotInitialized,
     #[error("block not found")]
     BlockNotFound,
+    #[error("not found: {0}")]
+    NotFound(String),
     #[error("invalid block: {0}")]
     InvalidBlock(String),
     #[error("database error: {0}")]
@@ -125,6 +127,21 @@ pub enum VMError {
 impl From<ConsensusError> for VMError {
     fn from(e: ConsensusError) -> Self {
         VMError::Consensus(e.to_string())
+    }
+}
+
+impl From<VMError> for ConsensusError {
+    fn from(e: VMError) -> Self {
+        match e {
+            VMError::AlreadyInitialized => ConsensusError::VMAlreadyInitialized,
+            VMError::NotInitialized => ConsensusError::VMNotInitialized,
+            VMError::BlockNotFound => ConsensusError::BlockNotFound("block not found".to_string()),
+            VMError::NotFound(s) => ConsensusError::NotFound(s),
+            VMError::InvalidBlock(s) => ConsensusError::InvalidBlock(s),
+            VMError::Database(s) => ConsensusError::Database(s),
+            VMError::Consensus(s) => ConsensusError::Internal(s),
+            VMError::Internal(s) => ConsensusError::Internal(s),
+        }
     }
 }
 
@@ -158,6 +175,15 @@ pub trait Block: Send + Sync {
 
     /// Verifies the block.
     fn verify(&self) -> Result<()>;
+
+    /// Accepts the block.
+    fn accept(&mut self) -> Result<()>;
+
+    /// Rejects the block.
+    fn reject(&mut self) -> Result<()>;
+
+    /// Returns the block's status.
+    fn status(&self) -> BlockStatus;
 }
 
 /// Application handler trait.
