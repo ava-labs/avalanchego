@@ -110,9 +110,10 @@ jobs:
       - name: Configure dependency versions
         if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
         shell: nix develop --command bash {0}
-        run: ./scripts/run_task.sh polyrepo -- ${{ matrix.firewood-ref != '' && format('sync firewood@{0}', matrix.firewood-ref) || '' }}
+        run: ./scripts/run_task.sh run-polyrepo
         env:
           LIBEVM_REF: ${{ matrix.libevm-ref }}
+          FIREWOOD_REF: ${{ matrix.firewood-ref }}
           # Required for Nix builds on ARC runners
           TMPDIR: /tmp
           NIX_BUILD_TOP: /tmp

@@ -174,8 +174,8 @@ tasks:
     desc: Runs shellcheck to check sanity of shell scripts
     cmd: ./scripts/shellcheck.sh
 
-  polyrepo:
-    desc: "Run polyrepo for orchestrating local dependencies. Example: LIBEVM_REF=v1.2.3 task polyrepo -- sync firewood@abc123"
+  run-polyrepo:
+    desc: "Run polyrepo for orchestrating local dependencies. Example: LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123 task run-polyrepo"
     cmd: ./scripts/run_polyrepo.sh {{.CLI_ARGS}}
 
   setup-chain-data:

@@ -261,16 +261,16 @@ The benchmarks support testing with custom versions of `libevm` and `firewood` d
 
 **Prerequisite**: You must be in a nix shell (`nix develop`).
 
-Use `run_polyrepo.sh` to set up custom dependencies:
-- `LIBEVM_REF=<ref>` env var updates libevm via `go get`
-- `sync firewood@<ref>` arg syncs firewood via polyrepo
+Use `run_polyrepo.sh` to set up custom dependencies via environment variables:
+- `LIBEVM_REF` - Git ref for libevm (runs `go get` and `go mod tidy`)
+- `FIREWOOD_REF` - Git ref for firewood (runs `polyrepo sync firewood@FIREWOOD_REF`)
 
 ```bash
 # Both libevm and firewood
-LIBEVM_REF=v1.2.3 ./scripts/run_polyrepo.sh sync firewood@abc123def
+LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123def ./scripts/run_polyrepo.sh
 
 # Only firewood
-./scripts/run_polyrepo.sh sync firewood@abc123def
+FIREWOOD_REF=abc123def ./scripts/run_polyrepo.sh
 
 # Only libevm
 LIBEVM_REF=v1.2.3 ./scripts/run_polyrepo.sh
