@@ -18,12 +18,15 @@ avalanche-net = { workspace = true }
 avalanche-snow = { workspace = true }
 avalanche-vm = { workspace = true }
 avalanche-api = { workspace = true }
+avalanche-crypto = { workspace = true }
 platformvm = { workspace = true }
 avm = { workspace = true }
+evm = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 async-trait = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+bytes = { workspace = true }
 thiserror = { workspace = true }
 parking_lot = { workspace = true }
 chrono = { workspace = true }
@@ -32,6 +35,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4.4", features = ["derive"] }
 directories = "5.0"
 toml = "0.8"
+hyper = { version = "1.0", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
+http-body-util = "0.1"
 
 [dev-dependencies]
 proptest = { workspace = true }

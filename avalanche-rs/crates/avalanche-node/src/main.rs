@@ -146,7 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("Data directory: {:?}", config.data_dir);
 
             // Create and start node
-            let node = Node::new(config).await?;
+            let node = std::sync::Arc::new(Node::new(config).await?);
 
             info!("Node initialized, starting services...");
 
