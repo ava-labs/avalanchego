@@ -15,10 +15,9 @@ import (
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
@@ -34,7 +33,7 @@ type codeSyncerTest struct {
 	err               error
 }
 
-func testCodeSyncer(t *testing.T, c codec.Manager, test codeSyncerTest) {
+func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 	// Set up serverDB
 	serverDB := memorydb.New()
 
@@ -46,8 +45,8 @@ func testCodeSyncer(t *testing.T, c codec.Manager, test codeSyncerTest) {
 	}
 
 	// Set up mockClient
-	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB, c, handlerstats.NewNoopHandlerStats())
-	mockClient := client.NewTestClient(c, nil, codeRequestHandler, nil)
+	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB, message.CorethCodec, handlerstats.NewNoopHandlerStats())
+	mockClient := client.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
 	mockClient.GetCodeIntercept = test.getCodeIntercept
 
 	clientDB := test.clientDB
@@ -97,87 +96,77 @@ func testCodeSyncer(t *testing.T, c codec.Manager, test codeSyncerTest) {
 }
 
 func TestCodeSyncerSingleCodeHash(t *testing.T) {
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-		codeBytes := utils.RandomBytes(100)
-		codeHash := crypto.Keccak256Hash(codeBytes)
-		testCodeSyncer(t, c, codeSyncerTest{
-			codeRequestHashes: [][]common.Hash{{codeHash}},
-			codeByteSlices:    [][]byte{codeBytes},
-		})
+	codeBytes := utils.RandomBytes(100)
+	codeHash := crypto.Keccak256Hash(codeBytes)
+	testCodeSyncer(t, codeSyncerTest{
+		codeRequestHashes: [][]common.Hash{{codeHash}},
+		codeByteSlices:    [][]byte{codeBytes},
 	})
 }
 
 func TestCodeSyncerManyCodeHashes(t *testing.T) {
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-		numCodeSlices := 5000
-		codeHashes := make([]common.Hash, 0, numCodeSlices)
-		codeByteSlices := make([][]byte, 0, numCodeSlices)
-		for i := 0; i < numCodeSlices; i++ {
-			codeBytes := utils.RandomBytes(100)
-			codeHash := crypto.Keccak256Hash(codeBytes)
-			codeHashes = append(codeHashes, codeHash)
-			codeByteSlices = append(codeByteSlices, codeBytes)
-		}
+	numCodeSlices := 5000
+	codeHashes := make([]common.Hash, 0, numCodeSlices)
+	codeByteSlices := make([][]byte, 0, numCodeSlices)
+	for i := 0; i < numCodeSlices; i++ {
+		codeBytes := utils.RandomBytes(100)
+		codeHash := crypto.Keccak256Hash(codeBytes)
+		codeHashes = append(codeHashes, codeHash)
+		codeByteSlices = append(codeByteSlices, codeBytes)
+	}
 
-		testCodeSyncer(t, c, codeSyncerTest{
-			queueCapacity:     10,
-			codeRequestHashes: [][]common.Hash{codeHashes[0:100], codeHashes[100:2000], codeHashes[2000:2005], codeHashes[2005:]},
-			codeByteSlices:    codeByteSlices,
-		})
+	testCodeSyncer(t, codeSyncerTest{
+		queueCapacity:     10,
+		codeRequestHashes: [][]common.Hash{codeHashes[0:100], codeHashes[100:2000], codeHashes[2000:2005], codeHashes[2005:]},
+		codeByteSlices:    codeByteSlices,
 	})
 }
 
 func TestCodeSyncerRequestErrors(t *testing.T) {
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-		codeBytes := utils.RandomBytes(100)
-		codeHash := crypto.Keccak256Hash(codeBytes)
-		err := errors.New("dummy error")
-		testCodeSyncer(t, c, codeSyncerTest{
-			codeRequestHashes: [][]common.Hash{{codeHash}},
-			codeByteSlices:    [][]byte{codeBytes},
-			getCodeIntercept: func([]common.Hash, [][]byte) ([][]byte, error) {
-				return nil, err
-			},
-			err: err,
-		})
+	codeBytes := utils.RandomBytes(100)
+	codeHash := crypto.Keccak256Hash(codeBytes)
+	err := errors.New("dummy error")
+	testCodeSyncer(t, codeSyncerTest{
+		codeRequestHashes: [][]common.Hash{{codeHash}},
+		codeByteSlices:    [][]byte{codeBytes},
+		getCodeIntercept: func([]common.Hash, [][]byte) ([][]byte, error) {
+			return nil, err
+		},
+		err: err,
 	})
 }
 
 func TestCodeSyncerAddsInProgressCodeHashes(t *testing.T) {
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-		codeBytes := utils.RandomBytes(100)
-		codeHash := crypto.Keccak256Hash(codeBytes)
-		clientDB := rawdb.NewMemoryDatabase()
-		require.NoError(t, customrawdb.WriteCodeToFetch(clientDB, codeHash))
-		testCodeSyncer(t, c, codeSyncerTest{
-			clientDB:          clientDB,
-			codeRequestHashes: nil,
-			codeByteSlices:    [][]byte{codeBytes},
-		})
+	codeBytes := utils.RandomBytes(100)
+	codeHash := crypto.Keccak256Hash(codeBytes)
+	clientDB := rawdb.NewMemoryDatabase()
+	require.NoError(t, customrawdb.WriteCodeToFetch(clientDB, codeHash))
+	testCodeSyncer(t, codeSyncerTest{
+		clientDB:          clientDB,
+		codeRequestHashes: nil,
+		codeByteSlices:    [][]byte{codeBytes},
 	})
 }
 
 func TestCodeSyncerAddsMoreInProgressThanQueueSize(t *testing.T) {
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-		numCodeSlices := 100
-		codeHashes := make([]common.Hash, 0, numCodeSlices)
-		codeByteSlices := make([][]byte, 0, numCodeSlices)
-		for i := 0; i < numCodeSlices; i++ {
-			codeBytes := utils.RandomBytes(100)
-			codeHash := crypto.Keccak256Hash(codeBytes)
-			codeHashes = append(codeHashes, codeHash)
-			codeByteSlices = append(codeByteSlices, codeBytes)
-		}
+	numCodeSlices := 100
+	codeHashes := make([]common.Hash, 0, numCodeSlices)
+	codeByteSlices := make([][]byte, 0, numCodeSlices)
+	for i := 0; i < numCodeSlices; i++ {
+		codeBytes := utils.RandomBytes(100)
+		codeHash := crypto.Keccak256Hash(codeBytes)
+		codeHashes = append(codeHashes, codeHash)
+		codeByteSlices = append(codeByteSlices, codeBytes)
+	}
 
-		db := rawdb.NewMemoryDatabase()
-		for _, codeHash := range codeHashes {
-			require.NoError(t, customrawdb.WriteCodeToFetch(db, codeHash))
-		}
+	db := rawdb.NewMemoryDatabase()
+	for _, codeHash := range codeHashes {
+		require.NoError(t, customrawdb.WriteCodeToFetch(db, codeHash))
+	}
 
-		testCodeSyncer(t, c, codeSyncerTest{
-			clientDB:          db,
-			codeRequestHashes: nil,
-			codeByteSlices:    codeByteSlices,
-		})
+	testCodeSyncer(t, codeSyncerTest{
+		clientDB:          db,
+		codeRequestHashes: nil,
+		codeByteSlices:    codeByteSlices,
 	})
 }

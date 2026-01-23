@@ -386,348 +386,338 @@ func TestGetLeafs(t *testing.T) {
 	largeTrieRoot, largeTrieKeys, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100_000, common.HashLength)
 	smallTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, leafsLimit, common.HashLength)
 
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-		handler := handlers.NewLeafsRequestHandler(trieDB, message.StateTrieKeyLength, nil, c, handlerstats.NewNoopHandlerStats())
+	handler := handlers.NewLeafsRequestHandler(
+		trieDB,
+		message.StateTrieKeyLength,
+		nil,
+		message.CorethCodec,
+		handlerstats.NewNoopHandlerStats(),
+	)
 
-		tests := map[string]struct {
-			request         message.LeafsRequest
-			getResponse     func(t *testing.T, request message.LeafsRequest) []byte
-			requireResponse func(t *testing.T, response message.LeafsResponse)
-			expectedErr     error
-		}{
-			"full response for small (single request) trie": {
-				request: newLeafsRequest(
-					c,
-					smallTrieRoot,
-					common.Hash{},
-					bytes.Repeat([]byte{0x00}, common.HashLength),
-					bytes.Repeat([]byte{0xff}, common.HashLength),
+	tests := map[string]struct {
+		request         message.LeafsRequest
+		getResponse     func(t *testing.T, request message.LeafsRequest) []byte
+		requireResponse func(t *testing.T, response message.LeafsResponse)
+		expectedErr     error
+	}{
+		"full response for small (single request) trie": {
+			request: newLeafsRequest(
+				smallTrieRoot,
+				common.Hash{},
+				bytes.Repeat([]byte{0x00}, common.HashLength),
+				bytes.Repeat([]byte{0xff}, common.HashLength),
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+
+				return response
+			},
+			requireResponse: func(t *testing.T, response message.LeafsResponse) {
+				require.False(t, response.More)
+				require.Len(t, response.Keys, leafsLimit)
+				require.Len(t, response.Vals, leafsLimit)
+			},
+		},
+		"too many leaves in response": {
+			request: newLeafsRequest(
+				smallTrieRoot,
+				common.Hash{},
+				bytes.Repeat([]byte{0x00}, common.HashLength),
+				bytes.Repeat([]byte{0xff}, common.HashLength),
+				leafsLimit/2,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				modifiedRequest := newLeafsRequest(
+					request.RootHash(),
+					request.AccountHash(),
+					request.StartKey(),
+					request.EndKey(),
 					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
+					request.NodeTypeValue(),
+				)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, modifiedRequest)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
-					return response
-				},
-				requireResponse: func(t *testing.T, response message.LeafsResponse) {
-					require.False(t, response.More)
-					require.Len(t, response.Keys, leafsLimit)
-					require.Len(t, response.Vals, leafsLimit)
-				},
+				return response
 			},
-			"too many leaves in response": {
-				request: newLeafsRequest(
-					c,
-					smallTrieRoot,
-					common.Hash{},
-					bytes.Repeat([]byte{0x00}, common.HashLength),
-					bytes.Repeat([]byte{0xff}, common.HashLength),
-					leafsLimit/2,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					modifiedRequest := newLeafsRequest(
-						c,
-						request.RootHash(),
-						request.AccountHash(),
-						request.StartKey(),
-						request.EndKey(),
-						leafsLimit,
-						request.NodeTypeValue(),
-					)
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, modifiedRequest)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
+			expectedErr: errTooManyLeaves,
+		},
+		"partial response to request for entire trie (full leaf limit)": {
+			request: newLeafsRequest(
+				largeTrieRoot,
+				common.Hash{},
+				bytes.Repeat([]byte{0x00}, common.HashLength),
+				bytes.Repeat([]byte{0xff}, common.HashLength),
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
-					return response
-				},
-				expectedErr: errTooManyLeaves,
+				return response
 			},
-			"partial response to request for entire trie (full leaf limit)": {
-				request: newLeafsRequest(
-					c,
-					largeTrieRoot,
-					common.Hash{},
-					bytes.Repeat([]byte{0x00}, common.HashLength),
-					bytes.Repeat([]byte{0xff}, common.HashLength),
-					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
-
-					return response
-				},
-				requireResponse: func(t *testing.T, response message.LeafsResponse) {
-					require.True(t, response.More)
-					require.Len(t, response.Keys, leafsLimit)
-					require.Len(t, response.Vals, leafsLimit)
-				},
+			requireResponse: func(t *testing.T, response message.LeafsResponse) {
+				require.True(t, response.More)
+				require.Len(t, response.Keys, leafsLimit)
+				require.Len(t, response.Vals, leafsLimit)
 			},
-			"partial response to request for middle range of trie (full leaf limit)": {
-				request: newLeafsRequest(
-					c,
-					largeTrieRoot,
-					common.Hash{},
-					largeTrieKeys[1000],
-					largeTrieKeys[99000],
-					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
+		},
+		"partial response to request for middle range of trie (full leaf limit)": {
+			request: newLeafsRequest(
+				largeTrieRoot,
+				common.Hash{},
+				largeTrieKeys[1000],
+				largeTrieKeys[99000],
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
-					return response
-				},
-				requireResponse: func(t *testing.T, response message.LeafsResponse) {
-					require.True(t, response.More)
-					require.Len(t, response.Keys, leafsLimit)
-					require.Len(t, response.Vals, leafsLimit)
-				},
+				return response
 			},
-			"full response from near end of trie to end of trie (less than leaf limit)": {
-				request: newLeafsRequest(
-					c,
-					largeTrieRoot,
-					common.Hash{},
-					largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
-					bytes.Repeat([]byte{0xff}, common.HashLength),
-					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
-
-					return response
-				},
-				requireResponse: func(t *testing.T, response message.LeafsResponse) {
-					require.False(t, response.More)
-					require.Len(t, response.Keys, 30)
-					require.Len(t, response.Vals, 30)
-				},
+			requireResponse: func(t *testing.T, response message.LeafsResponse) {
+				require.True(t, response.More)
+				require.Len(t, response.Keys, leafsLimit)
+				require.Len(t, response.Vals, leafsLimit)
 			},
-			"full response for intermediate range of trie (less than leaf limit)": {
-				request: newLeafsRequest(
-					c,
-					largeTrieRoot,
-					common.Hash{},
-					largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
-					largeTrieKeys[1099], // (inclusive range)
-					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
+		},
+		"full response from near end of trie to end of trie (less than leaf limit)": {
+			request: newLeafsRequest(
+				largeTrieRoot,
+				common.Hash{},
+				largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
+				bytes.Repeat([]byte{0xff}, common.HashLength),
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
-					return response
-				},
-				requireResponse: func(t *testing.T, response message.LeafsResponse) {
-					require.True(t, response.More)
-					require.Len(t, response.Keys, 100)
-					require.Len(t, response.Vals, 100)
-				},
+				return response
 			},
-			"removed first key in response": {
-				request: newLeafsRequest(
-					c,
-					largeTrieRoot,
-					common.Hash{},
-					bytes.Repeat([]byte{0x00}, common.HashLength),
-					bytes.Repeat([]byte{0xff}, common.HashLength),
-					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
-
-					var leafResponse message.LeafsResponse
-					_, err = c.Unmarshal(response, &leafResponse)
-					require.NoError(t, err)
-					leafResponse.Keys = leafResponse.Keys[1:]
-					leafResponse.Vals = leafResponse.Vals[1:]
-
-					modifiedResponse, err := c.Marshal(message.Version, leafResponse)
-					require.NoError(t, err)
-					return modifiedResponse
-				},
-				expectedErr: errInvalidRangeProof,
+			requireResponse: func(t *testing.T, response message.LeafsResponse) {
+				require.False(t, response.More)
+				require.Len(t, response.Keys, 30)
+				require.Len(t, response.Vals, 30)
 			},
-			"removed first key in response and replaced proof": {
-				request: newLeafsRequest(
-					c,
-					largeTrieRoot,
-					common.Hash{},
-					bytes.Repeat([]byte{0x00}, common.HashLength),
-					bytes.Repeat([]byte{0xff}, common.HashLength),
-					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
-					var leafResponse message.LeafsResponse
-					_, err = c.Unmarshal(response, &leafResponse)
-					require.NoError(t, err)
-					modifiedRequest := newLeafsRequest(
-						c,
-						request.RootHash(),
-						request.AccountHash(),
-						leafResponse.Keys[1],
-						request.EndKey(),
-						request.LimitValue(),
-						request.NodeTypeValue(),
-					)
-					modifiedResponse, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 2, modifiedRequest)
-					require.NoError(t, err)
-					return modifiedResponse
-				},
-				expectedErr: errInvalidRangeProof,
+		},
+		"full response for intermediate range of trie (less than leaf limit)": {
+			request: newLeafsRequest(
+				largeTrieRoot,
+				common.Hash{},
+				largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
+				largeTrieKeys[1099], // (inclusive range)
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+
+				return response
 			},
-			"removed last key in response": {
-				request: newLeafsRequest(
-					c,
-					largeTrieRoot,
-					common.Hash{},
-					bytes.Repeat([]byte{0x00}, common.HashLength),
-					bytes.Repeat([]byte{0xff}, common.HashLength),
-					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
-					var leafResponse message.LeafsResponse
-					_, err = c.Unmarshal(response, &leafResponse)
-					require.NoError(t, err)
-					leafResponse.Keys = leafResponse.Keys[:len(leafResponse.Keys)-2]
-					leafResponse.Vals = leafResponse.Vals[:len(leafResponse.Vals)-2]
-
-					modifiedResponse, err := c.Marshal(message.Version, leafResponse)
-					require.NoError(t, err)
-					return modifiedResponse
-				},
-				expectedErr: errInvalidRangeProof,
+			requireResponse: func(t *testing.T, response message.LeafsResponse) {
+				require.True(t, response.More)
+				require.Len(t, response.Keys, 100)
+				require.Len(t, response.Vals, 100)
 			},
-			"removed key from middle of response": {
-				request: newLeafsRequest(
-					c,
-					largeTrieRoot,
-					common.Hash{},
-					bytes.Repeat([]byte{0x00}, common.HashLength),
-					bytes.Repeat([]byte{0xff}, common.HashLength),
-					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
-					var leafResponse message.LeafsResponse
-					_, err = c.Unmarshal(response, &leafResponse)
-					require.NoError(t, err)
-					// Remove middle key-value pair response
-					leafResponse.Keys = append(leafResponse.Keys[:100], leafResponse.Keys[101:]...)
-					leafResponse.Vals = append(leafResponse.Vals[:100], leafResponse.Vals[101:]...)
+		},
+		"removed first key in response": {
+			request: newLeafsRequest(
+				largeTrieRoot,
+				common.Hash{},
+				bytes.Repeat([]byte{0x00}, common.HashLength),
+				bytes.Repeat([]byte{0xff}, common.HashLength),
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
-					modifiedResponse, err := c.Marshal(message.Version, leafResponse)
-					require.NoError(t, err)
-					return modifiedResponse
-				},
-				expectedErr: errInvalidRangeProof,
+				var leafResponse message.LeafsResponse
+				_, err = message.CorethCodec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
+				leafResponse.Keys = leafResponse.Keys[1:]
+				leafResponse.Vals = leafResponse.Vals[1:]
+
+				modifiedResponse, err := message.CorethCodec.Marshal(message.Version, leafResponse)
+				require.NoError(t, err)
+				return modifiedResponse
 			},
-			"corrupted value in middle of response": {
-				request: newLeafsRequest(
-					c,
-					largeTrieRoot,
-					common.Hash{},
-					bytes.Repeat([]byte{0x00}, common.HashLength),
-					bytes.Repeat([]byte{0xff}, common.HashLength),
-					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
-					var leafResponse message.LeafsResponse
-					_, err = c.Unmarshal(response, &leafResponse)
-					require.NoError(t, err)
-					// Remove middle key-value pair response
-					leafResponse.Vals[100] = []byte("garbage value data")
-
-					modifiedResponse, err := c.Marshal(message.Version, leafResponse)
-					require.NoError(t, err)
-					return modifiedResponse
-				},
-				expectedErr: errInvalidRangeProof,
+			expectedErr: errInvalidRangeProof,
+		},
+		"removed first key in response and replaced proof": {
+			request: newLeafsRequest(
+				largeTrieRoot,
+				common.Hash{},
+				bytes.Repeat([]byte{0x00}, common.HashLength),
+				bytes.Repeat([]byte{0xff}, common.HashLength),
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+				var leafResponse message.LeafsResponse
+				_, err = message.CorethCodec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
+				modifiedRequest := newLeafsRequest(
+					request.RootHash(),
+					request.AccountHash(),
+					leafResponse.Keys[1],
+					request.EndKey(),
+					request.LimitValue(),
+					request.NodeTypeValue(),
+				)
+				modifiedResponse, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 2, modifiedRequest)
+				require.NoError(t, err)
+				return modifiedResponse
 			},
-			"all proof keys removed from response": {
-				request: newLeafsRequest(
-					c,
-					largeTrieRoot,
-					common.Hash{},
-					bytes.Repeat([]byte{0x00}, common.HashLength),
-					bytes.Repeat([]byte{0xff}, common.HashLength),
-					leafsLimit,
-					message.StateTrieNode,
-				),
-				getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-					response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
+			expectedErr: errInvalidRangeProof,
+		},
+		"removed last key in response": {
+			request: newLeafsRequest(
+				largeTrieRoot,
+				common.Hash{},
+				bytes.Repeat([]byte{0x00}, common.HashLength),
+				bytes.Repeat([]byte{0xff}, common.HashLength),
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+				var leafResponse message.LeafsResponse
+				_, err = message.CorethCodec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
+				leafResponse.Keys = leafResponse.Keys[:len(leafResponse.Keys)-2]
+				leafResponse.Vals = leafResponse.Vals[:len(leafResponse.Vals)-2]
 
-					var leafResponse message.LeafsResponse
-					_, err = c.Unmarshal(response, &leafResponse)
-					require.NoError(t, err)
-					// Remove the proof
-					leafResponse.ProofVals = nil
-
-					modifiedResponse, err := c.Marshal(message.Version, leafResponse)
-					require.NoError(t, err)
-					return modifiedResponse
-				},
-				expectedErr: errInvalidRangeProof,
+				modifiedResponse, err := message.CorethCodec.Marshal(message.Version, leafResponse)
+				require.NoError(t, err)
+				return modifiedResponse
 			},
-		}
-		for name, test := range tests {
-			t.Run(name, func(t *testing.T) {
-				t.Parallel()
-				client := New(&Config{
-					NetworkClient:    &testNetwork{},
-					Codec:            c,
-					Stats:            clientstats.NewNoOpStats(),
-					StateSyncNodeIDs: nil,
-					BlockParser:      newTestBlockParser(),
-				})
-				responseBytes := test.getResponse(t, test.request)
+			expectedErr: errInvalidRangeProof,
+		},
+		"removed key from middle of response": {
+			request: newLeafsRequest(
+				largeTrieRoot,
+				common.Hash{},
+				bytes.Repeat([]byte{0x00}, common.HashLength),
+				bytes.Repeat([]byte{0xff}, common.HashLength),
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+				var leafResponse message.LeafsResponse
+				_, err = message.CorethCodec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
+				// Remove middle key-value pair response
+				leafResponse.Keys = append(leafResponse.Keys[:100], leafResponse.Keys[101:]...)
+				leafResponse.Vals = append(leafResponse.Vals[:100], leafResponse.Vals[101:]...)
 
-				response, _, err := parseLeafsResponse(client.codec, test.request, responseBytes)
-				require.ErrorIs(t, err, test.expectedErr)
-				if test.expectedErr != nil {
-					return
-				}
+				modifiedResponse, err := message.CorethCodec.Marshal(message.Version, leafResponse)
+				require.NoError(t, err)
+				return modifiedResponse
+			},
+			expectedErr: errInvalidRangeProof,
+		},
+		"corrupted value in middle of response": {
+			request: newLeafsRequest(
+				largeTrieRoot,
+				common.Hash{},
+				bytes.Repeat([]byte{0x00}, common.HashLength),
+				bytes.Repeat([]byte{0xff}, common.HashLength),
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+				var leafResponse message.LeafsResponse
+				_, err = message.CorethCodec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
+				// Remove middle key-value pair response
+				leafResponse.Vals[100] = []byte("garbage value data")
 
-				leafsResponse, ok := response.(message.LeafsResponse)
-				require.True(t, ok, "expected leafs response")
-				test.requireResponse(t, leafsResponse)
+				modifiedResponse, err := message.CorethCodec.Marshal(message.Version, leafResponse)
+				require.NoError(t, err)
+				return modifiedResponse
+			},
+			expectedErr: errInvalidRangeProof,
+		},
+		"all proof keys removed from response": {
+			request: newLeafsRequest(
+				largeTrieRoot,
+				common.Hash{},
+				bytes.Repeat([]byte{0x00}, common.HashLength),
+				bytes.Repeat([]byte{0xff}, common.HashLength),
+				leafsLimit,
+				message.StateTrieNode,
+			),
+			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+
+				var leafResponse message.LeafsResponse
+				_, err = message.CorethCodec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
+				// Remove the proof
+				leafResponse.ProofVals = nil
+
+				modifiedResponse, err := message.CorethCodec.Marshal(message.Version, leafResponse)
+				require.NoError(t, err)
+				return modifiedResponse
+			},
+			expectedErr: errInvalidRangeProof,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			client := New(&Config{
+				NetworkClient:    &testNetwork{},
+				Codec:            message.CorethCodec,
+				Stats:            clientstats.NewNoOpStats(),
+				StateSyncNodeIDs: nil,
+				BlockParser:      newTestBlockParser(),
 			})
-		}
-	})
+			responseBytes := test.getResponse(t, test.request)
+
+			response, _, err := parseLeafsResponse(client.codec, test.request, responseBytes)
+			require.ErrorIs(t, err, test.expectedErr)
+			if test.expectedErr != nil {
+				return
+			}
+
+			leafsResponse, ok := response.(message.LeafsResponse)
+			require.True(t, ok, "expected leafs response")
+			test.requireResponse(t, leafsResponse)
+		})
+	}
 }
 
 func TestGetLeafsRetries(t *testing.T) {
@@ -735,115 +725,114 @@ func TestGetLeafsRetries(t *testing.T) {
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	root, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100_000, common.HashLength)
 
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-		handler := handlers.NewLeafsRequestHandler(trieDB, message.StateTrieKeyLength, nil, c, handlerstats.NewNoopHandlerStats())
-		testNetClient := &testNetwork{}
+	handler := handlers.NewLeafsRequestHandler(
+		trieDB,
+		message.StateTrieKeyLength,
+		nil,
+		message.CorethCodec,
+		handlerstats.NewNoopHandlerStats(),
+	)
+	testNetClient := &testNetwork{}
 
-		const maxAttempts = 8
-		client := New(&Config{
-			NetworkClient:    testNetClient,
-			Codec:            c,
-			Stats:            clientstats.NewNoOpStats(),
-			StateSyncNodeIDs: nil,
-			BlockParser:      newTestBlockParser(),
-		})
-
-		request := newLeafsRequest(
-			c,
-			root,
-			common.Hash{},
-			bytes.Repeat([]byte{0x00}, common.HashLength),
-			bytes.Repeat([]byte{0xff}, common.HashLength),
-			1024,
-			message.StateTrieNode,
-		)
-
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-		goodResponse, responseErr := handler.OnLeafsRequest(ctx, ids.GenerateTestNodeID(), 1, request)
-		require.NoError(t, responseErr)
-		testNetClient.testResponse(1, nil, goodResponse)
-
-		res, err := client.GetLeafs(ctx, request)
-		require.NoError(t, err)
-		require.Len(t, res.Keys, 1024)
-		require.Len(t, res.Vals, 1024)
-
-		// Succeeds within the allotted number of attempts
-		invalidResponse := []byte("invalid response")
-		testNetClient.testResponses(nil, invalidResponse, invalidResponse, goodResponse)
-
-		res, err = client.GetLeafs(ctx, request)
-		require.NoError(t, err)
-		require.Len(t, res.Keys, 1024)
-		require.Len(t, res.Vals, 1024)
-
-		// Test that GetLeafs stops after the context is cancelled
-		numAttempts := 0
-		testNetClient.testResponse(maxAttempts, func() {
-			numAttempts++
-			if numAttempts >= maxAttempts {
-				cancel()
-			}
-		}, invalidResponse)
-		_, err = client.GetLeafs(ctx, request)
-		require.ErrorIs(t, err, context.Canceled)
+	const maxAttempts = 8
+	client := New(&Config{
+		NetworkClient:    testNetClient,
+		Codec:            message.CorethCodec,
+		Stats:            clientstats.NewNoOpStats(),
+		StateSyncNodeIDs: nil,
+		BlockParser:      newTestBlockParser(),
 	})
+
+	request := newLeafsRequest(
+		root,
+		common.Hash{},
+		bytes.Repeat([]byte{0x00}, common.HashLength),
+		bytes.Repeat([]byte{0xff}, common.HashLength),
+		1024,
+		message.StateTrieNode,
+	)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	goodResponse, responseErr := handler.OnLeafsRequest(ctx, ids.GenerateTestNodeID(), 1, request)
+	require.NoError(t, responseErr)
+	testNetClient.testResponse(1, nil, goodResponse)
+
+	res, err := client.GetLeafs(ctx, request)
+	require.NoError(t, err)
+	require.Len(t, res.Keys, 1024)
+	require.Len(t, res.Vals, 1024)
+
+	// Succeeds within the allotted number of attempts
+	invalidResponse := []byte("invalid response")
+	testNetClient.testResponses(nil, invalidResponse, invalidResponse, goodResponse)
+
+	res, err = client.GetLeafs(ctx, request)
+	require.NoError(t, err)
+	require.Len(t, res.Keys, 1024)
+	require.Len(t, res.Vals, 1024)
+
+	// Test that GetLeafs stops after the context is cancelled
+	numAttempts := 0
+	testNetClient.testResponse(maxAttempts, func() {
+		numAttempts++
+		if numAttempts >= maxAttempts {
+			cancel()
+		}
+	}, invalidResponse)
+	_, err = client.GetLeafs(ctx, request)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestStateSyncNodes(t *testing.T) {
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-		testNetClient := &testNetwork{}
+	testNetClient := &testNetwork{}
 
-		stateSyncNodes := []ids.NodeID{
-			ids.GenerateTestNodeID(),
-			ids.GenerateTestNodeID(),
-			ids.GenerateTestNodeID(),
-			ids.GenerateTestNodeID(),
-		}
-		client := New(&Config{
-			NetworkClient:    testNetClient,
-			Codec:            c,
-			Stats:            clientstats.NewNoOpStats(),
-			StateSyncNodeIDs: stateSyncNodes,
-			BlockParser:      newTestBlockParser(),
-		})
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-		attempt := 0
-		responses := [][]byte{{1}, {2}, {3}, {4}}
-		testNetClient.testResponses(func() {
-			attempt++
-			if attempt >= 4 {
-				cancel()
-			}
-		}, responses...)
-
-		// send some request, doesn't matter what it is because we're testing the interaction with state sync nodes here
-		response, err := client.GetLeafs(ctx, newEmptyLeafsRequest(c))
-		require.ErrorIs(t, err, context.Canceled)
-		require.Empty(t, response)
-
-		// require all nodes were called
-		require.Contains(t, testNetClient.nodesRequested, stateSyncNodes[0])
-		require.Contains(t, testNetClient.nodesRequested, stateSyncNodes[1])
-		require.Contains(t, testNetClient.nodesRequested, stateSyncNodes[2])
-		require.Contains(t, testNetClient.nodesRequested, stateSyncNodes[3])
+	stateSyncNodes := []ids.NodeID{
+		ids.GenerateTestNodeID(),
+		ids.GenerateTestNodeID(),
+		ids.GenerateTestNodeID(),
+		ids.GenerateTestNodeID(),
+	}
+	client := New(&Config{
+		NetworkClient:    testNetClient,
+		Codec:            message.CorethCodec,
+		Stats:            clientstats.NewNoOpStats(),
+		StateSyncNodeIDs: stateSyncNodes,
+		BlockParser:      newTestBlockParser(),
 	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	attempt := 0
+	responses := [][]byte{{1}, {2}, {3}, {4}}
+	testNetClient.testResponses(func() {
+		attempt++
+		if attempt >= 4 {
+			cancel()
+		}
+	}, responses...)
+
+	// send some request, doesn't matter what it is because we're testing the interaction with state sync nodes here
+	response, err := client.GetLeafs(ctx, newEmptyLeafsRequest())
+	require.ErrorIs(t, err, context.Canceled)
+	require.Empty(t, response)
+
+	// require all nodes were called
+	require.Contains(t, testNetClient.nodesRequested, stateSyncNodes[0])
+	require.Contains(t, testNetClient.nodesRequested, stateSyncNodes[1])
+	require.Contains(t, testNetClient.nodesRequested, stateSyncNodes[2])
+	require.Contains(t, testNetClient.nodesRequested, stateSyncNodes[3])
 }
 
 func newLeafsRequest(
-	c codec.Manager,
 	root common.Hash,
 	account common.Hash,
-	start []byte,
-	end []byte,
+	start, end []byte,
 	limit uint16,
 	nodeType message.NodeType,
 ) message.LeafsRequest {
-	return message.NewLeafsRequest(message.LeafsRequestTypeForCodec(c), root, account, start, end, limit, nodeType)
+	return message.NewLeafsRequest(message.LeafsRequestTypeForCodec(message.CorethCodec), root, account, start, end, limit, nodeType)
 }
 
-func newEmptyLeafsRequest(c codec.Manager) message.LeafsRequest {
-	return message.NewEmptyLeafsRequest(message.LeafsRequestTypeForCodec(c))
+func newEmptyLeafsRequest() message.LeafsRequest {
+	return message.NewEmptyLeafsRequest(message.LeafsRequestTypeForCodec(message.CorethCodec))
 }
