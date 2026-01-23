@@ -71,9 +71,9 @@ if left in committed code.
 
 ## Why Raw Commits Don't Work
 
-Fetching multiple modules at the same commit via `go get module@commit`
-does not work reliably due to Go's Minimal Version Selection (MVS)
-algorithm.
+Fetching multiple modules at the same commit via `go get
+module@commit` does not work reliably due to Go's [Minimal Version
+Selection (MVS)](https://research.swtch.com/vgo-mvs) algorithm.
 
 When you run `go get github.com/ava-labs/avalanchego@abc123`, Go
 creates a pseudo-version like `v0.0.0-20240115120000-abc123`. However,
