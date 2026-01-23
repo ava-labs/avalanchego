@@ -12,7 +12,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/libevm/core/types"
@@ -193,11 +192,10 @@ func UnpackSetRewardAddressInput(input []byte, useStrictMode bool) (common.Addre
 	if useStrictMode && len(input)%32 != 0 {
 		return common.Address{}, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
 	}
-	res, err := RewardManagerABI.UnpackInput("setRewardAddress", input)
-	if err != nil {
+	var unpacked common.Address
+	if err := RewardManagerABI.UnpackInputIntoInterface(&unpacked, "setRewardAddress", input); err != nil {
 		return common.Address{}, err
 	}
-	unpacked := *abi.ConvertType(res[0], new(common.Address)).(*common.Address)
 	return unpacked, nil
 }
 

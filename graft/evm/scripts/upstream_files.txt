@@ -1,3 +1,4 @@
+rpc/*
 core/*
 log/*
 triedb/*
