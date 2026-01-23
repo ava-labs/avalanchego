@@ -15,7 +15,6 @@ plugin/evm/customtypes/block_test.go
 plugin/evm/customtypes/hashing_test.go
 plugin/evm/customtypes/rlp_fuzzer_test.go
 plugin/evm/customtypes/types_test.go
-rpc/*
 signer/*
 tests/init.go
 tests/rlp_test_util.go

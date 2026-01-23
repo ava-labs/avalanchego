@@ -36,7 +36,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
-	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"

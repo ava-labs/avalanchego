@@ -9,7 +9,7 @@
 //
 // Much love to the original authors for their work.
 // **********
-// Copyright 2016 The go-ethereum Authors
+// Copyright 2015 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -29,17 +29,36 @@ package rpc
 
 import (
 	"context"
-	"net"
+	"encoding/json"
+	"io"
 )
 
-// DialInProc attaches an in-process connection to the given RPC server.
-func DialInProc(handler *Server) *Client {
-	initctx := context.Background()
-	cfg := new(clientConfig)
-	c, _ := newClient(initctx, cfg, func(context.Context) (ServerCodec, error) {
-		p1, p2 := net.Pipe()
-		go handler.ServeCodec(NewCodec(p1), 0, 0, 0, 0)
-		return NewCodec(p2), nil
-	})
-	return c
+// testConn is a test implementation of the serverConn interface.
+type testConn struct {
+	enc *json.Encoder
+}
+
+func (c *testConn) writeJSON(_ context.Context, msg interface{}, _ bool) error {
+	return c.enc.Encode(msg)
+}
+
+func (c *testConn) writeJSONSkipDeadline(_ context.Context, msg interface{}, _, _ bool) error {
+	return c.enc.Encode(msg)
+}
+
+func (*testConn) closed() <-chan interface{} { return nil }
+
+func (*testConn) remoteAddr() string { return "" }
+
+// NewTestNotifier creates a Notifier for testing that writes to the given writer.
+// This is exported so that tests in package rpc_test can create Notifiers without
+// accessing internal types.
+func NewTestNotifier(w io.Writer, subID ID) *Notifier {
+	return &Notifier{
+		h: &handler{
+			conn: &testConn{enc: json.NewEncoder(w)},
+		},
+		sub:       &Subscription{ID: subID},
+		activated: true,
+	}
 }

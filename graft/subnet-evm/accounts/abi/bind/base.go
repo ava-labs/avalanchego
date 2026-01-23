@@ -35,7 +35,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
