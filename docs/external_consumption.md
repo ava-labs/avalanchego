@@ -45,6 +45,30 @@ Development tags provide the same automatic submodule resolution as
 release tags. For instructions on creating development tags, see
 [Development Tags](releasing.md#development-tags).
 
+## Local Development with Replace Directives
+
+To develop against a local clone of avalanchego (e.g., testing
+unreleased changes), add `replace` directives to your project's
+`go.mod`:
+
+```go
+replace (
+    github.com/ava-labs/avalanchego => /path/to/avalanchego
+    github.com/ava-labs/avalanchego/graft/coreth => /path/to/avalanchego/graft/coreth
+    github.com/ava-labs/avalanchego/graft/evm => /path/to/avalanchego/graft/evm
+    github.com/ava-labs/avalanchego/graft/subnet-evm => /path/to/avalanchego/graft/subnet-evm
+)
+```
+
+This bypasses Go's module proxy entirely - all avalanchego imports
+resolve directly to your local filesystem. Changes to the local clone
+are picked up immediately without any version coordination.
+
+**Important:** Remove these directives before committing. Replace
+directives are ignored when your module is consumed as a dependency,
+so they won't affect downstream users, but they can cause confusion
+if left in committed code.
+
 ## Why Raw Commits Don't Work
 
 Fetching multiple modules at the same commit via `go get module@commit`
