@@ -1,0 +1,11 @@
+go 1.24.12
+
+use (
+	.
+	./graft/coreth
+	./graft/evm
+	./graft/subnet-evm
+)
+
+// Force newer genproto to avoid ambiguous import with split modules
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20230526161137-0005af68ea54
