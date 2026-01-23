@@ -7,8 +7,8 @@ use std::sync::Arc;
 use avalanche_api::{HttpConfig, HttpServer, Server as ApiServer};
 use avalanche_db::{Database, MemDb};
 use avalanche_ids::{Id, NodeId};
-use avalanche_net::{DiscoveryConfig, MessageHandler, Network, NetworkConfig, NetworkImpl, NoOpHandler, PeerDiscovery, PeerInfo, TlsConfig};
-use avalanche_snow::{BootstrapConfig, Bootstrapper, Mempool, MempoolConfig, Parameters, Snowman};
+use avalanche_net::{DiscoveryConfig, MessageHandler, Network, NetworkConfig, NetworkImpl, NoOpHandler, PeerDiscovery, PeerInfo, SyncNetworkAdapter, SyncNetworkTrait, TlsConfig};
+use avalanche_snow::{BootstrapConfig, Bootstrapper, Mempool, MempoolConfig, Parameters, Snowman, StateSync, StateSyncConfig, SyncClientConfig, SyncEngine};
 use avalanche_vm::atomic::{AtomicState, SharedMemory};
 use avalanche_vm::{CommonVM, Context};
 use avm::AVM;
@@ -301,8 +301,21 @@ impl Node {
             ..Default::default()
         };
 
-        // Load or create genesis
-        let genesis = platformvm::genesis::defaults::local_genesis();
+        // Load genesis based on network ID
+        let genesis = platformvm::genesis::defaults::genesis_for_network(network_id)
+            .unwrap_or_else(|| platformvm::genesis::defaults::local_genesis());
+
+        let network_name = match network_id {
+            1 => "mainnet",
+            5 => "fuji",
+            _ => "local",
+        };
+        info!("P-Chain using {} genesis with {} validators, {} allocations",
+            network_name,
+            genesis.validators.len(),
+            genesis.allocations.len()
+        );
+
         let genesis_bytes =
             serde_json::to_vec(&genesis).map_err(|e| NodeError::ChainError(e.to_string()))?;
 
@@ -341,8 +354,20 @@ impl Node {
             ..Default::default()
         };
 
-        // Load or create genesis
-        let genesis = avm::genesis::defaults::local_genesis();
+        // Load genesis based on network ID
+        let genesis = avm::genesis::defaults::genesis_for_network(network_id)
+            .unwrap_or_else(|| avm::genesis::defaults::local_genesis());
+
+        let network_name = match network_id {
+            1 => "mainnet",
+            5 => "fuji",
+            _ => "local",
+        };
+        info!("X-Chain using {} genesis with {} assets",
+            network_name,
+            genesis.assets.len()
+        );
+
         let genesis_bytes =
             serde_json::to_vec(&genesis).map_err(|e| NodeError::ChainError(e.to_string()))?;
 
@@ -506,6 +531,19 @@ impl Node {
             return Ok(());
         }
 
+        // Get the network for making sync requests
+        let network = self.network.read().clone();
+        let network = match network {
+            Some(n) => n,
+            None => {
+                warn!("Network not available, skipping bootstrap");
+                return Ok(());
+            }
+        };
+
+        // Create sync network adapter
+        let sync_adapter = Arc::new(SyncNetworkAdapter::new(network));
+
         // Bootstrap each chain
         let chain_ids: Vec<Id> = self.chains.read().keys().cloned().collect();
 
@@ -513,11 +551,66 @@ impl Node {
             let chain_name = chains::chain_name(&chain_id);
             debug!("Bootstrapping {}...", chain_name);
 
-            // Create bootstrapper for this chain
-            let _bootstrapper = Bootstrapper::new(BootstrapConfig::default());
+            // Create state sync for fast sync
+            let state_sync = Arc::new(StateSync::new(StateSyncConfig::default()));
 
-            // In production, fetch blocks from peers here
-            // For now, mark as bootstrapped
+            // Create bootstrapper for block sync
+            let bootstrapper = Arc::new(Bootstrapper::new(BootstrapConfig::default()));
+
+            // Get connected peers
+            let peers = sync_adapter.connected_peers();
+
+            if peers.is_empty() {
+                info!("{}: No peers available, starting from genesis", chain_name);
+                if let Some(chain) = self.chains.write().get_mut(&chain_id) {
+                    chain.bootstrapped = true;
+                }
+                continue;
+            }
+
+            info!("{}: Starting sync with {} peers", chain_name, peers.len());
+
+            // Try state sync first (faster for catching up)
+            if peers.len() >= 3 {
+                debug!("{}: Attempting state sync...", chain_name);
+                state_sync.start(peers.clone());
+
+                // Request state summaries from peers
+                for peer in state_sync.peers_to_query_summaries() {
+                    let request_id = rand_request_id();
+                    if let Err(e) = sync_adapter
+                        .get_state_summary_frontier(peer, chain_id, request_id)
+                        .await
+                    {
+                        debug!("Failed to request summary from {}: {}", peer, e);
+                    }
+                }
+
+                // In production, wait for responses and verify state
+                // For now, fall back to block sync
+            }
+
+            // Fall back to block bootstrapping
+            debug!("{}: Starting block bootstrap...", chain_name);
+            let last_accepted = Id::default(); // Genesis block
+            bootstrapper.start(last_accepted, peers.clone());
+
+            // Request accepted frontier from peers
+            for peer in bootstrapper.peers_to_query_frontier() {
+                let request_id = rand_request_id();
+                if let Err(e) = sync_adapter
+                    .get_accepted_frontier(peer, chain_id, request_id)
+                    .await
+                {
+                    debug!("Failed to request frontier from {}: {}", peer, e);
+                }
+            }
+
+            // In production, run full bootstrap loop:
+            // 1. Wait for frontier responses
+            // 2. Request accepted blocks
+            // 3. Fetch ancestors recursively
+            // 4. Process and verify blocks
 
             if let Some(chain) = self.chains.write().get_mut(&chain_id) {
                 chain.bootstrapped = true;
@@ -783,6 +876,13 @@ fn rand_bytes(len: usize) -> Vec<u8> {
     }
 
     result
+}
+
+/// Generates a random request ID.
+fn rand_request_id() -> u32 {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static COUNTER: AtomicU32 = AtomicU32::new(1);
+    COUNTER.fetch_add(1, Ordering::SeqCst)
 }
 
 #[cfg(test)]

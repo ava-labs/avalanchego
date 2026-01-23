@@ -55,4 +55,16 @@ pub enum ConsensusError {
     /// Internal error
     #[error("internal error: {0}")]
     Internal(String),
+
+    /// Not enough peers to sync
+    #[error("not enough peers available for sync")]
+    NotEnoughPeers,
+
+    /// Sync engine already running
+    #[error("sync engine is already running")]
+    AlreadyRunning,
+
+    /// Network error
+    #[error("network error: {0}")]
+    Network(String),
 }

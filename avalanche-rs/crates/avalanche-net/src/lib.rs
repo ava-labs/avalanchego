@@ -14,6 +14,7 @@ mod handshake;
 mod network;
 mod peer;
 mod peer_manager;
+pub mod sync_adapter;
 mod tls;
 mod version;
 pub mod warp;
@@ -28,6 +29,7 @@ pub use warp::{
     AggregatedSignature, SignedWarpMessage, WarpConfig, WarpError, WarpManager, WarpMessage,
     WarpSignature,
 };
+pub use sync_adapter::{SyncError, SyncMessageRouter, SyncNetworkAdapter, SyncNetworkTrait, SyncResponseMessage};
 pub use handshake::{
     create_claimed_ip_port, HandshakeProtocol, HandshakeResult, CLIENT_NAME, CLIENT_VERSION,
     MIN_COMPATIBLE_VERSION,

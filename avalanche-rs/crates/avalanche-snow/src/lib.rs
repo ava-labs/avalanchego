@@ -30,6 +30,7 @@ mod error;
 mod mempool;
 mod parameters;
 mod sync;
+pub mod sync_client;
 mod validators;
 
 pub use block_builder::{BlockBuilder, BlockBuilderConfig, BlockProducer, BlockTx, BuiltBlock};
@@ -40,6 +41,7 @@ pub use error::{ConsensusError, Result};
 pub use mempool::{AddResult, Mempool, MempoolConfig, MempoolTx, RejectReason, TxPriority};
 pub use parameters::Parameters;
 pub use sync::{StateChunk, StateSync, StateSyncConfig, StateSummary, SyncPhase};
+pub use sync_client::{SyncClientConfig, SyncEngine, SyncNetwork, SyncResponse};
 pub use validators::{Validator, ValidatorSet};
 
 #[cfg(test)]
