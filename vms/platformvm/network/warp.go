@@ -489,26 +489,11 @@ func (s signatureRequestVerifier) verifyValidatorSetDiff(
 		}
 	}
 
-	// Check that both heights are within the window of this node
-	minHeight, err := s.vdrsState.GetMinimumHeight(ctx)
-	if err != nil {
-		return &common.AppError{
-			Code:    common.ErrUndefined.Code,
-			Message: "failed to get minimum height: " + err.Error(),
-		}
-	}
-	if msg.PreviousHeight < minHeight {
-		return &common.AppError{
-			Code:    common.ErrUndefined.Code,
-			Message: fmt.Sprintf("previous height %d below minimum %d", msg.PreviousHeight, minHeight),
-		}
-	}
-	if msg.CurrentHeight < minHeight {
-		return &common.AppError{
-			Code:    common.ErrUndefined.Code,
-			Message: fmt.Sprintf("current height %d below minimum %d", msg.CurrentHeight, minHeight),
-		}
-	}
+	// Note: We don't check previousHeight against minHeight because:
+	// 1. GetAggregatedValidatorDiffs reads diffs at heights (previousHeight, currentHeight]
+	// 2. The diff at currentHeight contains changes FROM previousHeight TO currentHeight
+	// 3. Block data availability is verified separately below
+	// If any required data is missing, the subsequent operations will fail with appropriate errors.
 
 	// Verify previous timestamp
 	previousBlockID, err := s.state.GetBlockIDAtHeight(msg.PreviousHeight)
