@@ -16,12 +16,17 @@ mod peer;
 mod peer_manager;
 mod tls;
 mod version;
+pub mod warp;
 
 pub use codec::{MessageCodec, MessageFrame};
 pub use config::{NetworkConfig, PeerConfig, TimeoutConfig};
 pub use connection::Connection;
 pub use discovery::{
     DiscoveredPeer, DiscoveryConfig, DiscoverySource, DiscoveryTask, PeerDiscovery,
+};
+pub use warp::{
+    AggregatedSignature, SignedWarpMessage, WarpConfig, WarpError, WarpManager, WarpMessage,
+    WarpSignature,
 };
 pub use handshake::{
     create_claimed_ip_port, HandshakeProtocol, HandshakeResult, CLIENT_NAME, CLIENT_VERSION,
