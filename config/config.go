@@ -114,8 +114,8 @@ func setSimplexDefaults(config *subnets.Config, v *viper.Viper) {
 	// if we are setting simplex, we cannot have snow enabled
 	config.SnowParameters = nil
 
-	if config.SimplexParameters.MaxProposalWait == 0 {
-		config.SimplexParameters.MaxProposalWait = v.GetDuration(SimplexMaxProposalWaitKey)
+	if config.SimplexParameters.MaxNetworkDelay == 0 {
+		config.SimplexParameters.MaxNetworkDelay = v.GetDuration(SimplexMaxNetworkDelayKey)
 	}
 	if config.SimplexParameters.MaxRebroadcastWait == 0 {
 		config.SimplexParameters.MaxRebroadcastWait = v.GetDuration(SimplexMaxRebroadcastWaitKey)

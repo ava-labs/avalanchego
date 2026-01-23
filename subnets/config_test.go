@@ -73,7 +73,7 @@ func TestValid(t *testing.T) {
 			name: "valid simplex parameters",
 			s: Config{
 				SimplexParameters: &simplex.Parameters{
-					MaxProposalWait:    1 * time.Second,
+					MaxNetworkDelay:    1 * time.Second,
 					MaxRebroadcastWait: 1 * time.Second,
 					InitialValidators:  []simplex.SimplexValidatorInfo{{NodeID: ids.GenerateTestNodeID(), PublicKey: []byte{0x01}}},
 				},
@@ -98,7 +98,7 @@ func TestValid(t *testing.T) {
 			name: "invalid simplex parameters",
 			s: Config{
 				SimplexParameters: &simplex.Parameters{
-					MaxProposalWait:    -1,
+					MaxNetworkDelay:    -1,
 					MaxRebroadcastWait: -10,
 				},
 			},
@@ -108,7 +108,7 @@ func TestValid(t *testing.T) {
 			name: "empty simplex parameters",
 			s: Config{
 				SimplexParameters: &simplex.Parameters{
-					MaxProposalWait:    0,
+					MaxNetworkDelay:    0,
 					MaxRebroadcastWait: 0,
 				},
 			},

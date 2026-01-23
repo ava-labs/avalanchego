@@ -87,7 +87,7 @@ const (
 	StakingRPCSignerEndpointKey                          = "staking-rpc-signer-endpoint"
 	SybilProtectionEnabledKey                            = "sybil-protection-enabled"
 	SybilProtectionDisabledWeightKey                     = "sybil-protection-disabled-weight"
-	SimplexMaxProposalWaitKey                            = "simplex-max-proposal-wait"
+	SimplexMaxNetworkDelayKey                            = "simplex-max-network-delay"
 	SimplexMaxRebroadcastWaitKey                         = "simplex-max-rebroadcast-wait"
 	NetworkInitialTimeoutKey                             = "network-initial-timeout"
 	NetworkMinimumTimeoutKey                             = "network-minimum-timeout"

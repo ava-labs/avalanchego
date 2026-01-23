@@ -456,7 +456,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			{
 				"validatorOnly": true,
 				"simplexParameters": {
-						"MaxProposalWait":1000,
+						"MaxNetworkDelay":1000,
 						"MaxRebroadcastWait":1000,
 						"initialValidators": [
 								{
@@ -476,7 +476,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				require.True(ok)
 
 				require.True(config.ValidatorOnly)
-				require.Equal(time.Duration(1000), config.SimplexParameters.MaxProposalWait)
+				require.Equal(time.Duration(1000), config.SimplexParameters.MaxNetworkDelay)
 				require.Equal(time.Duration(1000), config.SimplexParameters.MaxRebroadcastWait)
 
 				pkBytes, err := base64.StdEncoding.DecodeString(
@@ -563,7 +563,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"simplexParameters": {
-						"MaxProposalWait":1000,
+						"MaxNetworkDelay":1000,
 						"MaxRebroadcastWait":1000,
 						"initialValidators": [
 								{
@@ -585,7 +585,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.True(ok)
 
 				require.True(config.ValidatorOnly)
-				require.Equal(time.Duration(1000), config.SimplexParameters.MaxProposalWait)
+				require.Equal(time.Duration(1000), config.SimplexParameters.MaxNetworkDelay)
 				require.Equal(time.Duration(1000), config.SimplexParameters.MaxRebroadcastWait)
 
 				pkBytes, err := base64.StdEncoding.DecodeString(

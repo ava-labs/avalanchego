@@ -74,7 +74,7 @@ same values used for the Primary Network, which are given [CLI Snow Parameters](
 | --snow-max-time-processing        | maxItemProcessingTime |
 | --snow-avalanche-batch-size       | `batchSize`           |
 | --snow-avalanche-num-parents      | `parentSize`          |
-| --simplex-max-proposal-wait       | `maxProposalWait`     |
+| --simplex-max-network-delay       | `maxNetworkDelay`     |
 | --simplex-max-rebroadcast-wait    | `maxRebroadcastWait`  |
 
 ### Gossip Configs
