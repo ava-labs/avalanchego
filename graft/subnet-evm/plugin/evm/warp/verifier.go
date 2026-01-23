@@ -98,7 +98,7 @@ func NewVerifier(
 func (v *Verifier) Verify(
 	p payload.Payload,
 	messageParseFail prometheus.Counter,
-) *common.AppError {
+) error {
 	addressedCall, ok := p.(*payload.AddressedCall)
 	if !ok {
 		return v.unknownVerifier.Verify(p, messageParseFail)
@@ -107,7 +107,6 @@ func (v *Verifier) Verify(
 	if len(addressedCall.SourceAddress) != 0 {
 		v.addressedCallVerifyFail.Inc()
 		return &common.AppError{
-			Code:    evmwarp.VerifyErrCode,
 			Message: "source address should be empty for offchain addressed messages",
 		}
 	}
@@ -116,7 +115,6 @@ func (v *Verifier) Verify(
 	if err != nil {
 		messageParseFail.Inc()
 		return &common.AppError{
-			Code:    evmwarp.ParseErrCode,
 			Message: fmt.Sprintf("failed to parse addressed call message: %s", err),
 		}
 	}
@@ -125,7 +123,6 @@ func (v *Verifier) Verify(
 	if err != nil {
 		v.uptimeVerifyFail.Inc()
 		return &common.AppError{
-			Code:    evmwarp.VerifyErrCode,
 			Message: fmt.Sprintf("failed to get uptime: %s", err),
 		}
 	}
@@ -135,7 +132,6 @@ func (v *Verifier) Verify(
 	if currentUptimeSeconds < uptimeMsg.TotalUptimeSeconds {
 		v.uptimeVerifyFail.Inc()
 		return &common.AppError{
-			Code:    evmwarp.VerifyErrCode,
 			Message: fmt.Sprintf("current uptime %d is less than queried uptime %d for validationID %s", currentUptimeSeconds, uptimeMsg.TotalUptimeSeconds, uptimeMsg.ValidationID),
 		}
 	}

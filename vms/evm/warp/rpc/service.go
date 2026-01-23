@@ -43,7 +43,7 @@ type Service struct {
 
 	messageCache     *lru.Cache[ids.ID, *warp.UnsignedMessage]
 	signatureCache   cache.Cacher[ids.ID, []byte]
-	offChainMessages map[ids.ID]*warp.UnsignedMessage
+	offChainMsgs evmwarp.OffChainMessages
 }
 
 func NewService(
@@ -55,30 +55,8 @@ func NewService(
 	verifier *evmwarp.Verifier,
 	signatureCache cache.Cacher[ids.ID, []byte],
 	signatureAggregator *acp118.SignatureAggregator,
-	offChainMessages [][]byte,
+	offChainMsgs evmwarp.OffChainMessages,
 ) (*Service, error) {
-	offchainMsgs := make(map[ids.ID]*warp.UnsignedMessage)
-	for i, offchainMsg := range offChainMessages {
-		unsignedMsg, err := warp.ParseUnsignedMessage(offchainMsg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse off-chain message at index %d: %w", i, err)
-		}
-
-		if unsignedMsg.NetworkID != networkID {
-			return nil, fmt.Errorf("wrong network ID at index %d", i)
-		}
-
-		if unsignedMsg.SourceChainID != chainID {
-			return nil, fmt.Errorf("wrong source chain ID at index %d", i)
-		}
-
-		_, err = payload.ParseAddressedCall(unsignedMsg.Payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse off-chain message at index %d as AddressedCall: %w", i, err)
-		}
-		offchainMsgs[unsignedMsg.ID()] = unsignedMsg
-	}
-
 	return &Service{
 		networkID:           networkID,
 		chainID:             chainID,
@@ -89,7 +67,7 @@ func NewService(
 		signatureAggregator: signatureAggregator,
 		messageCache:        lru.NewCache[ids.ID, *warp.UnsignedMessage](500),
 		signatureCache:      signatureCache,
-		offChainMessages:    offchainMsgs,
+		offChainMsgs:    offChainMsgs,
 	}, nil
 }
 
@@ -108,7 +86,7 @@ func (s *Service) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
 		return msg, nil
 	}
 
-	if msg, ok := s.offChainMessages[messageID]; ok {
+	if msg, ok := s.offChainMsgs.Get(messageID); ok {
 		return msg, nil
 	}
 

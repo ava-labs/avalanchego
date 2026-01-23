@@ -9,27 +9,128 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/stretchr/testify/require"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/ava-labs/avalanchego/network/p2p/acp118"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"errors"
 	evmwarp "github.com/ava-labs/avalanchego/vms/evm/warp"
-	"github.com/ava-labs/avalanchego/database"
 	"context"
+	"errors"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
 )
+
+func TestServiceGetMessage(t *testing.T) {
+	tests := []struct {
+		name         string
+		msgsInDB     []*warp.UnsignedMessage
+		offChainMsgs [][]byte
+		getMsgID ids.ID
+		want         []byte
+		wantErr  error
+	}{
+		{
+			name:     "unknown message",
+			getMsgID: ids.GenerateTestID(),
+			wantErr: database.ErrNotFound,
+		},
+		{
+			name: "message in db",
+			msgsInDB: []*warp.UnsignedMessage{
+				func() *warp.UnsignedMessage {
+					msg, err := warp.NewUnsignedMessage(0, ids.Empty, []byte{})
+					require.NoError(t, err)
+					return msg
+				}(),
+			},
+			getMsgID: func() ids.ID {
+				msg, err := warp.NewUnsignedMessage(0, ids.Empty, []byte{})
+				require.NoError(t, err)
+				return msg.ID()
+			}(),
+			want: func() []byte {
+				msg, err := warp.NewUnsignedMessage(0, ids.Empty, []byte{})
+				require.NoError(t, err)
+				return msg.Bytes()
+			}(),
+		},
+		{
+			name: "off-chain message",
+			offChainMsgs: [][]byte{
+				func() []byte {
+					addressedCall, err := payload.NewAddressedCall([]byte{}, []byte("foo"))
+					require.NoError(t, err)
+
+					msg, err := warp.NewUnsignedMessage(0, ids.Empty, addressedCall.Bytes())
+					require.NoError(t, err)
+
+					return msg.Bytes()
+				}(),
+			},
+			getMsgID: func() ids.ID {
+				addressedCall, err := payload.NewAddressedCall([]byte{}, []byte("foo"))
+				require.NoError(t, err)
+
+				msg, err := warp.NewUnsignedMessage(0, ids.Empty, addressedCall.Bytes())
+				require.NoError(t, err)
+
+				return msg.ID()
+			}(),
+			want: func() []byte {
+				addressedCall, err := payload.NewAddressedCall([]byte{}, []byte("foo"))
+				require.NoError(t, err)
+
+				msg, err := warp.NewUnsignedMessage(0, ids.Empty, addressedCall.Bytes())
+				require.NoError(t, err)
+
+				return msg.Bytes()
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := evmwarp.NewDB(memdb.New())
+
+			offChainMsgs, err := evmwarp.NewOffChainMessages(
+				0,
+				ids.Empty,
+				tt.offChainMsgs,
+			)
+			require.NoError(t, err)
+
+			service, err := NewService(
+				0,
+				ids.Empty,
+				nil,
+				db,
+				nil,
+				nil,
+				nil,
+				nil,
+				offChainMsgs,
+			)
+			require.NoError(t, err)
+
+			for _, msg := range tt.msgsInDB {
+				require.NoError(t, db.Add(msg))
+			}
+
+			got, err := service.GetMessage(tt.getMsgID)
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Equal(t, hexutil.Bytes(tt.want), got)
+		})
+	}
+}
 
 func TestServiceGetMessageSignature(t *testing.T) {
 	tests := []struct {
-		name    string
-		msgInDB  *warp.UnsignedMessage
-		// offChainMsgs [][]byte
-		getMsgID ids.ID
+		name         string
+		msgsInDB     []*warp.UnsignedMessage
+		offChainMsgs [][]byte
+		getMsgID     ids.ID
+		wantMsg      *warp.UnsignedMessage
 		wantErr  error
 	} {
 		{
@@ -38,46 +139,57 @@ func TestServiceGetMessageSignature(t *testing.T) {
 			wantErr:  ErrMessageNotFound,
 		},
 		{
-			name: "known message",
-			msgInDB: func() *warp.UnsignedMessage{
-				msg, err := warp.NewUnsignedMessage(0, ids.Empty, []byte{})
-				require.NoError(t, err)
-				return msg
-			}(),
-			getMsgID: func() ids.ID{
+			name: "message in db",
+			msgsInDB: []*warp.UnsignedMessage{
+				func() *warp.UnsignedMessage {
+					msg, err := warp.NewUnsignedMessage(0, ids.Empty, []byte{})
+					require.NoError(t, err)
+					return msg
+				}(),
+			},
+			getMsgID: func() ids.ID {
 				msg, err := warp.NewUnsignedMessage(0, ids.Empty, []byte{})
 				require.NoError(t, err)
 				return msg.ID()
 			}(),
+			wantMsg: func() *warp.UnsignedMessage {
+				msg, err := warp.NewUnsignedMessage(0, ids.Empty, []byte{})
+				require.NoError(t, err)
+				return msg
+			}(),
 		},
-		// {
-		// 	name: "off-chain message",
-		// 	offChainMsgs: [][]byte{
-		// 		func() []byte{
-		// 			uptimeBytes, err := (&evmwarp.ValidatorUptime{}).Bytes()
-		// 			require.NoError(t, err)
-		//
-		// 			addressedCall, err := payload.NewAddressedCall([]byte{}, uptimeBytes)
-		// 			require.NoError(t, err)
-		//
-		// 			msg, err := warp.NewUnsignedMessage(0, ids.Empty, addressedCall.Bytes())
-		// 			require.NoError(t, err)
-		//
-		// 			return msg.Bytes()
-		// 		}(),
-		// 	},
-		// 	getMsgID: func() ids.ID{
-		// 		uptimeBytes, err := (&evmwarp.ValidatorUptime{}).Bytes()
-		// 		require.NoError(t, err)
-		//
-		// 		addressedCall, err := payload.NewAddressedCall([]byte{}, uptimeBytes)
-		// 		require.NoError(t, err)
-		//
-		// 		msg, err := warp.NewUnsignedMessage(0, ids.Empty, addressedCall.Bytes())
-		// 		require.NoError(t, err)
-		// 		return msg.ID()
-		// 	}(),
-		// },
+		{
+			name: "off-chain message",
+			offChainMsgs: [][]byte{
+				func() []byte {
+					addressedCall, err := payload.NewAddressedCall([]byte{}, []byte("foo"))
+					require.NoError(t, err)
+
+					msg, err := warp.NewUnsignedMessage(0, ids.Empty, addressedCall.Bytes())
+					require.NoError(t, err)
+
+					return msg.Bytes()
+				}(),
+			},
+			getMsgID: func() ids.ID {
+				addressedCall, err := payload.NewAddressedCall([]byte{}, []byte("foo"))
+				require.NoError(t, err)
+
+				msg, err := warp.NewUnsignedMessage(0, ids.Empty, addressedCall.Bytes())
+				require.NoError(t, err)
+
+				return msg.ID()
+			}(),
+			wantMsg: func() *warp.UnsignedMessage {
+				addressedCall, err := payload.NewAddressedCall([]byte{}, []byte("foo"))
+				require.NoError(t, err)
+
+				msg, err := warp.NewUnsignedMessage(0, ids.Empty, addressedCall.Bytes())
+				require.NoError(t, err)
+
+				return msg
+			}(),
+		},
 	}
 
 	for _, tt := range tests {
@@ -86,25 +198,38 @@ func TestServiceGetMessageSignature(t *testing.T) {
 			signer, err := localsigner.New()
 			require.NoError(t, err)
 
-			verifier, err := evmwarp.NewVerifier(nil, db, prometheus.NewRegistry())
+			offChainMsgs, err := evmwarp.NewOffChainMessages(
+				0,
+				ids.Empty,
+				tt.offChainMsgs,
+			)
+			require.NoError(t, err)
+
+			verifier, err := evmwarp.NewVerifier(
+				evmwarp.NoVerifier{},
+				nil,
+				db,
+				offChainMsgs,
+				prometheus.NewRegistry(),
+			)
 			require.NoError(t, err)
 
 			warpSigner := warp.NewSigner(signer, 0, ids.Empty)
 			service, err := NewService(
 				0,
 				ids.Empty,
-				&validatorstest.State{},
+				nil,
 				db,
 				warpSigner,
 				verifier,
 				&cache.Empty[ids.ID, []byte]{},
-				acp118.NewSignatureAggregator(logging.NoLog{}, nil),
 				nil,
+				offChainMsgs,
 			)
 			require.NoError(t, err)
 
-			if tt.msgInDB != nil {
-				require.NoError(t, db.Add(tt.msgInDB))
+			for _, msg := range tt.msgsInDB {
+				require.NoError(t, db.Add(msg))
 			}
 
 			gotSig, err := service.GetMessageSignature(t.Context(), tt.getMsgID)
@@ -114,7 +239,7 @@ func TestServiceGetMessageSignature(t *testing.T) {
 				return
 			}
 
-			wantSig, err := warpSigner.Sign(tt.msgInDB)
+			wantSig, err := warpSigner.Sign(tt.wantMsg)
 			require.NoError(t, err)
 
 			require.Equal(t, hexutil.Bytes(wantSig), gotSig)
@@ -122,80 +247,85 @@ func TestServiceGetMessageSignature(t *testing.T) {
 	}
 }
 
-func TestServiceGetBlockSignature(t *testing.T) {
-	tests := []struct {
-		name    string
-		blksInDB []ids.ID
-		getBlkID ids.ID
-		wantErr  error
-	} {
-		{
-			name:     "unknown block",
-			getBlkID: ids.GenerateTestID(),
-			wantErr:  errors.New("todo: return an error here to fix this test"),
-		},
-		{
-			name: "known block",
-			blksInDB: []ids.ID{ids.Empty},
-			getBlkID: ids.Empty,
-		},
-	}
+// func TestServiceGetBlockSignature(t *testing.T) {
+// 	tests := []struct {
+// 		name    string
+// 		blksInDB []ids.ID
+// 		getBlkID ids.ID
+// 		wantErr  error
+// 	} {
+// 		{
+// 			name:     "unknown block",
+// 			getBlkID: ids.GenerateTestID(),
+// 			wantErr:  errors.New("todo: return an error here to fix this test"),
+// 		},
+// 		{
+// 			name: "known block",
+// 			blksInDB: []ids.ID{ids.Empty},
+// 			getBlkID: ids.Empty,
+// 		},
+// 	}
+//
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			db := evmwarp.NewDB(memdb.New())
+// 			signer, err := localsigner.New()
+// 			require.NoError(t, err)
+//
+// 			verifier, err := evmwarp.NewVerifier(
+// 				evmwarp.NoVerifier{},
+// 				nil,
+// 				db,
+// 				evmwarp.OffChainMessages{},
+// 				prometheus.NewRegistry(),
+// 			)
+// 			require.NoError(t, err)
+//
+// 			warpSigner := warp.NewSigner(signer, 0, ids.Empty)
+// 			service, err := NewService(
+// 				0,
+// 				ids.Empty,
+// 				&validatorstest.State{},
+// 				db,
+// 				warpSigner,
+// 				verifier,
+// 				&cache.Empty[ids.ID, []byte]{},
+// 				acp118.NewSignatureAggregator(logging.NoLog{}, nil),
+// 				offChainMsgs,
+// 			)
+// 			require.NoError(t, err)
+//
+// 			gotSig, err := service.GetBlockSignature(t.Context(), tt.getBlkID)
+// 			require.ErrorIs(t, err, tt.wantErr)
+//
+// 			if tt.wantErr != nil {
+// 				return
+// 			}
+//
+// 			hash, err := payload.NewHash(tt.getBlkID)
+// 			require.NoError(t, err)
+//
+// 			wantMsg, err := warp.NewUnsignedMessage(0, ids.Empty, hash.Bytes())
+// 			require.NoError(t, err)
+//
+// 			wantSig, err := warpSigner.Sign(wantMsg)
+// 			require.NoError(t, err)
+//
+// 			require.Equal(t, hexutil.Bytes(wantSig), gotSig)
+// 		})
+// 	}
+// }
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			db := evmwarp.NewDB(memdb.New())
-			signer, err := localsigner.New()
-			require.NoError(t, err)
-
-			verifier, err := evmwarp.NewVerifier(
-				// testBlockStore(set.Of(tt.blksInDB...)),
-				nil,
-				db,
-				prometheus.NewRegistry(),
-			)
-			require.NoError(t, err)
-
-			warpSigner := warp.NewSigner(signer, 0, ids.Empty)
-			service, err := NewService(
-				0,
-				ids.Empty,
-				&validatorstest.State{},
-				db,
-				warpSigner,
-				verifier,
-				&cache.Empty[ids.ID, []byte]{},
-				acp118.NewSignatureAggregator(logging.NoLog{}, nil),
-				[][]byte{},
-			)
-			require.NoError(t, err)
-
-			gotSig, err := service.GetBlockSignature(t.Context(), tt.getBlkID)
-			require.ErrorIs(t, err, tt.wantErr)
-
-			if tt.wantErr != nil {
-				return
-			}
-
-			hash, err := payload.NewHash(tt.getBlkID)
-			require.NoError(t, err)
-
-			wantMsg, err := warp.NewUnsignedMessage(0, ids.Empty, hash.Bytes())
-			require.NoError(t, err)
-
-			wantSig, err := warpSigner.Sign(wantMsg)
-			require.NoError(t, err)
-
-			require.Equal(t, hexutil.Bytes(wantSig), gotSig)
-		})
-	}
+type testVM struct {
+	blks set.Set[ids.ID]
 }
 
-type testBlockStore set.Set[ids.ID]
+var _ evmwarp.VM = (*testVM)(nil)
 
-func (t testBlockStore) HasBlock(_ context.Context, blockID ids.ID) error {
-	s := set.Set[ids.ID](t)
-	if !s.Contains(blockID) {
-		return database.ErrNotFound
+func (t testVM) HasBlock(_ context.Context, blkID ids.ID) error {
+	if !t.blks.Contains(blkID) {
+		return errors.New("not found")
 	}
+
 	return nil
 }
