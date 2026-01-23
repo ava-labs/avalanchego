@@ -270,7 +270,6 @@ func TestClientWebsocketPing(t *testing.T) {
 // This checks that the websocket transport can deal with large messages.
 func TestClientWebsocketLargeMessage(t *testing.T) {
 	t.Skip("Flaky test from go-ethereum")
-	t.Parallel()
 
 	var (
 		srv     = NewServer(0)
