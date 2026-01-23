@@ -22,12 +22,17 @@
 //! }
 //! ```
 
+pub mod atomic;
 mod block;
 mod context;
 mod error;
 mod state;
 mod vm;
 
+pub use atomic::{
+    AtomicState, AtomicValidator, ExportRequest, ImportRequest, SharedMemory,
+    SharedMemoryError, SharedUTXO, SharedUTXOId,
+};
 pub use block::{Block, BlockStatus, BuildBlockOptions, StatelessBlock};
 pub use context::Context;
 pub use error::{Result, VMError};
