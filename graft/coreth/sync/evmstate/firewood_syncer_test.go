@@ -194,7 +194,7 @@ func createDB(t *testing.T) state.Database {
 func assertFirewoodConsistency(t *testing.T, root common.Hash, serverState, clientState state.Database) {
 	t.Helper()
 
-	synctest.AssertTrieConsistency(t, root, clientState, serverState, func(key, val []byte) {
+	synctest.AssertTrieConsistency(t, root, clientState, serverState, func(_, val []byte) {
 		var acc types.StateAccount
 		require.NoError(t, rlp.DecodeBytes(val, &acc))
 

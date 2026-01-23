@@ -573,11 +573,9 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB, serverDB stat
 			storageTrieLeavesCount++
 			snapshotVal := rawdb.ReadStorageSnapshot(clientDB.DiskDB(), accHash, common.BytesToHash(key))
 			require.Equal(t, val, snapshotVal)
-			return
 		})
 
 		require.Equal(t, storageTrieLeavesCount, snapshotStorageKeysCount)
-		return
 	})
 
 	// Check that the number of accounts in the snapshot matches the number of leaves in the accounts trie

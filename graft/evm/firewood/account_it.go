@@ -51,7 +51,7 @@ func (a *accountIt) Error() error {
 }
 
 // Leaf always returns true since Firewood only iterates over leaf nodes.
-func (a *accountIt) Leaf() bool {
+func (*accountIt) Leaf() bool {
 	return true
 }
 
@@ -66,17 +66,17 @@ func (a *accountIt) LeafBlob() []byte {
 }
 
 // LeafProof returns nil since Firewood does not support proofs.
-func (a *accountIt) LeafProof() [][]byte {
+func (*accountIt) LeafProof() [][]byte {
 	return nil
 }
 
 // Hash is unused since Firewood does not expose internal hashes.
-func (a *accountIt) Hash() common.Hash {
+func (*accountIt) Hash() common.Hash {
 	return common.Hash{}
 }
 
 // NodeBlob is unused since Firewood does not expose internal nodes.
-func (a *accountIt) NodeBlob() []byte {
+func (*accountIt) NodeBlob() []byte {
 	return nil
 }
 
@@ -84,8 +84,8 @@ func (a *accountIt) Path() []byte {
 	return a.it.Key()
 }
 
-func (a *accountIt) AddResolver(trie.NodeResolver) {}
+func (*accountIt) AddResolver(trie.NodeResolver) {}
 
-func (a *accountIt) Parent() common.Hash {
+func (*accountIt) Parent() common.Hash {
 	return common.Hash{}
 }
