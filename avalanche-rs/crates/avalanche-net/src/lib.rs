@@ -9,6 +9,7 @@
 mod codec;
 mod config;
 mod connection;
+pub mod discovery;
 mod handshake;
 mod network;
 mod peer;
@@ -19,6 +20,9 @@ mod version;
 pub use codec::{MessageCodec, MessageFrame};
 pub use config::{NetworkConfig, PeerConfig, TimeoutConfig};
 pub use connection::Connection;
+pub use discovery::{
+    DiscoveredPeer, DiscoveryConfig, DiscoverySource, DiscoveryTask, PeerDiscovery,
+};
 pub use handshake::{
     create_claimed_ip_port, HandshakeProtocol, HandshakeResult, CLIENT_NAME, CLIENT_VERSION,
     MIN_COMPATIBLE_VERSION,
