@@ -2,15 +2,15 @@
 #
 # Creates release tags for avalanchego and its submodules.
 #
-# Usage: ./scripts/create_release_tags.sh <version>
+# Usage: ./scripts/create_tags.sh <version>
 #
 # Example:
-#   ./scripts/create_release_tags.sh v1.15.0
-#   ./scripts/create_release_tags.sh v0.0.0-mytest
+#   ./scripts/create_tags.sh v1.15.0
+#   ./scripts/create_tags.sh v0.0.0-mytest
 
 set -euo pipefail
 
-VERSION="${1:?Usage: create_release_tags.sh <version>}"
+VERSION="${1:?Usage: create_tags.sh <version>}"
 
 if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
     echo "Error: Version must match vX.Y.Z or vX.Y.Z-suffix" >&2
