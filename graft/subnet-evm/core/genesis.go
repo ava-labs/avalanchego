@@ -58,7 +58,7 @@ import (
 	"github.com/holiman/uint256"
 )
 
-//go:generate go tool -modfile=../../../tools/external/go.mod gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
+//go:generate ../../../scripts/run_tool.sh gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
 
 var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 

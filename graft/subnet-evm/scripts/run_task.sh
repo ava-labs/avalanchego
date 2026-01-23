@@ -6,5 +6,6 @@ set -euo pipefail
 if command -v task > /dev/null 2>&1; then
   exec task "${@}"
 else
-  go tool -modfile=../../tools/external/go.mod task "${@}"
+  REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd)
+  "$REPO_ROOT"/scripts/run_tool.sh task "${@}"
 fi
