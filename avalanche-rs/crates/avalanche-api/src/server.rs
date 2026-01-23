@@ -72,15 +72,17 @@ impl Endpoint {
 
     /// Handles a single request.
     pub async fn handle_request(&self, request: Request) -> Response {
-        let methods = self.methods.read();
+        // Clone the handler function to avoid holding the lock across await
+        let handler_fn = {
+            let methods = self.methods.read();
+            methods.get(&request.method).map(|h| h.func.clone())
+        };
 
-        match methods.get(&request.method) {
-            Some(handler) => {
-                match (handler.func)(request.params).await {
-                    Ok(result) => Response::success(request.id, result),
-                    Err(error) => Response::error(request.id, error),
-                }
-            }
+        match handler_fn {
+            Some(func) => match func(request.params).await {
+                Ok(result) => Response::success(request.id, result),
+                Err(error) => Response::error(request.id, error),
+            },
             None => Response::error(request.id, RpcError::method_not_found()),
         }
     }

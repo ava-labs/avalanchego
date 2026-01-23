@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use avalanche_api::Server as ApiServer;
+use avalanche_api::{HttpConfig, HttpServer, Server as ApiServer};
 use avalanche_db::{Database, MemDb};
 use avalanche_ids::{Id, NodeId};
 use avalanche_net::{DiscoveryConfig, PeerDiscovery};
@@ -117,6 +117,8 @@ pub struct Node {
     shared_memory: Arc<SharedMemory>,
     /// Peer discovery
     peer_discovery: RwLock<Option<PeerDiscovery>>,
+    /// HTTP API server
+    http_server: RwLock<Option<Arc<HttpServer>>>,
     /// API server handle
     api_handle: RwLock<Option<tokio::task::JoinHandle<()>>>,
     /// Shutdown signal
@@ -158,6 +160,7 @@ impl Node {
             chains: RwLock::new(HashMap::new()),
             shared_memory,
             peer_discovery: RwLock::new(None),
+            http_server: RwLock::new(None),
             api_handle: RwLock::new(None),
             shutdown_tx,
         })
@@ -518,42 +521,57 @@ impl Node {
         let port = self.config.api.http_port;
         let addr = SocketAddr::new(host, port);
 
-        // Create API server
-        let api_server = ApiServer::new(format!("{}:{}", host, port));
+        // Create JSON-RPC server with endpoints
+        let rpc_server = Arc::new(ApiServer::new(format!("{}:{}", host, port)));
 
         // Register endpoints using the endpoint creation functions
         let p_chain_endpoint = avalanche_api::create_platform_endpoint();
         let x_chain_endpoint = avalanche_api::create_avm_endpoint();
         let c_chain_endpoint = avalanche_api::create_evm_endpoint();
 
-        api_server.register_endpoint(p_chain_endpoint);
-        api_server.register_endpoint(x_chain_endpoint);
-        api_server.register_endpoint(c_chain_endpoint);
+        // Also create info and health endpoints
+        let info_endpoint = avalanche_api::server::create_info_endpoint();
+        let health_endpoint = avalanche_api::server::create_health_endpoint();
+
+        rpc_server.register_endpoint(p_chain_endpoint);
+        rpc_server.register_endpoint(x_chain_endpoint);
+        rpc_server.register_endpoint(c_chain_endpoint);
+        rpc_server.register_endpoint(info_endpoint);
+        rpc_server.register_endpoint(health_endpoint);
 
         if self.config.api.admin_api_enabled {
             let admin_endpoint = avalanche_api::create_admin_endpoint();
-            api_server.register_endpoint(admin_endpoint);
+            rpc_server.register_endpoint(admin_endpoint);
         }
 
-        info!("API server listening on http://{}:{}", host, port);
+        // Create HTTP server config
+        let http_config = HttpConfig {
+            addr,
+            max_body_size: 10 * 1024 * 1024, // 10 MB
+            cors_enabled: true,
+        };
+
+        // Create and start HTTP server
+        let http_server = Arc::new(HttpServer::new(http_config, rpc_server));
+        *self.http_server.write() = Some(http_server.clone());
+
+        info!("HTTP API server listening on http://{}:{}", host, port);
         info!("  P-Chain: /ext/bc/P");
         info!("  X-Chain: /ext/bc/X");
         info!("  C-Chain: /ext/bc/C/rpc");
         info!("  Info:    /ext/info");
         info!("  Health:  /ext/health");
 
-        // Spawn API server task
-        let shutdown_rx = self.shutdown_tx.subscribe();
-
+        // Spawn HTTP server task
         let handle = tokio::spawn(async move {
-            // Wait for shutdown signal
-            let mut shutdown = shutdown_rx;
-            let _ = shutdown.recv().await;
+            if let Err(e) = http_server.run().await {
+                warn!("HTTP server error: {}", e);
+            }
         });
 
         *self.api_handle.write() = Some(handle);
 
-        info!("API server started");
+        info!("API server started and accepting connections");
         Ok(())
     }
 
@@ -565,10 +583,14 @@ impl Node {
         // Signal all tasks to stop
         let _ = self.shutdown_tx.send(());
 
-        // Stop API server
+        // Stop HTTP API server
+        if let Some(http_server) = self.http_server.read().as_ref() {
+            debug!("Stopping HTTP server...");
+            http_server.shutdown();
+        }
         if let Some(handle) = self.api_handle.write().take() {
-            debug!("Stopping API server...");
-            handle.abort();
+            debug!("Waiting for API server to stop...");
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), handle).await;
         }
 
         // Stop consensus engines
