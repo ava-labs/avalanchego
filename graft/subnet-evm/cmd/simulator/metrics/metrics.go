@@ -15,7 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 )
 
 type Metrics struct {
