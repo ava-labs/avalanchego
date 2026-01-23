@@ -42,7 +42,9 @@ for go_mod in "${GO_MODS[@]}"; do
     echo "  $go_mod"
     for module in "${MODULES[@]}"; do
         # Only update if the module is already required
-        if grep -qF "$module " "$go_mod" 2>/dev/null; then
+        # Escape dots for regex and match module followed by whitespace (space or tab)
+        module_pattern="${module//./\\.}"
+        if grep -qE "[[:space:]]${module_pattern}[[:space:]]" "$go_mod" 2>/dev/null; then
             go mod edit -require="${module}@${VERSION}" "$go_mod"
         fi
     done
