@@ -17,6 +17,7 @@
 //! let vm = PlatformVM::new();
 //! ```
 
+pub mod atomic;
 pub mod block;
 pub mod genesis;
 pub mod rewards;

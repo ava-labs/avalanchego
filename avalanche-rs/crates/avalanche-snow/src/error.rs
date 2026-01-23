@@ -67,4 +67,12 @@ pub enum ConsensusError {
     /// Network error
     #[error("network error: {0}")]
     Network(String),
+
+    /// VM already initialized
+    #[error("VM already initialized")]
+    VMAlreadyInitialized,
+
+    /// VM not initialized
+    #[error("VM not initialized")]
+    VMNotInitialized,
 }

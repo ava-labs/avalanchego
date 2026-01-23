@@ -34,6 +34,7 @@ pub mod proposervm;
 mod sync;
 pub mod sync_client;
 mod validators;
+pub mod vm;
 
 pub use block_builder::{BlockBuilder, BlockBuilderConfig, BlockProducer, BlockTx, BuiltBlock};
 pub use bootstrapper::{BootstrapConfig, BootstrapPhase, Bootstrapper, FetchedBlock};
@@ -48,12 +49,16 @@ pub use mempool::{AddResult, Mempool, MempoolConfig, MempoolTx, RejectReason, Tx
 pub use parameters::Parameters;
 pub use sync::{StateChunk, StateSync, StateSyncConfig, StateSummary, SyncPhase};
 pub use sync_client::{SyncClientConfig, SyncEngine, SyncNetwork, SyncResponse};
-pub use validators::{Validator, ValidatorSet};
+pub use validators::{Validator, ValidatorSet, ValidatorSetTrait};
 pub use proposervm::{
     ProposerVM, ProposerVMConfig,
     block::{PostForkBlock, PreForkBlock, ProposerBlock},
     scheduler::{ProposerScheduler, RoundRobinScheduler, StakeWeightedScheduler, WindowScheduler},
     state::{BlockMetadata, ProposerState, StateStats},
+};
+pub use vm::{
+    AppHandler, Block, BuildBlockOptions, ChainVM, CommonVM, Context, HealthStatus, Version,
+    VMError,
 };
 
 #[cfg(test)]

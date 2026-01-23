@@ -10,7 +10,9 @@ use sha2::{Digest, Sha256};
 
 use avalanche_db::{Database, MemoryDB};
 use avalanche_ids::Id;
-use avalanche_vm::{Result, VMError};
+
+use crate::error::Result;
+use crate::vm::VMError;
 
 use super::block::ProposerBlock;
 

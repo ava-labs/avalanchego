@@ -16,6 +16,7 @@ pub mod transaction;
 pub mod executor;
 pub mod block;
 pub mod vm;
+pub mod precompiles;
 
 pub use state::{EvmState, Account, AccountInfo, Storage, StateSnapshot};
 pub use transaction::{
@@ -25,6 +26,7 @@ pub use transaction::{
 pub use executor::{BlockContext, ExecutionError, ExecutionOutcome, Executor, ExecutorConfig};
 pub use block::{Block, BlockBuilder, Header, Withdrawal};
 pub use vm::{EvmVM, GenesisAccount, GenesisConfig, VMConfig, VMError, VMState};
+pub use precompiles::{PrecompileRegistry, PrecompileResult, addresses as precompile_addresses};
 
 use alloy_primitives::Address;
 

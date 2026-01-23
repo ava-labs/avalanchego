@@ -18,6 +18,39 @@ pub struct Validator {
     pub public_key: Option<Vec<u8>>,
 }
 
+/// Trait for validator set operations.
+pub trait ValidatorSetTrait: Send + Sync {
+    /// Returns the subnet ID.
+    fn subnet_id(&self) -> Id;
+
+    /// Gets a validator by node ID.
+    fn get(&self, node_id: &NodeId) -> Option<Validator>;
+
+    /// Returns true if the validator exists.
+    fn contains(&self, node_id: &NodeId) -> bool;
+
+    /// Returns the number of validators.
+    fn len(&self) -> usize;
+
+    /// Returns true if empty.
+    fn is_empty(&self) -> bool;
+
+    /// Returns the total stake weight.
+    fn total_weight(&self) -> u64;
+
+    /// Returns all validators.
+    fn validators(&self) -> Vec<Validator>;
+
+    /// Returns all node IDs.
+    fn node_ids(&self) -> Vec<NodeId>;
+
+    /// Samples k validators weighted by stake.
+    fn sample(&self, k: usize) -> Result<Vec<NodeId>>;
+
+    /// Gets the weight of a validator.
+    fn weight(&self, node_id: &NodeId) -> u64;
+}
+
 impl Validator {
     /// Creates a new validator.
     pub fn new(node_id: NodeId, weight: u64) -> Self {
@@ -211,6 +244,48 @@ impl ValidatorSet {
             .get(node_id)
             .map(|v| v.weight)
             .unwrap_or(0)
+    }
+}
+
+impl ValidatorSetTrait for ValidatorSet {
+    fn subnet_id(&self) -> Id {
+        self.subnet_id
+    }
+
+    fn get(&self, node_id: &NodeId) -> Option<Validator> {
+        ValidatorSet::get(self, node_id)
+    }
+
+    fn contains(&self, node_id: &NodeId) -> bool {
+        ValidatorSet::contains(self, node_id)
+    }
+
+    fn len(&self) -> usize {
+        ValidatorSet::len(self)
+    }
+
+    fn is_empty(&self) -> bool {
+        ValidatorSet::is_empty(self)
+    }
+
+    fn total_weight(&self) -> u64 {
+        ValidatorSet::total_weight(self)
+    }
+
+    fn validators(&self) -> Vec<Validator> {
+        ValidatorSet::validators(self)
+    }
+
+    fn node_ids(&self) -> Vec<NodeId> {
+        ValidatorSet::node_ids(self)
+    }
+
+    fn sample(&self, k: usize) -> Result<Vec<NodeId>> {
+        ValidatorSet::sample(self, k)
+    }
+
+    fn weight(&self, node_id: &NodeId) -> u64 {
+        ValidatorSet::weight(self, node_id)
     }
 }
 

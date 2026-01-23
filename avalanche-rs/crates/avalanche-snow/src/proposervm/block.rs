@@ -7,7 +7,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use sha2::{Digest, Sha256};
 
 use avalanche_ids::{Id, NodeId};
-use avalanche_vm::{Block as VMBlock, BlockStatus, Result, VMError};
+
+use crate::error::Result;
+use crate::vm::{Block as VMBlock, BlockStatus, VMError};
 
 /// A ProposerVM block - either pre-fork or post-fork.
 #[derive(Debug, Clone)]

@@ -611,6 +611,7 @@ dependencies = [
  "parking_lot",
  "proptest",
  "serde",
+ "sha2",
  "thiserror",
  "tokio",
  "tokio-test",

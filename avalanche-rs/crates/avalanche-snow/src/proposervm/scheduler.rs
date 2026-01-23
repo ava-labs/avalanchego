@@ -8,14 +8,14 @@ use std::time::Duration;
 use sha2::{Digest, Sha256};
 
 use avalanche_ids::{Id, NodeId};
-use crate::validators::ValidatorSet;
+use crate::validators::ValidatorSetTrait;
 
 /// Trait for proposer scheduling.
 pub trait ProposerScheduler: Send + Sync {
     /// Gets the proposer for a given height and slot.
     fn get_proposer(
         &self,
-        validators: &dyn ValidatorSet,
+        validators: &dyn ValidatorSetTrait,
         parent_id: Id,
         height: u64,
         slot: u64,
@@ -24,7 +24,7 @@ pub trait ProposerScheduler: Send + Sync {
     /// Gets the delay before a node should propose.
     fn get_delay(
         &self,
-        validators: &dyn ValidatorSet,
+        validators: &dyn ValidatorSetTrait,
         parent_id: Id,
         height: u64,
         node_id: NodeId,
@@ -69,7 +69,7 @@ impl WindowScheduler {
     /// Computes a deterministic proposer order for a block height.
     fn compute_proposer_order(
         &self,
-        validators: &dyn ValidatorSet,
+        validators: &dyn ValidatorSetTrait,
         parent_id: Id,
         height: u64,
     ) -> Vec<NodeId> {
@@ -110,7 +110,7 @@ impl WindowScheduler {
 impl ProposerScheduler for WindowScheduler {
     fn get_proposer(
         &self,
-        validators: &dyn ValidatorSet,
+        validators: &dyn ValidatorSetTrait,
         parent_id: Id,
         height: u64,
         slot: u64,
@@ -132,7 +132,7 @@ impl ProposerScheduler for WindowScheduler {
 
     fn get_delay(
         &self,
-        validators: &dyn ValidatorSet,
+        validators: &dyn ValidatorSetTrait,
         parent_id: Id,
         height: u64,
         node_id: NodeId,
@@ -191,7 +191,7 @@ impl StakeWeightedScheduler {
     /// Computes stake-weighted proposer order.
     fn compute_weighted_order(
         &self,
-        validators: &dyn ValidatorSet,
+        validators: &dyn ValidatorSetTrait,
         parent_id: Id,
         height: u64,
     ) -> Vec<NodeId> {
@@ -238,7 +238,7 @@ impl StakeWeightedScheduler {
 impl ProposerScheduler for StakeWeightedScheduler {
     fn get_proposer(
         &self,
-        validators: &dyn ValidatorSet,
+        validators: &dyn ValidatorSetTrait,
         parent_id: Id,
         height: u64,
         slot: u64,
@@ -258,7 +258,7 @@ impl ProposerScheduler for StakeWeightedScheduler {
 
     fn get_delay(
         &self,
-        validators: &dyn ValidatorSet,
+        validators: &dyn ValidatorSetTrait,
         parent_id: Id,
         height: u64,
         node_id: NodeId,
@@ -310,7 +310,7 @@ impl RoundRobinScheduler {
 impl ProposerScheduler for RoundRobinScheduler {
     fn get_proposer(
         &self,
-        validators: &dyn ValidatorSet,
+        validators: &dyn ValidatorSetTrait,
         _parent_id: Id,
         height: u64,
         _slot: u64,
@@ -327,7 +327,7 @@ impl ProposerScheduler for RoundRobinScheduler {
 
     fn get_delay(
         &self,
-        validators: &dyn ValidatorSet,
+        validators: &dyn ValidatorSetTrait,
         _parent_id: Id,
         height: u64,
         node_id: NodeId,

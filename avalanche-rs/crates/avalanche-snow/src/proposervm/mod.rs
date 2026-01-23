@@ -17,12 +17,14 @@ use tracing::{debug, info, warn};
 
 use avalanche_db::Database;
 use avalanche_ids::{Id, NodeId};
-use avalanche_vm::{
-    Block as VMBlock, BuildBlockOptions, ChainVM, CommonVM, Context, HealthStatus, Result,
+
+use crate::error::Result;
+use crate::vm::{
+    AppHandler, Block as VMBlock, BuildBlockOptions, ChainVM, CommonVM, Context, HealthStatus,
     VMError, Version,
 };
 
-use crate::validators::ValidatorSet;
+use crate::validators::ValidatorSetTrait;
 use block::{PostForkBlock, PreForkBlock, ProposerBlock};
 use scheduler::{ProposerScheduler, WindowScheduler};
 use state::ProposerState;
@@ -70,7 +72,7 @@ pub struct ProposerVM<V: ChainVM> {
     /// Proposer state.
     state: Option<ProposerState>,
     /// Validator set for determining proposers.
-    validators: Option<Arc<dyn ValidatorSet>>,
+    validators: Option<Arc<dyn ValidatorSetTrait>>,
     /// Block scheduler.
     scheduler: Option<WindowScheduler>,
     /// Current height.
@@ -105,7 +107,7 @@ impl<V: ChainVM> ProposerVM<V> {
     }
 
     /// Sets the validator set.
-    pub fn set_validators(&mut self, validators: Arc<dyn ValidatorSet>) {
+    pub fn set_validators(&mut self, validators: Arc<dyn ValidatorSetTrait>) {
         self.validators = Some(validators);
     }
 
@@ -323,7 +325,7 @@ impl<V: ChainVM + Send + Sync> CommonVM for ProposerVM<V> {
         Version::new(1, 5, 0)
     }
 
-    fn create_handlers(&self) -> Vec<Box<dyn avalanche_vm::AppHandler>> {
+    fn create_handlers(&self) -> Vec<Box<dyn AppHandler>> {
         self.inner.create_handlers()
     }
 
