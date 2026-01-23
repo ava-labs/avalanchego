@@ -48,9 +48,22 @@ release tags. For instructions on creating development tags, see
 ## Why Raw Commits Don't Work
 
 Fetching multiple modules at the same commit via `go get module@commit`
-does not work reliably. Each module's `go.mod` contains `require`
-directives that may not resolve to valid versions for that commit,
-causing Go's dependency resolution to select mismatched versions.
+does not work reliably due to Go's Minimal Version Selection (MVS)
+algorithm.
+
+When you run `go get github.com/ava-labs/avalanchego@abc123`, Go
+creates a pseudo-version like `v0.0.0-20240115120000-abc123`. However,
+each module's `go.mod` contains `require` directives pointing to
+tagged versions (e.g., `require github.com/ava-labs/avalanchego v1.14.0`).
+
+MVS selects the **maximum** version across all requirements. Since
+pseudo-versions starting with `v0.0.0` compare lower than any tagged
+release in semver ordering, MVS will select the tagged version from
+the internal `require` directive rather than your pseudo-version.
+
+The result: mismatched module versions where some resolve to your
+target commit and others resolve to older tagged releases.
 
 Use [development tags](releasing.md#development-tags) instead - they
-ensure all modules resolve to coordinated versions.
+ensure all modules resolve to coordinated versions because the
+internal `require` directives are updated to match before tagging.
