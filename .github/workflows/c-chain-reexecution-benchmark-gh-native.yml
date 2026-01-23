@@ -93,6 +93,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+      # Nix is required before calling polyrepo.
+      # c-chain-reexecution-benchmark's Nix install will be skipped; installation is idempotent.
       - name: Install Nix
         if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
         uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31

@@ -83,6 +83,7 @@ inputs:
 runs:
   using: composite
   steps:
+    # Nix installation is idempotent skipped if already installed by the calling workflow.
     - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
       with:
         github_access_token: ${{ inputs.github-token }}
