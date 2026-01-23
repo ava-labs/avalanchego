@@ -91,6 +91,30 @@ impl TlsConfig {
         })
     }
 
+    /// Generates a self-signed certificate for testing/development.
+    pub fn generate_self_signed(node_id: NodeId) -> Result<Self> {
+        use rcgen::{generate_simple_self_signed, CertifiedKey};
+
+        info!("Generating self-signed TLS certificate for node {}", node_id);
+
+        // Generate a self-signed certificate
+        let subject_alt_names = vec!["localhost".to_string(), "127.0.0.1".to_string()];
+        let CertifiedKey { cert, key_pair } = generate_simple_self_signed(subject_alt_names)
+            .map_err(|e| NetworkError::Tls(format!("failed to generate certificate: {}", e)))?;
+
+        // Convert to DER format
+        let cert_der = CertificateDer::from(cert.der().to_vec());
+        let key_der = PrivateKeyDer::try_from(key_pair.serialize_der())
+            .map_err(|e| NetworkError::Tls(format!("failed to serialize key: {:?}", e)))?;
+
+        // Create TLS config from DER
+        let mut config = Self::from_der(vec![cert_der], key_der)?;
+
+        // Override node_id with the provided one (since self-signed won't have correct ID)
+        config.node_id = node_id;
+
+        Ok(config)
+    }
 }
 
 /// Derives a NodeId from a certificate.

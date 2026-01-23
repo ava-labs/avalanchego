@@ -7,7 +7,7 @@ use std::sync::Arc;
 use avalanche_api::{HttpConfig, HttpServer, Server as ApiServer};
 use avalanche_db::{Database, MemDb};
 use avalanche_ids::{Id, NodeId};
-use avalanche_net::{DiscoveryConfig, PeerDiscovery};
+use avalanche_net::{DiscoveryConfig, MessageHandler, Network, NetworkConfig, NetworkImpl, NoOpHandler, PeerDiscovery, PeerInfo, TlsConfig};
 use avalanche_snow::{BootstrapConfig, Bootstrapper, Mempool, MempoolConfig, Parameters, Snowman};
 use avalanche_vm::atomic::{AtomicState, SharedMemory};
 use avalanche_vm::{CommonVM, Context};
@@ -117,6 +117,10 @@ pub struct Node {
     shared_memory: Arc<SharedMemory>,
     /// Peer discovery
     peer_discovery: RwLock<Option<PeerDiscovery>>,
+    /// P2P network
+    network: RwLock<Option<Arc<NetworkImpl>>>,
+    /// Network task handle
+    network_handle: RwLock<Option<tokio::task::JoinHandle<()>>>,
     /// HTTP API server
     http_server: RwLock<Option<Arc<HttpServer>>>,
     /// API server handle
@@ -160,6 +164,8 @@ impl Node {
             chains: RwLock::new(HashMap::new()),
             shared_memory,
             peer_discovery: RwLock::new(None),
+            network: RwLock::new(None),
+            network_handle: RwLock::new(None),
             http_server: RwLock::new(None),
             api_handle: RwLock::new(None),
             shutdown_tx,
@@ -435,18 +441,51 @@ impl Node {
         };
 
         let peer_discovery = PeerDiscovery::new(discovery_config);
-
         *self.peer_discovery.write() = Some(peer_discovery);
 
-        // Start listening on staking port
-        info!("P2P listener starting on port {}", staking_port);
+        // Create TLS configuration (in production, load from staking key)
+        let tls_config = TlsConfig::generate_self_signed(self.node_id)
+            .map_err(|e| NodeError::NetworkError(format!("TLS config failed: {}", e)))?;
+
+        // Create network configuration
+        let network_config = NetworkConfig {
+            network_id: self.config.network.network_id,
+            listen_host: "0.0.0.0".parse().unwrap(),
+            staking_port,
+            bootstrap_nodes: self.config.network.bootstrap_nodes.clone(),
+            max_inbound: self.config.network.max_peers / 2,
+            max_outbound: self.config.network.max_peers / 2,
+            gossip_size: 10,
+            ..Default::default()
+        };
+
+        // Create message handler (for now, use no-op handler)
+        let handler: Arc<dyn MessageHandler> = Arc::new(NoOpHandler);
+
+        // Create network
+        let network = Arc::new(
+            NetworkImpl::new(network_config, tls_config, handler)
+                .map_err(|e| NodeError::NetworkError(format!("Network init failed: {}", e)))?,
+        );
+
+        *self.network.write() = Some(network.clone());
 
         // Log bootstrap nodes
         for bootstrap in &self.config.network.bootstrap_nodes {
             debug!("Bootstrap node configured: {}", bootstrap);
         }
 
-        info!("Networking layer started");
+        // Start network in background task
+        let network_clone = network.clone();
+        let handle = tokio::spawn(async move {
+            if let Err(e) = network_clone.run().await {
+                warn!("Network error: {}", e);
+            }
+        });
+
+        *self.network_handle.write() = Some(handle);
+
+        info!("P2P network started on port {}", staking_port);
         Ok(())
     }
 
@@ -602,6 +641,12 @@ impl Node {
 
         // Stop networking
         debug!("Stopping networking...");
+        if let Some(network) = self.network.read().as_ref() {
+            let _ = network.shutdown().await;
+        }
+        if let Some(handle) = self.network_handle.write().take() {
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), handle).await;
+        }
 
         // Shutdown VMs
         debug!("Shutting down VMs...");

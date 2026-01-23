@@ -106,6 +106,11 @@ impl PeerManager {
         self.tracked_peers.remove(node_id);
     }
 
+    /// Returns a receiver for peer events.
+    pub fn event_receiver(&self) -> broadcast::Receiver<PeerEvent> {
+        self.event_tx.subscribe()
+    }
+
     /// Returns all connected peers.
     pub fn connected_peers(&self) -> Vec<NodeId> {
         self.peers.iter().map(|e| *e.key()).collect()

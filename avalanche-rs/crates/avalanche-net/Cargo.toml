@@ -28,6 +28,7 @@ rustls = { workspace = true }
 tokio-rustls = { workspace = true }
 x509-parser = { workspace = true }
 rustls-pemfile = "2"
+rcgen = "0.13"
 
 # Crypto
 sha2 = { workspace = true }

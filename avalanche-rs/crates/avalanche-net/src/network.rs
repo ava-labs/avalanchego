@@ -167,6 +167,65 @@ impl NetworkImpl {
             }
         }
     }
+
+    /// Returns a shutdown receiver.
+    pub fn shutdown_receiver(&self) -> broadcast::Receiver<()> {
+        self.shutdown_tx.subscribe()
+    }
+
+    /// Runs the network, accepting connections and processing events.
+    /// This method takes Arc<Self> to enable spawning background tasks.
+    pub async fn run(self: Arc<Self>) -> Result<()> {
+        info!("Starting network on {}", self.listen_addr);
+
+        // Bind listener
+        let listener = TcpListener::bind(self.listen_addr)
+            .await
+            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+
+        info!("P2P listener bound to {}", self.listen_addr);
+
+        *self.running.write() = true;
+
+        // Start peer manager
+        self.peer_manager.start().await?;
+
+        // Connect to bootstrap nodes
+        self.connect_bootstrap().await;
+
+        // Get event receiver from peer manager
+        let event_rx = self.peer_manager.event_receiver();
+
+        // Spawn accept loop
+        let accept_self = self.clone();
+        let accept_handle = tokio::spawn(async move {
+            accept_self.accept_loop(listener).await;
+        });
+
+        // Spawn event loop
+        let event_self = self.clone();
+        let event_handle = tokio::spawn(async move {
+            event_self.event_loop(event_rx).await;
+        });
+
+        info!("Network running - accepting connections on {}", self.listen_addr);
+
+        // Wait for shutdown signal
+        let mut shutdown_rx = self.shutdown_tx.subscribe();
+        shutdown_rx.recv().await.ok();
+
+        info!("Network shutting down...");
+
+        // Abort background tasks
+        accept_handle.abort();
+        event_handle.abort();
+
+        *self.running.write() = false;
+        self.peer_manager.shutdown().await;
+
+        info!("Network shutdown complete");
+        Ok(())
+    }
 }
 
 #[async_trait]
