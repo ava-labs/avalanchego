@@ -110,3 +110,30 @@ opt-level = 0
 
 [profile.test]
 opt-level = 1
+
+[profile.bench]
+lto = "thin"
+codegen-units = 4
+
+# Benchmarks
+[[bench]]
+name = "consensus"
+harness = false
+path = "benches/consensus.rs"
+
+[[bench]]
+name = "network"
+harness = false
+path = "benches/network.rs"
+
+[[bench]]
+name = "database"
+harness = false
+path = "benches/database.rs"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+sha2 = "0.10"
+parking_lot = "0.12"
+tokio = { version = "1", features = ["full", "test-util"] }
+avalanche-ids = { path = "crates/avalanche-ids" }

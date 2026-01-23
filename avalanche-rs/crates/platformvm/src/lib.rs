@@ -21,6 +21,7 @@ pub mod block;
 pub mod genesis;
 pub mod rewards;
 pub mod state;
+pub mod subnet;
 pub mod txs;
 pub mod validator;
 

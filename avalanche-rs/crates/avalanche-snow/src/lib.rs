@@ -27,8 +27,10 @@ mod bootstrapper;
 mod consensus;
 mod engine;
 mod error;
+pub mod executor;
 mod mempool;
 mod parameters;
+pub mod proposervm;
 mod sync;
 pub mod sync_client;
 mod validators;
@@ -38,11 +40,21 @@ pub use bootstrapper::{BootstrapConfig, BootstrapPhase, Bootstrapper, FetchedBlo
 pub use consensus::{snowball::Snowball, snowman::Snowman, Consensus, Decidable};
 pub use engine::{Engine, EngineState};
 pub use error::{ConsensusError, Result};
+pub use executor::{
+    BlockAcceptor, BlockExecutor, BlockStatus, BlockVerifier, ExecutableBlock,
+    ExecutionPipeline, ExecutorConfig, ExecutorEvent, PipelineStats,
+};
 pub use mempool::{AddResult, Mempool, MempoolConfig, MempoolTx, RejectReason, TxPriority};
 pub use parameters::Parameters;
 pub use sync::{StateChunk, StateSync, StateSyncConfig, StateSummary, SyncPhase};
 pub use sync_client::{SyncClientConfig, SyncEngine, SyncNetwork, SyncResponse};
 pub use validators::{Validator, ValidatorSet};
+pub use proposervm::{
+    ProposerVM, ProposerVMConfig,
+    block::{PostForkBlock, PreForkBlock, ProposerBlock},
+    scheduler::{ProposerScheduler, RoundRobinScheduler, StakeWeightedScheduler, WindowScheduler},
+    state::{BlockMetadata, ProposerState, StateStats},
+};
 
 #[cfg(test)]
 mod tests {
