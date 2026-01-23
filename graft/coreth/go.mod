@@ -185,6 +185,7 @@ tool (
 	github.com/ava-labs/libevm/rlp/rlpgen
 	github.com/fjl/gencodec
 	github.com/onsi/ginkgo/v2/ginkgo
+	go.uber.org/mock/mockgen
 )
 
 replace (
