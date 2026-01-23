@@ -15,6 +15,7 @@ members = [
     "crates/avm",
     "crates/avalanche-node",
     "crates/avalanche-crypto",
+    "crates/evm",
 ]
 
 [workspace.package]
@@ -40,6 +41,7 @@ avm = { path = "crates/avm" }
 avalanche-node = { path = "crates/avalanche-node" }
 avalanche-crypto = { path = "crates/avalanche-crypto" }
 avalanche-trie = { path = "crates/avalanche-trie" }
+evm = { path = "crates/evm" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
