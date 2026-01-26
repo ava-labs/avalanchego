@@ -89,9 +89,13 @@ type ChainRouter struct {
 }
 
 type nodeMetrics struct {
-	Successes int
-	Failures  int
-	Timeouts  int
+	Successes      int
+	QuerySuccesses int
+	GetSuccesses   int
+	Failures       int
+	Timeouts       int
+	QueryFailed    int
+	GetFailed      int
 }
 
 // Initialize the router.
@@ -341,6 +345,11 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			if timeout {
 				metric.Timeouts++
 			}
+			if op == message.QueryFailedOp {
+				metric.QueryFailed++
+			} else {
+				metric.GetFailed++
+			}
 		}
 
 		// Tell the timeout manager we are no longer expecting a response
@@ -381,6 +390,11 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			cr.nodeMetrics[nodeID] = metric
 		}
 		metric.Successes++
+		if op == message.ChitsOp {
+			metric.QuerySuccesses++
+		} else {
+			metric.GetSuccesses++
+		}
 	}
 
 	// Calculate how long it took [nodeID] to reply
