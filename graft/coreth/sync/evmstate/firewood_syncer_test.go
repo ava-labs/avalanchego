@@ -191,7 +191,7 @@ func createDB(t *testing.T) state.Database {
 	return db
 }
 
-func assertFirewoodConsistency(t *testing.T, root common.Hash, serverState, clientState state.Database) {
+func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState, serverState state.Database) {
 	t.Helper()
 
 	synctest.AssertTrieConsistency(t, root, clientState, serverState, func(_, val []byte) {

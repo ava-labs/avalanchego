@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 )
 
@@ -30,7 +31,9 @@ func newAccountIt(rev *ffi.Revision, start []byte) (*accountIt, error) {
 	// that the underlying resources are freed when the iterator is garbage
 	// collected.
 	runtime.AddCleanup(a, func(it *ffi.Iterator) {
-		_ = it.Drop()
+		if err := it.Drop(); err != nil {
+			log.Warn("failed to drop iterator: %w, Firewood may leak resources", err)
+		}
 	}, it)
 	return a, nil
 }
