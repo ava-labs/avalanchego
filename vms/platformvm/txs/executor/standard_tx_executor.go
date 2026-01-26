@@ -116,6 +116,10 @@ func (*standardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrWrongTxType
 }
 
+func (*standardTxExecutor) RewardContinuousValidatorTx(*txs.RewardContinuousValidatorTx) error {
+	return ErrWrongTxType
+}
+
 func (e *standardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	if tx.Validator.NodeID == ids.EmptyNodeID {
 		return errEmptyNodeID
@@ -1368,6 +1372,49 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	// Disable the validator
 	l1Validator.EndAccumulatedFee = 0
 	return e.state.PutL1Validator(l1Validator)
+}
+
+func (e *standardTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	if err := verifyAddContinuousValidatorTx(e.backend, e.feeCalculator, e.state, e.tx, tx); err != nil {
+		return err
+	}
+
+	if err := e.putStaker(tx); err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, txID, tx.Outs)
+
+	if e.backend.Config.PartialSyncPrimaryNetwork &&
+		tx.ValidatorNodeID == e.backend.Ctx.NodeID {
+		e.backend.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
+			zap.String("reason", "primary network is not being fully synced"),
+			zap.Stringer("txID", txID),
+			zap.String("txType", "addContinuousValidatorTx"),
+			zap.Stringer("nodeID", tx.ValidatorNodeID),
+		)
+	}
+
+	return nil
+}
+
+func (e *standardTxExecutor) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfigTx) error {
+	validator, err := verifySetAutoRestakeConfigTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
+	if err != nil {
+		return err
+	}
+
+	if tx.HasAutoRestakeShares {
+		validator.AutoRestakeShares = tx.AutoRestakeShares
+	}
+
+	if tx.HasPeriod {
+		validator.ContinuationPeriod = time.Duration(tx.Period) * time.Second
+	}
+
+	return e.state.UpdateCurrentValidator(validator)
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].

@@ -81,3 +81,16 @@ func Split(totalAmount uint64, shares uint32) (uint64, uint64) {
 	amountFromShares := totalAmount - remainderAmount
 	return amountFromShares, remainderAmount
 }
+
+// ProportionalAmount computes (amount * numerator) / denominator with overflow safety.
+// The result is floored (rounded down) due to integer division. When splitting a
+// value into parts, consider whether rounding errors should favor one side:
+//   - To ensure you don't over-allocate: compute the smaller portion with this
+//     function, then subtract from total to get the remainder.
+func ProportionalAmount(amount, numerator, denominator uint64) uint64 {
+	result := amount / denominator * numerator
+	if optimistic, err := math.Mul(amount, numerator); err == nil {
+		result = optimistic / denominator
+	}
+	return result
+}
