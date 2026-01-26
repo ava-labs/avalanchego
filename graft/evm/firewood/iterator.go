@@ -32,6 +32,8 @@ func newAccountIterator(rev *ffi.Revision, start []byte) (*accountIterator, erro
 	// collected.
 	runtime.AddCleanup(a, func(it *ffi.Iterator) {
 		if err := it.Drop(); err != nil {
+			// Best-effort GC cleanup: there is no safe way to surface or recover from
+			// Drop errors here, and at this point the iterator is already unreachable.
 			log.Warn("failed to drop iterator, Firewood may leak resources", "error", err)
 		}
 	}, it)
