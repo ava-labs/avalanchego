@@ -49,7 +49,7 @@ func newCodec(skipCount int, leafsReqType LeafsRequestType) codec.Manager {
 	// Gossip types and sync summary type removed from codec
 	c.SkipRegistrations(skipCount)
 
-	leafsRequest := NewEmptyLeafsRequest(leafsReqType)
+	leafsRequest := newEmptyLeafsRequest(leafsReqType)
 
 	errs.Add(
 		// state sync types

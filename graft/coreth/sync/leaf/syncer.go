@@ -100,7 +100,7 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 			return err
 		}
 
-		leafsResponse, err := c.client.GetLeafs(ctx, message.NewLeafsRequest(
+		leafsRequest, err := message.NewLeafsRequest(
 			c.config.LeafsRequestType,
 			root,
 			task.Account(),
@@ -108,7 +108,12 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 			end,
 			c.config.RequestSize,
 			task.NodeType(),
-		))
+		)
+		if err != nil {
+			return err
+		}
+
+		leafsResponse, err := c.client.GetLeafs(ctx, leafsRequest)
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrFailedToFetchLeafs, err)
 		}

@@ -49,52 +49,58 @@ const (
 	SubnetEVMLeafsRequestType LeafsRequestType = "subnet-evm"
 )
 
+type leafsRequestBase struct {
+	Root    common.Hash `serialize:"true"`
+	Account common.Hash `serialize:"true"`
+	Start   []byte      `serialize:"true"`
+	End     []byte      `serialize:"true"`
+	Limit   uint16      `serialize:"true"`
+}
+
 // SubnetEVMLeafsRequest preserves the original subnet-evm wire format where NodeType is not serialized.
 // NOTE: NodeType is not serialized to maintain backward compatibility with subnet-evm nodes.
 type SubnetEVMLeafsRequest struct {
-	Root     common.Hash `serialize:"true"`
-	Account  common.Hash `serialize:"true"`
-	Start    []byte      `serialize:"true"`
-	End      []byte      `serialize:"true"`
-	Limit    uint16      `serialize:"true"`
+	leafsRequestBase
 	NodeType NodeType
 }
 
 // CorethLeafsRequest preserves the original coreth wire format where NodeType is serialized.
 type CorethLeafsRequest struct {
-	Root     common.Hash `serialize:"true"`
-	Account  common.Hash `serialize:"true"`
-	Start    []byte      `serialize:"true"`
-	End      []byte      `serialize:"true"`
-	Limit    uint16      `serialize:"true"`
-	NodeType NodeType    `serialize:"true"`
+	leafsRequestBase
+	NodeType NodeType `serialize:"true"`
 }
 
 // NewLeafsRequest builds a leafs request using the requested wire format.
-func NewLeafsRequest(leafReqType LeafsRequestType, root, account common.Hash, start, end []byte, limit uint16, nodeType NodeType) LeafsRequest {
+func NewLeafsRequest(leafReqType LeafsRequestType, root, account common.Hash, start, end []byte, limit uint16, nodeType NodeType) (LeafsRequest, error) {
 	switch leafReqType {
 	case SubnetEVMLeafsRequestType:
 		return SubnetEVMLeafsRequest{
-			Root:     root,
-			Account:  account,
-			Start:    start,
-			End:      end,
-			Limit:    limit,
+			leafsRequestBase: leafsRequestBase{
+				Root:    root,
+				Account: account,
+				Start:   start,
+				End:     end,
+				Limit:   limit,
+			},
 			NodeType: nodeType,
-		}
-	default:
+		}, nil
+	case CorethLeafsRequestType:
 		return CorethLeafsRequest{
-			Root:     root,
-			Account:  account,
-			Start:    start,
-			End:      end,
-			Limit:    limit,
+			leafsRequestBase: leafsRequestBase{
+				Root:    root,
+				Account: account,
+				Start:   start,
+				End:     end,
+				Limit:   limit,
+			},
 			NodeType: nodeType,
-		}
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported leafs request type: %q", leafReqType)
 	}
 }
 
-func NewEmptyLeafsRequest(leafReqType LeafsRequestType) LeafsRequest {
+func newEmptyLeafsRequest(leafReqType LeafsRequestType) LeafsRequest {
 	switch leafReqType {
 	case SubnetEVMLeafsRequestType:
 		return SubnetEVMLeafsRequest{}
@@ -103,7 +109,7 @@ func NewEmptyLeafsRequest(leafReqType LeafsRequestType) LeafsRequest {
 	}
 }
 
-func LeafsRequestTypeForCodec(c codec.Manager) LeafsRequestType {
+func leafsRequestTypeForCodec(c codec.Manager) LeafsRequestType {
 	switch c {
 	case SubnetEVMCodec:
 		return SubnetEVMLeafsRequestType
@@ -112,35 +118,34 @@ func LeafsRequestTypeForCodec(c codec.Manager) LeafsRequestType {
 	}
 }
 
-func (l SubnetEVMLeafsRequest) String() string {
-	return formatLeafsRequest("LeafsRequest", l.Root, l.Account, l.Start, l.End, l.Limit, l.NodeType)
+func (l leafsRequestBase) formatString(nodeType NodeType) string {
+	return formatLeafsRequest("LeafsRequest", l.Root, l.Account, l.Start, l.End, l.Limit, nodeType)
 }
 
-func (l CorethLeafsRequest) String() string {
-	return formatLeafsRequest("LeafsRequest", l.Root, l.Account, l.Start, l.End, l.Limit, l.NodeType)
+func (s SubnetEVMLeafsRequest) String() string {
+	return s.leafsRequestBase.formatString(s.NodeType)
 }
 
-func (l SubnetEVMLeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
-	return handler.HandleLeafsRequest(ctx, nodeID, requestID, l)
+func (s SubnetEVMLeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
+	return handler.HandleLeafsRequest(ctx, nodeID, requestID, s)
 }
 
-func (l CorethLeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
-	return handler.HandleLeafsRequest(ctx, nodeID, requestID, l)
+func (c CorethLeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
+	return handler.HandleLeafsRequest(ctx, nodeID, requestID, c)
 }
 
-func (l SubnetEVMLeafsRequest) RootHash() common.Hash    { return l.Root }
-func (l SubnetEVMLeafsRequest) AccountHash() common.Hash { return l.Account }
-func (l SubnetEVMLeafsRequest) StartKey() []byte         { return l.Start }
-func (l SubnetEVMLeafsRequest) EndKey() []byte           { return l.End }
-func (l SubnetEVMLeafsRequest) LimitValue() uint16       { return l.Limit }
-func (l SubnetEVMLeafsRequest) NodeTypeValue() NodeType  { return l.NodeType }
+func (c CorethLeafsRequest) String() string {
+	return c.leafsRequestBase.formatString(c.NodeType)
+}
 
-func (l CorethLeafsRequest) RootHash() common.Hash    { return l.Root }
-func (l CorethLeafsRequest) AccountHash() common.Hash { return l.Account }
-func (l CorethLeafsRequest) StartKey() []byte         { return l.Start }
-func (l CorethLeafsRequest) EndKey() []byte           { return l.End }
-func (l CorethLeafsRequest) LimitValue() uint16       { return l.Limit }
-func (l CorethLeafsRequest) NodeTypeValue() NodeType  { return l.NodeType }
+func (l leafsRequestBase) RootHash() common.Hash    { return l.Root }
+func (l leafsRequestBase) AccountHash() common.Hash { return l.Account }
+func (l leafsRequestBase) StartKey() []byte         { return l.Start }
+func (l leafsRequestBase) EndKey() []byte           { return l.End }
+func (l leafsRequestBase) LimitValue() uint16 { return l.Limit }
+
+func (s SubnetEVMLeafsRequest) NodeTypeValue() NodeType { return s.NodeType }
+func (c CorethLeafsRequest) NodeTypeValue() NodeType    { return c.NodeType }
 
 func formatLeafsRequest(prefix string, root common.Hash, account common.Hash, start []byte, end []byte, limit uint16, nodeType NodeType) string {
 	return fmt.Sprintf(

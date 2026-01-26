@@ -94,13 +94,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		}{
 			"zero limit dropped": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    0,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						common.Hash{},
+						common.Hash{},
+						bytes.Repeat([]byte{0x00}, common.HashLength),
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.Nil(t, response)
@@ -110,13 +112,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"empty root dropped": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     common.Hash{},
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						common.Hash{},
+						common.Hash{},
+						bytes.Repeat([]byte{0x00}, common.HashLength),
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.Nil(t, response)
@@ -126,13 +130,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"bad start len dropped": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     common.Hash{},
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength+2),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						common.Hash{},
+						common.Hash{},
+						bytes.Repeat([]byte{0x00}, common.HashLength+2),
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.Nil(t, response)
@@ -142,29 +148,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"bad end len dropped": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     common.Hash{},
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength-1),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
-				},
-				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
-					require.Nil(t, response)
-					require.NoError(t, err)
-					require.Equal(t, uint32(1), testHandlerStats.InvalidLeafsRequestCount)
-				},
-			},
-			"empty storage root dropped": {
-				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     types.EmptyRootHash,
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						common.Hash{},
+						common.Hash{},
+						bytes.Repeat([]byte{0x00}, common.HashLength),
+						bytes.Repeat([]byte{0xff}, common.HashLength-1),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.Nil(t, response)
@@ -174,13 +166,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"missing root dropped": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     common.BytesToHash([]byte("something is missing here...")),
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						common.BytesToHash([]byte("something is missing here...")),
+						common.Hash{},
+						bytes.Repeat([]byte{0x00}, common.HashLength),
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.Nil(t, response)
@@ -190,13 +184,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"corrupted trie drops request": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     corruptedTrieRoot,
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						corruptedTrieRoot,
+						common.Hash{},
+						bytes.Repeat([]byte{0x00}, common.HashLength),
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.Nil(t, response)
@@ -208,13 +204,16 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
 					ctx, cancel := context.WithCancel(t.Context())
 					defer cancel()
-					return ctx, message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+
+					return newLeafsRequest(t,
+						ctx,
+						largeTrieRoot,
+						common.Hash{},
+						bytes.Repeat([]byte{0x00}, common.HashLength),
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.Nil(t, response)
@@ -223,13 +222,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"nil start and end range returns entire trie": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     smallTrieRoot,
-						Start:    nil,
-						End:      nil,
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						smallTrieRoot,
+						common.Hash{},
+						nil,
+						nil,
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -243,13 +244,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"nil end range treated like greatest possible value": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     smallTrieRoot,
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
-						End:      nil,
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						smallTrieRoot,
+						common.Hash{},
+						bytes.Repeat([]byte{0x00}, common.HashLength),
+						nil,
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -264,13 +267,16 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
 					ctx, cancel := context.WithCancel(t.Context())
 					defer cancel()
-					return ctx, message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Start:    bytes.Repeat([]byte{0xbb}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xaa}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+
+					return newLeafsRequest(t,
+						ctx,
+						largeTrieRoot,
+						common.Hash{},
+						bytes.Repeat([]byte{0xbb}, common.HashLength),
+						bytes.Repeat([]byte{0xaa}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.Nil(t, response)
@@ -282,13 +288,16 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
 					ctx, cancel := context.WithCancel(t.Context())
 					defer cancel()
-					return ctx, message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Start:    bytes.Repeat([]byte{0xbb}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xaa}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.NodeType(11),
-					}
+
+					return newLeafsRequest(t,
+						ctx,
+						largeTrieRoot,
+						common.Hash{},
+						bytes.Repeat([]byte{0xbb}, common.HashLength),
+						bytes.Repeat([]byte{0xaa}, common.HashLength),
+						maxLeavesLimit,
+						message.NodeType(11),
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.Nil(t, response)
@@ -297,13 +306,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"max leaves overridden": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit * 10,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						largeTrieRoot,
+						common.Hash{},
+						bytes.Repeat([]byte{0x00}, common.HashLength),
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit*10,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -318,13 +329,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"full range with nil start": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Start:    nil,
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						largeTrieRoot,
+						common.Hash{},
+						nil,
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -340,13 +353,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"full range with 0x00 start": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						largeTrieRoot,
+						common.Hash{},
+						bytes.Repeat([]byte{0x00}, common.HashLength),
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -365,13 +380,16 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					startKey := largeTrieKeys[1_000]
 					startKey[31]++                 // exclude start key from response
 					endKey := largeTrieKeys[1_040] // include end key in response
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Start:    startKey,
-						End:      endKey,
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+
+					return newLeafsRequest(t,
+						t.Context(),
+						largeTrieRoot,
+						common.Hash{},
+						startKey,
+						endKey,
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -387,13 +405,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"partial end range": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Start:    largeTrieKeys[9_400],
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						largeTrieRoot,
+						common.Hash{},
+						largeTrieKeys[9_400],
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -409,13 +429,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"final end range": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Start:    bytes.Repeat([]byte{0xff}, common.HashLength),
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						largeTrieRoot,
+						common.Hash{},
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -431,13 +453,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 			},
 			"small trie root": {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     smallTrieRoot,
-						Start:    nil,
-						End:      bytes.Repeat([]byte{0xff}, common.HashLength),
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						smallTrieRoot,
+						common.Hash{},
+						nil,
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NotEmpty(t, response)
@@ -460,11 +484,16 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					snap, err := snapshot.New(snapConfig, memdb, trieDB, common.Hash{}, accountTrieRoot)
 					require.NoError(t, err)
 					snapshotProvider.Snapshot = snap
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     accountTrieRoot,
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+
+					return newLeafsRequest(t,
+						t.Context(),
+						accountTrieRoot,
+						common.Hash{},
+						nil,
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -504,11 +533,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 						i++
 					}
 
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     accountTrieRoot,
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						accountTrieRoot,
+						common.Hash{},
+						nil,
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -534,12 +567,16 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					snap, err := snapshot.New(snapConfig, memdb, trieDB, common.Hash{}, accountTrieRoot)
 					require.NoError(t, err)
 					snapshotProvider.Snapshot = snap
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Account:  largeStorageAccount,
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+
+					return newLeafsRequest(t,
+						t.Context(),
+						largeTrieRoot,
+						largeStorageAccount,
+						nil,
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -578,12 +615,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 						i++
 					}
 
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     largeTrieRoot,
-						Account:  largeStorageAccount,
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						largeTrieRoot,
+						largeStorageAccount,
+						nil,
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -617,12 +657,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					}
 					rawdb.DeleteStorageSnapshot(memdb, smallStorageAccount, lastKey)
 
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     smallTrieRoot,
-						Account:  smallStorageAccount,
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						smallTrieRoot,
+						smallStorageAccount,
+						nil,
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -651,13 +694,15 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					}
 					rawdb.DeleteStorageSnapshot(memdb, smallStorageAccount, lastKey)
 
-					return t.Context(), message.CorethLeafsRequest{
-						Root:     smallTrieRoot,
-						Account:  smallStorageAccount,
-						Start:    lastKey[:],
-						Limit:    maxLeavesLimit,
-						NodeType: message.StateTrieNode,
-					}
+					return newLeafsRequest(t,
+						t.Context(),
+						smallTrieRoot,
+						smallStorageAccount,
+						lastKey[:],
+						bytes.Repeat([]byte{0xff}, common.HashLength),
+						maxLeavesLimit,
+						message.StateTrieNode,
+					)
 				},
 				requireResponseFn: func(t *testing.T, request message.CorethLeafsRequest, response []byte, err error) {
 					require.NoError(t, err)
@@ -674,6 +719,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				},
 			},
 		}
+
 		for name, test := range tests {
 			t.Run(name, func(t *testing.T) {
 				ctx, request := test.prepareTestFn()
@@ -713,4 +759,18 @@ func requireRangeProofIsValid(t *testing.T, request *message.CorethLeafsRequest,
 	more, err := trie.VerifyRangeProof(request.Root, start, response.Keys, response.Vals, proof)
 	require.NoError(t, err)
 	require.Equal(t, expectMore, more)
+}
+
+func newLeafsRequest(
+	t *testing.T,
+	ctx context.Context,
+	root common.Hash,
+	account common.Hash,
+	start, end []byte,
+	limit uint16,
+	nodeType message.NodeType,
+) (context.Context, message.CorethLeafsRequest) {
+	request, err := message.NewLeafsRequest(message.CorethLeafsRequestType, root, account, start, end, limit, nodeType)
+	require.NoError(t, err)
+	return ctx, request.(message.CorethLeafsRequest)
 }
