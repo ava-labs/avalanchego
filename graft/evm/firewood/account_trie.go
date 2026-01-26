@@ -5,6 +5,7 @@ package firewood
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -247,13 +248,15 @@ func (*accountTrie) GetKey([]byte) []byte {
 	return nil
 }
 
+var errInvalidReader = errors.New("invalid reader type")
+
 // NodeIterator implements state.Trie.
 // It iterates only over account nodes, so all nodes are leaf nodes.
 // The first key yielded will be >= [start].
 func (a *accountTrie) NodeIterator(start []byte) (trie.NodeIterator, error) {
 	r, ok := a.reader.(*reader)
 	if !ok {
-		return nil, errors.New("invalid reader type for account trie")
+		return nil, fmt.Errorf("%w: got %T", errInvalidReader, a.reader)
 	}
 	return newAccountIterator(r.revision, start)
 }

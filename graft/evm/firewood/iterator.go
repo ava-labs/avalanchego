@@ -32,7 +32,7 @@ func newAccountIterator(rev *ffi.Revision, start []byte) (*accountIterator, erro
 	// collected.
 	runtime.AddCleanup(a, func(it *ffi.Iterator) {
 		if err := it.Drop(); err != nil {
-			log.Warn("failed to drop iterator: %w, Firewood may leak resources", err)
+			log.Warn("failed to drop iterator, Firewood may leak resources", "error", err)
 		}
 	}, it)
 	return a, nil
@@ -42,6 +42,7 @@ func newAccountIterator(rev *ffi.Revision, start []byte) (*accountIterator, erro
 func (a *accountIterator) Next(bool) bool {
 	next := a.it.Next()
 	for ; next; next = a.it.Next() {
+		// Account keys are 32 bytes
 		if len(a.it.Key()) == common.HashLength {
 			return true
 		}
