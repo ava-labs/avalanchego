@@ -255,7 +255,7 @@ func (a *accountTrie) NodeIterator(start []byte) (trie.NodeIterator, error) {
 	if !ok {
 		return nil, errors.New("invalid reader type for account trie")
 	}
-	return newAccountIt(r.revision, start)
+	return newAccountIterator(r.revision, start)
 }
 
 // Prove implements state.Trie.

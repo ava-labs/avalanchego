@@ -37,8 +37,10 @@ func (*storageTrie) Hash() common.Hash {
 	return common.Hash{}
 }
 
+var errStorageIteratorNotSupported = errors.New("storage trie does not support node iteration")
+
 func (*storageTrie) NodeIterator([]byte) (trie.NodeIterator, error) {
-	return nil, errors.New("storage trie does not support node iteration")
+	return nil, errStorageIteratorNotSupported
 }
 
 // Copy returns nil, as storage tries do not need to be copied separately.

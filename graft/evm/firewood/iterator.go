@@ -12,18 +12,18 @@ import (
 	"github.com/ava-labs/libevm/trie"
 )
 
-var _ trie.NodeIterator = (*accountIt)(nil)
+var _ trie.NodeIterator = (*accountIterator)(nil)
 
-type accountIt struct {
+type accountIterator struct {
 	it *ffi.Iterator
 }
 
-func newAccountIt(rev *ffi.Revision, start []byte) (*accountIt, error) {
+func newAccountIterator(rev *ffi.Revision, start []byte) (*accountIterator, error) {
 	it, err := rev.Iter(start)
 	if err != nil {
 		return nil, err
 	}
-	a := &accountIt{
+	a := &accountIterator{
 		it: it,
 	}
 
@@ -39,7 +39,7 @@ func newAccountIt(rev *ffi.Revision, start []byte) (*accountIt, error) {
 }
 
 // Next advances the iterator to the next account.
-func (a *accountIt) Next(bool) bool {
+func (a *accountIterator) Next(bool) bool {
 	next := a.it.Next()
 	for ; next; next = a.it.Next() {
 		if len(a.it.Key()) == common.HashLength {
@@ -50,46 +50,46 @@ func (a *accountIt) Next(bool) bool {
 }
 
 // Error returns any error that occurred during iteration.
-func (a *accountIt) Error() error {
+func (a *accountIterator) Error() error {
 	return a.it.Err()
 }
 
 // Leaf always returns true since Firewood only iterates over leaf nodes.
-func (*accountIt) Leaf() bool {
+func (*accountIterator) Leaf() bool {
 	return true
 }
 
 // LeafKey returns the key of the account.
-func (a *accountIt) LeafKey() []byte {
+func (a *accountIterator) LeafKey() []byte {
 	return a.it.Key()
 }
 
 // LeafBlob returns the RLP encoded account data.
-func (a *accountIt) LeafBlob() []byte {
+func (a *accountIterator) LeafBlob() []byte {
 	return a.it.Value()
 }
 
 // LeafProof returns nil since Firewood does not support proofs.
-func (*accountIt) LeafProof() [][]byte {
+func (*accountIterator) LeafProof() [][]byte {
 	return nil
 }
 
 // Hash is unused since Firewood does not expose internal hashes.
-func (*accountIt) Hash() common.Hash {
+func (*accountIterator) Hash() common.Hash {
 	return common.Hash{}
 }
 
 // NodeBlob is unused since Firewood does not expose internal nodes.
-func (*accountIt) NodeBlob() []byte {
+func (*accountIterator) NodeBlob() []byte {
 	return nil
 }
 
-func (a *accountIt) Path() []byte {
+func (a *accountIterator) Path() []byte {
 	return a.it.Key()
 }
 
-func (*accountIt) AddResolver(trie.NodeResolver) {}
+func (*accountIterator) AddResolver(trie.NodeResolver) {}
 
-func (*accountIt) Parent() common.Hash {
+func (*accountIterator) Parent() common.Hash {
 	return common.Hash{}
 }
