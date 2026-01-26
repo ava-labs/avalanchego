@@ -1292,10 +1292,11 @@ func (vm *VM) ReadLastAccepted() (common.Hash, uint64, error) {
 
 // defaultExtensions returns the default extension configuration.
 func defaultExtensions() *extension.Config {
+	provider := message.NewBlockSyncSummaryProvider(message.SubnetEVMCodec)
 	return &extension.Config{
 		Clock:               &mockable.Clock{},
-		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.SubnetEVMCodec),
-		SyncableParser:      message.NewBlockSyncSummaryParser(message.SubnetEVMCodec),
+		SyncSummaryProvider: provider,
+		SyncableParser:      provider,
 	}
 }
 

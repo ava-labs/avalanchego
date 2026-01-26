@@ -6,12 +6,9 @@ package types
 import (
 	"context"
 
-	"github.com/ava-labs/libevm/core/types"
-
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 // Syncer is the common interface for all sync operations.
@@ -35,11 +32,6 @@ type Syncer interface {
 type Finalizer interface {
 	// Finalize performs any necessary cleanup operations.
 	Finalize() error
-}
-
-// SummaryProvider is an interface for providing state summaries.
-type SummaryProvider interface {
-	StateSummaryAtBlock(ethBlock *types.Block) (block.StateSummary, error)
 }
 
 // Extender is an interface that allows for extending the state sync process.

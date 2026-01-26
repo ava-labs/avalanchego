@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -21,7 +21,7 @@ var errProviderNotSet = errors.New("provider not set")
 type server struct {
 	chain *core.BlockChain
 
-	provider         types.SummaryProvider
+	provider         message.SummaryProvider
 	syncableInterval uint64
 }
 
@@ -30,7 +30,7 @@ type Server interface {
 	GetStateSummary(context.Context, uint64) (block.StateSummary, error)
 }
 
-func NewServer(chain *core.BlockChain, provider types.SummaryProvider, syncableInterval uint64) Server {
+func NewServer(chain *core.BlockChain, provider message.SummaryProvider, syncableInterval uint64) Server {
 	return &server{
 		chain:            chain,
 		syncableInterval: syncableInterval,

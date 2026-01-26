@@ -28,13 +28,13 @@ func TestMarshalBlockSyncSummary(t *testing.T) {
 		expectedBase64Bytes := "AAAAAAAAAAAAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 		require.Equal(t, expectedBase64Bytes, base64.StdEncoding.EncodeToString(blockSyncSummary.Bytes()))
 
-		parser := message.NewBlockSyncSummaryParser(c)
+		provider := message.NewBlockSyncSummaryProvider(c)
 		called := false
 		acceptImplTest := func(message.Syncable) (block.StateSyncMode, error) {
 			called = true
 			return block.StateSyncSkipped, nil
 		}
-		s, err := parser.Parse(blockSyncSummary.Bytes(), acceptImplTest)
+		s, err := provider.Parse(blockSyncSummary.Bytes(), acceptImplTest)
 		require.NoError(t, err)
 		require.Equal(t, blockSyncSummary.GetBlockHash(), s.GetBlockHash())
 		require.Equal(t, blockSyncSummary.Height(), s.Height())
