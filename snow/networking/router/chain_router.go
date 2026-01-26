@@ -84,6 +84,13 @@ type ChainRouter struct {
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
 	timedRequests *linked.Hashmap[ids.RequestID, requestEntry]
+
+	nodeMetrics map[ids.NodeID]*nodeMetrics
+}
+
+type nodeMetrics struct {
+	Successes int
+	Failures  int
 }
 
 // Initialize the router.
@@ -114,6 +121,7 @@ func (cr *ChainRouter) Initialize(
 	cr.timedRequests = linked.NewHashmap[ids.RequestID, requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
+	cr.nodeMetrics = make(map[ids.NodeID]*nodeMetrics)
 
 	// Mark myself as connected
 	cr.myNodeID = nodeID
@@ -322,6 +330,13 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			return
 		}
 
+		metric, ok := cr.nodeMetrics[nodeID]
+		if !ok {
+			metric = &nodeMetrics{}
+			cr.nodeMetrics[nodeID] = metric
+		}
+		metric.Failures++
+
 		// Tell the timeout manager we are no longer expecting a response
 		cr.timeoutManager.RemoveRequest(uniqueRequestID)
 
@@ -352,6 +367,13 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 		msg.OnFinishedHandling()
 		return
 	}
+
+	metric, ok := cr.nodeMetrics[nodeID]
+	if !ok {
+		metric = &nodeMetrics{}
+		cr.nodeMetrics[nodeID] = metric
+	}
+	metric.Successes++
 
 	// Calculate how long it took [nodeID] to reply
 	latency := cr.clock.Time().Sub(req.time)
@@ -627,6 +649,8 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 func (cr *ChainRouter) HealthCheck(context.Context) (interface{}, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	cr.log.Info("node metrics", zap.Any("metrics", cr.nodeMetrics))
 
 	numOutstandingReqs := cr.timedRequests.Len()
 	isOutstandingReqs := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
