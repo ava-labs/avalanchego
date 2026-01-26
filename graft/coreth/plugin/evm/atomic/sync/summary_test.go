@@ -16,7 +16,7 @@ import (
 )
 
 func TestMarshalSummary(t *testing.T) {
-	atomicSummary, err := NewSummary(message.CorethCodec, common.Hash{1}, 2, common.Hash{3}, common.Hash{4})
+	atomicSummary, err := NewSummary(common.Hash{1}, 2, common.Hash{3}, common.Hash{4})
 	require.NoError(t, err, "failed to create summary")
 
 	require.Equal(t, common.Hash{1}, atomicSummary.GetBlockHash())

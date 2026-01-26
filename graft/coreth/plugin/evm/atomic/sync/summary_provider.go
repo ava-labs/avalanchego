@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
-	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -40,7 +39,7 @@ func (a *SummaryProvider) StateSummaryAtBlock(blk *ethtypes.Block) (block.StateS
 		return nil, fmt.Errorf("atomic trie root not found for height (%d)", height)
 	}
 
-	summary, err := NewSummary(message.CorethCodec, blk.Hash(), height, blk.Root(), atomicRoot)
+	summary, err := NewSummary(blk.Hash(), height, blk.Root(), atomicRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct syncable block at height %d: %w", height, err)
 	}

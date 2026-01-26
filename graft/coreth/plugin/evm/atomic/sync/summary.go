@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -29,7 +28,7 @@ type Summary struct {
 	acceptImpl message.AcceptImplFn
 }
 
-func NewSummary(c codec.Manager, blockHash common.Hash, blockNumber uint64, blockRoot common.Hash, atomicRoot common.Hash) (*Summary, error) {
+func NewSummary(blockHash common.Hash, blockNumber uint64, blockRoot common.Hash, atomicRoot common.Hash) (*Summary, error) {
 	// We intentionally do not use the acceptImpl here and leave it for the parser to set.
 	summary := Summary{
 		BlockSyncSummary: &message.BlockSyncSummary{
@@ -39,7 +38,7 @@ func NewSummary(c codec.Manager, blockHash common.Hash, blockNumber uint64, bloc
 		},
 		AtomicRoot: atomicRoot,
 	}
-	bytes, err := c.Marshal(message.Version, &summary)
+	bytes, err := message.CorethCodec.Marshal(message.Version, &summary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal syncable summary: %w", err)
 	}
