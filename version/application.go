@@ -36,6 +36,20 @@ func (a *Application) initString() {
 	)
 }
 
+// Semantic returns the semantic version string (e.g., "v1.14.1")
+func (a *Application) Semantic() string {
+	return fmt.Sprintf("v%d.%d.%d", a.Major, a.Minor, a.Patch)
+}
+
+// SemanticWithCommit returns the semantic version string with an optional git commit suffix
+func (a *Application) SemanticWithCommit(gitCommit string) string {
+	v := a.Semantic()
+	if len(gitCommit) != 0 {
+		return fmt.Sprintf("%s@%s", v, gitCommit)
+	}
+	return v
+}
+
 // Compare returns
 //
 //	-1 if a is less than o,

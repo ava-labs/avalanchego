@@ -188,7 +188,7 @@ func UnpackSetFeeConfigInput(input []byte, useStrictMode bool) (commontype.FeeCo
 		return commontype.FeeConfig{}, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
 	}
 	inputStruct := FeeConfigABIStruct{}
-	err := FeeManagerABI.UnpackInputIntoInterface(&inputStruct, "setFeeConfig", input, useStrictMode)
+	err := FeeManagerABI.UnpackInputIntoInterface(&inputStruct, "setFeeConfig", input)
 	if err != nil {
 		return commontype.FeeConfig{}, fmt.Errorf("%w: %w", ErrUnpackInput, err)
 	}
