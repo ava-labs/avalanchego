@@ -331,14 +331,16 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			return
 		}
 
-		metric, ok := cr.nodeMetrics[nodeID]
-		if !ok {
-			metric = &nodeMetrics{}
-			cr.nodeMetrics[nodeID] = metric
-		}
-		metric.Failures++
-		if timeout {
-			metric.Timeouts++
+		if op == message.QueryFailedOp || op == message.GetFailedOp {
+			metric, ok := cr.nodeMetrics[nodeID]
+			if !ok {
+				metric = &nodeMetrics{}
+				cr.nodeMetrics[nodeID] = metric
+			}
+			metric.Failures++
+			if timeout {
+				metric.Timeouts++
+			}
 		}
 
 		// Tell the timeout manager we are no longer expecting a response
@@ -372,12 +374,14 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 		return
 	}
 
-	metric, ok := cr.nodeMetrics[nodeID]
-	if !ok {
-		metric = &nodeMetrics{}
-		cr.nodeMetrics[nodeID] = metric
+	if op == message.ChitsOp || op == message.PutOp {
+		metric, ok := cr.nodeMetrics[nodeID]
+		if !ok {
+			metric = &nodeMetrics{}
+			cr.nodeMetrics[nodeID] = metric
+		}
+		metric.Successes++
 	}
-	metric.Successes++
 
 	// Calculate how long it took [nodeID] to reply
 	latency := cr.clock.Time().Sub(req.time)
