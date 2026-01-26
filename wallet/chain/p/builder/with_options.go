@@ -310,3 +310,45 @@ func (w *withOptions) NewAddPermissionlessDelegatorTx(
 		common.UnionOptions(w.options, options)...,
 	)
 }
+
+func (w *withOptions) NewAddContinuousValidatorTx(
+	validatorNodeID ids.NodeID,
+	weight uint64,
+	signer signer.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	configOwner *secp256k1fx.OutputOwners,
+	delegationShares uint32,
+	autoRestakeShares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.AddContinuousValidatorTx, error) {
+	return w.builder.NewAddContinuousValidatorTx(
+		validatorNodeID,
+		weight,
+		signer,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		configOwner,
+		delegationShares,
+		autoRestakeShares,
+		period,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) NewSetAutoRestakeConfigTx(
+	txID ids.ID,
+	autoRestakeShares *uint32,
+	period *uint64,
+	options ...common.Option,
+) (*txs.SetAutoRestakeConfigTx, error) {
+	return w.builder.NewSetAutoRestakeConfigTx(
+		txID,
+		autoRestakeShares,
+		period,
+		common.UnionOptions(w.options, options)...,
+	)
+}
