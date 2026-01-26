@@ -284,6 +284,8 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 
 	bufferedDeadline, err := timeUntil(deadline)
 	if err != nil {
+		// Drop the request if we already missed the deadline to respond.
+		droppedRequests.Inc(1)
 		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "err", err)
 		return nil
 	}
@@ -365,8 +367,6 @@ func timeUntil(deadline time.Time) (time.Time, error) {
 
 	// check if we have enough time to handle this request
 	if time.Until(bufferedDeadline) < minRequestHandlingDuration {
-		// Drop the request if we already missed the deadline to respond.
-		droppedRequests.Inc(1)
 		return time.Time{}, errExpiredRequest
 	}
 
