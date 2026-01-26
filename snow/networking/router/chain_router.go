@@ -91,6 +91,7 @@ type ChainRouter struct {
 type nodeMetrics struct {
 	Successes int
 	Failures  int
+	Timeouts  int
 }
 
 // Initialize the router.
@@ -206,13 +207,13 @@ func (cr *ChainRouter) RegisterRequest(
 		shouldMeasureLatency,
 		uniqueRequestID,
 		func() {
-			cr.handleMessage(ctx, timeoutMsg, true)
+			cr.handleMessage(ctx, timeoutMsg, true, true)
 		},
 	)
 }
 
 func (cr *ChainRouter) HandleInbound(ctx context.Context, msg *message.InboundMessage) {
-	cr.handleMessage(ctx, msg, false)
+	cr.handleMessage(ctx, msg, false, false)
 }
 
 func (cr *ChainRouter) HandleInternal(ctx context.Context, msg *message.InboundMessage) {
@@ -220,14 +221,14 @@ func (cr *ChainRouter) HandleInternal(ctx context.Context, msg *message.InboundM
 	// may be sent while holding the chain's context lock. To enforce the
 	// expected lock ordering, we must not grab the chain router lock while
 	// holding the chain's context lock.
-	go cr.handleMessage(ctx, msg, true)
+	go cr.handleMessage(ctx, msg, true, false)
 }
 
 // handleMessage routes a message to the specified chain. Messages may be
 // unrequested, responses, or timeouts. The internal flag indicates whether the
 // message is being sent from an internal component, such as due to a timeout,
 // or if the message originated from a remote peer.
-func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMessage, internal bool) {
+func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMessage, internal, timeout bool) {
 	nodeID := msg.NodeID
 	op := msg.Op
 
@@ -336,6 +337,9 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			cr.nodeMetrics[nodeID] = metric
 		}
 		metric.Failures++
+		if timeout {
+			metric.Timeouts++
+		}
 
 		// Tell the timeout manager we are no longer expecting a response
 		cr.timeoutManager.RemoveRequest(uniqueRequestID)
