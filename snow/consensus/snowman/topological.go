@@ -23,6 +23,9 @@ var (
 	errUnknownParentBlock      = errors.New("unknown parent block")
 	errTooManyProcessingBlocks = errors.New("too many processing blocks")
 	errBlockProcessingTooLong  = errors.New("block processing too long")
+	errAcceptanceTimeTooHigh   = errors.New("acceptance time too high")
+
+	maxAcceptanceTime = 15 * time.Second
 
 	_ Factory   = (*TopologicalFactory)(nil)
 	_ Consensus = (*Topological)(nil)
@@ -331,9 +334,21 @@ func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 		errs = append(errs, err)
 	}
 
+	// Check average acceptance time
+	avgAcceptanceTime := ts.metrics.GetAverageAcceptanceTime()
+	if avgAcceptanceTime > maxAcceptanceTime {
+		err := fmt.Errorf("%w: %s > %s",
+			errAcceptanceTimeTooHigh,
+			avgAcceptanceTime,
+			maxAcceptanceTime,
+		)
+		errs = append(errs, err)
+	}
+
 	return map[string]interface{}{
 		"processingBlocks":       numProcessingBlks,
 		"longestProcessingBlock": maxTimeProcessing.String(), // .String() is needed here to ensure a human readable format
+		"avgAcceptanceTime":      avgAcceptanceTime.String(),
 		"lastAcceptedID":         ts.lastAcceptedID,
 		"lastAcceptedHeight":     ts.lastAcceptedHeight,
 	}, errors.Join(errs...)
