@@ -82,7 +82,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	}
 
 	epochConfig := simplex.EpochConfig{
-		MaxProposalWait:     config.Params.MaxProposalWait,
+		MaxProposalWait:     config.Params.MaxNetworkDelay,
 		MaxRebroadcastWait:  config.Params.MaxRebroadcastWait,
 		QCDeserializer:      qcDeserializer,
 		Logger:              config.Log,
@@ -127,7 +127,7 @@ func (e *Engine) Start(_ context.Context, _ uint32) error {
 }
 
 func getTickInterval(params *pSimplex.Parameters) time.Duration {
-	tick := min(int64(params.MaxProposalWait), int64(params.MaxRebroadcastWait)) / 10
+	tick := min(int64(params.MaxNetworkDelay), int64(params.MaxRebroadcastWait)) / 10
 	return time.Duration(tick)
 }
 
