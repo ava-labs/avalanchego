@@ -22,19 +22,19 @@ type SimplexValidatorInfo struct {
 }
 
 type Parameters struct {
-	MaxProposalWait    time.Duration          `json:"maxProposalWait"    yaml:"maxProposalWait"`
+	MaxNetworkDelay    time.Duration          `json:"maxNetworkDelay"    yaml:"maxNetworkDelay"`
 	MaxRebroadcastWait time.Duration          `json:"maxRebroadcastWait" yaml:"maxRebroadcastWait"`
 	InitialValidators  []SimplexValidatorInfo `json:"initialValidators"  yaml:"initialValidators"`
 }
 
 var DefaultParameters = Parameters{
-	MaxProposalWait:    5 * time.Second,
+	MaxNetworkDelay:    5 * time.Second,
 	MaxRebroadcastWait: 5 * time.Second,
 }
 
 func (p Parameters) Verify() error {
-	if p.MaxProposalWait <= 0 {
-		return fmt.Errorf("%w: maxProposalWait must be positive", ErrInvalidParameters)
+	if p.MaxNetworkDelay <= 0 {
+		return fmt.Errorf("%w: maxNetworkDelay must be positive", ErrInvalidParameters)
 	}
 	if p.MaxRebroadcastWait <= 0 {
 		return fmt.Errorf("%w: maxRebroadcastWait must be positive", ErrInvalidParameters)

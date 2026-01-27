@@ -26,8 +26,8 @@ var (
 
 	errDigestNotFound        = errors.New("digest not found in block tracker")
 	errMismatchedPrevDigest  = errors.New("prev digest does not match block parent")
-	errFailedToParseMetadata = errors.New("failed to parse protocol metadata")
 	errGenesisVerification   = errors.New("genesis block should not be verified")
+	errFailedToParseMetadata = errors.New("failed to parse protocol metadata")
 )
 
 type Block struct {
