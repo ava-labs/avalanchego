@@ -51,6 +51,77 @@ func TestApplicationString(t *testing.T) {
 	}
 }
 
+func TestApplicationSemantic(t *testing.T) {
+	tests := []struct {
+		app  *Application
+		want string
+	}{
+		{
+			app: &Application{
+				Name:  Client,
+				Major: 0,
+				Minor: 0,
+				Patch: 1,
+			},
+			want: "v0.0.1",
+		},
+		{
+			app: &Application{
+				Name:  Client,
+				Major: 1,
+				Minor: 14,
+				Patch: 1,
+			},
+			want: "v1.14.1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			require.Equal(t, tt.want, tt.app.Semantic())
+		})
+	}
+}
+
+func TestApplicationSemanticWithCommit(t *testing.T) {
+	tests := []struct {
+		name      string
+		app       *Application
+		gitCommit string
+		want      string
+	}{
+		{
+			name: "without commit",
+			app: &Application{
+				Name:  Client,
+				Major: 1,
+				Minor: 14,
+				Patch: 1,
+			},
+			gitCommit: "",
+			want:      "v1.14.1",
+		},
+		{
+			name: "with commit",
+			app: &Application{
+				Name:  Client,
+				Major: 1,
+				Minor: 14,
+				Patch: 1,
+			},
+			gitCommit: "abc123",
+			want:      "v1.14.1@abc123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.app.SemanticWithCommit(tt.gitCommit)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestApplicationCompare(t *testing.T) {
 	tests := []struct {
 		myVersion   *Application
