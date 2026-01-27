@@ -70,7 +70,7 @@ func TestVerifyStateUpgrades(t *testing.T) {
 			name: "balance change exceeds uint256",
 			upgrades: []StateUpgrade{
 				{
-					BlockTimestamp: utils.NewUint64(1),
+					BlockTimestamp: utils.PointerTo[uint64](1),
 					StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
 						{1}: {
 							BalanceChange: (*math.HexOrDecimal256)(overflowValue),
@@ -84,7 +84,7 @@ func TestVerifyStateUpgrades(t *testing.T) {
 			name: "negative balance change exceeds uint256",
 			upgrades: []StateUpgrade{
 				{
-					BlockTimestamp: utils.NewUint64(1),
+					BlockTimestamp: utils.PointerTo[uint64](1),
 					StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
 						{1}: {
 							BalanceChange: (*math.HexOrDecimal256)(negativeOverflowValue),
@@ -98,7 +98,7 @@ func TestVerifyStateUpgrades(t *testing.T) {
 			name: "max uint256 balance change is valid",
 			upgrades: []StateUpgrade{
 				{
-					BlockTimestamp: utils.NewUint64(1),
+					BlockTimestamp: utils.PointerTo[uint64](1),
 					StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
 						{1}: {
 							BalanceChange: (*math.HexOrDecimal256)(maxUint256),
@@ -111,7 +111,7 @@ func TestVerifyStateUpgrades(t *testing.T) {
 			name: "negative max uint256 balance change is valid",
 			upgrades: []StateUpgrade{
 				{
-					BlockTimestamp: utils.NewUint64(1),
+					BlockTimestamp: utils.PointerTo[uint64](1),
 					StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
 						{1}: {
 							BalanceChange: (*math.HexOrDecimal256)(new(big.Int).Neg(maxUint256)),
