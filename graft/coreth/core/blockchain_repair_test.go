@@ -100,10 +100,8 @@ func testShortRepair(t *testing.T, snapshots bool) {
 // test scenario the side chain is below the committed block. In this case we expect
 // the canonical chain to be rolled back to the committed block, but the chain data
 // itself left in the database for replaying.
-func TestShortOldForkedRepair(t *testing.T) { testShortOldForkedRepair(t, false) }
-func TestShortOldForkedRepairWithSnapshots(t *testing.T) {
-	testShortOldForkedRepair(t, true)
-}
+func TestShortOldForkedRepair(t *testing.T)              { testShortOldForkedRepair(t, false) }
+func TestShortOldForkedRepairWithSnapshots(t *testing.T) { testShortOldForkedRepair(t, true) }
 
 func testShortOldForkedRepair(t *testing.T, snapshots bool) {
 	// Chain:

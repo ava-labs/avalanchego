@@ -144,7 +144,6 @@ func testArchiveBlockChainSnapsDisabled(t *testing.T, scheme string) {
 
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-
 			tt.testFunc(t, create)
 		})
 	}
