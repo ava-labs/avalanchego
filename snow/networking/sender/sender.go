@@ -691,16 +691,6 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		return
 	}
 
-	// [nodeID] may be benched. That is, they've been unresponsive so we don't
-	// even bother sending requests to them. We just have them immediately fail.
-	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-		s.failedDueToBench.With(prometheus.Labels{
-			opLabel: message.GetAncestorsOp.String(),
-		}).Inc()
-		s.router.HandleInternal(ctx, inMsg)
-		return
-	}
-
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -734,7 +724,10 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		s.ctx.SubnetID,
 		s.subnet,
 	)
-	if sentTo.Len() == 0 {
+
+	// [nodeID] may be benched. That is, they've been unresponsive so we don't
+	// even bother sending requests to them. We just have them immediately fail.
+	if isBenched := s.timeouts.IsBenched(nodeID, s.ctx.ChainID); isBenched || sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
 			zap.Stringer("messageOp", message.GetAncestorsOp),
 			zap.Stringer("nodeID", nodeID),
@@ -818,16 +811,6 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		return
 	}
 
-	// [nodeID] may be benched. That is, they've been unresponsive so we don't
-	// even bother sending requests to them. We just have them immediately fail.
-	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-		s.failedDueToBench.With(prometheus.Labels{
-			opLabel: message.GetOp.String(),
-		}).Inc()
-		s.router.HandleInternal(ctx, inMsg)
-		return
-	}
-
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -861,7 +844,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		)
 	}
 
-	if sentTo.Len() == 0 {
+	if isBenched := s.timeouts.IsBenched(nodeID, s.ctx.ChainID); isBenched || sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
 			zap.Stringer("messageOp", message.GetOp),
 			zap.Stringer("nodeID", nodeID),
@@ -976,27 +959,6 @@ func (s *sender) SendPushQuery(
 		s.router.HandleInternal(ctx, inMsg)
 	}
 
-	// Some of [nodeIDs] may be benched. That is, they've been unresponsive so
-	// we don't even bother sending messages to them. We just have them
-	// immediately fail.
-	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-			s.failedDueToBench.With(prometheus.Labels{
-				opLabel: message.PushQueryOp.String(),
-			}).Inc()
-			nodeIDs.Remove(nodeID)
-
-			// Immediately register a failure. Do so asynchronously to avoid
-			// deadlock.
-			inMsg := message.InternalQueryFailed(
-				nodeID,
-				s.ctx.ChainID,
-				requestID,
-			)
-			s.router.HandleInternal(ctx, inMsg)
-		}
-	}
-
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.PushQuery(
 		s.ctx.ChainID,
@@ -1036,7 +998,7 @@ func (s *sender) SendPushQuery(
 	)
 
 	for nodeID := range nodeIDs {
-		if !sentTo.Contains(nodeID) {
+		if isBenched := s.timeouts.IsBenched(nodeID, s.ctx.ChainID); isBenched || !sentTo.Contains(nodeID) {
 			if s.ctx.Log.Enabled(logging.Verbo) {
 				s.ctx.Log.Verbo("failed to send message",
 					zap.Stringer("messageOp", message.PushQueryOp),
@@ -1115,26 +1077,6 @@ func (s *sender) SendPullQuery(
 		s.router.HandleInternal(ctx, inMsg)
 	}
 
-	// Some of the nodes in [nodeIDs] may be benched. That is, they've been
-	// unresponsive so we don't even bother sending messages to them. We just
-	// have them immediately fail.
-	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-			s.failedDueToBench.With(prometheus.Labels{
-				opLabel: message.PullQueryOp.String(),
-			}).Inc()
-			nodeIDs.Remove(nodeID)
-			// Immediately register a failure. Do so asynchronously to avoid
-			// deadlock.
-			inMsg := message.InternalQueryFailed(
-				nodeID,
-				s.ctx.ChainID,
-				requestID,
-			)
-			s.router.HandleInternal(ctx, inMsg)
-		}
-	}
-
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.PullQuery(
 		s.ctx.ChainID,
@@ -1175,7 +1117,7 @@ func (s *sender) SendPullQuery(
 	)
 
 	for nodeID := range nodeIDs {
-		if !sentTo.Contains(nodeID) {
+		if isBenched := s.timeouts.IsBenched(nodeID, s.ctx.ChainID); isBenched || !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug("failed to send message",
 				zap.Stringer("messageOp", message.PullQueryOp),
 				zap.Stringer("nodeID", nodeID),
@@ -1311,29 +1253,6 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 		s.router.HandleInternal(ctx, inMsg)
 	}
 
-	// Some of the nodes in [nodeIDs] may be benched. That is, they've been
-	// unresponsive so we don't even bother sending messages to them. We just
-	// have them immediately fail.
-	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-			s.failedDueToBench.With(prometheus.Labels{
-				opLabel: message.AppRequestOp.String(),
-			}).Inc()
-			nodeIDs.Remove(nodeID)
-
-			// Immediately register a failure. Do so asynchronously to avoid
-			// deadlock.
-			inMsg := message.InboundAppError(
-				nodeID,
-				s.ctx.ChainID,
-				requestID,
-				common.ErrTimeout.Code,
-				common.ErrTimeout.Message,
-			)
-			s.router.HandleInternal(ctx, inMsg)
-		}
-	}
-
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppRequest(
 		s.ctx.ChainID,
@@ -1370,7 +1289,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	)
 
 	for nodeID := range nodeIDs {
-		if !sentTo.Contains(nodeID) {
+		if isBenched := s.timeouts.IsBenched(nodeID, s.ctx.ChainID); isBenched || !sentTo.Contains(nodeID) {
 			if s.ctx.Log.Enabled(logging.Verbo) {
 				s.ctx.Log.Verbo("failed to send message",
 					zap.Stringer("messageOp", message.AppRequestOp),
