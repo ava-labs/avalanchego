@@ -398,7 +398,7 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 	}
 
 	uniqueRequestID, req := cr.clearRequest(op, nodeID, chainID, requestID)
-	if req == nil {
+	if req == nil || req.handled {
 		// We didn't request this message.
 		msg.OnFinishedHandling()
 		return

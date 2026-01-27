@@ -111,10 +111,25 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		return nil
 	}
 
-	m.chainBenchlists[ctx.ChainID] = newBenchlist(
+	reg, err := metrics.MakeAndRegister(
+		m.config.BenchlistRegisterer,
+		ctx.PrimaryAlias,
+	)
+	if err != nil {
+		return err
+	}
+
+	benchlist, err := newBenchlist(
 		ctx,
 		m.config.Benchable,
+		m.config.Validators,
+		reg,
 	)
+	if err != nil {
+		return err
+	}
+
+	m.chainBenchlists[ctx.ChainID] = benchlist
 	return nil
 }
 

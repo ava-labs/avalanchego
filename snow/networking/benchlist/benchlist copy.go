@@ -4,14 +4,18 @@
 package benchlist
 
 import (
+	"errors"
 	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
 
@@ -36,6 +40,10 @@ type benchlist struct {
 	ctx       *snow.ConsensusContext
 	benchable Benchable
 
+	numBenched    prometheus.Gauge
+	weightBenched prometheus.Gauge
+	vdrs          validators.Manager
+
 	lock  sync.RWMutex
 	nodes map[ids.NodeID]*node
 
@@ -55,15 +63,36 @@ type job struct {
 func newBenchlist(
 	ctx *snow.ConsensusContext,
 	benchable Benchable,
-) *benchlist {
+	vdrs validators.Manager,
+	reg prometheus.Registerer,
+) (*benchlist, error) {
 	b := &benchlist{
 		ctx:       ctx,
 		benchable: benchable,
-		nodes:     make(map[ids.NodeID]*node),
-		jobs:      buffer.NewUnboundedBlockingDeque[job](1),
+
+		numBenched: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "benched_num",
+			Help: "Number of currently benched validators",
+		}),
+		weightBenched: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "benched_weight",
+			Help: "Weight of currently benched validators",
+		}),
+		vdrs: vdrs,
+
+		nodes: make(map[ids.NodeID]*node),
+		jobs:  buffer.NewUnboundedBlockingDeque[job](1),
 	}
+	err := errors.Join(
+		reg.Register(b.numBenched),
+		reg.Register(b.weightBenched),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	go b.run()
-	return b
+	return b, nil
 }
 
 // RegisterResponse notes that we received a response from [nodeID] prior to the
@@ -140,6 +169,7 @@ func (b *benchlist) getNode(nodeID ids.NodeID) *node {
 }
 
 func (b *benchlist) run() {
+	var benched set.Set[ids.NodeID]
 	for {
 		job, _ := b.jobs.PopLeft()
 		if job.bench {
@@ -147,11 +177,26 @@ func (b *benchlist) run() {
 				zap.Stringer("nodeID", job.nodeID),
 			)
 			b.benchable.Benched(b.ctx.ChainID, job.nodeID)
+			benched.Add(job.nodeID)
+			b.numBenched.Inc()
 		} else {
 			b.ctx.Log.Info("removing node from benchlist",
 				zap.Stringer("nodeID", job.nodeID),
 			)
 			b.benchable.Unbenched(b.ctx.ChainID, job.nodeID)
+			benched.Remove(job.nodeID)
+			b.numBenched.Dec()
 		}
+
+		benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benched)
+		if err != nil {
+			b.ctx.Log.Error("error calculating benched stake",
+				zap.Stringer("subnetID", b.ctx.SubnetID),
+				zap.Error(err),
+			)
+			continue
+		}
+		b.weightBenched.Set(float64(benchedStake))
+
 	}
 }
