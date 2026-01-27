@@ -3,9 +3,7 @@
 
 package sync
 
-import (
-	"github.com/ava-labs/avalanchego/graft/evm/message"
-)
+import "github.com/ava-labs/avalanchego/graft/evm/message"
 
 var _ message.SyncableParser = (*summaryParser)(nil)
 

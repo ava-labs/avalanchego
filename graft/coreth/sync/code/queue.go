@@ -23,7 +23,7 @@ const defaultQueueCapacity = 5000
 var (
 	_ types.Finalizer = (*Queue)(nil)
 
-	errFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
+	ErrFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
 	errFailedToFinalizeCodeQueue    = errors.New("failed to finalize code queue")
 )
 
@@ -129,7 +129,7 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	if q.in == nil {
 		// Although this will happen anyway once the `select` is reached,
 		// bailing early avoids unnecessary database writes.
-		return errFailedToAddCodeHashesToQueue
+		return ErrFailedToAddCodeHashesToQueue
 	}
 
 	batch := q.db.NewBatch()
@@ -152,7 +152,7 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 		select {
 		case q.in <- h: // guaranteed to be open or nil, but never closed
 		case <-q.quit:
-			return errFailedToAddCodeHashesToQueue
+			return ErrFailedToAddCodeHashesToQueue
 		case <-ctx.Done():
 			return ctx.Err()
 		}

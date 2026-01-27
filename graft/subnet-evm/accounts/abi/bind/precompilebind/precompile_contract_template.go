@@ -162,11 +162,10 @@ func Pack{{.Normalized.Name}}(inputStruct {{capitalise .Normalized.Name}}Input) 
 // Unpack{{capitalise .Normalized.Name}}Input attempts to unpack [input] into the {{$bindedType}} type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func Unpack{{capitalise .Normalized.Name}}Input(input []byte)({{$bindedType}}, error) {
-res, err := {{$contract.Type}}ABI.UnpackInput("{{$method.Original.Name}}", input)
-if err != nil {
+var unpacked {{$bindedType}}
+if err := {{$contract.Type}}ABI.UnpackInputIntoInterface(&unpacked, "{{$method.Original.Name}}", input); err != nil {
 	return {{bindtypenew $input.Type $structs}}, err
 }
-unpacked := *abi.ConvertType(res[0], new({{$bindedType}})).(*{{$bindedType}})
 return unpacked, nil
 }
 
