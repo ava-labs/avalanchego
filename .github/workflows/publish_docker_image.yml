@@ -26,14 +26,16 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
           DOCKER_IMAGE: ${{ secrets.DOCKER_REPO }}
-          BUILD_MULTI_ARCH: 1
+          PLATFORMS: "linux/amd64,linux/arm64"
+          PUSH: 1
         run: scripts/run_task.sh build-image
       - name: Build and publish bootstrap-monitor image to DockerHub
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
           DOCKER_IMAGE: avaplatform/bootstrap-monitor
-          BUILD_MULTI_ARCH: 1
+          PLATFORMS: "linux/amd64,linux/arm64"
+          PUSH: 1
         run: scripts/run_task.sh build-bootstrap-monitor-image
       - name: Build and publish subnet-evm image to DockerHub
         env:
@@ -41,6 +43,6 @@ jobs:
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
           IMAGE_NAME: avaplatform/subnet-evm
           PLATFORMS: "linux/amd64,linux/arm64"
-          PUBLISH: 1
+          PUSH: 1
           ALLOW_TAG_LATEST: ${{ github.event_name != 'workflow_dispatch' }}
         run: scripts/run_task.sh build-subnet-evm-image

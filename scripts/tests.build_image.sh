@@ -18,21 +18,25 @@ source "$AVALANCHE_PATH"/scripts/image_tag.sh
 build_and_test() {
   local image_name=$1
 
-  BUILD_MULTI_ARCH=1 DOCKER_IMAGE="$image_name" ./scripts/build_image.sh
-
-  echo "listing images"
-  docker images
-
   local host_arch
   host_arch="$(go env GOARCH)"
 
   if [[ "$image_name" == *"/"* ]]; then
-    # Test all arches if testing a multi-arch image
+    # Multi-arch build for registry
+    local platforms="linux/amd64,linux/arm64"
     local arches=("amd64" "arm64")
+    local push="1"
   else
-    # Test only the host platform for single arch builds
+    # Single-arch local build
+    local platforms="linux/$host_arch"
     local arches=("$host_arch")
+    local push=""
   fi
+
+  PLATFORMS="$platforms" PUSH="$push" DOCKER_IMAGE="$image_name" ./scripts/build_image.sh
+
+  echo "listing images"
+  docker images
 
   # Check all of the images expected to have been built
   local target_images=(

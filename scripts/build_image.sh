@@ -2,14 +2,17 @@
 
 set -euo pipefail
 
+# Builds Docker images for avalanchego.
+#
 # e.g.,
-# ./scripts/build_image.sh                                                            # Build local single-arch image
-# ./scripts/build_image.sh --no-cache                                                 # All arguments are provided to `docker buildx build`
-# SKIP_BUILD_RACE=1 ./scripts/build_image.sh                                          # Build local single-arch image but skip building -r image
-# DOCKER_IMAGE=myavalanchego ./scripts/build_image.sh                                 # Build local single arch image with a custom image name
-# DOCKER_IMAGE=avaplatform/avalanchego ./scripts/build_image.sh                       # Build and push multi-arch image to docker hub
-# DOCKER_IMAGE=localhost:5001/avalanchego ./scripts/build_image.sh                    # Build and push multi-arch image to private registry
-# DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_MASTER=1 ./scripts/build_image.sh # Build and push image to private registry with tag `master`
+# ./scripts/build_image.sh                                                              # Build local single-arch image
+# ./scripts/build_image.sh --no-cache                                                   # All arguments are provided to `docker buildx build`
+# SKIP_BUILD_RACE=1 ./scripts/build_image.sh                                            # Build local single-arch but skip building -r image
+# DOCKER_IMAGE=myavalanchego ./scripts/build_image.sh                                   # Build local single-arch with custom image name
+# PLATFORMS=linux/arm64 ./scripts/build_image.sh                                        # Build local single-arch for arm64
+# PLATFORMS=linux/amd64,linux/arm64 PUSH=1 DOCKER_IMAGE=avaplatform/avalanchego ./scripts/build_image.sh  # Build and push multi-arch to docker hub
+# PUSH=1 DOCKER_IMAGE=localhost:5001/avalanchego ./scripts/build_image.sh               # Build and push single-arch to private registry
+# PUSH=1 DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_MASTER=1 ./scripts/build_image.sh  # Build and push with tag `master`
 
 # Multi-arch builds require Docker Buildx and QEMU. buildx should be enabled by
 # default in the version of docker included with Ubuntu 22.04, and qemu can be
@@ -47,20 +50,14 @@ if [[ -z "${SKIP_BUILD_RACE}" && $image_tag == *"-r" ]]; then
 fi
 
 # The published name should be 'avaplatform/avalanchego', but to avoid unintentional
-# pushes it is defaulted to 'avalanchego' (without a repo or registry name) which can
-# only be used to create local images.
+# pushes it is defaulted to 'avalanchego'.
 DOCKER_IMAGE="${DOCKER_IMAGE:-avalanchego}"
 
-# If set to non-empty, prompts the building of a multi-arch image when the image
-# name indicates use of a registry.
-#
-# A registry is required to build a multi-arch image since a multi-arch image is
-# not really an image at all. A multi-arch image (also called a manifest) is
-# basically a list of arch-specific images available from the same registry that
-# hosts the manifest. Manifests are not supported for local images.
+# If set to non-empty, pushes the image to a registry. Otherwise, loads it locally.
+# Multi-arch builds require PUSH=1 since multi-arch images cannot be loaded locally.
 #
 # Reference: https://docs.docker.com/build/building/multi-platform/
-BUILD_MULTI_ARCH="${BUILD_MULTI_ARCH:-}"
+PUSH="${PUSH:-}"
 
 # buildx (BuildKit) improves the speed and UI of builds over the legacy builder and
 # simplifies creation of multi-arch images.
@@ -80,13 +77,8 @@ DOCKER_CMD="${DOCKER_CMD} --build-arg GO_VERSION=${GO_VERSION}"
 # directory to copy into the image.
 DOCKER_CMD="${DOCKER_CMD} --build-arg AVALANCHEGO_COMMIT=${git_commit}"
 
-# If BUILD_MULTI_ARCH is set and PLATFORMS is not, use default platforms
-if [[ -n "${BUILD_MULTI_ARCH}" && -z "${PLATFORMS:-}" ]]; then
-  PLATFORMS="linux/amd64,linux/arm64"
-fi
-
 # Configure build mode (push vs load) and platform flags
-configure_docker_build_mode "$DOCKER_IMAGE" "${PLATFORMS:-}"
+configure_docker_build_mode "${PLATFORMS:-}" "${PUSH}"
 DOCKER_CMD="${DOCKER_CMD} ${DOCKER_BUILD_MODE_FLAGS} ${DOCKER_PLATFORM_FLAGS}"
 
 echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash , $DOCKER_IMAGE:$image_tag"

@@ -2,19 +2,14 @@
 
 set -euo pipefail
 
-# If set to non-empty, prompts the building of a multi-arch image when the image
-# name indicates use of a registry.
-#
-# A registry is required to build a multi-arch image since a multi-arch image is
-# not really an image at all. A multi-arch image (also called a manifest) is
-# basically a list of arch-specific images available from the same registry that
-# hosts the manifest. Manifests are not supported for local images.
+# Comma-separated list of platforms to build for (e.g., "linux/amd64,linux/arm64").
+# Multi-arch builds require PUSH=1 since multi-arch images cannot be loaded locally.
 #
 # Reference: https://docs.docker.com/build/building/multi-platform/
 PLATFORMS="${PLATFORMS:-}"
 
-# If set to non-empty, the image will be published to the registry.
-PUBLISH="${PUBLISH:-}"
+# If set to non-empty, pushes the image to a registry. Otherwise, loads it locally.
+PUSH="${PUSH:-}"
 
 # Directory above this script
 SUBNET_EVM_PATH=$(
@@ -41,10 +36,10 @@ ALLOW_TAG_LATEST="${ALLOW_TAG_LATEST:-}"
 DOCKER_CMD="docker buildx build"
 
 # Configure build mode (push vs load) and platform flags
-if [[ -n "${PUBLISH}" ]]; then
+if [[ -n "${PUSH}" ]]; then
   echo "Pushing $IMAGE_NAME:$BUILD_IMAGE_ID"
 fi
-configure_docker_build_mode "$IMAGE_NAME" "${PLATFORMS:-}"
+configure_docker_build_mode "${PLATFORMS:-}" "${PUSH}"
 DOCKER_CMD="${DOCKER_CMD} ${DOCKER_BUILD_MODE_FLAGS} ${DOCKER_PLATFORM_FLAGS}"
 
 VM_ID=${VM_ID:-"${DEFAULT_VM_ID}"}
@@ -55,12 +50,6 @@ AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_NODE_IMAGE:-${AVALANCHEGO_IMAGE_NAME}:${AV
 # Build the avalanchego image if it cannot be pulled. This will usually be due to
 # AVALANCHE_VERSION being not yet merged since the image is published post-merge.
 if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
-  # Build a multi-arch avalanchego image if the subnet-evm image build is multi-arch
-  BUILD_MULTI_ARCH="$([[ "$PLATFORMS" =~ , ]] && echo 1 || echo "")"
-
-  # - Use a image name without a repository (i.e. without 'avaplatform/' prefix ) to build a
-  #   local single-arch image that will not be pushed.
-  # - Use a image name with a repository to build a multi-arch image that will be pushed.
   AVALANCHEGO_LOCAL_IMAGE_NAME="${AVALANCHEGO_LOCAL_IMAGE_NAME:-avalanchego}"
 
   AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}:${AVALANCHE_VERSION}"
@@ -69,7 +58,8 @@ if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
   AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
   SKIP_BUILD_RACE=1 \
     DOCKER_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}" \
-    BUILD_MULTI_ARCH="${BUILD_MULTI_ARCH}" \
+    PLATFORMS="${PLATFORMS}" \
+    PUSH="${PUSH}" \
     "${AVALANCHE_PATH}"/scripts/build_image.sh
 fi
 

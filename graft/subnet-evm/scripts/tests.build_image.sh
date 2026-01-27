@@ -22,16 +22,19 @@ build_and_test() {
 
   if [[ "${multiarch_image}" == true ]]; then
     local arches="linux/amd64,linux/arm64"
+    local push="1"
   else
     # Test only the host platform for single arch builds
     local host_arch
     host_arch="$(go env GOARCH)"
     local arches="linux/$host_arch"
+    local push=""
   fi
 
   local imgtag="testtag"
 
   PLATFORMS="${arches}" \
+    PUSH="${push}" \
     BUILD_IMAGE_ID="${imgtag}" \
     VM_ID=$"${vm_id}" \
     IMAGE_NAME="${imagename}" \

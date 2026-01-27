@@ -14,40 +14,43 @@ docker_login_if_needed() {
 }
 
 # Configures Docker buildx mode and platform flags.
-# - Multi-arch builds (comma in platforms) require registry and use --push
-# - Single-arch with registry (slash in image name) uses --push
-# - Single-arch local builds use --load
+# - Multi-arch builds (comma in platforms) require push to registry
+# - Use PUSH=1 to push to registry, empty/unset to load locally
 #
 # Sets: DOCKER_BUILD_MODE_FLAGS, DOCKER_PLATFORM_FLAGS
 configure_docker_build_mode() {
-  local image_name="${1:-}"
-  local platforms="${2:-}"
+  local platforms="${1:-}"
+  local push="${2:-}"
 
   # Reset output variables
+  # shellcheck disable=SC2034  # Variables used by caller
   DOCKER_BUILD_MODE_FLAGS=""
+  # shellcheck disable=SC2034  # Variables used by caller
   DOCKER_PLATFORM_FLAGS=""
 
   local is_multi_arch=0
   [[ "$platforms" == *,* ]] && is_multi_arch=1
 
-  local has_registry=0
-  [[ "$image_name" == *"/"* ]] && has_registry=1
-
-  # Multi-arch requires registry
-  if [[ $is_multi_arch -eq 1 && $has_registry -eq 0 ]]; then
-    echo "ERROR: Multi-arch images must be pushed to a registry."
-    echo "ERROR: Image name must include repository (e.g., 'myregistry/image' or 'dockerhub/image')"
-    exit 1
+  # Multi-arch requires push (can't load multi-arch images locally)
+  if [[ $is_multi_arch -eq 1 ]]; then
+    if [[ -z "$push" ]]; then
+      echo "ERROR: Multi-arch images cannot be loaded locally."
+      echo "ERROR: Set PUSH=1 to push to a registry."
+      exit 1
+    fi
   fi
 
-  if [[ $has_registry -eq 1 ]]; then
+  if [[ -n "$push" ]]; then
+    # shellcheck disable=SC2034  # Variables used by caller
     DOCKER_BUILD_MODE_FLAGS="--push"
     docker_login_if_needed
   else
+    # shellcheck disable=SC2034  # Variables used by caller
     DOCKER_BUILD_MODE_FLAGS="--load"
   fi
 
   if [[ -n "$platforms" ]]; then
+    # shellcheck disable=SC2034  # Variables used by caller
     DOCKER_PLATFORM_FLAGS="--platform=$platforms"
   fi
 }
