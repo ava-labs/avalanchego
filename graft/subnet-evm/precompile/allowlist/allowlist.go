@@ -79,7 +79,7 @@ func UnpackModifyAllowListInput(input []byte, r Role, useStrictMode bool) (commo
 		return common.Address{}, err
 	}
 	var modifyAddress common.Address
-	err = AllowListABI.UnpackInputIntoInterface(&modifyAddress, funcName, input, useStrictMode)
+	err = AllowListABI.UnpackInputIntoInterface(&modifyAddress, funcName, input)
 	return modifyAddress, err
 }
 
@@ -145,7 +145,7 @@ func UnpackReadAllowListInput(input []byte, useStrictMode bool) (common.Address,
 	}
 
 	var modifyAddress common.Address
-	err := AllowListABI.UnpackInputIntoInterface(&modifyAddress, "readAllowList", input, useStrictMode)
+	err := AllowListABI.UnpackInputIntoInterface(&modifyAddress, "readAllowList", input)
 	return modifyAddress, err
 }
 
