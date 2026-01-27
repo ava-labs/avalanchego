@@ -22,6 +22,7 @@ source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
 # Load shared build functions
 AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
+# shellcheck disable=SC1091
 source "$AVALANCHE_PATH"/scripts/lib_build_image.sh
 
 # ALLOW_TAG_LATEST is used to tag the image as 'latest' if set to true.

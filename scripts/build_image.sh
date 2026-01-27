@@ -42,6 +42,7 @@ FORCE_TAG_MASTER="${FORCE_TAG_MASTER:-}"
 source "$AVALANCHE_PATH"/scripts/constants.sh
 source "$AVALANCHE_PATH"/scripts/git_commit.sh
 source "$AVALANCHE_PATH"/scripts/image_tag.sh
+# shellcheck disable=SC1091
 source "$AVALANCHE_PATH"/scripts/lib_build_image.sh
 
 if [[ -z "${SKIP_BUILD_RACE}" && $image_tag == *"-r" ]]; then
