@@ -58,7 +58,7 @@ func testSync(t *testing.T, test syncTest) {
 
 	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverDB.TrieDB(), message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
-	mockClient := client.NewTestClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
+	mockClient := client.NewTestClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil, nil)
 	// Set intercept functions for the mock client
 	mockClient.GetLeafsIntercept = test.GetLeafsIntercept
 	mockClient.GetCodeIntercept = test.GetCodeIntercept

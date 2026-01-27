@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
@@ -143,14 +144,15 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 
 func createSyncers(t *testing.T, clientState, serverState state.Database, root common.Hash) (*FirewoodSyncer, *code.Syncer, *code.Queue) {
 	t.Helper()
+
 	// Create the mock P2P client that serves range proofs and change proofs from the server DB.
-	var (
-		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
-		mockClient         = statesyncclient.NewTestClient(message.Codec, nil, codeRequestHandler, nil)
-		serverDB           = dbFromState(t, serverState)
-		rHandler           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetRangeProofHandler(serverDB))
-		cHandler           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetChangeProofHandler(serverDB))
-	)
+	serverDB := dbFromState(t, serverState)
+	testHandlers := map[uint64]*p2p.Client{
+		p2p.FirewoodRangeProofHandlerID:  p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetRangeProofHandler(serverDB)),
+		p2p.FirewoodChangeProofHandlerID: p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetChangeProofHandler(serverDB)),
+	}
+	codeRequestHandler := handlers.NewCodeRequestHandler(serverState.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
+	mockClient := statesyncclient.NewTestClient(message.Codec, nil, codeRequestHandler, nil, testHandlers)
 
 	// Create the producer code queue.
 	codeQueue, err := code.NewQueue(clientState.DiskDB().(ethdb.Database), make(chan struct{}))
@@ -166,8 +168,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 		dbFromState(t, clientState),
 		root,
 		codeQueue,
-		rHandler,
-		cHandler,
+		mockClient,
 	)
 	require.NoError(t, err, "NewFirewoodSyncer()")
 	return firewoodSyncer, codeSyncer, codeQueue

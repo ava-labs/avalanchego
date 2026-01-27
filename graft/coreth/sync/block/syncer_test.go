@@ -201,6 +201,7 @@ func newTestEnvironment(t *testing.T, numBlocks int) *testEnvironment {
 			nil,
 			nil,
 			blockHandler,
+			nil,
 		),
 	}
 }

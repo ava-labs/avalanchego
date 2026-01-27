@@ -9,21 +9,25 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/firewood/syncer"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/evmstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	blocksync "github.com/ava-labs/avalanchego/graft/coreth/sync/block"
 	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
@@ -373,11 +377,25 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		return nil, fmt.Errorf("failed to create code syncer: %w", err)
 	}
 
-	stateSyncer, err := evmstate.NewSyncer(
-		c.config.Client, c.config.ChainDB,
-		summary.GetBlockRoot(),
-		codeQueue, c.config.RequestSize,
-	)
+	var stateSyncer types.Syncer
+	switch scheme := c.config.Chain.BlockChain().CacheConfig().StateScheme; scheme {
+	case rawdb.HashScheme:
+		stateSyncer, err = evmstate.NewSyncer(
+			c.config.Client, c.config.ChainDB,
+			summary.GetBlockRoot(),
+			codeQueue, c.config.RequestSize,
+		)
+	case customrawdb.FirewoodScheme:
+		stateSyncer, err = evmstate.NewFirewoodSyncer(
+			syncer.Config{},
+			c.config.Chain.BlockChain().TrieDB().Backend().(*firewood.TrieDB).Firewood,
+			summary.GetBlockRoot(),
+			codeQueue,
+			c.config.Client,
+		)
+	default:
+		err = fmt.Errorf("unsupported state scheme: %q", scheme)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
 	}

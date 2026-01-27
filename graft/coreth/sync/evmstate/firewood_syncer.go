@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/firewood/syncer"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
@@ -32,14 +33,15 @@ type FirewoodSyncer struct {
 	finalizeOnce func() error
 }
 
-func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue *code.Queue, rangeProofClient, changeProofClient *p2p.Client) (*FirewoodSyncer, error) {
+func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue *code.Queue, network client.Client) (*FirewoodSyncer, error) {
+	config.StateSyncNodes = network.NodeIDs()
 	s, err := syncer.NewEVM(
 		config,
 		db,
 		codeQueue,
 		ids.ID(target),
-		rangeProofClient,
-		changeProofClient,
+		network.NewClient(p2p.FirewoodRangeProofHandlerID),
+		network.NewClient(p2p.FirewoodChangeProofHandlerID),
 	)
 	if err != nil {
 		return nil, err
