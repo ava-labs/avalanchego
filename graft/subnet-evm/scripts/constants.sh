@@ -11,8 +11,11 @@ SUBNET_EVM_PATH=$(
 )
 
 # Source common constants from root
+# shellcheck disable=SC1091
 source "$SUBNET_EVM_PATH"/../../scripts/constants.sh
+# shellcheck disable=SC1091
 source "$SUBNET_EVM_PATH"/../../scripts/git_commit.sh
+# shellcheck disable=SC1091
 source "$SUBNET_EVM_PATH"/../../scripts/image_tag.sh
 
 # Subnet-EVM specific constants

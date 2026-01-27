@@ -14,6 +14,7 @@ SUBNET_EVM_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Path to the avalanchego repository root (now the parent of graft/)
 AVALANCHE_PATH=$( cd "${SUBNET_EVM_PATH}"; cd ../.. && pwd )
 
+# shellcheck source=graft/subnet-evm/scripts/constants.sh disable=SC1091
 source "${SUBNET_EVM_PATH}"/scripts/constants.sh
 
 # Use the current repo's commit hash for the avalanchego image tag
@@ -30,7 +31,9 @@ IMAGE_PREFIX="${IMAGE_PREFIX:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
 if [[ -z "${IMAGE_TAG}" ]]; then
   # Default to tagging with the commit hash
+  # shellcheck source=graft/subnet-evm/scripts/constants.sh disable=SC1091
   source "${SUBNET_EVM_PATH}"/scripts/constants.sh
+  # shellcheck disable=SC2154
   IMAGE_TAG="${git_commit::8}"
 fi
 

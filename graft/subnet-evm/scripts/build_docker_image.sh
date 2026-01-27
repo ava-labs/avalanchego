@@ -21,6 +21,7 @@ SUBNET_EVM_PATH=$(
   cd .. && pwd
 )
 
+# shellcheck source=graft/subnet-evm/scripts/constants.sh disable=SC1091
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
 # Tag the image as 'latest' if set to true and building from master branch.
@@ -97,6 +98,7 @@ GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
 
 # Use repo root as context so Dockerfile can access graft/ directory
 echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based on AvalancheGo@$image_tag"
+# shellcheck disable=SC2154
 ${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${commit_hash}" \
   "${SUBNET_EVM_PATH}/../.." -f "$SUBNET_EVM_PATH/Dockerfile" \
   --build-arg GO_VERSION="${GO_VERSION}" \
