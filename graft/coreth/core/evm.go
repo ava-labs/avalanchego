@@ -70,6 +70,7 @@ func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 type hooks struct{}
 
 // PreprocessingGasCharge is not necessary.
+// It is required to implement the vm.Hooks interface, but is only needed post-SAE.
 func (hooks) PreprocessingGasCharge(common.Hash) (uint64, error) {
 	return 0, nil
 }
