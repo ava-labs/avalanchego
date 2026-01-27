@@ -20,9 +20,9 @@ All components follow aligned versioning:
 ### Component Release Notes
 
 | Component | Release Artifact | Notes |
-|-----------|-----------------|-------|
+| --------- | ---------------- | ----- |
 | AvalancheGo | `avalanchego` binary | Main node binary |
-| Coreth | None (compiled into AvalancheGo) | No separate release; version in `version.go` is informational only |
+| Coreth | None (compiled into AvalancheGo) | No separate release |
 | Subnet-EVM | `subnet-evm` binary | Separate plugin binary for L1s |
 
 ## Release Procedure
@@ -402,4 +402,3 @@ To verify compatibility:
 ```bash
 go test -run ^TestCompatibility$ github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm
 ```
-
