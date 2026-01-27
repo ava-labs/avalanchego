@@ -251,7 +251,7 @@ func testLongShallowRepair(t *testing.T, snapshots bool) {
 // to disk and then the process crashed. In this case we expect the chain to be rolled
 // back to the committed block, but the chain data itself left in the database for replaying.
 func TestLongDeepRepair(t *testing.T)              { testLongDeepRepair(t, false) }
-func TestLongDeepRepairWithSnapshots(t *testing.T) { t.Parallel(); testLongDeepRepair(t, true) }
+func TestLongDeepRepairWithSnapshots(t *testing.T) { testLongDeepRepair(t, true) }
 
 func testLongDeepRepair(t *testing.T, snapshots bool) {
 	t.Parallel()

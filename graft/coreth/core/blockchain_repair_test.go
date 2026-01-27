@@ -370,7 +370,9 @@ func testLongOldForkedDeepRepair(t *testing.T, snapshots bool) {
 // block was already committed to disk and then the process crashed. In this test scenario
 // the side chain is above the committed block. In this case we expect the chain to be
 // rolled back to the committed block, but the chain data itself left in the database for replaying.
-func TestLongNewerForkedShallowRepair(t *testing.T) { testLongNewerForkedShallowRepair(t, false) }
+func TestLongNewerForkedShallowRepair(t *testing.T) {
+	testLongNewerForkedShallowRepair(t, false)
+}
 func TestLongNewerForkedShallowRepairWithSnapshots(t *testing.T) {
 	testLongNewerForkedShallowRepair(t, true)
 }
@@ -447,8 +449,7 @@ func testLongNewerForkedDeepRepair(t *testing.T, snapshots bool) {
 // Tests a recovery for a long canonical chain with a longer side chain, where a recent block
 // was already committed to disk and then the process crashed. In this case we expect the chain to be
 // rolled back to the committed block, but the chain data itself left in the database for replaying.
-func TestLongReorgedShallowRepair(t *testing.T) { testLongReorgedShallowRepair(t, false) }
-
+func TestLongReorgedShallowRepair(t *testing.T)              { testLongReorgedShallowRepair(t, false) }
 func TestLongReorgedShallowRepairWithSnapshots(t *testing.T) { testLongReorgedShallowRepair(t, true) }
 
 func testLongReorgedShallowRepair(t *testing.T, snapshots bool) {
