@@ -420,20 +420,33 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			},
 			expectedErr: snowball.ErrParametersInvalid,
 		},
-		"deprecated consensus parameters": {
+		"invalid + deprecated consensus parameters": {
 			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{
 				"consensusParameters": {
-					"snowballParameters": {
-						"k": 111,
-						"alphaPreference": 1234
-					}
+					"k": 111,
+					"alphaPreference": 1234
 				}
 			}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Nil(given)
 			},
-			expectedErr: subnets.ErrUnsupportedConsensusParameters,
+			expectedErr: snowball.ErrParametersInvalid,
+		},
+		"correct but deprecated consensus config": {
+			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{"validatorOnly": true, "consensusParameters":{"alphaConfidence":16}}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+
+				require.True(config.ValidatorOnly)
+				require.Equal(16, config.SnowParameters.AlphaConfidence)
+				// must still respect defaults
+				require.Equal(20, config.SnowParameters.K)
+			},
+			expectedErr: nil,
 		},
 		"correct snowball config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
@@ -447,6 +460,68 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				require.Equal(16, config.SnowParameters.AlphaConfidence)
 				// must still respect defaults
 				require.Equal(20, config.SnowParameters.K)
+			},
+			expectedErr: nil,
+		},
+		"multiple configs": {
+			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{
+				"consensusParameters": {
+					"alphaConfidence": 16
+				},
+				"simplexParameters": {}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Nil(given)
+			},
+			expectedErr: subnets.ErrTooManyConsensusParameters,
+		},
+		"default simplex params set": {
+			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `
+			{
+				"simplexParameters": {
+						"initialValidators": [
+								{
+										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								},
+								{
+										"nodeID": "NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								}
+						]
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+
+				require.False(config.ValidatorOnly)
+				require.Equal(simplex.DefaultParameters.MaxNetworkDelay, config.SimplexParameters.MaxNetworkDelay)
+				require.Equal(simplex.DefaultParameters.MaxRebroadcastWait, config.SimplexParameters.MaxRebroadcastWait)
+
+				pkBytes, err := base64.StdEncoding.DecodeString(
+					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",
+				)
+				require.NoError(err)
+
+				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
+				require.NoError(err)
+				validator := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator, config.SimplexParameters.InitialValidators[0])
+
+				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
+				require.NoError(err)
+				validator2 := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID2,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator2, config.SimplexParameters.InitialValidators[1])
 			},
 			expectedErr: nil,
 		},
@@ -635,7 +710,45 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"correct snow config": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-						"snowballParameters": {
+					"snowballParameters": {
+							"k": 30,
+							"alphaPreference": 16,
+							"alphaConfidence": 20
+					},
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				require.True(config.ValidatorOnly)
+				require.Equal(16, config.SnowParameters.AlphaPreference)
+				require.Equal(20, config.SnowParameters.AlphaConfidence)
+				require.Equal(30, config.SnowParameters.K)
+				// must still respect defaults
+				require.Equal(256, config.SnowParameters.MaxOutstandingItems)
+			},
+			expectedErr: nil,
+		},
+		"multiple configs": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"snowballParameters": {
+						"alphaConfidence": 16
+					},
+					"simplexParameters": {}
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Nil(given)
+			},
+			expectedErr: subnets.ErrTooManyConsensusParameters,
+		},
+		"correct but deprecated consensus config": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+						"consensusParameters": {
 							"k": 30,
 							"alphaPreference": 16,
 							"alphaConfidence": 20

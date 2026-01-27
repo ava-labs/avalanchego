@@ -90,7 +90,46 @@ var (
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
 )
 
-func getConsensusParams(v *viper.Viper) *snowball.Parameters {
+func setSnowDefaults(config *snowball.Parameters, v *viper.Viper) {
+	if config == nil {
+		return
+	}
+	if config.K == 0 {
+		config.K = v.GetInt(SnowSampleSizeKey)
+	}
+	if config.AlphaPreference == 0 {
+		config.AlphaPreference = v.GetInt(SnowPreferenceQuorumSizeKey)
+	}
+	if config.AlphaConfidence == 0 {
+		config.AlphaConfidence = v.GetInt(SnowConfidenceQuorumSizeKey)
+	}
+	if config.Beta == 0 {
+		config.Beta = v.GetInt(SnowCommitThresholdKey)
+	}
+	if config.ConcurrentRepolls == 0 {
+		config.ConcurrentRepolls = v.GetInt(SnowConcurrentRepollsKey)
+	}
+	if config.OptimalProcessing == 0 {
+		config.OptimalProcessing = v.GetInt(SnowOptimalProcessingKey)
+	}
+	if config.MaxOutstandingItems == 0 {
+		config.MaxOutstandingItems = v.GetInt(SnowMaxProcessingKey)
+	}
+	if config.MaxItemProcessingTime == 0 {
+		config.MaxItemProcessingTime = v.GetDuration(SnowMaxTimeProcessingKey)
+	}
+
+	if v.IsSet(SnowQuorumSizeKey) {
+		config.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
+		config.AlphaConfidence = config.AlphaPreference
+	}
+	if config.Alpha != nil {
+		config.AlphaPreference = *config.Alpha
+		config.AlphaConfidence = config.AlphaPreference
+	}
+}
+
+func getDefaultSnowParams(v *viper.Viper) *snowball.Parameters {
 	p := &snowball.Parameters{
 		K:                     v.GetInt(SnowSampleSizeKey),
 		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
@@ -120,6 +159,47 @@ func setSimplexDefaults(config *subnets.Config, v *viper.Viper) {
 	if config.SimplexParameters.MaxRebroadcastWait == 0 {
 		config.SimplexParameters.MaxRebroadcastWait = v.GetDuration(SimplexMaxRebroadcastWaitKey)
 	}
+}
+
+// setConfigDefaults sets the default values for any unset fields in the subnets.Config.
+func setConfigDefaults(config *subnets.Config, v *viper.Viper) {
+	if config.SimplexParameters != nil {
+		setSimplexDefaults(config, v)
+	} else if config.SnowParameters != nil {
+		setSnowDefaults(config.SnowParameters, v)
+	} else if config.ConsensusParameters != nil {
+		setSnowDefaults(config.ConsensusParameters, v)
+		config.SnowParameters = config.ConsensusParameters
+		config.ConsensusParameters = nil
+	} else {
+		// If no consensus parameters are set, default to snowball parameters
+		config.SnowParameters = getDefaultSnowParams(v)
+	}
+}
+
+func getConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, error) {
+	config := getPrimaryNetworkConfig(v)
+	config.SnowParameters = nil
+	config.SimplexParameters = nil
+	config.ConsensusParameters = nil
+
+	if err := json.Unmarshal(rawBytes, &config); err != nil {
+		return subnets.Config{}, fmt.Errorf("%w: %s", errUnmarshalling, err.Error())
+	}
+
+	// Ensure that at most one consensus parameter type is set
+	if err := config.ValidConsensusConfiguration(); err != nil {
+		return subnets.Config{}, err
+	}
+	// set unset fields
+	setConfigDefaults(&config, v)
+
+	// validate parameters
+	if err := config.ValidParameters(); err != nil {
+		return subnets.Config{}, err
+	}
+
+	return config, nil
 }
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
@@ -1046,27 +1126,15 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 
 	res := make(map[ids.ID]subnets.Config)
 	for _, subnetID := range subnetIDs {
-		config := getPrimaryNetworkConfig(v)
+		rawSubnetConfigBytes, ok := subnetConfigs[subnetID]
+		if !ok {
+			res[subnetID] = getPrimaryNetworkConfig(v)
+			continue
+		}
 
-		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
-			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
-				return nil, err
-			}
-			// support deprecated field, will be removed in future
-			if config.ConsensusParameters != nil && config.SnowParameters == nil {
-				config.SnowParameters = config.ConsensusParameters
-				config.ConsensusParameters = nil
-			}
-			if config.SimplexParameters != nil {
-				setSimplexDefaults(&config, v)
-			} else if config.SnowParameters.Alpha != nil {
-				config.SnowParameters.AlphaPreference = *config.SnowParameters.Alpha
-				config.SnowParameters.AlphaConfidence = config.SnowParameters.AlphaPreference
-			}
-
-			if err := config.Valid(); err != nil {
-				return nil, err
-			}
+		config, err := getConfigFromBytes(rawSubnetConfigBytes, v)
+		if err != nil {
+			return nil, fmt.Errorf("could not read subnet config for %q: %w", subnetID, err)
 		}
 
 		res[subnetID] = config
@@ -1085,11 +1153,8 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 	// reads subnet config files from a path and given subnetIDs and returns a map.
 	for _, subnetID := range subnetIDs {
-		// Ensure default configuration
-		config := getPrimaryNetworkConfig(v)
-		subnetConfigs[subnetID] = config
-
 		if len(subnetConfigPath) == 0 {
+			subnetConfigs[subnetID] = getPrimaryNetworkConfig(v)
 			// subnet config path does not exist but not explicitly specified, so ignore it
 			continue
 		}
@@ -1099,6 +1164,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 		switch {
 		case errors.Is(err, os.ErrNotExist):
 			// this subnet config does not exist, the default configuration will be used
+			subnetConfigs[subnetID] = getPrimaryNetworkConfig(v)
 			continue
 		case err != nil:
 			return nil, err
@@ -1112,24 +1178,9 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, err
 		}
 
-		// Update the default config with the values from the file
-		if err := json.Unmarshal(file, &config); err != nil {
-			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
-		}
-
-		if config.ConsensusParameters != nil && config.SnowParameters == nil {
-			config.SnowParameters = config.ConsensusParameters
-			config.ConsensusParameters = nil
-		}
-		if config.SimplexParameters != nil {
-			setSimplexDefaults(&config, v)
-		} else if config.SnowParameters.Alpha != nil {
-			config.SnowParameters.AlphaPreference = *config.SnowParameters.Alpha
-			config.SnowParameters.AlphaConfidence = config.SnowParameters.AlphaPreference
-		}
-
-		if err := config.Valid(); err != nil {
-			return nil, err
+		config, err := getConfigFromBytes(file, v)
+		if err != nil {
+			return nil, fmt.Errorf("could not read subnet config file %q: %w", filePath, err)
 		}
 
 		subnetConfigs[subnetID] = config
@@ -1140,7 +1191,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
-		SnowParameters:              getConsensusParams(v),
+		SnowParameters:              getDefaultSnowParams(v),
 		ValidatorOnly:               false,
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}
@@ -1373,7 +1424,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	primaryNetworkConfig := getPrimaryNetworkConfig(v)
-	if err := primaryNetworkConfig.Valid(); err != nil {
+	if err := primaryNetworkConfig.ValidParameters(); err != nil {
 		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
 	}
 	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig
