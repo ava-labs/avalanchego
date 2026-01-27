@@ -45,6 +45,8 @@ type requestEntry struct {
 	op message.Op
 	// The engine type of the request that was made
 	engineType p2p.EngineType
+
+	handled bool
 }
 
 type peer struct {
@@ -83,7 +85,7 @@ type ChainRouter struct {
 	// Parameters for doing health checks
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
-	timedRequests *linked.Hashmap[ids.RequestID, requestEntry]
+	timedRequests *linked.Hashmap[ids.RequestID, *requestEntry]
 
 	nodeMetrics  map[ids.NodeID]*nodeMetrics
 	totalMetrics nodeMetrics
@@ -123,7 +125,7 @@ func (cr *ChainRouter) Initialize(
 	cr.criticalChains = criticalChains
 	cr.sybilProtectionEnabled = sybilProtectionEnabled
 	cr.onFatal = onFatal
-	cr.timedRequests = linked.NewHashmap[ids.RequestID, requestEntry]()
+	cr.timedRequests = linked.NewHashmap[ids.RequestID, *requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
 	cr.nodeMetrics = make(map[ids.NodeID]*nodeMetrics)
@@ -187,10 +189,11 @@ func (cr *ChainRouter) RegisterRequest(
 		Op:        byte(op),
 	}
 	// Add to the set of unfulfilled requests
-	cr.timedRequests.Put(uniqueRequestID, requestEntry{
+	cr.timedRequests.Put(uniqueRequestID, &requestEntry{
 		time:       cr.clock.Time(),
 		op:         op,
 		engineType: engineType,
+		handled:    false,
 	})
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	cr.lock.Unlock()
@@ -345,24 +348,33 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 		if timeout {
 			cr.timedRequests.Delete(uniqueRequestID)
 			cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
+		}
 
-			if op == message.QueryFailedOp || op == message.GetFailedOp {
-				metric, ok := cr.nodeMetrics[nodeID]
-				if !ok {
-					metric = &nodeMetrics{}
-					cr.nodeMetrics[nodeID] = metric
-				}
-				metric.Timeouts++
-				cr.totalMetrics.Timeouts++
-				if op == message.QueryFailedOp {
-					metric.QueryFailed++
-					cr.totalMetrics.QueryFailed++
-				} else {
-					metric.GetFailed++
-					cr.totalMetrics.GetFailed++
-				}
+		if req.handled {
+			// This was a duplicated response.
+			msg.OnFinishedHandling()
+			return
+		}
+
+		if timeout && (op == message.QueryFailedOp || op == message.GetFailedOp) {
+			metric, ok := cr.nodeMetrics[nodeID]
+			if !ok {
+				metric = &nodeMetrics{}
+				cr.nodeMetrics[nodeID] = metric
+			}
+			metric.Timeouts++
+			cr.totalMetrics.Timeouts++
+			if op == message.QueryFailedOp {
+				metric.QueryFailed++
+				cr.totalMetrics.QueryFailed++
+			} else {
+				metric.GetFailed++
+				cr.totalMetrics.GetFailed++
 			}
 		}
+
+		// Prevent duplicate handling of this request
+		req.handled = true
 
 		// Pass the failure to the chain
 		chain.Push(
@@ -781,5 +793,5 @@ func (cr *ChainRouter) clearRequest(
 
 	cr.timedRequests.Delete(uniqueRequestID)
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
-	return uniqueRequestID, &request
+	return uniqueRequestID, request
 }
