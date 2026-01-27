@@ -63,16 +63,11 @@ type rewindTest struct {
 // committed to disk and then the process crashed. In this case we expect the full
 // chain to be rolled back to the committed block, but the chain data itself left
 // in the database for replaying.
-func TestShortRepair(t *testing.T) {
-	t.Parallel()
-	testShortRepair(t, false)
-}
-func TestShortRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
-	testShortRepair(t, true)
-}
+func TestShortRepair(t *testing.T)              { testShortRepair(t, false) }
+func TestShortRepairWithSnapshots(t *testing.T) { testShortRepair(t, true) }
 
 func testShortRepair(t *testing.T, snapshots bool) {
+	t.Parallel()
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//
@@ -105,16 +100,11 @@ func testShortRepair(t *testing.T, snapshots bool) {
 // test scenario the side chain is below the committed block. In this case we expect
 // the canonical chain to be rolled back to the committed block, but the chain data
 // itself left in the database for replaying.
-func TestShortOldForkedRepair(t *testing.T) {
-	t.Parallel()
-	testShortOldForkedRepair(t, false)
-}
-func TestShortOldForkedRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
-	testShortOldForkedRepair(t, true)
-}
+func TestShortOldForkedRepair(t *testing.T)              { testShortOldForkedRepair(t, false) }
+func TestShortOldForkedRepairWithSnapshots(t *testing.T) { testShortOldForkedRepair(t, true) }
 
 func testShortOldForkedRepair(t *testing.T, snapshots bool) {
+	t.Parallel()
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//   └->S1->S2->S3
@@ -149,16 +139,11 @@ func testShortOldForkedRepair(t *testing.T, snapshots bool) {
 // test scenario the side chain reaches above the committed block. In this case we
 // expect the canonical chain to be rolled back to the committed block, but the
 // chain data itself left in the database for replaying.
-func TestShortNewlyForkedRepair(t *testing.T) {
-	t.Parallel()
-	testShortNewlyForkedRepair(t, false)
-}
-func TestShortNewlyForkedRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
-	testShortNewlyForkedRepair(t, true)
-}
+func TestShortNewlyForkedRepair(t *testing.T)              { testShortNewlyForkedRepair(t, false) }
+func TestShortNewlyForkedRepairWithSnapshots(t *testing.T) { testShortNewlyForkedRepair(t, true) }
 
 func testShortNewlyForkedRepair(t *testing.T, snapshots bool) {
+	t.Parallel()
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//   └->S1->S2->S3->S4->S5->S6
@@ -192,16 +177,11 @@ func testShortNewlyForkedRepair(t *testing.T, snapshots bool) {
 // recent block was already committed to disk and then the process crashed. In this
 // case we expect the canonical chain to be rolled back to the committed block, but
 // the chain data itself left in the database for replaying.
-func TestShortReorgedRepair(t *testing.T) {
-	t.Parallel()
-	testShortReorgedRepair(t, false)
-}
-func TestShortReorgedRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
-	testShortReorgedRepair(t, true)
-}
+func TestShortReorgedRepair(t *testing.T)              { testShortReorgedRepair(t, false) }
+func TestShortReorgedRepairWithSnapshots(t *testing.T) { testShortReorgedRepair(t, true) }
 
 func testShortReorgedRepair(t *testing.T, snapshots bool) {
+	t.Parallel()
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10
@@ -235,16 +215,11 @@ func testShortReorgedRepair(t *testing.T, snapshots bool) {
 // committed to disk and then the process crashed. In this case we expect the chain
 // to be rolled back to the committed block, but the chain data itself left in the
 // database for replaying.
-func TestLongShallowRepair(t *testing.T) {
-	t.Parallel()
-	testLongShallowRepair(t, false)
-}
-func TestLongShallowRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
-	testLongShallowRepair(t, true)
-}
+func TestLongShallowRepair(t *testing.T)              { testLongShallowRepair(t, false) }
+func TestLongShallowRepairWithSnapshots(t *testing.T) { testLongShallowRepair(t, true) }
 
 func testLongShallowRepair(t *testing.T, snapshots bool) {
+	t.Parallel()
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18 (HEAD)
 	//
@@ -275,16 +250,11 @@ func testLongShallowRepair(t *testing.T, snapshots bool) {
 // Tests a recovery for a long canonical chain where a recent block was already committed
 // to disk and then the process crashed. In this case we expect the chain to be rolled
 // back to the committed block, but the chain data itself left in the database for replaying.
-func TestLongDeepRepair(t *testing.T) {
-	t.Parallel()
-	testLongDeepRepair(t, false)
-}
-func TestLongDeepRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
-	testLongDeepRepair(t, true)
-}
+func TestLongDeepRepair(t *testing.T)              { testLongDeepRepair(t, false) }
+func TestLongDeepRepairWithSnapshots(t *testing.T) { t.Parallel(); testLongDeepRepair(t, true) }
 
 func testLongDeepRepair(t *testing.T, snapshots bool) {
+	t.Parallel()
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24 (HEAD)
 	//
@@ -358,16 +328,11 @@ func testLongOldForkedShallowRepair(t *testing.T, snapshots bool) {
 // was already committed to disk and then the process crashed. In this test scenario the side
 // chain is below the committed block. In this case we expect the canonical chain to be
 // rolled back to the committed block, but the chain data itself left in the database for replaying.
-func TestLongOldForkedDeepRepair(t *testing.T) {
-	t.Parallel()
-	testLongOldForkedDeepRepair(t, false)
-}
-func TestLongOldForkedDeepRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
-	testLongOldForkedDeepRepair(t, true)
-}
+func TestLongOldForkedDeepRepair(t *testing.T)              { testLongOldForkedDeepRepair(t, false) }
+func TestLongOldForkedDeepRepairWithSnapshots(t *testing.T) { testLongOldForkedDeepRepair(t, true) }
 
 func testLongOldForkedDeepRepair(t *testing.T, snapshots bool) {
+	t.Parallel()
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24 (HEAD)
 	//   └->S1->S2->S3
@@ -442,16 +407,11 @@ func testLongNewerForkedShallowRepair(t *testing.T, snapshots bool) {
 // was already committed to disk and then the process crashed. In this test scenario the side
 // chain is above the committed block. In this case we expect the canonical chain to be rolled
 // back to the committed block, but the chain data itself left in the database for replaying.
-func TestLongNewerForkedDeepRepair(t *testing.T) {
-	t.Parallel()
-	testLongNewerForkedDeepRepair(t, false)
-}
-func TestLongNewerForkedDeepRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
-	testLongNewerForkedDeepRepair(t, true)
-}
+func TestLongNewerForkedDeepRepair(t *testing.T)              { testLongNewerForkedDeepRepair(t, false) }
+func TestLongNewerForkedDeepRepairWithSnapshots(t *testing.T) { testLongNewerForkedDeepRepair(t, true) }
 
 func testLongNewerForkedDeepRepair(t *testing.T, snapshots bool) {
+	t.Parallel()
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24 (HEAD)
 	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12
@@ -484,16 +444,11 @@ func testLongNewerForkedDeepRepair(t *testing.T, snapshots bool) {
 // Tests a recovery for a long canonical chain with a longer side chain, where a recent block
 // was already committed to disk and then the process crashed. In this case we expect the chain to be
 // rolled back to the committed block, but the chain data itself left in the database for replaying.
-func TestLongReorgedShallowRepair(t *testing.T) {
-	t.Parallel()
-	testLongReorgedShallowRepair(t, false)
-}
-func TestLongReorgedShallowRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
-	testLongReorgedShallowRepair(t, true)
-}
+func TestLongReorgedShallowRepair(t *testing.T)              { testLongReorgedShallowRepair(t, false) }
+func TestLongReorgedShallowRepairWithSnapshots(t *testing.T) { testLongReorgedShallowRepair(t, true) }
 
 func testLongReorgedShallowRepair(t *testing.T, snapshots bool) {
+	t.Parallel()
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18 (HEAD)
 	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12->S13->S14->S15->S16->S17->S18->S19->S20->S21->S22->S23->S24->S25->S26
@@ -527,16 +482,11 @@ func testLongReorgedShallowRepair(t *testing.T, snapshots bool) {
 // was already committed to disk and then the process crashed. In this case we expect the canonical
 // chains to be rolled back to the committed block, but the chain data itself left in the database
 // for replaying.
-func TestLongReorgedDeepRepair(t *testing.T) {
-	t.Parallel()
-	testLongReorgedDeepRepair(t, false)
-}
-func TestLongReorgedDeepRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
-	testLongReorgedDeepRepair(t, true)
-}
+func TestLongReorgedDeepRepair(t *testing.T)              { testLongReorgedDeepRepair(t, false) }
+func TestLongReorgedDeepRepairWithSnapshots(t *testing.T) { testLongReorgedDeepRepair(t, true) }
 
 func testLongReorgedDeepRepair(t *testing.T, snapshots bool) {
+	t.Parallel()
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24 (HEAD)
 	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12->S13->S14->S15->S16->S17->S18->S19->S20->S21->S22->S23->S24->S25->S26

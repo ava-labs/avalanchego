@@ -103,7 +103,6 @@ func testShortRepair(t *testing.T, snapshots bool) {
 // itself left in the database for replaying.
 func TestShortOldForkedRepair(t *testing.T) { testShortOldForkedRepair(t, false) }
 func TestShortOldForkedRepairWithSnapshots(t *testing.T) {
-	t.Parallel()
 	testShortOldForkedRepair(t, true)
 }
 
