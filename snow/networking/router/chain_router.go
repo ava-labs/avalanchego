@@ -377,7 +377,7 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 	}
 
 	uniqueRequestID, req := cr.clearRequest(op, nodeID, chainID, requestID)
-	if req == nil || req.handled {
+	if req == nil {
 		// We didn't request this message.
 		msg.OnFinishedHandling()
 		return
@@ -388,6 +388,12 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 
 	// Tell the timeout manager we got a response
 	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
+
+	if req.handled {
+		// We didn't request this message.
+		msg.OnFinishedHandling()
+		return
+	}
 
 	// Pass the response to the chain
 	chain.Push(
