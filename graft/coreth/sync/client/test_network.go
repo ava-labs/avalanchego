@@ -12,9 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ network.SyncedNetworkClient = (*testNetwork)(nil)
-
 type testNetwork struct {
+	network.Network
 	// captured request data
 	numCalls uint
 

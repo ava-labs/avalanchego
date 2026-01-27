@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 )
 
 var (
@@ -31,6 +32,7 @@ type TestClient struct {
 	codeReceived   int32
 	blocksHandler  *handlers.BlockRequestHandler
 	blocksReceived int32
+	p2pClients     map[uint64]*p2p.Client
 	// GetLeafsIntercept is called on every GetLeafs request if set to a non-nil callback.
 	// The returned response will be returned by TestClient to the caller.
 	GetLeafsIntercept func(req message.LeafsRequest, res message.LeafsResponse) (message.LeafsResponse, error)
@@ -47,13 +49,26 @@ func NewTestClient(
 	leafHandler handlers.LeafRequestHandler,
 	codesHandler *handlers.CodeRequestHandler,
 	blocksHandler *handlers.BlockRequestHandler,
+	p2pClients map[uint64]*p2p.Client,
 ) *TestClient {
+	if p2pClients == nil {
+		p2pClients = make(map[uint64]*p2p.Client)
+	}
 	return &TestClient{
 		codec:         codec,
 		leafsHandler:  leafHandler,
 		codesHandler:  codesHandler,
 		blocksHandler: blocksHandler,
+		p2pClients:    p2pClients,
 	}
+}
+
+func (ml *TestClient) NewClient(handlerID uint64) *p2p.Client {
+	return ml.p2pClients[handlerID]
+}
+
+func (*TestClient) NodeIDs() []ids.NodeID {
+	return nil
 }
 
 func (ml *TestClient) GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error) {
