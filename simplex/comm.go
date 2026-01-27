@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -79,6 +79,11 @@ func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
 	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
 	if err != nil {
 		c.logger.Error("Failed creating message", zap.Error(err))
+		return
+	}
+
+	if outboundMsg == nil {
+		c.logger.Debug("Outbound message is nil")
 		return
 	}
 

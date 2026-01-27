@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators_test
@@ -6,15 +6,12 @@ package validators_test
 import (
 	"context"
 	"errors"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/upgrade"
 
 	. "github.com/ava-labs/avalanchego/snow/validators"
 )
@@ -28,7 +25,7 @@ func TestCachedState_GetSubnetID(t *testing.T) {
 		T:               t,
 		CantGetSubnetID: true,
 	}
-	cached := NewCachedState(uncached, upgrade.InitiallyActiveTime)
+	cached := NewCachedState(uncached)
 
 	blockchainID1 := ids.GenerateTestID()
 	blockchainID2 := ids.GenerateTestID()
@@ -110,7 +107,7 @@ func TestCachedState_GetWarpValidatorSets(t *testing.T) {
 		T:                        t,
 		CantGetWarpValidatorSets: true,
 	}
-	cached := NewCachedState(uncached, upgrade.InitiallyActiveTime)
+	cached := NewCachedState(uncached)
 
 	allVdrs0 := map[ids.ID]WarpSet{
 		ids.GenerateTestID(): validatorstest.NewWarpSet(t, 3),

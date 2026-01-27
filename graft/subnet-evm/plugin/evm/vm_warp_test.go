@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -20,6 +20,7 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -28,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -366,9 +366,9 @@ func testWarpVMTransaction(t *testing.T, scheme string, unsignedMessage *avalanc
 		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			return ids.Empty, nil
 		},
-		GetWarpValidatorSetF: func(_ context.Context, height uint64, _ ids.ID) (validators.WarpSet, error) {
+		GetWarpValidatorSetsF: func(_ context.Context, height uint64) (map[ids.ID]validators.WarpSet, error) {
 			if height < minimumValidPChainHeight {
-				return validators.WarpSet{}, getValidatorSetTestErr
+				return nil, getValidatorSetTestErr
 			}
 			vdrs := validators.WarpSet{
 				Validators: []*validators.Warp{
@@ -386,7 +386,9 @@ func testWarpVMTransaction(t *testing.T, scheme string, unsignedMessage *avalanc
 				TotalWeight: 100,
 			}
 			avagoUtils.Sort(vdrs.Validators)
-			return vdrs, nil
+			return map[ids.ID]validators.WarpSet{
+				ids.Empty: vdrs,
+			}, nil
 		},
 	}
 
@@ -672,13 +674,9 @@ func testReceiveWarpMessage(
 			}
 			return vm.ctx.SubnetID, nil
 		},
-		GetWarpValidatorSetF: func(_ context.Context, height uint64, subnetID ids.ID) (validators.WarpSet, error) {
+		GetWarpValidatorSetsF: func(_ context.Context, height uint64) (map[ids.ID]validators.WarpSet, error) {
 			if height < minimumValidPChainHeight {
-				return validators.WarpSet{}, getValidatorSetTestErr
-			}
-			signers := subnetSigners
-			if subnetID == constants.PrimaryNetworkID {
-				signers = primarySigners
+				return nil, getValidatorSetTestErr
 			}
 
 			vdrs := validators.WarpSet{}
@@ -691,8 +689,11 @@ func testReceiveWarpMessage(
 				})
 				vdrs.TotalWeight += s.weight
 			}
-			avagoUtils.Sort(vdrs.Validators)
-			return vdrs, nil
+
+			return map[ids.ID]validators.WarpSet{
+				constants.PrimaryNetworkID: makeVdrSet(primarySigners),
+				vm.ctx.SubnetID:            makeVdrSet(subnetSigners),
+			}, nil
 		},
 	}
 

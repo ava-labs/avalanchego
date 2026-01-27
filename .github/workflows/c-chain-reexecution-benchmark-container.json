@@ -3,7 +3,7 @@
         "include": [
             {
                 "runner": "ubuntu-latest",
-                "task": "c-chain-reexecution-hashdb-101-250k",
+                "test": "hashdb-101-250k",
                 "timeout-minutes": 30
             },
             {
@@ -21,12 +21,12 @@
         "include": [
             {
                 "runner": "avago-runner-m6i-4xlarge-ebs-fast",
-                "task": "c-chain-reexecution-hashdb-33m-33m500k",
+                "test": "hashdb-33m-33m500k",
                 "timeout-minutes": 1440
             },
             {
                 "runner": "avago-runner-i4i-4xlarge-local-ssd",
-                "task": "c-chain-reexecution-hashdb-33m-33m500k",
+                "test": "hashdb-33m-33m500k",
                 "timeout-minutes": 1440
             }
         ]
