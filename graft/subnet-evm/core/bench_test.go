@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -34,7 +34,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -253,7 +253,7 @@ func makeChainForBench(db ethdb.Database, genesis *Genesis, full bool, count uin
 		rawdb.WriteCanonicalHash(db, hash, n)
 
 		if n == 0 {
-			customrawdb.WriteChainConfig(db, hash, genesis.Config)
+			customrawdb.WriteChainConfig(db, hash, genesis.Config, params.GetExtra(genesis.Config).UpgradeConfig)
 		}
 		rawdb.WriteHeadHeaderHash(db, hash)
 

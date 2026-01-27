@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -236,18 +236,21 @@ func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateCon
 		}
 	}
 
-	validatorSet, err := predicateContext.SnowCtx.ValidatorState.GetWarpValidatorSet(
+	validatorSets, err := predicateContext.SnowCtx.ValidatorState.GetWarpValidatorSets(
 		context.TODO(),
 		predicateContext.ProposerVMBlockCtx.PChainHeight,
-		sourceSubnetID,
 	)
 	if err != nil {
-		log.Debug("failed to retrieve canonical validator set",
+		log.Debug("failed to retrieve canonical validator sets",
 			"msgID", warpMsg.ID(),
 			"subnetID", sourceSubnetID,
 			"err", err,
 		)
 		return fmt.Errorf("%w: %w", errCannotRetrieveValidatorSet, err)
+	}
+	validatorSet, ok := validatorSets[sourceSubnetID]
+	if !ok {
+		return fmt.Errorf("%w: %s source subnet not found", errCannotRetrieveValidatorSet, sourceSubnetID)
 	}
 
 	err = warpMsg.Signature.Verify(

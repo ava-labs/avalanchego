@@ -1,7 +1,7 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package firewood
+package syncer
 
 import (
 	"bytes"
@@ -26,7 +26,7 @@ var (
 	defaultSimultaneousWorkLimit = 8
 )
 
-// database wraps a Firewood FFI database to implement the xsync.DB interface.
+// database wraps a Firewood [ffi.Database] to implement the xsync.DB interface.
 type database struct {
 	db *ffi.Database
 }
@@ -38,7 +38,17 @@ type Config struct {
 	Registerer            prometheus.Registerer
 }
 
-func NewSyncer(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
+func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
+	return newWithDB(
+		config,
+		&database{db},
+		targetRoot,
+		rangeProofClient,
+		changeProofClient,
+	)
+}
+
+func newWithDB(config Config, db xsync.DB[*RangeProof, struct{}], targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
 	if config.Registerer == nil {
 		config.Registerer = prometheus.NewRegistry()
 	}
@@ -49,7 +59,7 @@ func NewSyncer(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofCli
 		config.SimultaneousWorkLimit = defaultSimultaneousWorkLimit
 	}
 	return xsync.NewSyncer(
-		&database{db: db},
+		db,
 		xsync.Config[*RangeProof, struct{}]{
 			RangeProofMarshaler:   rangeProofMarshaler{},
 			ChangeProofMarshaler:  changeProofMarshaler{},
@@ -121,9 +131,10 @@ func (db *database) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[
 	return maybe.Some(nextKey), nil
 }
 
-// TODO: implement this method.
+// TODO: Use change proofs to optimize syncing.
+// Returning the sentinel error suggests to the server handler to serve a full range proof instead.
 func (*database) GetChangeProof(context.Context, ids.ID, ids.ID, maybe.Maybe[[]byte], maybe.Maybe[[]byte], int) (struct{}, error) {
-	return struct{}{}, errors.New("change proofs are not implemented")
+	return struct{}{}, xsync.ErrInsufficientHistory
 }
 
 // TODO: implement this method.
@@ -138,6 +149,6 @@ func (*database) CommitChangeProof(context.Context, maybe.Maybe[[]byte], struct{
 
 func (db *database) Clear() error {
 	// Prefix delete key of length 0.
-	_, err := db.db.Update([][]byte{{}}, [][]byte{nil})
+	_, err := db.db.Update([]ffi.BatchOp{ffi.PrefixDelete([]byte{})})
 	return err
 }

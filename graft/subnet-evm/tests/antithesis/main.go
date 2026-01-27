@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -9,8 +9,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
-	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/antithesishq/antithesis-sdk-go/assert"
@@ -23,6 +21,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/tests/utils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
@@ -51,10 +50,8 @@ func main() {
 			tmpnet.FlagsMap{},
 		),
 		func(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
-			_, thisFile, _, _ := runtime.Caller(0)
-			genesisPath := filepath.Join(filepath.Dir(thisFile), "..", "load", "genesis.json")
 			return []*tmpnet.Subnet{
-				utils.NewTmpnetSubnet("subnet-evm", genesisPath, utils.DefaultChainConfig, nodes...),
+				utils.NewTmpnetSubnet("subnet-evm", tests.Genesis, utils.DefaultChainConfig, nodes...),
 			}
 		},
 	)

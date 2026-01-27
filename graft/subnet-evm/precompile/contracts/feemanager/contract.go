@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package feemanager
@@ -188,7 +188,7 @@ func UnpackSetFeeConfigInput(input []byte, useStrictMode bool) (commontype.FeeCo
 		return commontype.FeeConfig{}, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
 	}
 	inputStruct := FeeConfigABIStruct{}
-	err := FeeManagerABI.UnpackInputIntoInterface(&inputStruct, "setFeeConfig", input, useStrictMode)
+	err := FeeManagerABI.UnpackInputIntoInterface(&inputStruct, "setFeeConfig", input)
 	if err != nil {
 		return commontype.FeeConfig{}, fmt.Errorf("%w: %w", ErrUnpackInput, err)
 	}

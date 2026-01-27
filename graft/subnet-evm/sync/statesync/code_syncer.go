@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package statesync
@@ -13,10 +13,10 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	statesyncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 )
@@ -116,7 +116,9 @@ func (c *codeSyncer) addCodeToFetchFromDBToQueue() error {
 		codeHash := common.BytesToHash(it.Key()[len(customrawdb.CodeToFetchPrefix):])
 		// If we already have the codeHash, delete the marker from the database and continue
 		if rawdb.HasCode(c.DB, codeHash) {
-			customrawdb.DeleteCodeToFetch(batch, codeHash)
+			if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
+				return fmt.Errorf("failed to delete stale code marker: %w", err)
+			}
 			// Write the batch to disk if it has reached the ideal batch size.
 			if batch.ValueSize() > ethdb.IdealBatchSize {
 				if err := batch.Write(); err != nil {
@@ -189,7 +191,10 @@ func (c *codeSyncer) fulfillCodeRequest(ctx context.Context, codeHashes []common
 	c.lock.Lock()
 	batch := c.DB.NewBatch()
 	for i, codeHash := range codeHashes {
-		customrawdb.DeleteCodeToFetch(batch, codeHash)
+		if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
+			c.lock.Unlock()
+			return fmt.Errorf("failed to delete code to fetch marker: %w", err)
+		}
 		c.outstandingCodeHashes.Remove(ids.ID(codeHash))
 		rawdb.WriteCode(batch, codeHash, codeByteSlices[i])
 	}
@@ -214,7 +219,10 @@ func (c *codeSyncer) addCode(codeHashes []common.Hash) error {
 		if !c.outstandingCodeHashes.Contains(ids.ID(codeHash)) && !rawdb.HasCode(c.DB, codeHash) {
 			selectedCodeHashes = append(selectedCodeHashes, codeHash)
 			c.outstandingCodeHashes.Add(ids.ID(codeHash))
-			customrawdb.AddCodeToFetch(batch, codeHash)
+			if err := customrawdb.WriteCodeToFetch(batch, codeHash); err != nil {
+				c.lock.Unlock()
+				return fmt.Errorf("failed to write code to fetch marker: %w", err)
+			}
 		}
 	}
 	c.lock.Unlock()

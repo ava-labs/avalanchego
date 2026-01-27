@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nativeminter_test
@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/utils"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
 	nativeminterbindings "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter/nativemintertest/bindings"
@@ -143,7 +143,7 @@ func TestNativeMinter(t *testing.T) {
 		},
 	}
 
-	precompileCfg := nativeminter.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil)
+	precompileCfg := nativeminter.NewConfig(utils.PointerTo[uint64](0), []common.Address{adminAddress}, nil, nil, nil)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
@@ -163,7 +163,7 @@ func TestINativeMinter_Events(t *testing.T) {
 	testKey, _ := crypto.GenerateKey()
 	testAddress := crypto.PubkeyToAddress(testKey.PublicKey)
 
-	precompileCfg := nativeminter.NewConfig(utils.NewUint64(0), []common.Address{adminAddress}, nil, nil, nil)
+	precompileCfg := nativeminter.NewConfig(utils.PointerTo[uint64](0), []common.Address{adminAddress}, nil, nil, nil)
 	backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 	defer backend.Close()
 

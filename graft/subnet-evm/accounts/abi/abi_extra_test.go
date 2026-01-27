@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package abi
@@ -38,35 +38,23 @@ func TestUnpackInputIntoInterface(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, test := range []struct {
-		name                   string
-		extraPaddingBytes      int
-		strictMode             bool
-		expectedErrorSubstring string
+		name              string
+		extraPaddingBytes int
 	}{
 		{
-			name:       "No extra padding to input data",
-			strictMode: true,
+			name: "No extra padding to input data",
 		},
 		{
 			name:              "Valid input data with 32 extra padding(%32) ",
 			extraPaddingBytes: 32,
-			strictMode:        true,
 		},
 		{
 			name:              "Valid input data with 64 extra padding(%32)",
 			extraPaddingBytes: 64,
-			strictMode:        true,
 		},
 		{
-			name:                   "Valid input data with extra padding indivisible by 32",
-			extraPaddingBytes:      33,
-			strictMode:             true,
-			expectedErrorSubstring: "abi: improperly formatted input:",
-		},
-		{
-			name:              "Valid input data with extra padding indivisible by 32, no strict mode",
+			name:              "Valid input data with extra padding indivisible by 32",
 			extraPaddingBytes: 33,
-			strictMode:        false,
 		},
 	} {
 		{
@@ -78,14 +66,9 @@ func TestUnpackInputIntoInterface(t *testing.T) {
 
 				// Unpack into interface
 				var v inputType
-				err = abi.UnpackInputIntoInterface(&v, "receive", data, test.strictMode) // skips 4 byte selector
-
-				if test.expectedErrorSubstring != "" {
-					require.ErrorContains(t, err, test.expectedErrorSubstring) //nolint:forbidigo // uses upstream code
-				} else {
-					require.NoError(t, err)
-					require.Equal(t, input, v)
-				}
+				err = abi.UnpackInputIntoInterface(&v, "receive", data)
+				require.NoError(t, err)
+				require.Equal(t, input, v)
 			})
 		}
 	}
