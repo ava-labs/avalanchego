@@ -733,6 +733,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("containerID", containerID),
+			zap.Bool("benched", isBenched),
 		)
 		s.router.HandleInternal(ctx, inMsg)
 	} else {
@@ -850,6 +851,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("containerID", containerID),
+			zap.Bool("benched", isBenched),
 		)
 		s.router.HandleInternal(ctx, inMsg)
 	} else {
@@ -1006,6 +1008,7 @@ func (s *sender) SendPushQuery(
 					zap.Uint32("requestID", requestID),
 					zap.Binary("container", container),
 					zap.Uint64("requestedHeight", requestedHeight),
+					zap.Bool("benched", isBenched),
 				)
 			} else {
 				s.ctx.Log.Debug("failed to send message",
@@ -1013,6 +1016,7 @@ func (s *sender) SendPushQuery(
 					zap.Stringer("nodeID", nodeID),
 					zap.Uint32("requestID", requestID),
 					zap.Uint64("requestedHeight", requestedHeight),
+					zap.Bool("benched", isBenched),
 				)
 			}
 
@@ -1124,6 +1128,7 @@ func (s *sender) SendPullQuery(
 				zap.Uint32("requestID", requestID),
 				zap.Stringer("containerID", containerID),
 				zap.Uint64("requestedHeight", requestedHeight),
+				zap.Bool("benched", isBenched),
 			)
 
 			// Register failures for nodes we didn't send a request to.
@@ -1296,12 +1301,14 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 					zap.Stringer("nodeID", nodeID),
 					zap.Uint32("requestID", requestID),
 					zap.Binary("payload", appRequestBytes),
+					zap.Bool("benched", isBenched),
 				)
 			} else {
 				s.ctx.Log.Debug("failed to send message",
 					zap.Stringer("messageOp", message.AppRequestOp),
 					zap.Stringer("nodeID", nodeID),
 					zap.Uint32("requestID", requestID),
+					zap.Bool("benched", isBenched),
 				)
 			}
 

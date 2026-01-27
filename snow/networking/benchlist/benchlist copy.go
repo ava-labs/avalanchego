@@ -5,7 +5,6 @@ package benchlist
 
 import (
 	"errors"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -146,17 +145,6 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 }
 
 func (b *benchlist) getNode(nodeID ids.NodeID) *node {
-	if rand.Intn(10000) == 0 {
-		p := make(map[ids.NodeID]float64, len(b.nodes))
-		for id, n := range b.nodes {
-			p[id] = n.failureProbability.Read()
-		}
-		b.ctx.Log.Info("benchlist node failure probabilities",
-			zap.Stringer("chainID", b.ctx.ChainID),
-			zap.Any("probabilities", p),
-		)
-	}
-
 	if n, exists := b.nodes[nodeID]; exists {
 		return n
 	}
@@ -173,14 +161,14 @@ func (b *benchlist) run() {
 	for {
 		job, _ := b.jobs.PopLeft()
 		if job.bench {
-			b.ctx.Log.Info("adding node to benchlist",
+			b.ctx.Log.Debug("adding node to benchlist",
 				zap.Stringer("nodeID", job.nodeID),
 			)
 			b.benchable.Benched(b.ctx.ChainID, job.nodeID)
 			benched.Add(job.nodeID)
 			b.numBenched.Inc()
 		} else {
-			b.ctx.Log.Info("removing node from benchlist",
+			b.ctx.Log.Debug("removing node from benchlist",
 				zap.Stringer("nodeID", job.nodeID),
 			)
 			b.benchable.Unbenched(b.ctx.ChainID, job.nodeID)

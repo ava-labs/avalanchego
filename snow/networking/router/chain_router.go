@@ -86,9 +86,6 @@ type ChainRouter struct {
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
 	timedRequests *linked.Hashmap[ids.RequestID, *requestEntry]
-
-	nodeMetrics  map[ids.NodeID]*nodeMetrics
-	totalMetrics nodeMetrics
 }
 
 type nodeMetrics struct {
@@ -128,7 +125,6 @@ func (cr *ChainRouter) Initialize(
 	cr.timedRequests = linked.NewHashmap[ids.RequestID, *requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
-	cr.nodeMetrics = make(map[ids.NodeID]*nodeMetrics)
 
 	// Mark myself as connected
 	cr.myNodeID = nodeID
@@ -356,23 +352,6 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			return
 		}
 
-		if timeout && (op == message.QueryFailedOp || op == message.GetFailedOp) {
-			metric, ok := cr.nodeMetrics[nodeID]
-			if !ok {
-				metric = &nodeMetrics{}
-				cr.nodeMetrics[nodeID] = metric
-			}
-			metric.Timeouts++
-			cr.totalMetrics.Timeouts++
-			if op == message.QueryFailedOp {
-				metric.QueryFailed++
-				cr.totalMetrics.QueryFailed++
-			} else {
-				metric.GetFailed++
-				cr.totalMetrics.GetFailed++
-			}
-		}
-
 		// Prevent duplicate handling of this request
 		req.handled = true
 
@@ -402,23 +381,6 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 		// We didn't request this message.
 		msg.OnFinishedHandling()
 		return
-	}
-
-	if op == message.ChitsOp || op == message.PutOp {
-		metric, ok := cr.nodeMetrics[nodeID]
-		if !ok {
-			metric = &nodeMetrics{}
-			cr.nodeMetrics[nodeID] = metric
-		}
-		metric.Successes++
-		cr.totalMetrics.Successes++
-		if op == message.ChitsOp {
-			metric.QuerySuccesses++
-			cr.totalMetrics.QuerySuccesses++
-		} else {
-			metric.GetSuccesses++
-			cr.totalMetrics.GetSuccesses++
-		}
 	}
 
 	// Calculate how long it took [nodeID] to reply
@@ -695,11 +657,6 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 func (cr *ChainRouter) HealthCheck(context.Context) (interface{}, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
-
-	cr.log.Info("node metrics",
-		zap.Any("aggMetrics", cr.totalMetrics),
-		zap.Any("metrics", cr.nodeMetrics),
-	)
 
 	numOutstandingReqs := cr.timedRequests.Len()
 	isOutstandingReqs := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
