@@ -105,7 +105,7 @@ func FillIndependentTrie(t *testing.T, r *rand.Rand, start, numKeys int, keySize
 // AssertTrieConsistency ensures given trieDB [a] and [b] both have the same
 // non-empty trie at [root]. (all key/value pairs must be equal)
 //
-// This is only safe for HashDB or PathDB, since Firewood doesn't store trie nodes individually.
+// Firewood storage tries are not supported.
 func AssertTrieConsistency(t testing.TB, root common.Hash, a, b state.Database, onLeaf func(key, val []byte)) {
 	trieA, err := a.OpenTrie(root)
 	require.NoError(t, err)

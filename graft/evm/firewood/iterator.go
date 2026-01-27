@@ -44,7 +44,7 @@ func newAccountIterator(rev *ffi.Revision, start []byte) (*accountIterator, erro
 func (a *accountIterator) Next(bool) bool {
 	next := a.it.Next()
 	for ; next; next = a.it.Next() {
-		// Account keys are 32 bytes
+		// Is an account if and only if the key length is 32 bytes
 		if len(a.it.Key()) == common.HashLength {
 			return true
 		}
