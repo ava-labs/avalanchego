@@ -31,7 +31,7 @@ IMAGE_TAG="${IMAGE_TAG:-}"
 if [[ -z "${IMAGE_TAG}" ]]; then
   # Default to tagging with the commit hash
   source "${SUBNET_EVM_PATH}"/scripts/constants.sh
-  IMAGE_TAG="${SUBNET_EVM_COMMIT::8}"
+  IMAGE_TAG="${git_commit::8}"
 fi
 
 # The dockerfiles don't specify the golang version to minimize the changes required to bump
