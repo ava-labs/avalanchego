@@ -85,7 +85,8 @@ type ChainRouter struct {
 	// aggregator of requests based on their time
 	timedRequests *linked.Hashmap[ids.RequestID, requestEntry]
 
-	nodeMetrics map[ids.NodeID]*nodeMetrics
+	nodeMetrics  map[ids.NodeID]*nodeMetrics
+	totalMetrics nodeMetrics
 }
 
 type nodeMetrics struct {
@@ -326,13 +327,25 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 	}
 
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
-		// Create the request ID of the request we sent that this message is in
-		// response to.
-		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
-		if req == nil {
+		uniqueRequestID := ids.RequestID{
+			NodeID:    nodeID,
+			ChainID:   chainID,
+			RequestID: requestID,
+			Op:        byte(expectedResponse),
+		}
+		req, exists := cr.timedRequests.Get(uniqueRequestID)
+		if !exists {
 			// This was a duplicated response.
 			msg.OnFinishedHandling()
 			return
+		}
+
+		// If this is a timeout, make sure to clear the request. If this isn't a
+		// timeout, then the request should be cleared by either a correct
+		// response or a following timeout.
+		if timeout {
+			cr.timedRequests.Delete(uniqueRequestID)
+			cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 		}
 
 		if op == message.QueryFailedOp || op == message.GetFailedOp {
@@ -342,18 +355,19 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 				cr.nodeMetrics[nodeID] = metric
 			}
 			metric.Failures++
+			cr.totalMetrics.Failures++
 			if timeout {
 				metric.Timeouts++
+				cr.totalMetrics.Timeouts++
 			}
 			if op == message.QueryFailedOp {
 				metric.QueryFailed++
+				cr.totalMetrics.QueryFailed++
 			} else {
 				metric.GetFailed++
+				cr.totalMetrics.GetFailed++
 			}
 		}
-
-		// Tell the timeout manager we are no longer expecting a response
-		cr.timeoutManager.RemoveRequest(uniqueRequestID)
 
 		// Pass the failure to the chain
 		chain.Push(
@@ -390,10 +404,13 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			cr.nodeMetrics[nodeID] = metric
 		}
 		metric.Successes++
+		cr.totalMetrics.Successes++
 		if op == message.ChitsOp {
 			metric.QuerySuccesses++
+			cr.totalMetrics.QuerySuccesses++
 		} else {
 			metric.GetSuccesses++
+			cr.totalMetrics.GetSuccesses++
 		}
 	}
 
@@ -672,7 +689,10 @@ func (cr *ChainRouter) HealthCheck(context.Context) (interface{}, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	cr.log.Info("node metrics", zap.Any("metrics", cr.nodeMetrics))
+	cr.log.Info("node metrics",
+		zap.Any("aggMetrics", cr.totalMetrics),
+		zap.Any("metrics", cr.nodeMetrics),
+	)
 
 	numOutstandingReqs := cr.timedRequests.Len()
 	isOutstandingReqs := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests

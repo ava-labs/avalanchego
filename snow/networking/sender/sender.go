@@ -697,7 +697,6 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		s.failedDueToBench.With(prometheus.Labels{
 			opLabel: message.GetAncestorsOp.String(),
 		}).Inc()
-		s.timeouts.RegisterRequestToUnreachableValidator()
 		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
@@ -742,8 +741,6 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("containerID", containerID),
 		)
-
-		s.timeouts.RegisterRequestToUnreachableValidator()
 		s.router.HandleInternal(ctx, inMsg)
 	} else {
 		s.ctx.Log.Debug("sent message",
@@ -827,7 +824,6 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		s.failedDueToBench.With(prometheus.Labels{
 			opLabel: message.GetOp.String(),
 		}).Inc()
-		s.timeouts.RegisterRequestToUnreachableValidator()
 		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
@@ -872,8 +868,6 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("containerID", containerID),
 		)
-
-		s.timeouts.RegisterRequestToUnreachableValidator()
 		s.router.HandleInternal(ctx, inMsg)
 	} else {
 		s.ctx.Log.Debug("sent message",
@@ -991,7 +985,6 @@ func (s *sender) SendPushQuery(
 				opLabel: message.PushQueryOp.String(),
 			}).Inc()
 			nodeIDs.Remove(nodeID)
-			s.timeouts.RegisterRequestToUnreachableValidator()
 
 			// Immediately register a failure. Do so asynchronously to avoid
 			// deadlock.
@@ -1062,7 +1055,6 @@ func (s *sender) SendPushQuery(
 			}
 
 			// Register failures for nodes we didn't send a request to.
-			s.timeouts.RegisterRequestToUnreachableValidator()
 			inMsg := message.InternalQueryFailed(
 				nodeID,
 				s.ctx.ChainID,
@@ -1132,7 +1124,6 @@ func (s *sender) SendPullQuery(
 				opLabel: message.PullQueryOp.String(),
 			}).Inc()
 			nodeIDs.Remove(nodeID)
-			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid
 			// deadlock.
 			inMsg := message.InternalQueryFailed(
@@ -1194,7 +1185,6 @@ func (s *sender) SendPullQuery(
 			)
 
 			// Register failures for nodes we didn't send a request to.
-			s.timeouts.RegisterRequestToUnreachableValidator()
 			inMsg := message.InternalQueryFailed(
 				nodeID,
 				s.ctx.ChainID,
@@ -1330,7 +1320,6 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 				opLabel: message.AppRequestOp.String(),
 			}).Inc()
 			nodeIDs.Remove(nodeID)
-			s.timeouts.RegisterRequestToUnreachableValidator()
 
 			// Immediately register a failure. Do so asynchronously to avoid
 			// deadlock.
@@ -1398,7 +1387,6 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 			}
 
 			// Register failures for nodes we didn't send a request to.
-			s.timeouts.RegisterRequestToUnreachableValidator()
 			inMsg := message.InboundAppError(
 				nodeID,
 				s.ctx.ChainID,

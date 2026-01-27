@@ -42,7 +42,7 @@ func TestBenchlistAdd(t *testing.T) {
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
-	benchIntf, err := NewBenchlist(
+	b, err := newBenchlistOld(
 		ctx,
 		benchable,
 		vdrs,
@@ -53,7 +53,6 @@ func TestBenchlistAdd(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
-	b := benchIntf.(*benchlist)
 	now := time.Now()
 	b.clock.Set(now)
 
@@ -167,7 +166,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 	duration := 1 * time.Hour
 	// Shouldn't bench more than 2550 (5100/2)
 	maxPortion := 0.5
-	benchIntf, err := NewBenchlist(
+	b, err := newBenchlistOld(
 		ctx,
 		&TestBenchable{T: t},
 		vdrs,
@@ -178,7 +177,6 @@ func TestBenchlistMaxStake(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
-	b := benchIntf.(*benchlist)
 	now := time.Now()
 	b.clock.Set(now)
 
@@ -290,7 +288,7 @@ func TestBenchlistRemove(t *testing.T) {
 	threshold := 3
 	duration := 2 * time.Second
 	maxPortion := 0.76 // can bench 3 of the 5 validators
-	benchIntf, err := NewBenchlist(
+	b, err := newBenchlistOld(
 		ctx,
 		benchable,
 		vdrs,
@@ -301,7 +299,6 @@ func TestBenchlistRemove(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
-	b := benchIntf.(*benchlist)
 	now := time.Now()
 	b.lock.Lock()
 	b.clock.Set(now)

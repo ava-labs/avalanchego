@@ -20,12 +20,13 @@ var _ Manager = (*manager)(nil)
 // consistently failing queries on a benchlist to prevent waiting up to
 // the full network timeout for their responses.
 type Manager interface {
-	// RegisterResponse registers that we receive a request response from [nodeID]
-	// regarding [chainID] within the timeout
+	// RegisterResponse registers that we receive a request response from
+	// [nodeID] regarding [chainID] within the timeout
 	RegisterResponse(chainID ids.ID, nodeID ids.NodeID)
 	// RegisterFailure registers that a request to [nodeID] regarding
 	// [chainID] timed out
 	RegisterFailure(chainID ids.ID, nodeID ids.NodeID)
+
 	// RegisterChain registers a new chain with metrics under [namespace]
 	RegisterChain(ctx *snow.ConsensusContext) error
 	// IsBenched returns true if messages to [nodeID] regarding chain [chainID]
@@ -53,7 +54,7 @@ type manager struct {
 	config *Config
 	// Chain ID --> benchlist for that chain.
 	// Each benchlist is safe for concurrent access.
-	chainBenchlists map[ids.ID]Benchlist
+	chainBenchlists map[ids.ID]*benchlist
 
 	lock sync.RWMutex
 }
@@ -67,7 +68,7 @@ func NewManager(config *Config) Manager {
 	}
 	return &manager{
 		config:          config,
-		chainBenchlists: make(map[ids.ID]Benchlist),
+		chainBenchlists: make(map[ids.ID]*benchlist),
 	}
 }
 
@@ -110,29 +111,10 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		return nil
 	}
 
-	reg, err := metrics.MakeAndRegister(
-		m.config.BenchlistRegisterer,
-		ctx.PrimaryAlias,
-	)
-	if err != nil {
-		return err
-	}
-
-	benchlist, err := NewBenchlist(
+	m.chainBenchlists[ctx.ChainID] = newBenchlist(
 		ctx,
 		m.config.Benchable,
-		m.config.Validators,
-		m.config.Threshold,
-		m.config.MinimumFailingDuration,
-		m.config.Duration,
-		m.config.MaxPortion,
-		reg,
 	)
-	if err != nil {
-		return err
-	}
-
-	m.chainBenchlists[ctx.ChainID] = benchlist
 	return nil
 }
 
