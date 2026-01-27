@@ -291,7 +291,9 @@ func testLongDeepRepair(t *testing.T, snapshots bool) {
 // the side chain is below the committed block. In this case we expect the chain to be
 // rolled back to the committed block, but the chain data itself left in the database
 // for replaying.
-func TestLongOldForkedShallowRepair(t *testing.T) { testLongOldForkedShallowRepair(t, false) }
+func TestLongOldForkedShallowRepair(t *testing.T) {
+	testLongOldForkedShallowRepair(t, false)
+}
 func TestLongOldForkedShallowRepairWithSnapshots(t *testing.T) {
 	testLongOldForkedShallowRepair(t, true)
 }
