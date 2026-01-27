@@ -946,6 +946,27 @@ func setupFile(t *testing.T, path string, fileName string, value string) {
 	require.NoError(os.WriteFile(filePath, []byte(value), 0o600))
 }
 
+func TestGetPrimaryNetworkConfig(t *testing.T) {
+	require := require.New(t)
+	v := setupViperFlags()
+
+	config := getPrimaryNetworkConfig(v)
+
+	// Verify basic config structure
+	require.False(config.ValidatorOnly, "ValidatorOnly should be false for primary network")
+
+	// Verify SnowParameters have the default values from snowball.DefaultParameters
+	require.NotNil(config.SnowParameters, "SnowParameters should not be nil")
+	require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
+	require.Equal(snowball.DefaultParameters.AlphaPreference, config.SnowParameters.AlphaPreference)
+	require.Equal(snowball.DefaultParameters.AlphaConfidence, config.SnowParameters.AlphaConfidence)
+	require.Equal(snowball.DefaultParameters.Beta, config.SnowParameters.Beta)
+	require.Equal(snowball.DefaultParameters.ConcurrentRepolls, config.SnowParameters.ConcurrentRepolls)
+	require.Equal(snowball.DefaultParameters.OptimalProcessing, config.SnowParameters.OptimalProcessing)
+	require.Equal(snowball.DefaultParameters.MaxOutstandingItems, config.SnowParameters.MaxOutstandingItems)
+	require.Equal(snowball.DefaultParameters.MaxItemProcessingTime, config.SnowParameters.MaxItemProcessingTime)
+}
+
 func setupViperFlags() *viper.Viper {
 	v := viper.New()
 	fs := BuildFlagSet()

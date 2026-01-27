@@ -90,6 +90,9 @@ var (
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
 )
 
+// setSnowDefaults sets the default values for any unset fields in the
+// snowball.Parameters struct.
+// It also handles the deprecated Alpha field for backwards compatibility.
 func setSnowDefaults(config *snowball.Parameters, v *viper.Viper) {
 	if config == nil {
 		return
@@ -130,21 +133,10 @@ func setSnowDefaults(config *snowball.Parameters, v *viper.Viper) {
 }
 
 func getDefaultSnowParams(v *viper.Viper) *snowball.Parameters {
-	p := &snowball.Parameters{
-		K:                     v.GetInt(SnowSampleSizeKey),
-		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
-		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
-		Beta:                  v.GetInt(SnowCommitThresholdKey),
-		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
-		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
-		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
-		MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
-	}
-	if v.IsSet(SnowQuorumSizeKey) {
-		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
-		p.AlphaConfidence = p.AlphaPreference
-	}
-	return p
+	p := snowball.DefaultParameters
+	setSnowDefaults(&p, v)
+
+	return &p
 }
 
 // setSimplexDefaults sets the default values for any unset fields in the
@@ -175,6 +167,8 @@ func setConfigDefaults(config *subnets.Config, v *viper.Viper) {
 	}
 }
 
+// getConfigFromBytes unmarshals a subnet config from rawBytes and validates it.
+// It also sets any unset fields to their default values for the provided subnet config.
 func getConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, error) {
 	config := getPrimaryNetworkConfig(v)
 	config.SnowParameters = nil
