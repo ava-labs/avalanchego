@@ -163,15 +163,16 @@ func setSimplexDefaults(config *subnets.Config, v *viper.Viper) {
 
 // setConfigDefaults sets the default values for any unset fields in the subnets.Config.
 func setConfigDefaults(config *subnets.Config, v *viper.Viper) {
-	if config.SimplexParameters != nil {
+	switch {
+	case config.SimplexParameters != nil:
 		setSimplexDefaults(config, v)
-	} else if config.SnowParameters != nil {
+	case config.SnowParameters != nil:
 		setSnowDefaults(config.SnowParameters, v)
-	} else if config.ConsensusParameters != nil {
+	case config.ConsensusParameters != nil:
 		setSnowDefaults(config.ConsensusParameters, v)
 		config.SnowParameters = config.ConsensusParameters
 		config.ConsensusParameters = nil
-	} else {
+	default:
 		// If no consensus parameters are set, default to snowball parameters
 		config.SnowParameters = getDefaultSnowParams(v)
 	}

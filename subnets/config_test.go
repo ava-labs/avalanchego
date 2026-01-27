@@ -84,15 +84,7 @@ func TestValid(t *testing.T) {
 		{
 			name:        "no consensus parameters",
 			s:           Config{},
-			expectedErr: errInvalidConsensusConfiguration,
-		},
-		{
-			name: "both consensus parameters set",
-			s: Config{
-				SnowParameters:    &validParameters,
-				SimplexParameters: &simplex.Parameters{},
-			},
-			expectedErr: errInvalidConsensusConfiguration,
+			expectedErr: errNoParametersSet,
 		},
 		{
 			name: "invalid simplex parameters",
@@ -119,6 +111,77 @@ func TestValid(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.s.ValidParameters()
 			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestValidConsensusConfiguration(t *testing.T) {
+	tests := []struct {
+		name        string
+		cfg         Config
+		expectedErr error
+	}{
+		{
+			name:        "none set",
+			cfg:         Config{},
+			expectedErr: nil,
+		},
+		{
+			name: "only snow set",
+			cfg: Config{
+				SnowParameters: &snowball.Parameters{},
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "only simplex set",
+			cfg: Config{
+				SimplexParameters: &simplex.Parameters{},
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "only deprecated consensusParameters set",
+			cfg: Config{
+				ConsensusParameters: &snowball.Parameters{},
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "snow + simplex set",
+			cfg: Config{
+				SnowParameters:    &snowball.Parameters{},
+				SimplexParameters: &simplex.Parameters{},
+			},
+			expectedErr: ErrTooManyConsensusParameters,
+		},
+		{
+			name: "consensusParameters + snow set",
+			cfg: Config{
+				ConsensusParameters: &snowball.Parameters{},
+				SnowParameters:      &snowball.Parameters{},
+			},
+			expectedErr: ErrTooManyConsensusParameters,
+		},
+		{
+			name: "all three set",
+			cfg: Config{
+				ConsensusParameters: &snowball.Parameters{},
+				SnowParameters:      &snowball.Parameters{},
+				SimplexParameters:   &simplex.Parameters{},
+			},
+			expectedErr: ErrTooManyConsensusParameters,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.ValidConsensusConfiguration()
+			if tt.expectedErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tt.expectedErr)
+			}
 		})
 	}
 }

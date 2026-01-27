@@ -14,7 +14,7 @@ import (
 
 var (
 	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
-	errInvalidConsensusConfiguration    = errors.New("consensus config must have either snowball or simplex parameters set")
+	errNoParametersSet                  = errors.New("consensus config must have either snowball or simplex parameters set")
 	ErrUnsupportedConsensusParameters   = errors.New("consensusParameters is deprecated; use either snowballParameters or simplexParameters instead")
 	ErrTooManyConsensusParameters       = errors.New("only one of consensusParameters, snowballParameters, or simplexParameters can be set")
 )
@@ -76,6 +76,10 @@ func (c *Config) ValidConsensusConfiguration() error {
 }
 
 func (c *Config) ValidParameters() error {
+	if !c.ValidatorOnly && c.AllowedNodes.Len() > 0 {
+		return errAllowedNodesWhenNotValidatorOnly
+	}
+
 	if c.ConsensusParameters != nil {
 		return ErrUnsupportedConsensusParameters
 	}
@@ -85,8 +89,6 @@ func (c *Config) ValidParameters() error {
 	if c.SimplexParameters != nil {
 		return c.SimplexParameters.Verify()
 	}
-	if !c.ValidatorOnly && c.AllowedNodes.Len() > 0 {
-		return errAllowedNodesWhenNotValidatorOnly
-	}
-	return nil
+
+	return errNoParametersSet
 }
