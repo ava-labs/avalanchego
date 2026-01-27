@@ -17,8 +17,8 @@ import (
 
 const (
 	halflife           = time.Minute
-	unbenchProbability = .1
-	benchProbability   = .2
+	unbenchProbability = .2
+	benchProbability   = .5
 )
 
 // If is projected not to respond to queries, it will increase latencies on the
