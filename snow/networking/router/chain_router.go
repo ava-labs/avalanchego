@@ -88,15 +88,6 @@ type ChainRouter struct {
 	timedRequests *linked.Hashmap[ids.RequestID, *requestEntry]
 }
 
-type nodeMetrics struct {
-	Successes      int
-	QuerySuccesses int
-	GetSuccesses   int
-	Timeouts       int
-	QueryFailed    int
-	GetFailed      int
-}
-
 // Initialize the router.
 //
 // When this router receives an incoming message, it cancels the timeout in
