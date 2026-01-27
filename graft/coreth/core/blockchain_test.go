@@ -105,7 +105,7 @@ func TestArchiveBlockChain(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
+
 			tt.testFunc(t, createArchiveBlockChain)
 		})
 	}
@@ -144,7 +144,7 @@ func testArchiveBlockChainSnapsDisabled(t *testing.T, scheme string) {
 
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
+
 			tt.testFunc(t, create)
 		})
 	}
@@ -156,7 +156,6 @@ func TestPruningBlockChain(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, createPruningBlockChain)
 		})
 	}
@@ -193,7 +192,6 @@ func testPruningBlockChainSnapsDisabled(t *testing.T, scheme string) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -252,7 +250,6 @@ func testPruningEmptyCallbacks(t *testing.T, scheme string) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -278,7 +275,6 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -287,7 +283,6 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
-			t.Parallel()
 			testPruningBlockChainUngracefulShutdownSnapsDisabled(t, scheme)
 		})
 	}
@@ -326,7 +321,6 @@ func testPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T, scheme s
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -378,7 +372,6 @@ func TestCorruptSnapshots(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -427,7 +420,6 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -438,7 +430,6 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 func TestPruningToNonPruning(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
-			t.Parallel()
 			testPruningToNonPruning(t, scheme)
 		})
 	}
@@ -699,7 +690,6 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 func TestUngracefulAsyncShutdownNoSnapshots(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
-			t.Parallel()
 			testUngracefulAsyncShutdown(t, scheme, false)
 		})
 	}
@@ -732,7 +722,6 @@ func testUngracefulAsyncShutdown(t *testing.T, scheme string, snapshotEnabled bo
 	}
 	for _, tt := range reexecTests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -743,7 +732,6 @@ func testUngracefulAsyncShutdown(t *testing.T, scheme string, snapshotEnabled bo
 func TestCanonicalHashMarker(t *testing.T) {
 	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme, customrawdb.FirewoodScheme} {
 		t.Run(scheme, func(t *testing.T) {
-			t.Parallel()
 			testCanonicalHashMarker(t, scheme)
 		})
 	}
@@ -880,7 +868,6 @@ func TestTxLookupBlockChain(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, createTxLookupBlockChain)
 		})
 	}
@@ -906,7 +893,6 @@ func TestTxLookupSkipIndexingBlockChain(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, createTxLookupBlockChain)
 		})
 	}
