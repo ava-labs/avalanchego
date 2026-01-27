@@ -179,6 +179,10 @@ tasks:
     desc: Runs shellcheck to check sanity of shell scripts
     cmd: ./scripts/shellcheck.sh
 
+  run-polyrepo:
+    desc: "Run polyrepo for orchestrating local dependencies. Example: LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123 task run-polyrepo"
+    cmd: ./scripts/run_polyrepo.sh {{.CLI_ARGS}}
+
   setup-chain-data:
     desc: Sets up C-Chain test data (blocks from S3, state from S3 or empty for genesis).
     cmd: ./scripts/setup_cchain_data.sh
