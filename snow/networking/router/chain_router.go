@@ -93,7 +93,6 @@ type nodeMetrics struct {
 	Successes      int
 	QuerySuccesses int
 	GetSuccesses   int
-	Failures       int
 	Timeouts       int
 	QueryFailed    int
 	GetFailed      int
@@ -346,26 +345,22 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 		if timeout {
 			cr.timedRequests.Delete(uniqueRequestID)
 			cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
-		}
 
-		if op == message.QueryFailedOp || op == message.GetFailedOp {
-			metric, ok := cr.nodeMetrics[nodeID]
-			if !ok {
-				metric = &nodeMetrics{}
-				cr.nodeMetrics[nodeID] = metric
-			}
-			metric.Failures++
-			cr.totalMetrics.Failures++
-			if timeout {
+			if op == message.QueryFailedOp || op == message.GetFailedOp {
+				metric, ok := cr.nodeMetrics[nodeID]
+				if !ok {
+					metric = &nodeMetrics{}
+					cr.nodeMetrics[nodeID] = metric
+				}
 				metric.Timeouts++
 				cr.totalMetrics.Timeouts++
-			}
-			if op == message.QueryFailedOp {
-				metric.QueryFailed++
-				cr.totalMetrics.QueryFailed++
-			} else {
-				metric.GetFailed++
-				cr.totalMetrics.GetFailed++
+				if op == message.QueryFailedOp {
+					metric.QueryFailed++
+					cr.totalMetrics.QueryFailed++
+				} else {
+					metric.GetFailed++
+					cr.totalMetrics.GetFailed++
+				}
 			}
 		}
 
