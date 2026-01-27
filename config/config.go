@@ -150,9 +150,6 @@ func getDefaultSnowParams(v *viper.Viper) *snowball.Parameters {
 // setSimplexDefaults sets the default values for any unset fields in the
 // simplex.Parameters.
 func setSimplexDefaults(config *subnets.Config, v *viper.Viper) {
-	// if we are setting simplex, we cannot have snow enabled
-	config.SnowParameters = nil
-
 	if config.SimplexParameters.MaxNetworkDelay == 0 {
 		config.SimplexParameters.MaxNetworkDelay = v.GetDuration(SimplexMaxNetworkDelayKey)
 	}
