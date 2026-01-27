@@ -5,6 +5,7 @@ package syncer
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"math/rand"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/x/sync"
+	"github.com/ava-labs/avalanchego/x/sync/synctest"
 )
 
 func Test_Firewood_Sync(t *testing.T) {
@@ -62,33 +64,30 @@ func Test_Firewood_Sync(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testSync(t, 0, tt.clientSize, tt.serverSize)
+			testSync(t, tt.clientSize, tt.serverSize)
 		})
 	}
 }
 
-func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
+func testSync(t *testing.T, clientKeys int, serverKeys int) {
 	ctx := t.Context()
+	r := rand.New(rand.NewSource(1))
 
-	serverDB := generateDB(t, serverKeys, seed)
-	clientDB := generateDB(t, clientKeys, seed+1) // guarantee different data
+	serverDB, root := generateDB(t, r, serverKeys)
+	clientDB, _ := generateDB(t, r, clientKeys)
 	defer func() {
 		require.NoError(t, serverDB.Close(ctx))
 		require.NoError(t, clientDB.Close(ctx))
 	}()
 
-	root, err := serverDB.Root()
-	require.NoError(t, err)
-
 	syncer, err := New(
 		Config{},
 		clientDB,
-		ids.ID(root),
+		root,
 		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(serverDB)),
 		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
 	)
 	require.NoError(t, err)
-	require.NotNil(t, syncer)
 
 	require.NoError(t, syncer.Start(ctx))
 	err = syncer.Wait(ctx)
@@ -99,23 +98,114 @@ func testSync(t *testing.T, seed int64, clientKeys int, serverKeys int) {
 	require.NoError(t, err)
 }
 
+func Test_Firewood_Sync_UpdateSyncTarget(t *testing.T) {
+	tests := []struct {
+		name                    string
+		clientSize              int
+		serverSize              int
+		numRequestsBeforeUpdate int
+	}{
+		{
+			name:                    "finish with stale root",
+			clientSize:              0,
+			serverSize:              sync.DefaultRequestKeyLimit, // one request
+			numRequestsBeforeUpdate: 0,
+		},
+		{
+			name:                    "replace all with stale root",
+			clientSize:              sync.DefaultRequestKeyLimit,
+			serverSize:              sync.DefaultRequestKeyLimit, // one request
+			numRequestsBeforeUpdate: 0,
+		},
+		{
+			name:                    "partial sync then update",
+			clientSize:              0,
+			serverSize:              5 * sync.DefaultRequestKeyLimit, // multiple requests
+			numRequestsBeforeUpdate: 1,
+		},
+		{
+			name:                    "partial sync with replace then update",
+			clientSize:              5 * sync.DefaultRequestKeyLimit,
+			serverSize:              5 * sync.DefaultRequestKeyLimit, // multiple requests
+			numRequestsBeforeUpdate: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testSyncWithUpdate(t, tt.clientSize, tt.serverSize, tt.numRequestsBeforeUpdate)
+		})
+	}
+}
+
+func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequestsBeforeUpdate int) {
+	r := rand.New(rand.NewSource(1))
+
+	serverDB, firstRoot := generateDB(t, r, serverKeys)
+	clientDB, _ := generateDB(t, r, clientKeys)
+	defer func() {
+		require.NoError(t, serverDB.Close(t.Context()))
+		require.NoError(t, clientDB.Close(t.Context()))
+	}()
+	wantRoot := fillDB(t, r, serverDB, serverKeys)
+
+	var syncer *sync.Syncer[*RangeProof, struct{}]
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
+
+	rangeProofHandler := synctest.NewCounterHandler(NewGetRangeProofHandler(serverDB), func() {
+		err := syncer.UpdateSyncTarget(wantRoot)
+		if err != nil {
+			cancel(err)
+		}
+	}, numRequestsBeforeUpdate)
+	syncer, err := New(
+		Config{},
+		clientDB,
+		firstRoot,
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, syncer.Start(ctx))
+	err = syncer.Wait(ctx)
+	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
+		t.Log("syncer reported root mismatch; logging diff between DBs")
+		logDiff(t, serverDB, clientDB)
+	}
+	require.NoError(t, err)
+
+	gotRoot, err := clientDB.Root()
+	require.NoError(t, err)
+	require.Equal(t, wantRoot, ids.ID(gotRoot))
+}
+
 // generateDB creates a new Firewood database with up to [numKeys] random key/value pairs.
-// The function returned closes the database, waiting on the provided context, if there were no test failures.
+// The database should be closed by the caller.
 // Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
-func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
+// Returns the database and its resulting root.
+func generateDB(t *testing.T, r *rand.Rand, numKeys int) (*ffi.Database, ids.ID) {
 	t.Helper()
-	db, err := ffi.New(t.TempDir())
+	db, err := ffi.New(t.TempDir(), ffi.EthereumNodeHashing)
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
+	root := fillDB(t, r, db, numKeys)
+	return db, root
+}
+
+// fillDB adds up to [numKeys] random key/value pairs to [db].
+// Returns the resulting root of the database.
+// Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
+func fillDB(t *testing.T, r *rand.Rand, db *ffi.Database, numKeys int) ids.ID {
 	if numKeys == 0 {
-		return db
+		root, err := db.Root()
+		require.NoError(t, err)
+		return ids.ID(root)
 	}
 
 	var (
-		r         = rand.New(rand.NewSource(seed)) // #nosec G404
-		keys      = make([][]byte, numKeys)
-		vals      = make([][]byte, numKeys)
+		ops       = make([]ffi.BatchOp, 0, numKeys)
 		minLength = 1
 		maxLength = 64
 	)
@@ -132,14 +222,13 @@ func generateDB(t *testing.T, numKeys int, seed int64) *ffi.Database {
 		_, err = r.Read(val)
 		require.NoError(t, err, "read never errors")
 
-		keys = append(keys, key)
-		vals = append(vals, val)
+		ops = append(ops, ffi.Put(key, val))
 	}
 
-	_, err = db.Update(keys, vals)
+	root, err := db.Update(ops)
 	require.NoError(t, err)
 
-	return db
+	return ids.ID(root)
 }
 
 // logDiff logs the differences between two Firewood databases.
