@@ -194,17 +194,6 @@ func (abi ABI) getArguments(name string, data []byte) (Arguments, error) {
 	return args, nil
 }
 
-// UnpackInput unpacks the input according to the ABI specification.
-// No length check is performed, so if the data is expected to be padded by a multiple of 32,
-// this check must be performed by the caller.
-func (abi ABI) UnpackInput(name string, data []byte) ([]interface{}, error) {
-	args, err := abi.getInputs(name)
-	if err != nil {
-		return nil, err
-	}
-	return args.Unpack(data)
-}
-
 // Unpack unpacks the output according to the abi specification.
 func (abi ABI) Unpack(name string, data []byte) ([]interface{}, error) {
 	args, err := abi.getArguments(name, data)

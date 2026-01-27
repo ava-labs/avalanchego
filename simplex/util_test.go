@@ -136,7 +136,7 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 // newSimplexChainParams creates simplex chain parameters with the given nodes as initial validators.
 func newSimplexChainParams(nodes []*testNode) *pSimplex.Parameters {
 	params := &pSimplex.Parameters{
-		MaxProposalWait:    1 * time.Second,
+		MaxNetworkDelay:    1 * time.Second,
 		MaxRebroadcastWait: 1 * time.Second,
 	}
 	params.InitialValidators = make([]pSimplex.SimplexValidatorInfo, len(nodes))

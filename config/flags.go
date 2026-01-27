@@ -317,7 +317,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(SnowMaxTimeProcessingKey, snowball.DefaultParameters.MaxItemProcessingTime, "Maximum amount of time an item should be processing and still be healthy")
 
 	// Simplex Consensus
-	fs.Duration(SimplexMaxProposalWaitKey, simplex.DefaultParameters.MaxProposalWait, "Time to wait for a block to undergo consensus before failing over so a different node will propose a block")
+	fs.Duration(SimplexMaxNetworkDelayKey, simplex.DefaultParameters.MaxNetworkDelay, "Maximum expected network delay for message transmission in Simplex consensus")
 	fs.Duration(SimplexMaxRebroadcastWaitKey, simplex.DefaultParameters.MaxRebroadcastWait, "Time to retry message transmission in case of network instability")
 
 	// ProposerVM

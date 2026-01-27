@@ -14,8 +14,9 @@ import (
 
 var (
 	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
-	errInvalidConsensusConfiguration    = errors.New("consensus config must have either snowball or simplex parameters set")
+	errNoParametersSet                  = errors.New("consensus config must have either snowball or simplex parameters set")
 	ErrUnsupportedConsensusParameters   = errors.New("consensusParameters is deprecated; use either snowballParameters or simplexParameters instead")
+	ErrTooManyConsensusParameters       = errors.New("only one of consensusParameters, snowballParameters, or simplexParameters can be set")
 )
 
 type Config struct {
@@ -54,29 +55,40 @@ type Config struct {
 	ProposerNumHistoricalBlocks uint64 `json:"proposerNumHistoricalBlocks" yaml:"proposerNumHistoricalBlocks"`
 }
 
-func (c *Config) Valid() error {
-	if err := c.validateConsensusParameters(); err != nil {
-		return err
+// ValidConsensusConfiguration ensures that at most one consensus parameter type is set.
+// If none are set, then the default snowball parameters will be used for SnowParameters.
+func (c *Config) ValidConsensusConfiguration() error {
+	numSet := 0
+	if c.SimplexParameters != nil {
+		numSet++
+	}
+	if c.SnowParameters != nil {
+		numSet++
+	}
+	if c.ConsensusParameters != nil {
+		numSet++
 	}
 
-	if !c.ValidatorOnly && c.AllowedNodes.Len() > 0 {
-		return errAllowedNodesWhenNotValidatorOnly
+	if numSet > 1 {
+		return ErrTooManyConsensusParameters
 	}
 	return nil
 }
 
-func (c *Config) validateConsensusParameters() error {
+func (c *Config) ValidParameters() error {
+	if !c.ValidatorOnly && c.AllowedNodes.Len() > 0 {
+		return errAllowedNodesWhenNotValidatorOnly
+	}
+
 	if c.ConsensusParameters != nil {
 		return ErrUnsupportedConsensusParameters
 	}
-
-	if c.SnowParameters != nil && c.SimplexParameters == nil {
+	if c.SnowParameters != nil {
 		return c.SnowParameters.Verify()
 	}
-
-	if c.SimplexParameters != nil && c.SnowParameters == nil {
+	if c.SimplexParameters != nil {
 		return c.SimplexParameters.Verify()
 	}
 
-	return errInvalidConsensusConfiguration
+	return errNoParametersSet
 }

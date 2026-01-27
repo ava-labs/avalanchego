@@ -39,6 +39,16 @@ type Config struct {
 }
 
 func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
+	return newWithDB(
+		config,
+		&database{db},
+		targetRoot,
+		rangeProofClient,
+		changeProofClient,
+	)
+}
+
+func newWithDB(config Config, db xsync.DB[*RangeProof, struct{}], targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
 	if config.Registerer == nil {
 		config.Registerer = prometheus.NewRegistry()
 	}
@@ -49,7 +59,7 @@ func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p
 		config.SimultaneousWorkLimit = defaultSimultaneousWorkLimit
 	}
 	return xsync.NewSyncer(
-		&database{db: db},
+		db,
 		xsync.Config[*RangeProof, struct{}]{
 			RangeProofMarshaler:   rangeProofMarshaler{},
 			ChangeProofMarshaler:  changeProofMarshaler{},
