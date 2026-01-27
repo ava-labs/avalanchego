@@ -76,7 +76,7 @@ ${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${DOCKERHUB_TAG}"
   --build-arg CURRENT_BRANCH="$CURRENT_BRANCH" \
   --build-arg VM_ID="$VM_ID"
 
-if [[ -n "${PUBLISH}" && $CURRENT_BRANCH == "master" && $ALLOW_TAG_LATEST == true ]]; then
+if [[ -n "${PUSH}" && $CURRENT_BRANCH == "master" && $ALLOW_TAG_LATEST == true ]]; then
   echo "Tagging current image as $IMAGE_NAME:latest"
   docker buildx imagetools create -t "$IMAGE_NAME:latest" "$IMAGE_NAME:$BUILD_IMAGE_ID"
 fi
