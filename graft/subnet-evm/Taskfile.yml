@@ -24,7 +24,7 @@ tasks:
 
   build-docker-image:
     desc: Build multi-platform Docker image with avalanchego integration and optional publishing
-    cmd: ./scripts/build_docker_image.sh # publish_docker.yml
+    cmd: ./scripts/build_image.sh # publish_docker.yml
 
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
@@ -143,7 +143,7 @@ tasks:
 
   test-build-image:
     desc: Test docker image build
-    cmd: bash -x scripts/tests.build_docker_image.sh
+    cmd: bash -x scripts/tests.build_image.sh
 
   test-e2e-load:
     desc: Run end-to-end load tests using Ginkgo test framework

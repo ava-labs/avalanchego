@@ -39,6 +39,7 @@ FORCE_TAG_MASTER="${FORCE_TAG_MASTER:-}"
 source "$AVALANCHE_PATH"/scripts/constants.sh
 source "$AVALANCHE_PATH"/scripts/git_commit.sh
 source "$AVALANCHE_PATH"/scripts/image_tag.sh
+source "$AVALANCHE_PATH"/scripts/lib_build_image.sh
 
 if [[ -z "${SKIP_BUILD_RACE}" && $image_tag == *"-r" ]]; then
   echo "Branch name must not end in '-r'"
@@ -70,7 +71,7 @@ DOCKER_CMD="docker buildx build ${*}"
 # The dockerfile doesn't specify the golang version to minimize the
 # changes required to bump the version. Instead, the golang version is
 # provided as an argument.
-GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
+GO_VERSION="$(get_go_version)"
 DOCKER_CMD="${DOCKER_CMD} --build-arg GO_VERSION=${GO_VERSION}"
 
 # Provide the git commit as a build argument to avoid requiring this
@@ -79,32 +80,14 @@ DOCKER_CMD="${DOCKER_CMD} --build-arg GO_VERSION=${GO_VERSION}"
 # directory to copy into the image.
 DOCKER_CMD="${DOCKER_CMD} --build-arg AVALANCHEGO_COMMIT=${git_commit}"
 
-if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
-  # Default to pushing when the image name includes a slash which indicates the
-  # use of a registry e.g.
-  #
-  #  - dockerhub: [repo]/[image name]:[tag]
-  #  - private registry: [private registry hostname]/[image name]:[tag]
-  DOCKER_CMD="${DOCKER_CMD} --push"
-
-  # Build a multi-arch image if requested
-  if [[ -n "${BUILD_MULTI_ARCH}" ]]; then
-    DOCKER_CMD="${DOCKER_CMD} --platform=${PLATFORMS:-linux/amd64,linux/arm64}"
-  fi
-
-  # A populated DOCKER_USERNAME env var triggers login
-  if [[ -n "${DOCKER_USERNAME:-}" ]]; then
-    echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
-  fi
-else
-  # Build a single-arch image since the image name does not include a slash which
-  # indicates that a registry is not available.
-  #
-  # Building a single-arch image with buildx and having the resulting image show up
-  # in the local store of docker images (ala 'docker build') requires explicitly
-  # loading it from the buildx store with '--load'.
-  DOCKER_CMD="${DOCKER_CMD} --load"
+# If BUILD_MULTI_ARCH is set and PLATFORMS is not, use default platforms
+if [[ -n "${BUILD_MULTI_ARCH}" && -z "${PLATFORMS:-}" ]]; then
+  PLATFORMS="linux/amd64,linux/arm64"
 fi
+
+# Configure build mode (push vs load) and platform flags
+configure_docker_build_mode "$DOCKER_IMAGE" "${PLATFORMS:-}"
+DOCKER_CMD="${DOCKER_CMD} ${DOCKER_BUILD_MODE_FLAGS} ${DOCKER_PLATFORM_FLAGS}"
 
 echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash , $DOCKER_IMAGE:$image_tag"
 ${DOCKER_CMD} -t "$DOCKER_IMAGE:$commit_hash" -t "$DOCKER_IMAGE:$image_tag" \

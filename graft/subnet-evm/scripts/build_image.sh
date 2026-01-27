@@ -25,6 +25,10 @@ SUBNET_EVM_PATH=$(
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
+# Load shared build functions
+AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
+source "$AVALANCHE_PATH"/scripts/lib_build_image.sh
+
 # ALLOW_TAG_LATEST is used to tag the image as 'latest' if set to true.
 # It only works if the image is built from the master branch. This is to avoid
 # tagging images from a manual triggered build as 'latest' with older avalanchego versions.
@@ -35,38 +39,13 @@ ALLOW_TAG_LATEST="${ALLOW_TAG_LATEST:-}"
 #
 # Reference: https://docs.docker.com/build/buildkit/
 DOCKER_CMD="docker buildx build"
-ispush=0
+
+# Configure build mode (push vs load) and platform flags
 if [[ -n "${PUBLISH}" ]]; then
   echo "Pushing $IMAGE_NAME:$BUILD_IMAGE_ID"
-  ispush=1
-  # A populated DOCKER_USERNAME env var triggers login
-  if [[ -n "${DOCKER_USERNAME:-}" ]]; then
-    echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
-  fi
 fi
-
-# Build a specified platform image if requested
-if [[ -n "${PLATFORMS}" ]]; then
-  DOCKER_CMD="${DOCKER_CMD} --platform=${PLATFORMS}"
-  if [[ "$PLATFORMS" == *,* ]]; then ## Multi-arch
-    if [[ "${IMAGE_NAME}" != *"/"* ]]; then
-      echo "ERROR: Multi-arch images (multi-platform) must be pushed to a registry."
-      exit 1
-    fi
-    ispush=1
-  fi
-fi
-
-if [[ $ispush -eq 1 ]]; then
-  DOCKER_CMD="${DOCKER_CMD} --push"
-else
-  ## Single arch
-  #
-  # Building a single-arch image with buildx and having the resulting image show up
-  # in the local store of docker images (ala 'docker build') requires explicitly
-  # loading it from the buildx store with '--load'.
-  DOCKER_CMD="${DOCKER_CMD} --load"
-fi
+configure_docker_build_mode "$IMAGE_NAME" "${PLATFORMS:-}"
+DOCKER_CMD="${DOCKER_CMD} ${DOCKER_BUILD_MODE_FLAGS} ${DOCKER_PLATFORM_FLAGS}"
 
 VM_ID=${VM_ID:-"${DEFAULT_VM_ID}"}
 
@@ -84,11 +63,6 @@ if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
   # - Use a image name with a repository to build a multi-arch image that will be pushed.
   AVALANCHEGO_LOCAL_IMAGE_NAME="${AVALANCHEGO_LOCAL_IMAGE_NAME:-avalanchego}"
 
-  if [[ -n "${BUILD_MULTI_ARCH}" && "${AVALANCHEGO_LOCAL_IMAGE_NAME}" != *"/"* ]]; then
-    echo "ERROR: Multi-arch images must be pushed to a registry."
-    exit 1
-  fi
-
   AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}:${AVALANCHE_VERSION}"
   echo "Building ${AVALANCHEGO_NODE_IMAGE} locally"
 
@@ -99,7 +73,7 @@ if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
     "${AVALANCHE_PATH}"/scripts/build_image.sh
 fi
 
-GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
+GO_VERSION="$(get_go_version)"
 
 echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based of AvalancheGo@$AVALANCHE_VERSION"
 # Use repo root as context so Dockerfile can access graft/ directory

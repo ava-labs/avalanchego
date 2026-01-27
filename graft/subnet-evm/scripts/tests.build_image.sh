@@ -36,7 +36,7 @@ build_and_test() {
     VM_ID=$"${vm_id}" \
     IMAGE_NAME="${imagename}" \
     AVALANCHEGO_LOCAL_IMAGE_NAME="${avalanchego_local_image_name}" \
-    ./scripts/build_docker_image.sh
+    ./scripts/build_image.sh
 
   echo "listing images"
   docker images
