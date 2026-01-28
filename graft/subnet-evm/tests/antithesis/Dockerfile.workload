@@ -12,9 +12,8 @@ ARG BUILDER_WORKDIR
 
 WORKDIR $BUILDER_WORKDIR
 
-# Build the workload using module import path (root go.mod has replacement for subnet-evm)
-# -mod=mod allows downloading dependencies that aren't in root go.sum (from submodule)
-RUN go build -mod=mod -o ./graft/subnet-evm/build/workload \
+# Build the workload using module import path (go.work includes graft/subnet-evm)
+RUN go build -o ./graft/subnet-evm/build/workload \
     github.com/ava-labs/avalanchego/graft/subnet-evm/tests/antithesis
 
 # ============= Cleanup Stage ================
