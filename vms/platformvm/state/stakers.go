@@ -22,6 +22,7 @@ var (
 type Stakers interface {
 	CurrentStakers
 	PendingStakers
+	ContinuousStakers
 }
 
 type CurrentStakers interface {
@@ -45,14 +46,6 @@ type CurrentStakers interface {
 	// UpdateCurrentValidator updates the [staker] describing a validator to the
 	// staker set. Only specific mutable fields can be updated.
 	UpdateCurrentValidator(staker *Staker) error
-
-	// SetDelegateeReward sets the accrued delegation rewards for [nodeID] on
-	// [subnetID] to [amount].
-	SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error
-
-	// GetDelegateeReward returns the accrued delegation rewards for [nodeID] on
-	// [subnetID].
-	GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error)
 
 	// GetCurrentDelegatorIterator returns the delegators associated with the
 	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
@@ -106,6 +99,17 @@ type PendingStakers interface {
 	// GetPendingStakerIterator returns stakers in order of their removal from
 	// the pending staker set.
 	GetPendingStakerIterator() (iterator.Iterator[*Staker], error)
+}
+
+type ContinuousStakers interface {
+	// ResetContinuousValidatorCycle is updating the continuous validator fields.
+	//
+	// Invariant: [staker] is currently a CurrentValidator
+	ResetContinuousValidatorCycle(
+		validator *Staker,
+		weight uint64,
+		potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
+	) error
 }
 
 type baseStakers struct {

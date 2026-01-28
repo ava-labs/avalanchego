@@ -5,171 +5,12 @@ package state
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
-
-func TestValidatorUptimes(t *testing.T) {
-	require := require.New(t)
-	state := newValidatorState()
-
-	// get non-existent uptime
-	nodeID := ids.GenerateTestNodeID()
-	subnetID := ids.GenerateTestID()
-	_, _, err := state.GetUptime(nodeID, subnetID)
-	require.ErrorIs(err, database.ErrNotFound)
-
-	// set non-existent uptime
-	err = state.SetUptime(nodeID, subnetID, 1, time.Now())
-	require.ErrorIs(err, database.ErrNotFound)
-
-	testMetadata := &validatorMetadata{
-		UpDuration:  time.Hour,
-		lastUpdated: time.Now(),
-	}
-	// load uptime
-	state.LoadValidatorMetadata(nodeID, subnetID, testMetadata)
-
-	// get uptime
-	upDuration, lastUpdated, err := state.GetUptime(nodeID, subnetID)
-	require.NoError(err)
-	require.Equal(testMetadata.UpDuration, upDuration)
-	require.Equal(testMetadata.lastUpdated, lastUpdated)
-
-	// set uptime
-	newUpDuration := testMetadata.UpDuration + 1
-	newLastUpdated := testMetadata.lastUpdated.Add(time.Hour)
-	require.NoError(state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated))
-
-	// get new uptime
-	upDuration, lastUpdated, err = state.GetUptime(nodeID, subnetID)
-	require.NoError(err)
-	require.Equal(newUpDuration, upDuration)
-	require.Equal(newLastUpdated, lastUpdated)
-
-	// load uptime changes uptimes
-	newTestMetadata := &validatorMetadata{
-		UpDuration:  testMetadata.UpDuration + time.Hour,
-		lastUpdated: testMetadata.lastUpdated.Add(time.Hour),
-	}
-	state.LoadValidatorMetadata(nodeID, subnetID, newTestMetadata)
-
-	// get new uptime
-	upDuration, lastUpdated, err = state.GetUptime(nodeID, subnetID)
-	require.NoError(err)
-	require.Equal(newTestMetadata.UpDuration, upDuration)
-	require.Equal(newTestMetadata.lastUpdated, lastUpdated)
-
-	// delete uptime
-	state.DeleteValidatorMetadata(nodeID, subnetID)
-
-	// get deleted uptime
-	_, _, err = state.GetUptime(nodeID, subnetID)
-	require.ErrorIs(err, database.ErrNotFound)
-}
-
-func TestWriteValidatorMetadata(t *testing.T) {
-	require := require.New(t)
-	state := newValidatorState()
-
-	primaryDB := memdb.New()
-	subnetDB := memdb.New()
-
-	// write empty uptimes
-	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
-
-	// load uptime
-	nodeID := ids.GenerateTestNodeID()
-	subnetID := ids.GenerateTestID()
-	testUptimeReward := &validatorMetadata{
-		UpDuration:      time.Hour,
-		lastUpdated:     time.Now(),
-		PotentialReward: 100,
-		txID:            ids.GenerateTestID(),
-	}
-	state.LoadValidatorMetadata(nodeID, subnetID, testUptimeReward)
-
-	// write state, should not reflect to DB yet
-	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
-	require.False(primaryDB.Has(testUptimeReward.txID[:]))
-	require.False(subnetDB.Has(testUptimeReward.txID[:]))
-
-	// get uptime should still return the loaded value
-	upDuration, lastUpdated, err := state.GetUptime(nodeID, subnetID)
-	require.NoError(err)
-	require.Equal(testUptimeReward.UpDuration, upDuration)
-	require.Equal(testUptimeReward.lastUpdated, lastUpdated)
-
-	// update uptimes
-	newUpDuration := testUptimeReward.UpDuration + 1
-	newLastUpdated := testUptimeReward.lastUpdated.Add(time.Hour)
-	require.NoError(state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated))
-
-	// write uptimes, should reflect to subnet DB
-	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
-	require.False(primaryDB.Has(testUptimeReward.txID[:]))
-	require.True(subnetDB.Has(testUptimeReward.txID[:]))
-}
-
-func TestValidatorDelegateeRewards(t *testing.T) {
-	require := require.New(t)
-	state := newValidatorState()
-
-	// get non-existent delegatee reward
-	nodeID := ids.GenerateTestNodeID()
-	subnetID := ids.GenerateTestID()
-	_, err := state.GetDelegateeReward(subnetID, nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
-
-	// set non-existent delegatee reward
-	err = state.SetDelegateeReward(subnetID, nodeID, 100000)
-	require.ErrorIs(err, database.ErrNotFound)
-
-	testMetadata := &validatorMetadata{
-		PotentialDelegateeReward: 100000,
-	}
-	// load delegatee reward
-	state.LoadValidatorMetadata(nodeID, subnetID, testMetadata)
-
-	// get delegatee reward
-	delegateeReward, err := state.GetDelegateeReward(subnetID, nodeID)
-	require.NoError(err)
-	require.Equal(testMetadata.PotentialDelegateeReward, delegateeReward)
-
-	// set delegatee reward
-	newDelegateeReward := testMetadata.PotentialDelegateeReward + 100000
-	require.NoError(state.SetDelegateeReward(subnetID, nodeID, newDelegateeReward))
-
-	// get new delegatee reward
-	delegateeReward, err = state.GetDelegateeReward(subnetID, nodeID)
-	require.NoError(err)
-	require.Equal(newDelegateeReward, delegateeReward)
-
-	// load delegatee reward changes
-	newTestMetadata := &validatorMetadata{
-		PotentialDelegateeReward: testMetadata.PotentialDelegateeReward + 100000,
-	}
-	state.LoadValidatorMetadata(nodeID, subnetID, newTestMetadata)
-
-	// get new delegatee reward
-	delegateeReward, err = state.GetDelegateeReward(subnetID, nodeID)
-	require.NoError(err)
-	require.Equal(newTestMetadata.PotentialDelegateeReward, delegateeReward)
-
-	// delete delegatee reward
-	state.DeleteValidatorMetadata(nodeID, subnetID)
-
-	// get deleted delegatee reward
-	_, _, err = state.GetUptime(nodeID, subnetID)
-	require.ErrorIs(err, database.ErrNotFound)
-}
 
 func TestParseValidatorMetadata(t *testing.T) {
 	type test struct {
@@ -180,19 +21,15 @@ func TestParseValidatorMetadata(t *testing.T) {
 	}
 	tests := []test{
 		{
-			name:  "nil",
-			bytes: nil,
-			expected: &validatorMetadata{
-				lastUpdated: time.Unix(0, 0),
-			},
+			name:        "nil",
+			bytes:       nil,
+			expected:    &validatorMetadata{},
 			expectedErr: nil,
 		},
 		{
-			name:  "nil",
-			bytes: []byte{},
-			expected: &validatorMetadata{
-				lastUpdated: time.Unix(0, 0),
-			},
+			name:        "nil",
+			bytes:       []byte{},
+			expected:    &validatorMetadata{},
 			expectedErr: nil,
 		},
 		{
@@ -202,7 +39,6 @@ func TestParseValidatorMetadata(t *testing.T) {
 			},
 			expected: &validatorMetadata{
 				PotentialReward: 100000,
-				lastUpdated:     time.Unix(0, 0),
 			},
 			expectedErr: nil,
 		},
@@ -222,7 +58,6 @@ func TestParseValidatorMetadata(t *testing.T) {
 				UpDuration:      6000000,
 				LastUpdated:     900000,
 				PotentialReward: 100000,
-				lastUpdated:     time.Unix(900000, 0),
 			},
 			expectedErr: nil,
 		},
@@ -245,7 +80,68 @@ func TestParseValidatorMetadata(t *testing.T) {
 				LastUpdated:              900000,
 				PotentialReward:          100000,
 				PotentialDelegateeReward: 20000,
-				lastUpdated:              time.Unix(900000, 0),
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "uptime + potential reward + potential delegatee reward + staker start time",
+			bytes: []byte{
+				// codec version
+				0x00, 0x01,
+				// up duration
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
+				// last updated
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x0D, 0xBB, 0xA0,
+				// potential reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0xA0,
+				// potential delegatee reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4E, 0x20,
+				// staker start time
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x93, 0xE0,
+			},
+			expected: &validatorMetadata{
+				UpDuration:               6000000,
+				LastUpdated:              900000,
+				PotentialReward:          100000,
+				PotentialDelegateeReward: 20000,
+				StakerStartTime:          300000,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "codec v2 fields",
+			bytes: []byte{
+				// codec version
+				0x00, 0x02,
+				// up duration
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
+				// last updated
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x0D, 0xBB, 0xA0,
+				// potential reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0xA0,
+				// potential delegatee reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4E, 0x20,
+				// staker start time
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x93, 0xE0,
+				// accrued rewards
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE8,
+				// accrued delegatee rewards
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xF4,
+				// auto restake shares
+				0x00, 0x04, 0x93, 0xE0,
+				// continuation period
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x51, 0x80,
+			},
+			expected: &validatorMetadata{
+				UpDuration:               6000000,
+				LastUpdated:              900000,
+				PotentialReward:          100000,
+				PotentialDelegateeReward: 20000,
+				StakerStartTime:          300000,
+				AccruedRewards:           1000,
+				AccruedDelegateeRewards:  500,
+				AutoRestakeShares:        300000,
+				ContinuationPeriod:       86400,
 			},
 			expectedErr: nil,
 		},
@@ -253,7 +149,7 @@ func TestParseValidatorMetadata(t *testing.T) {
 			name: "invalid codec version",
 			bytes: []byte{
 				// codec version
-				0x00, 0x02,
+				0x00, 0x03,
 				// up duration
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
 				// last updated

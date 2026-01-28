@@ -277,16 +277,17 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require.NoError(err)
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
-	vdrStaker, err := state.NewCurrentStaker(
+	vdrStaker, err := state.NewCurrentValidator(
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		0,
 		0,
 	)
 	require.NoError(err)
 
 	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
-	delStaker, err := state.NewCurrentStaker(
+	delStaker, err := state.NewCurrentDelegator(
 		delTx.ID(),
 		addDelTx,
 		addDelTx.StartTime(),
@@ -408,17 +409,18 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
 	vdrRewardAmt := uint64(2000000)
-	vdrStaker, err := state.NewCurrentStaker(
+	vdrStaker, err := state.NewCurrentValidator(
 		vdrTx.ID(),
 		addValTx,
 		time.Unix(int64(vdrStartTime), 0),
 		vdrRewardAmt,
+		0,
 	)
 	require.NoError(err)
 
 	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
 	delRewardAmt := uint64(1000000)
-	delStaker, err := state.NewCurrentStaker(
+	delStaker, err := state.NewCurrentDelegator(
 		delTx.ID(),
 		addDelTx,
 		time.Unix(int64(delStartTime), 0),
@@ -633,17 +635,18 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
 	vdrRewardAmt := uint64(2000000)
-	vdrStaker, err := state.NewCurrentStaker(
+	vdrStaker, err := state.NewCurrentValidator(
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
 		vdrRewardAmt,
+		0,
 	)
 	require.NoError(err)
 
 	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
 	delRewardAmt := uint64(1000000)
-	delStaker, err := state.NewCurrentStaker(
+	delStaker, err := state.NewCurrentDelegator(
 		delTx.ID(),
 		addDelTx,
 		time.Unix(int64(delStartTime), 0),
@@ -803,16 +806,17 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
-	vdrStaker, err := state.NewCurrentStaker(
+	vdrStaker, err := state.NewCurrentValidator(
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		0,
 		0,
 	)
 	require.NoError(err)
 
 	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
-	delStaker, err := state.NewCurrentStaker(
+	delStaker, err := state.NewCurrentDelegator(
 		delTx.ID(),
 		addDelTx,
 		addDelTx.StartTime(),
