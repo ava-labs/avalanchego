@@ -211,7 +211,8 @@ tasks:
     desc: Downloads module dependencies and syncs go.work.sum
     cmds:
       - cmd: go mod download
-      - cmd: go work sync
+      # GOWORK="" overrides GOWORK=off set by actions/setup-go
+      - cmd: GOWORK="" go work sync
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
