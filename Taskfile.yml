@@ -113,6 +113,17 @@ tasks:
       - task: check-clean-branch
       - task: sync-go-work
       - task: check-clean-branch
+      - cmd: go mod tidy
+        dir: graft/evm
+      - task: check-clean-branch
+      - cmd: go mod tidy
+        dir: graft/coreth
+      - task: check-clean-branch
+      - cmd: go mod tidy
+        dir: graft/subnet-evm
+      - task: check-clean-branch
+      - task: sync-go-work
+      - task: check-clean-branch
 
   create-kind-cluster:
     desc: Creates the default kind cluster
