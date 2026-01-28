@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
+	"github.com/ava-labs/avalanchego/graft/evm/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -36,7 +36,7 @@ type Client interface {
 	MemoryProfile(ctx context.Context, options ...rpc.Option) error
 	LockProfile(ctx context.Context, options ...rpc.Option) error
 	SetLogLevel(ctx context.Context, level slog.Level, options ...rpc.Option) error
-	GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.Config, error)
+	GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.CChainConfig, error)
 }
 
 // Client implementation for interacting with EVM [chain]
@@ -163,11 +163,11 @@ func (c *client) SetLogLevel(ctx context.Context, level slog.Level, options ...r
 }
 
 type ConfigReply struct {
-	Config *config.Config `json:"config"`
+	Config *config.CChainConfig `json:"config"`
 }
 
 // GetVMConfig returns the current config of the VM
-func (c *client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.Config, error) {
+func (c *client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.CChainConfig, error) {
 	res := &ConfigReply{}
 	err := c.adminRequester.SendRequest(ctx, "admin.getVMConfig", struct{}{}, res, options...)
 	return res.Config, err

@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
+	"github.com/ava-labs/avalanchego/graft/evm/config"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
@@ -124,7 +124,7 @@ func (vm *VM) useStandaloneDatabase(acceptedDB avalanchedatabase.Database) (bool
 	// no config provided, use default
 	standaloneDBFlag := vm.config.UseStandaloneDatabase
 	if standaloneDBFlag != nil {
-		return standaloneDBFlag.Bool(), nil
+		return *standaloneDBFlag, nil
 	}
 
 	// check if the chain can use a standalone database
@@ -138,7 +138,7 @@ func (vm *VM) useStandaloneDatabase(acceptedDB avalanchedatabase.Database) (bool
 
 // getDatabaseConfig returns the database configuration for the chain
 // to be used by separate, standalone database.
-func getDatabaseConfig(config config.Config, chainDataDir string) (DatabaseConfig, error) {
+func getDatabaseConfig(config config.L1Config, chainDataDir string) (DatabaseConfig, error) {
 	var (
 		configBytes []byte
 		err         error

@@ -52,7 +52,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmerrors"
@@ -62,6 +61,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/coreth/warp"
+	"github.com/ava-labs/avalanchego/graft/evm/config"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
@@ -183,7 +183,7 @@ type VM struct {
 	// with an efficient caching layer.
 	*chain.State
 
-	config config.Config
+	config config.CChainConfig
 
 	chainID     *big.Int
 	genesisHash common.Hash
@@ -270,7 +270,7 @@ func (vm *VM) Initialize(
 	vm.ctx = chainCtx
 	vm.clock = vm.extensionConfig.Clock
 
-	cfg, deprecateMsg, err := config.GetConfig(configBytes, vm.ctx.NetworkID)
+	cfg, deprecateMsg, err := config.GetConfig(configBytes, vm.ctx.NetworkID, config.NewDefaultCChainConfig)
 	if err != nil {
 		return fmt.Errorf("failed to get config: %w", err)
 	}
@@ -1025,7 +1025,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		handler.SetHTTPBodyLimit(int(vm.config.HTTPBodyLimit))
 	}
 
-	enabledAPIs := vm.config.EthAPIs()
+	enabledAPIs := vm.config.EnabledEthAPIs
 	if err := attachEthService(handler, vm.eth.APIs(), enabledAPIs); err != nil {
 		return nil, err
 	}

@@ -8,13 +8,27 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
+
+	avaxutils "github.com/ava-labs/avalanchego/utils"
 )
 
-const defaultCommitInterval = 4096
+const (
+	defaultCommitInterval = 4096
 
-func NewDefaultConfig() Config {
-	return Config{
+	// Protocol constants for transaction gossip bloom filters.
+	// These values are fixed across all nodes and cannot be changed without
+	// a coordinated network upgrade.
+	TxGossipBloomMinTargetElements       = 8 * 1024
+	TxGossipBloomTargetFalsePositiveRate = 0.01
+	TxGossipBloomResetFalsePositiveRate  = 0.05
+	TxGossipBloomChurnMultiplier         = 3
+)
+
+// newDefaultCommonConfig returns a CommonConfig with sensible defaults shared by both C-Chain and L1.
+func newDefaultCommonConfig() CommonConfig {
+	return CommonConfig{
 		AllowUnprotectedTxHashes: []common.Hash{
 			common.HexToHash("0xfefb2da535e927b85fe68eb81cb2e4a5827c905f78381a01ef2322aa9b0aee8e"), // EIP-1820: https://eips.ethereum.org/EIPS/eip-1820
 		},
@@ -42,23 +56,23 @@ func NewDefaultConfig() Config {
 		RPCTxFeeCap:               100,        // 100 AVAX
 		MetricsExpensiveEnabled:   true,
 		// Default to no maximum API call duration
-		APIMaxDuration: timeToDuration(0),
+		APIMaxDuration: wrapDuration(0),
 		// Default to no maximum WS CPU usage
-		WSCPURefillRate: timeToDuration(0),
+		WSCPURefillRate: wrapDuration(0),
 		// Default to no maximum WS CPU usage
-		WSCPUMaxStored: timeToDuration(0),
+		WSCPUMaxStored: wrapDuration(0),
 		// Default to no maximum on the number of blocks per getLogs request
 		MaxBlocksPerRequest:         0,
-		ContinuousProfilerFrequency: timeToDuration(15 * time.Minute),
+		ContinuousProfilerFrequency: wrapDuration(15 * time.Minute),
 		ContinuousProfilerMaxFiles:  5,
 		PushGossipPercentStake:      .9,
 		PushGossipNumValidators:     100,
 		PushGossipNumPeers:          0,
 		PushRegossipNumValidators:   10,
 		PushRegossipNumPeers:        0,
-		PushGossipFrequency:         timeToDuration(100 * time.Millisecond),
-		PullGossipFrequency:         timeToDuration(1 * time.Second),
-		RegossipFrequency:           timeToDuration(30 * time.Second),
+		PushGossipFrequency:         wrapDuration(100 * time.Millisecond),
+		PullGossipFrequency:         wrapDuration(1 * time.Second),
+		RegossipFrequency:           wrapDuration(30 * time.Second),
 		// Default size (MB) for the offline pruner to use
 		OfflinePruningBloomFilterSize:   uint64(512),
 		LogLevel:                        "info",
@@ -80,10 +94,6 @@ func NewDefaultConfig() Config {
 		StateHistory:         uint64(32),
 		// Estimated block count in 24 hours with 2s block accept period
 		HistoricalProofQueryWindow: uint64(24 * time.Hour / (2 * time.Second)),
-		// Price Option Defaults
-		PriceOptionSlowFeePercentage: uint64(95),
-		PriceOptionFastFeePercentage: uint64(105),
-		PriceOptionMaxTip:            uint64(20 * utils.GWei),
 		// Mempool settings
 		TxPoolPriceLimit:   1,
 		TxPoolPriceBump:    10,
@@ -91,13 +101,36 @@ func NewDefaultConfig() Config {
 		TxPoolGlobalSlots:  4096 + 1024, // urgent + floating queue capacity with 4:1 ratio,
 		TxPoolAccountQueue: 64,
 		TxPoolGlobalQueue:  1024,
-		TxPoolLifetime:     timeToDuration(10 * time.Minute),
+		TxPoolLifetime:     wrapDuration(10 * time.Minute),
 		// RPC settings
 		BatchRequestLimit:    1000,
 		BatchResponseMaxSize: 25 * 1000 * 1000, // 25MB
 	}
 }
 
-func timeToDuration(t time.Duration) Duration {
+func NewDefaultCChainConfig() CChainConfig {
+	return CChainConfig{
+		CommonConfig: newDefaultCommonConfig(),
+		// Price Option Defaults (C-Chain specific)
+		PriceOptionSlowFeePercentage: uint64(95),
+		PriceOptionFastFeePercentage: uint64(105),
+		PriceOptionMaxTip:            uint64(20 * utils.GWei),
+	}
+}
+
+func NewDefaultL1Config() L1Config {
+	cfg := newDefaultCommonConfig()
+	// Subnet EVM defaults to state sync disabled (unlike C-Chain which enables at genesis)
+	cfg.StateSyncEnabled = avaxutils.PointerTo(false)
+	return L1Config{
+		CommonConfig: cfg,
+		// Subnet EVM API settings
+		ValidatorsAPIEnabled: true,
+		// Database settings
+		DatabaseType: pebbledb.Name,
+	}
+}
+
+func wrapDuration(t time.Duration) Duration {
 	return Duration{t}
 }
