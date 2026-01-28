@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -106,15 +105,6 @@ func newEmptyLeafsRequest(leafReqType LeafsRequestType) LeafsRequest {
 		return SubnetEVMLeafsRequest{}
 	default:
 		return CorethLeafsRequest{}
-	}
-}
-
-func leafsRequestTypeForCodec(c codec.Manager) LeafsRequestType {
-	switch c {
-	case SubnetEVMCodec:
-		return SubnetEVMLeafsRequestType
-	default:
-		return CorethLeafsRequestType
 	}
 }
 
