@@ -4424,20 +4424,22 @@ func TestStandardExecutorAddContinuousValidatorTx(t *testing.T) {
 	require.NoError(err)
 
 	expectedValidator := &state.Staker{
-		TxID:                    addContVdrTx.TxID,
-		NodeID:                  nodeID,
-		PublicKey:               sk.PublicKey(),
-		SubnetID:                constants.PrimaryNetworkID,
-		Weight:                  weight,
-		StartTime:               diff.GetTimestamp(),
-		EndTime:                 diff.GetTimestamp().Add(continuationPeriod),
-		PotentialReward:         expectedPotentialReward,
-		AccruedRewards:          0,
-		AccruedDelegateeRewards: 0,
-		AutoRestakeShares:       200_000,
-		NextTime:                diff.GetTimestamp().Add(continuationPeriod),
-		Priority:                txs.PrimaryNetworkValidatorCurrentPriority,
-		ContinuationPeriod:      continuationPeriod,
+		ContinuousValidator: state.ContinuousValidator{
+			AccruedRewards:          0,
+			AccruedDelegateeRewards: 0,
+			AutoRestakeShares:       200_000,
+			ContinuationPeriod:      continuationPeriod,
+		},
+		TxID:            addContVdrTx.TxID,
+		NodeID:          nodeID,
+		PublicKey:       sk.PublicKey(),
+		SubnetID:        constants.PrimaryNetworkID,
+		Weight:          weight,
+		StartTime:       diff.GetTimestamp(),
+		EndTime:         diff.GetTimestamp().Add(continuationPeriod),
+		PotentialReward: expectedPotentialReward,
+		NextTime:        diff.GetTimestamp().Add(continuationPeriod),
+		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
 	}
 	require.Equal(expectedValidator, validator)
 

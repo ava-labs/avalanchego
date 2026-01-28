@@ -25,7 +25,7 @@ type RewardContinuousValidatorTx struct {
 	// ID of the tx that created the delegator/validator being removed/rewarded
 	TxID ids.ID `serialize:"true" json:"txID"`
 
-	// End time of the validator.
+	// End time of the validation cycle
 	Timestamp uint64 `serialize:"true" json:"timestamp"`
 
 	unsignedBytes []byte // Unsigned byte representation of this data

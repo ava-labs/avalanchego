@@ -2623,9 +2623,6 @@ func TestStateResetContinuousValidatorCycle(t *testing.T) {
 	require.Equal(expectedEndTime, continuousValidator.EndTime)
 }
 
-// TestValidatorMetadataPersistence verifies that validator metadata (including
-// ACP-236 continuous staking fields) and uptime are properly written to and
-// loaded from the database when adding, modifying, and deleting validators.
 func TestValidatorMetadataPersistence(t *testing.T) {
 	require := require.New(t)
 
@@ -2817,8 +2814,6 @@ func createContinuousValidatorTx(t testing.TB) *txs.AddContinuousValidatorTx {
 	}
 }
 
-// TestValidatorUptimePersistence verifies that validator uptime is properly
-// written to and loaded from the database.
 func TestValidatorUptimePersistence(t *testing.T) {
 	require := require.New(t)
 
@@ -2865,134 +2860,4 @@ func TestValidatorUptimePersistence(t *testing.T) {
 	require.NoError(err)
 	require.Equal(upDuration, loadedUpDuration)
 	require.Equal(lastUpdated, loadedLastUpdated)
-}
-
-func TestStateResetContinuousValidatorCycleValidation(t *testing.T) {
-	require := require.New(t)
-
-	subnetID := ids.GenerateTestID()
-
-	state := newTestState(t, memdb.New())
-
-	blsKey, err := localsigner.New()
-	require.NoError(err)
-
-	continuousValidator := &Staker{
-		TxID:                    ids.GenerateTestID(),
-		NodeID:                  ids.GenerateTestNodeID(),
-		PublicKey:               blsKey.PublicKey(),
-		SubnetID:                subnetID,
-		Weight:                  10,
-		StartTime:               time.Unix(1, 0),
-		EndTime:                 time.Unix(2, 0),
-		PotentialReward:         100,
-		AccruedRewards:          10,
-		AccruedDelegateeRewards: 5,
-		NextTime:                time.Time{},
-		Priority:                txs.PrimaryNetworkValidatorCurrentPriority,
-		ContinuationPeriod:      14 * 24 * time.Hour,
-	}
-	require.NoError(state.PutCurrentValidator(continuousValidator))
-
-	tests := []struct {
-		name                                                               string
-		expectedErr                                                        error
-		validator                                                          *Staker
-		weight                                                             uint64
-		potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64
-	}{
-		{
-			name:                         "decreased accrued rewards",
-			validator:                    continuousValidator,
-			weight:                       continuousValidator.Weight,
-			potentialReward:              continuousValidator.PotentialReward,
-			totalAccruedRewards:          continuousValidator.AccruedRewards - 1,
-			totalAccruedDelegateeRewards: continuousValidator.AccruedDelegateeRewards,
-			expectedErr:                  errDecreasedAccruedRewards,
-		},
-		{
-			name:                         "decreased accrued delegatee rewards",
-			validator:                    continuousValidator,
-			weight:                       continuousValidator.Weight,
-			potentialReward:              continuousValidator.PotentialReward,
-			totalAccruedRewards:          continuousValidator.AccruedRewards,
-			totalAccruedDelegateeRewards: continuousValidator.AccruedDelegateeRewards - 1,
-			expectedErr:                  errDecreasedAccruedDelegateeRewards,
-		},
-		{
-			name:                         "decreased weight",
-			validator:                    continuousValidator,
-			weight:                       continuousValidator.Weight - 1,
-			potentialReward:              continuousValidator.PotentialReward,
-			totalAccruedRewards:          continuousValidator.AccruedRewards,
-			totalAccruedDelegateeRewards: continuousValidator.AccruedDelegateeRewards,
-			expectedErr:                  errDecreasedWeight,
-		},
-	}
-
-	for _, test := range tests {
-		err = state.ResetContinuousValidatorCycle(
-			test.validator,
-			test.weight,
-			test.potentialReward,
-			test.totalAccruedRewards,
-			test.totalAccruedDelegateeRewards,
-		)
-
-		require.ErrorIs(err, test.expectedErr)
-	}
-}
-
-func TestStateResetContinuousValidatorCycle(t *testing.T) {
-	require := require.New(t)
-
-	subnetID := ids.GenerateTestID()
-
-	state := newTestState(t, memdb.New())
-
-	blsKey, err := localsigner.New()
-	require.NoError(err)
-
-	continuousValidator := &Staker{
-		TxID:                    ids.GenerateTestID(),
-		NodeID:                  ids.GenerateTestNodeID(),
-		PublicKey:               blsKey.PublicKey(),
-		SubnetID:                subnetID,
-		Weight:                  10,
-		StartTime:               time.Unix(1, 0),
-		EndTime:                 time.Unix(2, 0),
-		PotentialReward:         100,
-		AccruedRewards:          10,
-		AccruedDelegateeRewards: 5,
-		NextTime:                time.Time{},
-		Priority:                txs.PrimaryNetworkValidatorCurrentPriority,
-		ContinuationPeriod:      14 * 24 * time.Hour,
-	}
-	require.NoError(state.PutCurrentValidator(continuousValidator))
-
-	newWeight := continuousValidator.Weight + 10
-	newPotentialReward := continuousValidator.PotentialReward + 15
-	newAccruedRewards := continuousValidator.AccruedRewards + 20
-	newAccruedDelegateeRewards := continuousValidator.AccruedDelegateeRewards + 25
-
-	expectedStartTime := continuousValidator.EndTime
-	expectedEndTime := continuousValidator.EndTime.Add(continuousValidator.ContinuationPeriod)
-	err = state.ResetContinuousValidatorCycle(
-		continuousValidator,
-		newWeight,
-		newPotentialReward,
-		newAccruedRewards,
-		newAccruedDelegateeRewards,
-	)
-	require.NoError(err)
-
-	continuousValidator, err = state.GetCurrentValidator(subnetID, continuousValidator.NodeID)
-	require.NoError(err)
-
-	require.Equal(newWeight, continuousValidator.Weight)
-	require.Equal(newPotentialReward, continuousValidator.PotentialReward)
-	require.Equal(newAccruedRewards, continuousValidator.AccruedRewards)
-	require.Equal(newAccruedDelegateeRewards, continuousValidator.AccruedDelegateeRewards)
-	require.Equal(expectedStartTime, continuousValidator.StartTime)
-	require.Equal(expectedEndTime, continuousValidator.EndTime)
 }

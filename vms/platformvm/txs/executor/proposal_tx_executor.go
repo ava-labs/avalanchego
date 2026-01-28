@@ -704,7 +704,7 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 		// Invariant: The rewards calculator can never return a
 		//            [potentialReward] that would overflow the
 		//            accumulated rewards.
-		newDelegateeReward, err := math.Add(validator.DelegateeReward, delegateeReward)
+		newDelegateeReward, err := safemath.Add(validator.DelegateeReward, delegateeReward)
 		if err != nil {
 			return err
 		}
@@ -791,15 +791,10 @@ func (e *proposalTxExecutor) createUTXOsContinuousValidatorOnAbort(uValidatorTx 
 	}
 
 	// Create UTXOs for accrrued delegatee rewards.
-	delegateeReward, err := e.onCommitState.GetDelegateeReward(
-		validator.SubnetID,
-		validator.NodeID,
-	)
+	totalDelegateeRewards, err := safemath.Add(validator.DelegateeReward, validator.AccruedDelegateeRewards)
 	if err != nil {
-		return fmt.Errorf("failed to fetch delegatee rewards: %w", err)
+		return err
 	}
-
-	totalDelegateeRewards := delegateeReward + validator.AccruedDelegateeRewards
 	if totalDelegateeRewards > 0 {
 		outIntf, err := e.backend.Fx.CreateOutput(totalDelegateeRewards, uValidatorTx.DelegationRewardsOwner())
 		if err != nil {
@@ -836,19 +831,13 @@ func (e *proposalTxExecutor) createUTXOsContinuousValidatorOnAbort(uValidatorTx 
 //  4. If restaking would exceed MaxValidatorStake, the excess is withdrawn
 //  5. Updates the validator state
 func (e *proposalTxExecutor) setOnCommitStateContinuousValidatorRestake(validatorTx txs.ValidatorTx, validator *state.Staker) error {
+	var err error
+
 	outputIndexOffset := uint32(len(e.tx.Unsigned.Outputs()))
 	asset := validatorTx.Stake()[0].Asset
 
-	delegateeReward, err := e.onCommitState.GetDelegateeReward(
-		validator.SubnetID,
-		validator.NodeID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to fetch delegatee rewards: %w", err)
-	}
-
 	restakingRewards, withdrawingRewards := reward.Split(validator.PotentialReward, validator.AutoRestakeShares)
-	restakingDelegateeRewards, withdrawingDelegateeRewards := reward.Split(delegateeReward, validator.AutoRestakeShares)
+	restakingDelegateeRewards, withdrawingDelegateeRewards := reward.Split(validator.DelegateeReward, validator.AutoRestakeShares)
 
 	if withdrawingRewards > 0 {
 		outIntf, err := e.backend.Fx.CreateOutput(withdrawingRewards, validatorTx.ValidationRewardsOwner())
@@ -1049,7 +1038,10 @@ func (e *proposalTxExecutor) createUTXOsContinuousValidatorOnGracefulExit(uValid
 
 	// Create UTXOs for rewards for [onCommitState].
 	onCommitUTXOsOffset := uint32(len(e.tx.Unsigned.Outputs()))
-	totalRewards := validator.PotentialReward + validator.AccruedRewards
+	totalRewards, err := safemath.Add(validator.PotentialReward, validator.AccruedRewards)
+	if err != nil {
+		return err
+	}
 	if totalRewards > 0 {
 		outIntf, err := e.backend.Fx.CreateOutput(totalRewards, uValidatorTx.ValidationRewardsOwner())
 		if err != nil {
@@ -1076,15 +1068,10 @@ func (e *proposalTxExecutor) createUTXOsContinuousValidatorOnGracefulExit(uValid
 	}
 
 	// Provide the delegatee rewards from successful delegations here.
-	delegateeReward, err := e.onCommitState.GetDelegateeReward(
-		validator.SubnetID,
-		validator.NodeID,
-	)
+	totalDelegateeRewards, err := safemath.Add(validator.DelegateeReward, validator.AccruedDelegateeRewards)
 	if err != nil {
-		return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
+		return err
 	}
-
-	totalDelegateeRewards := delegateeReward + validator.AccruedDelegateeRewards
 	if totalDelegateeRewards == 0 {
 		return nil
 	}
