@@ -570,6 +570,7 @@ func (vm *VM) getPostDurangoSlotTime(
 		pChainHeight,
 		vm.ctx.NodeID,
 		slot,
+		vm.ctx.Log,
 	)
 	// Note: The P-chain does not currently try to target any block time. It
 	// notifies the consensus engine as soon as a new block may be built. To
@@ -577,6 +578,9 @@ func (vm *VM) getPostDurangoSlotTime(
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
 	// time, ProposerMinBlockDelay can be configured in the node config.
+
+	vm.ctx.Log.Debug("proposervm minimum delay", zap.Duration("delay", delay), zap.Error(err))
+
 	switch {
 	case err == nil:
 		delay = max(delay, vm.MinBlkDelay)
