@@ -50,6 +50,10 @@ func (*visitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
+func (*visitor) RewardContinuousValidatorTx(*txs.RewardContinuousValidatorTx) error {
+	return ErrUnsupportedTxType
+}
+
 func (s *visitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
@@ -231,6 +235,27 @@ func (s *visitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
 		return err
 	}
 	txSigners = append(txSigners, disableAuthSigners)
+	return sign(s.tx, txSigners)
+}
+
+func (s *visitor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, txSigners)
+}
+
+func (s *visitor) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfigTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	authSigners, err := s.getAuthSigners(tx.TxID, tx.Auth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, authSigners)
 	return sign(s.tx, txSigners)
 }
 

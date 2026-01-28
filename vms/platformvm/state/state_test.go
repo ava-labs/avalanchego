@@ -2623,9 +2623,6 @@ func TestStateResetContinuousValidatorCycle(t *testing.T) {
 	require.Equal(expectedEndTime, continuousValidator.EndTime)
 }
 
-// TestValidatorMetadataPersistence verifies that validator metadata (including
-// ACP-236 continuous staking fields) and uptime are properly written to and
-// loaded from the database when adding, modifying, and deleting validators.
 func TestValidatorMetadataPersistence(t *testing.T) {
 	require := require.New(t)
 
@@ -2817,8 +2814,6 @@ func createContinuousValidatorTx(t testing.TB) *txs.AddContinuousValidatorTx {
 	}
 }
 
-// TestValidatorUptimePersistence verifies that validator uptime is properly
-// written to and loaded from the database.
 func TestValidatorUptimePersistence(t *testing.T) {
 	require := require.New(t)
 
