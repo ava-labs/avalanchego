@@ -85,7 +85,6 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 	var (
 		root  = task.Root()
 		start = task.Start()
-		end   = task.End()
 	)
 
 	if skip, err := task.OnStart(); err != nil {
@@ -105,7 +104,7 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 			root,
 			task.Account(),
 			start,
-			end,
+			nil, // End is intentionally nil, because VerifyRangeProof does not handle empty responses with non-empty end key.
 			c.config.RequestSize,
 			task.NodeType(),
 		)

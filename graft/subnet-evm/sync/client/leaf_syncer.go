@@ -83,7 +83,6 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 	var (
 		root  = task.Root()
 		start = task.Start()
-		end   = task.End()
 	)
 
 	if skip, err := task.OnStart(); err != nil {
@@ -103,7 +102,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 			root,
 			task.Account(),
 			start,
-			end,
+			nil, // End is intentionally nil; VerifyRangeProof does not handle empty responses with non-empty end key
 			c.requestSize,
 			message.StateTrieNode,
 		)

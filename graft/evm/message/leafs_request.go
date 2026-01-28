@@ -42,11 +42,11 @@ type LeafsRequest interface {
 }
 
 // LeafsRequestType selects which wire format to use when building leafs requests.
-type LeafsRequestType string
+type LeafsRequestType int
 
 const (
-	CorethLeafsRequestType    LeafsRequestType = "coreth"
-	SubnetEVMLeafsRequestType LeafsRequestType = "subnet-evm"
+	CorethLeafsRequestType LeafsRequestType = iota
+	SubnetEVMLeafsRequestType
 )
 
 type leafsRequestBase struct {
@@ -142,7 +142,7 @@ func (l leafsRequestBase) RootHash() common.Hash    { return l.Root }
 func (l leafsRequestBase) AccountHash() common.Hash { return l.Account }
 func (l leafsRequestBase) StartKey() []byte         { return l.Start }
 func (l leafsRequestBase) EndKey() []byte           { return l.End }
-func (l leafsRequestBase) LimitValue() uint16 { return l.Limit }
+func (l leafsRequestBase) LimitValue() uint16       { return l.Limit }
 
 func (s SubnetEVMLeafsRequest) NodeTypeValue() NodeType { return s.NodeType }
 func (c CorethLeafsRequest) NodeTypeValue() NodeType    { return c.NodeType }

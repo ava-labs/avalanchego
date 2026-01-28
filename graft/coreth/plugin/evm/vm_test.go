@@ -88,8 +88,10 @@ var (
 )
 
 func defaultExtensions() *extension.Config {
+	syncSummaryProvider := message.NewBlockSyncSummaryProvider(message.CorethCodec)
 	return &extension.Config{
-		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.CorethCodec),
+		SyncSummaryProvider: syncSummaryProvider,
+		SyncableParser:      syncSummaryProvider,
 		Clock:               &mockable.Clock{},
 	}
 }
