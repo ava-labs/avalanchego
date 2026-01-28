@@ -10,6 +10,7 @@ SUBNET_EVM_PATH=$(
   cd .. && pwd
 )
 # Load the constants
+# shellcheck source=graft/subnet-evm/scripts/constants.sh disable=SC1091
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
 build_and_test() {
@@ -44,7 +45,7 @@ build_and_test() {
   # Check all of the images expected to have been built
   local target_images=(
     "$imagename:$imgtag"
-    "$imagename:$DOCKERHUB_TAG"
+    "$imagename:$commit_hash"
   )
   IFS=',' read -r -a archarray <<<"$arches"
   for arch in "${archarray[@]}"; do
