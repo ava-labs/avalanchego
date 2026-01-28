@@ -100,7 +100,7 @@ tasks:
       - cmd: go mod tidy
       - task: check-clean-branch
       - cmd: go mod tidy
-        dir: tools
+        dir: tools/external
       - task: check-clean-branch
 
   create-kind-cluster:
