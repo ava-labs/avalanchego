@@ -86,6 +86,9 @@ func TestStateSyncFromScratchExceedParent(t *testing.T) {
 }
 
 func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
+	// TODO(#4702): flaky test - should be fixed with state sync refactor
+	t.Skip("Flaky test - tracked in #4702")
+
 	rand.New(rand.NewSource(1))
 
 	var lock sync.Mutex

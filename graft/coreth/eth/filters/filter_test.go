@@ -376,7 +376,7 @@ func TestFilters(t *testing.T) {
 	// This test occasionally returns nil due to context handling differences with go-ethereum.
 	// These differences are not critical, so this test can simply be skipped.
 	t.Run("timeout", func(t *testing.T) {
-		t.Skip("Flaky")
+		t.Skip("Flaky test from go-ethereum")
 		f := sys.NewRangeFilter(0, -1, nil, nil)
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Hour))
 		defer cancel()
