@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -225,6 +226,23 @@ func (nop *noOpQueryHandler) PushQuery(_ context.Context, nodeID ids.NodeID, req
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 		zap.Uint64("requestedHeight", requestedHeight),
+	)
+	return nil
+}
+
+type noOpSimplexHandler struct {
+	log logging.Logger
+}
+
+func NewNoOpSimplexHandler(log logging.Logger) SimplexHandler {
+	return &noOpSimplexHandler{log: log}
+}
+
+func (nop *noOpSimplexHandler) Simplex(_ context.Context, nodeID ids.NodeID, _ *p2p.Simplex) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.SimplexOp),
+		zap.Stringer("nodeID", nodeID),
 	)
 	return nil
 }

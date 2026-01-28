@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/simplex/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/simplex"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap/queue"
@@ -101,6 +103,9 @@ var (
 
 	// Bootstrapping prefixes for ChainVMs
 	ChainBootstrappingDBPrefix = []byte("interval_bs")
+
+	// Prefix used for simplex storage
+	simplexDBPrefix = []byte("simplex")
 
 	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
@@ -562,6 +567,15 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
+		// handle simplex engine based off parameters
+		if sb.Config().SimplexParameters != nil {
+			chain, err = m.createSimplexChain(ctx, vm, sb, chainParams.GenesisData, chainFxs)
+			if err != nil {
+				return nil, fmt.Errorf("error while creating simplex chain %w", err)
+			}
+			break
+		}
+
 		beacons := m.Validators
 		if chainParams.ID == constants.PlatformChainID {
 			beacons = chainParams.CustomBeacons
@@ -1589,4 +1603,241 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	}
 	m.vmGatherer[vmID] = vmGatherer
 	return vmGatherer, nil
+}
+
+// createSimplexHandler creates a handler that passes messages from the network to the consensus engine
+func (m *manager) createSimplexHandler(ctx *snow.ConsensusContext, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
+	handlerReg, err := metrics.MakeAndRegister(
+		m.handlerGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Asynchronously passes messages from the network to the consensus engine
+	return handler.New(
+		ctx,
+		nil, // we don't need a change notifier for simplex, since the engine listens for events and we don't want the handler to intercept them
+		nil,
+		m.Validators,
+		m.FrontierPollFrequency,
+		m.ConsensusAppConcurrency,
+		m.ResourceTracker,
+		sb,
+		connectedValidators,
+		peerTracker,
+		handlerReg,
+		halter.Halt,
+	)
+}
+
+// createMessageSender creates a sender that passes messages from the consensus engine to the network
+func (m *manager) createMessageSender(ctx *snow.ConsensusContext, sb subnets.Subnet) (common.Sender, error) {
+	msgSender, err := sender.New(
+		ctx,
+		m.MsgCreator,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		p2ppb.EngineType_ENGINE_TYPE_CHAIN,
+		sb,
+		ctx.Registerer,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	if m.TracingEnabled {
+		msgSender = sender.Trace(msgSender, m.Tracer)
+	}
+
+	return msgSender, nil
+}
+
+func (m *manager) createTrackedPeers(primaryAlias string) (tracker.Peers, error) {
+	stakeReg, err := metrics.MakeAndRegister(
+		m.stakeGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+	connectedValidators, err := tracker.NewMeteredPeers(stakeReg)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+	return connectedValidators, nil
+}
+
+// createPeerTracker creates a peer tracker for the Snowman consensus engine
+func (m *manager) createPeerTracker(ctx *snow.ConsensusContext, primaryAlias string) (*p2p.PeerTracker, error) {
+	p2pReg, err := metrics.MakeAndRegister(
+		m.p2pGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	peerTracker, err := p2p.NewPeerTracker(
+		ctx.Log,
+		"peer_tracker",
+		p2pReg,
+		set.Of(ctx.NodeID),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+	return peerTracker, nil
+}
+
+func simplexCtxConfig(ctx *snow.ConsensusContext) simplex.SimplexChainContext {
+	return simplex.SimplexChainContext{
+		NodeID:    ctx.NodeID,
+		ChainID:   ctx.ChainID,
+		SubnetID:  ctx.SubnetID,
+		NetworkID: ctx.NetworkID,
+	}
+}
+
+func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainVM, sb subnets.Subnet, genesisData []byte, fxs []*common.Fx) (*chain, error) {
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
+
+	ctx.State.Set(snow.EngineState{
+		Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
+		State: snow.Initializing,
+	})
+
+	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+	m.Log.Info("creating simplex chain", zap.String("chain", primaryAlias))
+
+	messageSender, err := m.createMessageSender(ctx, sb)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create snowman message sender: %w", err)
+	}
+
+	// initialize the VM
+	vmDB, simplexDB, err := m.createSimplexDBs(primaryAlias, ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create simplex DBs: %w", err)
+	}
+
+	// TODO: wrap the vm in a LOCKED VM that locks the VM interface methods(excluding WaitForEvent)
+
+	var halter common.Halter
+	connectedValidators, err := m.createTrackedPeers(primaryAlias)
+	if err != nil {
+		return nil, fmt.Errorf("error creating connected validators: %w", err)
+	}
+	m.Validators.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
+
+	peerTracker, err := m.createPeerTracker(ctx, primaryAlias)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracking: %w", err)
+	}
+
+	h, err := m.createSimplexHandler(ctx, sb, primaryAlias, connectedValidators, peerTracker, halter)
+	if err != nil {
+		return nil, fmt.Errorf("error creating handler: %w", err)
+	}
+
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+
+	// we need to set initialize the VM before creating the simplex engine
+	// in order to have the genesis data available
+	if err := vm.Initialize(
+		context.TODO(),
+		ctx.Context,
+		vmDB,
+		genesisData,
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		fxs,
+		messageSender,
+	); err != nil {
+		return nil, fmt.Errorf("couldn't initialize simplex VM: %w", err)
+	}
+
+	walLocation := getChainWALLocation(ctx.ChainDataDir, ctx.ChainID)
+	wal, err := wal.New(walLocation)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create simplex wal: %w", err)
+	}
+
+	config := &simplex.Config{
+		Ctx:                simplexCtxConfig(ctx),
+		Log:                ctx.Log,
+		Sender:             m.Net,
+		OutboundMsgBuilder: m.MsgCreator,
+		VM:                 vm,
+		WAL:                wal,
+		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
+		DB:                 simplexDB,
+		Params:             sb.Config().SimplexParameters,
+	}
+
+	engine, err := simplex.NewEngine(ctx, context.TODO(), config)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create simplex engine: %w", err)
+	}
+
+	bootstrapper := &simplex.TODOBootstrapper{
+		BootstrapTracker: sb,
+		Engine:           engine,
+	}
+
+	h.SetEngineManager(&handler.EngineManager{
+		DAG: nil,
+		Chain: &handler.Engine{
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+	})
+
+	// Register health checks
+	if err := m.Health.RegisterHealthCheck(primaryAlias, h, ctx.SubnetID.String()); err != nil {
+		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
+	}
+
+	return &chain{
+		Name:    primaryAlias,
+		Context: ctx,
+		VM:      vm,
+		Handler: h,
+	}, nil
+}
+
+// createSimplexDBs creates dbs for simplex. One is used for the VM to store blocks,
+// the other is used for simplex to store finalizations
+func (m *manager) createSimplexDBs(primaryAlias string, chainID ids.ID) (*prefixdb.Database, *prefixdb.Database, error) {
+	meterDBReg, err := metrics.MakeAndRegister(
+		m.MeterDBMetrics,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	meterDB, err := meterdb.New(meterDBReg, m.DB)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	prefixDB := prefixdb.New(chainID[:], meterDB)
+	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
+	simplexDB := prefixdb.New(simplexDBPrefix, prefixDB)
+	return vmDB, simplexDB, nil
+}
+
+func getChainWALLocation(chainDataDir string, chainID ids.ID) string {
+	return filepath.Join(
+		chainDataDir,
+		chainID.String()+"_simplex.wal",
+	)
 }
