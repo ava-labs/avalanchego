@@ -2555,15 +2555,16 @@ func TestStateResetContinuousValidatorCycleValidation(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err = state.ResetContinuousValidatorCycle(
-			test.validator,
-			test.weight,
-			test.potentialReward,
-			test.totalAccruedRewards,
-			test.totalAccruedDelegateeRewards,
+		require.ErrorIs(
+			state.ResetContinuousValidatorCycle(
+				test.validator,
+				test.weight,
+				test.potentialReward,
+				test.totalAccruedRewards,
+				test.totalAccruedDelegateeRewards,
+			),
+			test.expectedErr,
 		)
-
-		require.ErrorIs(err, test.expectedErr)
 	}
 }
 
@@ -2709,8 +2710,7 @@ func TestValidatorMetadataPersistence(t *testing.T) {
 	mutatedValidator.EndTime = newEndTime
 	mutatedValidator.NextTime = newEndTime
 
-	err = state2.UpdateCurrentValidator(&mutatedValidator)
-	require.NoError(err)
+	require.NoError(state2.UpdateCurrentValidator(&mutatedValidator))
 	require.NoError(state2.Commit())
 
 	// Create a third state to verify modifications persisted
