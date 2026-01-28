@@ -599,10 +599,15 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 			return err
 		}
 
+		// Make a copy to avoid mutating the shared parent state object.
+		// The commit and abort states share the same parent, so modifying
+		// the validator directly would affect both states.
+		validatorCopy := *validator
+
 		// For any validators starting after [CortinaTime], we defer rewarding the
 		// [reward] until their staking period is over.
-		validator.DelegateeReward = newDelegateeReward
-		if err := e.onCommitState.UpdateCurrentValidator(validator); err != nil {
+		validatorCopy.DelegateeReward = newDelegateeReward
+		if err := e.onCommitState.UpdateCurrentValidator(&validatorCopy); err != nil {
 			return err
 		}
 	} else {
