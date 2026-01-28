@@ -124,8 +124,9 @@ func NewSyncer(client leaf.Client, db *versiondb.Database, atomicTrie *atomicsta
 	close(tasks)
 
 	syncer.syncer = leaf.NewCallbackSyncer(client, tasks, &leaf.SyncerConfig{
-		RequestSize: cfg.requestSize,
-		NumWorkers:  cfg.numWorkers,
+		RequestSize:      cfg.requestSize,
+		NumWorkers:       cfg.numWorkers,
+		LeafsRequestType: message.CorethLeafsRequestType,
 	})
 
 	return syncer, nil

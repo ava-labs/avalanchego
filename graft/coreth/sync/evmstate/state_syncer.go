@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
 
 const (
@@ -110,8 +111,9 @@ func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQu
 	options.ApplyTo(ss, opts...)
 
 	ss.syncer = leaf.NewCallbackSyncer(client, ss.segments, &leaf.SyncerConfig{
-		RequestSize: leafsRequestSize,
-		NumWorkers:  defaultNumWorkers,
+		RequestSize:      leafsRequestSize,
+		NumWorkers:       defaultNumWorkers,
+		LeafsRequestType: message.CorethLeafsRequestType,
 	})
 
 	if codeQueue == nil {
