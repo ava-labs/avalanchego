@@ -133,10 +133,12 @@ func (s *Staker) ValidateMutation(ms *Staker) error {
 }
 
 func (s Staker) immutableFieldsAreUnmodified(ms *Staker) bool {
+	publicKeysEqual := (s.PublicKey == nil && ms.PublicKey == nil) ||
+		(s.PublicKey != nil && s.PublicKey.Equals(ms.PublicKey))
+
 	return s.TxID == ms.TxID &&
 		s.NodeID == ms.NodeID &&
-		s.PublicKey.Equals(ms.PublicKey) &&
+		publicKeysEqual &&
 		s.SubnetID == ms.SubnetID &&
-		s.NextTime.Equal(ms.NextTime) &&
 		s.Priority == ms.Priority
 }
