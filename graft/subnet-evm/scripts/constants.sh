@@ -16,7 +16,7 @@ DEFAULT_VM_ID="srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
 # You should probably set it - export IMAGE_NAME='avaplatform/subnet-evm_avalanchego'
 IMAGE_NAME=${IMAGE_NAME:-"subnet-evm_avalanchego"}
 
-# Shared between ./scripts/build_docker_image.sh and ./scripts/tests.build_docker_image.sh
+# Shared between ./scripts/build_image.sh and ./scripts/tests.build_image.sh
 AVALANCHEGO_IMAGE_NAME="${AVALANCHEGO_IMAGE_NAME:-avaplatform/avalanchego}"
 
 # if this isn't a git repository (say building from a release), don't set our git constants.
@@ -54,7 +54,7 @@ if [[ -z ${AVALANCHE_VERSION:-} ]]; then
   fi
 fi
 
-# Shared between ./scripts/build_docker_image.sh and ./scripts/tests.build_docker_image.sh
+# Shared between ./scripts/build_image.sh and ./scripts/tests.build_image.sh
 DOCKERHUB_TAG="${SUBNET_EVM_COMMIT::8}_${AVALANCHE_VERSION}"
 # WARNING: this will use the most recent commit even if there are un-committed changes present
 BUILD_IMAGE_ID=${BUILD_IMAGE_ID:-"${CURRENT_BRANCH}_${AVALANCHE_VERSION}"}

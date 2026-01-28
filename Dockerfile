@@ -29,15 +29,7 @@ ARG BUILDPLATFORM
 #
 # build_env.sh is used to capture the environmental changes required by the build step since RUN
 # environment state is not otherwise persistent.
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] && [ "$BUILDPLATFORM" != "linux/arm64" ]; then \
-    apt-get update && apt-get install -y gcc-aarch64-linux-gnu && \
-    echo "export CC=aarch64-linux-gnu-gcc" > ./build_env.sh \
-    ; elif [ "$TARGETPLATFORM" = "linux/amd64" ] && [ "$BUILDPLATFORM" != "linux/amd64" ]; then \
-    apt-get update && apt-get install -y gcc-x86-64-linux-gnu && \
-    echo "export CC=x86_64-linux-gnu-gcc" > ./build_env.sh \
-    ; else \
-    echo "export CC=gcc" > ./build_env.sh \
-    ; fi
+RUN ./scripts/setup_cross_compile.sh "$TARGETPLATFORM" "$BUILDPLATFORM"
 
 # Build avalanchego. The build environment is configured with build_env.sh from the step
 # enabling cross-compilation.
