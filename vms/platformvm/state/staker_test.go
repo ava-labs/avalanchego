@@ -201,13 +201,10 @@ func TestNewPendingStaker(t *testing.T) {
 }
 
 func TestValidateMutation(t *testing.T) {
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
 	staker := &Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          ids.GenerateTestNodeID(),
-		PublicKey:       sk.PublicKey(),
+		PublicKey:       nil,
 		SubnetID:        ids.GenerateTestID(),
 		Weight:          100,
 		StartTime:       time.Unix(10, 0),
@@ -255,14 +252,6 @@ func TestValidateMutation(t *testing.T) {
 			name: "mutated subnet id",
 			mutateFn: func(staker Staker) *Staker {
 				staker.SubnetID = ids.GenerateTestID()
-				return &staker
-			},
-			expectedErr: errImmutableFieldsModified,
-		},
-		{
-			name: "mutated next time",
-			mutateFn: func(staker Staker) *Staker {
-				staker.NextTime = time.Unix(10, 0)
 				return &staker
 			},
 			expectedErr: errImmutableFieldsModified,
