@@ -2604,14 +2604,13 @@ func TestStateResetContinuousValidatorCycle(t *testing.T) {
 
 	expectedStartTime := continuousValidator.EndTime
 	expectedEndTime := continuousValidator.EndTime.Add(continuousValidator.ContinuationPeriod)
-	err = state.ResetContinuousValidatorCycle(
+	require.NoError(state.ResetContinuousValidatorCycle(
 		continuousValidator,
 		newWeight,
 		newPotentialReward,
 		newAccruedRewards,
 		newAccruedDelegateeRewards,
-	)
-	require.NoError(err)
+	))
 
 	continuousValidator, err = state.GetCurrentValidator(subnetID, continuousValidator.NodeID)
 	require.NoError(err)
