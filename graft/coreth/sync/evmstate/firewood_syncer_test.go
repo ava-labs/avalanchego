@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
@@ -197,13 +198,14 @@ func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state
 	require.NoErrorf(t, err, "%T.Root()", db)
 	require.Equal(t, root, common.Hash(gotRoot), "client DB root does not match expected root")
 
-	for _, acc := range accounts {
+	for k, acc := range accounts {
 		codeHash := common.BytesToHash(acc.CodeHash)
 		if codeHash == (common.Hash{}) || codeHash == types.EmptyCodeHash {
 			continue
 		}
 		codeBytes := rawdb.ReadCode(clientState.DiskDB(), codeHash)
-		require.NotNilf(t, codeBytes, "no code found for code hash %s", codeHash.Hex())
+		require.NotEmptyf(t, codeBytes, "no code found for code hash %s", codeHash.Hex())
+		require.Equalf(t, codeHash, crypto.Keccak256Hash(codeBytes), "incorrect code for account %+x", k.Address)
 	}
 
 	it := customrawdb.NewCodeToFetchIterator(clientState.DiskDB())
