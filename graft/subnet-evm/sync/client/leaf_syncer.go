@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 )
 
 var errFailedToFetchLeafs = errors.New("failed to fetch leafs")
@@ -39,6 +39,7 @@ type CallbackLeafSyncer struct {
 	done        chan error
 	tasks       <-chan LeafSyncTask
 	requestSize uint16
+	requestType message.LeafsRequestType
 }
 
 type LeafClient interface {
@@ -48,12 +49,13 @@ type LeafClient interface {
 }
 
 // NewCallbackLeafSyncer creates a new syncer object to perform leaf sync of tries.
-func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, requestSize uint16) *CallbackLeafSyncer {
+func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, requestSize uint16, requestType message.LeafsRequestType) *CallbackLeafSyncer {
 	return &CallbackLeafSyncer{
 		client:      client,
 		done:        make(chan error),
 		tasks:       tasks,
 		requestSize: requestSize,
+		requestType: requestType,
 	}
 }
 
@@ -95,13 +97,20 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 			return err
 		}
 
-		leafsResponse, err := c.client.GetLeafs(ctx, message.LeafsRequest{
-			Root:     root,
-			Account:  task.Account(),
-			Start:    start,
-			Limit:    c.requestSize,
-			NodeType: message.StateTrieNode,
-		})
+		leafsRequest, err := message.NewLeafsRequest(
+			c.requestType,
+			root,
+			task.Account(),
+			start,
+			nil, // End is intentionally nil; VerifyRangeProof does not handle empty responses with non-empty end key
+			c.requestSize,
+			message.StateTrieNode,
+		)
+		if err != nil {
+			return err
+		}
+
+		leafsResponse, err := c.client.GetLeafs(ctx, leafsRequest)
 		if err != nil {
 			return fmt.Errorf("%w: %w", errFailedToFetchLeafs, err)
 		}

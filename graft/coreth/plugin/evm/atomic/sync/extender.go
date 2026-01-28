@@ -8,9 +8,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
 
 // Extender is the sync extender for the atomic VM.

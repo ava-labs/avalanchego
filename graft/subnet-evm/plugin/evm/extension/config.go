@@ -13,12 +13,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/ids"

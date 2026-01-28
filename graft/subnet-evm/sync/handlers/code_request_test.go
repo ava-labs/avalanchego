@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats/statstest"
 	"github.com/ava-labs/avalanchego/ids"
 
@@ -35,7 +35,7 @@ func TestCodeRequestHandler(t *testing.T) {
 	rawdb.WriteCode(database, maxSizeCodeHash, maxSizeCodeBytes)
 
 	mockHandlerStats := &statstest.TestHandlerStats{}
-	codeRequestHandler := NewCodeRequestHandler(database, message.Codec, mockHandlerStats)
+	codeRequestHandler := NewCodeRequestHandler(database, message.SubnetEVMCodec, mockHandlerStats)
 
 	tests := map[string]struct {
 		setup       func() (request message.CodeRequest, expectedCodeResponse [][]byte)
@@ -100,7 +100,7 @@ func TestCodeRequestHandler(t *testing.T) {
 				return
 			}
 			var response message.CodeResponse
-			_, err = message.Codec.Unmarshal(responseBytes, &response)
+			_, err = message.SubnetEVMCodec.Unmarshal(responseBytes, &response)
 			require.NoError(t, err)
 			require.Len(t, response.Data, len(expectedResponse))
 			for i, code := range expectedResponse {

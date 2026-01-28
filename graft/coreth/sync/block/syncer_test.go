@@ -21,9 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -130,6 +130,7 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 
 func TestBlockSyncer_ContextCancellation(t *testing.T) {
 	t.Parallel()
+
 	env := newTestEnvironment(t, 10)
 	syncer, err := env.createSyncer(5, 3)
 	require.NoError(t, err)
@@ -189,7 +190,7 @@ func newTestEnvironment(t *testing.T, numBlocks int) *testEnvironment {
 
 	blockHandler := handlers.NewBlockRequestHandler(
 		blockProvider,
-		message.Codec,
+		message.CorethCodec,
 		handlerstats.NewNoopHandlerStats(),
 	)
 
@@ -197,7 +198,7 @@ func newTestEnvironment(t *testing.T, numBlocks int) *testEnvironment {
 		chainDB: rawdb.NewMemoryDatabase(),
 		blocks:  blocks,
 		client: client.NewTestClient(
-			message.Codec,
+			message.CorethCodec,
 			nil,
 			nil,
 			blockHandler,

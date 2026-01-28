@@ -39,11 +39,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -88,9 +88,10 @@ var (
 )
 
 func defaultExtensions() *extension.Config {
+	syncSummaryProvider := message.NewBlockSyncSummaryProvider(message.CorethCodec)
 	return &extension.Config{
-		SyncSummaryProvider: &message.BlockSyncSummaryProvider{},
-		SyncableParser:      &message.BlockSyncSummaryParser{},
+		SyncSummaryProvider: syncSummaryProvider,
+		SyncableParser:      syncSummaryProvider,
 		Clock:               &mockable.Clock{},
 	}
 }

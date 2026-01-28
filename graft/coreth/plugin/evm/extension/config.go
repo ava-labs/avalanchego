@@ -17,10 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -140,7 +140,7 @@ type Config struct {
 	// SyncSummaryProvider is the sync summary provider to use
 	// for the VM to be used in syncer.
 	// It's required and should be non-nil
-	SyncSummaryProvider types.SummaryProvider
+	SyncSummaryProvider message.SummaryProvider
 	// SyncExtender can extend the syncer to handle custom sync logic.
 	// It's optional and can be nil
 	SyncExtender types.Extender
