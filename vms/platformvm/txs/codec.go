@@ -128,9 +128,6 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&SetL1ValidatorWeightTx{}),
 		targetCodec.RegisterType(&IncreaseL1ValidatorBalanceTx{}),
 		targetCodec.RegisterType(&DisableL1ValidatorTx{}),
-
-		// TODO ACP-236: move to proper upgrade
-		targetCodec.RegisterType(&AddContinuousValidatorTx{}),
 	)
 }
 

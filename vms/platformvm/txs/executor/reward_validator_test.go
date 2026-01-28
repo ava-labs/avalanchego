@@ -901,7 +901,7 @@ func TestRewardValidatorStakerType(t *testing.T) {
 		wallet        = newWallet(t, env, walletConfig{})
 	)
 
-	vdrTx, err := wallet.IssueAddContinuousValidatorTx(
+	sValidatorTx, err := wallet.IssueAddContinuousValidatorTx(
 		ids.GenerateTestNodeID(),
 		env.config.MinValidatorStake,
 		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
@@ -914,13 +914,20 @@ func TestRewardValidatorStakerType(t *testing.T) {
 		env.config.MinStakeDuration,
 	)
 	require.NoError(err)
-	env.state.AddTx(vdrTx, status.Committed)
+	env.state.AddTx(sValidatorTx, status.Committed)
 
-	vdrStaker, err := state.NewCurrentStaker(
-		vdrTx.ID(),
-		vdrTx.Unsigned.(*txs.AddContinuousValidatorTx),
+	validatorTx := sValidatorTx.Unsigned.(*txs.AddContinuousValidatorTx)
+
+	vdrStaker, err := state.NewContinuousStaker(
+		sValidatorTx.ID(),
+		sValidatorTx.Unsigned.(txs.Staker),
 		time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0),
 		uint64(1000000),
+		0,
+		0,
+		0,
+		0,
+		validatorTx.PeriodDuration(),
 	)
 	require.NoError(err)
 	require.NoError(env.state.PutCurrentValidator(vdrStaker))
@@ -930,7 +937,7 @@ func TestRewardValidatorStakerType(t *testing.T) {
 	err = ProposalTx(
 		&env.backend,
 		feeCalculator,
-		must[*txs.Tx](t)(newRewardValidatorTx(t, vdrTx.ID())),
+		must[*txs.Tx](t)(newRewardValidatorTx(t, sValidatorTx.ID())),
 		must[state.Diff](t)(state.NewDiffOn(env.state)), // onCommitState
 		must[state.Diff](t)(state.NewDiffOn(env.state)), // onAbortState
 	)
@@ -962,11 +969,12 @@ func TestRewardContinuousValidatorErrors(t *testing.T) {
 	require.NoError(t, err)
 	env.state.AddTx(vdrTx, status.Committed)
 
-	staker, err := state.NewCurrentStaker(
+	staker, err := state.NewCurrentValidator(
 		vdrTx.ID(),
 		vdrTx.Unsigned.(*txs.AddPermissionlessValidatorTx),
 		time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0),
 		uint64(1000000),
+		0,
 	)
 	require.NoError(t, err)
 	require.NoError(t, env.state.PutCurrentValidator(staker))
@@ -1046,21 +1054,20 @@ func TestRewardContinuousValidatorGracefulStop(t *testing.T) {
 	validatorTx := sValidatorTx.Unsigned.(*txs.AddContinuousValidatorTx)
 	avax.Produce(env.state, sValidatorTx.ID(), validatorTx.Outputs())
 
-	staker, err := state.NewCurrentStaker(
+	staker, err := state.NewContinuousStaker(
 		sValidatorTx.ID(),
-		validatorTx,
+		sValidatorTx.Unsigned.(txs.Staker),
 		time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0),
 		10_000_000,
+		5_000_000,
+		1_000_000,
+		500_000,
+		validatorTx.AutoRestakeSharesAmount(),
+		0,
 	)
-	staker.AccruedRewards = 1_000_000
-	staker.AccruedDelegateeRewards = 500_000
-	staker.ContinuationPeriod = 0
 
 	require.NoError(err)
 	require.NoError(env.state.PutCurrentValidator(staker))
-	require.NoError(env.state.Commit()) // required to update validator metadata to be able to call [env.state.SetDelegateeReward]
-
-	require.NoError(env.state.SetDelegateeReward(constants.PrimaryNetworkID, staker.NodeID, 5_000_000))
 
 	env.state.SetTimestamp(staker.EndTime)
 
@@ -1160,7 +1167,7 @@ func TestRewardContinuousValidatorTxMaxValidatorStake(t *testing.T) {
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
 
-	vdrWeight := env.config.MaxValidatorStake - 500_000
+	vdrWeight := env.config.MaxValidatorStake - 2_000_000
 
 	sValidatorTx, err := wallet.IssueAddContinuousValidatorTx(
 		ids.GenerateTestNodeID(),
@@ -1180,20 +1187,20 @@ func TestRewardContinuousValidatorTxMaxValidatorStake(t *testing.T) {
 	validatorTx := sValidatorTx.Unsigned.(*txs.AddContinuousValidatorTx)
 	avax.Produce(env.state, sValidatorTx.ID(), validatorTx.Outputs())
 
-	staker, err := state.NewCurrentStaker(
+	staker, err := state.NewContinuousStaker(
 		sValidatorTx.ID(),
-		validatorTx,
+		sValidatorTx.Unsigned.(txs.Staker),
 		time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0),
 		10_000_000,
+		5_000_000,
+		1_000_000,
+		500_000,
+		validatorTx.AutoRestakeSharesAmount(),
+		validatorTx.PeriodDuration(),
 	)
-	staker.AccruedRewards = 1_000_000
-	staker.AccruedDelegateeRewards = 500_000
 
 	require.NoError(err)
 	require.NoError(env.state.PutCurrentValidator(staker))
-	require.NoError(env.state.Commit()) // required to update validator metadata to be able to call [env.state.SetDelegateeReward]
-
-	require.NoError(env.state.SetDelegateeReward(constants.PrimaryNetworkID, staker.NodeID, 5_000_000))
 
 	env.state.SetTimestamp(staker.EndTime)
 

@@ -53,7 +53,7 @@ type AddContinuousValidatorTx struct {
 	DelegatorRewardsOwner fx.Owner `serialize:"true" json:"delegationRewardsOwner"`
 
 	// Who is authorized to modify the auto-restake config
-	ConfigOwner fx.Owner `serialize:"true" json:"configOwner"`
+	ConfigOwner fx.Owner `serialize:"true" json:"owner"`
 
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has DelegationShares=300,000 then they
@@ -89,6 +89,7 @@ func (tx *AddContinuousValidatorTx) InitCtx(ctx *snow.Context) {
 	}
 	tx.ValidatorRewardsOwner.InitCtx(ctx)
 	tx.DelegatorRewardsOwner.InitCtx(ctx)
+	tx.ConfigOwner.InitCtx(ctx)
 }
 
 func (*AddContinuousValidatorTx) SubnetID() ids.ID {
