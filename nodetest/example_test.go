@@ -82,11 +82,9 @@ func TestExample(t *testing.T) {
 	blkBytes, err := tx.Codec.Marshal(tx.CodecVersion, peerBlk)
 	require.NoError(t, err)
 
-	Accept(
-		t,
+	subnet.Validators[0].Accept(
 		subnet.ChainID,
 		Block{Bytes: blkBytes, Height: peerBlk.Height},
-		subnet.Validators[0].Node,
 	)
 
 	// Check that each validator accepted the block

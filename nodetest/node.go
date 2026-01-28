@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
@@ -23,9 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -34,6 +31,9 @@ import (
 
 	nodeconfig "github.com/ava-labs/avalanchego/config/node"
 	avalanchenode "github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/message"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
 func init() {
@@ -235,28 +235,13 @@ func awaitHealthy(t *testing.T, n *Node, tags ...string) {
 	require.NoError(t, err)
 }
 
-type Block struct {
-	Bytes  []byte
-	Height uint64
-}
-
-type Validator[T block.ChainVM] struct {
-	*Node
-	VM T
-}
-
-func Accept(
-	t *testing.T,
-	chainID ids.ID,
-	b Block,
-	n *Node,
-) {
+func (n *Node) Accept(chainID ids.ID, b Block) {
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
 		compression.TypeNone,
 		time.Minute,
 	)
-	require.NoError(t, err)
+	require.NoError(n.t, err)
 
 	outMsg, err := mc.PushQuery(
 		chainID,
@@ -265,14 +250,24 @@ func Accept(
 		b.Bytes,
 		b.Height-1,
 	)
-	require.NoError(t, err)
+	require.NoError(n.t, err)
 
 	// It does not matter who this message is from because we skip the
 	// networking layer
 	inMsg, err := mc.Parse(outMsg.Bytes, ids.GenerateTestNodeID(), func() {})
-	require.NoError(t, err)
+	require.NoError(n.t, err)
 
-	n.n.HandleMessage(context.WithValue(t.Context(), DebugKey, n.id), inMsg)
+	n.n.HandleMessage(context.WithValue(n.t.Context(), DebugKey, n.id), inMsg)
+}
+
+type Block struct {
+	Bytes  []byte
+	Height uint64
+}
+
+type Validator[T block.ChainVM] struct {
+	*Node
+	VM T
 }
 
 func AwaitAcceptance[T block.ChainVM](
