@@ -235,8 +235,8 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"nil start and end range returns entire trie": {
 			prepareTestFn: func() (context.Context, message.SubnetEVMLeafsRequest) {
-				req, err := message.NewLeafsRequest(
-					message.SubnetEVMLeafsRequestType,
+				return newLeafsRequest(t,
+					t.Context(),
 					smallTrieRoot,
 					common.Hash{},
 					nil,
@@ -244,8 +244,6 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					maxLeavesLimit,
 					message.StateTrieNode,
 				)
-				require.NoError(t, err)
-				return t.Context(), req.(message.SubnetEVMLeafsRequest)
 			},
 			requireResponseFn: func(t *testing.T, _ message.SubnetEVMLeafsRequest, response []byte, err error) {
 				require.NoError(t, err)

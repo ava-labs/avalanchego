@@ -96,6 +96,7 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 }
 
 func TestCodeSyncerSingleCodeHash(t *testing.T) {
+	t.Parallel()
 	codeBytes := utils.RandomBytes(100)
 	codeHash := crypto.Keccak256Hash(codeBytes)
 	testCodeSyncer(t, codeSyncerTest{
@@ -105,6 +106,7 @@ func TestCodeSyncerSingleCodeHash(t *testing.T) {
 }
 
 func TestCodeSyncerManyCodeHashes(t *testing.T) {
+	t.Parallel()
 	numCodeSlices := 5000
 	codeHashes := make([]common.Hash, 0, numCodeSlices)
 	codeByteSlices := make([][]byte, 0, numCodeSlices)
@@ -123,6 +125,7 @@ func TestCodeSyncerManyCodeHashes(t *testing.T) {
 }
 
 func TestCodeSyncerRequestErrors(t *testing.T) {
+	t.Parallel()
 	codeBytes := utils.RandomBytes(100)
 	codeHash := crypto.Keccak256Hash(codeBytes)
 	err := errors.New("dummy error")
@@ -137,6 +140,7 @@ func TestCodeSyncerRequestErrors(t *testing.T) {
 }
 
 func TestCodeSyncerAddsInProgressCodeHashes(t *testing.T) {
+	t.Parallel()
 	codeBytes := utils.RandomBytes(100)
 	codeHash := crypto.Keccak256Hash(codeBytes)
 	clientDB := rawdb.NewMemoryDatabase()
@@ -149,6 +153,7 @@ func TestCodeSyncerAddsInProgressCodeHashes(t *testing.T) {
 }
 
 func TestCodeSyncerAddsMoreInProgressThanQueueSize(t *testing.T) {
+	t.Parallel()
 	numCodeSlices := 100
 	codeHashes := make([]common.Hash, 0, numCodeSlices)
 	codeByteSlices := make([][]byte, 0, numCodeSlices)
