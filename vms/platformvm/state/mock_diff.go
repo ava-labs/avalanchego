@@ -294,21 +294,6 @@ func (mr *MockDiffMockRecorder) GetCurrentValidator(subnetID, nodeID any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidator", reflect.TypeOf((*MockDiff)(nil).GetCurrentValidator), subnetID, nodeID)
 }
 
-// GetDelegateeReward mocks base method.
-func (m *MockDiff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDelegateeReward", subnetID, nodeID)
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDelegateeReward indicates an expected call of GetDelegateeReward.
-func (mr *MockDiffMockRecorder) GetDelegateeReward(subnetID, nodeID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).GetDelegateeReward), subnetID, nodeID)
-}
-
 // GetExpiryIterator mocks base method.
 func (m *MockDiff) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	m.ctrl.T.Helper()
@@ -660,20 +645,6 @@ func (m *MockDiff) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 func (mr *MockDiffMockRecorder) SetCurrentSupply(subnetID, cs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockDiff)(nil).SetCurrentSupply), subnetID, cs)
-}
-
-// SetDelegateeReward mocks base method.
-func (m *MockDiff) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetDelegateeReward", subnetID, nodeID, amount)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetDelegateeReward indicates an expected call of SetDelegateeReward.
-func (mr *MockDiffMockRecorder) SetDelegateeReward(subnetID, nodeID, amount any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).SetDelegateeReward), subnetID, nodeID, amount)
 }
 
 // SetFeeState mocks base method.

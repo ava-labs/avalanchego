@@ -133,20 +133,24 @@ func TestStakerLess(t *testing.T) {
 	}
 }
 
-func TestNewCurrentStaker(t *testing.T) {
+func TestNewCurrentValidator(t *testing.T) {
 	require := require.New(t)
 	stakerTx := generateStakerTx(require)
 
 	txID := ids.GenerateTestID()
 	startTime := stakerTx.StartTime().Add(2 * time.Hour)
 	potentialReward := uint64(12345)
+	delegateeReward := uint64(5678)
 
-	staker, err := NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	staker, err := NewCurrentValidator(txID, stakerTx, startTime, potentialReward, delegateeReward)
 	require.NoError(err)
 	publicKey, isNil, err := stakerTx.PublicKey()
 	require.NoError(err)
 	require.True(isNil)
 	require.Equal(&Staker{
+		Validator: Validator{
+			DelegateeReward: delegateeReward,
+		},
 		TxID:            txID,
 		NodeID:          stakerTx.NodeID(),
 		PublicKey:       publicKey,
@@ -164,7 +168,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	signer.EXPECT().Verify().Return(errCustom)
 	stakerTx.Signer = signer
 
-	_, err = NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	_, err = NewCurrentValidator(txID, stakerTx, startTime, potentialReward, delegateeReward)
 	require.ErrorIs(err, errCustom)
 }
 
@@ -200,8 +204,125 @@ func TestNewPendingStaker(t *testing.T) {
 	require.ErrorIs(err, errCustom)
 }
 
+func TestNewContinuousStaker(t *testing.T) {
+	require := require.New(t)
+	stakerTx := generateStakerTx(require)
+
+	txID := ids.GenerateTestID()
+	startTime := stakerTx.StartTime().Add(2 * time.Hour)
+	potentialReward := uint64(12345)
+	delegateeReward := uint64(5678)
+	accruedRewards := uint64(1000)
+	accruedDelegateeRewards := uint64(500)
+	autoRestakeShares := uint32(300_000)
+	continuationPeriod := 24 * time.Hour
+
+	staker, err := NewContinuousStaker(
+		txID,
+		stakerTx,
+		startTime,
+		potentialReward,
+		delegateeReward,
+		accruedRewards,
+		accruedDelegateeRewards,
+		autoRestakeShares,
+		continuationPeriod,
+	)
+	require.NoError(err)
+
+	publicKey, isNil, err := stakerTx.PublicKey()
+	require.NoError(err)
+	require.True(isNil)
+
+	expectedEndTime := startTime.Add(continuationPeriod)
+	require.Equal(&Staker{
+		ContinuousValidator: ContinuousValidator{
+			AccruedRewards:          accruedRewards,
+			AccruedDelegateeRewards: accruedDelegateeRewards,
+			AutoRestakeShares:       autoRestakeShares,
+			ContinuationPeriod:      continuationPeriod,
+		},
+		Validator: Validator{
+			DelegateeReward: delegateeReward,
+		},
+		TxID:            txID,
+		NodeID:          stakerTx.NodeID(),
+		PublicKey:       publicKey,
+		SubnetID:        stakerTx.SubnetID(),
+		Weight:          stakerTx.Weight() + accruedRewards + accruedDelegateeRewards,
+		StartTime:       startTime,
+		EndTime:         expectedEndTime,
+		PotentialReward: potentialReward,
+		NextTime:        expectedEndTime,
+		Priority:        stakerTx.CurrentPriority(),
+	}, staker)
+
+	ctrl := gomock.NewController(t)
+	signer := signermock.NewSigner(ctrl)
+	signer.EXPECT().Verify().Return(errCustom)
+	stakerTx.Signer = signer
+
+	_, err = NewContinuousStaker(
+		txID,
+		stakerTx,
+		startTime,
+		potentialReward,
+		delegateeReward,
+		accruedRewards,
+		accruedDelegateeRewards,
+		autoRestakeShares,
+		continuationPeriod,
+	)
+	require.ErrorIs(err, errCustom)
+}
+
+func TestNewCurrentDelegator(t *testing.T) {
+	require := require.New(t)
+	stakerTx := generateStakerTx(require)
+
+	txID := ids.GenerateTestID()
+	startTime := stakerTx.StartTime().Add(2 * time.Hour)
+	potentialReward := uint64(12345)
+
+	staker, err := NewCurrentDelegator(txID, stakerTx, startTime, potentialReward)
+	require.NoError(err)
+
+	publicKey, isNil, err := stakerTx.PublicKey()
+	require.NoError(err)
+	require.True(isNil)
+
+	require.Equal(&Staker{
+		TxID:            txID,
+		NodeID:          stakerTx.NodeID(),
+		PublicKey:       publicKey,
+		SubnetID:        stakerTx.SubnetID(),
+		Weight:          stakerTx.Weight(),
+		StartTime:       startTime,
+		EndTime:         stakerTx.EndTime(),
+		PotentialReward: potentialReward,
+		NextTime:        stakerTx.EndTime(),
+		Priority:        stakerTx.CurrentPriority(),
+	}, staker)
+
+	ctrl := gomock.NewController(t)
+	signer := signermock.NewSigner(ctrl)
+	signer.EXPECT().Verify().Return(errCustom)
+	stakerTx.Signer = signer
+
+	_, err = NewCurrentDelegator(txID, stakerTx, startTime, potentialReward)
+	require.ErrorIs(err, errCustom)
+}
+
 func TestValidateMutation(t *testing.T) {
-	staker := &Staker{
+	continuousStaker := &Staker{
+		ContinuousValidator: ContinuousValidator{
+			AccruedRewards:          20,
+			AccruedDelegateeRewards: 15,
+			ContinuationPeriod:      15,
+		},
+		Validator: Validator{
+			DelegateeReward: 20,
+		},
 		TxID:            ids.GenerateTestID(),
 		NodeID:          ids.GenerateTestNodeID(),
 		PublicKey:       nil,
@@ -281,12 +402,13 @@ func TestValidateMutation(t *testing.T) {
 			expectedErr: errDecreasedAccruedDelegateeRewards,
 		},
 		{
-			name: "decreased weight",
+			name: "end time and next time mismatch",
 			mutateFn: func(staker Staker) *Staker {
-				staker.Weight -= 1
+				staker.EndTime = time.Unix(40, 0)
+				staker.NextTime = time.Unix(50, 0)
 				return &staker
 			},
-			expectedErr: errDecreasedWeight,
+			expectedErr: errEndTimeAndNextTimeMismatch,
 		},
 		{
 			name: "valid mutation",
@@ -294,6 +416,22 @@ func TestValidateMutation(t *testing.T) {
 				staker.Weight = 200
 				staker.StartTime = time.Unix(30, 0)
 				staker.EndTime = time.Unix(40, 0)
+				staker.NextTime = time.Unix(40, 0)
+				staker.PotentialReward = 20
+				staker.AccruedRewards = 30
+				staker.AccruedDelegateeRewards = 25
+				staker.ContinuationPeriod = 0
+				return &staker
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "valid mutation",
+			mutateFn: func(staker Staker) *Staker {
+				staker.Weight = 200
+				staker.StartTime = time.Unix(30, 0)
+				staker.EndTime = time.Unix(40, 0)
+				staker.NextTime = time.Unix(40, 0)
 				staker.PotentialReward = 20
 				staker.AccruedRewards = 30
 				staker.AccruedDelegateeRewards = 25
@@ -307,10 +445,11 @@ func TestValidateMutation(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
+			v := test.mutateFn(*continuousStaker)
 			require.ErrorIs(
 				test.expectedErr,
 				continuousStaker.ValidateMutation(
-					test.mutateFn(*continuousStaker),
+					v,
 				),
 			)
 		})

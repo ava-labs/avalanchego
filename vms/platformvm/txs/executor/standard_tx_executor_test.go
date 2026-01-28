@@ -151,10 +151,11 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
-		staker, err := state.NewCurrentStaker(
+		staker, err := state.NewCurrentValidator(
 			tx.ID(),
 			addValTx,
 			newValidatorStartTime,
+			0,
 			0,
 		)
 		require.NoError(err)
@@ -186,10 +187,11 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
-		staker, err := state.NewCurrentStaker(
+		staker, err := state.NewCurrentValidator(
 			tx.ID(),
 			addValTx,
 			newValidatorStartTime,
+			0,
 			0,
 		)
 		require.NoError(err)
@@ -502,10 +504,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	}
 
 	addValTx := addDSTx.Unsigned.(*txs.AddValidatorTx)
-	staker, err := state.NewCurrentStaker(
+	staker, err := state.NewCurrentValidator(
 		addDSTx.ID(),
 		addValTx,
 		dsStartTime,
+		0,
 		0,
 	)
 	require.NoError(err)
@@ -671,10 +674,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require.NoError(err)
 
 	addSubnetValTx := subnetTx.Unsigned.(*txs.AddSubnetValidatorTx)
-	staker, err = state.NewCurrentStaker(
+	staker, err = state.NewCurrentValidator(
 		subnetTx.ID(),
 		addSubnetValTx,
 		genesistest.DefaultValidatorStartTime,
+		0,
 		0,
 	)
 	require.NoError(err)
@@ -856,10 +860,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		addSubnetValTx := subnetTx.Unsigned.(*txs.AddSubnetValidatorTx)
-		staker, err = state.NewCurrentStaker(
+		staker, err = state.NewCurrentValidator(
 			subnetTx.ID(),
 			addSubnetValTx,
 			genesistest.DefaultValidatorStartTime,
+			0,
 			0,
 		)
 		require.NoError(err)
@@ -988,10 +993,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
-		staker, err := state.NewCurrentStaker(
+		staker, err := state.NewCurrentValidator(
 			tx.ID(),
 			addValTx,
 			startTime,
+			0,
 			0,
 		)
 		require.NoError(err)

@@ -168,11 +168,12 @@ func TestState_writeStakers(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	primaryNetworkCurrentValidatorStaker, err := NewCurrentStaker(
+	primaryNetworkCurrentValidatorStaker, err := NewCurrentValidator(
 		addPrimaryNetworkValidator.ID(),
 		unsignedAddPrimaryNetworkValidator,
 		primaryValidatorStartTime,
 		primaryValidatorReward,
+		0,
 	)
 	require.NoError(t, err)
 
@@ -186,11 +187,12 @@ func TestState_writeStakers(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	primaryNetworkCurrentDelegatorStaker, err := NewCurrentStaker(
+	primaryNetworkCurrentDelegatorStaker, err := NewCurrentValidator(
 		addPrimaryNetworkDelegator.ID(),
 		unsignedAddPrimaryNetworkDelegator,
 		primaryDelegatorStartTime,
 		primaryDelegatorReward,
+		0,
 	)
 	require.NoError(t, err)
 
@@ -198,11 +200,12 @@ func TestState_writeStakers(t *testing.T) {
 	addSubnetValidator := &txs.Tx{Unsigned: unsignedAddSubnetValidator}
 	require.NoError(t, addSubnetValidator.Initialize(txs.Codec))
 
-	subnetCurrentValidatorStaker, err := NewCurrentStaker(
+	subnetCurrentValidatorStaker, err := NewCurrentValidator(
 		addSubnetValidator.ID(),
 		unsignedAddSubnetValidator,
 		subnetValidatorStartTime,
 		subnetValidatorReward,
+		0,
 	)
 	require.NoError(t, err)
 
@@ -789,7 +792,6 @@ func TestValidatorWeightDiff(t *testing.T) {
 	}
 }
 
-// todo: test that weights are computed properly per subnet, per nodeid and even total weight
 func TestState_ApplyValidatorDiffs(t *testing.T) {
 	require := require.New(t)
 
@@ -2459,14 +2461,16 @@ func TestStateUpdateValidator(t *testing.T) {
 			require.NoError(err)
 
 			currentValidator := &Staker{
-				TxID:      ids.GenerateTestID(),
-				NodeID:    ids.GenerateTestNodeID(),
-				PublicKey: blsKey.PublicKey(),
-				SubnetID:  ids.GenerateTestID(),
-				Weight:    10,
-				StartTime: time.Unix(1, 0),
-				EndTime:   time.Unix(2, 0),
-				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+				TxID:            ids.GenerateTestID(),
+				NodeID:          ids.GenerateTestNodeID(),
+				PublicKey:       blsKey.PublicKey(),
+				SubnetID:        ids.GenerateTestID(),
+				Weight:          10,
+				StartTime:       time.Unix(1, 0),
+				EndTime:         time.Unix(2, 0),
+				PotentialReward: 0,
+				NextTime:        time.Unix(2, 0),
+				Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
 			}
 			require.NoError(state.PutCurrentValidator(currentValidator))
 
@@ -2496,19 +2500,21 @@ func TestStateResetContinuousValidatorCycleValidation(t *testing.T) {
 	require.NoError(err)
 
 	continuousValidator := &Staker{
-		TxID:                    ids.GenerateTestID(),
-		NodeID:                  ids.GenerateTestNodeID(),
-		PublicKey:               blsKey.PublicKey(),
-		SubnetID:                subnetID,
-		Weight:                  10,
-		StartTime:               time.Unix(1, 0),
-		EndTime:                 time.Unix(2, 0),
-		PotentialReward:         100,
-		AccruedRewards:          10,
-		AccruedDelegateeRewards: 5,
-		NextTime:                time.Time{},
-		Priority:                txs.PrimaryNetworkValidatorCurrentPriority,
-		ContinuationPeriod:      14 * 24 * time.Hour,
+		ContinuousValidator: ContinuousValidator{
+			AccruedRewards:          10,
+			AccruedDelegateeRewards: 5,
+			ContinuationPeriod:      14 * 24 * time.Hour,
+		},
+		TxID:            ids.GenerateTestID(),
+		NodeID:          ids.GenerateTestNodeID(),
+		PublicKey:       blsKey.PublicKey(),
+		SubnetID:        subnetID,
+		Weight:          10,
+		StartTime:       time.Unix(1, 0),
+		EndTime:         time.Unix(2, 0),
+		PotentialReward: 100,
+		NextTime:        time.Unix(2, 0),
+		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
 	}
 	require.NoError(state.PutCurrentValidator(continuousValidator))
 
@@ -2572,19 +2578,21 @@ func TestStateResetContinuousValidatorCycle(t *testing.T) {
 	require.NoError(err)
 
 	continuousValidator := &Staker{
-		TxID:                    ids.GenerateTestID(),
-		NodeID:                  ids.GenerateTestNodeID(),
-		PublicKey:               blsKey.PublicKey(),
-		SubnetID:                subnetID,
-		Weight:                  10,
-		StartTime:               time.Unix(1, 0),
-		EndTime:                 time.Unix(2, 0),
-		PotentialReward:         100,
-		AccruedRewards:          10,
-		AccruedDelegateeRewards: 5,
-		NextTime:                time.Time{},
-		Priority:                txs.PrimaryNetworkValidatorCurrentPriority,
-		ContinuationPeriod:      14 * 24 * time.Hour,
+		ContinuousValidator: ContinuousValidator{
+			AccruedRewards:          10,
+			AccruedDelegateeRewards: 5,
+			ContinuationPeriod:      14 * 24 * time.Hour,
+		},
+		TxID:            ids.GenerateTestID(),
+		NodeID:          ids.GenerateTestNodeID(),
+		PublicKey:       blsKey.PublicKey(),
+		SubnetID:        subnetID,
+		Weight:          10,
+		StartTime:       time.Unix(1, 0),
+		EndTime:         time.Unix(2, 0),
+		PotentialReward: 100,
+		NextTime:        time.Unix(2, 0),
+		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
 	}
 	require.NoError(state.PutCurrentValidator(continuousValidator))
 
@@ -2613,4 +2621,249 @@ func TestStateResetContinuousValidatorCycle(t *testing.T) {
 	require.Equal(newAccruedDelegateeRewards, continuousValidator.AccruedDelegateeRewards)
 	require.Equal(expectedStartTime, continuousValidator.StartTime)
 	require.Equal(expectedEndTime, continuousValidator.EndTime)
+}
+
+// TestValidatorMetadataPersistence verifies that validator metadata (including
+// ACP-236 continuous staking fields) and uptime are properly written to and
+// loaded from the database when adding, modifying, and deleting validators.
+func TestValidatorMetadataPersistence(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	state := newTestState(t, db)
+
+	// Create a continuous validator transaction
+	startTime := time.Now().Truncate(time.Second)
+	continuationPeriod := 14 * 24 * time.Hour
+	autoRestakeShares := uint32(100_000)
+
+	unsignedTx := createContinuousValidatorTx(t)
+	signedTx := &txs.Tx{Unsigned: unsignedTx}
+	require.NoError(signedTx.Initialize(txs.Codec))
+
+	// Create the staker using NewContinuousStaker
+	staker, err := NewContinuousStaker(
+		signedTx.ID(),
+		unsignedTx,
+		startTime,
+		500,
+		0,
+		0,
+		0,
+		autoRestakeShares,
+		continuationPeriod,
+	)
+	require.NoError(err)
+
+	// Add transaction and validator to state
+	state.AddTx(signedTx, status.Committed)
+	require.NoError(state.PutCurrentValidator(staker))
+	require.NoError(state.Commit())
+
+	// Verify uptime was set on add
+	upDuration, lastUpdated, err := state.GetUptime(staker.NodeID)
+	require.NoError(err)
+	require.Equal(time.Duration(0), upDuration)
+	require.Equal(startTime, lastUpdated)
+
+	// Update uptime
+	newUpDuration := 5 * time.Hour
+	newLastUpdated := time.Unix(2000, 0)
+	require.NoError(state.SetUptime(staker.NodeID, newUpDuration, newLastUpdated))
+	require.NoError(state.Commit())
+
+	// Create a new state from the same DB to verify persistence
+	state2 := newTestState(t, db)
+
+	// Verify the validator was loaded correctly with all metadata fields
+	loadedValidator, err := state2.GetCurrentValidator(constants.PrimaryNetworkID, staker.NodeID)
+	require.NoError(err)
+	require.Equal(signedTx.ID(), loadedValidator.TxID)
+	require.Equal(staker.NodeID, loadedValidator.NodeID)
+	require.Equal(uint64(500), loadedValidator.PotentialReward)
+	// Note: On initial add, DelegateeReward and AccruedRewards are set to 0.
+	// They only get persisted with their actual values on modify/update.
+	require.Equal(uint64(0), loadedValidator.DelegateeReward)
+	require.Equal(uint64(0), loadedValidator.AccruedRewards)
+	require.Equal(uint64(0), loadedValidator.AccruedDelegateeRewards)
+
+	// Verify AutoRestakeShares and ContinuationPeriod ARE persisted on initial add
+	require.Equal(autoRestakeShares, loadedValidator.AutoRestakeShares)
+	require.Equal(continuationPeriod, loadedValidator.ContinuationPeriod)
+
+	// Verify uptime was persisted
+	loadedUpDuration, loadedLastUpdated, err := state2.GetUptime(staker.NodeID)
+	require.NoError(err)
+	require.Equal(newUpDuration, loadedUpDuration)
+	require.Equal(newLastUpdated, loadedLastUpdated)
+
+	// Modify the validator using UpdateCurrentValidator
+	// Create a mutated copy with updated mutable fields
+	mutatedValidator := *loadedValidator
+	newEndTime := loadedValidator.EndTime.Add(continuationPeriod)
+	mutatedValidator.PotentialReward = 600
+	mutatedValidator.DelegateeReward = 50
+	mutatedValidator.AccruedRewards = 200
+	mutatedValidator.AccruedDelegateeRewards = 100
+	mutatedValidator.StartTime = loadedValidator.EndTime
+	mutatedValidator.EndTime = newEndTime
+	mutatedValidator.NextTime = newEndTime
+
+	err = state2.UpdateCurrentValidator(&mutatedValidator)
+	require.NoError(err)
+	require.NoError(state2.Commit())
+
+	// Create a third state to verify modifications persisted
+	state3 := newTestState(t, db)
+
+	loadedModified, err := state3.GetCurrentValidator(constants.PrimaryNetworkID, staker.NodeID)
+	require.NoError(err)
+
+	// Assert all mutable fields were persisted correctly
+	require.Equal(unsignedTx.Wght+mutatedValidator.AccruedRewards+mutatedValidator.AccruedDelegateeRewards, loadedModified.Weight)
+	require.Equal(uint64(600), loadedModified.PotentialReward)
+	require.Equal(uint64(50), loadedModified.DelegateeReward)
+	require.Equal(uint64(200), loadedModified.AccruedRewards)
+	require.Equal(uint64(100), loadedModified.AccruedDelegateeRewards)
+	require.Equal(newEndTime, loadedModified.EndTime)
+	require.Equal(newEndTime, loadedModified.NextTime)
+
+	// Verify immutable fields remain unchanged
+	require.Equal(signedTx.ID(), loadedModified.TxID)
+	require.Equal(staker.NodeID, loadedModified.NodeID)
+	require.Equal(staker.SubnetID, loadedModified.SubnetID)
+	require.Equal(staker.Priority, loadedModified.Priority)
+	require.Equal(autoRestakeShares, loadedModified.AutoRestakeShares)
+	require.Equal(continuationPeriod, loadedModified.ContinuationPeriod)
+
+	// Delete the validator
+	state3.DeleteCurrentValidator(loadedModified)
+	require.NoError(state3.Commit())
+
+	// Create fourth state to verify deletion persisted
+	state4 := newTestState(t, db)
+
+	_, err = state4.GetCurrentValidator(constants.PrimaryNetworkID, staker.NodeID)
+	require.ErrorIs(err, database.ErrNotFound)
+
+	// Verify uptime was deleted
+	_, _, err = state4.GetUptime(staker.NodeID)
+	require.ErrorIs(err, database.ErrNotFound)
+}
+
+func createContinuousValidatorTx(t testing.TB) *txs.AddContinuousValidatorTx {
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	sig, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+
+	return &txs.AddContinuousValidatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    constants.MainnetID,
+				BlockchainID: constants.PlatformChainID,
+				Outs:         []*avax.TransferableOutput{},
+				Ins: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID:        ids.GenerateTestID(),
+							OutputIndex: 1,
+						},
+						Asset: avax.Asset{
+							ID: ids.GenerateTestID(),
+						},
+						In: &secp256k1fx.TransferInput{
+							Amt: 2 * units.KiloAvax,
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{1},
+							},
+						},
+					},
+				},
+				Memo: types.JSONByteSlice{},
+			},
+		},
+		ValidatorNodeID: ids.GenerateTestNodeID(),
+		Signer:          sig,
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{
+					ID: ids.GenerateTestID(),
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1000,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+				},
+			},
+		},
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		ConfigOwner: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		DelegationShares:  reward.PercentDenominator,
+		Wght:              1000,
+		AutoRestakeShares: 300000,
+		Period:            uint64((14 * 24 * time.Hour).Seconds()),
+	}
+}
+
+// TestValidatorUptimePersistence verifies that validator uptime is properly
+// written to and loaded from the database.
+func TestValidatorUptimePersistence(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	state := newTestState(t, db)
+
+	// Create a proper transaction for the validator
+	startTime := time.Now().Truncate(time.Second)
+	endTime := startTime.Add(28 * 24 * time.Hour)
+	validatorData := txs.Validator{
+		NodeID: ids.GenerateTestNodeID(),
+		End:    uint64(endTime.Unix()),
+		Wght:   1000,
+	}
+
+	unsignedTx := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, validatorData)
+	signedTx := &txs.Tx{Unsigned: unsignedTx}
+	require.NoError(signedTx.Initialize(txs.Codec))
+
+	staker, err := NewCurrentValidator(
+		signedTx.ID(),
+		unsignedTx,
+		startTime,
+		0, // potentialReward
+		0, // delegateeReward
+	)
+	require.NoError(err)
+
+	// Add transaction and validator
+	state.AddTx(signedTx, status.Committed)
+	require.NoError(state.PutCurrentValidator(staker))
+	require.NoError(state.Commit())
+
+	// Set and commit uptime
+	upDuration := 10 * time.Hour
+	lastUpdated := time.Unix(5000, 0)
+	require.NoError(state.SetUptime(staker.NodeID, upDuration, lastUpdated))
+	require.NoError(state.Commit())
+
+	// Reload and verify uptime persisted
+	state2 := newTestState(t, db)
+
+	loadedUpDuration, loadedLastUpdated, err := state2.GetUptime(staker.NodeID)
+	require.NoError(err)
+	require.Equal(upDuration, loadedUpDuration)
+	require.Equal(lastUpdated, loadedLastUpdated)
 }

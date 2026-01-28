@@ -1425,7 +1425,24 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 			e.state.SetCurrentSupply(subnetID, currentSupply+potentialReward)
 		}
 
-		staker, err = state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
+		switch tTx := stakerTx.(type) {
+		case txs.FixedStaker:
+			staker, err = state.NewCurrentValidator(txID, tTx, chainTime, potentialReward, 0)
+		case txs.ContinuousStaker:
+			staker, err = state.NewContinuousStaker(
+				txID,
+				stakerTx,
+				chainTime,
+				potentialReward,
+				0,
+				0,
+				0,
+				tTx.AutoRestakeSharesAmount(),
+				tTx.PeriodDuration(),
+			)
+		default:
+			return fmt.Errorf("unexpected staker tx type: %T", stakerTx)
+		}
 	}
 	if err != nil {
 		return err

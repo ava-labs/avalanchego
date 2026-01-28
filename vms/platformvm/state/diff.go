@@ -48,9 +48,7 @@ type diff struct {
 	l1ValidatorsDiff *l1ValidatorsDiff
 
 	currentStakerDiffs diffStakers
-	// map of subnetID -> nodeID -> total accrued delegatee rewards
-	modifiedDelegateeRewards map[ids.ID]map[ids.NodeID]uint64
-	pendingStakerDiffs       diffStakers
+	pendingStakerDiffs diffStakers
 
 	addedSubnetIDs []ids.ID
 	// Subnet ID --> Owner of the subnet
@@ -280,31 +278,6 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 		}
 		return parentState.GetCurrentValidator(subnetID, nodeID)
 	}
-}
-
-func (d *diff) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
-	if d.modifiedDelegateeRewards == nil {
-		d.modifiedDelegateeRewards = make(map[ids.ID]map[ids.NodeID]uint64)
-	}
-	nodes, ok := d.modifiedDelegateeRewards[subnetID]
-	if !ok {
-		nodes = make(map[ids.NodeID]uint64)
-		d.modifiedDelegateeRewards[subnetID] = nodes
-	}
-	nodes[nodeID] = amount
-	return nil
-}
-
-func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
-	amount, modified := d.modifiedDelegateeRewards[subnetID][nodeID]
-	if modified {
-		return amount, nil
-	}
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	return parentState.GetDelegateeReward(subnetID, nodeID)
 }
 
 func (d *diff) PutCurrentValidator(staker *Staker) error {
@@ -648,13 +621,6 @@ func (d *diff) Apply(baseState Chain) error {
 
 			for _, delegator := range validatorDiff.deletedDelegators {
 				baseState.DeleteCurrentDelegator(delegator)
-			}
-		}
-	}
-	for subnetID, nodes := range d.modifiedDelegateeRewards {
-		for nodeID, amount := range nodes {
-			if err := baseState.SetDelegateeReward(subnetID, nodeID, amount); err != nil {
-				return err
 			}
 		}
 	}
