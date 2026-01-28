@@ -12,7 +12,7 @@ import (
 
 var (
 	_ SummaryProvider = (*BlockSyncSummaryProvider)(nil)
-	_ SyncableParser = (*BlockSyncSummaryProvider)(nil)
+	_ SyncableParser  = (*BlockSyncSummaryProvider)(nil)
 )
 
 type BlockSyncSummaryProvider struct {

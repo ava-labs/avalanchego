@@ -71,15 +71,6 @@ func NewLeafsRequest(leafReqType LeafsRequestType, root, account common.Hash, st
 	}
 }
 
-func newEmptyLeafsRequest(leafReqType LeafsRequestType) LeafsRequest {
-	switch leafReqType {
-	case SubnetEVMLeafsRequestType:
-		return SubnetEVMLeafsRequest{}
-	default:
-		return CorethLeafsRequest{}
-	}
-}
-
 // LeafsResponse is a response to a LeafsRequest
 // Keys must be within LeafsRequest.Start and LeafsRequest.End and sorted in lexicographical order.
 //

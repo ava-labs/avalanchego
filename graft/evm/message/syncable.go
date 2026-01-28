@@ -39,16 +39,15 @@ type SyncableParser interface {
 
 type AcceptImplFn func(Syncable) (block.StateSyncMode, error)
 
-
 // ParseSyncableSummary unmarshals `summaryBytes` into `summary` and returns its ID.
 func ParseSyncableSummary(c codec.Manager, summaryBytes []byte, summary any) (ids.ID, error) {
 	if _, err := c.Unmarshal(summaryBytes, summary); err != nil {
-		return ids.Empty, fmt.Errorf("%w: %v", errParseSyncableSummary, err)
+		return ids.Empty, fmt.Errorf("%w: %w", errParseSyncableSummary, err)
 	}
 
 	summaryID, err := ids.ToID(crypto.Keccak256(summaryBytes))
 	if err != nil {
-		return ids.Empty, fmt.Errorf("%w: %v", errComputeSummaryID, err)
+		return ids.Empty, fmt.Errorf("%w: %w", errComputeSummaryID, err)
 	}
 	return summaryID, nil
 }

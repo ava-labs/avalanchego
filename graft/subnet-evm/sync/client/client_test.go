@@ -808,6 +808,3 @@ func newLeafsRequest(
 	return request.(message.SubnetEVMLeafsRequest)
 }
 
-func newEmptyLeafsRequest() message.SubnetEVMLeafsRequest {
-	return message.SubnetEVMLeafsRequest{}
-}

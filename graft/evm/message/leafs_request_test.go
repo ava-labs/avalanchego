@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 )
 
 const (
@@ -20,11 +21,6 @@ const (
 	subnetEVMLeafsRequestB64 = "AAAAAAAAAAAAAAAAAAAAAABpbSBST09UaW5nIGZvciB5YQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIFL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJAAAAIIGFWthoHQ2G0ekeABZ5OctmlNLEIqzSCKAHKTlIf2mZBAA="
 	leafsResponseFixtureB64  = "AAAAAAAQAAAAIE8WP18PmmIdcpVmx00QA3xNe7sEB9HixkmBhVrYaB0NAAAAIGagByk5SH9pmeudGKRHhARdh/PGfPInRumVr1olNnlRAAAAIK2zfFghtmgLTnyLdjobHUnUlVyEhiFjJSU/7HON16niAAAAIIYVu9oIMfUFmHWSHmaKW98sf8SERZLSVyvNBmjS1sUvAAAAIHHb2Wiw9xcu2FeUuzWLDDtSXaF4b5//CUJ52xlE69ehAAAAIPhMiSs77qX090OR9EXRWv1ClAQDdPaSS5jL+HE/jZYtAAAAIMr8yuOmvI+effHZKTM/+ZOTO+pvWzr23gN0NmxHGeQ6AAAAIBZZpE856x5YScYHfbtXIvVxeiiaJm+XZHmBmY6+qJwLAAAAIHOq53hmZ/fpNs1PJKv334ZrqlYDg2etYUXeHuj0qLCZAAAAIHiN5WOvpGfUnexqQOmh0AfwM8KCMGG90Oqln45NpkMBAAAAIKAQ13yW6oCnpmX2BvamO389/SVnwYl55NYPJmhtm/L7AAAAIAfuKbpk+Eq0PKDG5rkcH9O+iZBDQXnTr0SRo2kBLbktAAAAILsXyQKL6ZFOt2ScbJNHgAl50YMDVvKlTD3qsqS0R11jAAAAIOqxOTXzHYRIRRfpJK73iuFRwAdVklg2twdYhWUMMOwpAAAAIHnqPf5BNqv3UrO4Jx0D6USzyds2a3UEX479adIq5UEZAAAAIDLWEMqsbjP+qjJjo5lDcCS6nJsUZ4onTwGpEK4pX277AAAAEAAAAAmG0ekeABZ5OcsAAAAMuqL/bNRxxIPxX7kLAAAACov5IRGcFg8HAkQAAAAIUFTi0INr+EwAAAAOnQ97usvgJVqlt9RL7EAAAAAJfI0BkZLCQiTiAAAACxsGfYm8fwHx9XOYAAAADUs3OXARXoLtb0ElyPoAAAAKPr34iDoK2L6cOQAAAAoFIg0LKWiLc0uOAAAACCbJAf81TN4WAAAADBhPw50XNP9XFkKJUwAAAAuvvo+1aYfHf1gYUgAAAAqjcDk0v1CijaECAAAADkfLVT12lCZ670686kBrAAAADf5fWr9EzN4mO1YGYz4AAAAEAAAADlcyXwVWMEo+Pq4Uwo0MAAAADeo50qHks46vP0TGxu8AAAAOg2Ly9WQIVMFd/KyqiiwAAAAL7M5aOpS00zilFD4="
 )
-
-type messageFormat struct {
-	leafReqType message.LeafsRequestType
-	codec       codec.Manager
-}
 
 // TestMarshalLeafsRequest requires that the leafs request wire formats haven't changed.
 func TestMarshalLeafsRequest(t *testing.T) {
@@ -95,13 +91,13 @@ func TestMarshalLeafsResponse(t *testing.T) {
 
 	leafsResponse := newLeafsResponseFixture(t, r)
 
-	forEachMessageFormat(t, func(t *testing.T, _ string, format messageFormat) {
-		leafsResponseBytes, err := format.codec.Marshal(message.Version, leafsResponse)
+	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		leafsResponseBytes, err := c.Marshal(message.Version, leafsResponse)
 		require.NoError(t, err)
 		require.Equal(t, leafsResponseFixtureB64, base64.StdEncoding.EncodeToString(leafsResponseBytes))
 
 		var l message.LeafsResponse
-		_, err = format.codec.Unmarshal(leafsResponseBytes, &l)
+		_, err = c.Unmarshal(leafsResponseBytes, &l)
 		require.NoError(t, err)
 		require.Equal(t, leafsResponse.Keys, l.Keys)
 		require.Equal(t, leafsResponse.Vals, l.Vals)
@@ -155,19 +151,6 @@ func TestSubnetEVMLeafsRequestNodeTypeNotSerialized(t *testing.T) {
 	require.Equal(t, leafsRequestDefault.StartKey(), unmarshaled.StartKey())
 	require.Equal(t, leafsRequestDefault.EndKey(), unmarshaled.EndKey())
 	require.Equal(t, leafsRequestDefault.LimitValue(), unmarshaled.LimitValue())
-}
-
-func forEachMessageFormat(t *testing.T, fn func(t *testing.T, name string, format messageFormat)) {
-	t.Helper()
-	formats := map[string]messageFormat{
-		"coreth":     {leafReqType: message.CorethLeafsRequestType, codec: message.CorethCodec},
-		"subnet-evm": {leafReqType: message.SubnetEVMLeafsRequestType, codec: message.SubnetEVMCodec},
-	}
-	for name, format := range formats {
-		t.Run(name, func(t *testing.T) {
-			fn(t, name, format)
-		})
-	}
 }
 
 func newTestRand() *rand.Rand {
