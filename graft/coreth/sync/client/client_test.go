@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -26,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 
 	clientstats "github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
@@ -92,55 +90,53 @@ func TestGetCode(t *testing.T) {
 		},
 	}
 
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-		for name, test := range tests {
-			t.Run(name, func(t *testing.T) {
-				t.Parallel()
-				testNetClient := &testNetwork{}
-				stateSyncClient := New(&Config{
-					NetworkClient:    testNetClient,
-					Codec:            c,
-					Stats:            clientstats.NewNoOpStats(),
-					StateSyncNodeIDs: nil,
-					BlockParser:      newTestBlockParser(),
-				})
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-				codeHashes, res, expectedCode := test.setupRequest()
-
-				responseBytes, err := c.Marshal(message.Version, res)
-				require.NoError(t, err)
-				// Dirty hack required because the client will re-request if it encounters
-				// an error.
-				attempted := false
-				if test.expectedErr == nil {
-					testNetClient.testResponse(1, nil, responseBytes)
-				} else {
-					testNetClient.testResponse(2, func() {
-						// Cancel before the second attempt is processed.
-						if attempted {
-							cancel()
-						}
-						attempted = true
-					}, responseBytes)
-				}
-
-				codeBytes, err := stateSyncClient.GetCode(ctx, codeHashes)
-				require.ErrorIs(t, err, test.expectedErr)
-				// If we expected an error, verify retry behavior and return
-				if test.expectedErr != nil {
-					require.Equal(t, uint(2), testNetClient.numCalls)
-					return
-				}
-				// Otherwise, require that the result is as expected
-				require.Len(t, codeBytes, len(expectedCode))
-				for i, code := range codeBytes {
-					require.Equal(t, expectedCode[i], code)
-				}
-				require.Equal(t, uint(1), testNetClient.numCalls)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			testNetClient := &testNetwork{}
+			stateSyncClient := New(&Config{
+				NetworkClient:    testNetClient,
+				Codec:            message.CorethCodec,
+				Stats:            clientstats.NewNoOpStats(),
+				StateSyncNodeIDs: nil,
+				BlockParser:      newTestBlockParser(),
 			})
-		}
-	})
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			codeHashes, res, expectedCode := test.setupRequest()
+
+			responseBytes, err := message.CorethCodec.Marshal(message.Version, res)
+			require.NoError(t, err)
+			// Dirty hack required because the client will re-request if it encounters
+			// an error.
+			attempted := false
+			if test.expectedErr == nil {
+				testNetClient.testResponse(1, nil, responseBytes)
+			} else {
+				testNetClient.testResponse(2, func() {
+					// Cancel before the second attempt is processed.
+					if attempted {
+						cancel()
+					}
+					attempted = true
+				}, responseBytes)
+			}
+
+			codeBytes, err := stateSyncClient.GetCode(ctx, codeHashes)
+			require.ErrorIs(t, err, test.expectedErr)
+			// If we expected an error, verify retry behavior and return
+			if test.expectedErr != nil {
+				require.Equal(t, uint(2), testNetClient.numCalls)
+				return
+			}
+			// Otherwise, require that the result is as expected
+			require.Len(t, codeBytes, len(expectedCode))
+			for i, code := range codeBytes {
+				require.Equal(t, expectedCode[i], code)
+			}
+			require.Equal(t, uint(1), testNetClient.numCalls)
+		})
+	}
 }
 
 func TestGetBlocks(t *testing.T) {
@@ -156,213 +152,211 @@ func TestGetBlocks(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, blocks, numBlocks)
 
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-		blocksRequestHandler := handlers.NewBlockRequestHandler(buildGetter(blocks), c, handlerstats.NewNoopHandlerStats())
+	blocksRequestHandler := handlers.NewBlockRequestHandler(buildGetter(blocks), message.CorethCodec, handlerstats.NewNoopHandlerStats())
 
-		// encodeBlockSlice takes a slice of blocks that are ordered in increasing height order
-		// and returns a slice of byte slices with those blocks encoded in reverse order
-		encodeBlockSlice := func(blocks []*types.Block) [][]byte {
-			blockBytes := make([][]byte, 0, len(blocks))
-			for i := len(blocks) - 1; i >= 0; i-- {
-				buf := new(bytes.Buffer)
-				require.NoError(t, blocks[i].EncodeRLP(buf))
-				blockBytes = append(blockBytes, buf.Bytes())
+	// encodeBlockSlice takes a slice of blocks that are ordered in increasing height order
+	// and returns a slice of byte slices with those blocks encoded in reverse order
+	encodeBlockSlice := func(blocks []*types.Block) [][]byte {
+		blockBytes := make([][]byte, 0, len(blocks))
+		for i := len(blocks) - 1; i >= 0; i-- {
+			buf := new(bytes.Buffer)
+			require.NoError(t, blocks[i].EncodeRLP(buf))
+			blockBytes = append(blockBytes, buf.Bytes())
+		}
+
+		return blockBytes
+	}
+	tests := map[string]struct {
+		request        message.BlockRequest
+		getResponse    func(t *testing.T, request message.BlockRequest) []byte
+		assertResponse func(t *testing.T, response []*types.Block)
+		expectedErr    error
+	}{
+		"normal resonse": {
+			request: message.BlockRequest{
+				Hash:    blocks[100].Hash(),
+				Height:  100,
+				Parents: 16,
+			},
+			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
+				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response, "Failed to generate valid response")
+
+				return response
+			},
+			assertResponse: func(t *testing.T, response []*types.Block) {
+				require.Len(t, response, 16)
+			},
+		},
+		"fewer than requested blocks": {
+			request: message.BlockRequest{
+				Hash:    blocks[100].Hash(),
+				Height:  100,
+				Parents: 16,
+			},
+			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
+				request.Parents -= 5
+				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+
+				return response
+			},
+			// If the server returns fewer than requested blocks, we should consider it valid
+			assertResponse: func(t *testing.T, response []*types.Block) {
+				require.Len(t, response, 11)
+			},
+		},
+		"gibberish response": {
+			request: message.BlockRequest{
+				Hash:    blocks[100].Hash(),
+				Height:  100,
+				Parents: 16,
+			},
+			getResponse: func(_ *testing.T, _ message.BlockRequest) []byte {
+				return []byte("gibberish")
+			},
+			expectedErr: errUnmarshalResponse,
+		},
+		"invalid value replacing block": {
+			request: message.BlockRequest{
+				Hash:    blocks[100].Hash(),
+				Height:  100,
+				Parents: 16,
+			},
+			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
+				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+				require.NoError(t, err)
+				var blockResponse message.BlockResponse
+				_, err = message.CorethCodec.Unmarshal(response, &blockResponse)
+				require.NoError(t, err)
+				// Replace middle value with garbage data
+				blockResponse.Blocks[10] = []byte("invalid value replacing block bytes")
+				responseBytes, err := message.CorethCodec.Marshal(message.Version, blockResponse)
+				require.NoError(t, err)
+
+				return responseBytes
+			},
+			expectedErr: errUnmarshalResponse,
+		},
+		"incorrect starting point": {
+			request: message.BlockRequest{
+				Hash:    blocks[100].Hash(),
+				Height:  100,
+				Parents: 16,
+			},
+			getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
+				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, message.BlockRequest{
+					Hash:    blocks[99].Hash(),
+					Height:  99,
+					Parents: 16,
+				})
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+
+				return response
+			},
+			expectedErr: errHashMismatch,
+		},
+		"missing link in between blocks": {
+			request: message.BlockRequest{
+				Hash:    blocks[100].Hash(),
+				Height:  100,
+				Parents: 16,
+			},
+			getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
+				// Encode blocks with a missing link
+				blks := make([]*types.Block, 0)
+				blks = append(blks, blocks[84:89]...)
+				blks = append(blks, blocks[90:101]...)
+				blockBytes := encodeBlockSlice(blks)
+
+				blockResponse := message.BlockResponse{
+					Blocks: blockBytes,
+				}
+				responseBytes, err := message.CorethCodec.Marshal(message.Version, blockResponse)
+				require.NoError(t, err)
+
+				return responseBytes
+			},
+			expectedErr: errHashMismatch,
+		},
+		"no blocks": {
+			request: message.BlockRequest{
+				Hash:    blocks[100].Hash(),
+				Height:  100,
+				Parents: 16,
+			},
+			getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
+				blockResponse := message.BlockResponse{
+					Blocks: nil,
+				}
+				responseBytes, err := message.CorethCodec.Marshal(message.Version, blockResponse)
+				require.NoError(t, err)
+
+				return responseBytes
+			},
+			expectedErr: errEmptyResponse,
+		},
+		"more than requested blocks": {
+			request: message.BlockRequest{
+				Hash:    blocks[100].Hash(),
+				Height:  100,
+				Parents: 16,
+			},
+			getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
+				blockBytes := encodeBlockSlice(blocks[80:100])
+
+				blockResponse := message.BlockResponse{
+					Blocks: blockBytes,
+				}
+				responseBytes, err := message.CorethCodec.Marshal(message.Version, blockResponse)
+				require.NoError(t, err)
+
+				return responseBytes
+			},
+			expectedErr: errTooManyBlocks,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Construct client
+			testNetClient := &testNetwork{}
+			stateSyncClient := New(&Config{
+				NetworkClient:    testNetClient,
+				Codec:            message.CorethCodec,
+				Stats:            clientstats.NewNoOpStats(),
+				StateSyncNodeIDs: nil,
+				BlockParser:      newTestBlockParser(),
+			})
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			responseBytes := test.getResponse(t, test.request)
+			if test.expectedErr == nil {
+				testNetClient.testResponse(1, nil, responseBytes)
+			} else {
+				attempted := false
+				testNetClient.testResponse(2, func() {
+					if attempted {
+						cancel()
+					}
+					attempted = true
+				}, responseBytes)
 			}
 
-			return blockBytes
-		}
-		tests := map[string]struct {
-			request        message.BlockRequest
-			getResponse    func(t *testing.T, request message.BlockRequest) []byte
-			assertResponse func(t *testing.T, response []*types.Block)
-			expectedErr    error
-		}{
-			"normal resonse": {
-				request: message.BlockRequest{
-					Hash:    blocks[100].Hash(),
-					Height:  100,
-					Parents: 16,
-				},
-				getResponse: func(t *testing.T, request message.BlockRequest) []byte {
-					response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response, "Failed to generate valid response")
+			blockResponse, err := stateSyncClient.GetBlocks(ctx, test.request.Hash, test.request.Height, test.request.Parents)
+			require.ErrorIs(t, err, test.expectedErr)
+			if test.expectedErr != nil {
+				return
+			}
 
-					return response
-				},
-				assertResponse: func(t *testing.T, response []*types.Block) {
-					require.Len(t, response, 16)
-				},
-			},
-			"fewer than requested blocks": {
-				request: message.BlockRequest{
-					Hash:    blocks[100].Hash(),
-					Height:  100,
-					Parents: 16,
-				},
-				getResponse: func(t *testing.T, request message.BlockRequest) []byte {
-					request.Parents -= 5
-					response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
-
-					return response
-				},
-				// If the server returns fewer than requested blocks, we should consider it valid
-				assertResponse: func(t *testing.T, response []*types.Block) {
-					require.Len(t, response, 11)
-				},
-			},
-			"gibberish response": {
-				request: message.BlockRequest{
-					Hash:    blocks[100].Hash(),
-					Height:  100,
-					Parents: 16,
-				},
-				getResponse: func(_ *testing.T, _ message.BlockRequest) []byte {
-					return []byte("gibberish")
-				},
-				expectedErr: errUnmarshalResponse,
-			},
-			"invalid value replacing block": {
-				request: message.BlockRequest{
-					Hash:    blocks[100].Hash(),
-					Height:  100,
-					Parents: 16,
-				},
-				getResponse: func(t *testing.T, request message.BlockRequest) []byte {
-					response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-					require.NoError(t, err)
-					var blockResponse message.BlockResponse
-					_, err = c.Unmarshal(response, &blockResponse)
-					require.NoError(t, err)
-					// Replace middle value with garbage data
-					blockResponse.Blocks[10] = []byte("invalid value replacing block bytes")
-					responseBytes, err := c.Marshal(message.Version, blockResponse)
-					require.NoError(t, err)
-
-					return responseBytes
-				},
-				expectedErr: errUnmarshalResponse,
-			},
-			"incorrect starting point": {
-				request: message.BlockRequest{
-					Hash:    blocks[100].Hash(),
-					Height:  100,
-					Parents: 16,
-				},
-				getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
-					response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, message.BlockRequest{
-						Hash:    blocks[99].Hash(),
-						Height:  99,
-						Parents: 16,
-					})
-					require.NoError(t, err)
-					require.NotEmpty(t, response)
-
-					return response
-				},
-				expectedErr: errHashMismatch,
-			},
-			"missing link in between blocks": {
-				request: message.BlockRequest{
-					Hash:    blocks[100].Hash(),
-					Height:  100,
-					Parents: 16,
-				},
-				getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
-					// Encode blocks with a missing link
-					blks := make([]*types.Block, 0)
-					blks = append(blks, blocks[84:89]...)
-					blks = append(blks, blocks[90:101]...)
-					blockBytes := encodeBlockSlice(blks)
-
-					blockResponse := message.BlockResponse{
-						Blocks: blockBytes,
-					}
-					responseBytes, err := c.Marshal(message.Version, blockResponse)
-					require.NoError(t, err)
-
-					return responseBytes
-				},
-				expectedErr: errHashMismatch,
-			},
-			"no blocks": {
-				request: message.BlockRequest{
-					Hash:    blocks[100].Hash(),
-					Height:  100,
-					Parents: 16,
-				},
-				getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
-					blockResponse := message.BlockResponse{
-						Blocks: nil,
-					}
-					responseBytes, err := c.Marshal(message.Version, blockResponse)
-					require.NoError(t, err)
-
-					return responseBytes
-				},
-				expectedErr: errEmptyResponse,
-			},
-			"more than requested blocks": {
-				request: message.BlockRequest{
-					Hash:    blocks[100].Hash(),
-					Height:  100,
-					Parents: 16,
-				},
-				getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
-					blockBytes := encodeBlockSlice(blocks[80:100])
-
-					blockResponse := message.BlockResponse{
-						Blocks: blockBytes,
-					}
-					responseBytes, err := c.Marshal(message.Version, blockResponse)
-					require.NoError(t, err)
-
-					return responseBytes
-				},
-				expectedErr: errTooManyBlocks,
-			},
-		}
-		for name, test := range tests {
-			t.Run(name, func(t *testing.T) {
-				t.Parallel()
-				// Construct client
-				testNetClient := &testNetwork{}
-				stateSyncClient := New(&Config{
-					NetworkClient:    testNetClient,
-					Codec:            c,
-					Stats:            clientstats.NewNoOpStats(),
-					StateSyncNodeIDs: nil,
-					BlockParser:      newTestBlockParser(),
-				})
-
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-
-				responseBytes := test.getResponse(t, test.request)
-				if test.expectedErr == nil {
-					testNetClient.testResponse(1, nil, responseBytes)
-				} else {
-					attempted := false
-					testNetClient.testResponse(2, func() {
-						if attempted {
-							cancel()
-						}
-						attempted = true
-					}, responseBytes)
-				}
-
-				blockResponse, err := stateSyncClient.GetBlocks(ctx, test.request.Hash, test.request.Height, test.request.Parents)
-				require.ErrorIs(t, err, test.expectedErr)
-				if test.expectedErr != nil {
-					return
-				}
-
-				test.assertResponse(t, blockResponse)
-			})
-		}
-	})
+			test.assertResponse(t, blockResponse)
+		})
+	}
 }
 
 func buildGetter(blocks []*types.Block) handlers.BlockProvider {

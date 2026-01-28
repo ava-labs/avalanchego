@@ -188,6 +188,8 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 }
 
 func TestSyncerRegistry_ConcurrentStart(t *testing.T) {
+	t.Parallel()
+
 	registry := NewSyncerRegistry()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -215,6 +217,8 @@ func TestSyncerRegistry_ConcurrentStart(t *testing.T) {
 }
 
 func TestSyncerRegistry_ErrorPropagatesAndCancelsOthers(t *testing.T) {
+	t.Parallel()
+
 	registry := NewSyncerRegistry()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -245,6 +249,8 @@ func TestSyncerRegistry_ErrorPropagatesAndCancelsOthers(t *testing.T) {
 }
 
 func TestSyncerRegistry_FirstErrorWinsAcrossMany(t *testing.T) {
+	t.Parallel()
+
 	registry := NewSyncerRegistry()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -283,6 +289,8 @@ func TestSyncerRegistry_FirstErrorWinsAcrossMany(t *testing.T) {
 }
 
 func TestSyncerRegistry_NoSyncersRegistered(t *testing.T) {
+	t.Parallel()
+
 	registry := NewSyncerRegistry()
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
@@ -291,6 +299,8 @@ func TestSyncerRegistry_NoSyncersRegistered(t *testing.T) {
 }
 
 func TestSyncerRegistry_ContextCancellationErrors(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		wantErr       error
@@ -348,6 +358,8 @@ func TestSyncerRegistry_ContextCancellationErrors(t *testing.T) {
 }
 
 func TestSyncerRegistry_EarlyReturnOnAlreadyCancelledContext(t *testing.T) {
+	t.Parallel()
+
 	registry := NewSyncerRegistry()
 
 	// Create and immediately cancel context.
@@ -377,10 +389,12 @@ func TestSyncerRegistry_EarlyReturnOnAlreadyCancelledContext(t *testing.T) {
 }
 
 func TestSyncerRegistry_MixedCancellationAndSuccess(t *testing.T) {
+	t.Parallel()
+
 	registry := NewSyncerRegistry()
 
 	ctx, cancel := context.WithCancel(t.Context())
-	t.Cleanup(cancel)
+	defer cancel()
 
 	// Create a syncer that will succeed quickly.
 	releaseCh := make(chan struct{})

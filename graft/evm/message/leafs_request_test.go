@@ -33,31 +33,56 @@ func TestMarshalLeafsRequest(t *testing.T) {
 	r := newTestRand()
 	startBytes := randomBytes(t, r, common.HashLength)
 	endBytes := randomBytes(t, r, common.HashLength)
-	expectedByType := map[message.LeafsRequestType]string{
-		message.CorethLeafsRequestType:    corethLeafsRequestB64,
-		message.SubnetEVMLeafsRequestType: subnetEVMLeafsRequestB64,
-	}
 
-	forEachMessageFormat(t, func(t *testing.T, _ string, format messageFormat) {
-		request, err := message.NewLeafsRequest(
-			format.leafReqType,
-			common.BytesToHash([]byte("im ROOTing for ya")),
-			common.Hash{},
-			startBytes,
-			endBytes,
-			1024,
-			message.StateTrieNode,
-		)
+	// Test coreth format - marshal concrete struct directly to verify wire format
+	t.Run("coreth", func(t *testing.T) {
+		request := message.CorethLeafsRequest{
+			Root:     common.BytesToHash([]byte("im ROOTing for ya")),
+			Account:  common.Hash{},
+			Start:    startBytes,
+			End:      endBytes,
+			Limit:    1024,
+			NodeType: message.StateTrieNode,
+		}
+
+		leafsRequestBytes, err := message.CorethCodec.Marshal(message.Version, request)
 		require.NoError(t, err)
+		require.Equal(t, corethLeafsRequestB64, base64.StdEncoding.EncodeToString(leafsRequestBytes))
 
-		expectedB64, ok := expectedByType[format.leafReqType]
-		require.Truef(t, ok, "unexpected leaf request type: %s", format.leafReqType)
-
-		leafsRequestBytes, err := format.codec.Marshal(message.Version, request)
+		var decoded message.CorethLeafsRequest
+		_, err = message.CorethCodec.Unmarshal(leafsRequestBytes, &decoded)
 		require.NoError(t, err)
-		require.Equal(t, expectedB64, base64.StdEncoding.EncodeToString(leafsRequestBytes))
+		require.Equal(t, request.Root, decoded.Root)
+		require.Equal(t, request.Start, decoded.Start)
+		require.Equal(t, request.End, decoded.End)
+		require.Equal(t, request.Limit, decoded.Limit)
+		require.Equal(t, request.NodeType, decoded.NodeType)
+	})
 
-		assertLeafsRequestDecode(t, format, request, leafsRequestBytes)
+	// Test subnet-evm format - marshal concrete struct directly to verify wire format
+	t.Run("subnet-evm", func(t *testing.T) {
+		request := message.SubnetEVMLeafsRequest{
+			Root:     common.BytesToHash([]byte("im ROOTing for ya")),
+			Account:  common.Hash{},
+			Start:    startBytes,
+			End:      endBytes,
+			Limit:    1024,
+			NodeType: message.StateTrieNode,
+		}
+
+		leafsRequestBytes, err := message.SubnetEVMCodec.Marshal(message.Version, request)
+		require.NoError(t, err)
+		require.Equal(t, subnetEVMLeafsRequestB64, base64.StdEncoding.EncodeToString(leafsRequestBytes))
+
+		var decoded message.SubnetEVMLeafsRequest
+		_, err = message.SubnetEVMCodec.Unmarshal(leafsRequestBytes, &decoded)
+		require.NoError(t, err)
+		require.Equal(t, request.Root, decoded.Root)
+		require.Equal(t, request.Start, decoded.Start)
+		require.Equal(t, request.End, decoded.End)
+		require.Equal(t, request.Limit, decoded.Limit)
+		// NodeType should not be serialized for subnet-evm
+		require.Equal(t, message.NodeType(0), decoded.NodeType)
 	})
 }
 
@@ -93,31 +118,25 @@ func TestSubnetEVMLeafsRequestNodeTypeNotSerialized(t *testing.T) {
 	startBytes := randomBytes(t, r, common.HashLength)
 	endBytes := randomBytes(t, r, common.HashLength)
 
-
 	// Create request without explicit NodeType (defaults to 0)
-	leafsRequestDefault, err := message.NewLeafsRequest(
-		message.SubnetEVMLeafsRequestType,
-		common.BytesToHash([]byte("test root")),
-		common.Hash{},
-		startBytes,
-		endBytes,
-		512,
-		message.NodeType(0),
-	)
-	require.NoError(t, err)
-
+	leafsRequestDefault := message.SubnetEVMLeafsRequest{
+		Root:     common.BytesToHash([]byte("test root")),
+		Account:  common.Hash{},
+		Start:    startBytes,
+		End:      endBytes,
+		Limit:    512,
+		NodeType: message.NodeType(0),
+	}
 
 	// Create request with explicit NodeType
-	leafsRequestWithNodeType, err := message.NewLeafsRequest(
-		message.SubnetEVMLeafsRequestType,
-		common.BytesToHash([]byte("test root")),
-		common.Hash{},
-		startBytes,
-		endBytes,
-		512,
-		message.StateTrieNode,
-	)
-	require.NoError(t, err)
+	leafsRequestWithNodeType := message.SubnetEVMLeafsRequest{
+		Root:     common.BytesToHash([]byte("test root")),
+		Account:  common.Hash{},
+		Start:    startBytes,
+		End:      endBytes,
+		Limit:    512,
+		NodeType: message.StateTrieNode,
+	}
 
 	bytesDefault, err := message.SubnetEVMCodec.Marshal(message.Version, leafsRequestDefault)
 	require.NoError(t, err)
@@ -136,49 +155,6 @@ func TestSubnetEVMLeafsRequestNodeTypeNotSerialized(t *testing.T) {
 	require.Equal(t, leafsRequestDefault.StartKey(), unmarshaled.StartKey())
 	require.Equal(t, leafsRequestDefault.EndKey(), unmarshaled.EndKey())
 	require.Equal(t, leafsRequestDefault.LimitValue(), unmarshaled.LimitValue())
-}
-
-func assertLeafsRequestDecode(t *testing.T, format messageFormat, request message.LeafsRequest, requestBytes []byte) {
-	t.Helper()
-	switch format.leafReqType {
-	case message.SubnetEVMLeafsRequestType:
-		var decoded message.SubnetEVMLeafsRequest
-		_, err := format.codec.Unmarshal(requestBytes, &decoded)
-		require.NoError(t, err)
-		leafsRequest := request.(message.SubnetEVMLeafsRequest)
-		require.Equal(t, leafsRequest.Root, decoded.Root)
-		require.Equal(t, leafsRequest.Start, decoded.Start)
-		require.Equal(t, leafsRequest.End, decoded.End)
-		require.Equal(t, leafsRequest.Limit, decoded.Limit)
-		require.Equal(t, message.NodeType(0), decoded.NodeType) // make sure it is not serialized
-	case message.CorethLeafsRequestType:
-		var decoded message.CorethLeafsRequest
-		_, err := format.codec.Unmarshal(requestBytes, &decoded)
-		require.NoError(t, err)
-		leafsRequest := request.(message.CorethLeafsRequest)
-		require.Equal(t, leafsRequest.Root, decoded.Root)
-		require.Equal(t, leafsRequest.Start, decoded.Start)
-		require.Equal(t, leafsRequest.End, decoded.End)
-		require.Equal(t, leafsRequest.Limit, decoded.Limit)
-		require.Equal(t, leafsRequest.NodeType, decoded.NodeType)
-
-		leafsRequestDefault, err := message.NewLeafsRequest(
-			message.CorethLeafsRequestType,
-			leafsRequest.RootHash(),
-			leafsRequest.AccountHash(),
-			leafsRequest.StartKey(),
-			leafsRequest.EndKey(),
-			leafsRequest.LimitValue(),
-			leafsRequest.NodeTypeValue(),
-		)
-		require.NoError(t, err)
-
-		bytesDefault, err := message.CorethCodec.Marshal(message.Version, leafsRequestDefault)
-		require.NoError(t, err)
-		require.NotEqual(t, bytesDefault, requestBytes, "NodeType should affect serialization")
-	default:
-		require.Failf(t, "unexpected leaf request type", "%s", format.leafReqType)
-	}
 }
 
 func forEachMessageFormat(t *testing.T, fn func(t *testing.T, name string, format messageFormat)) {

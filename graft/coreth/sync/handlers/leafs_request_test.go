@@ -96,11 +96,11 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
 					return newLeafsRequest(t,
 						t.Context(),
-						common.Hash{},
+						largeTrieRoot,
 						common.Hash{},
 						bytes.Repeat([]byte{0x00}, common.HashLength),
 						bytes.Repeat([]byte{0xff}, common.HashLength),
-						maxLeavesLimit,
+						0,
 						message.StateTrieNode,
 					)
 				},

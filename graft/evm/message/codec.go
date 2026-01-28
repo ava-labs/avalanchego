@@ -49,13 +49,22 @@ func newCodec(skipCount int, leafsReqType LeafsRequestType) codec.Manager {
 	// Gossip types and sync summary type removed from codec
 	c.SkipRegistrations(skipCount)
 
-	leafsRequest := newEmptyLeafsRequest(leafsReqType)
-
 	errs.Add(
 		// state sync types
 		c.RegisterType(BlockRequest{}),
 		c.RegisterType(BlockResponse{}),
-		c.RegisterType(leafsRequest),
+	)
+
+	// Register the concrete leafs request type for the wire format.
+	// Must register concrete type, not interface, for codec to serialize correctly.
+	switch leafsReqType {
+	case SubnetEVMLeafsRequestType:
+		errs.Add(c.RegisterType(SubnetEVMLeafsRequest{}))
+	default:
+		errs.Add(c.RegisterType(CorethLeafsRequest{}))
+	}
+
+	errs.Add(
 		c.RegisterType(LeafsResponse{}),
 		c.RegisterType(CodeRequest{}),
 		c.RegisterType(CodeResponse{}),
