@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -34,7 +34,7 @@ func (f *firewoodDB) Repair(ctx context.Context, vm VM, s State) error {
 	}
 
 	var replayStartHeight int
-	if firewoodHeight, ok := f.db.Height(); !ok {
+	if firewoodHeight := f.db.Height(); {
 		// A height of zero means that we have not flushed any data to firewood yet,
 		// so we need to replay all blocks including genesis.
 		replayStartHeight = -1
@@ -96,7 +96,7 @@ type firewoodBatch struct {
 }
 
 func (f *firewoodBatch) Write() error {
-	chainDBHeight, ok := f.firewoodDB.Height()
+	chainDBHeight := f.firewoodDB.Height()
 	if !ok && f.nextStateHeight > 1 {
 		// This should always be initialized after the first (non-genesis) block is
 		// accepted.

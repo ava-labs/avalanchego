@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -82,7 +82,7 @@ func (f *FirewoodMigration) Migrate(
 	log logging.Logger,
 	parser block.Parser,
 	metrics prometheus.Registerer,
-	_ State,
+	prev State,
 	prevVersionDB *versiondb.Database,
 	prevUTXODB database.Database,
 	prevTxDB database.Database,
@@ -93,7 +93,17 @@ func (f *FirewoodMigration) Migrate(
 	stopVertexID ids.ID,
 	genesisTimestamp time.Time,
 ) (State, ChainDB, error) {
-	next, chainDB, err := newMigrationState(parser, metrics, chainDataDir)
+	lastAccepted, err := prev.GetBlock(prev.GetLastAccepted())
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting last accepted block: %w", err)
+	}
+
+	next, chainDB, err := newMigrationState(
+		parser,
+		metrics,
+		chainDataDir,
+		lastAccepted.Height(),
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("initializing state: %w", err)
 	}
@@ -308,9 +318,10 @@ func newMigrationState(
 	parser block.Parser,
 	metrics prometheus.Registerer,
 	chainDataDir string,
+	lastAcceptedHeight uint64,
 ) (*migrationState, ChainDB, error) {
 	// The state db is used for state agreed upon by consensus
-	stateDB, err := firewood.New(filepath.Join(chainDataDir, "state"))
+	stateDB, err := firewood.New(filepath.Join(chainDataDir, "state"), lastAcceptedHeight)
 	if err != nil {
 		return nil, nil, fmt.Errorf("initializing state db: %w", err)
 	}

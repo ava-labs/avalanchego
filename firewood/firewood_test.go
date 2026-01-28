@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package firewood
@@ -71,7 +71,7 @@ func TestDBPut(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, err := New(filepath.Join(t.TempDir(), "firewood.test"))
+			db, err := New(filepath.Join(t.TempDir(), "firewood.test"), 0)
 			require.NoError(t, err)
 
 			db.Put(tt.key, tt.val)
@@ -90,7 +90,7 @@ func TestDBPut(t *testing.T) {
 }
 
 func TestDBDelete(t *testing.T) {
-	db, err := New(filepath.Join(t.TempDir(), "firewood.test"))
+	db, err := New(filepath.Join(t.TempDir(), "firewood.test"), 0)
 	require.NoError(t, err)
 
 	key := []byte("foo")
@@ -106,26 +106,23 @@ func TestDBDelete(t *testing.T) {
 }
 
 func TestDBHeight(t *testing.T) {
-	db, err := New(filepath.Join(t.TempDir(), "firewood.test"))
+	db, err := New(filepath.Join(t.TempDir(), "firewood.test"), 0)
 	require.NoError(t, err)
 
-	_, ok := db.Height()
-	require.False(t, ok)
-
 	for i := range 5 {
+		require.Equal(t, uint64(i), db.Height())
+
 		db.Put([]byte("foo"), []byte("bar"))
 		require.NoError(t, db.Flush())
 
-		height, ok := db.Height()
-		require.True(t, ok)
-		require.Equal(t, uint64(i), height)
+		require.Equal(t, uint64(i+1), db.Height())
 	}
 }
 
 func TestDBPersistence(t *testing.T) {
 	dir := t.TempDir()
 
-	db, err := New(filepath.Join(dir, "firewood.test"))
+	db, err := New(filepath.Join(dir, "firewood.test"), 0)
 	require.NoError(t, err)
 
 	key := []byte("foo")
@@ -134,9 +131,7 @@ func TestDBPersistence(t *testing.T) {
 
 	require.NoError(t, db.Flush())
 
-	height, ok := db.Height()
-	require.True(t, ok)
-	require.Zero(t, height)
+	require.Equal(t, uint64(1), db.Height())
 
 	got, err := db.Get(key)
 	require.NoError(t, err)
@@ -144,12 +139,10 @@ func TestDBPersistence(t *testing.T) {
 
 	require.NoError(t, db.Close(t.Context()))
 
-	db, err = New(filepath.Join(dir, "firewood.test"))
+	db, err = New(filepath.Join(dir, "firewood.test"), 0)
 	require.NoError(t, err)
 
-	height, ok = db.Height()
-	require.True(t, ok)
-	require.Zero(t, height)
+	require.Equal(t, uint64(1), db.Height())
 
 	got, err = db.Get(key)
 	require.NoError(t, err)
@@ -232,7 +225,7 @@ func TestDBAbort_Put(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, err := New(filepath.Join(t.TempDir(), "firewood.test"))
+			db, err := New(filepath.Join(t.TempDir(), "firewood.test"), 0)
 			require.NoError(t, err)
 
 			for _, p := range tt.puts {
@@ -252,7 +245,7 @@ func TestDBAbort_Put(t *testing.T) {
 }
 
 func TestDBAbort_Delete(t *testing.T) {
-	db, err := New(filepath.Join(t.TempDir(), "firewood.test"))
+	db, err := New(filepath.Join(t.TempDir(), "firewood.test"), 0)
 	require.NoError(t, err)
 
 	key := []byte("foo")
@@ -293,7 +286,7 @@ func TestDBRoot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, err := New(filepath.Join(t.TempDir(), "firewood.test"))
+			db, err := New(filepath.Join(t.TempDir(), "firewood.test"), 0)
 			require.NoError(t, err)
 
 			prevRoot, err := db.Root()

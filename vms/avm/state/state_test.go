@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -326,7 +326,7 @@ func TestFirewoodInconsistentHeight(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 
-	firewood, err := firewood.New(filepath.Join(t.TempDir(), "state"))
+	firewood, err := firewood.New(filepath.Join(t.TempDir(), "state"), 0)
 	require.NoError(t, err)
 
 	s, err := NewWithFormat(
@@ -386,7 +386,7 @@ func TestFirewoodRootUpdate(t *testing.T) {
 			db := memdb.New()
 			vdb := versiondb.New(db)
 
-			firewood, err := firewood.New(filepath.Join(t.TempDir(), "state"))
+			firewood, err := firewood.New(filepath.Join(t.TempDir(), "state"), 0)
 			require.NoError(t, err)
 
 			s, err := NewWithFormat(

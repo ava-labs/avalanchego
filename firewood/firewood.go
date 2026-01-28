@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package firewood
@@ -62,12 +62,13 @@ func (c *changes) Get(key []byte) ([]byte, bool) {
 type DB struct {
 	db                *ffi.Database
 	height            uint64
-	heightInitialized bool
 	heightKey         []byte
 	pending           changes
 }
 
-func New(path string) (*DB, error) {
+// New returns an instance of [DB]. If [DB] has not been written yet, it has
+// an initial height key of `height`.
+func New(path string, height uint64) (*DB, error) {
 	db, err := ffi.New(path, ffi.DefaultConfig())
 	if err != nil {
 		return nil, fmt.Errorf("opening firewood db: %w", err)
@@ -79,7 +80,6 @@ func New(path string) (*DB, error) {
 		return nil, fmt.Errorf("getting height: %w", err)
 	}
 
-	var height uint64
 	if heightBytes != nil {
 		height, err = database.ParseUInt64(heightBytes)
 		if err != nil {
@@ -90,7 +90,6 @@ func New(path string) (*DB, error) {
 	return &DB{
 		db:                db,
 		height:            height,
-		heightInitialized: heightBytes != nil,
 		heightKey:         heightKey,
 	}, nil
 }
@@ -128,12 +127,8 @@ func (db *DB) Delete(key []byte) {
 // Height returns the last height of [DB] written to by [DB.Flush].
 //
 // If this returns false, the height has not been initialized yet.
-func (db *DB) Height() (uint64, bool) {
-	if !db.heightInitialized {
-		return 0, false
-	}
-
-	return db.height, true
+func (db *DB) Height() uint64 {
+	return db.height
 }
 
 // Root returns the merkle root of the state on disk ignoring pending writes.
@@ -153,12 +148,7 @@ func (db *DB) Abort() {
 
 // Flush flushes pending writes to disk and increments [DB.Height].
 func (db *DB) Flush() error {
-	if !db.heightInitialized {
-		db.heightInitialized = true
-	} else {
-		db.height++
-	}
-
+	db.height++
 	db.pending.Put(db.heightKey, database.PackUInt64(db.height))
 
 	p, err := db.db.Propose(db.pending.Keys, db.pending.Vals)
