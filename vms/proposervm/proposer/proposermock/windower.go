@@ -15,6 +15,7 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
+	logging "github.com/ava-labs/avalanchego/utils/logging"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -73,18 +74,18 @@ func (mr *WindowerMockRecorder) ExpectedProposer(ctx, blockHeight, pChainHeight,
 }
 
 // MinDelayForProposer mocks base method.
-func (m *Windower) MinDelayForProposer(ctx context.Context, blockHeight, pChainHeight uint64, nodeID ids.NodeID, startSlot uint64) (time.Duration, error) {
+func (m *Windower) MinDelayForProposer(ctx context.Context, blockHeight, pChainHeight uint64, nodeID ids.NodeID, startSlot uint64, logger logging.Logger) (time.Duration, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MinDelayForProposer", ctx, blockHeight, pChainHeight, nodeID, startSlot)
+	ret := m.ctrl.Call(m, "MinDelayForProposer", ctx, blockHeight, pChainHeight, nodeID, startSlot, logger)
 	ret0, _ := ret[0].(time.Duration)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // MinDelayForProposer indicates an expected call of MinDelayForProposer.
-func (mr *WindowerMockRecorder) MinDelayForProposer(ctx, blockHeight, pChainHeight, nodeID, startSlot any) *gomock.Call {
+func (mr *WindowerMockRecorder) MinDelayForProposer(ctx, blockHeight, pChainHeight, nodeID, startSlot, logger any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MinDelayForProposer", reflect.TypeOf((*Windower)(nil).MinDelayForProposer), ctx, blockHeight, pChainHeight, nodeID, startSlot)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MinDelayForProposer", reflect.TypeOf((*Windower)(nil).MinDelayForProposer), ctx, blockHeight, pChainHeight, nodeID, startSlot, logger)
 }
 
 // Proposers mocks base method.

@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -64,7 +65,7 @@ func TestWindowerNoValidators(t *testing.T) {
 			require.ErrorIs(err, ErrAnyoneCanPropose)
 			require.Equal(ids.EmptyNodeID, proposer)
 
-			delay, err = w.MinDelayForProposer(t.Context(), chainHeight, pChainHeight, nodeID, slot)
+			delay, err = w.MinDelayForProposer(t.Context(), chainHeight, pChainHeight, nodeID, slot, &logging.NoLog{})
 			require.ErrorIs(err, ErrAnyoneCanPropose)
 			require.Zero(delay)
 		})
@@ -303,7 +304,6 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 
 func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 	require := require.New(t)
-
 	_, vdrState := makeValidators(t, 10)
 	w := New(vdrState, subnetID, fixedChainID)
 
@@ -319,7 +319,7 @@ func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 
 		// proposerID is the scheduled proposer. It should start with the
 		// expected delay
-		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, proposerID, slot)
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, proposerID, slot, &logging.NoLog{})
 		require.NoError(err)
 		require.Equal(time.Duration(slot)*WindowDuration, delay)
 	}
@@ -353,7 +353,7 @@ func TestMinDelayForProposer(t *testing.T) {
 	}
 
 	for nodeID, expectedDelay := range expectedDelays {
-		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, nodeID, slot)
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, nodeID, slot, &logging.NoLog{})
 		require.NoError(err)
 		require.Equal(expectedDelay, delay)
 	}
@@ -375,7 +375,7 @@ func BenchmarkMinDelayForProposer(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, nodeID, slot)
+		_, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, nodeID, slot, &logging.NoLog{})
 		require.NoError(err)
 	}
 }

@@ -9,11 +9,13 @@ import (
 	"math/bits"
 	"time"
 
+	"go.uber.org/zap"
 	"gonum.org/v1/gonum/mathext/prng"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -92,6 +94,7 @@ type Windower interface {
 		pChainHeight uint64,
 		nodeID ids.NodeID,
 		startSlot uint64,
+		logger logging.Logger,
 	) (time.Duration, error)
 }
 
@@ -194,12 +197,17 @@ func (w *windower) MinDelayForProposer(
 	pChainHeight uint64,
 	nodeID ids.NodeID,
 	startSlot uint64,
+	logger logging.Logger,
 ) (time.Duration, error) {
 	source := prng.NewMT19937_64()
 	sampler, validators, err := w.makeSampler(ctx, pChainHeight, source)
 	if err != nil {
 		return 0, err
 	}
+
+	logger.Debug("Sampled validators for P-chain height",
+		zap.Uint64("pChainHeight", pChainHeight), zap.Int("numValidators", len(validators)))
+
 	if len(validators) == 0 {
 		return 0, ErrAnyoneCanPropose
 	}
