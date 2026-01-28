@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
 
+// ForEachCodec runs fn as a subtest for each supported codec (coreth and subnet-evm).
 func ForEachCodec(t *testing.T, fn func(name string, c codec.Manager)) {
 	t.Helper()
 	codecs := map[string]codec.Manager{
