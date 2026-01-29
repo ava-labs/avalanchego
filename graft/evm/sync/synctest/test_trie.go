@@ -208,8 +208,8 @@ func FillAccounts(
 	return newRoot, accounts
 }
 
-func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.Database, numAccounts int) common.Hash {
-	newRoot, _ := FillAccounts(t, r, serverDB, types.EmptyRootHash, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
+func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.Database, root common.Hash, numAccounts int) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
+	return FillAccounts(t, r, serverDB, root, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
 		codeBytes := make([]byte, 256)
 		_, err := r.Read(codeBytes)
 		require.NoError(t, err, "error reading random code bytes")
@@ -222,7 +222,6 @@ func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.D
 		FillStorageForAccount(t, r, 16, addr, storageTr)
 		return account
 	})
-	return newRoot
 }
 
 // FillStorageForAccount adds [numStorageKeys] random key-value pairs to the storage trie for [addr] in [storageTr].
