@@ -2,8 +2,9 @@
 
 set -euo pipefail
 
-# This script does not perform any linting on the graft subdirectory.
+# This script does not perform any linting on the graft or .idea subdirectories.
 IGNORE_PATH="graft"
+IGNORE_PATH_IDEA=".idea"
 
 if ! [[ "$0" =~ scripts/lint.sh ]]; then
   echo "must be run from repository root"
@@ -57,7 +58,8 @@ function test_license_header {
       ! -path './**/*mock/*.go' \
       ! -name '*.canoto.go' \
       ! -name '*.bindings.go' \
-      ! -path "./${IGNORE_PATH}/*"
+      ! -path "./${IGNORE_PATH}/*" \
+      ! -path "./${IGNORE_PATH_IDEA}/*"
     )
 
   # shellcheck disable=SC2086
@@ -68,21 +70,21 @@ function test_license_header {
 }
 
 function test_single_import {
-  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" 'import \(\n\t".*"\n\)' .; then
+  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" --exclude-dir="${IGNORE_PATH_IDEA}" 'import \(\n\t".*"\n\)' .; then
     echo ""
     return 1
   fi
 }
 
 function test_require_error_is_no_funcs_as_params {
-  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
+  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" --exclude-dir="${IGNORE_PATH_IDEA}" 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
     echo ""
     return 1
   fi
 }
 
 function test_require_no_error_inline_func {
-  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
+  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" --exclude-dir="${IGNORE_PATH_IDEA}" '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
     echo ""
     echo "Checking that a function with a single error return doesn't error should be done in-line."
     echo ""
@@ -92,7 +94,7 @@ function test_require_no_error_inline_func {
 
 # Ref: https://go.dev/doc/effective_go#blank_implements
 function test_interface_compliance_nil {
-  if grep -R -o -P --exclude-dir="${IGNORE_PATH}" '_ .+? = &.+?\{\}' .; then
+  if grep -R -o -P --exclude-dir="${IGNORE_PATH}" --exclude-dir="${IGNORE_PATH_IDEA}" '_ .+? = &.+?\{\}' .; then
     echo ""
     echo "Interface compliance checks need to be of the form:"
     echo "  var _ json.Marshaler = (*RawMessage)(nil)"
@@ -103,7 +105,7 @@ function test_interface_compliance_nil {
 
 function test_import_testing_only_in_tests {
   ROOT=$( git rev-parse --show-toplevel )
-  NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' ! -path "${ROOT}/tests/*" ! -path "${ROOT}/${IGNORE_PATH}/*" );
+  NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' ! -path "${ROOT}/tests/*" ! -path "${ROOT}/${IGNORE_PATH}/*" ! -path "${ROOT}/${IGNORE_PATH_IDEA}/*" );
 
   IMPORT_TESTING=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"');
   IMPORT_TESTIFY=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/stretchr/testify');
