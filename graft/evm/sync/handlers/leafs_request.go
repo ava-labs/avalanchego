@@ -27,6 +27,16 @@ import (
 
 var _ LeafRequestHandler = (*leafsRequestHandler)(nil)
 
+// LeafRequestHandler handles incoming leaf requests from peers.
+type LeafRequestHandler interface {
+	OnLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error)
+}
+
+// SnapshotProvider provides access to the snapshot tree.
+type SnapshotProvider interface {
+	Snapshots() *snapshot.Tree
+}
+
 const (
 	// Maximum number of leaves to return in a message.LeafsResponse
 	// This parameter overrides any other Limit specified
@@ -39,10 +49,6 @@ const (
 
 	segmentLen = 64 // divide data from snapshot to segments of this size
 )
-
-type LeafRequestHandler interface {
-	OnLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error)
-}
 
 // leafsRequestHandler is a peer.RequestHandler for types.LeafsRequest
 // serving requested trie data

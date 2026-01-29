@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -17,6 +18,17 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
+
+// SyncDataProvider combines [BlockProvider] and [SnapshotProvider] for sync operations.
+type SyncDataProvider interface {
+	BlockProvider
+	SnapshotProvider
+}
+
+// BlockProvider provides blocks by hash and height.
+type BlockProvider interface {
+	GetBlock(common.Hash, uint64) *types.Block
+}
 
 const (
 	// parentLimit specifies how many parents to retrieve and send given a starting hash

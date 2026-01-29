@@ -9,24 +9,24 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/graft/coreth/eth"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/evmstate"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
-	blocksync "github.com/ava-labs/avalanchego/graft/coreth/sync/block"
-	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	blocksync "github.com/ava-labs/avalanchego/graft/evm/sync/block"
+	syncclient "github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
@@ -52,6 +52,23 @@ type EthBlockWrapper interface {
 	GetEthBlock() *ethtypes.Block
 }
 
+// BloomIndexer provides bloom filter indexing functionality.
+// This is used to mark checkpoint blocks during state sync.
+type BloomIndexer interface {
+	// AddCheckpoint adds a checkpoint for bloom indexing at the given section and hash.
+	AddCheckpoint(sectionIdx uint64, sectionHead common.Hash)
+}
+
+// ChainContext provides the chain context needed by the state sync client.
+// This interface abstracts the Ethereum backend operations required for state sync.
+type ChainContext interface {
+	// BloomIndexer returns the bloom indexer for the chain.
+	BloomIndexer() BloomIndexer
+
+	// BlockChain returns the blockchain instance.
+	BlockChain() BlockChain
+}
+
 // BlockAcceptor provides a mechanism to update the last accepted block ID during state synchronization.
 // This interface is used by the state sync process to ensure the blockchain state
 // is properly updated when new blocks are synchronized from the network.
@@ -74,7 +91,7 @@ type Executor interface {
 var _ Acceptor = (*client)(nil)
 
 type ClientConfig struct {
-	Chain      *eth.Ethereum
+	Chain      ChainContext
 	State      *chain.State
 	ChainDB    ethdb.Database
 	Acceptor   BlockAcceptor
