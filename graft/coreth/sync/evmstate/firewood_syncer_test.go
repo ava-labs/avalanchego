@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
@@ -24,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -65,16 +68,17 @@ func TestFirewoodSync(t *testing.T) {
 			r := rand.New(rand.NewSource(1))
 
 			clientState := createDB(t)
-			_ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, tt.clientSize)
+			_, _ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, types.EmptyRootHash, tt.clientSize)
 
 			serverState := createDB(t)
-			root := synctest.FillAccountsWithStorageAndCode(t, r, serverState, tt.serverSize)
+			// Store the expected accounts to verify after sync.
+			root, accounts := synctest.FillAccountsWithStorageAndCode(t, r, serverState, types.EmptyRootHash, tt.serverSize)
 
 			firewoodSyncer, codeSyncer, codeQueue := createSyncers(t, clientState, serverState, root)
 			require.NoError(t, runFirewoodSync(t.Context(), codeSyncer, firewoodSyncer), "failure during sync")
 
 			// Finalization is not necessary, as no errors were encountered during sync.
-			assertFirewoodConsistency(t, root, clientState)
+			assertFirewoodConsistency(t, root, clientState, accounts)
 
 			// Code queue should be closed.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
@@ -103,10 +107,10 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 			r := rand.New(rand.NewSource(1))
 
 			clientState := createDB(t)
-			_ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, 0)
+			_, _ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, types.EmptyRootHash, 0)
 
 			serverState := createDB(t)
-			root := synctest.FillAccountsWithStorageAndCode(t, r, serverState, 10)
+			root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverState, types.EmptyRootHash, 10)
 
 			firewoodSyncer, codeSyncer, codeQueue := createSyncers(t, clientState, serverState, root)
 
@@ -187,13 +191,23 @@ func createDB(t *testing.T) state.Database {
 	return db
 }
 
-func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state.Database) {
+func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state.Database, accounts map[*utilstest.Key]*types.StateAccount) {
 	t.Helper()
 
 	db := dbFromState(t, clientState)
 	gotRoot, err := db.Root()
 	require.NoErrorf(t, err, "%T.Root()", db)
 	require.Equal(t, root, common.Hash(gotRoot), "client DB root does not match expected root")
+
+	for k, acc := range accounts {
+		codeHash := common.BytesToHash(acc.CodeHash)
+		if codeHash == (common.Hash{}) || codeHash == types.EmptyCodeHash {
+			continue
+		}
+		codeBytes := rawdb.ReadCode(clientState.DiskDB(), codeHash)
+		require.NotEmptyf(t, codeBytes, "no code found for code hash %s", codeHash.Hex())
+		require.Equalf(t, codeHash, crypto.Keccak256Hash(codeBytes), "incorrect code for account %+x", k.Address)
+	}
 
 	it := customrawdb.NewCodeToFetchIterator(clientState.DiskDB())
 	defer it.Release()
