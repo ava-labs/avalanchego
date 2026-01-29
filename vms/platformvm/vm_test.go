@@ -1411,7 +1411,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.True(currentStakerIterator.Next())
 
 	stakerToRemove := currentStakerIterator.Value()
-	rewardValidatorTx, err := blockbuilder.NewRewardValidatorTx(ctx, stakerToRemove.TxID)
+	rewardValidatorTx, err := txs.NewRewardValidatorTx(ctx, stakerToRemove.TxID)
 	require.NoError(err)
 	currentStakerIterator.Release()
 
