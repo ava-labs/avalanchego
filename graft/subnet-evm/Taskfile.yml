@@ -12,11 +12,7 @@ tasks:
 
   build:
     desc: Compile Subnet EVM binary with git commit and static linking flags
-    cmd: ./scripts/build.sh {{.CLI_ARGS}} 
-
-  build-antithesis-images:
-    desc: Build Docker images for antithesis testing including avalanchego node and subnet-evm builder images
-    cmd: bash -x ./scripts/build_antithesis_images.sh # publish_antithesis_images.yml
+    cmd: ./scripts/build.sh {{.CLI_ARGS}}
 
   build-bench-precompiles:
     desc: Run benchmark tests for precompile contracts with timeout and coverage
@@ -128,18 +124,6 @@ tasks:
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
     cmd: ./scripts/shellcheck.sh
-
-  test-build-antithesis-images:
-    desc: Test antithesis images build
-    cmd: bash -x scripts/tests.build_antithesis_images.sh
-
-  test-build-antithesis-images-ci: # consolidated test-build-antithesis-images
-    desc: Test antithesis images build with CI setup
-    cmds:
-      - cmd: cd ../../ && ./scripts/build.sh # build avalanchego from root
-      - task: build # build subnet-evm
-      - cmd: go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --duration=60s
-      - task: test-build-antithesis-images
 
   test-build-image:
     desc: Test docker image build
