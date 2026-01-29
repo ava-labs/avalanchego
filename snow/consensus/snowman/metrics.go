@@ -63,7 +63,8 @@ type metrics struct {
 	numSuccessfulPolls prometheus.Counter
 
 	// avgAcceptanceTime tracks the average acceptance time
-	avgAcceptanceTime math.Averager
+	avgAcceptanceTime      math.Averager
+	avgAcceptanceTimeGauge prometheus.Gauge
 }
 
 func newMetrics(
@@ -143,6 +144,12 @@ func newMetrics(
 			Help: "number of failed polls",
 		}),
 		avgAcceptanceTime: math.NewUninitializedAverager(5 * time.Minute),
+		avgAcceptanceTimeGauge: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "average_acceptance_time",
+				Help: "average time to finality for the past five minutes",
+			},
+		),
 	}
 
 	// Initially set the metrics for the last accepted block.
@@ -160,6 +167,7 @@ func newMetrics(
 		reg.Register(m.blockSizeRejectedSum),
 		reg.Register(m.numSuccessfulPolls),
 		reg.Register(m.numFailedPolls),
+		reg.Register(m.avgAcceptanceTimeGauge),
 	)
 	return m, errs.Err
 }
@@ -208,6 +216,7 @@ func (m *metrics) Accepted(
 	builtDuration := now.Sub(timestamp)
 	m.buildLatencyAccepted.Add(float64(builtDuration))
 	m.avgAcceptanceTime.Observe(float64(builtDuration), now)
+	m.avgAcceptanceTimeGauge.Set(m.avgAcceptanceTime.Read())
 }
 
 func (m *metrics) Rejected(blkID ids.ID, pollNumber uint64, blockSize int) {
