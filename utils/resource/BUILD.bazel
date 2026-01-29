@@ -1,0 +1,30 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "resource",
+    srcs = [
+        "metrics.go",
+        "no_usage.go",
+        "usage.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/resource",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/logging",
+        "//utils/storage",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_shirou_gopsutil//cpu",
+        "@com_github_shirou_gopsutil//process",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "resource_test",
+    srcs = [
+        "mocks_generate_test.go",
+        "usage_test.go",
+    ],
+    embed = [":resource"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

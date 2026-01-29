@@ -1,0 +1,27 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "snow",
+    srcs = [
+        "acceptor.go",
+        "context.go",
+        "decidable.go",
+        "state.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/metrics",
+        "//chains/atomic",
+        "//ids",
+        "//proto/pb/p2p",
+        "//snow/validators",
+        "//upgrade",
+        "//utils",
+        "//utils/crypto/bls",
+        "//utils/logging",
+        "//vms/platformvm/warp",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_uber_go_zap//:zap",
+    ],
+)

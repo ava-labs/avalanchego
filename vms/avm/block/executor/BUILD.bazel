@@ -1,0 +1,57 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "executor",
+    srcs = [
+        "block.go",
+        "manager.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/avm/block/executor",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chains/atomic",
+        "//ids",
+        "//snow/consensus/snowman",
+        "//utils/set",
+        "//utils/timer/mockable",
+        "//vms/avm/block",
+        "//vms/avm/metrics",
+        "//vms/avm/state",
+        "//vms/avm/txs",
+        "//vms/avm/txs/executor",
+        "//vms/txs/mempool",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "executor_test",
+    srcs = [
+        "block_test.go",
+        "manager_test.go",
+        "mocks_generate_test.go",
+    ],
+    embed = [":executor"],
+    deps = [
+        "//chains/atomic",
+        "//chains/atomic/atomicmock",
+        "//ids",
+        "//snow",
+        "//upgrade/upgradetest",
+        "//utils",
+        "//utils/logging",
+        "//utils/set",
+        "//utils/timer/mockable",
+        "//vms/avm/block",
+        "//vms/avm/config",
+        "//vms/avm/metrics/metricsmock",
+        "//vms/avm/state/statemock",
+        "//vms/avm/txs",
+        "//vms/avm/txs/executor",
+        "//vms/avm/txs/mempool",
+        "//vms/avm/txs/txsmock",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

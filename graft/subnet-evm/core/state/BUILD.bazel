@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "state_test",
+    srcs = ["trie_prefetcher_extra_test.go"],
+    deps = [
+        "//database",
+        "//graft/subnet-evm/core/extstate",
+        "//graft/subnet-evm/core/state/snapshot",
+        "//graft/subnet-evm/triedb/hashdb",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

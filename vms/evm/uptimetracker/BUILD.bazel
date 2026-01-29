@@ -1,0 +1,36 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "uptimetracker",
+    srcs = [
+        "state.go",
+        "uptime_tracker.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/uptimetracker",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//database",
+        "//ids",
+        "//snow/uptime",
+        "//snow/validators",
+        "//utils/set",
+        "//utils/timer/mockable",
+        "@org_golang_x_exp//maps",
+    ],
+)
+
+go_test(
+    name = "uptimetracker_test",
+    srcs = ["uptime_tracker_test.go"],
+    embed = [":uptimetracker"],
+    deps = [
+        "//database/memdb",
+        "//ids",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//utils/timer/mockable",
+        "@com_github_stretchr_testify//require",
+    ],
+)

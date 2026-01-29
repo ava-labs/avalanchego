@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "subnet",
+    srcs = ["xsvm.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/fixture/subnet",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//tests/fixture/tmpnet",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//vms/example/xsvm/genesis",
+    ],
+)
