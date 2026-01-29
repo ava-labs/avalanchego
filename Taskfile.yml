@@ -28,7 +28,8 @@ tasks:
 
   build-antithesis-images-subnet-evm:
     desc: Builds docker images for antithesis for the subnet-evm test setup
-    dir: graft/subnet-evm
+    env:
+      TEST_SETUP: subnet-evm
     cmd: bash -x ./scripts/build_antithesis_images.sh
 
   build-antithesis-images-xsvm:
@@ -36,6 +37,7 @@ tasks:
     env:
       TEST_SETUP: xsvm
     cmd: bash -x ./scripts/build_antithesis_images.sh
+
 
   build-bootstrap-monitor:
     desc: Builds bootstrap-monitor
@@ -52,6 +54,10 @@ tasks:
   build-race:
     desc: Builds avalanchego with race detection enabled
     cmd: ./scripts/build.sh -r
+
+  build-subnet-evm:
+    desc: Builds subnet-evm plugin
+    cmd: ./graft/subnet-evm/scripts/build.sh
 
   build-subnet-evm-image:
     desc: Builds docker image for subnet-evm
@@ -245,6 +251,16 @@ tasks:
     cmds:
       - task: build-race
       - cmd: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=120s
+      - cmd: bash -x ./scripts/tests.build_antithesis_images.sh
+
+  test-build-antithesis-images-subnet-evm:
+    desc: Tests the build of antithesis images for the subnet-evm test setup
+    env:
+      TEST_SETUP: subnet-evm
+    cmds:
+      - task: build-race
+      - task: build-subnet-evm
+      - cmd: cd graft/subnet-evm && go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --duration=120s
       - cmd: bash -x ./scripts/tests.build_antithesis_images.sh
 
   test-build-antithesis-images-xsvm:
