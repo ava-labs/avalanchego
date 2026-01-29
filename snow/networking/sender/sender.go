@@ -154,7 +154,6 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 	log := s.logWith(
 		zap.Binary("summary", summary), // only logged if verbo
 		zap.Stringer("messageOp", message.StateSummaryFrontierOp),
-		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
 	msg, err := s.msgCreator.StateSummaryFrontier(
@@ -214,6 +213,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
 		zap.Uint32("requestID", requestID),
+		zap.Duration("deadline", deadline),
 		zap.Uint64s("heights", heights),
 	)
 	msg, err := s.msgCreator.GetAcceptedStateSummary(
@@ -408,6 +408,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.GetAcceptedOp),
 		zap.Uint32("requestID", requestID),
+		zap.Duration("deadline", deadline),
 		zap.Stringers("containerIDs", containerIDs),
 	)
 	msg, err := s.msgCreator.GetAccepted(
@@ -504,6 +505,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.GetAncestorsOp),
 		zap.Uint32("requestID", requestID),
+		zap.Duration("deadline", deadline),
 		zap.Stringer("containerID", containerID),
 	)
 	msg, err := s.msgCreator.GetAncestors(
@@ -590,6 +592,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.GetOp),
 		zap.Uint32("requestID", requestID),
+		zap.Duration("deadline", deadline),
 		zap.Stringer("containerID", containerID),
 	)
 	msg, err := s.msgCreator.Get(
@@ -949,6 +952,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 		zap.Binary("payload", bytes),
 		zap.Stringer("messageOp", message.AppRequestOp),
 		zap.Uint32("requestID", requestID),
+		zap.Duration("deadline", deadline),
 	)
 	msg, err := s.msgCreator.AppRequest(
 		s.ctx.ChainID,
