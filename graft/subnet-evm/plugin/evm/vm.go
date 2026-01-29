@@ -711,17 +711,17 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				BlockParser:      vm,
 			},
 		),
-		Enabled:            vm.config.StateSyncEnabled,
-		SkipResume:         vm.config.StateSyncSkipResume,
-		MinBlocks:          vm.config.StateSyncMinBlocks,
-		RequestSize:        vm.config.StateSyncRequestSize,
-		LastAcceptedHeight: lastAcceptedHeight, // TODO clean up how this is passed around
-		ChaindDB:           vm.chaindb,
-		VerDB:              vm.versiondb,
-		MetadataDB:         vm.metadataDB,
-		Acceptor:           vm,
-		Parser:             vm.extensionConfig.SyncableParser,
-		Extender:           nil,
+		Enabled:             vm.config.StateSyncEnabled,
+		SkipResume:          vm.config.StateSyncSkipResume,
+		MinBlocks:           vm.config.StateSyncMinBlocks,
+		RequestSize:         vm.config.StateSyncRequestSize,
+		LastAcceptedHeight:  lastAcceptedHeight, // TODO clean up how this is passed around
+		ChaindDB:            vm.chaindb,
+		VerDB:               vm.versiondb,
+		MetadataDB:          vm.metadataDB,
+		Acceptor:            vm,
+		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
+		Extender:            nil,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
@@ -1292,11 +1292,9 @@ func (vm *VM) ReadLastAccepted() (common.Hash, uint64, error) {
 
 // defaultExtensions returns the default extension configuration.
 func defaultExtensions() *extension.Config {
-	provider := message.NewBlockSyncSummaryProvider(message.SubnetEVMCodec)
 	return &extension.Config{
 		Clock:               &mockable.Clock{},
-		SyncSummaryProvider: provider,
-		SyncableParser:      provider,
+		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.SubnetEVMCodec),
 	}
 }
 

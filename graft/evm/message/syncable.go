@@ -27,13 +27,11 @@ type Syncable interface {
 	GetBlockRoot() common.Hash
 }
 
-// SummaryProvider is an interface for providing state summaries.
-type SummaryProvider interface {
+// SyncSummaryProvider provides and parses state sync summaries.
+type SyncSummaryProvider interface {
+	// StateSummaryAtBlock returns the state summary for the given block.
 	StateSummaryAtBlock(ethBlock *types.Block) (block.StateSummary, error)
-}
-
-// SyncableParser parses syncable summaries from bytes.
-type SyncableParser interface {
+	// Parse parses a syncable summary from bytes.
 	Parse(summaryBytes []byte, acceptImpl AcceptImplFn) (Syncable, error)
 }
 

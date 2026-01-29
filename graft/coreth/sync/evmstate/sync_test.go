@@ -197,6 +197,7 @@ func TestSimpleSyncCases(t *testing.T) {
 }
 
 func TestCancelSync(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
@@ -239,6 +240,7 @@ func (i *interruptLeafsIntercept) getLeafsIntercept(request message.LeafsRequest
 }
 
 func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 	root, _ := synctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, 2000, 3)
@@ -265,6 +267,7 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 }
 
 func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -297,6 +300,7 @@ func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 }
 
 func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -338,6 +342,7 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 }
 
 func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -370,6 +375,7 @@ func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testi
 }
 
 func TestResumeSyncLargeStorageTrieWithSpreadOutDuplicatesInterrupted(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 

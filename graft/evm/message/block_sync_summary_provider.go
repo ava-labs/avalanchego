@@ -10,10 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-var (
-	_ SummaryProvider = (*BlockSyncSummaryProvider)(nil)
-	_ SyncableParser  = (*BlockSyncSummaryProvider)(nil)
-)
+var _ SyncSummaryProvider = (*BlockSyncSummaryProvider)(nil)
 
 type BlockSyncSummaryProvider struct {
 	codec codec.Manager

@@ -95,7 +95,7 @@ type ClientConfig struct {
 	MetadataDB database.Database
 
 	// Extension points
-	Parser message.SyncableParser
+	SyncSummaryProvider message.SyncSummaryProvider
 	// Extender is an optional extension point for the state sync process, and can be nil.
 	Extender Extender
 
@@ -161,7 +161,7 @@ func (client *client) GetOngoingSyncStateSummary(context.Context) (block.StateSu
 		return nil, err // includes the [database.ErrNotFound] case
 	}
 
-	summary, err := client.Parser.Parse(summaryBytes, client.acceptSyncSummary)
+	summary, err := client.SyncSummaryProvider.Parse(summaryBytes, client.acceptSyncSummary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse saved state sync summary to SyncSummary: %w", err)
 	}
@@ -182,7 +182,7 @@ func (client *client) ClearOngoingSummary() error {
 }
 
 func (client *client) ParseStateSummary(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
-	return client.Parser.Parse(summaryBytes, client.acceptSyncSummary)
+	return client.SyncSummaryProvider.Parse(summaryBytes, client.acceptSyncSummary)
 }
 
 // stateSync blockingly performs the state sync for the EVM state and the atomic state
