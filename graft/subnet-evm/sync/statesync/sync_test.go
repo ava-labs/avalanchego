@@ -145,7 +145,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with code and storage": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, numAccounts)
+				root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, numAccounts)
 				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 		},
@@ -182,7 +182,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"failed to fetch code": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, numAccountsSmall)
+				root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, numAccountsSmall)
 				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 			GetCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {
@@ -208,7 +208,7 @@ func TestCancelSync(t *testing.T) {
 		prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 			// Create trie with 2000 accounts (more than one leaf request)
 			serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-			root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, 2000)
+			root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, 2000)
 			return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 		},
 		expectedError: context.Canceled,
@@ -584,7 +584,7 @@ func TestDifferentWaitContext(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 	// Create trie with many accounts to ensure sync takes time
-	root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, 2000)
+	root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, 2000)
 	clientEthDB := rawdb.NewMemoryDatabase()
 
 	// Track requests to show sync continues after Wait returns

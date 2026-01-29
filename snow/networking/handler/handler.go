@@ -451,12 +451,10 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		if requestID, ok := message.GetRequestID(body); ok {
 			fields = append(fields, zap.Uint32("requestID", requestID))
 		}
-		log := h.ctx.Log.Debug
 		if h.ctx.Log.Enabled(logging.Verbo) {
-			log = h.ctx.Log.Verbo
 			fields = append(fields, zap.Stringer("message", body))
 		}
-		log("forwarding sync message to consensus", fields...)
+		h.ctx.Log.Debug("forwarding sync message to consensus", fields...)
 	}
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
