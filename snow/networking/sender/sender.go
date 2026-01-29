@@ -507,6 +507,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		zap.Uint32("requestID", requestID),
 		zap.Duration("deadline", deadline),
 		zap.Stringer("containerID", containerID),
+		zap.Stringer("engineType", s.engineType),
 	)
 	msg, err := s.msgCreator.GetAncestors(
 		s.ctx.ChainID,
