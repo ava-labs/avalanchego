@@ -9,10 +9,10 @@ import "time"
 // been running for at least the half-life duration.
 type maturedAverager struct {
 	Averager
-	halflife       time.Duration
-	startTime      time.Time
-	lastObserved   time.Time
-	hasObserved    bool
+	halflife     time.Duration
+	startTime    time.Time
+	lastObserved time.Time
+	hasObserved  bool
 }
 
 // NewMaturedAverager creates a new matured averager that wraps the provided
@@ -21,7 +21,7 @@ type maturedAverager struct {
 func NewMaturedAverager(halflife time.Duration, averager Averager) Averager {
 	return &maturedAverager{
 		Averager: averager,
-		halflife:   halflife,
+		halflife: halflife,
 	}
 }
 
