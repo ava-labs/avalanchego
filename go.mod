@@ -1,14 +1,14 @@
 module github.com/ava-labs/avalanchego
 
 // CLI tools intended for invocation with `go tool` should be added to
-// tools/go.mod to avoid polluting the main module's dependencies. See
-// tools/go.mod for usage details.
+// tools/external/go.mod to avoid polluting the main module's dependencies. See
+// tools/external/go.mod for usage details.
 
 // - Changes to the minimum golang version must also be replicated in:
 //
 // The following go.mod files:
 //   - go.mod (here)
-//   - tools/go.mod
+//   - tools/external/go.mod
 //   - graft/evm/go.mod
 //   - graft/coreth/go.mod
 //   - graft/subnet-evm/go.mod
@@ -20,7 +20,7 @@ module github.com/ava-labs/avalanchego
 //   - nix/go/default.nix (update version and sha256 for supported arches)
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
-//   - Consider updating the version of golangci-lint (see tools/go.mod)
+//   - Consider updating the version of golangci-lint (see tools/external/go.mod)
 go 1.24.12
 
 require (

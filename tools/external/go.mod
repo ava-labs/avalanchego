@@ -1,16 +1,16 @@
-module github.com/ava-labs/avalanchego/tools
+module github.com/ava-labs/avalanchego/tools/external
 
 // This module manages CLI tools intended for invocation with `go
 // tool`. Such dependencies are managed separately from the main
 // module to avoid polluting the main module's dependencies.
 //
-// Add `-modfile=tools/go.mod` to `go` commands to use this file e.g.
+// Add `-modfile=tools/external/go.mod` to `go` commands to use this file e.g.
 //
 // - Add or update a tool
-//   - go get -tool -modfile=tools/go.mod github.com/my/dep/@[version]
+//   - go get -tool -modfile=tools/external/go.mod github.com/my/dep/@[version]
 //
 // - Run a tool
-//   - go tool -modfile=tools/go.mod [tool] [args]
+//   - go tool -modfile=tools/external/go.mod [tool] [args]
 //   - ./scripts/run_tool.sh [tool] [args]
 
 go 1.24.12
