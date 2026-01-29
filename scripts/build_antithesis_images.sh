@@ -11,8 +11,8 @@ set -euo pipefail
 # TEST_SETUP=xsvm IMAGE_PREFIX=<registry>/<repo> IMAGE_TAG=latest ./scripts/build_antithesis_images.sh # Specify a prefix to enable image push and use a specific tag
 
 TEST_SETUP="${TEST_SETUP:-}"
-if [[ "${TEST_SETUP}" != "avalanchego" && "${TEST_SETUP}" != "xsvm" ]]; then
-  echo "TEST_SETUP must be set. Valid values are 'avalanchego' or 'xsvm'"
+if [[ "${TEST_SETUP}" != "avalanchego" && "${TEST_SETUP}" != "xsvm" && "${TEST_SETUP}" != "subnet-evm" ]]; then
+  echo "TEST_SETUP must be set. Valid values are 'avalanchego', 'xsvm', or 'subnet-evm'"
   exit 255
 fi
 
@@ -70,22 +70,55 @@ if [[ "${TEST_SETUP}" == "avalanchego" ]]; then
 
   build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY:-}"
 else
+  # VM test setups (xsvm, subnet-evm) follow a common pattern
   build_builder_image_for_avalanchego
 
-  # Only build the avalanchego node image to use as the base for the xsvm image. Provide an empty
+  # Build VM-specific builder if needed
+  if [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
+    echo "Building subnet-evm builder image"
+    build_antithesis_builder_image "${GO_VERSION}" "antithesis-subnet-evm-builder:${IMAGE_TAG}" "${AVALANCHE_PATH}" "${AVALANCHE_PATH}"
+  fi
+
+  # Only build the avalanchego node image to use as the base for the VM image. Provide an empty
   # image prefix (the 1st argument) to prevent the image from being pushed
   NODE_ONLY=1
   build_antithesis_images_for_avalanchego avalanchego "" "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY}"
 
-  # Ensure avalanchego and xsvm binaries are available to create an initial db state that includes subnets.
+  # Build required binaries for the VM test setup
   echo "Building binaries required for configuring the ${TEST_SETUP} test setup"
   "${AVALANCHE_PATH}"/scripts/build.sh
-  "${AVALANCHE_PATH}"/scripts/build_xsvm.sh
+  if [[ "${TEST_SETUP}" == "xsvm" ]]; then
+    "${AVALANCHE_PATH}"/scripts/build_xsvm.sh
+  elif [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
+    "${AVALANCHE_PATH}"/graft/subnet-evm/scripts/build.sh
+  fi
+
+  # Set VM-specific paths
+  if [[ "${TEST_SETUP}" == "xsvm" ]]; then
+    vm_dockerfile="${AVALANCHE_PATH}/vms/example/xsvm/Dockerfile"
+  elif [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
+    vm_dockerfile="${AVALANCHE_PATH}/graft/subnet-evm/Dockerfile"
+  fi
 
   echo "Generating compose configuration for ${TEST_SETUP}"
-  gen_antithesis_compose_config "${IMAGE_TAG}" "${AVALANCHE_PATH}/tests/antithesis/xsvm/gencomposeconfig" \
-                                "${AVALANCHE_PATH}/build/antithesis/xsvm" \
-                                "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVAGO_PLUGIN_DIR=${AVALANCHE_PATH}/build/plugins"
+  if [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
+    # subnet-evm gencomposeconfig is in a different module, so cd there first
+    (cd "${AVALANCHE_PATH}/graft/subnet-evm" && \
+     env TARGET_PATH="${AVALANCHE_PATH}/build/antithesis/${TEST_SETUP}" \
+         IMAGE_TAG="${IMAGE_TAG}" \
+         AVALANCHEGO_PATH="${AVALANCHE_PATH}/build/avalanchego" \
+         AVAGO_PLUGIN_DIR="${AVALANCHE_PATH}/build/plugins" \
+         go run ./tests/antithesis/gencomposeconfig)
+  else
+    # xsvm and others are in the root module
+    if [[ "${TEST_SETUP}" == "xsvm" ]]; then
+      gencomposeconfig_path="${AVALANCHE_PATH}/tests/antithesis/xsvm/gencomposeconfig"
+    fi
+    gen_antithesis_compose_config "${IMAGE_TAG}" \
+      "${gencomposeconfig_path}" \
+      "${AVALANCHE_PATH}/build/antithesis/${TEST_SETUP}" \
+      "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVAGO_PLUGIN_DIR=${AVALANCHE_PATH}/build/plugins"
+  fi
 
-  build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${AVALANCHE_PATH}/vms/example/xsvm/Dockerfile"
+  build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${vm_dockerfile}"
 fi
