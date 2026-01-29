@@ -143,7 +143,10 @@ func newMetrics(
 			Name: "polls_failed",
 			Help: "number of failed polls",
 		}),
-		avgAcceptanceTime: math.NewUninitializedAverager(5 * time.Minute),
+		avgAcceptanceTime: math.NewMaturedAverager(
+			5*time.Minute,
+			math.NewUninitializedAverager(5*time.Minute),
+		),
 		avgAcceptanceTimeGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "average_acceptance_time",
