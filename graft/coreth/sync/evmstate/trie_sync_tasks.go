@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/syncutils"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/syncutils"
 )
 
 var (
