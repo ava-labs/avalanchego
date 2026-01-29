@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
