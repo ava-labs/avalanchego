@@ -59,11 +59,13 @@ func NewLeafsRequest(leafReqType LeafsRequestType, root, account common.Hash, st
 		}, nil
 	case CorethLeafsRequestType:
 		return CorethLeafsRequest{
-			Root:     root,
-			Account:  account,
-			Start:    start,
-			End:      end,
-			Limit:    limit,
+			LeafsRequestBase: LeafsRequestBase{
+				Root:    root,
+				Account: account,
+				Start:   start,
+				End:     end,
+				Limit:   limit,
+			},
 			NodeType: nodeType,
 		}, nil
 	default:
