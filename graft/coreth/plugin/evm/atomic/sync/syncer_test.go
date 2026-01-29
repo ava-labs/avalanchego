@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 
-	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
+	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 )
 
 const (
