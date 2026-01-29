@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )
 
 const blocksPerRequest = 32
