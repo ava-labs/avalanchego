@@ -8,15 +8,31 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var errProviderNotSet = errors.New("provider not set")
+
+// BlockChain provides the blockchain interface needed by the state sync server.
+// This interface abstracts the blockchain operations required for serving state summaries.
+type BlockChain interface {
+	// LastAcceptedBlock returns the last accepted block.
+	LastAcceptedBlock() *types.Block
+
+	// GetBlockByNumber returns the block at the given height, or nil if not found.
+	GetBlockByNumber(number uint64) *types.Block
+
+	// HasState returns true if the state for the given root hash is available.
+	HasState(root common.Hash) bool
+
+	// ResetToStateSyncedBlock resets the blockchain to the given synced block.
+	ResetToStateSyncedBlock(block *types.Block) error
+}
 
 // SummaryProvider provides state summaries for blocks.
 type SummaryProvider interface {
@@ -24,7 +40,7 @@ type SummaryProvider interface {
 }
 
 type server struct {
-	chain *core.BlockChain
+	chain BlockChain
 
 	provider         SummaryProvider
 	syncableInterval uint64
@@ -35,7 +51,7 @@ type Server interface {
 	GetStateSummary(context.Context, uint64) (block.StateSummary, error)
 }
 
-func NewServer(chain *core.BlockChain, provider SummaryProvider, syncableInterval uint64) Server {
+func NewServer(chain BlockChain, provider SummaryProvider, syncableInterval uint64) Server {
 	return &server{
 		chain:            chain,
 		syncableInterval: syncableInterval,
@@ -47,11 +63,11 @@ func NewServer(chain *core.BlockChain, provider SummaryProvider, syncableInterva
 // State summary is calculated by the block nearest to last accepted
 // that is divisible by [syncableInterval]
 // If no summary is available, [database.ErrNotFound] must be returned.
-func (server *server) GetLastStateSummary(context.Context) (block.StateSummary, error) {
-	lastHeight := server.chain.LastAcceptedBlock().NumberU64()
-	lastSyncSummaryNumber := lastHeight - lastHeight%server.syncableInterval
+func (s *server) GetLastStateSummary(context.Context) (block.StateSummary, error) {
+	lastHeight := s.chain.LastAcceptedBlock().NumberU64()
+	lastSyncSummaryNumber := lastHeight - lastHeight%s.syncableInterval
 
-	summary, err := server.stateSummaryAtHeight(lastSyncSummaryNumber)
+	summary, err := s.stateSummaryAtHeight(lastSyncSummaryNumber)
 	if err != nil {
 		log.Debug("could not get latest state summary", "err", err)
 		return nil, database.ErrNotFound
@@ -63,15 +79,15 @@ func (server *server) GetLastStateSummary(context.Context) (block.StateSummary, 
 // GetStateSummary implements StateSyncableVM and returns a summary corresponding
 // to the provided [height] if the node can serve state sync data for that key.
 // If not, [database.ErrNotFound] must be returned.
-func (server *server) GetStateSummary(_ context.Context, height uint64) (block.StateSummary, error) {
-	summaryBlock := server.chain.GetBlockByNumber(height)
+func (s *server) GetStateSummary(_ context.Context, height uint64) (block.StateSummary, error) {
+	summaryBlock := s.chain.GetBlockByNumber(height)
 	if summaryBlock == nil ||
-		summaryBlock.NumberU64() > server.chain.LastAcceptedBlock().NumberU64() ||
-		summaryBlock.NumberU64()%server.syncableInterval != 0 {
+		summaryBlock.NumberU64() > s.chain.LastAcceptedBlock().NumberU64() ||
+		summaryBlock.NumberU64()%s.syncableInterval != 0 {
 		return nil, database.ErrNotFound
 	}
 
-	summary, err := server.stateSummaryAtHeight(summaryBlock.NumberU64())
+	summary, err := s.stateSummaryAtHeight(summaryBlock.NumberU64())
 	if err != nil {
 		log.Debug("could not get state summary", "height", height, "err", err)
 		return nil, database.ErrNotFound
@@ -81,17 +97,17 @@ func (server *server) GetStateSummary(_ context.Context, height uint64) (block.S
 	return summary, nil
 }
 
-func (server *server) stateSummaryAtHeight(height uint64) (block.StateSummary, error) {
-	blk := server.chain.GetBlockByNumber(height)
+func (s *server) stateSummaryAtHeight(height uint64) (block.StateSummary, error) {
+	blk := s.chain.GetBlockByNumber(height)
 	if blk == nil {
 		return nil, fmt.Errorf("block not found for height (%d)", height)
 	}
 
-	if !server.chain.HasState(blk.Root()) {
+	if !s.chain.HasState(blk.Root()) {
 		return nil, fmt.Errorf("block root does not exist for height (%d), root (%s)", height, blk.Root())
 	}
-	if server.provider == nil {
+	if s.provider == nil {
 		return nil, errProviderNotSet
 	}
-	return server.provider.StateSummaryAtBlock(blk)
+	return s.provider.StateSummaryAtBlock(blk)
 }

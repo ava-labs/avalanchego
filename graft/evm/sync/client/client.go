@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/network"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client/stats"
 	"github.com/ava-labs/avalanchego/ids"
@@ -52,6 +51,24 @@ var (
 )
 var _ Client = (*client)(nil)
 
+// NetworkClient defines the interface for sending sync requests over the network.
+// This interface is implemented by the network layer in coreth and subnet-evm.
+type NetworkClient interface {
+	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
+	// node version greater than or equal to minVersion.
+	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
+	// the request should be retried.
+	SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
+
+	// SendSyncedAppRequest synchronously sends request to the selected nodeID
+	// Returns response bytes, and ErrRequestFailed if the request should be retried.
+	SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
+
+	// TrackBandwidth should be called after receiving a response from a peer to
+	// track performance. This is used to prioritize peers that are more responsive.
+	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
+}
+
 // Client synchronously fetches data from the network to fulfill state sync requests.
 // Repeatedly requests failed requests until the context to the request is expired.
 type Client interface {
@@ -74,7 +91,7 @@ type Client interface {
 type parseResponseFn func(codec codec.Manager, request message.Request, response []byte) (interface{}, int, error)
 
 type client struct {
-	networkClient    network.SyncedNetworkClient
+	networkClient    NetworkClient
 	codec            codec.Manager
 	stateSyncNodes   []ids.NodeID
 	stateSyncNodeIdx uint32
@@ -83,7 +100,7 @@ type client struct {
 }
 
 type Config struct {
-	NetworkClient    network.SyncedNetworkClient
+	NetworkClient    NetworkClient
 	Codec            codec.Manager
 	Stats            stats.ClientSyncerStats
 	StateSyncNodeIDs []ids.NodeID
