@@ -71,6 +71,7 @@ func TestFirewoodSync(t *testing.T) {
 			_, _ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, types.EmptyRootHash, tt.clientSize)
 
 			serverState := createDB(t)
+			// Store the expected accounts to verify after sync.
 			root, accounts := synctest.FillAccountsWithStorageAndCode(t, r, serverState, types.EmptyRootHash, tt.serverSize)
 
 			firewoodSyncer, codeSyncer, codeQueue := createSyncers(t, clientState, serverState, root)
