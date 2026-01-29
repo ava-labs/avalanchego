@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
-	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
+	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 )
 
 const testRequestSize = 1024
