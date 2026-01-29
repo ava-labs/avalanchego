@@ -144,10 +144,10 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 		return
 	}
 
-	log := s.logWith(
-		zap.Binary("summary", summary), // only logged if verbo
+	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.StateSummaryFrontierOp),
 		zap.Uint32("requestID", requestID),
+		zap.Int("summaryLen", len(summary)),
 	)
 	to := common.SendConfig{
 		NodeIDs: set.Of(nodeID),
@@ -542,10 +542,10 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 }
 
 func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
-	log := s.logWith(
-		zap.Binary("container", container), // only logged if verbo
+	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.PutOp),
 		zap.Uint32("requestID", requestID),
+		zap.Int("containerLen", len(container)),
 	)
 	to := common.SendConfig{
 		NodeIDs: set.Of(nodeID),
@@ -615,8 +615,7 @@ func (s *sender) SendPushQuery(
 		}
 	}
 
-	log := s.logWith(
-		zap.Binary("container", container), // only logged if verbo
+	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.PushQueryOp),
 		zap.Uint32("requestID", requestID),
 		zap.Duration("deadline", deadline),
@@ -848,8 +847,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 		}
 	}
 
-	log := s.logWith(
-		zap.Binary("payload", bytes),
+	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.AppRequestOp),
 		zap.Uint32("requestID", requestID),
 		zap.Duration("deadline", deadline),
@@ -898,8 +896,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 		return nil
 	}
 
-	log := s.logWith(
-		zap.Binary("payload", bytes),
+	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.AppResponseOp),
 		zap.Uint32("requestID", requestID),
 		zap.Int("payloadLen", len(bytes)),
@@ -956,20 +953,13 @@ func (s *sender) SendAppGossip(
 	to common.SendConfig,
 	bytes []byte,
 ) error {
-	log := s.logWith(
-		zap.Binary("payload", bytes), // only if verbo
+	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.AppGossipOp),
+		zap.Int("payloadLen", len(bytes)),
 	)
 	msg, err := s.msgCreator.AppGossip(s.ctx.ChainID, bytes)
 	s.sendUnlessError(log, to, msg, err)
 	return nil
-}
-
-func (s *sender) logWith(verboField zap.Field, fields ...zap.Field) logging.Logger {
-	if s.ctx.Log.Enabled(logging.Verbo) {
-		fields = append(fields, verboField)
-	}
-	return s.ctx.Log.With(fields...)
 }
 
 func (s *sender) sendUnlessError(
