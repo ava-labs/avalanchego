@@ -47,5 +47,5 @@ func (c CorethLeafsRequest) RootHash() common.Hash    { return c.Root }
 func (c CorethLeafsRequest) AccountHash() common.Hash { return c.Account }
 func (c CorethLeafsRequest) StartKey() []byte         { return c.Start }
 func (c CorethLeafsRequest) EndKey() []byte           { return c.End }
-func (c CorethLeafsRequest) LimitValue() uint16       { return c.Limit }
-func (c CorethLeafsRequest) NodeTypeValue() NodeType  { return c.NodeType }
+func (c CorethLeafsRequest) KeyLimit() uint16         { return c.Limit }
+func (c CorethLeafsRequest) LeafType() NodeType       { return c.NodeType }

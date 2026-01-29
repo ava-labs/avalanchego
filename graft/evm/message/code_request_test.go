@@ -53,14 +53,14 @@ func TestMarshalCodeResponse(t *testing.T) {
 	}
 
 	base64CodeResponse := "AAAAAAABAAAAMlL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJgYVa2GgdDYbR6R4AFnk5y2aU"
-	utilstest.ForEachCodec(t, func(_ string, cdc codec.Manager) {
-		codeResponseBytes, err := cdc.Marshal(message.Version, codeResponse)
+	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		codeResponseBytes, err := c.Marshal(message.Version, codeResponse)
 		require.NoError(t, err)
 		require.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))
 
-		var c message.CodeResponse
-		_, err = cdc.Unmarshal(codeResponseBytes, &c)
+		var resp message.CodeResponse
+		_, err = c.Unmarshal(codeResponseBytes, &resp)
 		require.NoError(t, err)
-		require.Equal(t, codeResponse.Data, c.Data)
+		require.Equal(t, codeResponse.Data, resp.Data)
 	})
 }

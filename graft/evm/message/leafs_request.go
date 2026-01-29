@@ -33,8 +33,8 @@ type LeafsRequest interface {
 	AccountHash() common.Hash
 	StartKey() []byte
 	EndKey() []byte
-	LimitValue() uint16
-	NodeTypeValue() NodeType
+	KeyLimit() uint16
+	LeafType() NodeType
 }
 
 // LeafsRequestType selects which wire format to use when building leafs requests.

@@ -81,7 +81,7 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 	startKey := leafsRequest.StartKey()
 	endKey := leafsRequest.EndKey()
 	root := leafsRequest.RootHash()
-	limitValue := leafsRequest.LimitValue()
+	limitValue := leafsRequest.KeyLimit()
 
 	if (len(endKey) > 0 && bytes.Compare(startKey, endKey) > 0) ||
 		root == (common.Hash{}) ||

@@ -767,6 +767,9 @@ func requireRangeProofIsValid(t *testing.T, request *message.SubnetEVMLeafsReque
 	require.Equal(t, expectMore, more)
 }
 
+// newLeafsRequest creates a new SubnetEVMLeafsRequest for testing.
+// When account is common.Hash{} (empty), it creates an account trie request.
+// When account is set to a specific account hash, it creates a storage trie request for that account.
 func newLeafsRequest(
 	t *testing.T,
 	ctx context.Context,

@@ -49,5 +49,5 @@ func (s SubnetEVMLeafsRequest) RootHash() common.Hash    { return s.Root }
 func (s SubnetEVMLeafsRequest) AccountHash() common.Hash { return s.Account }
 func (s SubnetEVMLeafsRequest) StartKey() []byte         { return s.Start }
 func (s SubnetEVMLeafsRequest) EndKey() []byte           { return s.End }
-func (s SubnetEVMLeafsRequest) LimitValue() uint16       { return s.Limit }
-func (s SubnetEVMLeafsRequest) NodeTypeValue() NodeType  { return s.NodeType }
+func (s SubnetEVMLeafsRequest) KeyLimit() uint16         { return s.Limit }
+func (s SubnetEVMLeafsRequest) LeafType() NodeType       { return s.NodeType }

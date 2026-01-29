@@ -150,7 +150,7 @@ func TestSubnetEVMLeafsRequestNodeTypeNotSerialized(t *testing.T) {
 	require.Equal(t, leafsRequestDefault.RootHash(), unmarshaled.RootHash())
 	require.Equal(t, leafsRequestDefault.StartKey(), unmarshaled.StartKey())
 	require.Equal(t, leafsRequestDefault.EndKey(), unmarshaled.EndKey())
-	require.Equal(t, leafsRequestDefault.LimitValue(), unmarshaled.LimitValue())
+	require.Equal(t, leafsRequestDefault.KeyLimit(), unmarshaled.KeyLimit())
 }
 
 func newTestRand() *rand.Rand {

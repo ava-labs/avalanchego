@@ -52,9 +52,9 @@ func newNetworkHandler(
 }
 
 func (n networkHandler) HandleLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
-	handler, ok := n.leafRequestHandlers[leafsRequest.NodeTypeValue()]
+	handler, ok := n.leafRequestHandlers[leafsRequest.LeafType()]
 	if !ok {
-		log.Debug("node type is not recognised, dropping request", "nodeID", nodeID, "requestID", requestID, "nodeType", leafsRequest.NodeTypeValue())
+		log.Debug("node type is not recognised, dropping request", "nodeID", nodeID, "requestID", requestID, "nodeType", leafsRequest.LeafType())
 		return nil, nil
 	}
 	return handler.OnLeafsRequest(ctx, nodeID, requestID, leafsRequest)

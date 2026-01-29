@@ -432,7 +432,7 @@ func TestGetLeafs(t *testing.T) {
 					request.StartKey(),
 					request.EndKey(),
 					leafsLimit,
-					request.NodeTypeValue(),
+					request.LeafType(),
 				)
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, modifiedRequest)
 				require.NoError(t, err)
@@ -577,8 +577,8 @@ func TestGetLeafs(t *testing.T) {
 					request.AccountHash(),
 					leafResponse.Keys[1],
 					request.EndKey(),
-					request.LimitValue(),
-					request.NodeTypeValue(),
+					request.KeyLimit(),
+					request.LeafType(),
 				)
 				modifiedResponse, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 2, modifiedRequest)
 				require.NoError(t, err)
@@ -817,6 +817,9 @@ func TestStateSyncNodes(t *testing.T) {
 	require.Contains(t, testNetClient.nodesRequested, stateSyncNodes[3])
 }
 
+// newLeafsRequest creates a new CorethLeafsRequest for testing.
+// When account is common.Hash{} (empty), it creates an account trie request.
+// When account is set to a specific account hash, it creates a storage trie request for that account.
 func newLeafsRequest(
 	t *testing.T,
 	root common.Hash,

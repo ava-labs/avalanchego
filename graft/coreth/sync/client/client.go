@@ -136,7 +136,7 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 	leafsRequest := reqIntf.(message.LeafsRequest)
 
 	// Ensure the response does not contain more than the maximum requested number of leaves.
-	limitValue := leafsRequest.LimitValue()
+	limitValue := leafsRequest.KeyLimit()
 	if len(leafsResponse.Keys) > int(limitValue) || len(leafsResponse.Vals) > int(limitValue) {
 		return nil, 0, fmt.Errorf("%w: (%d) > %d)", errTooManyLeaves, len(leafsResponse.Keys), limitValue)
 	}
