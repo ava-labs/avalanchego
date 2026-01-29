@@ -114,7 +114,7 @@ jobs:
         env:
           LIBEVM_REF: ${{ matrix.libevm-ref }}
           FIREWOOD_REF: ${{ matrix.firewood-ref }}
-          FORCE_SYNC: 'true' # Some runners have persistent storage (ava-labs/devops-argocd#14042)
+          FORCE_SYNC: 'true' # Some self-hosted runners have persistent storage
           # Required for Nix builds on ARC runners
           TMPDIR: /tmp
           NIX_BUILD_TOP: /tmp
