@@ -31,6 +31,10 @@ import (
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 )
 
+// DebugKey is a key in the [context.Context] to set up conditional breakpoints
+// Delve does not support conditional breakpoints on function calls currently
+// so you will have to hack a breakpoint onto a line like so:
+// _ = ctx.GetValue("nodetest-id")
 const DebugKey = "nodetest-id"
 
 type Subnet[T block.ChainVM] struct {
