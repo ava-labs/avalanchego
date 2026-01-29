@@ -21,17 +21,17 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
-	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	statesyncclient "github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 )
 

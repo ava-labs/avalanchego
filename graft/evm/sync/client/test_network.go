@@ -7,12 +7,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/network"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ network.SyncedNetworkClient = (*testNetwork)(nil)
+var _ NetworkClient = (*testNetwork)(nil)
 
 type testNetwork struct {
 	// captured request data
@@ -65,10 +64,6 @@ func (t *testNetwork) processTest() ([]byte, error) {
 	}
 
 	return response, err
-}
-
-func (*testNetwork) Gossip([]byte) error {
-	panic("not implemented") // we don't care about this function for this test
 }
 
 func (t *testNetwork) testResponse(times uint8, callback func(), response []byte) {

@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 )
 
@@ -42,18 +43,12 @@ type SyncerConfig struct {
 
 type CallbackSyncer struct {
 	config *SyncerConfig
-	client Client
+	client types.LeafClient
 	tasks  <-chan SyncTask
 }
 
-type Client interface {
-	// GetLeafs synchronously sends the given request, returning a parsed LeafsResponse or error
-	// Note: this verifies the response including the range proofs.
-	GetLeafs(context.Context, message.LeafsRequest) (message.LeafsResponse, error)
-}
-
 // NewCallbackSyncer creates a new syncer object to perform leaf sync of tries.
-func NewCallbackSyncer(client Client, tasks <-chan SyncTask, config *SyncerConfig) *CallbackSyncer {
+func NewCallbackSyncer(client types.LeafClient, tasks <-chan SyncTask, config *SyncerConfig) *CallbackSyncer {
 	return &CallbackSyncer{
 		config: config,
 		client: client,
