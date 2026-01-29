@@ -118,22 +118,15 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 		zap.Uint32("requestID", requestID),
 		zap.Duration("deadline", deadline),
 	)
+	to := common.SendConfig{
+		NodeIDs: nodeIDs,
+	}
 	msg, err := s.msgCreator.GetStateSummaryFrontier(
 		s.ctx.ChainID,
 		requestID,
 		deadline,
 	)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
-	to := common.SendConfig{
-		NodeIDs: nodeIDs,
-	}
-	s.send(log, to, msg)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
@@ -156,22 +149,15 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 		zap.Stringer("messageOp", message.StateSummaryFrontierOp),
 		zap.Uint32("requestID", requestID),
 	)
+	to := common.SendConfig{
+		NodeIDs: set.Of(nodeID),
+	}
 	msg, err := s.msgCreator.StateSummaryFrontier(
 		s.ctx.ChainID,
 		requestID,
 		summary,
 	)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
-	to := common.SendConfig{
-		NodeIDs: set.Of(nodeID),
-	}
-	s.send(log, to, msg)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64) {
@@ -216,23 +202,16 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 		zap.Duration("deadline", deadline),
 		zap.Uint64s("heights", heights),
 	)
+	to := common.SendConfig{
+		NodeIDs: nodeIDs,
+	}
 	msg, err := s.msgCreator.GetAcceptedStateSummary(
 		s.ctx.ChainID,
 		requestID,
 		deadline,
 		heights,
 	)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
-	to := common.SendConfig{
-		NodeIDs: nodeIDs,
-	}
-	s.send(log, to, msg)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
@@ -255,22 +234,15 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 		zap.Uint32("requestID", requestID),
 		zap.Stringers("summaryIDs", summaryIDs),
 	)
+	to := common.SendConfig{
+		NodeIDs: set.Of(nodeID),
+	}
 	msg, err := s.msgCreator.AcceptedStateSummary(
 		s.ctx.ChainID,
 		requestID,
 		summaryIDs,
 	)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
-	to := common.SendConfig{
-		NodeIDs: set.Of(nodeID),
-	}
-	s.send(log, to, msg)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
@@ -313,22 +285,15 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 		zap.Uint32("requestID", requestID),
 		zap.Duration("deadline", deadline),
 	)
+	to := common.SendConfig{
+		NodeIDs: nodeIDs,
+	}
 	msg, err := s.msgCreator.GetAcceptedFrontier(
 		s.ctx.ChainID,
 		requestID,
 		deadline,
 	)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
-	to := common.SendConfig{
-		NodeIDs: nodeIDs,
-	}
-	s.send(log, to, msg)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
@@ -351,22 +316,15 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 		zap.Uint32("requestID", requestID),
 		zap.Stringer("containerID", containerID),
 	)
+	to := common.SendConfig{
+		NodeIDs: set.Of(nodeID),
+	}
 	msg, err := s.msgCreator.AcceptedFrontier(
 		s.ctx.ChainID,
 		requestID,
 		containerID,
 	)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
-	to := common.SendConfig{
-		NodeIDs: set.Of(nodeID),
-	}
-	s.send(log, to, msg)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
@@ -411,23 +369,16 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 		zap.Duration("deadline", deadline),
 		zap.Stringers("containerIDs", containerIDs),
 	)
+	to := common.SendConfig{
+		NodeIDs: nodeIDs,
+	}
 	msg, err := s.msgCreator.GetAccepted(
 		s.ctx.ChainID,
 		requestID,
 		deadline,
 		containerIDs,
 	)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
-	to := common.SendConfig{
-		NodeIDs: nodeIDs,
-	}
-	s.send(log, to, msg)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
@@ -450,18 +401,11 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 		zap.Uint32("requestID", requestID),
 		zap.Stringers("containerIDs", containerIDs),
 	)
-	msg, err := s.msgCreator.Accepted(s.ctx.ChainID, requestID, containerIDs)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
 	to := common.SendConfig{
 		NodeIDs: set.Of(nodeID),
 	}
-	s.send(log, to, msg)
+	msg, err := s.msgCreator.Accepted(s.ctx.ChainID, requestID, containerIDs)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
@@ -509,6 +453,9 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		zap.Stringer("containerID", containerID),
 		zap.Stringer("engineType", s.engineType),
 	)
+	to := common.SendConfig{
+		NodeIDs: set.Of(nodeID),
+	}
 	msg, err := s.msgCreator.GetAncestors(
 		s.ctx.ChainID,
 		requestID,
@@ -516,9 +463,6 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		containerID,
 		s.engineType,
 	)
-	to := common.SendConfig{
-		NodeIDs: set.Of(nodeID),
-	}
 	sent := s.sendUnlessError(log, to, msg, err)
 	if sent.Len() == 0 {
 		s.timeouts.RegisterRequestToUnreachableValidator()
@@ -532,18 +476,11 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 		zap.Uint32("requestID", requestID),
 		zap.Int("numContainers", len(containers)),
 	)
-	msg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
 	to := common.SendConfig{
 		NodeIDs: set.Of(nodeID),
 	}
-	s.send(log, to, msg)
+	msg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
@@ -588,15 +525,15 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		zap.Duration("deadline", deadline),
 		zap.Stringer("containerID", containerID),
 	)
+	to := common.SendConfig{
+		NodeIDs: set.Of(nodeID),
+	}
 	msg, err := s.msgCreator.Get(
 		s.ctx.ChainID,
 		requestID,
 		deadline,
 		containerID,
 	)
-	to := common.SendConfig{
-		NodeIDs: set.Of(nodeID),
-	}
 	sent := s.sendUnlessError(log, to, msg, err)
 	if sent.Len() == 0 {
 		s.timeouts.RegisterRequestToUnreachableValidator()
@@ -610,18 +547,11 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 		zap.Stringer("messageOp", message.PutOp),
 		zap.Uint32("requestID", requestID),
 	)
-	msg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
 	to := common.SendConfig{
 		NodeIDs: set.Of(nodeID),
 	}
-	s.send(log, to, msg)
+	msg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendPushQuery(
@@ -693,6 +623,9 @@ func (s *sender) SendPushQuery(
 		zap.Int("containerLen", len(container)),
 		zap.Uint64("requestedHeight", requestedHeight),
 	)
+	to := common.SendConfig{
+		NodeIDs: nodeIDs,
+	}
 	msg, err := s.msgCreator.PushQuery(
 		s.ctx.ChainID,
 		requestID,
@@ -700,9 +633,6 @@ func (s *sender) SendPushQuery(
 		container,
 		requestedHeight,
 	)
-	to := common.SendConfig{
-		NodeIDs: nodeIDs,
-	}
 	sent := s.sendUnlessError(log, to, msg, err)
 	for nodeID := range nodeIDs {
 		if !sent.Contains(nodeID) {
@@ -787,6 +717,9 @@ func (s *sender) SendPullQuery(
 		zap.Stringer("containerID", containerID),
 		zap.Uint64("requestedHeight", requestedHeight),
 	)
+	to := common.SendConfig{
+		NodeIDs: nodeIDs,
+	}
 	msg, err := s.msgCreator.PullQuery(
 		s.ctx.ChainID,
 		requestID,
@@ -794,9 +727,6 @@ func (s *sender) SendPullQuery(
 		containerID,
 		requestedHeight,
 	)
-	to := common.SendConfig{
-		NodeIDs: nodeIDs,
-	}
 	sent := s.sendUnlessError(log, to, msg, err)
 	for nodeID := range nodeIDs {
 		if !sent.Contains(nodeID) {
@@ -846,18 +776,18 @@ func (s *sender) SendChits(
 		zap.Stringer("acceptedID", acceptedID),
 		zap.Uint64("acceptedHeight", acceptedHeight),
 	)
-	msg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return
-	}
-
 	to := common.SendConfig{
 		NodeIDs: set.Of(nodeID),
 	}
-	s.send(log, to, msg)
+	msg, err := s.msgCreator.Chits(
+		s.ctx.ChainID,
+		requestID,
+		preferredID,
+		preferredIDAtHeight,
+		acceptedID,
+		acceptedHeight,
+	)
+	s.sendUnlessError(log, to, msg, err)
 }
 
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, bytes []byte) error {
@@ -925,15 +855,15 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 		zap.Duration("deadline", deadline),
 		zap.Int("payloadLen", len(bytes)),
 	)
+	to := common.SendConfig{
+		NodeIDs: nodeIDs,
+	}
 	msg, err := s.msgCreator.AppRequest(
 		s.ctx.ChainID,
 		requestID,
 		deadline,
 		bytes,
 	)
-	to := common.SendConfig{
-		NodeIDs: nodeIDs,
-	}
 	sent := s.sendUnlessError(log, to, msg, err)
 	for nodeID := range nodeIDs {
 		if !sent.Contains(nodeID) {
@@ -972,24 +902,17 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 		zap.Binary("payload", bytes),
 		zap.Stringer("messageOp", message.AppResponseOp),
 		zap.Uint32("requestID", requestID),
+		zap.Int("payloadLen", len(bytes)),
 	)
+	to := common.SendConfig{
+		NodeIDs: set.Of(nodeID),
+	}
 	msg, err := s.msgCreator.AppResponse(
 		s.ctx.ChainID,
 		requestID,
 		bytes,
 	)
-	if err != nil {
-		s.ctx.Log.Error("failed to build message",
-			zap.Binary("payload", bytes), // always log payload
-			zap.Error(err),
-		)
-		return nil
-	}
-
-	to := common.SendConfig{
-		NodeIDs: set.Of(nodeID),
-	}
-	s.send(log, to, msg)
+	s.sendUnlessError(log, to, msg, err)
 	return nil
 }
 
@@ -1015,23 +938,16 @@ func (s *sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 		zap.Int32("errorCode", errorCode),
 		zap.String("errorMessage", errorMessage),
 	)
+	to := common.SendConfig{
+		NodeIDs: set.Of(nodeID),
+	}
 	msg, err := s.msgCreator.AppError(
 		s.ctx.ChainID,
 		requestID,
 		errorCode,
 		errorMessage,
 	)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return nil
-	}
-
-	to := common.SendConfig{
-		NodeIDs: set.Of(nodeID),
-	}
-	s.send(log, to, msg)
+	s.sendUnlessError(log, to, msg, err)
 	return nil
 }
 
@@ -1045,14 +961,7 @@ func (s *sender) SendAppGossip(
 		zap.Stringer("messageOp", message.AppGossipOp),
 	)
 	msg, err := s.msgCreator.AppGossip(s.ctx.ChainID, bytes)
-	if err != nil {
-		log.Error("failed to build message",
-			zap.Error(err),
-		)
-		return nil
-	}
-
-	s.send(log, to, msg)
+	s.sendUnlessError(log, to, msg, err)
 	return nil
 }
 
@@ -1063,17 +972,18 @@ func (s *sender) logWith(verboField zap.Field, fields ...zap.Field) logging.Logg
 	return s.ctx.Log.With(fields...)
 }
 
-func (s *sender) sendUnlessError(log logging.Logger, to common.SendConfig, msg *message.OutboundMessage, err error) set.Set[ids.NodeID] {
+func (s *sender) sendUnlessError(
+	log logging.Logger,
+	to common.SendConfig,
+	msg *message.OutboundMessage,
+	err error,
+) set.Set[ids.NodeID] {
 	if err != nil {
 		log.Error("failed to build message",
 			zap.Error(err),
 		)
 		return nil
 	}
-	return s.send(log, to, msg)
-}
-
-func (s *sender) send(log logging.Logger, to common.SendConfig, msg *message.OutboundMessage) set.Set[ids.NodeID] {
 	sent := s.sender.Send(msg, to, s.ctx.SubnetID, s.subnet)
 	log.Debug("sent message",
 		zap.Reflect("to", to),
