@@ -467,8 +467,6 @@ Example usage:
 ```yaml
 - name: Run e2e tests
 
-  # A qualified path is required for use outside of avalanchego
-  # e.g. `ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@[sha or tag]`
   uses: ./.github/actions/run-monitored-tmpnet-cmd
 
   with:

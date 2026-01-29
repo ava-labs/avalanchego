@@ -74,7 +74,7 @@ func NewDefaultConfig() Config {
 	}
 }
 
-//go:generate go tool -modfile=../../../../tools/go.mod gencodec -type Config -formats toml -out gen_config.go
+//go:generate ../../../../scripts/run_tool.sh gencodec -type Config -formats toml -out gen_config.go
 
 // Config contains configuration options for ETH and LES protocols.
 type Config struct {

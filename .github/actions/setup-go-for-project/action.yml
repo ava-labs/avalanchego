@@ -22,4 +22,4 @@ runs:
         go-version-file: go.mod
         cache-dependency-path: |
           go.sum
-          tools/go.sum
+          tools/external/go.sum
