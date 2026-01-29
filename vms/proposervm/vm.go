@@ -155,7 +155,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.State = baseState
-	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
+	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -570,7 +570,6 @@ func (vm *VM) getPostDurangoSlotTime(
 		pChainHeight,
 		vm.ctx.NodeID,
 		slot,
-		vm.ctx.Log,
 	)
 	// Note: The P-chain does not currently try to target any block time. It
 	// notifies the consensus engine as soon as a new block may be built. To
@@ -578,8 +577,9 @@ func (vm *VM) getPostDurangoSlotTime(
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
 	// time, ProposerMinBlockDelay can be configured in the node config.
-
-	vm.ctx.Log.Debug("ProposerVM minimum delay", zap.Duration("delay", delay), zap.Error(err))
+	if err != nil {
+		vm.ctx.Log.Debug("Minimum delay", zap.Duration("delay", delay), zap.Error(err))
+	}
 
 	switch {
 	case err == nil:

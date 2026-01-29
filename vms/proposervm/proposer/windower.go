@@ -94,7 +94,6 @@ type Windower interface {
 		pChainHeight uint64,
 		nodeID ids.NodeID,
 		startSlot uint64,
-		logger logging.Logger,
 	) (time.Duration, error)
 }
 
@@ -104,11 +103,13 @@ type windower struct {
 	state       validators.State
 	subnetID    ids.ID
 	chainSource uint64
+	logger      logging.Logger
 }
 
-func New(state validators.State, subnetID, chainID ids.ID) Windower {
+func New(state validators.State, subnetID, chainID ids.ID, logger logging.Logger) Windower {
 	w := wrappers.Packer{Bytes: chainID[:]}
 	return &windower{
+		logger:      logger,
 		state:       state,
 		subnetID:    subnetID,
 		chainSource: w.UnpackLong(),
@@ -197,7 +198,6 @@ func (w *windower) MinDelayForProposer(
 	pChainHeight uint64,
 	nodeID ids.NodeID,
 	startSlot uint64,
-	logger logging.Logger,
 ) (time.Duration, error) {
 	source := prng.NewMT19937_64()
 	sampler, validators, err := w.makeSampler(ctx, pChainHeight, source)
@@ -205,7 +205,7 @@ func (w *windower) MinDelayForProposer(
 		return 0, err
 	}
 
-	logger.Debug("Sampled validators for P-chain height",
+	w.logger.Debug("Sampled validators for P-chain height",
 		zap.Uint64("pChainHeight", pChainHeight), zap.Int("numValidators", len(validators)))
 
 	if len(validators) == 0 {
