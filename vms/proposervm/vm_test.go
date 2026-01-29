@@ -247,6 +247,7 @@ func (vm *VM) waitForProposerWindow() error {
 			pChainHeight,
 			vm.ctx.NodeID,
 			slot,
+			&logging.NoLog{},
 		)
 		if err != nil {
 			return err

@@ -155,7 +155,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.State = baseState
-	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
+	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -577,6 +577,10 @@ func (vm *VM) getPostDurangoSlotTime(
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
 	// time, ProposerMinBlockDelay can be configured in the node config.
+	if err != nil {
+		vm.ctx.Log.Debug("Minimum delay", zap.Duration("delay", delay), zap.Error(err))
+	}
+
 	switch {
 	case err == nil:
 		delay = max(delay, vm.MinBlkDelay)
