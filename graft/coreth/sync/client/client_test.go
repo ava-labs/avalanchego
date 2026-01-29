@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 
-	clientstats "github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
+	clientstats "github.com/ava-labs/avalanchego/graft/evm/sync/client/stats"
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	ethparams "github.com/ava-labs/libevm/params"
 )
