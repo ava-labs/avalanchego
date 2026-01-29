@@ -205,7 +205,7 @@ func (w *windower) MinDelayForProposer(
 		return 0, err
 	}
 
-	w.logger.Debug("Sampled validators for P-chain height",
+	w.logger.Debug("sampled validators for P-chain height",
 		zap.Uint64("pChainHeight", pChainHeight), zap.Int("numValidators", len(validators)))
 
 	if len(validators) == 0 {

@@ -577,17 +577,17 @@ func (vm *VM) getPostDurangoSlotTime(
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
 	// time, ProposerMinBlockDelay can be configured in the node config.
-	if err != nil {
-		vm.ctx.Log.Debug("Minimum delay", zap.Duration("delay", delay), zap.Error(err))
-	}
 
 	switch {
 	case err == nil:
+		vm.ctx.Log.Debug("slot time", zap.Duration("delay", delay), zap.Duration("min block delay", vm.MinBlkDelay))
 		delay = max(delay, vm.MinBlkDelay)
 		return parentTimestamp.Add(delay), nil
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
+		vm.ctx.Log.Debug("anyone can propose", zap.Duration("min block delay", vm.MinBlkDelay), zap.Time("parent timestamp", parentTimestamp))
 		return parentTimestamp.Add(vm.MinBlkDelay), nil
 	default:
+		vm.ctx.Log.Debug("failed fetching the expected delay", zap.Error(err))
 		return time.Time{}, err
 	}
 }
