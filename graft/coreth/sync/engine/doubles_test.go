@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )
 
 // FuncSyncer adapts a function to the simple Syncer shape used in tests. It is
