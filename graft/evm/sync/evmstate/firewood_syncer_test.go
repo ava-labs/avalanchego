@@ -19,9 +19,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
-	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
@@ -64,24 +64,26 @@ func TestFirewoodSync(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := rand.New(rand.NewSource(1))
+			utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+				r := rand.New(rand.NewSource(1))
 
-			clientState := createDB(t)
-			_, _ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, types.EmptyRootHash, tt.clientSize)
+				clientState := createDB(t)
+				_, _ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, types.EmptyRootHash, tt.clientSize)
 
-			serverState := createDB(t)
-			// Store the expected accounts to verify after sync.
-			root, accounts := synctest.FillAccountsWithStorageAndCode(t, r, serverState, types.EmptyRootHash, tt.serverSize)
+				serverState := createDB(t)
+				// Store the expected accounts to verify after sync.
+				root, accounts := synctest.FillAccountsWithStorageAndCode(t, r, serverState, types.EmptyRootHash, tt.serverSize)
 
-			firewoodSyncer, codeSyncer, codeQueue := createSyncers(t, clientState, serverState, root)
-			require.NoError(t, runFirewoodSync(t.Context(), codeSyncer, firewoodSyncer), "failure during sync")
+				firewoodSyncer, codeSyncer, codeQueue := createSyncers(t, clientState, serverState, root, c)
+				require.NoError(t, runFirewoodSync(t.Context(), codeSyncer, firewoodSyncer), "failure during sync")
 
-			// Finalization is not necessary, as no errors were encountered during sync.
-			assertFirewoodConsistency(t, root, clientState, accounts)
+				// Finalization is not necessary, as no errors were encountered during sync.
+				assertFirewoodConsistency(t, root, clientState, accounts)
 
-			// Code queue should be closed.
-			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
-			require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
+				// Code queue should be closed.
+				err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
+				require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
+			})
 		})
 	}
 }
@@ -103,49 +105,51 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := rand.New(rand.NewSource(1))
+			utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+				r := rand.New(rand.NewSource(1))
 
-			clientState := createDB(t)
-			_, _ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, types.EmptyRootHash, 0)
+				clientState := createDB(t)
+				_, _ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, types.EmptyRootHash, 0)
 
-			serverState := createDB(t)
-			root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverState, types.EmptyRootHash, 10)
+				serverState := createDB(t)
+				root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverState, types.EmptyRootHash, 10)
 
-			firewoodSyncer, codeSyncer, codeQueue := createSyncers(t, clientState, serverState, root)
+				firewoodSyncer, codeSyncer, codeQueue := createSyncers(t, clientState, serverState, root, c)
 
-			ctx := t.Context()
-			var cancel context.CancelFunc
-			if tt.cancel {
-				ctx, cancel = context.WithCancel(ctx)
-				t.Cleanup(cancel)
-			}
+				ctx := t.Context()
+				var cancel context.CancelFunc
+				if tt.cancel {
+					ctx, cancel = context.WithCancel(ctx)
+					t.Cleanup(cancel)
+				}
 
-			if tt.cancel {
-				// Trigger cancellation and wait for both syncers to exit.
-				cancel()
-				err := runFirewoodSync(ctx, codeSyncer, firewoodSyncer)
-				require.ErrorIs(t, err, context.Canceled)
-			} else {
-				require.NoError(t, runFirewoodSync(ctx, codeSyncer, firewoodSyncer), "failure during sync")
-			}
+				if tt.cancel {
+					// Trigger cancellation and wait for both syncers to exit.
+					cancel()
+					err := runFirewoodSync(ctx, codeSyncer, firewoodSyncer)
+					require.ErrorIs(t, err, context.Canceled)
+				} else {
+					require.NoError(t, runFirewoodSync(ctx, codeSyncer, firewoodSyncer), "failure during sync")
+				}
 
-			// Ensure Finalize is idempotent and that the queue is closed.
-			require.NoError(t, firewoodSyncer.Finalize())
-			require.NoError(t, firewoodSyncer.Finalize())
+				// Ensure Finalize is idempotent and that the queue is closed.
+				require.NoError(t, firewoodSyncer.Finalize())
+				require.NoError(t, firewoodSyncer.Finalize())
 
-			// After finalize, the queue should reject new code additions.
-			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
-			require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
+				// After finalize, the queue should reject new code additions.
+				err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
+				require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
+			})
 		})
 	}
 }
 
-func createSyncers(t *testing.T, clientState, serverState state.Database, root common.Hash) (*FirewoodSyncer, *code.Syncer, *code.Queue) {
+func createSyncers(t *testing.T, clientState, serverState state.Database, root common.Hash, c codec.Manager) (*FirewoodSyncer, *code.Syncer, *code.Queue) {
 	t.Helper()
 	// Create the mock P2P client that serves range proofs and change proofs from the server DB.
 	var (
-		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
-		mockClient         = statesyncclient.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
+		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), c, handlerstats.NewNoopHandlerStats())
+		mockClient         = statesyncclient.NewTestClient(c, nil, codeRequestHandler, nil)
 		serverDB           = dbFromState(t, serverState)
 		rHandler           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetRangeProofHandler(serverDB))
 		cHandler           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetChangeProofHandler(serverDB))
