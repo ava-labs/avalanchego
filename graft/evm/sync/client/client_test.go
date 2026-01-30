@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -18,10 +17,6 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
@@ -31,12 +26,6 @@ import (
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	ethparams "github.com/ava-labs/libevm/params"
 )
-
-func TestMain(m *testing.M) {
-	customtypes.Register()
-	params.RegisterExtras()
-	os.Exit(m.Run())
-}
 
 func TestGetCode(t *testing.T) {
 	tests := map[string]struct {
@@ -140,17 +129,10 @@ func TestGetCode(t *testing.T) {
 }
 
 func TestGetBlocks(t *testing.T) {
-	gspec := &core.Genesis{
-		Config: params.TestChainConfig,
-	}
-	memdb := rawdb.NewMemoryDatabase()
-	tdb := triedb.NewDatabase(memdb, nil)
-	genesis := gspec.MustCommit(memdb, tdb)
-	engine := dummy.NewETHFaker()
 	numBlocks := 110
-	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, numBlocks, 0, func(_ int, _ *core.BlockGen) {})
-	require.NoError(t, err)
-	require.Len(t, blocks, numBlocks)
+	// Generate blocks using shared test utilities
+	blocks := synctest.GenerateTestBlocks(t, numBlocks, nil)
+	require.Len(t, blocks, numBlocks+1) // includes genesis
 
 	blocksRequestHandler := handlers.NewBlockRequestHandler(buildGetter(blocks), message.CorethCodec, handlerstats.NewNoopHandlerStats())
 
@@ -362,6 +344,9 @@ func TestGetBlocks(t *testing.T) {
 func buildGetter(blocks []*types.Block) handlers.BlockProvider {
 	return &handlers.TestBlockProvider{
 		GetBlockFn: func(blockHash common.Hash, blockHeight uint64) *types.Block {
+			if blockHeight >= uint64(len(blocks)) {
+				return nil
+			}
 			requestedBlock := blocks[blockHeight]
 			if requestedBlock.Hash() != blockHash {
 				fmt.Printf("ERROR height=%d, hash=%s, parentHash=%s, reqHash=%s\n", blockHeight, blockHash, requestedBlock.ParentHash(), requestedBlock.Hash())
