@@ -20,7 +20,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
@@ -184,11 +183,15 @@ func createDB(t *testing.T) state.Database {
 	t.Helper()
 	diskdb := rawdb.NewMemoryDatabase()
 	config := firewood.DefaultConfig(t.TempDir())
-	db := extstate.NewDatabaseWithConfig(diskdb, &triedb.Config{DBOverride: config.BackendConstructor})
+	triedbConfig := &triedb.Config{
+		DBOverride: config.BackendConstructor,
+	}
+	internalState := state.NewDatabaseWithConfig(diskdb, triedbConfig)
+	tdb := internalState.TrieDB().Backend().(*firewood.TrieDB)
 	t.Cleanup(func() {
-		require.NoError(t, db.TrieDB().Close())
+		require.NoError(t, tdb.Close())
 	})
-	return db
+	return firewood.NewStateAccessor(internalState, tdb)
 }
 
 func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state.Database, accounts map[*utilstest.Key]*types.StateAccount) {
