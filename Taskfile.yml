@@ -211,7 +211,7 @@ tasks:
     desc: Downloads module dependencies and syncs go.work.sum
     cmds:
       - cmd: go mod download
-      # GOWORK="" overrides GOWORK=off set by actions/setup-go
+      # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
       - cmd: GOWORK="" go work sync
 
   test-bootstrap-monitor-e2e:

@@ -24,7 +24,8 @@ fi
 MODULE_PATH="$1"
 
 # Get module details from go.mod
-MODULE_DETAILS="$(go list -m "${MODULE_PATH}" 2>/dev/null || true)"
+# GOWORK=off ensures we query the module's go.mod, not the workspace
+MODULE_DETAILS="$(GOWORK=off go list -m "${MODULE_PATH}" 2>/dev/null || true)"
 if [ -z "${MODULE_DETAILS}" ]; then
   echo "Error: module ${MODULE_PATH} not found in go.mod" >&2
   exit 1
