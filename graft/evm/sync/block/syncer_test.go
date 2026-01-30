@@ -6,34 +6,20 @@ package block
 import (
 	"context"
 	"fmt"
-	"math/big"
-	"os"
 	"testing"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
-	ethparams "github.com/ava-labs/libevm/params"
 )
-
-func TestMain(m *testing.M) {
-	customtypes.Register()
-	params.RegisterExtras()
-	os.Exit(m.Run())
-}
 
 func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 	tests := []struct {
@@ -153,40 +139,11 @@ type testEnvironment struct {
 func newTestEnvironment(t *testing.T, numBlocks int) *testEnvironment {
 	t.Helper()
 
-	var (
-		key, _         = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-		addr           = crypto.PubkeyToAddress(key.PublicKey)
-		genesisBalance = big.NewInt(1000000000)
-		signer         = types.HomesteadSigner{}
-	)
+	blocks := synctest.GenerateTestBlocks(t, numBlocks, nil)
 
-	// Ensure that key has some funds in the genesis block.
-	gspec := &core.Genesis{
-		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-		Alloc:  types.GenesisAlloc{addr: {Balance: genesisBalance}},
+	blockProvider := &handlers.TestBlockProvider{
+		GetBlockFn: synctest.BlockProviderFunc(blocks),
 	}
-	engine := dummy.NewETHFaker()
-
-	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, 0, func(_ int, gen *core.BlockGen) {
-		// Generate a transaction to create a unique block
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr), addr, big.NewInt(10), ethparams.TxGas, nil, nil), signer, key)
-		gen.AddTx(tx)
-	})
-	require.NoError(t, err)
-
-	// The genesis block is not include in the blocks slice, so we need to prepend it
-	blocks = append([]*types.Block{gspec.ToBlock()}, blocks...)
-
-	blockProvider := &handlers.TestBlockProvider{GetBlockFn: func(hash common.Hash, height uint64) *types.Block {
-		if height >= uint64(len(blocks)) {
-			return nil
-		}
-		block := blocks[height]
-		if block.Hash() != hash {
-			return nil
-		}
-		return block
-	}}
 
 	blockHandler := handlers.NewBlockRequestHandler(
 		blockProvider,
@@ -210,8 +167,7 @@ func newTestEnvironment(t *testing.T, numBlocks int) *testEnvironment {
 func (e *testEnvironment) prePopulateBlocks(blockHeights []int) error {
 	batch := e.chainDB.NewBatch()
 	for _, height := range blockHeights {
-		if height <= len(e.blocks) {
-			// blocks[0] is block number 1, blocks[1] is block number 2, etc.
+		if height < len(e.blocks) {
 			block := e.blocks[height]
 			rawdb.WriteBlock(batch, block)
 			rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
@@ -222,7 +178,8 @@ func (e *testEnvironment) prePopulateBlocks(blockHeights []int) error {
 
 // createSyncer creates a block syncer with the given configuration
 func (e *testEnvironment) createSyncer(fromHeight uint64, blocksToFetch uint64) (*BlockSyncer, error) {
-	if fromHeight > uint64(len(e.blocks)) {
+	// Use >= because we access e.blocks[fromHeight] below.
+	if fromHeight >= uint64(len(e.blocks)) {
 		return nil, fmt.Errorf("fromHeight %d exceeds available blocks %d", fromHeight, len(e.blocks))
 	}
 
@@ -241,7 +198,7 @@ func (e *testEnvironment) verifyBlocksInDB(t *testing.T, expectedBlockHeights []
 
 	// Verify expected blocks are present
 	for _, height := range expectedBlockHeights {
-		if height > len(e.blocks) {
+		if height >= len(e.blocks) {
 			continue
 		}
 		block := e.blocks[height]

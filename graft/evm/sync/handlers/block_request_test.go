@@ -5,34 +5,20 @@ package handlers
 
 import (
 	"context"
-	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats/statstest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
-
-func TestMain(m *testing.M) {
-	customtypes.Register()
-	params.RegisterExtras()
-	os.Exit(m.Run())
-}
 
 type blockRequestTest struct {
 	name string
@@ -52,10 +38,7 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 	testHandlerStats := &statstest.TestHandlerStats{}
 
 	// convert into map
-	blocksDB := make(map[common.Hash]*types.Block, len(blocks))
-	for _, blk := range blocks {
-		blocksDB[blk.Hash()] = blk
-	}
+	blocksDB := synctest.BlockMap(blocks)
 	blockProvider := &TestBlockProvider{
 		GetBlockFn: func(hash common.Hash, height uint64) *types.Block {
 			blk, ok := blocksDB[hash]
@@ -107,16 +90,9 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 }
 
 func TestBlockRequestHandler(t *testing.T) {
-	gspec := &core.Genesis{
-		Config: params.TestChainConfig,
-	}
-	memdb := rawdb.NewMemoryDatabase()
-	tdb := triedb.NewDatabase(memdb, nil)
-	genesis := gspec.MustCommit(memdb, tdb)
-	engine := dummy.NewETHFaker()
-	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, 96, 0, func(_ int, _ *core.BlockGen) {})
-	require.NoError(t, err)
-	require.Len(t, blocks, 96)
+	// Generate 97 blocks (genesis + 96)
+	blocks := synctest.GenerateTestBlocks(t, 96, nil)
+	require.Len(t, blocks, 97)
 
 	tests := []blockRequestTest{
 		{
@@ -157,34 +133,21 @@ func TestBlockRequestHandler(t *testing.T) {
 }
 
 func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
-	var (
-		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
-		funds   = big.NewInt(1000000000000000000)
-		gspec   = &core.Genesis{
-			Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-			Alloc:  types.GenesisAlloc{addr1: {Balance: funds}},
-		}
-		signer = types.LatestSigner(gspec.Config)
-	)
-	memdb := rawdb.NewMemoryDatabase()
-	tdb := triedb.NewDatabase(memdb, nil)
-	genesis := gspec.MustCommit(memdb, tdb)
-	engine := dummy.NewETHFaker()
-	blocks, _, err := core.GenerateChain(gspec.Config, genesis, engine, memdb, 96, 0, func(i int, b *core.BlockGen) {
-		var data []byte
-		switch {
-		case i <= 32:
-			data = make([]byte, units.MiB)
-		default:
-			data = make([]byte, units.MiB/16)
-		}
-		tx, err := types.SignTx(types.NewTransaction(b.TxNonce(addr1), addr1, big.NewInt(10000), 4_215_304, nil, data), signer, key1)
-		require.NoError(t, err)
-		b.AddTx(tx)
+	// Generate blocks with varying sizes
+	// blocks 1-32: 1MB tx data, blocks 33+: 64KB tx data
+	blocks := synctest.GenerateTestBlocks(t, 96, &synctest.BlockGeneratorConfig{
+		GasLimit: 500_000_000, // Large gas limit for big txs
+		TxDataSizeFunc: func(blockIndex int) int {
+			if blockIndex == 0 {
+				return 0 // genesis has no tx
+			}
+			if blockIndex <= 32 {
+				return int(units.MiB)
+			}
+			return int(units.MiB / 16)
+		},
 	})
-	require.NoError(t, err)
-	require.Len(t, blocks, 96)
+	require.Len(t, blocks, 97)
 
 	tests := []blockRequestTest{
 		{
@@ -216,23 +179,13 @@ func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
 
 func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	t.Parallel()
-	gspec := &core.Genesis{
-		Config: params.TestChainConfig,
-	}
-	memdb := rawdb.NewMemoryDatabase()
-	tdb := triedb.NewDatabase(memdb, nil)
-	genesis := gspec.MustCommit(memdb, tdb)
-	engine := dummy.NewETHFaker()
-	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, 11, 0, func(_ int, _ *core.BlockGen) {})
-	require.NoError(t, err)
 
-	require.Len(t, blocks, 11)
+	// Generate 12 blocks (genesis + 11)
+	blocks := synctest.GenerateTestBlocks(t, 11, nil)
+	require.Len(t, blocks, 12)
 
 	// convert into map
-	blocksDB := make(map[common.Hash]*types.Block, 11)
-	for _, blk := range blocks {
-		blocksDB[blk.Hash()] = blk
-	}
+	blocksDB := synctest.BlockMap(blocks)
 
 	cancelAfterNumRequests := 2
 	ctx, cancel := context.WithCancel(t.Context())
@@ -254,9 +207,10 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	}
 	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.CorethCodec, stats.NewNoopHandlerStats())
 
+	lastBlock := blocks[len(blocks)-1]
 	responseBytes, err := blockRequestHandler.OnBlockRequest(ctx, ids.GenerateTestNodeID(), 1, message.BlockRequest{
-		Hash:    blocks[10].Hash(),
-		Height:  blocks[10].NumberU64(),
+		Hash:    lastBlock.Hash(),
+		Height:  lastBlock.NumberU64(),
 		Parents: uint16(8),
 	})
 	require.NoError(t, err)
