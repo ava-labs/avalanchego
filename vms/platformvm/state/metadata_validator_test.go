@@ -16,65 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-func TestValidatorUptimes(t *testing.T) {
-	require := require.New(t)
-	state := newValidatorState()
-
-	// get non-existent uptime
-	nodeID := ids.GenerateTestNodeID()
-	subnetID := ids.GenerateTestID()
-	_, _, err := state.GetUptime(nodeID, subnetID)
-	require.ErrorIs(err, database.ErrNotFound)
-
-	// set non-existent uptime
-	err = state.SetUptime(nodeID, subnetID, 1, time.Now())
-	require.ErrorIs(err, database.ErrNotFound)
-
-	testMetadata := &validatorMetadata{
-		UpDuration:  time.Hour,
-		lastUpdated: time.Now(),
-	}
-	// load uptime
-	state.LoadValidatorMetadata(nodeID, subnetID, testMetadata)
-
-	// get uptime
-	upDuration, lastUpdated, err := state.GetUptime(nodeID, subnetID)
-	require.NoError(err)
-	require.Equal(testMetadata.UpDuration, upDuration)
-	require.Equal(testMetadata.lastUpdated, lastUpdated)
-
-	// set uptime
-	newUpDuration := testMetadata.UpDuration + 1
-	newLastUpdated := testMetadata.lastUpdated.Add(time.Hour)
-	require.NoError(state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated))
-
-	// get new uptime
-	upDuration, lastUpdated, err = state.GetUptime(nodeID, subnetID)
-	require.NoError(err)
-	require.Equal(newUpDuration, upDuration)
-	require.Equal(newLastUpdated, lastUpdated)
-
-	// load uptime changes uptimes
-	newTestMetadata := &validatorMetadata{
-		UpDuration:  testMetadata.UpDuration + time.Hour,
-		lastUpdated: testMetadata.lastUpdated.Add(time.Hour),
-	}
-	state.LoadValidatorMetadata(nodeID, subnetID, newTestMetadata)
-
-	// get new uptime
-	upDuration, lastUpdated, err = state.GetUptime(nodeID, subnetID)
-	require.NoError(err)
-	require.Equal(newTestMetadata.UpDuration, upDuration)
-	require.Equal(newTestMetadata.lastUpdated, lastUpdated)
-
-	// delete uptime
-	state.DeleteValidatorMetadata(nodeID, subnetID)
-
-	// get deleted uptime
-	_, _, err = state.GetUptime(nodeID, subnetID)
-	require.ErrorIs(err, database.ErrNotFound)
-}
-
 func TestWriteValidatorMetadata(t *testing.T) {
 	require := require.New(t)
 	state := newValidatorState()
@@ -82,40 +23,38 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	primaryDB := memdb.New()
 	subnetDB := memdb.New()
 
-	// write empty uptimes
+	// write no metadata
 	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
 
-	// load uptime
+	// load metadata
 	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
-	testUptimeReward := &validatorMetadata{
+	vdrMetadata := &validatorMetadata{
 		UpDuration:      time.Hour,
 		lastUpdated:     time.Now(),
 		PotentialReward: 100,
 		txID:            ids.GenerateTestID(),
 	}
-	state.LoadValidatorMetadata(nodeID, subnetID, testUptimeReward)
+	state.LoadValidatorMetadata(nodeID, subnetID, vdrMetadata)
 
 	// write state, should not reflect to DB yet
 	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
-	require.False(primaryDB.Has(testUptimeReward.txID[:]))
-	require.False(subnetDB.Has(testUptimeReward.txID[:]))
+	require.False(primaryDB.Has(vdrMetadata.txID[:]))
+	require.False(subnetDB.Has(vdrMetadata.txID[:]))
 
-	// get uptime should still return the loaded value
-	upDuration, lastUpdated, err := state.GetUptime(nodeID, subnetID)
+	// get delegatee reward should return the loaded value
+	delegateeReward, err := state.GetDelegateeReward(subnetID, nodeID)
 	require.NoError(err)
-	require.Equal(testUptimeReward.UpDuration, upDuration)
-	require.Equal(testUptimeReward.lastUpdated, lastUpdated)
+	require.Equal(vdrMetadata.PotentialDelegateeReward, delegateeReward)
 
-	// update uptimes
-	newUpDuration := testUptimeReward.UpDuration + 1
-	newLastUpdated := testUptimeReward.lastUpdated.Add(time.Hour)
-	require.NoError(state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated))
+	// update delegatee reward
+	newDelegateeReward := vdrMetadata.PotentialDelegateeReward + 100
+	require.NoError(state.SetDelegateeReward(subnetID, nodeID, newDelegateeReward))
 
-	// write uptimes, should reflect to subnet DB
+	// write metadata, should reflect to subnet DB
 	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
-	require.False(primaryDB.Has(testUptimeReward.txID[:]))
-	require.True(subnetDB.Has(testUptimeReward.txID[:]))
+	require.False(primaryDB.Has(vdrMetadata.txID[:]))
+	require.True(subnetDB.Has(vdrMetadata.txID[:]))
 }
 
 func TestValidatorDelegateeRewards(t *testing.T) {
@@ -167,7 +106,7 @@ func TestValidatorDelegateeRewards(t *testing.T) {
 	state.DeleteValidatorMetadata(nodeID, subnetID)
 
 	// get deleted delegatee reward
-	_, _, err = state.GetUptime(nodeID, subnetID)
+	_, err = state.GetDelegateeReward(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
