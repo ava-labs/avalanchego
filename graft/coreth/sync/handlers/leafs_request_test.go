@@ -91,8 +91,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	}{
 		"zero limit dropped": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					common.Hash{},
 					bytes.Repeat([]byte{0x00}, common.HashLength),
@@ -109,8 +108,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"empty root dropped": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					common.Hash{},
 					common.Hash{},
 					bytes.Repeat([]byte{0x00}, common.HashLength),
@@ -127,8 +125,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"bad start len dropped": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					common.Hash{},
 					common.Hash{},
 					bytes.Repeat([]byte{0x00}, common.HashLength+2),
@@ -145,8 +142,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"bad end len dropped": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					common.Hash{},
 					common.Hash{},
 					bytes.Repeat([]byte{0x00}, common.HashLength),
@@ -163,8 +159,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"missing root dropped": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					common.BytesToHash([]byte("something is missing here...")),
 					common.Hash{},
 					bytes.Repeat([]byte{0x00}, common.HashLength),
@@ -181,8 +176,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"corrupted trie drops request": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					corruptedTrieRoot,
 					common.Hash{},
 					bytes.Repeat([]byte{0x00}, common.HashLength),
@@ -200,10 +194,9 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		"cancelled context dropped": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
 				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
+				cancel()
 
-				return newLeafsRequest(t,
-					ctx,
+				return ctx, newLeafsRequest(t,
 					largeTrieRoot,
 					common.Hash{},
 					bytes.Repeat([]byte{0x00}, common.HashLength),
@@ -219,8 +212,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"nil start and end range returns entire trie": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					smallTrieRoot,
 					common.Hash{},
 					nil,
@@ -241,8 +233,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"nil end range treated like greatest possible value": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					smallTrieRoot,
 					common.Hash{},
 					bytes.Repeat([]byte{0x00}, common.HashLength),
@@ -262,11 +253,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"end greater than start dropped": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-
-				return newLeafsRequest(t,
-					ctx,
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					common.Hash{},
 					bytes.Repeat([]byte{0xbb}, common.HashLength),
@@ -283,11 +270,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"invalid node type dropped": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-
-				return newLeafsRequest(t,
-					ctx,
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					common.Hash{},
 					bytes.Repeat([]byte{0xbb}, common.HashLength),
@@ -303,8 +286,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"max leaves overridden": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					common.Hash{},
 					bytes.Repeat([]byte{0x00}, common.HashLength),
@@ -326,8 +308,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"full range with nil start": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					common.Hash{},
 					nil,
@@ -350,8 +331,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"full range with 0x00 start": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					common.Hash{},
 					bytes.Repeat([]byte{0x00}, common.HashLength),
@@ -378,8 +358,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				startKey[31]++                 // exclude start key from response
 				endKey := largeTrieKeys[1_040] // include end key in response
 
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					common.Hash{},
 					startKey,
@@ -402,8 +381,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"partial end range": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					common.Hash{},
 					largeTrieKeys[9_400],
@@ -426,8 +404,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"final end range": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					common.Hash{},
 					bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -450,8 +427,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"small trie root": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					smallTrieRoot,
 					common.Hash{},
 					nil,
@@ -482,8 +458,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				require.NoError(t, err)
 				snapshotProvider.Snapshot = snap
 
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					accountTrieRoot,
 					common.Hash{},
 					nil,
@@ -530,8 +505,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					i++
 				}
 
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					accountTrieRoot,
 					common.Hash{},
 					nil,
@@ -565,8 +539,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				require.NoError(t, err)
 				snapshotProvider.Snapshot = snap
 
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					largeStorageAccount,
 					nil,
@@ -612,8 +585,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					i++
 				}
 
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					largeTrieRoot,
 					largeStorageAccount,
 					nil,
@@ -654,8 +626,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				}
 				rawdb.DeleteStorageSnapshot(memdb, smallStorageAccount, lastKey)
 
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					smallTrieRoot,
 					smallStorageAccount,
 					nil,
@@ -691,8 +662,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				}
 				rawdb.DeleteStorageSnapshot(memdb, smallStorageAccount, lastKey)
 
-				return newLeafsRequest(t,
-					t.Context(),
+				return t.Context(), newLeafsRequest(t,
 					smallTrieRoot,
 					smallStorageAccount,
 					lastKey[:],
@@ -762,14 +732,13 @@ func requireRangeProofIsValid(t *testing.T, request *message.CorethLeafsRequest,
 // When account is set to a specific account hash, it creates a storage trie request for that account.
 func newLeafsRequest(
 	t *testing.T,
-	ctx context.Context,
 	root common.Hash,
 	account common.Hash,
 	start, end []byte,
 	limit uint16,
 	nodeType message.NodeType,
-) (context.Context, message.CorethLeafsRequest) {
+) message.CorethLeafsRequest {
 	request, err := message.NewLeafsRequest(message.CorethLeafsRequestType, root, account, start, end, limit, nodeType)
 	require.NoError(t, err)
-	return ctx, request.(message.CorethLeafsRequest)
+	return request.(message.CorethLeafsRequest)
 }
