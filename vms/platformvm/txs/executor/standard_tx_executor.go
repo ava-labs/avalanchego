@@ -1405,7 +1405,17 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 
 			// Post-Durango, stakers are immediately added to the current staker
 			// set. Their [StartTime] is the current chain time.
-			stakeDuration := stakerTx.EndTime().Sub(chainTime)
+			var stakeDuration time.Duration
+
+			switch tTx := stakerTx.(type) {
+			case txs.FixedStaker:
+				stakeDuration = tTx.EndTime().Sub(chainTime)
+			case txs.ContinuousStaker:
+				stakeDuration = tTx.PeriodDuration()
+			default:
+				return fmt.Errorf("unexpected staker tx type: %T", stakerTx)
+			}
+
 			potentialReward = rewards.Calculate(
 				stakeDuration,
 				stakerTx.Weight(),
@@ -1415,7 +1425,24 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 			e.state.SetCurrentSupply(subnetID, currentSupply+potentialReward)
 		}
 
-		staker, err = state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
+		switch tTx := stakerTx.(type) {
+		case txs.FixedStaker:
+			staker, err = state.NewCurrentValidator(txID, tTx, chainTime, potentialReward, 0)
+		case txs.ContinuousStaker:
+			staker, err = state.NewContinuousStaker(
+				txID,
+				stakerTx,
+				chainTime,
+				potentialReward,
+				0,
+				0,
+				0,
+				tTx.AutoRestakeSharesAmount(),
+				tTx.PeriodDuration(),
+			)
+		default:
+			return fmt.Errorf("unexpected staker tx type: %T", stakerTx)
+		}
 	}
 	if err != nil {
 		return err
