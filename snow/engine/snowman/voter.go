@@ -1,12 +1,10 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
 
 import (
 	"context"
-
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/job"
@@ -56,9 +54,6 @@ func (v *voter) Execute(ctx context.Context, _ []ids.ID, _ []ids.ID) error {
 	}
 
 	for _, result := range results {
-		v.e.Ctx.Log.Debug("finishing poll",
-			zap.Stringer("result", &result),
-		)
 		if err := v.e.Consensus.RecordPoll(ctx, result); err != nil {
 			return err
 		}

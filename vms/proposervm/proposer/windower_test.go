@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposer
@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -48,6 +49,7 @@ func TestWindowerNoValidators(t *testing.T) {
 				makeValidatorState(t, test.validators),
 				subnetID,
 				randomChainID,
+				&logging.NoLog{},
 			)
 
 			var (
@@ -91,7 +93,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 		},
 	}
 
-	w := New(vdrState, subnetID, randomChainID)
+	w := New(vdrState, subnetID, randomChainID, &logging.NoLog{})
 
 	validatorDelay, err := w.Delay(t.Context(), 1, 0, validatorID, MaxVerifyWindows)
 	require.NoError(err)
@@ -106,7 +108,7 @@ func TestDelayChangeByHeight(t *testing.T) {
 	require := require.New(t)
 
 	validatorIDs, vdrState := makeValidators(t, MaxVerifyWindows)
-	w := New(vdrState, subnetID, fixedChainID)
+	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
 
 	expectedDelays1 := []time.Duration{
 		2 * WindowDuration,
@@ -154,8 +156,8 @@ func TestDelayChangeByChain(t *testing.T) {
 	require.NoError(err)
 
 	validatorIDs, vdrState := makeValidators(t, MaxVerifyWindows)
-	w0 := New(vdrState, subnetID, chainID0)
-	w1 := New(vdrState, subnetID, chainID1)
+	w0 := New(vdrState, subnetID, chainID0, &logging.NoLog{})
+	w1 := New(vdrState, subnetID, chainID1, &logging.NoLog{})
 
 	expectedDelays0 := []time.Duration{
 		5 * WindowDuration,
@@ -192,7 +194,7 @@ func TestExpectedProposerChangeByHeight(t *testing.T) {
 	require := require.New(t)
 
 	validatorIDs, vdrState := makeValidators(t, 10)
-	w := New(vdrState, subnetID, fixedChainID)
+	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
 
 	var (
 		dummyCtx            = t.Context()
@@ -241,7 +243,7 @@ func TestExpectedProposerChangeByChain(t *testing.T) {
 	}
 
 	for chainID, expectedProposerID := range expectedProposers {
-		w := New(vdrState, subnetID, chainID)
+		w := New(vdrState, subnetID, chainID, &logging.NoLog{})
 		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
 		require.NoError(err)
 		require.Equal(expectedProposerID, proposerID)
@@ -252,7 +254,7 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 	require := require.New(t)
 
 	validatorIDs, vdrState := makeValidators(t, 10)
-	w := New(vdrState, subnetID, fixedChainID)
+	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
 
 	var (
 		dummyCtx            = t.Context()
@@ -305,7 +307,7 @@ func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 	require := require.New(t)
 
 	_, vdrState := makeValidators(t, 10)
-	w := New(vdrState, subnetID, fixedChainID)
+	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
 
 	var (
 		dummyCtx            = t.Context()
@@ -329,7 +331,7 @@ func TestMinDelayForProposer(t *testing.T) {
 	require := require.New(t)
 
 	validatorIDs, vdrState := makeValidators(t, 10)
-	w := New(vdrState, subnetID, fixedChainID)
+	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
 
 	var (
 		dummyCtx            = t.Context()
@@ -363,7 +365,7 @@ func BenchmarkMinDelayForProposer(b *testing.B) {
 	require := require.New(b)
 
 	_, vdrState := makeValidators(b, 10)
-	w := New(vdrState, subnetID, fixedChainID)
+	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
 
 	var (
 		dummyCtx            = b.Context()
@@ -421,7 +423,7 @@ func TestProposerDistribution(t *testing.T) {
 	require := require.New(t)
 
 	validatorIDs, vdrState := makeValidators(t, 10)
-	w := New(vdrState, subnetID, fixedChainID)
+	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
 
 	var (
 		dummyCtx               = t.Context()

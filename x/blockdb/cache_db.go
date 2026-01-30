@@ -1,11 +1,10 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
 
 import (
-	"slices"
-	"sync"
+	"sync/atomic"
 
 	"go.uber.org/zap"
 
@@ -22,11 +21,9 @@ var _ database.HeightIndex = (*cacheDB)(nil)
 // the cache and database contain different values. This limitation is acceptable
 // because concurrent writes to the same height are not an intended use case.
 type cacheDB struct {
-	db    *Database
-	cache *lru.Cache[BlockHeight, BlockData]
-
-	closeMu sync.RWMutex
-	closed  bool
+	db     *Database
+	cache  *lru.Cache[BlockHeight, BlockData]
+	closed atomic.Bool
 }
 
 func newCacheDB(db *Database, size uint16) *cacheDB {
@@ -37,30 +34,24 @@ func newCacheDB(db *Database, size uint16) *cacheDB {
 }
 
 func (c *cacheDB) Get(height BlockHeight) (BlockData, error) {
-	c.closeMu.RLock()
-	defer c.closeMu.RUnlock()
-
-	if c.closed {
+	if c.closed.Load() {
 		c.db.log.Error("Failed Get: database closed", zap.Uint64("height", height))
 		return nil, database.ErrClosed
 	}
 
 	if cached, ok := c.cache.Get(height); ok {
-		return slices.Clone(cached), nil
+		return cached, nil
 	}
 	data, err := c.db.Get(height)
 	if err != nil {
 		return nil, err
 	}
-	c.cache.Put(height, slices.Clone(data))
+	c.cache.Put(height, data)
 	return data, nil
 }
 
 func (c *cacheDB) Put(height BlockHeight, data BlockData) error {
-	c.closeMu.RLock()
-	defer c.closeMu.RUnlock()
-
-	if c.closed {
+	if c.closed.Load() {
 		c.db.log.Error("Failed Put: database closed", zap.Uint64("height", height))
 		return database.ErrClosed
 	}
@@ -69,15 +60,12 @@ func (c *cacheDB) Put(height BlockHeight, data BlockData) error {
 		return err
 	}
 
-	c.cache.Put(height, slices.Clone(data))
+	c.cache.Put(height, data)
 	return nil
 }
 
 func (c *cacheDB) Has(height BlockHeight) (bool, error) {
-	c.closeMu.RLock()
-	defer c.closeMu.RUnlock()
-
-	if c.closed {
+	if c.closed.Load() {
 		c.db.log.Error("Failed Has: database closed", zap.Uint64("height", height))
 		return false, database.ErrClosed
 	}
@@ -88,14 +76,17 @@ func (c *cacheDB) Has(height BlockHeight) (bool, error) {
 	return c.db.Has(height)
 }
 
-func (c *cacheDB) Close() error {
-	c.closeMu.Lock()
-	defer c.closeMu.Unlock()
-
-	if c.closed {
+func (c *cacheDB) Sync(start, end uint64) error {
+	if c.closed.Load() {
 		return database.ErrClosed
 	}
-	c.closed = true
+	return c.db.Sync(start, end)
+}
+
+func (c *cacheDB) Close() error {
+	if !c.closed.CompareAndSwap(false, true) {
+		return database.ErrClosed
+	}
 	c.cache.Flush()
 	return c.db.Close()
 }

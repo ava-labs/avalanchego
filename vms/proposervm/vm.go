@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -155,7 +155,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.State = baseState
-	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
+	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -552,7 +552,7 @@ func (vm *VM) getPreDurangoSlotTime(
 	// avoid fast runs of blocks there is an additional minimum delay that
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
-	// time, ProposerMinBlockDelay can be configured in the subnet config.
+	// time, ProposerMinBlockDelay can be configured in the node config.
 	delay = max(delay, vm.MinBlkDelay)
 	return parentTimestamp.Add(delay), nil
 }
@@ -576,14 +576,18 @@ func (vm *VM) getPostDurangoSlotTime(
 	// avoid fast runs of blocks there is an additional minimum delay that
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
-	// time, ProposerMinBlockDelay can be configured in the subnet config.
+	// time, ProposerMinBlockDelay can be configured in the node config.
+
 	switch {
 	case err == nil:
+		vm.ctx.Log.Debug("slot time", zap.Duration("delay", delay), zap.Duration("min block delay", vm.MinBlkDelay))
 		delay = max(delay, vm.MinBlkDelay)
 		return parentTimestamp.Add(delay), nil
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
+		vm.ctx.Log.Debug("anyone can propose", zap.Duration("min block delay", vm.MinBlkDelay), zap.Time("parent timestamp", parentTimestamp))
 		return parentTimestamp.Add(vm.MinBlkDelay), nil
 	default:
+		vm.ctx.Log.Debug("failed fetching the expected delay", zap.Error(err))
 		return time.Time{}, err
 	}
 }

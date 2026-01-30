@@ -2,7 +2,7 @@
 
 The C-Chain benchmarks support re-executing a range of mainnet C-Chain blocks against a provided snapshot of the current state as of some initial state.
 
-AvalancheGo provides a [Taskfile](https://taskfile.dev/) with commands to manage the import/export of data required for re-execution (block range and current state) and triggering a benchmark run.
+Benchmarks can be invoked by running `./scripts/run_task.sh test-cchain-reexecution` or `./scripts/benchmark_cchain_range.sh`.
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ export AWS_REGION=us-east-2
 
 ### Metrics Collection
 
-If running locally, metrics collection can be customized via the following parameters:
+If running locally, metrics collection can be customized via the following **environment variables**:
 
 - `METRICS_SERVER_ENABLED`: starts a Prometheus server exporting VM metrics.
 - `METRICS_SERVER_PORT`: if set, determines the port the Prometheus server will listen to (set to `0` by default).
@@ -50,19 +50,35 @@ If running locally, metrics collection can be customized via the following param
 
 When utilizing the metrics collector feature, follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to set the required Prometheus environment variables.
 
-Running the re-execution test in CI will always set `METRICS_SERVER_ENABLED=true` and `METRICS_COLLECTOR_ENABLED=true`.
+Running the re-execution test in CI will implicitly set `METRICS_COLLECTOR_ENABLED: ${{ inputs.prometheus-username != '' }}` if Prometheus credentials are provided.
 
 ## Quick Start
 
 Let's run the default benchmark to get started. Make sure that you have completed the [Prerequisites](#prerequisites) section because it is required to copy the data from S3.
 
-Decide what directory you want to use as a working directory and set the parameter `EXECUTION_DATA_DIR`. To re-execute a range of blocks, we need to copy the blocks themselves and the initial state of the chain, so these will be copied into `EXECUTION_DATA_DIR`.
+### Using Predefined Tests
 
-[Taskfile](https://taskfile.dev/) supports reading arguments via both environment variables and named arguments on the command line, so we'll set `EXECUTION_DATA_DIR` and use the defaults for the remainder of the parameters:
+Run the script with `help` as the test name to see available tests:
 
 ```bash
+./scripts/benchmark_cchain_range.sh help
+```
+
+To run a predefined test:
+```bash
+./scripts/benchmark_cchain_range.sh hashdb-101-250k
+```
+
+These tests automatically download the required data from S3 and run the benchmark with the appropriate configuration.
+
+### Using Custom Parameters
+
+For custom benchmark runs, provide S3 sources or local paths via environment variables:
+
+```bash
+# Export env vars that you want to be available to all future script invocations
 export EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/default
-task reexecute-cchain-range-with-copied-data
+BLOCK_DIR_SRC=cchain-mainnet-blocks-1m-ldb CURRENT_STATE_DIR_SRC=cchain-current-state-hashdb-full-100 START_BLOCK=101 END_BLOCK=250000 ./scripts/benchmark_cchain_range.sh
 ```
 
 This performs the following steps:
@@ -119,11 +135,11 @@ First, we will import the first 10k blocks. To see what block databases are avai
 s5cmd ls s3://avalanchego-bootstrap-testing | grep blocks
 ```
 
-In this case, we will use the directory: `s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/`. To import it, run the import task:
+In this case, we will use the directory: `s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/`. To import it:
 
 ```bash
 export EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/walkthrough
-task import-s3-to-dir SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** DST=$EXECUTION_DATA_DIR/blocks
+./scripts/copy_dir.sh "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/**" "$EXECUTION_DATA_DIR/blocks"
 ```
 
 Next, we need to want to execute the range of blocks [1, N]. We use 1 as the initial start block, since VM initialization vacuously executes the genesis block.
@@ -140,7 +156,7 @@ To generate this from scratch, we can use a directory path for `CURRENT_STATE_DI
 ```bash
 export CURRENT_STATE_DIR=$EXECUTION_DATA_DIR/current-state
 export BLOCK_DIR=$EXECUTION_DATA_DIR/blocks
-task reexecute-cchain-range START_BLOCK=1 END_BLOCK=100
+START_BLOCK=1 END_BLOCK=100 ./scripts/benchmark_cchain_range.sh
 ```
 
 This initializes the contents of `$EXECUTION_DATA_DIR/current-state` to include two subdirectories:
@@ -179,34 +195,34 @@ $HOME/exec-data
 
 After generating the `$EXECUTION_DATA_DIR/current-state` directory from executing the first segment of blocks, we can take a snapshot of the current state and push to S3 (or copy to another location including a local directory if preferred) for re-use.
 
-Since we are already using the S3 bucket `s3://avalanchego-bootstrap-testing`, we'll re-use it here. We'll use the `export-dir-to-s3` task, which takes in two parameters:
+Since we are already using the S3 bucket `s3://avalanchego-bootstrap-testing`, we'll re-use it here. We'll use the `copy-dir.sh` script, which takes in two parameters:
 
-- `SRC` - local path to recursive copy contents from
-- `DST` - S3 bucket destination path
+-- local path to recursive copy contents from
+-- S3 bucket destination path
 
 To avoid clobbering useful data, `export-dir-to-s3` will first attempt to check that the destination does not yet exist and that the path does not have any nesting. For example, `s3://avalanchego-bootstrap-testing/target-dir/` is valid, but `s3://avalanchego-bootstrap-testing/nested/target-dir/` is invalid because it contains two levels of nesting.
 
 As a result, if you run into a warning using this command, check the current contents using either the AWS Console or `s5cmd ls` and pick a valid, unused prefix.
 
 ```bash
-task export-dir-to-s3 SRC=$EXECUTION_DATA_DIR/current-state/ DST=s3://avalanchego-bootstrap-testing/cchain-current-state-test/
+./scripts/copy_dir.sh "$EXECUTION_DATA_DIR/current-state/" "s3://avalanchego-bootstrap-testing/cchain-current-state-test/"
 ```
 
 ### Re-Execute C-Chain Range
 
-Now that we've pushed the current-state back to S3, we can run the target range of blocks [101, 200] either re-using the data we already have locally or copying the data in fresh using the `reexecute-cchain-range-with-copied-data` task.
+Now that we've pushed the current-state back to S3, we can run the target range of blocks [101, 200] either re-using the data we already have locally or copying the data in fresh using the `benchmark_cchain_range.sh` script.
 
-First, let's continue executing using the already available `CURRENT_STATE_DIR` and `BLOCK_DIR`. Since we have already exported these values, the task will pick them up and we can set only the `START_BLOCK` and `END_BLOCK` parameters:
+First, let's continue executing using the already available `CURRENT_STATE_DIR` and `BLOCK_DIR`. Since we have already exported these values, the script will pick them up and we can set only the `START_BLOCK` and `END_BLOCK` parameters:
 
 ```bash
-task reexecute-cchain-range START_BLOCK=101 END_BLOCK=200
+START_BLOCK=101 END_BLOCK=200 ./scripts/benchmark_cchain_range.sh
 ```
 
 Note: if you attempt to re-execute a second time on the same data set, it will fail because the current state has been updated to block 200.
 
 ### Re-Execute C-Chain Range with Copied Data
 
-Next, we can re-execute the same range using the `CURRENT_STATE_DIR` that we exported to S3 using `reexecute-cchain-with-copied-data`.
+Next, we can re-execute the same range using the `CURRENT_STATE_DIR` that we exported to S3.
 
 This time we will copy the same block directory from S3 and copy the state snapshot that we just exported into S3 to pick up re-execution from where we left off.
 
@@ -221,12 +237,12 @@ Specify the following parameters:
 We'll use a new `EXECUTION_DATA_DIR` for this run to avoid conflicts with previous runs from this walkthrough:
 
 ```bash
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/reexecute-with-copied-data BLOCK_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
+BLOCK_DIR_SRC=cchain-mainnet-blocks-10k-ldb CURRENT_STATE_DIR_SRC=cchain-current-state-test START_BLOCK=101 END_BLOCK=10000 EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/reexecute-with-copied-data ./scripts/benchmark_cchain_range.sh
 ```
 
 ## Predefined Configs
 
-To support testing the VM in multiple configurations, the benchmark supports a set of pre-defined configs passed via the Task variable ex. `CONFIG=archive`.
+To support testing the VM in multiple configurations, the benchmark supports a set of pre-defined configs passed via the `CONFIG` environment variable.
 
 The currently supported options are: "default", "archive", and "firewood".
 
@@ -234,15 +250,70 @@ To execute a benchmark with any of these options, you must use a compatible `CUR
 
 The `CONFIG` parameter currently only supports pre-defined configs and not passing a full JSON blob in, so that we can define corresponding names for each config option. The config name is attached as a label to the exported metrics and included in the name of the sub-benchmark (used by GitHub Action Benchmark to separate historical results with different configs).
 
+## Testing with Custom Dependency Versions
+
+The benchmarks support testing with custom versions of `libevm` and `firewood` dependencies. This is useful for:
+- Testing unreleased versions before merging
+- Benchmarking performance changes in dependencies
+- Reproducing issues with specific dependency versions
+
+### Local Usage
+
+**Prerequisite**: You must be in a nix shell (`nix develop`).
+
+Use `run_polyrepo.sh` to set up custom dependencies via environment variables:
+- `LIBEVM_REF` - Git ref for libevm (runs `go get` and `go mod tidy`)
+- `FIREWOOD_REF` - Git ref for firewood (runs `polyrepo sync firewood@FIREWOOD_REF`)
+
+```bash
+# Both libevm and firewood
+LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123def ./scripts/run_polyrepo.sh
+
+# Only firewood
+FIREWOOD_REF=abc123def ./scripts/run_polyrepo.sh
+
+# Only libevm
+LIBEVM_REF=v1.2.3 ./scripts/run_polyrepo.sh
+
+# Then run the benchmark
+./scripts/run_task.sh test-cchain-reexecution -- firewood-101-250k
+```
+
+### CI Usage
+
+Use `with-dependencies` to specify custom versions. Either or both can be provided:
+
+```bash
+gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+  -f test=firewood-101-250k \
+  -f with-dependencies="firewood=abc123,libevm=v1.2.3" \
+  -f runner=blacksmith-4vcpu-ubuntu-2404
+```
+
+See [Trigger Workflow Dispatch with GitHub CLI](#trigger-workflow-dispatch-with-github-cli) for more examples.
+
 ## Metrics
 
 The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
 
-To export metrics for a local run, simply set the Taskfile variables `METRICS_SERVER_ENABLED=true` and `METRICS_COLLECTOR_ENABLED=true` either via environment variable or passing it at the command line.
+To export metrics for a local run, set the environment variables `METRICS_COLLECTOR_ENABLED=true`:
+
+```bash
+export METRICS_COLLECTOR_ENABLED=true
+./scripts/benchmark_cchain_range.sh hashdb-101-250k
+```
 
 You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
 
-To attach additional labels to the metrics from a local run, set the Taskfile variable `LABELS` to a comma separated list of key value pairs (ex. `LABELS=user=alice,os=ubuntu`).
+**NOTE: Prometheus credentials are required for collection**
+
+---
+
+To attach additional labels to the metrics from a local run, set the `LABELS` environment variable to a comma separated list of key value pairs:
+
+```bash
+export LABELS=user=alice,os=ubuntu
+```
 
 Note: to ensure Prometheus gets a final scrape at the end of a run, the test will sleep for 2s greater than the 10s Prometheus scrape interval, which will cause short-running tests to appear to take much longer than expected. Additionally, the linked dashboard displays most metrics using a 1min rate, which means that very short running tests will not produce a very useful visualization.
 
@@ -267,46 +338,64 @@ Both workflows provide three triggers:
 
 The manual workflow takes in all parameters specified by the user. To more easily specify a CI matrix and avoid GitHub's pain inducing matrix syntax, we define simple JSON files with the exact set of configs to run for each `pull_request` and `schedule` trigger. To add a new job for either of these triggers, simply define the entry in JSON and add it to run on the desired workflow.
 
-For example, to add a new Firewood benchmark to execute the block range [30m, 40m] on a daily basis, follow the instructions above to generate the Firewood state as of block height 30m, export it to S3, and add the following entry under the `schedule` include array in the [GH Native JSON file](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.json).
+The workflows support two approaches:
+1. **Test-based**: Specify a predefined `test` name (e.g., `"test": "firewood-101-250k"`)
+2. **Custom parameters**: Leave `test` empty and provide `config`, `start-block`, `end-block`, `block-dir-src`, `current-state-dir-src`
+
+For example, to add a Firewood benchmark to execute the block range [101, 250K] on a daily basis, add the following entry under the `schedule` include array in the [GH Native JSON file](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.json).
 
 ```json
 {
     "runner": "blacksmith-4vcpu-ubuntu-2404",
-    "config": "firewood",
-    "start-block": 30000001,
-    "end-block": 40000000,
-    "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb/**",
-    "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-30m/**",
-    "timeout-minutes": 1440
+    "test": "firewood-101-250k",
+    "timeout-minutes": 30
 }
 ```
 
 ## Trigger Workflow Dispatch with GitHub CLI
 
-To triggers runs conveniently, you can use the [GitHub CLI](https://cli.github.com/manual/gh_workflow_run) to trigger workflows.
+To trigger runs conveniently, you can use the [GitHub CLI](https://cli.github.com/manual/gh_workflow_run) to trigger workflows.
 
-Note: passing JSON to the GitHub CLI requires all key/value pairs as strings, so ensure that any number parameters are quoted as strings or you will see the error:
-
-```bash
-could not parse provided JSON: json: cannot unmarshal number into Go value of type string
-```
-
-Copy your desired parameters as JSON into a file or write it out on the command line:
-
-```json
-{
-    "runner": "blacksmith-4vcpu-ubuntu-2404",
-    "config": "firewood",
-    "start-block": "101",
-    "end-block": "200",
-    "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/**",
-    "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**",
-    "timeout-minutes": "5"
-}
-```
-
-Then pass it to the GitHub CLI:
+### Using a Predefined Test
 
 ```bash
-cat input.json | gh workflow run .github/workflows/c-chain-reexecution-benchmark-gh-native.yml --json
+gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+  -f test=firewood-101-250k \
+  -f runner=blacksmith-4vcpu-ubuntu-2404 \
+  -f timeout-minutes=60
+```
+
+### Using Custom Dependency Versions
+
+Use `with-dependencies` to specify `firewood=<ref>` and/or `libevm=<ref>`:
+
+```bash
+gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+  -f test=firewood-101-250k \
+  -f with-dependencies="firewood=abc123def,libevm=v1.2.3" \
+  -f runner=blacksmith-4vcpu-ubuntu-2404 \
+  -f timeout-minutes=60
+```
+
+### Using Custom Parameters
+
+```bash
+gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+  -f block-dir-src=cchain-mainnet-blocks-1m-ldb \
+  -f current-state-dir-src=cchain-current-state-hashdb-full-100 \
+  -f start-block=101 \
+  -f end-block=250000 \
+  -f config=default \
+  -f runner=ubuntu-latest \
+  -f timeout-minutes=360
+```
+
+### Pushing Post-Execution State to S3
+
+```bash
+gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+  -f test=hashdb-101-250k \
+  -f runner=blacksmith-4vcpu-ubuntu-2404 \
+  -f push-post-state=s3://avalanchego-bootstrap-testing/cchain-current-state-new/ \
+  -f timeout-minutes=60
 ```

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package emulate
@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
-	cchain "github.com/ava-labs/coreth/plugin/evm/customtypes"
-	subnet "github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
+	cchain "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	subnet "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 )
 
 // setAndGetMillis is an arbitrary function that can be run if and only if

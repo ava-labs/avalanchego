@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timer
@@ -8,12 +8,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-)
 
-// timePtr is a helper function to convert a time.Duration to a pointer
-func timePtr(d time.Duration) *time.Duration {
-	return &d
-}
+	"github.com/ava-labs/avalanchego/utils"
+)
 
 func TestEtaTracker(t *testing.T) {
 	tracker := NewEtaTracker(3, 1.0)
@@ -48,7 +45,7 @@ func TestEtaTracker(t *testing.T) {
 			name:            "sample 3: sufficient data for ETA",
 			completed:       200,
 			timestamp:       now.Add(20 * time.Second),
-			expectedEta:     timePtr(80 * time.Second),
+			expectedEta:     utils.PointerTo(80 * time.Second),
 			expectedPercent: 20.0,
 		},
 		{
@@ -56,7 +53,7 @@ func TestEtaTracker(t *testing.T) {
 			name:            "sample 4: non linear since we sped up",
 			completed:       600,
 			timestamp:       now.Add(40 * time.Second),
-			expectedEta:     timePtr(24 * time.Second),
+			expectedEta:     utils.PointerTo(24 * time.Second),
 			expectedPercent: 60.0,
 		},
 		{
@@ -64,7 +61,7 @@ func TestEtaTracker(t *testing.T) {
 			name:            "sample 5: at the end",
 			completed:       1000,
 			timestamp:       now.Add(1 * time.Second),
-			expectedEta:     timePtr(0),
+			expectedEta:     utils.PointerTo[time.Duration](0),
 			expectedPercent: 100.0,
 		},
 		{
@@ -72,7 +69,7 @@ func TestEtaTracker(t *testing.T) {
 			name:            "sample 6: past the end",
 			completed:       2000,
 			timestamp:       now.Add(1 * time.Second),
-			expectedEta:     timePtr(0),
+			expectedEta:     utils.PointerTo[time.Duration](0),
 			expectedPercent: 100.0,
 		},
 		{

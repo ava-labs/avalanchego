@@ -65,3 +65,10 @@ vendor
 
 # debug files
 __debug_*
+
+# polyrepo
+polyrepo.log
+firewood
+
+# solc downloads from setup-solc GitHub Action
+setup-solc_downloads/

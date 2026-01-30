@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -317,7 +317,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// ProposerVM
 	fs.Bool(ProposerVMUseCurrentHeightKey, false, "Have the ProposerVM always report the last accepted P-chain block height")
-	fs.Duration(ProposerVMMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the primary network chains and the default minimum delay for subnets")
+	fs.Duration(ProposerVMMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the P-chain and X-chain")
 
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
@@ -357,8 +357,10 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(SystemTrackerProcessingHalflifeKey, 15*time.Second, "Halflife to use for the processing requests tracker. Larger halflife --> usage metrics change more slowly")
 	fs.Duration(SystemTrackerCPUHalflifeKey, 15*time.Second, "Halflife to use for the cpu tracker. Larger halflife --> cpu usage metrics change more slowly")
 	fs.Duration(SystemTrackerDiskHalflifeKey, time.Minute, "Halflife to use for the disk tracker. Larger halflife --> disk usage metrics change more slowly")
-	fs.Uint64(SystemTrackerRequiredAvailableDiskSpaceKey, units.GiB/2, "Minimum number of available bytes on disk, under which the node will shutdown.")
-	fs.Uint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey, units.GiB, fmt.Sprintf("Warning threshold for the number of available bytes on disk, under which the node will be considered unhealthy.  Must be >= [%s]", SystemTrackerRequiredAvailableDiskSpaceKey))
+	fs.Uint64(SystemTrackerRequiredAvailableDiskSpaceKey, 0, "DEPRECATED: Minimum number of available bytes on disk, under which the node will shutdown.")
+	fs.Uint64(SystemTrackerRequiredAvailableDiskSpacePercentageKey, 3, "Minimum percentage (between 0 and 50) of available disk space, under which the node will shutdown.")
+	fs.Uint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey, 0, fmt.Sprintf("DEPRECATED: Warning threshold for the number of available bytes on disk, under which the node will be considered unhealthy.  Must be >= [%s]", SystemTrackerRequiredAvailableDiskSpaceKey))
+	fs.Uint64(SystemTrackerWarningAvailableDiskSpacePercentageKey, 10, fmt.Sprintf("Warning threshold for the percentage (between 0 and 50) of available disk space, under which the node will be considered unhealthy. Must be >= [%s]", SystemTrackerRequiredAvailableDiskSpacePercentageKey))
 
 	// CPU management
 	fs.Float64(CPUVdrAllocKey, float64(runtime.NumCPU()), "Maximum number of CPUs to allocate for use by validators. Value should be in range [0, total core count]")

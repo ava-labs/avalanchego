@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -55,44 +54,6 @@ func TestCacheHas(t *testing.T) {
 	has, err := db.Has(height)
 	require.NoError(t, err)
 	require.True(t, has)
-}
-
-func TestCachePutStoresClone(t *testing.T) {
-	db := newCacheDatabase(t, DefaultConfig())
-	height := uint64(40)
-	block := randomBlock(t)
-	clone := slices.Clone(block)
-	require.NoError(t, db.Put(height, clone))
-
-	// Modify the original block after Put
-	clone[0] = 99
-
-	// Cache should have the original unmodified data
-	cached, ok := db.cache.Get(height)
-	require.True(t, ok)
-	require.Equal(t, block, cached)
-}
-
-func TestCacheGetReturnsClone(t *testing.T) {
-	db := newCacheDatabase(t, DefaultConfig())
-	height := uint64(50)
-	block := randomBlock(t)
-	require.NoError(t, db.Put(height, block))
-
-	// Get the block and modify the returned data
-	data, err := db.Get(height)
-	require.NoError(t, err)
-	data[0] = 99
-
-	// Cache should still have the original unmodified data
-	cached, ok := db.cache.Get(height)
-	require.True(t, ok)
-	require.Equal(t, block, cached)
-
-	// Second Get should also return original data
-	data, err = db.Get(height)
-	require.NoError(t, err)
-	require.Equal(t, block, data)
 }
 
 func TestCachePutOverridesSameHeight(t *testing.T) {

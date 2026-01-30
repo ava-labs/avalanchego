@@ -1,19 +1,27 @@
 module github.com/ava-labs/avalanchego
 
 // CLI tools intended for invocation with `go tool` should be added to
-// tools/go.mod to avoid polluting the main module's dependencies. See
-// tools/go.mod for usage details.
+// tools/external/go.mod to avoid polluting the main module's dependencies. See
+// tools/external/go.mod for usage details.
 
 // - Changes to the minimum golang version must also be replicated in:
+//
+// The following go.mod files:
+//   - go.mod (here)
+//   - tools/external/go.mod
+//   - graft/evm/go.mod
+//   - graft/coreth/go.mod
+//   - graft/subnet-evm/go.mod
+//
+// and
 //   - CONTRIBUTING.md
 //   - README.md
-//   - go.mod (here)
+//   - RELEASES.md
 //   - nix/go/default.nix (update version and sha256 for supported arches)
-//   - tools/go.mod
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
-//   - Consider updating the version of golangci-lint (see tools/go.mod)
-go 1.24.9
+//   - Consider updating the version of golangci-lint (see tools/external/go.mod)
+go 1.24.12
 
 require (
 	connectrpc.com/connect v1.18.1
@@ -21,9 +29,9 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.3
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.16.0-rc.0
-	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
-	github.com/ava-labs/subnet-evm v0.8.1-db-metrics-fix
+	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca
+	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
+	github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -67,11 +75,11 @@ require (
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.43.0
+	golang.org/x/crypto v0.45.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
-	golang.org/x/net v0.46.0
-	golang.org/x/sync v0.17.0
-	golang.org/x/term v0.36.0
+	golang.org/x/net v0.47.0
+	golang.org/x/sync v0.18.0
+	golang.org/x/term v0.37.0
 	golang.org/x/time v0.12.0
 	golang.org/x/tools v0.38.0
 	gonum.org/v1/gonum v0.16.0
@@ -86,10 +94,12 @@ require (
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
+require github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000 // indirect
+
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.13 // indirect
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
 	github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
@@ -170,7 +180,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sagikazarmark/locafero v0.9.0 // indirect
 	github.com/sanity-io/litter v1.5.1 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.14.0 // indirect
 	github.com/status-im/keycard-go v0.2.0 // indirect
@@ -187,8 +197,8 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -204,3 +214,9 @@ tool (
 	github.com/onsi/ginkgo/v2/ginkgo
 	go.uber.org/mock/mockgen
 )
+
+replace github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
+
+replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
+
+replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm

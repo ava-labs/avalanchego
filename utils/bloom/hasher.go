@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bloom
@@ -8,8 +8,8 @@ import (
 	"encoding/binary"
 )
 
-func Add(f *Filter, key, salt []byte) {
-	f.Add(Hash(key, salt))
+func Add(f *Filter, key, salt []byte) bool {
+	return f.Add(Hash(key, salt))
 }
 
 func Contains(c Checker, key, salt []byte) bool {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -37,7 +37,7 @@ func Test_newOutboundBuilder(t *testing.T) {
 				[]uint64{1000, 2000},
 			)
 			require.NoError(t, err)
-			t.Logf("outbound message with compression type %s built message with size %d", compressionType, len(outMsg.Bytes()))
+			t.Logf("outbound message with compression type %s built message with size %d", compressionType, len(outMsg.Bytes))
 		})
 	}
 }

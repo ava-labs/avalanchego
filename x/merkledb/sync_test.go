@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -7,7 +7,6 @@ import (
 	"context"
 	"math/rand"
 	"slices"
-	"sync"
 	"testing"
 	"time"
 
@@ -18,9 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/x/sync/synctest"
 
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
@@ -41,9 +40,9 @@ func Test_Creation(t *testing.T) {
 	require.NoError(err)
 
 	ctx := t.Context()
-	syncer, err := xsync.NewManager(
+	syncer, err := xsync.NewSyncer(
 		db,
-		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
+		xsync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(db, rangeProofMarshaler)),
@@ -261,9 +260,9 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				changeProofClient = tt.changeProofClient(dbToSync)
 			}
 
-			syncer, err := xsync.NewManager(
+			syncer, err := xsync.NewSyncer(
 				db,
-				xsync.ManagerConfig[*RangeProof, *ChangeProof]{
+				xsync.Config[*RangeProof, *ChangeProof]{
 					RangeProofMarshaler:   rangeProofMarshaler,
 					ChangeProofMarshaler:  changeProofMarshaler,
 					RangeProofClient:      rangeProofClient,
@@ -337,9 +336,9 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NoError(err)
 
 	ctx := t.Context()
-	syncer, err := xsync.NewManager(
+	syncer, err := xsync.NewSyncer(
 		db,
-		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
+		xsync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)),
@@ -362,9 +361,9 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	}, 5*time.Second, 5*time.Millisecond)
 	syncer.Close()
 
-	newSyncer, err := xsync.NewManager(
+	newSyncer, err := xsync.NewSyncer(
 		db,
-		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
+		xsync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)),
@@ -435,12 +434,21 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	)
 	require.NoError(err)
 
-	actionHandler := &p2p.TestHandler{}
+	var syncer *xsync.Syncer[*RangeProof, *ChangeProof]
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
 
-	ctx := t.Context()
-	syncer, err := xsync.NewManager(
+	// Allow 1 request to go through before blocking
+	actionHandler := synctest.NewCounterHandler(xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
+		err := syncer.UpdateSyncTarget(secondSyncRoot)
+		if err != nil {
+			cancel(err)
+		}
+	}, 1)
+
+	syncer, err = xsync.NewSyncer(
 		db,
-		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
+		xsync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
@@ -454,35 +462,19 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(syncer)
 
-	// Allow 1 request to go through before blocking
-	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)
-	updatedRootChan := make(chan struct{}, 1)
-	updatedRootChan <- struct{}{}
-	once := &sync.Once{}
-	actionHandler.AppRequestF = func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-		select {
-		case <-updatedRootChan:
-			// do nothing, allow 1 request to go through
-		default:
-			once.Do(func() {
-				require.NoError(syncer.UpdateSyncTarget(secondSyncRoot))
-			})
-		}
-		return rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
-	}
-
-	require.NoError(syncer.Start(t.Context()))
-	require.NoError(syncer.Wait(t.Context()))
+	require.NoError(syncer.Start(ctx))
+	require.NoError(syncer.Wait(ctx))
 	require.NoError(syncer.Error())
 
-	newRoot, err := db.GetMerkleRoot(t.Context())
+	newRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 	require.Equal(secondSyncRoot, newRoot)
 }
 
 func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require := require.New(t)
-	ctx := t.Context()
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -506,11 +498,16 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)
-	actionHandler := &p2p.TestHandler{}
-	m, err := xsync.NewManager(
+	var syncer *xsync.Syncer[*RangeProof, *ChangeProof]
+	actionHandler := synctest.NewCounterHandler(xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler), func() {
+		err := syncer.UpdateSyncTarget(root1)
+		if err != nil {
+			cancel(err)
+		}
+	}, 0)
+	syncer, err = xsync.NewSyncer(
 		db,
-		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
+		xsync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
@@ -523,16 +520,8 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// Update sync target on first request
-	once := &sync.Once{}
-	actionHandler.AppRequestF = func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-		once.Do(func() {
-			require.NoError(m.UpdateSyncTarget(root2))
-		})
-		return rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
-	}
-	require.NoError(m.Start(ctx))
-	require.NoError(m.Wait(ctx))
+	require.NoError(syncer.Start(ctx))
+	require.NoError(syncer.Wait(ctx))
 }
 
 func generateTrie(t *testing.T, r *rand.Rand, count int) (MerkleDB, error) {
