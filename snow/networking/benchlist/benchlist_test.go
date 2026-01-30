@@ -31,18 +31,14 @@ func (b *benchable) Benched(chainID ids.ID, nodeID ids.NodeID) {
 	require.Equal(b.t, b.wantChainID, chainID)
 	require.NotContains(b.t, b.benched, nodeID)
 	b.benched.Add(nodeID)
-	if b.updated != nil {
-		b.updated <- struct{}{}
-	}
+	b.updated <- struct{}{}
 }
 
 func (b *benchable) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 	require.Equal(b.t, b.wantChainID, chainID)
 	require.Contains(b.t, b.benched, nodeID)
 	b.benched.Remove(nodeID)
-	if b.updated != nil {
-		b.updated <- struct{}{}
-	}
+	b.updated <- struct{}{}
 }
 
 func TestBenchlist(t *testing.T) {
