@@ -81,12 +81,11 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 	startKey := leafsRequest.StartKey()
 	endKey := leafsRequest.EndKey()
 	root := leafsRequest.RootHash()
-	limitValue := leafsRequest.KeyLimit()
 
 	if (len(endKey) > 0 && bytes.Compare(startKey, endKey) > 0) ||
 		root == (common.Hash{}) ||
 		root == types.EmptyRootHash ||
-		limitValue == 0 {
+		leafsRequest.KeyLimit() == 0 {
 		log.Debug("invalid leafs request, dropping request", "nodeID", nodeID, "requestID", requestID, "request", leafsRequest)
 		lrh.stats.IncInvalidLeafsRequest()
 		return nil, nil
@@ -109,7 +108,7 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		return nil, nil
 	}
 	// override limit if it is greater than the configured maxLeavesLimit
-	limit := limitValue
+	limit := leafsRequest.KeyLimit()
 	if limit > maxLeavesLimit {
 		limit = maxLeavesLimit
 	}

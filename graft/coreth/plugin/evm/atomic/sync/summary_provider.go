@@ -48,7 +48,7 @@ func (a *SummaryProvider) StateSummaryAtBlock(blk *ethtypes.Block) (block.StateS
 
 // Parse parses the summary bytes into a Syncable summary.
 func (*SummaryProvider) Parse(summaryBytes []byte, acceptImpl message.AcceptImplFn) (message.Syncable, error) {
-	summary := Summary{}
+	var summary Summary
 	summaryID, err := message.ParseSyncableSummary(message.CorethCodec, summaryBytes, &summary)
 	if err != nil {
 		return nil, err

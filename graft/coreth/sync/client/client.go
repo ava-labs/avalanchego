@@ -136,9 +136,9 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 	leafsRequest := reqIntf.(message.LeafsRequest)
 
 	// Ensure the response does not contain more than the maximum requested number of leaves.
-	limitValue := leafsRequest.KeyLimit()
-	if len(leafsResponse.Keys) > int(limitValue) || len(leafsResponse.Vals) > int(limitValue) {
-		return nil, 0, fmt.Errorf("%w: (%d) > %d)", errTooManyLeaves, len(leafsResponse.Keys), limitValue)
+	limit := leafsRequest.KeyLimit()
+	if len(leafsResponse.Keys) > int(limit) || len(leafsResponse.Vals) > int(limit) {
+		return nil, 0, fmt.Errorf("%w: (%d) > %d)", errTooManyLeaves, len(leafsResponse.Keys), limit)
 	}
 
 	// An empty response (no more keys) requires a merkle proof
