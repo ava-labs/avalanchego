@@ -29,6 +29,8 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
+const subnetEVMCodecName = "subnet-evm"
+
 func TestGetCode(t *testing.T) {
 	tests := map[string]struct {
 		setupRequest func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte)
@@ -162,7 +164,7 @@ func TestGetBlocks(t *testing.T) {
 				Height:  100,
 				Parents: 16,
 			},
-			getResponse: func(t *testing.T, c codec.Manager, blocksRequestHandler *handlers.BlockRequestHandler, request message.BlockRequest) []byte {
+			getResponse: func(t *testing.T, _ codec.Manager, blocksRequestHandler *handlers.BlockRequestHandler, request message.BlockRequest) []byte {
 				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response, "Failed to generate valid response")
@@ -179,7 +181,7 @@ func TestGetBlocks(t *testing.T) {
 				Height:  100,
 				Parents: 16,
 			},
-			getResponse: func(t *testing.T, c codec.Manager, blocksRequestHandler *handlers.BlockRequestHandler, request message.BlockRequest) []byte {
+			getResponse: func(t *testing.T, _ codec.Manager, blocksRequestHandler *handlers.BlockRequestHandler, request message.BlockRequest) []byte {
 				request.Parents -= 5
 				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
@@ -230,7 +232,7 @@ func TestGetBlocks(t *testing.T) {
 				Height:  100,
 				Parents: 16,
 			},
-			getResponse: func(t *testing.T, c codec.Manager, blocksRequestHandler *handlers.BlockRequestHandler, _ message.BlockRequest) []byte {
+			getResponse: func(t *testing.T, _ codec.Manager, blocksRequestHandler *handlers.BlockRequestHandler, _ message.BlockRequest) []byte {
 				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, message.BlockRequest{
 					Hash:    blocks[99].Hash(),
 					Height:  99,
@@ -389,7 +391,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, _ codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, _ message.LeafsRequestType) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response)
@@ -414,7 +416,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, _ codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
 				modifiedRequest := newLeafsRequest(t,
 					leafReqType,
 					request.RootHash(),
@@ -444,7 +446,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, _ codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, _ message.LeafsRequestType) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response)
@@ -469,7 +471,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, _ codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, _ message.LeafsRequestType) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response)
@@ -494,7 +496,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, _ codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, _ message.LeafsRequestType) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response)
@@ -519,7 +521,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, _ codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, _ message.LeafsRequestType) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response)
@@ -544,7 +546,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, _ message.LeafsRequestType) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response)
@@ -607,7 +609,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, _ message.LeafsRequestType) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response)
@@ -635,7 +637,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, _ message.LeafsRequestType) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response)
@@ -664,7 +666,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, _ message.LeafsRequestType) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response)
@@ -692,7 +694,7 @@ func TestGetLeafs(t *testing.T) {
 					message.StateTrieNode,
 				)
 			},
-			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
+			getResponse: func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, _ message.LeafsRequestType) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				require.NoError(t, err)
 				require.NotEmpty(t, response)
@@ -713,7 +715,7 @@ func TestGetLeafs(t *testing.T) {
 	for name, test := range tests {
 		utilstest.ForEachCodec(t, func(codecName string, c codec.Manager) {
 			leafReqType := message.CorethLeafsRequestType
-			if codecName == "subnet-evm" {
+			if codecName == subnetEVMCodecName {
 				leafReqType = message.SubnetEVMLeafsRequestType
 			}
 			handler := handlers.NewLeafsRequestHandler(
@@ -757,7 +759,7 @@ func TestGetLeafsRetries(t *testing.T) {
 
 	utilstest.ForEachCodec(t, func(codecName string, c codec.Manager) {
 		leafReqType := message.CorethLeafsRequestType
-		if codecName == "subnet-evm" {
+		if codecName == subnetEVMCodecName {
 			leafReqType = message.SubnetEVMLeafsRequestType
 		}
 		handler := handlers.NewLeafsRequestHandler(
@@ -824,7 +826,7 @@ func TestGetLeafsRetries(t *testing.T) {
 func TestStateSyncNodes(t *testing.T) {
 	utilstest.ForEachCodec(t, func(codecName string, c codec.Manager) {
 		leafReqType := message.CorethLeafsRequestType
-		if codecName == "subnet-evm" {
+		if codecName == subnetEVMCodecName {
 			leafReqType = message.SubnetEVMLeafsRequestType
 		}
 		testNetClient := &testNetwork{}
