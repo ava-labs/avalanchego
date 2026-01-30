@@ -52,7 +52,7 @@ tasks:
   build-subnet-evm-image:
     desc: Builds docker image for subnet-evm
     dir: graft/subnet-evm
-    cmd: ./scripts/build_docker_image.sh
+    cmd: ./scripts/build_image.sh
 
   build-tmpnetctl:
     desc: Builds tmpnetctl

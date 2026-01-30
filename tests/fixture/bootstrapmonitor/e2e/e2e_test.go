@@ -257,6 +257,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	) // #nosec G204
 	cmd.Env = append(os.Environ(),
 		"DOCKER_IMAGE="+imageName,
+		"PUSH=1",
 		"FORCE_TAG_MASTER=1",
 		"SKIP_BUILD_RACE=1",
 	)

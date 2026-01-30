@@ -17,7 +17,7 @@ AVALANCHEGO_IMAGE="localhost:5001/avalanchego"
 if [[ -n "${SKIP_BUILD_IMAGE:-}" ]]; then
   echo "Skipping build of avalanchego image due to SKIP_BUILD_IMAGE=${SKIP_BUILD_IMAGE}"
 else
-  DOCKER_IMAGE="$AVALANCHEGO_IMAGE" FORCE_TAG_MASTER=1 ./scripts/build_image.sh
+  DOCKER_IMAGE="$AVALANCHEGO_IMAGE" PUSH=1 FORCE_TAG_MASTER=1 ./scripts/build_image.sh
 fi
 
 # Determine kubeconfig context to use
