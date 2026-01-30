@@ -110,14 +110,16 @@ func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 }
 
 func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
-	if b.vdrs.GetWeight(b.ctx.SubnetID, nodeID) == 0 {
-		return // Don't bench non-validators
-	}
-
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
 	n, ok := b.nodes[nodeID]
+	if weight := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID); weight == 0 && (!ok || !n.isBenched) {
+		// Don't track non-validators unless they're already benched to avoid
+		// excess memory pressure.
+		return
+	}
+
 	if !ok {
 		n = &node{
 			failureProbability: math.NewUninitializedAverager(halflife),
