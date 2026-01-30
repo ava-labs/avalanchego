@@ -8,6 +8,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth"
 )
 
+var _ engine.ChainContext = (*chainContextAdapter)(nil)
+
 // chainContextAdapter adapts *eth.Ethereum to implement engine.ChainContext.
 // This is needed because eth.Ethereum.BlockChain() returns *core.BlockChain
 // while the interface expects engine.BlockChain.
