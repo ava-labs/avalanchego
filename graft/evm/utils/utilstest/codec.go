@@ -11,14 +11,14 @@ import (
 )
 
 // ForEachCodec runs fn as a subtest for each supported codec (coreth and subnet-evm).
-func ForEachCodec(t *testing.T, fn func(name string, c codec.Manager)) {
+func ForEachCodec(t *testing.T, fn func(string, codec.Manager)) {
 	t.Helper()
 	codecs := map[string]codec.Manager{
 		"coreth":     message.CorethCodec,
 		"subnet-evm": message.SubnetEVMCodec,
 	}
 	for name, c := range codecs {
-		t.Run(name, func(_ *testing.T) {
+		t.Run(name, func(*testing.T) {
 			fn(name, c)
 		})
 	}
