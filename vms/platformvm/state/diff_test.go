@@ -1180,8 +1180,7 @@ func TestDiffUpdateValidator(t *testing.T) {
 	mutatedValidator = *currentValidator
 	mutatedValidator.Weight = 45
 
-	err = d.UpdateCurrentValidator(&mutatedValidator)
-	require.NoError(err)
+	require.NoError(d.UpdateCurrentValidator(&mutatedValidator))
 
 	currentValidator, err = d.GetCurrentValidator(subnetID, validator.NodeID)
 	require.NoError(err)
