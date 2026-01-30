@@ -110,6 +110,24 @@ if [[ -n "$TEST_NAME" ]]; then
             START_BLOCK="${START_BLOCK:-33000001}"
             END_BLOCK="${END_BLOCK:-33500000}"
             ;;
+        hashdb-69m-69m100k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-69m-70m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-full-69m}"
+            START_BLOCK="${START_BLOCK:-69000001}"
+            END_BLOCK="${END_BLOCK:-69100000}"
+            ;;
+        hashdb-archive-69m-69m100k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-69m-70m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-archive-69m}"
+            START_BLOCK="${START_BLOCK:-69000001}"
+            END_BLOCK="${END_BLOCK:-69100000}"
+            ;;
+        hashdb-statesync-69m-69m100k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-69m-70m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-statesync-checkpoint-69m}"
+            START_BLOCK="${START_BLOCK:-69000001}"
+            END_BLOCK="${END_BLOCK:-69100000}"
+            ;;
         firewood-101-250k)
             BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-1m-ldb}"
             CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-100}"
