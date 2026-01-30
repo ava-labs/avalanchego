@@ -104,8 +104,17 @@ func TestBenchlist(t *testing.T) {
 
 	for range 8 {
 		b.RegisterResponse(vdrID)
-	}
-	// p = 2 / 11
+	} // p = 2 / 11
 	<-benchable.updated
 	requireNoBenchings()
+
+	// p = 1 / 5.5
+	now = now.Add(halflife)
+	b.clock.Set(now)
+
+	for range 4 {
+		b.RegisterFailure(vdrID)
+	} // p = 5 / 9.5
+	<-benchable.updated
+	requireBenched()
 }
