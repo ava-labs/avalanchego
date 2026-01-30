@@ -413,6 +413,10 @@ func (*inputOutputGetter) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return fmt.Errorf("%w: RewardValidatorTx", ErrUnsupportedTxType)
 }
 
+func (*inputOutputGetter) RewardContinuousValidatorTx(*txs.RewardContinuousValidatorTx) error {
+	return fmt.Errorf("%w: RewardContinuousValidatorTx", ErrUnsupportedTxType)
+}
+
 func (i *inputOutputGetter) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	i.getUTXOs(tx.BaseTx)
 
@@ -507,6 +511,19 @@ func (i *inputOutputGetter) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Valid
 }
 
 func (i *inputOutputGetter) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
+func (i *inputOutputGetter) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
+
+	return nil
+}
+
+func (i *inputOutputGetter) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfigTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	return nil

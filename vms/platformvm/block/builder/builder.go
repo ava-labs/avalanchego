@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -323,7 +322,12 @@ func buildBlock(
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
 	if shouldReward {
-		rewardValidatorTx, err := NewRewardValidatorTx(builder.txExecutorBackend.Ctx, stakerTxID)
+		stakerTx, _, err := parentState.GetTx(stakerTxID)
+		if err != nil {
+			return nil, err
+		}
+
+		rewardValidatorTx, err := txs.NewRewardTxForStaker(builder.txExecutorBackend.Ctx, stakerTx, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
@@ -631,13 +635,4 @@ func getNextStakerToReward(
 		}
 	}
 	return ids.Empty, false, nil
-}
-
-func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
-	utx := &txs.RewardValidatorTx{TxID: txID}
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
-	if err != nil {
-		return nil, err
-	}
-	return tx, tx.SyntacticVerify(ctx)
 }

@@ -179,7 +179,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		require.NoError(blk.Verify(t.Context()))
 		require.IsType(&block.BanffProposalBlock{}, blk.(*blockexecutor.Block).Block)
 
-		expectedTx, err := NewRewardValidatorTx(env.ctx, staker.TxID)
+		expectedTx, err := txs.NewRewardValidatorTx(env.ctx, staker.TxID)
 		require.NoError(err)
 		require.Equal([]*txs.Tx{expectedTx}, blk.(*blockexecutor.Block).Block.Txs())
 
