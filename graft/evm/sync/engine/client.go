@@ -114,6 +114,10 @@ type ClientConfig struct {
 	RequestSize        uint16 // number of key/value pairs to ask peers for per request
 	Enabled            bool
 	SkipResume         bool
+
+	// LeafsRequestType specifies the wire format for leafs requests.
+	// Defaults to CorethLeafsRequestType if not set.
+	LeafsRequestType message.LeafsRequestType
 }
 
 type client struct {
@@ -394,6 +398,7 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		c.config.Client, c.config.ChainDB,
 		summary.GetBlockRoot(),
 		codeQueue, c.config.RequestSize,
+		evmstate.WithLeafsRequestType(c.config.LeafsRequestType),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)

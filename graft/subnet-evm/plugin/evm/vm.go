@@ -722,6 +722,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		Acceptor:            vm,
 		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
 		Extender:            nil,
+		LeafsRequestType:    message.SubnetEVMLeafsRequestType,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
