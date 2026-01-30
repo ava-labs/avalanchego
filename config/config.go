@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
@@ -417,27 +416,6 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkReadHandshakeTimeoutKey)
 	case config.MaxClockDifference < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
-	}
-	return config, nil
-}
-
-func getBenchlistConfig(v *viper.Viper, consensusParameters snowball.Parameters) (benchlist.Config, error) {
-	// AlphaConfidence is used here to ensure that benching can't cause a
-	// liveness failure. If AlphaPreference were used, the benchlist may grow to
-	// a point that committing would be extremely unlikely to happen.
-	alpha := consensusParameters.AlphaConfidence
-	k := consensusParameters.K
-	config := benchlist.Config{
-		Threshold:              v.GetInt(BenchlistFailThresholdKey),
-		Duration:               v.GetDuration(BenchlistDurationKey),
-		MinimumFailingDuration: v.GetDuration(BenchlistMinFailingDurationKey),
-		MaxPortion:             (1.0 - (float64(alpha) / float64(k))) / 3.0,
-	}
-	switch {
-	case config.Duration < 0:
-		return benchlist.Config{}, fmt.Errorf("%q must be >= 0", BenchlistDurationKey)
-	case config.MinimumFailingDuration < 0:
-		return benchlist.Config{}, fmt.Errorf("%q must be >= 0", BenchlistMinFailingDurationKey)
 	}
 	return config, nil
 }
@@ -1351,12 +1329,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ProposerMinBlockDelay = v.GetDuration(ProposerVMMinBlockDelayKey)
 	nodeConfig.SubnetConfigs = subnetConfigs
-
-	// Benchlist
-	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.ConsensusParameters)
-	if err != nil {
-		return node.Config{}, err
-	}
 
 	// File Descriptor Limit
 	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)

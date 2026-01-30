@@ -106,7 +106,7 @@ func (m *manager) TimeoutDuration() time.Duration {
 // IsBenched returns true if messages to [nodeID] regarding [chainID]
 // should not be sent over the network and should immediately fail.
 func (m *manager) IsBenched(nodeID ids.NodeID, chainID ids.ID) bool {
-	return m.benchlistMgr.IsBenched(nodeID, chainID)
+	return m.benchlistMgr.IsBenched(chainID, nodeID)
 }
 
 func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {

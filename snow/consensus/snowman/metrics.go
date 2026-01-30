@@ -16,10 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const (
-	unusuallyLongConsensusThreshold = 5 * time.Second
-)
-
+const unusuallyLongConsensusThreshold = 5 * time.Second
 
 type processingStart struct {
 	time       time.Time
