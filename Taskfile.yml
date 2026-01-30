@@ -156,7 +156,7 @@ tasks:
     cmds:
       - cmd: go mod tidy
       - cmd: go mod tidy
-        dir: external/tools
+        dir: tools/external
       - cmd: go mod tidy
         dir: graft/evm
       - cmd: go mod tidy
