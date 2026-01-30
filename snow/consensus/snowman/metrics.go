@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+const acceptanceTimeSmoothingFactor = 5 * time.Minute
+
 type processingStart struct {
 	time       time.Time
 	pollNumber uint64
@@ -144,8 +146,8 @@ func newMetrics(
 			Help: "number of failed polls",
 		}),
 		avgAcceptanceTime: math.NewMaturedAverager(
-			5*time.Minute,
-			math.NewUninitializedAverager(5*time.Minute),
+			acceptanceTimeSmoothingFactor,
+			math.NewUninitializedAverager(acceptanceTimeSmoothingFactor),
 		),
 		avgAcceptanceTimeGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
