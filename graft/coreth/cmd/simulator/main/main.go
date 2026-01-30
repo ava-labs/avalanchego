@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/load"
-	"github.com/ava-labs/avalanchego/graft/coreth/log"
+	"github.com/ava-labs/avalanchego/graft/evm/log"
 
 	gethlog "github.com/ava-labs/libevm/log"
 )

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package customheader
@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/etna"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 )
@@ -40,7 +40,7 @@ func TestBaseFee(t *testing.T) {
 		{
 			name: "ap3_first_block",
 			upgrades: extras.NetworkUpgrades{
-				ApricotPhase3BlockTimestamp: utils.NewUint64(1),
+				ApricotPhase3BlockTimestamp: utils.PointerTo[uint64](1),
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -347,7 +347,7 @@ func TestBaseFee(t *testing.T) {
 		{
 			name: "fortuna_first_block",
 			upgrades: extras.NetworkUpgrades{
-				FortunaTimestamp: utils.NewUint64(1),
+				FortunaTimestamp: utils.PointerTo[uint64](1),
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -409,7 +409,7 @@ func TestBaseFee(t *testing.T) {
 				Time:   1,
 				Extra:  (&acp176.State{}).Bytes(),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: utils.NewUint64(1000),
+				TimeMilliseconds: utils.PointerTo[uint64](1000),
 			}),
 			timeMS:  0,
 			wantErr: errInvalidTimestamp,
@@ -417,8 +417,8 @@ func TestBaseFee(t *testing.T) {
 		{
 			name: "granite_first_block_with_state",
 			upgrades: extras.NetworkUpgrades{
-				FortunaTimestamp: utils.NewUint64(1),
-				GraniteTimestamp: utils.NewUint64(1),
+				FortunaTimestamp: utils.PointerTo[uint64](1),
+				GraniteTimestamp: utils.PointerTo[uint64](1),
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -430,8 +430,8 @@ func TestBaseFee(t *testing.T) {
 		{
 			name: "granite_first_block_after_fortuna",
 			upgrades: extras.NetworkUpgrades{
-				FortunaTimestamp: utils.NewUint64(0),
-				GraniteTimestamp: utils.NewUint64(1),
+				FortunaTimestamp: utils.PointerTo[uint64](0),
+				GraniteTimestamp: utils.PointerTo[uint64](1),
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),

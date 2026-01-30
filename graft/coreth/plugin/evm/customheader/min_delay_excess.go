@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package customheader
@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	errRemoteMinDelayExcessSet = errors.New("remote min delay excess should be nil")
 	errRemoteMinDelayExcessNil = errors.New("remote min delay excess should not be nil")
 	errIncorrectMinDelayExcess = errors.New("incorrect min delay excess")
 	errParentMinDelayExcessNil = errors.New("parent min delay excess should not be nil")
@@ -48,39 +47,35 @@ func VerifyMinDelayExcess(
 	parent *types.Header,
 	header *types.Header,
 ) error {
-	switch {
-	case config.IsGranite(header.Time):
-		remoteDelayExcess := customtypes.GetHeaderExtra(header).MinDelayExcess
-		if remoteDelayExcess == nil {
-			return fmt.Errorf("%w: %s", errRemoteMinDelayExcessNil, header.Hash())
-		}
-		// By passing in the claimed excess, we ensure that the expected
-		// excess is equal to the claimed excess if it is possible
-		// to have correctly set it to that value. Otherwise, the resulting
-		// value will be as close to the claimed value as possible, but would
-		// not be equal.
-		expectedDelayExcess, err := minDelayExcess(
-			config,
-			parent,
-			remoteDelayExcess,
-		)
-		if err != nil {
-			return fmt.Errorf("calculating expected min delay excess: %w", err)
-		}
+	if !config.IsGranite(header.Time) {
+		return nil
+	}
 
-		if *remoteDelayExcess != expectedDelayExcess {
-			return fmt.Errorf("%w: expected %d, found %d",
-				errIncorrectMinDelayExcess,
-				expectedDelayExcess,
-				*remoteDelayExcess,
-			)
-		}
-	default:
-		// Prior to Granite there was no expected min delay excess.
-		// TODO (ceyonur): this can be removed after Granite is activated. (See https://github.com/ava-labs/avalanchego/graft/coreth/issues/1318)
-		if customtypes.GetHeaderExtra(header).MinDelayExcess != nil {
-			return fmt.Errorf("%w: %s", errRemoteMinDelayExcessSet, header.Hash())
-		}
+	remoteDelayExcess := customtypes.GetHeaderExtra(header).MinDelayExcess
+	if remoteDelayExcess == nil {
+		return fmt.Errorf("%w: %s", errRemoteMinDelayExcessNil, header.Hash())
+	}
+
+	// By passing in the claimed excess, we ensure that the expected
+	// excess is equal to the claimed excess if it is possible
+	// to have correctly set it to that value. Otherwise, the resulting
+	// value will be as close to the claimed value as possible, but would
+	// not be equal.
+	expectedDelayExcess, err := minDelayExcess(
+		config,
+		parent,
+		remoteDelayExcess,
+	)
+	if err != nil {
+		return fmt.Errorf("calculating expected min delay excess: %w", err)
+	}
+
+	if *remoteDelayExcess != expectedDelayExcess {
+		return fmt.Errorf("%w: expected %d, found %d",
+			errIncorrectMinDelayExcess,
+			expectedDelayExcess,
+			*remoteDelayExcess,
+		)
 	}
 	return nil
 }
@@ -95,7 +90,7 @@ func minDelayExcess(
 	parent *types.Header,
 	desiredMinDelayExcess *acp226.DelayExcess,
 ) (acp226.DelayExcess, error) {
-	minDelayExcess := acp226.DelayExcess(acp226.InitialDelayExcess)
+	minDelayExcess := acp226.InitialDelayExcess
 	if config.IsGranite(parent.Time) {
 		// If the parent block was running with ACP-226, we start with the
 		// resulting min delay excess from the parent block.

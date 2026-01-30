@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package emulate provides temporary emulation of coreth (C-Chain) and
@@ -9,7 +9,7 @@ package emulate
 
 import (
 	cchain "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
-	subnet "github.com/ava-labs/subnet-evm/plugin/evm"
+	subnet "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 )
 
 // CChain executes `fn` as if running in a `coreth` node.

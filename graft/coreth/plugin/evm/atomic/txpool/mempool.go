@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txpool
@@ -15,10 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
 var (
-	_ gossip.Set[*atomic.Tx] = (*Mempool)(nil)
+	_ gossip.SystemSet[*atomic.Tx] = (*Mempool)(nil)
 
 	ErrAlreadyKnown    = errors.New("already known")
 	ErrConflict        = errors.New("conflict present")
@@ -298,9 +299,9 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	return nil
 }
 
-func (m *Mempool) GetFilter() ([]byte, []byte) {
+func (m *Mempool) BloomFilter() (*bloom.Filter, ids.ID) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	return m.bloom.Marshal()
+	return m.bloom.BloomFilter()
 }

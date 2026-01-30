@@ -9,7 +9,7 @@ set -euo pipefail
 # DOCKER_IMAGE=myavalanchego ./scripts/build_image.sh                                 # Build local single arch image with a custom image name
 # DOCKER_IMAGE=avaplatform/avalanchego ./scripts/build_image.sh                       # Build and push multi-arch image to docker hub
 # DOCKER_IMAGE=localhost:5001/avalanchego ./scripts/build_image.sh                    # Build and push multi-arch image to private registry
-# DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_LATEST=1 ./scripts/build_image.sh # Build and push image to private registry with tag `latest`
+# DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_MASTER=1 ./scripts/build_image.sh # Build and push image to private registry with tag `master`
 
 # Multi-arch builds require Docker Buildx and QEMU. buildx should be enabled by
 # default in the version of docker included with Ubuntu 22.04, and qemu can be
@@ -32,8 +32,8 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Skip building the race image
 SKIP_BUILD_RACE="${SKIP_BUILD_RACE:-}"
 
-# Force tagging as latest even if not the master branch
-FORCE_TAG_LATEST="${FORCE_TAG_LATEST:-}"
+# Force tagging as master for testing purposes
+FORCE_TAG_MASTER="${FORCE_TAG_MASTER:-}"
 
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
@@ -116,8 +116,14 @@ if [[ -z "${SKIP_BUILD_RACE}" ]]; then
                  "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 fi
 
-# Only tag the latest image for the master branch when images are pushed to a registry
-if [[ "${DOCKER_IMAGE}" == *"/"* && ($image_tag == "master" || -n "${FORCE_TAG_LATEST}") ]]; then
+# Tag latest when pushing to a registry and the tag is a release (vMAJOR.MINOR.PATCH)
+if [[ "${DOCKER_IMAGE}" == *"/"* && $image_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Tagging current avalanchego images as $DOCKER_IMAGE:latest"
   docker buildx imagetools create -t "$DOCKER_IMAGE:latest" "$DOCKER_IMAGE:$commit_hash"
+fi
+
+# Forcibly tag the image as `master` if requested. This is only intended to be used for testing.
+if [[ "${DOCKER_IMAGE}" == *"/"* && -n "${FORCE_TAG_MASTER}" ]]; then
+  echo "Tagging current avalanchego images as $DOCKER_IMAGE:master"
+  docker buildx imagetools create -t "$DOCKER_IMAGE:master" "$DOCKER_IMAGE:$commit_hash"
 fi

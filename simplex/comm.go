@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -82,6 +82,11 @@ func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
 		return
 	}
 
+	if outboundMsg == nil {
+		c.logger.Debug("Outbound message is nil")
+		return
+	}
+
 	dest, err := ids.ToNodeID(destination)
 	if err != nil {
 		c.logger.Error("Failed to convert destination NodeID", zap.Error(err))
@@ -101,7 +106,7 @@ func (c *Comm) Broadcast(msg *simplex.Message) {
 	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: c.broadcastNodes}, c.subnetID, subnets.NoOpAllower)
 }
 
-func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.OutboundMessage, error) {
+func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (*message.OutboundMessage, error) {
 	var simplexMsg *p2p.Simplex
 	switch {
 	case msg.VerifiedBlockMessage != nil:

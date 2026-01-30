@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -15,11 +15,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	atomicstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
-	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
 const (
@@ -31,8 +31,9 @@ const (
 )
 
 var (
-	_ sync.Syncer             = (*Syncer)(nil)
-	_ syncclient.LeafSyncTask = (*syncerLeafTask)(nil)
+	_ types.Syncer    = (*Syncer)(nil)
+	_ types.Finalizer = (*Syncer)(nil)
+	_ leaf.SyncTask   = (*syncerLeafTask)(nil)
 
 	errTargetHeightRequired = errors.New("target height must be > 0")
 )
@@ -80,7 +81,7 @@ type Syncer struct {
 	targetHeight uint64
 
 	// syncer is used to sync leaves from the network.
-	syncer *syncclient.CallbackLeafSyncer
+	syncer *leaf.CallbackSyncer
 
 	// lastHeight is the greatest height for which key / values
 	// were last inserted into the [atomicTrie]
@@ -88,7 +89,7 @@ type Syncer struct {
 }
 
 // NewSyncer returns a new syncer instance that will sync the atomic trie from the network.
-func NewSyncer(client syncclient.LeafClient, db *versiondb.Database, atomicTrie *atomicstate.AtomicTrie, targetRoot common.Hash, targetHeight uint64, opts ...SyncerOption) (*Syncer, error) {
+func NewSyncer(client leaf.Client, db *versiondb.Database, atomicTrie *atomicstate.AtomicTrie, targetRoot common.Hash, targetHeight uint64, opts ...SyncerOption) (*Syncer, error) {
 	if targetHeight == 0 {
 		return nil, errTargetHeightRequired
 	}
@@ -115,17 +116,16 @@ func NewSyncer(client syncclient.LeafClient, db *versiondb.Database, atomicTrie 
 	}
 
 	// Create tasks channel with capacity for the number of workers.
-	tasks := make(chan syncclient.LeafSyncTask, cfg.numWorkers)
+	tasks := make(chan leaf.SyncTask, cfg.numWorkers)
 
 	// For atomic trie syncing, we typically want a single task since the trie is sequential.
 	// But we can create multiple tasks if needed for parallel processing of different ranges.
 	tasks <- &syncerLeafTask{syncer: syncer}
 	close(tasks)
 
-	syncer.syncer = syncclient.NewCallbackLeafSyncer(client, tasks, &syncclient.LeafSyncerConfig{
+	syncer.syncer = leaf.NewCallbackSyncer(client, tasks, &leaf.SyncerConfig{
 		RequestSize: cfg.requestSize,
 		NumWorkers:  cfg.numWorkers,
-		OnFailure:   func() {}, // No-op since we flush progress to disk at the regular commit interval.
 	})
 
 	return syncer, nil
@@ -144,6 +144,13 @@ func (*Syncer) ID() string {
 // Sync begins syncing the target atomic root with the configured number of worker goroutines.
 func (s *Syncer) Sync(ctx context.Context) error {
 	return s.syncer.Sync(ctx)
+}
+
+// Finalize commits any pending database changes to disk.
+// This ensures that even if the sync is cancelled or fails, we preserve
+// the progress up to the last fully synced height.
+func (s *Syncer) Finalize() error {
+	return s.db.Commit()
 }
 
 // addZeroes returns the big-endian representation of `height`, prefixed with [common.HashLength] zeroes.

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bloom
@@ -42,6 +42,19 @@ func TestNewErrors(t *testing.T) {
 	}
 }
 
+func TestAdd(t *testing.T) {
+	require := require.New(t)
+
+	initialNumHashes, initialNumBytes := OptimalParameters(1024, 0.01)
+	filter, err := New(initialNumHashes, initialNumBytes)
+	require.NoError(err)
+
+	require.True(filter.Add(1))
+	require.Equal(1, filter.Count())
+	require.False(filter.Add(1))
+	require.Equal(1, filter.Count())
+}
+
 func TestNormalUsage(t *testing.T) {
 	require := require.New(t)
 
@@ -61,7 +74,7 @@ func TestNormalUsage(t *testing.T) {
 		}
 	}
 
-	require.Equal(len(toAdd), filter.Count())
+	require.LessOrEqual(filter.Count(), len(toAdd))
 
 	filterBytes := filter.Marshal()
 	parsedFilter, err := Parse(filterBytes)
