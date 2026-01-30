@@ -40,15 +40,16 @@ var (
 
 // stateSync keeps the state of the entire state sync operation.
 type stateSync struct {
-	db        ethdb.Database            // database we are syncing
-	root      common.Hash               // root of the EVM state we are syncing to
-	trieDB    *triedb.Database          // trieDB on top of db we are syncing. used to restore any existing tries.
-	snapshot  snapshot.SnapshotIterable // used to access the database we are syncing as a snapshot.
-	batchSize uint                      // write batches when they reach this size
-	segments  chan leaf.SyncTask        // channel of tasks to sync
-	syncer    *leaf.CallbackSyncer      // performs the sync, looping over each task's range and invoking specified callbacks
-	codeQueue *code.Queue               // queue that manages the asynchronous download and batching of code hashes
-	trieQueue *trieQueue                // manages a persistent list of storage tries we need to sync and any segments that are created for them
+	db               ethdb.Database            // database we are syncing
+	root             common.Hash               // root of the EVM state we are syncing to
+	trieDB           *triedb.Database          // trieDB on top of db we are syncing. used to restore any existing tries.
+	snapshot         snapshot.SnapshotIterable // used to access the database we are syncing as a snapshot.
+	batchSize        uint                      // write batches when they reach this size
+	leafsRequestType message.LeafsRequestType  // type of leafs request to use (coreth or subnet-evm wire format)
+	segments         chan leaf.SyncTask        // channel of tasks to sync
+	syncer           *leaf.CallbackSyncer      // performs the sync, looping over each task's range and invoking specified callbacks
+	codeQueue        *code.Queue               // queue that manages the asynchronous download and batching of code hashes
+	trieQueue        *trieQueue                // manages a persistent list of storage tries we need to sync and any segments that are created for them
 
 	// track the main account trie specifically to commit its root at the end of the operation
 	mainTrie *trieToSync
@@ -80,6 +81,13 @@ func WithBatchSize(n uint) SyncerOption {
 	})
 }
 
+// WithLeafsRequestType sets the leafs request type (coreth or subnet-evm wire format).
+func WithLeafsRequestType(t message.LeafsRequestType) SyncerOption {
+	return options.Func[stateSync](func(s *stateSync) {
+		s.leafsRequestType = t
+	})
+}
+
 func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue, leafsRequestSize uint16, opts ...SyncerOption) (types.Syncer, error) {
 	if leafsRequestSize == 0 {
 		return nil, errLeafsRequestSizeRequired
@@ -87,12 +95,13 @@ func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQu
 
 	// Construct with defaults, then apply options directly to stateSync.
 	ss := &stateSync{
-		db:              db,
-		root:            root,
-		trieDB:          triedb.NewDatabase(db, nil),
-		snapshot:        snapshot.NewDiskLayer(db),
-		stats:           newTrieSyncStats(),
-		triesInProgress: make(map[common.Hash]*trieToSync),
+		db:               db,
+		root:             root,
+		trieDB:           triedb.NewDatabase(db, nil),
+		snapshot:         snapshot.NewDiskLayer(db),
+		stats:            newTrieSyncStats(),
+		triesInProgress:  make(map[common.Hash]*trieToSync),
+		leafsRequestType: message.CorethLeafsRequestType, // default to coreth wire format
 
 		// [triesInProgressSem] is used to keep the number of tries syncing
 		// less than or equal to [defaultNumWorkers].
@@ -113,7 +122,7 @@ func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQu
 	ss.syncer = leaf.NewCallbackSyncer(client, ss.segments, &leaf.SyncerConfig{
 		RequestSize:      leafsRequestSize,
 		NumWorkers:       defaultNumWorkers,
-		LeafsRequestType: message.CorethLeafsRequestType,
+		LeafsRequestType: ss.leafsRequestType,
 	})
 
 	if codeQueue == nil {
