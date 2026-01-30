@@ -147,9 +147,12 @@ func (ts *Topological) NumProcessing() int {
 func (ts *Topological) Add(blk Block) error {
 	blkID := blk.ID()
 	height := blk.Height()
-	ts.ctx.Log.Verbo("adding block",
+	parentID := blk.Parent()
+	ts.ctx.Log.Trace("adding block",
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", height),
+		zap.Time("timestamp", blk.Timestamp()),
+		zap.Stringer("parentID", parentID),
 	)
 
 	// Make sure a block is not inserted twice.
@@ -160,7 +163,6 @@ func (ts *Topological) Add(blk Block) error {
 	ts.metrics.Verified(height)
 	ts.metrics.Issued(blkID, ts.pollNumber)
 
-	parentID := blk.Parent()
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
 		return errUnknownParentBlock
@@ -614,6 +616,7 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 		zap.Stringer("blkID", pref),
 		zap.Uint64("height", height),
 		zap.Time("timestamp", timestamp),
+		zap.Stringer("parentID", ts.lastAcceptedID),
 	)
 	if err := child.Accept(ctx); err != nil {
 		return err
