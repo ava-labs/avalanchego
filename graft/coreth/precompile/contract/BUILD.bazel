@@ -1,0 +1,37 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "contract",
+    srcs = [
+        "contract.go",
+        "interfaces.go",
+        "mocks.go",
+        "utils.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/contract",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/accounts/abi",
+        "//graft/coreth/precompile/precompileconfig",
+        "//snow",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_holiman_uint256//:uint256",
+        "@org_uber_go_mock//gomock",
+    ],
+)
+
+go_test(
+    name = "contract_test",
+    srcs = [
+        "mocks_generate_test.go",
+        "utils_test.go",
+    ],
+    embed = [":contract"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

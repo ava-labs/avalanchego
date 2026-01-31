@@ -1,0 +1,25 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "acp176",
+    srcs = ["acp176.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/acp176",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/math",
+        "//utils/wrappers",
+        "//vms/components/gas",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+go_test(
+    name = "acp176_test",
+    srcs = ["acp176_test.go"],
+    embed = [":acp176"],
+    deps = [
+        "//vms/components/gas",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+    ],
+)
