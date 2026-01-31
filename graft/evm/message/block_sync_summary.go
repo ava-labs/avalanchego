@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -28,14 +29,14 @@ type BlockSyncSummary struct {
 	acceptImpl AcceptImplFn
 }
 
-func NewBlockSyncSummary(blockHash common.Hash, blockNumber uint64, blockRoot common.Hash) (*BlockSyncSummary, error) {
+func NewBlockSyncSummary(c codec.Manager, blockHash common.Hash, blockNumber uint64, blockRoot common.Hash) (*BlockSyncSummary, error) {
 	// We intentionally do not use the acceptImpl here and leave it for the parser to set.
 	summary := BlockSyncSummary{
 		BlockNumber: blockNumber,
 		BlockHash:   blockHash,
 		BlockRoot:   blockRoot,
 	}
-	bytes, err := Codec.Marshal(Version, &summary)
+	bytes, err := c.Marshal(Version, &summary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal syncable summary: %w", err)
 	}

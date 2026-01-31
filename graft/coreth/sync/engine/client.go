@@ -16,11 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/evmstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -82,7 +82,7 @@ type ClientConfig struct {
 	MetadataDB database.Database
 
 	// Extension points.
-	Parser message.SyncableParser
+	SyncSummaryProvider message.SyncSummaryProvider
 
 	// Extender is an optional extension point for the state sync process, and can be nil.
 	Extender      types.Extender
@@ -143,7 +143,7 @@ func (c *client) GetOngoingSyncStateSummary(context.Context) (block.StateSummary
 		return nil, err // includes the [database.ErrNotFound] case
 	}
 
-	summary, err := c.config.Parser.Parse(summaryBytes, c.acceptSyncSummary)
+	summary, err := c.config.SyncSummaryProvider.Parse(summaryBytes, c.acceptSyncSummary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse saved state sync summary to SyncSummary: %w", err)
 	}
@@ -165,7 +165,7 @@ func (c *client) ClearOngoingSummary() error {
 
 // ParseStateSummary parses [summaryBytes] to [commonEng.Summary]
 func (c *client) ParseStateSummary(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
-	return c.config.Parser.Parse(summaryBytes, c.acceptSyncSummary)
+	return c.config.SyncSummaryProvider.Parse(summaryBytes, c.acceptSyncSummary)
 }
 
 // acceptSyncSummary returns true if sync will be performed and launches the state sync process

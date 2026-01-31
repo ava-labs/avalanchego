@@ -13,14 +13,15 @@ import (
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats/statstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestCodeRequestHandler(t *testing.T) {
+	t.Parallel()
 	database := memorydb.New()
 
 	codeBytes := []byte("some code goes here")
@@ -35,7 +36,7 @@ func TestCodeRequestHandler(t *testing.T) {
 	rawdb.WriteCode(database, maxSizeCodeHash, maxSizeCodeBytes)
 
 	testHandlerStats := &statstest.TestHandlerStats{}
-	codeRequestHandler := NewCodeRequestHandler(database, message.Codec, testHandlerStats)
+	codeRequestHandler := NewCodeRequestHandler(database, message.CorethCodec, testHandlerStats)
 
 	tests := map[string]struct {
 		setup       func() (request message.CodeRequest, expectedCodeResponse [][]byte)
@@ -100,7 +101,7 @@ func TestCodeRequestHandler(t *testing.T) {
 				return
 			}
 			var response message.CodeResponse
-			_, err = message.Codec.Unmarshal(responseBytes, &response)
+			_, err = message.CorethCodec.Unmarshal(responseBytes, &response)
 			require.NoError(t, err)
 			require.Len(t, response.Data, len(expectedResponse))
 			for i, code := range expectedResponse {

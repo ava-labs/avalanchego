@@ -21,9 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats/statstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
@@ -65,7 +65,7 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 			return blk
 		},
 	}
-	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.Codec, testHandlerStats)
+	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.CorethCodec, testHandlerStats)
 
 	var blockRequest message.BlockRequest
 	if test.startBlockHash != (common.Hash{}) {
@@ -92,7 +92,7 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 	require.NotEmpty(t, responseBytes)
 
 	var response message.BlockResponse
-	_, err = message.Codec.Unmarshal(responseBytes, &response)
+	_, err = message.CorethCodec.Unmarshal(responseBytes, &response)
 	require.NoError(t, err)
 	require.Len(t, response.Blocks, test.expectedBlocks)
 
@@ -252,7 +252,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 			return blk
 		},
 	}
-	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.Codec, stats.NewNoopHandlerStats())
+	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.CorethCodec, stats.NewNoopHandlerStats())
 
 	responseBytes, err := blockRequestHandler.OnBlockRequest(ctx, ids.GenerateTestNodeID(), 1, message.BlockRequest{
 		Hash:    blocks[10].Hash(),
@@ -263,7 +263,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	require.NotEmpty(t, responseBytes)
 
 	var response message.BlockResponse
-	_, err = message.Codec.Unmarshal(responseBytes, &response)
+	_, err = message.CorethCodec.Unmarshal(responseBytes, &response)
 	require.NoError(t, err)
 	// requested 8 blocks, received cancelAfterNumRequests because of timeout
 	require.Len(t, response.Blocks, cancelAfterNumRequests)

@@ -14,9 +14,9 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	atomicstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
@@ -124,8 +124,9 @@ func NewSyncer(client leaf.Client, db *versiondb.Database, atomicTrie *atomicsta
 	close(tasks)
 
 	syncer.syncer = leaf.NewCallbackSyncer(client, tasks, &leaf.SyncerConfig{
-		RequestSize: cfg.requestSize,
-		NumWorkers:  cfg.numWorkers,
+		RequestSize:      cfg.requestSize,
+		NumWorkers:       cfg.numWorkers,
+		LeafsRequestType: message.CorethLeafsRequestType,
 	})
 
 	return syncer, nil
