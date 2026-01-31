@@ -4355,6 +4355,1056 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	}
 }
 
+func TestStandardExecutorAddContinuousValidatorTx(t *testing.T) {
+	// todo: test for invalid upgrade?
+
+	require := require.New(t)
+
+	var (
+		env           = newEnvironment(t, upgradetest.Latest)
+		wallet        = newWallet(t, env, walletConfig{})
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+	)
+
+	diff, err := state.NewDiffOn(env.state)
+	require.NoError(err)
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	nodeID := ids.GenerateTestNodeID()
+	continuationPeriod := 2 * defaultMinStakingDuration
+	weight := 2 * defaultMinValidatorStake
+	configOwner := &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
+
+	addContVdrTx, err := wallet.IssueAddContinuousValidatorTx(
+		&txs.Validator{
+			NodeID: nodeID,
+			Wght:   weight,
+		},
+		pop,
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		configOwner,
+		100_000,
+		200_000,
+		continuationPeriod,
+	)
+	require.NoError(err)
+
+	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(err)
+
+	expectedPotentialReward := env.backend.Rewards.Calculate(
+		continuationPeriod,
+		weight,
+		currentSupply,
+	)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		addContVdrTx,
+		diff,
+	)
+	require.NoError(err)
+	require.True(addContVdrTx.Unsigned.(*txs.AddContinuousValidatorTx).BaseTx.SyntacticallyVerified)
+	require.NoError(diff.Apply(env.state))
+	require.NoError(env.state.Commit())
+
+	validator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	expectedValidator := &state.Staker{
+		TxID:                    addContVdrTx.TxID,
+		NodeID:                  nodeID,
+		PublicKey:               sk.PublicKey(),
+		SubnetID:                constants.PrimaryNetworkID,
+		Weight:                  weight,
+		StartTime:               diff.GetTimestamp(),
+		EndTime:                 diff.GetTimestamp().Add(continuationPeriod),
+		PotentialReward:         expectedPotentialReward,
+		AccruedRewards:          0,
+		AccruedDelegateeRewards: 0,
+		AutoRestakeShares:       200_000,
+		NextTime:                diff.GetTimestamp().Add(continuationPeriod),
+		Priority:                txs.PrimaryNetworkValidatorCurrentPriority,
+		ContinuationPeriod:      continuationPeriod,
+	}
+	require.Equal(expectedValidator, validator)
+
+	for utxoID := range addContVdrTx.InputIDs() {
+		_, err := diff.GetUTXO(utxoID)
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	baseTxOutputUTXOs := addContVdrTx.UTXOs()
+	for _, expectedUTXO := range baseTxOutputUTXOs {
+		utxoID := expectedUTXO.InputID()
+		utxo, err := diff.GetUTXO(utxoID)
+		require.NoError(err)
+		require.Equal(expectedUTXO, utxo)
+	}
+}
+
+func TestStandardExecutorSetAutoRestakeConfigTx(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		env           = newEnvironment(t, upgradetest.Latest)
+		wallet        = newWallet(t, env, walletConfig{})
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+	)
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	staker := &txs.Validator{
+		NodeID: ids.GenerateTestNodeID(),
+		Wght:   defaultMinValidatorStake,
+	}
+
+	addContValidatorTx, err := wallet.IssueAddContinuousValidatorTx(
+		staker,
+		pop,
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		500_000,
+		300_000,
+		2*defaultMinStakingDuration,
+	)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(env.state)
+	require.NoError(err)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		addContValidatorTx,
+		diff,
+	)
+	require.NoError(err)
+	diff.AddTx(addContValidatorTx, status.Committed)
+	require.NoError(diff.Apply(env.state))
+
+	tests := []struct {
+		name                 string
+		newPeriod            *uint64
+		newAutoRestakeShares *uint32
+	}{
+		{
+			name:      "updated period",
+			newPeriod: utils.PointerTo(uint64((30 * 24 * time.Hour).Seconds())),
+		},
+		{
+			name:                 "updated auto-restake shares",
+			newAutoRestakeShares: utils.PointerTo(uint32(300_000)),
+		},
+		{
+			name:                 "updated period and auto-restake shares",
+			newAutoRestakeShares: utils.PointerTo(uint32(300_000)),
+			newPeriod:            utils.PointerTo(uint64((30 * 24 * time.Hour).Seconds())),
+		},
+		{
+			name:      "period 0 (exit requested)",
+			newPeriod: utils.PointerTo(uint64(0)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diff, err := state.NewDiffOn(env.state)
+			require.NoError(err)
+
+			setAutoRestakeConfigTx, err := wallet.IssueSetAutoRestakeConfigTx(
+				addContValidatorTx.TxID,
+				tt.newAutoRestakeShares,
+				tt.newPeriod,
+			)
+			require.NoError(err)
+
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				setAutoRestakeConfigTx,
+				diff,
+			)
+
+			require.NoError(err)
+			require.True(setAutoRestakeConfigTx.Unsigned.(*txs.SetAutoRestakeConfigTx).BaseTx.SyntacticallyVerified)
+
+			validator, err := diff.GetCurrentValidator(constants.PrimaryNetworkID, staker.NodeID)
+			require.NoError(err)
+
+			if tt.newAutoRestakeShares != nil {
+				require.Equal(*tt.newAutoRestakeShares, validator.AutoRestakeShares)
+			}
+
+			if tt.newPeriod != nil {
+				require.Equal(*tt.newPeriod, uint64(validator.ContinuationPeriod.Seconds()))
+			}
+		})
+	}
+}
+
+func TestStandardExecutorSetAutoRestakeConfigTxErrors(t *testing.T) {
+	var (
+		env           = newEnvironment(t, upgradetest.Latest)
+		wallet        = newWallet(t, env, walletConfig{})
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+	)
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+
+	staker := &txs.Validator{
+		NodeID: ids.GenerateTestNodeID(),
+		Wght:   env.config.MinValidatorStake,
+	}
+
+	addPastContValidatorTx := &txs.Tx{
+		Unsigned: &txs.AddContinuousValidatorTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    env.ctx.NetworkID,
+				BlockchainID: env.ctx.ChainID,
+			}},
+			ValidatorNodeID:       staker.NodeID,
+			Signer:                pop,
+			StakeOuts:             []*avax.TransferableOutput{},
+			ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+			DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+			ConfigOwner:           &secp256k1fx.OutputOwners{},
+			DelegationShares:      reward.PercentDenominator,
+		},
+		Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+	}
+	require.NoError(t, addPastContValidatorTx.Initialize(txs.Codec))
+	env.state.AddTx(addPastContValidatorTx, status.Committed)
+
+	addContValidatorTx, err := wallet.IssueAddContinuousValidatorTx(
+		staker,
+		pop,
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()}},
+		500_000,
+		300_000,
+		2*env.config.MinStakeDuration,
+	)
+	require.NoError(t, err)
+
+	diff, err := state.NewDiffOn(env.state)
+	require.NoError(t, err)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		addContValidatorTx,
+		diff,
+	)
+	require.NoError(t, err)
+	diff.AddTx(addContValidatorTx, status.Committed)
+	require.NoError(t, diff.Apply(env.state))
+
+	// Create a fixed validator
+	sk2, err := localsigner.New()
+	require.NoError(t, err)
+
+	pop2, err := signer.NewProofOfPossession(sk2)
+	require.NoError(t, err)
+
+	addPermissionlessValTx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				End:    uint64(env.state.GetTimestamp().Add(env.config.MinStakeDuration).Unix()),
+				Wght:   env.config.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		pop2,
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		reward.PercentDenominator,
+	)
+	require.NoError(t, err)
+
+	diff, err = state.NewDiffOn(env.state)
+	require.NoError(t, err)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		addPermissionlessValTx,
+		diff,
+	)
+	require.NoError(t, err)
+	diff.AddTx(addPermissionlessValTx, status.Committed)
+	require.NoError(t, diff.Apply(env.state))
+
+	tests := []struct {
+		name        string
+		tx          func(*require.Assertions) *txs.Tx
+		expectedErr error
+	}{
+		{
+			name: "missing staker tx",
+			tx: func(require *require.Assertions) *txs.Tx {
+				tx := &txs.Tx{
+					Unsigned: &txs.SetAutoRestakeConfigTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						TxID:                 ids.GenerateTestID(),
+						Auth:                 &secp256k1fx.Input{SigIndices: []uint32{0}},
+						AutoRestakeShares:    0,
+						HasAutoRestakeShares: true,
+						Period:               uint64(defaultMinStakingDuration.Seconds()),
+						HasPeriod:            true,
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrMissingStakerTx,
+		},
+		{
+			name: "invalid staker tx",
+			tx: func(require *require.Assertions) *txs.Tx {
+				tx := &txs.Tx{
+					Unsigned: &txs.SetAutoRestakeConfigTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						TxID:                 addPastContValidatorTx.ID(),
+						Auth:                 &secp256k1fx.Input{SigIndices: []uint32{0}},
+						AutoRestakeShares:    0,
+						HasAutoRestakeShares: true,
+						Period:               uint64(env.config.MinStakeDuration.Seconds()),
+						HasPeriod:            true,
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				return tx
+			},
+			expectedErr: ErrInvalidStakerTx,
+		},
+		{
+			name: "invalid staker tx type",
+			tx: func(require *require.Assertions) *txs.Tx {
+				tx := &txs.Tx{
+					Unsigned: &txs.SetAutoRestakeConfigTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						TxID:                 addPermissionlessValTx.ID(),
+						Auth:                 &secp256k1fx.Input{SigIndices: []uint32{0}},
+						AutoRestakeShares:    0,
+						HasAutoRestakeShares: true,
+						Period:               uint64(env.config.MinStakeDuration.Seconds()),
+						HasPeriod:            true,
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrInvalidStakerTxType,
+		},
+		{
+			name: "stake too short",
+			tx: func(require *require.Assertions) *txs.Tx {
+				tx := &txs.Tx{
+					Unsigned: &txs.SetAutoRestakeConfigTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						TxID:      addContValidatorTx.ID(),
+						Auth:      &secp256k1fx.Input{SigIndices: []uint32{0}},
+						Period:    uint64(env.config.MinStakeDuration.Seconds()) - 1,
+						HasPeriod: true,
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrStakeTooShort,
+		},
+		{
+			name: "stake too long",
+			tx: func(require *require.Assertions) *txs.Tx {
+				tx := &txs.Tx{
+					Unsigned: &txs.SetAutoRestakeConfigTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						TxID:      addContValidatorTx.ID(),
+						Auth:      &secp256k1fx.Input{SigIndices: []uint32{0}},
+						Period:    uint64(env.config.MaxStakeDuration.Seconds()) + 1,
+						HasPeriod: true,
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrStakeTooLong,
+		},
+		{
+			name: "invalid auth",
+			tx: func(require *require.Assertions) *txs.Tx {
+				dummySig, err := genesistest.DefaultFundedKeys[1].SignHash([]byte{})
+				require.NoError(err)
+
+				tx := &txs.Tx{
+					Unsigned: &txs.SetAutoRestakeConfigTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						TxID:      addContValidatorTx.ID(),
+						Auth:      &secp256k1fx.Input{SigIndices: []uint32{0}},
+						Period:    uint64(env.config.MinStakeDuration.Seconds()),
+						HasPeriod: true,
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}, &secp256k1fx.Credential{
+						Sigs: [][secp256k1.SignatureLen]byte{[secp256k1.SignatureLen]byte(dummySig)},
+					}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: secp256k1fx.ErrWrongSig,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diff, err := state.NewDiffOn(env.state)
+			require.NoError(t, err)
+
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tt.tx(require.New(t)),
+				diff,
+			)
+
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestStandardExecutorAddContinuousValidatorTxErrors(t *testing.T) {
+	var (
+		env           = newEnvironment(t, upgradetest.Latest)
+		wallet        = newWallet(t, env, walletConfig{})
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+	)
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+
+	// Create an existing validator for ErrDuplicateValidator test
+	existingNodeID := ids.GenerateTestNodeID()
+	existingStaker := &txs.Validator{
+		NodeID: existingNodeID,
+		Wght:   env.config.MinValidatorStake,
+	}
+
+	addExistingValidatorTx, err := wallet.IssueAddContinuousValidatorTx(
+		existingStaker,
+		pop,
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		500_000,
+		300_000,
+		2*env.config.MinStakeDuration,
+	)
+	require.NoError(t, err)
+
+	diff, err := state.NewDiffOn(env.state)
+	require.NoError(t, err)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		addExistingValidatorTx,
+		diff,
+	)
+	require.NoError(t, err)
+	diff.AddTx(addExistingValidatorTx, status.Committed)
+	require.NoError(t, diff.Apply(env.state))
+
+	// todo: maybe provide a valid tx in the func, and only mutate to break it?
+	tests := []struct {
+		name        string
+		tx          func(*require.Assertions) *txs.Tx
+		expectedErr error
+	}{
+		{
+			name: "weight too small",
+			tx: func(require *require.Assertions) *txs.Tx {
+				sk, err := localsigner.New()
+				require.NoError(err)
+				pop, err := signer.NewProofOfPossession(sk)
+				require.NoError(err)
+
+				tx := &txs.Tx{
+					Unsigned: &txs.AddContinuousValidatorTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						ValidatorNodeID: ids.GenerateTestNodeID(),
+						Signer:          pop,
+						StakeOuts: []*avax.TransferableOutput{{
+							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt:          env.config.MinValidatorStake - 1,
+								OutputOwners: secp256k1fx.OutputOwners{},
+							},
+						}},
+						ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						ConfigOwner:           &secp256k1fx.OutputOwners{},
+						DelegationShares:      reward.PercentDenominator,
+						Wght:                  env.config.MinValidatorStake - 1,
+						AutoRestakeShares:     0,
+						Period:                uint64(env.config.MinStakeDuration.Seconds()),
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrWeightTooSmall,
+		},
+		{
+			name: "weight too large",
+			tx: func(require *require.Assertions) *txs.Tx {
+				sk, err := localsigner.New()
+				require.NoError(err)
+				pop, err := signer.NewProofOfPossession(sk)
+				require.NoError(err)
+
+				tx := &txs.Tx{
+					Unsigned: &txs.AddContinuousValidatorTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						ValidatorNodeID: ids.GenerateTestNodeID(),
+						Signer:          pop,
+						StakeOuts: []*avax.TransferableOutput{{
+							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt:          env.config.MaxValidatorStake + 1,
+								OutputOwners: secp256k1fx.OutputOwners{},
+							},
+						}},
+						ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						ConfigOwner:           &secp256k1fx.OutputOwners{},
+						DelegationShares:      reward.PercentDenominator,
+						Wght:                  env.config.MaxValidatorStake + 1,
+						AutoRestakeShares:     0,
+						Period:                uint64(env.config.MinStakeDuration.Seconds()),
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrWeightTooLarge,
+		},
+		{
+			name: "insufficient delegation fee",
+			tx: func(require *require.Assertions) *txs.Tx {
+				sk, err := localsigner.New()
+				require.NoError(err)
+				pop, err := signer.NewProofOfPossession(sk)
+				require.NoError(err)
+
+				tx := &txs.Tx{
+					Unsigned: &txs.AddContinuousValidatorTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						ValidatorNodeID: ids.GenerateTestNodeID(),
+						Signer:          pop,
+						StakeOuts: []*avax.TransferableOutput{{
+							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt:          env.config.MinValidatorStake,
+								OutputOwners: secp256k1fx.OutputOwners{},
+							},
+						}},
+						ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						ConfigOwner:           &secp256k1fx.OutputOwners{},
+						DelegationShares:      env.config.MinDelegationFee - 1,
+						Wght:                  env.config.MinValidatorStake,
+						AutoRestakeShares:     0,
+						Period:                uint64(env.config.MinStakeDuration.Seconds()),
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrInsufficientDelegationFee,
+		},
+		{
+			name: "stake too short",
+			tx: func(require *require.Assertions) *txs.Tx {
+				sk, err := localsigner.New()
+				require.NoError(err)
+				pop, err := signer.NewProofOfPossession(sk)
+				require.NoError(err)
+
+				tx := &txs.Tx{
+					Unsigned: &txs.AddContinuousValidatorTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						ValidatorNodeID: ids.GenerateTestNodeID(),
+						Signer:          pop,
+						StakeOuts: []*avax.TransferableOutput{{
+							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt:          env.config.MinValidatorStake,
+								OutputOwners: secp256k1fx.OutputOwners{},
+							},
+						}},
+						ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						ConfigOwner:           &secp256k1fx.OutputOwners{},
+						DelegationShares:      reward.PercentDenominator,
+						Wght:                  env.config.MinValidatorStake,
+						AutoRestakeShares:     0,
+						Period:                uint64(env.config.MinStakeDuration.Seconds()) - 1,
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrStakeTooShort,
+		},
+		{
+			name: "stake too long",
+			tx: func(require *require.Assertions) *txs.Tx {
+				sk, err := localsigner.New()
+				require.NoError(err)
+				pop, err := signer.NewProofOfPossession(sk)
+				require.NoError(err)
+
+				tx := &txs.Tx{
+					Unsigned: &txs.AddContinuousValidatorTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						ValidatorNodeID: ids.GenerateTestNodeID(),
+						Signer:          pop,
+						StakeOuts: []*avax.TransferableOutput{{
+							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt:          env.config.MinValidatorStake,
+								OutputOwners: secp256k1fx.OutputOwners{},
+							},
+						}},
+						ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						ConfigOwner:           &secp256k1fx.OutputOwners{},
+						DelegationShares:      reward.PercentDenominator,
+						Wght:                  env.config.MinValidatorStake,
+						AutoRestakeShares:     0,
+						Period:                uint64(env.config.MaxStakeDuration.Seconds()) + 1,
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrStakeTooLong,
+		},
+		{
+			name: "wrong staked asset ID",
+			tx: func(require *require.Assertions) *txs.Tx {
+				sk, err := localsigner.New()
+				require.NoError(err)
+				pop, err := signer.NewProofOfPossession(sk)
+				require.NoError(err)
+
+				tx := &txs.Tx{
+					Unsigned: &txs.AddContinuousValidatorTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						ValidatorNodeID: ids.GenerateTestNodeID(),
+						Signer:          pop,
+						StakeOuts: []*avax.TransferableOutput{{
+							Asset: avax.Asset{ID: ids.GenerateTestID()},
+							Out: &secp256k1fx.TransferOutput{
+								Amt:          env.config.MinValidatorStake,
+								OutputOwners: secp256k1fx.OutputOwners{},
+							},
+						}},
+						ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						ConfigOwner:           &secp256k1fx.OutputOwners{},
+						DelegationShares:      reward.PercentDenominator,
+						Wght:                  env.config.MinValidatorStake,
+						AutoRestakeShares:     0,
+						Period:                uint64(env.config.MinStakeDuration.Seconds()),
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrWrongStakedAssetID,
+		},
+		{
+			name: "duplicate validator",
+			tx: func(require *require.Assertions) *txs.Tx {
+				sk, err := localsigner.New()
+				require.NoError(err)
+				pop, err := signer.NewProofOfPossession(sk)
+				require.NoError(err)
+
+				tx := &txs.Tx{
+					Unsigned: &txs.AddContinuousValidatorTx{
+						BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+							NetworkID:    env.ctx.NetworkID,
+							BlockchainID: env.ctx.ChainID,
+						}},
+						ValidatorNodeID: existingNodeID,
+						Signer:          pop,
+						StakeOuts: []*avax.TransferableOutput{{
+							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt:          env.config.MinValidatorStake,
+								OutputOwners: secp256k1fx.OutputOwners{},
+							},
+						}},
+						ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+						ConfigOwner:           &secp256k1fx.OutputOwners{},
+						DelegationShares:      reward.PercentDenominator,
+						Wght:                  env.config.MinValidatorStake,
+						AutoRestakeShares:     0,
+						Period:                uint64(env.config.MinStakeDuration.Seconds()),
+					},
+					Creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+				}
+				require.NoError(tx.Initialize(txs.Codec))
+				return tx
+			},
+			expectedErr: ErrDuplicateValidator,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diff, err := state.NewDiffOn(env.state)
+			require.NoError(t, err)
+
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tt.tx(require.New(t)),
+				diff,
+			)
+
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+//func TestStandardExecutorStopContinuousValidatorTx(t *testing.T) {
+//	nodeID := ids.GenerateTestNodeID()
+//	sk, err := localsigner.New()
+//	require.NoError(t, err)
+//
+//	tests := []struct {
+//		name        string
+//		modifyTx    func(*require.Assertions, *txs.Tx)
+//		updateState func(require *require.Assertions, state state.Chain)
+//		expectedErr error
+//	}{
+//		// todo: add upgradeNotActive test
+//		{
+//			name: "invalid tx id",
+//			modifyTx: func(require *require.Assertions, tx *txs.Tx) {
+//				stopContValidatorTx := tx.Unsigned.(*txs.StopContinuousValidatorTx)
+//				stopContValidatorTx.TxID = ids.GenerateTestID()
+//			},
+//			expectedErr: database.ErrNotFound,
+//		},
+//		{
+//			name: "invalid signature",
+//			modifyTx: func(require *require.Assertions, tx *txs.Tx) {
+//				wrongTxID := ids.GenerateTestID()
+//				wrongSig, err := sk.SignProofOfPossession(wrongTxID[:])
+//				require.NoError(err)
+//
+//				wrongBlsSig := [bls.SignatureLen]byte{}
+//				copy(wrongBlsSig[:], bls.SignatureToBytes(wrongSig))
+//
+//				stopContValidatorTx := tx.Unsigned.(*txs.StopContinuousValidatorTx)
+//				stopContValidatorTx.StopSignature = wrongBlsSig
+//			},
+//			expectedErr: errUnauthorizedModification,
+//		},
+//		{
+//			name: "removed validator",
+//			updateState: func(require *require.Assertions, state state.Chain) {
+//				validator, err := state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+//				require.NoError(err)
+//
+//				state.DeleteCurrentValidator(validator)
+//			},
+//			expectedErr: database.ErrNotFound,
+//		},
+//		{
+//			name: "already stopped validator",
+//			updateState: func(require *require.Assertions, state state.Chain) {
+//				validator, err := state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+//				require.NoError(err)
+//
+//				validator.ContinuationPeriod = 0
+//			},
+//			expectedErr: errContinuousValidatorAlreadyStopped,
+//		},
+//		{
+//			name:        "happy path",
+//			modifyTx:    func(*require.Assertions, *txs.Tx) {},
+//			expectedErr: nil,
+//		},
+//	}
+//
+//	for _, test := range tests {
+//		t.Run(test.name, func(t *testing.T) {
+//			require := require.New(t)
+//
+//			env := newEnvironment(t, upgradetest.Latest)
+//			wallet := newWallet(t, env, walletConfig{})
+//			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+//
+//			pop, err := signer.NewProofOfPossession(sk)
+//			require.NoError(err)
+//
+//			continuationPeriod := 2 * defaultMinStakingDuration
+//			weight := 2 * defaultMinValidatorStake
+//
+//			// Add continuous validator
+//			addContVdrTx, err := wallet.IssueAddContinuousValidatorTx(
+//				&txs.Validator{
+//					NodeID: nodeID,
+//					Wght:   weight,
+//				},
+//				pop,
+//				env.ctx.AVAXAssetID,
+//				&secp256k1fx.OutputOwners{
+//					Threshold: 1,
+//					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+//				},
+//				&secp256k1fx.OutputOwners{
+//					Threshold: 1,
+//					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+//				},
+//				reward.PercentDenominator,
+//				continuationPeriod,
+//			)
+//			require.NoError(err)
+//
+//			diff, err := state.NewDiffOn(env.state)
+//			require.NoError(err)
+//
+//			_, _, _, err = StandardTx(
+//				&env.backend,
+//				feeCalculator,
+//				addContVdrTx,
+//				diff,
+//			)
+//			require.NoError(err)
+//			diff.AddTx(addContVdrTx, status.Committed)
+//			require.NoError(diff.Apply(env.state))
+//			require.NoError(env.state.Commit())
+//
+//			validator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+//			require.NoError(err)
+//
+//			signature, err := sk.SignProofOfPossession(validator.TxID[:])
+//			require.NoError(err)
+//
+//			blsSig := [bls.SignatureLen]byte{}
+//			copy(blsSig[:], bls.SignatureToBytes(signature))
+//
+//			stopContVdrTx, err := wallet.IssueStopContinuousValidatorTx(
+//				validator.TxID,
+//				blsSig,
+//			)
+//			require.NoError(err)
+//
+//			if test.modifyTx != nil {
+//				test.modifyTx(require, stopContVdrTx)
+//			}
+//
+//			diff, err = state.NewDiffOn(env.state)
+//			require.NoError(err)
+//
+//			standardTxEx := &standardTxExecutor{
+//				backend:       &env.backend,
+//				feeCalculator: feeCalculator,
+//				tx:            stopContVdrTx,
+//				state:         diff,
+//			}
+//
+//			if test.updateState != nil {
+//				test.updateState(require, standardTxEx.state)
+//			}
+//
+//			require.ErrorIs(stopContVdrTx.Unsigned.Visit(standardTxEx), test.expectedErr)
+//			require.True(stopContVdrTx.Unsigned.(*txs.StopContinuousValidatorTx).BaseTx.SyntacticallyVerified)
+//			require.NoError(diff.Apply(env.state))
+//			require.NoError(env.state.Commit())
+//		})
+//	}
+//}
+//
+//func TestStandardExecutorStopContinuousValidatorTxInvalidStaker(t *testing.T) {
+//	env := newEnvironment(t, upgradetest.Latest)
+//	wallet := newWallet(t, env, walletConfig{})
+//	feeCalculator := state.PickFeeCalculator(env.config, env.state)
+//
+//	require := require.New(t)
+//
+//	sk, err := localsigner.New()
+//	require.NoError(err)
+//
+//	pop, err := signer.NewProofOfPossession(sk)
+//	require.NoError(err)
+//
+//	nodeID := ids.GenerateTestNodeID()
+//
+//	addValTx, err := wallet.IssueAddPermissionlessValidatorTx(
+//		&txs.SubnetValidator{
+//			Validator: txs.Validator{
+//				NodeID: nodeID,
+//				End:    uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix()),
+//				Wght:   env.config.MinValidatorStake,
+//			},
+//			Subnet: constants.PrimaryNetworkID,
+//		},
+//		pop,
+//		env.ctx.AVAXAssetID,
+//		&secp256k1fx.OutputOwners{
+//			Threshold: 1,
+//			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+//		},
+//		&secp256k1fx.OutputOwners{
+//			Threshold: 1,
+//			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+//		},
+//		reward.PercentDenominator,
+//	)
+//	require.NoError(err)
+//
+//	diff, err := state.NewDiffOn(env.state)
+//	require.NoError(err)
+//
+//	_, _, _, err = StandardTx(
+//		&env.backend,
+//		feeCalculator,
+//		addValTx,
+//		diff,
+//	)
+//	require.NoError(err)
+//	diff.AddTx(addValTx, status.Committed)
+//	require.NoError(diff.Apply(env.state))
+//	require.NoError(env.state.Commit())
+//
+//	validator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+//	require.NoError(err)
+//
+//	signature, err := sk.SignProofOfPossession(validator.TxID[:])
+//	require.NoError(err)
+//
+//	blsSig := [bls.SignatureLen]byte{}
+//	copy(blsSig[:], bls.SignatureToBytes(signature))
+//
+//	stopContVdrTx, err := wallet.IssueStopContinuousValidatorTx(
+//		validator.TxID,
+//		blsSig,
+//	)
+//	require.NoError(err)
+//
+//	diff, err = state.NewDiffOn(env.state)
+//	require.NoError(err)
+//
+//	_, _, _, err = StandardTx(
+//		&env.backend,
+//		feeCalculator,
+//		stopContVdrTx,
+//		diff,
+//	)
+//
+//	require.ErrorIs(err, ErrInvalidStakerTx)
+//}
+
+func TestStandardExecutorRewardContinuousValidatorTx(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, upgradetest.Latest)
+
+	tx, err := newRewardContinuousValidatorTx(t, ids.GenerateTestID(), 1)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(env.state)
+	require.NoError(err)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		state.PickFeeCalculator(env.config, env.state),
+		tx,
+		diff,
+	)
+	require.ErrorIs(err, ErrWrongTxType)
+}
+
 func must[T any](t require.TestingT) func(T, error) T {
 	return func(val T, err error) T {
 		require.NoError(t, err)

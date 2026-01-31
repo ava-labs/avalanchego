@@ -269,7 +269,7 @@ type State interface {
 	ReindexBlocks(lock sync.Locker, log logging.Logger) error
 
 	// Commit changes to the base database.
-	Commit() error
+	Commit() error // todo: test commit with the new stuff added
 
 	// Returns a batch of unwritten changes that, when written, will commit all
 	// pending changes to the base database.
@@ -1003,6 +1003,39 @@ func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 
 func (s *state) PutCurrentValidator(staker *Staker) error {
 	s.currentStakers.PutValidator(staker)
+	return nil
+}
+
+func (s *state) UpdateCurrentValidator(staker *Staker) error {
+	oldValidator, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	if err != nil {
+		return err
+	}
+
+	if err := oldValidator.ValidateMutation(staker); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
+	}
+
+	s.currentStakers.UpdateValidator(staker)
+	return nil
+}
+
+func (s *state) ResetContinuousValidatorCycle(
+	validator *Staker,
+	weight uint64,
+	potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
+) error {
+	// todo: is this ok? check that we dont edit the underlying validator
+	mutatedValidator := *validator
+	if err := (&mutatedValidator).resetContinuousStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards); err != nil {
+		return err
+	}
+
+	if err := validator.ValidateMutation(&mutatedValidator); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
+	}
+
+	s.currentStakers.UpdateValidator(&mutatedValidator)
 	return nil
 }
 
@@ -2676,6 +2709,7 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				weightDiff: weightDiff,
 			}
 			if pk != nil {
+				//	I think both [prevPublicKey] and [newPublicKey] will by [pkBytes]
 				pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 				if diff.validatorStatus != added {
 					change.prevPublicKey = pkBytes
@@ -2808,7 +2842,7 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 		// Record the change in weight and/or public key for each validator.
 		for nodeID, validatorDiff := range validatorDiffs {
 			switch validatorDiff.validatorStatus {
-			case added:
+			case added, modified: // todo: is modified case breaking the invariant from below?
 				staker := validatorDiff.validator
 
 				// The validator is being added.
