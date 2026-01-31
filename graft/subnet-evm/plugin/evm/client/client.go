@@ -10,7 +10,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
+	"github.com/ava-labs/avalanchego/graft/evm/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
@@ -37,7 +37,7 @@ type Client interface {
 	MemoryProfile(ctx context.Context, options ...rpc.Option) error
 	LockProfile(ctx context.Context, options ...rpc.Option) error
 	SetLogLevel(ctx context.Context, level slog.Level, options ...rpc.Option) error
-	GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.Config, error)
+	GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.L1Config, error)
 	GetCurrentValidators(ctx context.Context, nodeIDs []ids.NodeID, options ...rpc.Option) ([]CurrentValidator, error)
 }
 
@@ -93,11 +93,11 @@ func (c *client) SetLogLevel(ctx context.Context, level slog.Level, options ...r
 }
 
 type ConfigReply struct {
-	Config *config.Config `json:"config"`
+	Config *config.L1Config `json:"config"`
 }
 
 // GetVMConfig returns the current config of the VM
-func (c *client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.Config, error) {
+func (c *client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.L1Config, error) {
 	res := &ConfigReply{}
 	err := c.adminRequester.SendRequest(ctx, "admin.getVMConfig", struct{}{}, res, options...)
 	return res.Config, err
