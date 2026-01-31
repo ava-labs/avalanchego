@@ -20,18 +20,18 @@ runs:
       id: go-mod-cache
       with:
         path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum', 'tools/external/go.sum') }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
         restore-keys: ${{ runner.os }}-go-mod-
     # Cache Go build cache (architecture-specific)
     - uses: actions/cache@v4
       with:
         path: ~/.cache/go-build
-        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.sum', 'tools/external/go.sum') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
         restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
     # Download modules only on cache miss
     - run: nix develop --command go mod download
       if: steps.go-mod-cache.outputs.cache-hit != 'true'
       shell: bash
-    - run: nix develop --command go mod download -modfile=tools/external/go.mod
+    - run: GOWORK=off nix develop --command go mod download -modfile=tools/external/go.mod
       if: steps.go-mod-cache.outputs.cache-hit != 'true'
       shell: bash
