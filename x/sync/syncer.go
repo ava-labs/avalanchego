@@ -200,7 +200,8 @@ func NewSyncer[R any, C any](
 // - [ctx] is canceled.
 // If [ctx] is canceled, returns [ctx].Err().
 func (s *Syncer[_, _]) Sync(ctx context.Context) error {
-	if err := s.setup(ctx); err != nil {
+	ctx, err := s.setup(ctx)
+	if err != nil {
 		return err
 	}
 
@@ -226,13 +227,13 @@ func (s *Syncer[_, _]) Sync(ctx context.Context) error {
 	return nil
 }
 
-// setup initiates the work queue and enables cancellation.
-func (s *Syncer[_, _]) setup(ctx context.Context) error {
+// setup initiates the work queue and enables cancellation through a new context.
+func (s *Syncer[_, _]) setup(ctx context.Context) (context.Context, error) {
 	s.workLock.Lock()
 	defer s.workLock.Unlock()
 
 	if s.syncing {
-		return ErrAlreadyStarted
+		return ctx, ErrAlreadyStarted
 	}
 
 	s.config.Log.Info("starting sync", zap.Stringer("target root", s.config.TargetRoot))
@@ -243,7 +244,7 @@ func (s *Syncer[_, _]) setup(ctx context.Context) error {
 
 	s.syncing = true
 	ctx, s.cancelCtx = context.WithCancel(ctx)
-	return nil
+	return ctx, nil
 }
 
 // workLoop awaits signal on [s.unprocessedWorkCond], which indicates that there
@@ -263,6 +264,7 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 		// Invariant: [s.workLock] is held here.
 		switch {
 		case ctx.Err() != nil:
+			s.setError(ctx.Err())
 			return // [s.workLock] released by defer.
 		case s.processingWorkItems >= s.config.SimultaneousWorkLimit:
 			// We're already processing the maximum number of work items.
