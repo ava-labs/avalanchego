@@ -518,6 +518,61 @@ func (s *Database) hasWithoutLock(height BlockHeight) (bool, error) {
 	return true, nil
 }
 
+func (s *Database) getDataFileIndexForHeight(height BlockHeight) (int, error) {
+	entry, err := s.readBlockIndex(height)
+	if err != nil {
+		return 0, err
+	}
+	_, _, idx, err := s.getDataFileAndOffset(entry.Offset)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get data file index for height %d: %w", height, err)
+	}
+	return idx, nil
+}
+
+// Sync calls sync on all data files in the range [start, end],
+// assuming data are written in-order. If no data exists at start or end,
+// nothing is synced.
+func (s *Database) Sync(start, end uint64) error {
+	s.closeMu.RLock()
+	defer s.closeMu.RUnlock()
+
+	if s.closed {
+		s.log.Error("Failed Sync: database closed",
+			zap.Uint64("start", start),
+			zap.Uint64("end", end),
+		)
+		return database.ErrClosed
+	}
+
+	firstIdx, err := s.getDataFileIndexForHeight(start)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	lastIdx, err := s.getDataFileIndexForHeight(end)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	for idx := firstIdx; idx <= lastIdx; idx++ {
+		f, err := s.getOrOpenDataFile(idx)
+		if err != nil {
+			return fmt.Errorf("failed to open data file %d: %w", idx, err)
+		}
+		if err := f.Sync(); err != nil {
+			return fmt.Errorf("failed to sync data file %d: %w", idx, err)
+		}
+	}
+
+	return nil
+}
+
 func (s *Database) indexEntryOffset(height BlockHeight) (uint64, error) {
 	if height < s.header.MinHeight {
 		return 0, fmt.Errorf("%w: failed to get index entry offset for block at height %d, minimum height is %d", ErrInvalidBlockHeight, height, s.header.MinHeight)

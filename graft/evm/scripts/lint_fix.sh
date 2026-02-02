@@ -19,7 +19,7 @@
 #
 # References (from avalanchego/ root):
 #   - avalanchego/graft/.golangci.yml: Shared lint config for graft modules
-#   - avalanchego/tools/go.mod: Avalanchego tools module
+#   - avalanchego/tools/external/go.mod: Avalanchego tools module
 #   - avalanchego/.golangci.yml: Avalanchego lint config
 
 set -euo pipefail
@@ -30,9 +30,10 @@ if ! [[ "$0" =~ scripts/lint_fix.sh ]]; then
 fi
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+RUN_TOOL="$SCRIPT_DIR/../../../scripts/run_tool.sh"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lint_setup.sh"
 setup_lint
-go tool -modfile=../../tools/go.mod golangci-lint run --config ../.golangci.yml --fix
-go tool -modfile=../../tools/go.mod golangci-lint run --config "$AVALANCHE_LINT_FILE" --fix
+"$RUN_TOOL" golangci-lint run --config ../.golangci.yml --fix
+"$RUN_TOOL" golangci-lint run --config "$AVALANCHE_LINT_FILE" --fix

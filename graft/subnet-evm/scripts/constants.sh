@@ -38,7 +38,7 @@ fi
 # Don't export them as they're used in the context of other calls
 if [[ -z ${AVALANCHE_VERSION:-} ]]; then
   # Get module details from go.mod
-  MODULE_DETAILS="$(go list -m "github.com/ava-labs/avalanchego" 2>/dev/null)"
+  MODULE_DETAILS="$(GOWORK=off go list -m "github.com/ava-labs/avalanchego" 2>/dev/null)"
 
   AVALANCHE_VERSION="$(echo "${MODULE_DETAILS}" | awk '{print $2}')"
 

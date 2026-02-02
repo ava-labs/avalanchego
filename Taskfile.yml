@@ -95,12 +95,23 @@ tasks:
       - task: check-clean-branch
 
   check-go-mod-tidy:
-    desc: Checks that go.mod and go.sum are up-to-date (requires a clean git working tree)
+    desc: Checks that go.mod, go.sum and go.work.sum are up-to-date (requires a clean git working tree)
     cmds:
       - cmd: go mod tidy
       - task: check-clean-branch
       - cmd: go mod tidy
-        dir: tools
+        dir: tools/external
+      - task: check-clean-branch
+      - cmd: go mod tidy
+        dir: graft/evm
+      - task: check-clean-branch
+      - cmd: go mod tidy
+        dir: graft/coreth
+      - task: check-clean-branch
+      - cmd: go mod tidy
+        dir: graft/subnet-evm
+      - task: check-clean-branch
+      - task: sync-go-work
       - task: check-clean-branch
 
   create-kind-cluster:
@@ -140,6 +151,20 @@ tasks:
     desc: Runs ginkgo against the current working directory
     cmd: ./bin/ginkgo build {{.USER_WORKING_DIR}}
 
+  go-mod-tidy:
+    desc: Ensures go.mod, go.sum and go.work.sum are up-to-date
+    cmds:
+      - cmd: go mod tidy
+      - cmd: go mod tidy
+        dir: tools/external
+      - cmd: go mod tidy
+        dir: graft/evm
+      - cmd: go mod tidy
+        dir: graft/coreth
+      - cmd: go mod tidy
+        dir: graft/subnet-evm
+      - task: sync-go-work
+
   install-nix:
     desc: Installs nix with an OS-appropriate installer
     cmd: ./scripts/install_nix.sh
@@ -174,9 +199,20 @@ tasks:
     desc: Runs shellcheck to check sanity of shell scripts
     cmd: ./scripts/shellcheck.sh
 
+  run-polyrepo:
+    desc: "Run polyrepo for orchestrating local dependencies. Example: LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123 task run-polyrepo"
+    cmd: ./scripts/run_polyrepo.sh {{.CLI_ARGS}}
+
   setup-chain-data:
     desc: Sets up C-Chain test data (blocks from S3, state from S3 or empty for genesis).
     cmd: ./scripts/setup_cchain_data.sh
+
+  sync-go-work:
+    desc: Downloads module dependencies and syncs go.work.sum
+    cmds:
+      - cmd: go mod download
+      # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
+      - cmd: GOWORK="" go work sync
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
