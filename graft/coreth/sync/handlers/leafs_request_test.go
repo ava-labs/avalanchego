@@ -157,6 +157,23 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				require.Equal(t, uint32(1), testHandlerStats.InvalidLeafsRequestCount)
 			},
 		},
+		"empty storage root dropped": {
+			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
+				return t.Context(), newLeafsRequest(t,
+					types.EmptyRootHash,
+					common.Hash{},
+					bytes.Repeat([]byte{0x00}, common.HashLength),
+					bytes.Repeat([]byte{0xff}, common.HashLength),
+					maxLeavesLimit,
+					message.StateTrieNode,
+				)
+			},
+			requireResponseFn: func(t *testing.T, _ message.CorethLeafsRequest, response []byte, err error) {
+				require.Nil(t, response)
+				require.NoError(t, err)
+				require.Equal(t, uint32(1), testHandlerStats.InvalidLeafsRequestCount)
+			},
+		},
 		"missing root dropped": {
 			prepareTestFn: func() (context.Context, message.CorethLeafsRequest) {
 				return t.Context(), newLeafsRequest(t,

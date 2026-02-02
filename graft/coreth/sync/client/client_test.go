@@ -153,7 +153,6 @@ func TestGetBlocks(t *testing.T) {
 	require.Len(t, blocks, numBlocks)
 
 	blocksRequestHandler := handlers.NewBlockRequestHandler(buildGetter(blocks), message.CorethCodec, handlerstats.NewNoopHandlerStats())
-
 	// encodeBlockSlice takes a slice of blocks that are ordered in increasing height order
 	// and returns a slice of byte slices with those blocks encoded in reverse order
 	encodeBlockSlice := func(blocks []*types.Block) [][]byte {
