@@ -475,7 +475,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					accountTrieRoot,
 					common.Hash{},
 					nil,
-					bytes.Repeat([]byte{0xff}, common.HashLength),
+					nil,
 					maxLeavesLimit,
 					message.StateTrieNode,
 				)
@@ -522,7 +522,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					accountTrieRoot,
 					common.Hash{},
 					nil,
-					bytes.Repeat([]byte{0xff}, common.HashLength),
+					nil,
 					maxLeavesLimit,
 					message.StateTrieNode,
 				)
@@ -555,7 +555,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					largeTrieRoot,
 					largeStorageAccount,
 					nil,
-					bytes.Repeat([]byte{0xff}, common.HashLength),
+					nil,
 					maxLeavesLimit,
 					message.StateTrieNode,
 				)
@@ -601,7 +601,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					largeTrieRoot,
 					largeStorageAccount,
 					nil,
-					bytes.Repeat([]byte{0xff}, common.HashLength),
+					nil,
 					maxLeavesLimit,
 					message.StateTrieNode,
 				)
@@ -642,7 +642,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					smallTrieRoot,
 					smallStorageAccount,
 					nil,
-					bytes.Repeat([]byte{0xff}, common.HashLength),
+					nil,
 					maxLeavesLimit,
 					message.StateTrieNode,
 				)
@@ -678,7 +678,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					smallTrieRoot,
 					smallStorageAccount,
 					lastKey[:],
-					bytes.Repeat([]byte{0xff}, common.HashLength),
+					nil,
 					maxLeavesLimit,
 					message.StateTrieNode,
 				)
