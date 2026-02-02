@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -162,7 +163,7 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
 	if validatorDiff.validatorStatus == modified {
-		validatorDiff.oldValidator = nil
+		validatorDiff.oldWeight = 0
 	}
 	validatorDiff.validatorStatus = deleted
 	validatorDiff.validator = staker
@@ -177,7 +178,7 @@ func (v *baseStakers) UpdateValidator(mutatedValidator *Staker) {
 	validatorDiff := v.getOrCreateValidatorDiff(mutatedValidator.SubnetID, mutatedValidator.NodeID)
 	if validatorDiff.validatorStatus == unmodified {
 		validatorDiff.validatorStatus = modified
-		validatorDiff.oldValidator = validator.validator
+		validatorDiff.oldWeight = validator.validator.Weight
 	}
 	validatorDiff.validator = mutatedValidator
 
@@ -296,23 +297,26 @@ type diffValidator struct {
 	// mean that diffValidator hasn't change, since delegators may have changed.
 	validatorStatus diffValidatorStatus
 	validator       *Staker
-	oldValidator    *Staker // this is set iff [validatorStatus] has "modified" const value.
+	oldWeight       uint64 // set iff [validatorStatus] is "modified"; used to compute weight diff
 
 	addedDelegators   *btree.BTreeG[*Staker]
 	deletedDelegators map[ids.ID]*Staker
 }
 
 func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
-	weightDiff := ValidatorWeightDiff{
-		Decrease: d.validatorStatus == deleted,
-	}
-	if d.validatorStatus != unmodified {
+	var weightDiff ValidatorWeightDiff
+	switch d.validatorStatus {
+	case added:
 		weightDiff.Amount = d.validator.Weight
-
-		if d.validatorStatus == modified {
-			// if the validator is modified, we need to subtract the old weight in order to get the weight diff.
-			weightDiff.Amount -= d.oldValidator.Weight
+	case modified:
+		var err error
+		weightDiff.Amount, err = math.Sub(d.validator.Weight, d.oldWeight)
+		if err != nil {
+			return ValidatorWeightDiff{}, fmt.Errorf("modified validators weight can only increase: %w", err)
 		}
+	case deleted:
+		weightDiff.Decrease = true
+		weightDiff.Amount = d.validator.Weight
 	}
 
 	for _, staker := range d.deletedDelegators {
@@ -387,7 +391,7 @@ func (s *diffStakers) DeleteValidator(staker *Staker) {
 		s.addedOrModifiedStakers.Delete(validatorDiff.validator)
 		validatorDiff.validatorStatus = deleted
 		validatorDiff.validator = staker
-		validatorDiff.oldValidator = nil
+		validatorDiff.oldWeight = 0
 		if s.deletedStakers == nil {
 			s.deletedStakers = make(map[ids.ID]*Staker)
 		}
@@ -402,7 +406,9 @@ func (s *diffStakers) DeleteValidator(staker *Staker) {
 	}
 }
 
-// Invariant: [mutatedValidator] is a valid mutation of [oldValidator].
+// Invariants:
+//   - [oldValidator] must be an existing validator
+//   - [mutatedValidator] must be a valid mutation of [oldValidator].
 func (s *diffStakers) UpdateValidator(
 	oldValidator *Staker,
 	mutatedValidator *Staker,
@@ -411,20 +417,14 @@ func (s *diffStakers) UpdateValidator(
 
 	switch validatorDiff.validatorStatus {
 	case added, modified:
-		// Keep the same validatorDiff.validatorStatus.
+		// Keep the same [validatorDiff.validatorStatus].
 		validatorDiff.validator = mutatedValidator
-
-		if s.addedOrModifiedStakers == nil {
-			// This shouldn't happen, since the current validator was already added.
-			s.addedOrModifiedStakers = btree.NewG(defaultTreeDegree, (*Staker).Less)
-		}
-
 		s.addedOrModifiedStakers.ReplaceOrInsert(mutatedValidator)
 
 	case unmodified:
 		validatorDiff.validator = mutatedValidator
 		validatorDiff.validatorStatus = modified
-		validatorDiff.oldValidator = oldValidator
+		validatorDiff.oldWeight = oldValidator.Weight
 
 		if s.addedOrModifiedStakers == nil {
 			s.addedOrModifiedStakers = btree.NewG(defaultTreeDegree, (*Staker).Less)

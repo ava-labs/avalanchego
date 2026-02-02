@@ -2718,7 +2718,6 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				weightDiff: weightDiff,
 			}
 			if pk != nil {
-				//	I think both [prevPublicKey] and [newPublicKey] will by [pkBytes]
 				pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 				if diff.validatorStatus != added {
 					change.prevPublicKey = pkBytes
@@ -2851,7 +2850,7 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 		// Record the change in weight and/or public key for each validator.
 		for nodeID, validatorDiff := range validatorDiffs {
 			switch validatorDiff.validatorStatus {
-			case added, modified: // todo: is modified case breaking the invariant from below?
+			case added, modified:
 				staker := validatorDiff.validator
 
 				// The validator is being added.
