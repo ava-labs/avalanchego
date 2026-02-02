@@ -2466,6 +2466,7 @@ func TestStateUpdateValidator(t *testing.T) {
 				Weight:    10,
 				StartTime: time.Unix(1, 0),
 				EndTime:   time.Unix(2, 0),
+				NextTime:  time.Unix(2, 0),
 				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
 			}
 			require.NoError(state.PutCurrentValidator(currentValidator))

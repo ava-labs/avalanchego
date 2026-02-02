@@ -1116,6 +1116,7 @@ func TestDiffUpdateValidatorErrors(t *testing.T) {
 				Weight:    10,
 				StartTime: time.Unix(1, 0),
 				EndTime:   time.Unix(2, 0),
+				NextTime:  time.Unix(2, 0),
 				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
 			}
 			require.NoError(state.PutCurrentValidator(currentValidator))
@@ -1136,4 +1137,72 @@ func TestDiffUpdateValidatorErrors(t *testing.T) {
 			require.ErrorIs(err, test.expectedErr)
 		})
 	}
+}
+
+func TestDiffUpdateValidator(t *testing.T) {
+	require := require.New(t)
+
+	subnetID := ids.GenerateTestID()
+
+	state := newTestState(t, memdb.New())
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+
+	blsKey, err := localsigner.New()
+	require.NoError(err)
+
+	validator := &Staker{
+		TxID:      ids.GenerateTestID(),
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: blsKey.PublicKey(),
+		SubnetID:  subnetID,
+		Weight:    10,
+		StartTime: time.Unix(1, 0),
+		EndTime:   time.Unix(20, 0),
+		NextTime:  time.Unix(20, 0),
+		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+	}
+
+	require.NoError(d.PutCurrentValidator(validator))
+
+	// First update
+	mutatedValidator := *validator
+	mutatedValidator.Weight = 35
+
+	require.NoError(d.UpdateCurrentValidator(&mutatedValidator))
+
+	currentValidator, err := d.GetCurrentValidator(subnetID, validator.NodeID)
+	require.NoError(err)
+
+	require.Equal(uint64(35), currentValidator.Weight)
+
+	// Second update
+	mutatedValidator = *currentValidator
+	mutatedValidator.Weight = 45
+
+	require.NoError(d.UpdateCurrentValidator(&mutatedValidator))
+
+	currentValidator, err = d.GetCurrentValidator(subnetID, validator.NodeID)
+	require.NoError(err)
+
+	require.Equal(uint64(45), currentValidator.Weight)
+
+	// Check state after diff is applied
+	expectedStakersIterator, err := d.GetCurrentStakerIterator()
+	require.NoError(err)
+
+	expectedStakers := iterator.ToSlice(expectedStakersIterator)
+	expectedStakersIterator.Release()
+
+	require.NoError(d.Apply(state))
+
+	actualStakersIterator, err := state.GetCurrentStakerIterator()
+	require.NoError(err)
+	actualStakers := iterator.ToSlice(actualStakersIterator)
+	actualStakersIterator.Release()
+
+	require.Equal(
+		expectedStakers,
+		actualStakers,
+	)
 }
