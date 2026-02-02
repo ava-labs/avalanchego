@@ -31,7 +31,6 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 	vdrMetadata := &validatorMetadata{
 		UpDuration:      time.Hour,
-		lastUpdated:     time.Now(),
 		PotentialReward: 100,
 		txID:            ids.GenerateTestID(),
 	}
@@ -119,19 +118,15 @@ func TestParseValidatorMetadata(t *testing.T) {
 	}
 	tests := []test{
 		{
-			name:  "nil",
-			bytes: nil,
-			expected: &validatorMetadata{
-				lastUpdated: time.Unix(0, 0),
-			},
+			name:        "nil",
+			bytes:       nil,
+			expected:    &validatorMetadata{},
 			expectedErr: nil,
 		},
 		{
-			name:  "nil",
-			bytes: []byte{},
-			expected: &validatorMetadata{
-				lastUpdated: time.Unix(0, 0),
-			},
+			name:        "nil",
+			bytes:       []byte{},
+			expected:    &validatorMetadata{},
 			expectedErr: nil,
 		},
 		{
@@ -141,7 +136,6 @@ func TestParseValidatorMetadata(t *testing.T) {
 			},
 			expected: &validatorMetadata{
 				PotentialReward: 100000,
-				lastUpdated:     time.Unix(0, 0),
 			},
 			expectedErr: nil,
 		},
@@ -161,7 +155,6 @@ func TestParseValidatorMetadata(t *testing.T) {
 				UpDuration:      6000000,
 				LastUpdated:     900000,
 				PotentialReward: 100000,
-				lastUpdated:     time.Unix(900000, 0),
 			},
 			expectedErr: nil,
 		},
@@ -184,7 +177,6 @@ func TestParseValidatorMetadata(t *testing.T) {
 				LastUpdated:              900000,
 				PotentialReward:          100000,
 				PotentialDelegateeReward: 20000,
-				lastUpdated:              time.Unix(900000, 0),
 			},
 			expectedErr: nil,
 		},

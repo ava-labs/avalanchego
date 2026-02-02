@@ -35,8 +35,7 @@ type validatorMetadata struct {
 	PotentialDelegateeReward uint64        `v0:"true"`
 	StakerStartTime          uint64        `          v1:"true"`
 
-	txID        ids.ID
-	lastUpdated time.Time
+	txID ids.ID
 }
 
 // Permissioned validators originally wrote their values as nil.
@@ -73,7 +72,6 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 			return err
 		}
 	}
-	metadata.lastUpdated = time.Unix(int64(metadata.LastUpdated), 0)
 	return nil
 }
 
@@ -191,7 +189,6 @@ func (m *metadata) WriteValidatorMetadata(
 	for vdrID, updatedSubnets := range m.updatedMetadata {
 		for subnetID := range updatedSubnets {
 			metadata := m.metadata[vdrID][subnetID]
-			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
 
 			metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
 			if err != nil {
