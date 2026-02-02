@@ -2841,7 +2841,7 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 		// Record the change in weight and/or public key for each validator.
 		for nodeID, validatorDiff := range validatorDiffs {
 			switch validatorDiff.validatorStatus {
-			case added, modified:
+			case added:
 				staker := validatorDiff.validator
 
 				// The validator is being added.
@@ -2850,14 +2850,9 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 				// in the same block that the validator was added.
 				startTime := uint64(staker.StartTime.Unix())
 				metadata := &validatorMetadata{
-					txID:        staker.TxID,
-					lastUpdated: staker.StartTime,
-
-					UpDuration:               0,
-					LastUpdated:              startTime,
-					StakerStartTime:          startTime,
-					PotentialReward:          staker.PotentialReward,
-					PotentialDelegateeReward: 0,
+					txID:            staker.TxID,
+					StakerStartTime: startTime,
+					PotentialReward: staker.PotentialReward,
 				}
 
 				metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
@@ -2870,6 +2865,33 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 				}
 
 				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
+			case modified:
+				staker := validatorDiff.validator
+
+				// Preserve existing delegatee reward.
+				existingDelegateeReward, err := s.validatorState.GetDelegateeReward(subnetID, nodeID)
+				if err != nil {
+					return fmt.Errorf("failed to get existing delegatee reward: %w", err)
+				}
+
+				metadata := &validatorMetadata{
+					txID:                     staker.TxID,
+					StakerStartTime:          uint64(staker.StartTime.Unix()),
+					PotentialReward:          staker.PotentialReward,
+					PotentialDelegateeReward: existingDelegateeReward,
+				}
+
+				metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
+				if err != nil {
+					return fmt.Errorf("failed to serialize modified validator: %w", err)
+				}
+
+				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
+					return fmt.Errorf("failed to write modified validator to list: %w", err)
+				}
+
+				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
+
 			case deleted:
 				if err := validatorDB.Delete(validatorDiff.validator.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
