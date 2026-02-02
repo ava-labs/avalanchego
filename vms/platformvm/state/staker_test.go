@@ -278,6 +278,7 @@ func TestValidateMutation(t *testing.T) {
 				staker.Weight = 200
 				staker.StartTime = time.Unix(30, 0)
 				staker.EndTime = time.Unix(40, 0)
+				staker.NextTime = time.Unix(50, 0)
 				staker.PotentialReward = 20
 				return &staker
 			},
