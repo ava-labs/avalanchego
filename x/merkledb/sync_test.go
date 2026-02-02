@@ -54,8 +54,7 @@ func Test_Creation(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NotNil(syncer)
-	require.NoError(syncer.Start(t.Context()))
-	require.NoError(syncer.Wait(t.Context()))
+	require.NoError(syncer.Sync(t.Context()))
 }
 
 // Tests that we are able to sync to the correct root while the server is
@@ -278,7 +277,10 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			require.NotNil(syncer)
 
 			// Start syncing from the server
-			require.NoError(syncer.Start(ctx))
+			errChan := make(chan error, 1)
+			go func() {
+				errChan <- syncer.Sync(ctx)
+			}()
 
 			// Simulate writes on the server
 			//
@@ -304,7 +306,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			}
 
 			// Block until all syncing is done
-			require.NoError(syncer.Wait(ctx))
+			require.NoErrorf(<-errChan, "%T.Sync()", syncer)
 
 			// We should have the same resulting root as the server
 			wantRoot, err := dbToSync.GetMerkleRoot(t.Context())
@@ -353,7 +355,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Start syncing from the server, will be cancelled by the range proof handler
-	require.NoError(syncer.Start(ctx))
+	require.NoError(syncer.Sync(ctx))
 
 	// Wait until we've processed some work before closing
 	require.Eventually(func() bool {
@@ -377,9 +379,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(newSyncer)
 
-	require.NoError(newSyncer.Start(t.Context()))
-	require.NoError(newSyncer.Error())
-	require.NoError(newSyncer.Wait(t.Context()))
+	require.NoError(newSyncer.Sync(t.Context()))
 
 	newRoot, err := db.GetMerkleRoot(t.Context())
 	require.NoError(err)
@@ -462,9 +462,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(syncer)
 
-	require.NoError(syncer.Start(ctx))
-	require.NoError(syncer.Wait(ctx))
-	require.NoError(syncer.Error())
+	require.NoError(syncer.Sync(ctx))
 
 	newRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
@@ -520,8 +518,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(syncer.Start(ctx))
-	require.NoError(syncer.Wait(ctx))
+	require.NoError(syncer.Sync(ctx))
 }
 
 func generateTrie(t *testing.T, r *rand.Rand, count int) (MerkleDB, error) {

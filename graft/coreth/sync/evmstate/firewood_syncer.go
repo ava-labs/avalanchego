@@ -53,12 +53,8 @@ func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Has
 }
 
 func (f *FirewoodSyncer) Sync(ctx context.Context) error {
-	if err := f.s.Start(ctx); err != nil {
-		return fmt.Errorf("starting syncer: %w", err)
-	}
-
-	if err := f.s.Wait(ctx); err != nil {
-		return fmt.Errorf("waiting for syncer: %w", err)
+	if err := f.s.Sync(ctx); err != nil {
+		return err
 	}
 
 	return f.Finalize()
