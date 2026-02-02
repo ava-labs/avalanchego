@@ -68,7 +68,6 @@ __debug_*
 
 # polyrepo
 polyrepo.log
-firewood
 
 # solc downloads from setup-solc GitHub Action
 setup-solc_downloads/

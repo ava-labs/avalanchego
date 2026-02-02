@@ -14,20 +14,20 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/merkle/sync"
+	"github.com/ava-labs/avalanchego/database/merkle/sync/protoutils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/x/sync/protoutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
-	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 const verificationCacheSize = math.MaxUint16
 
 var (
-	_ xsync.Marshaler[*ChangeProof] = (*ChangeProofMarshaler)(nil)
-	_ xsync.Marshaler[*RangeProof]  = (*RangeProofMarshaler)(nil)
+	_ sync.Marshaler[*ChangeProof] = (*ChangeProofMarshaler)(nil)
+	_ sync.Marshaler[*RangeProof]  = (*RangeProofMarshaler)(nil)
 
 	ErrInvalidProof                  = errors.New("proof obtained an invalid root ID")
 	ErrInvalidMaxLength              = errors.New("expected max length to be > 0")

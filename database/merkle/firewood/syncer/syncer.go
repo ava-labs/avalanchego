@@ -12,16 +12,15 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-
-	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 var (
-	_ xsync.DB[*RangeProof, struct{}] = (*database)(nil)
+	_ sync.DB[*RangeProof, struct{}] = (*database)(nil)
 
 	defaultSimultaneousWorkLimit = 8
 )
@@ -38,7 +37,7 @@ type Config struct {
 	Registerer            prometheus.Registerer
 }
 
-func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
+func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
 	return newWithDB(
 		config,
 		&database{db},
@@ -48,7 +47,7 @@ func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p
 	)
 }
 
-func newWithDB(config Config, db xsync.DB[*RangeProof, struct{}], targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*xsync.Syncer[*RangeProof, struct{}], error) {
+func newWithDB(config Config, db sync.DB[*RangeProof, struct{}], targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
 	if config.Registerer == nil {
 		config.Registerer = prometheus.NewRegistry()
 	}
@@ -58,9 +57,9 @@ func newWithDB(config Config, db xsync.DB[*RangeProof, struct{}], targetRoot ids
 	if config.SimultaneousWorkLimit == 0 {
 		config.SimultaneousWorkLimit = defaultSimultaneousWorkLimit
 	}
-	return xsync.NewSyncer(
+	return sync.NewSyncer(
 		db,
-		xsync.Config[*RangeProof, struct{}]{
+		sync.Config[*RangeProof, struct{}]{
 			RangeProofMarshaler:   rangeProofMarshaler{},
 			ChangeProofMarshaler:  changeProofMarshaler{},
 			EmptyRoot:             ids.ID(types.EmptyRootHash),
@@ -134,7 +133,7 @@ func (db *database) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[
 // TODO: Use change proofs to optimize syncing.
 // Returning the sentinel error suggests to the server handler to serve a full range proof instead.
 func (*database) GetChangeProof(context.Context, ids.ID, ids.ID, maybe.Maybe[[]byte], maybe.Maybe[[]byte], int) (struct{}, error) {
-	return struct{}{}, xsync.ErrInsufficientHistory
+	return struct{}{}, sync.ErrInsufficientHistory
 }
 
 // TODO: implement this method.
