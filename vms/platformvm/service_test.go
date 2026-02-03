@@ -539,10 +539,11 @@ func TestGetStake(t *testing.T) {
 	require.NoError(err)
 
 	addDelTx := tx.Unsigned.(*txs.AddDelegatorTx)
-	staker, err := state.NewCurrentStaker(
+	staker, err := state.NewCurrentValidator(
 		tx.ID(),
 		addDelTx,
 		genesistest.DefaultValidatorStartTime,
+		0,
 		0,
 	)
 	require.NoError(err)
@@ -693,7 +694,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.NoError(err)
 
 	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
-	staker, err := state.NewCurrentStaker(
+	staker, err := state.NewCurrentDelegator(
 		delTx.ID(),
 		addDelTx,
 		genesistest.DefaultValidatorStartTime,
@@ -751,7 +752,10 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.NoError(err)
 	service.vm.state.AddTx(tx, status.Committed)
 	service.vm.state.DeleteCurrentDelegator(staker)
-	require.NoError(service.vm.state.SetDelegateeReward(staker.SubnetID, staker.NodeID, 100000))
+	validator, err := service.vm.state.GetCurrentValidator(constants.PrimaryNetworkID, validatorNodeID)
+	require.NoError(err)
+	validator.DelegateeReward = 100000
+	require.NoError(service.vm.state.UpdateCurrentValidator(validator))
 	require.NoError(service.vm.state.Commit())
 
 	service.vm.ctx.Lock.Unlock()
