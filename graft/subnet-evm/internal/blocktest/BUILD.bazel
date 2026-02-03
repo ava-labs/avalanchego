@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "blocktest",
+    srcs = ["test_hash.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest",
+    visibility = ["//graft/subnet-evm:__subpackages__"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@org_golang_x_crypto//sha3",
+    ],
+)

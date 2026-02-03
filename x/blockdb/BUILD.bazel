@@ -1,0 +1,48 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "blockdb",
+    srcs = [
+        "cache_db.go",
+        "config.go",
+        "database.go",
+        "errors.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/x/blockdb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache/lru",
+        "//database",
+        "//utils/compression",
+        "//utils/logging",
+        "//utils/math",
+        "@com_github_cespare_xxhash_v2//:xxhash",
+        "@com_github_datadog_zstd//:zstd",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "blockdb_test",
+    srcs = [
+        "cache_db_test.go",
+        "database_test.go",
+        "datasplit_test.go",
+        "helpers_test.go",
+        "readblock_test.go",
+        "recovery_test.go",
+        "writeblock_test.go",
+    ],
+    embed = [":blockdb"],
+    deps = [
+        "//cache/lru",
+        "//database",
+        "//database/heightindexdb/dbtest",
+        "//utils",
+        "//utils/compression",
+        "//utils/logging",
+        "//utils/math",
+        "@com_github_datadog_zstd//:zstd",
+        "@com_github_stretchr_testify//require",
+    ],
+)

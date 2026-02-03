@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "metrics",
+    srcs = [
+        "client.go",
+        "label_gatherer.go",
+        "multi_gatherer.go",
+        "prefix_gatherer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/api/metrics",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "//utils/metric",
+        "//utils/rpc",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_model//go",
+        "@com_github_prometheus_common//expfmt",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+go_test(
+    name = "metrics_test",
+    srcs = [
+        "gatherer_test.go",
+        "label_gatherer_test.go",
+        "prefix_gatherer_test.go",
+    ],
+    embed = [":metrics"],
+    deps = [
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/testutil",
+        "@com_github_prometheus_client_model//go",
+        "@com_github_stretchr_testify//require",
+    ],
+)

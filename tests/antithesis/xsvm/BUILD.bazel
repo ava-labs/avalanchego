@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "xsvm_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/antithesis/xsvm",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//tests",
+        "//tests/antithesis",
+        "//tests/fixture/subnet",
+        "//tests/fixture/tmpnet",
+        "//utils/crypto/secp256k1",
+        "//utils/logging",
+        "//utils/set",
+        "//utils/timer",
+        "//utils/units",
+        "//vms/example/xsvm/api",
+        "//vms/example/xsvm/cmd/issue/status",
+        "//vms/example/xsvm/cmd/issue/transfer",
+        "@com_github_antithesishq_antithesis_sdk_go//assert",
+        "@com_github_antithesishq_antithesis_sdk_go//lifecycle",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_binary(
+    name = "xsvm",
+    embed = [":xsvm_lib"],
+    visibility = ["//visibility:public"],
+)

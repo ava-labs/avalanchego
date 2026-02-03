@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "precompileconfig",
+    srcs = [
+        "config.go",
+        "mocks.go",
+        "upgradeable.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/utils",
+        "//snow",
+        "//snow/engine/snowman/block",
+        "//vms/evm/predicate",
+        "//vms/platformvm/warp",
+        "@com_github_ava_labs_libevm//common",
+        "@org_uber_go_mock//gomock",
+    ],
+)
+
+graft_go_test_900s(
+    name = "precompileconfig_test",
+    srcs = ["mocks_generate_test.go"],
+    embed = [":precompileconfig"],
+)

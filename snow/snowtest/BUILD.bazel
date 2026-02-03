@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "snowtest",
+    srcs = [
+        "context.go",
+        "decidable.go",
+        "status.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/snowtest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/metrics",
+        "//chains/atomic",
+        "//database/memdb",
+        "//ids",
+        "//snow",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//upgrade/upgradetest",
+        "//utils/constants",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/logging",
+        "//vms/platformvm/warp",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

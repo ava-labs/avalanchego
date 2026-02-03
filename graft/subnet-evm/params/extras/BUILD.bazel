@@ -1,0 +1,62 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "extras",
+    srcs = [
+        "config.go",
+        "network_upgrades.go",
+        "precompile_upgrade.go",
+        "precompiles.go",
+        "rules.go",
+        "state_upgrade.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/utils",
+        "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/precompile/modules",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "//snow",
+        "//upgrade",
+        "//utils",
+        "//utils/constants",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)
+
+graft_go_test_900s(
+    name = "extras_test",
+    srcs = [
+        "config_extra_test.go",
+        "config_test.go",
+        "network_upgrades_test.go",
+        "precompile_config_test.go",
+        "precompile_upgrade_test.go",
+        "state_upgrade_test.go",
+    ],
+    embed = [":extras"],
+    deps = [
+        "//graft/evm/utils",
+        "//graft/evm/utils/utilstest",
+        "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/precompile/allowlist",
+        "//graft/subnet-evm/precompile/contracts/deployerallowlist",
+        "//graft/subnet-evm/precompile/contracts/feemanager",
+        "//graft/subnet-evm/precompile/contracts/nativeminter",
+        "//graft/subnet-evm/precompile/contracts/rewardmanager",
+        "//graft/subnet-evm/precompile/contracts/txallowlist",
+        "//snow",
+        "//upgrade",
+        "//upgrade/upgradetest",
+        "//utils",
+        "//utils/constants",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_stretchr_testify//require",
+    ],
+)

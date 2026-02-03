@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "reexecute",
+    srcs = [
+        "db.go",
+        "vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tests/reexecute",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/metrics",
+        "//chains/atomic",
+        "//database",
+        "//database/leveldb",
+        "//database/prefixdb",
+        "//genesis",
+        "//graft/coreth/plugin/factory",
+        "//ids",
+        "//snow",
+        "//snow/engine/enginetest",
+        "//snow/engine/snowman/block",
+        "//snow/validators/validatorstest",
+        "//tests",
+        "//upgrade",
+        "//utils/constants",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/logging",
+        "//vms/metervm",
+        "//vms/platformvm/warp",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

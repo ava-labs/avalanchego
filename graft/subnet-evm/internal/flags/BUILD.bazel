@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "flags",
+    srcs = [
+        "categories.go",
+        "flags.go",
+        "helpers.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/internal/flags",
+    visibility = ["//graft/subnet-evm:__subpackages__"],
+    deps = [
+        "//graft/subnet-evm/internal/version",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_mattn_go_isatty//:go-isatty",
+        "@com_github_urfave_cli_v2//:cli",
+    ],
+)
+
+graft_go_test_900s(
+    name = "flags_test",
+    srcs = ["flags_test.go"],
+    embed = [":flags"],
+)

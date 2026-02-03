@@ -1,0 +1,52 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "simulated",
+    srcs = [
+        "backend.go",
+        "options.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/ethclient/simulated",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/consensus/dummy",
+        "//graft/coreth/core",
+        "//graft/coreth/eth",
+        "//graft/coreth/eth/ethconfig",
+        "//graft/coreth/ethclient",
+        "//graft/coreth/interfaces",
+        "//graft/coreth/node",
+        "//graft/coreth/params",
+        "//graft/evm/constants",
+        "//graft/evm/rpc",
+        "//utils/timer/mockable",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+    ],
+)
+
+graft_go_test_900s(
+    name = "simulated_test",
+    srcs = [
+        "backend_test.go",
+        "options_test.go",
+    ],
+    embed = [":simulated"],
+    deps = [
+        "//graft/coreth/accounts/abi/bind",
+        "//graft/coreth/core",
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//graft/evm/rpc",
+        "//vms/evm/acp176",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+    ],
+)

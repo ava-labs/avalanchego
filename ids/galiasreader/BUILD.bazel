@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "galiasreader",
+    srcs = [
+        "alias_reader_client.go",
+        "alias_reader_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/ids/galiasreader",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//proto/pb/aliasreader",
+    ],
+)
+
+go_test(
+    name = "galiasreader_test",
+    srcs = ["alias_reader_test.go"],
+    embed = [":galiasreader"],
+    deps = [
+        "//ids",
+        "//ids/idstest",
+        "//proto/pb/aliasreader",
+        "//vms/rpcchainvm/grpcutils",
+        "@com_github_stretchr_testify//require",
+    ],
+)

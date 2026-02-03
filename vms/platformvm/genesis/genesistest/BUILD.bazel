@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "genesistest",
+    srcs = ["genesis.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/snowtest",
+        "//upgrade",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//utils/units",
+        "//vms/components/avax",
+        "//vms/platformvm/genesis",
+        "//vms/platformvm/reward",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+        "@com_github_stretchr_testify//require",
+    ],
+)

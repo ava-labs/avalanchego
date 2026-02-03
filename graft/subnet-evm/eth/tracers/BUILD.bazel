@@ -1,0 +1,68 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "tracers",
+    srcs = [
+        "api.go",
+        "tracers.go",
+        "tracker.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/rpc",
+        "//graft/subnet-evm/consensus",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/internal/ethapi",
+        "//graft/subnet-evm/params",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//eth/tracers",
+        "@com_github_ava_labs_libevm//eth/tracers/logger",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//rlp",
+    ],
+)
+
+graft_go_test_900s(
+    name = "tracers_test",
+    srcs = [
+        "api_extra_test.go",
+        "api_test.go",
+        "tracers_test.go",
+        "tracker_test.go",
+    ],
+    embed = [":tracers"],
+    deps = [
+        "//graft/evm/rpc",
+        "//graft/subnet-evm/consensus",
+        "//graft/subnet-evm/consensus/dummy",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/internal/ethapi",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "//graft/subnet-evm/precompile/contracts/txallowlist",
+        "//graft/subnet-evm/tests",
+        "//vms/evm/sync/customrawdb",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//eth/tracers/logger",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm/ethtest",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_exp//slices",
+    ],
+)

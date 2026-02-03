@@ -1,0 +1,67 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "warp",
+    srcs = [
+        "config.go",
+        "contract.go",
+        "contract_warp_handler.go",
+        "module.go",
+    ],
+    embedsrcs = ["IWarpMessenger.abi"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/precompile/contract",
+        "//graft/coreth/precompile/modules",
+        "//graft/coreth/precompile/precompileconfig",
+        "//utils/constants",
+        "//vms/evm/predicate",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_ava_labs_libevm//accounts/abi",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//log",
+    ],
+)
+
+graft_go_test_900s(
+    name = "warp_test",
+    srcs = [
+        "config_test.go",
+        "contract_test.go",
+        "predicate_test.go",
+    ],
+    embed = [":warp"],
+    deps = [
+        "//graft/coreth/params/extras",
+        "//graft/coreth/params/extras/extrastest",
+        "//graft/coreth/precompile/contract",
+        "//graft/coreth/precompile/precompileconfig",
+        "//graft/coreth/precompile/precompiletest",
+        "//ids",
+        "//snow",
+        "//snow/engine/snowman/block",
+        "//snow/snowtest",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//upgrade/upgradetest",
+        "//utils",
+        "//utils/constants",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/math",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

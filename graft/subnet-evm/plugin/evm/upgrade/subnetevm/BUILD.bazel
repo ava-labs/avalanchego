@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "subnetevm",
+    srcs = ["window.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/subnetevm",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/wrappers",
+        "@com_github_ava_labs_libevm//common/math",
+    ],
+)
+
+graft_go_test_900s(
+    name = "subnetevm_test",
+    srcs = ["window_test.go"],
+    embed = [":subnetevm"],
+    deps = [
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_stretchr_testify//require",
+    ],
+)

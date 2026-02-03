@@ -1,0 +1,52 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "runtime",
+    srcs = [
+        "doc.go",
+        "env.go",
+        "runtime.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/core/vm/runtime",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/core",
+        "//graft/coreth/params",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/plugin/evm/upgrade/ap3",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+graft_go_test_900s(
+    name = "runtime_test",
+    srcs = [
+        "runtime_example_test.go",
+        "runtime_test.go",
+    ],
+    embed = [":runtime"],
+    deps = [
+        "//graft/coreth/consensus",
+        "//graft/coreth/core",
+        "//graft/coreth/eth/tracers",
+        "//graft/coreth/params",
+        "@com_github_ava_labs_libevm//accounts/abi",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/asm",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//eth/tracers/js",
+        "@com_github_ava_labs_libevm//eth/tracers/logger",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)

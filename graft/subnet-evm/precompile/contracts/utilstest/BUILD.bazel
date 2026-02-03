@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "utilstest",
+    srcs = ["simulated_helpers.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/accounts/abi/bind",
+        "//graft/subnet-evm/eth/ethconfig",
+        "//graft/subnet-evm/ethclient/simulated",
+        "//graft/subnet-evm/node",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
+    ],
+)

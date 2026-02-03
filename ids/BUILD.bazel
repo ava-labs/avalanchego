@@ -1,0 +1,41 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ids",
+    srcs = [
+        "aliases.go",
+        "bits.go",
+        "id.go",
+        "node_id.go",
+        "request_id.go",
+        "short.go",
+        "test_generator.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/ids",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//staking",
+        "//utils",
+        "//utils/cb58",
+        "//utils/hashing",
+        "//utils/wrappers",
+    ],
+)
+
+go_test(
+    name = "ids_test",
+    srcs = [
+        "aliases_test.go",
+        "bits_test.go",
+        "id_test.go",
+        "node_id_test.go",
+    ],
+    embed = [":ids"],
+    deps = [
+        "//ids/idstest",
+        "//utils",
+        "//utils/cb58",
+        "//utils/hashing",
+        "@com_github_stretchr_testify//require",
+    ],
+)

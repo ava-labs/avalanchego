@@ -1,0 +1,37 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "leveldb",
+    srcs = [
+        "db.go",
+        "metrics.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/database/leveldb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//utils",
+        "//utils/logging",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_syndtr_goleveldb//leveldb",
+        "@com_github_syndtr_goleveldb//leveldb/errors",
+        "@com_github_syndtr_goleveldb//leveldb/filter",
+        "@com_github_syndtr_goleveldb//leveldb/iterator",
+        "@com_github_syndtr_goleveldb//leveldb/opt",
+        "@com_github_syndtr_goleveldb//leveldb/util",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "leveldb_test",
+    srcs = ["db_test.go"],
+    embed = [":leveldb"],
+    deps = [
+        "//database",
+        "//database/dbtest",
+        "//utils/logging",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

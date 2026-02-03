@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "validators_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/genesis/generate/validators",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//ids",
+        "//utils/constants",
+        "//utils/perms",
+        "//utils/set",
+        "//vms/platformvm",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "validators",
+    embed = [":validators_lib"],
+    visibility = ["//visibility:public"],
+)

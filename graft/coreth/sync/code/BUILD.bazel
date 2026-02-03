@@ -1,0 +1,49 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "code",
+    srcs = [
+        "queue.go",
+        "syncer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/sync/code",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/plugin/evm/message",
+        "//graft/coreth/sync/client",
+        "//graft/coreth/sync/types",
+        "//vms/evm/sync/customrawdb",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm/options",
+        "@org_golang_x_sync//errgroup",
+    ],
+)
+
+graft_go_test_900s(
+    name = "code_test",
+    srcs = [
+        "queue_test.go",
+        "syncer_test.go",
+    ],
+    embed = [":code"],
+    deps = [
+        "//graft/coreth/plugin/evm/message",
+        "//graft/coreth/sync/client",
+        "//graft/coreth/sync/handlers",
+        "//graft/coreth/sync/handlers/stats",
+        "//utils",
+        "//utils/set",
+        "//vms/evm/sync/customrawdb",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//ethdb/memorydb",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+    ],
+)

@@ -1,0 +1,48 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "state",
+    srcs = [
+        "prefixed_state.go",
+        "serializer.go",
+        "state.go",
+        "unique_vertex.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/avalanche/state",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//database",
+        "//database/versiondb",
+        "//ids",
+        "//snow/choices",
+        "//snow/consensus/avalanche",
+        "//snow/consensus/snowstorm",
+        "//snow/engine/avalanche/vertex",
+        "//utils/formatting",
+        "//utils/hashing",
+        "//utils/logging",
+        "//utils/math",
+        "//utils/set",
+        "//utils/wrappers",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "state_test",
+    srcs = ["unique_vertex_test.go"],
+    embed = [":state"],
+    deps = [
+        "//database/memdb",
+        "//ids",
+        "//snow/choices",
+        "//snow/consensus/snowstorm",
+        "//snow/engine/avalanche/vertex",
+        "//snow/engine/avalanche/vertex/vertextest",
+        "//utils/hashing",
+        "//utils/logging",
+        "@com_github_stretchr_testify//require",
+    ],
+)

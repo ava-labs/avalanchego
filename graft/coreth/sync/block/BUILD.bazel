@@ -1,0 +1,40 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "block",
+    srcs = ["syncer.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/sync/block",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/sync/client",
+        "//graft/coreth/sync/types",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//log",
+    ],
+)
+
+graft_go_test_900s(
+    name = "block_test",
+    srcs = ["syncer_test.go"],
+    embed = [":block"],
+    deps = [
+        "//graft/coreth/consensus/dummy",
+        "//graft/coreth/core",
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//graft/coreth/plugin/evm/message",
+        "//graft/coreth/sync/client",
+        "//graft/coreth/sync/handlers",
+        "//graft/coreth/sync/handlers/stats",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+    ],
+)

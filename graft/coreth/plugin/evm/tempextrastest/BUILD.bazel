@@ -1,0 +1,16 @@
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+graft_go_test_900s(
+    name = "tempextrastest_test",
+    srcs = ["tempextras_test.go"],
+    deps = [
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm",
+        "//graft/coreth/plugin/evm/customtypes",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+    ],
+)

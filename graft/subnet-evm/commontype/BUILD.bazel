@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "commontype",
+    srcs = [
+        "fee_config.go",
+        "test_fee_config.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/utils",
+        "@com_github_ava_labs_libevm//common",
+    ],
+)
+
+graft_go_test_900s(
+    name = "commontype_test",
+    srcs = ["fee_config_test.go"],
+    embed = [":commontype"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

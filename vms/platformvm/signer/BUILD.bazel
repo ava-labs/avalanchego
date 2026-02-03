@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "signer",
+    srcs = [
+        "empty.go",
+        "proof_of_possession.go",
+        "signer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/signer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/crypto/bls",
+        "//utils/formatting",
+        "//vms/components/verify",
+    ],
+)
+
+go_test(
+    name = "signer_test",
+    srcs = [
+        "empty_test.go",
+        "mocks_generate_test.go",
+        "proof_of_possession_test.go",
+    ],
+    embed = [":signer"],
+    deps = [
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "@com_github_stretchr_testify//require",
+    ],
+)

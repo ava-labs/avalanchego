@@ -1,0 +1,60 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "rewardmanager",
+    srcs = [
+        "config.go",
+        "contract.go",
+        "event.go",
+        "module.go",
+    ],
+    embedsrcs = ["IRewardManager.abi"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/constants",
+        "//graft/subnet-evm/precompile/allowlist",
+        "//graft/subnet-evm/precompile/contract",
+        "//graft/subnet-evm/precompile/modules",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+    ],
+)
+
+graft_go_test_900s(
+    name = "rewardmanager_test",
+    srcs = [
+        "config_test.go",
+        "contract_test.go",
+        "simulated_test.go",
+    ],
+    deps = [
+        ":rewardmanager",
+        "//graft/evm/constants",
+        "//graft/subnet-evm/accounts/abi/bind",
+        "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/core/extstate",
+        "//graft/subnet-evm/eth/ethconfig",
+        "//graft/subnet-evm/ethclient/simulated",
+        "//graft/subnet-evm/node",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "//graft/subnet-evm/precompile/allowlist",
+        "//graft/subnet-evm/precompile/allowlist/allowlisttest",
+        "//graft/subnet-evm/precompile/contracts/rewardmanager/rewardmanagertest/bindings",
+        "//graft/subnet-evm/precompile/contracts/utilstest",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "//graft/subnet-evm/precompile/precompiletest",
+        "//utils",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

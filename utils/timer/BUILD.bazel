@@ -1,0 +1,37 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "timer",
+    srcs = [
+        "adaptive_timeout_manager.go",
+        "eta.go",
+        "meter.go",
+        "stopped_timer.go",
+        "timer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/timer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/heap",
+        "//utils/math",
+        "//utils/timer/mockable",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "timer_test",
+    srcs = [
+        "adaptive_timeout_manager_test.go",
+        "eta_test.go",
+        "timer_test.go",
+    ],
+    embed = [":timer"],
+    deps = [
+        "//ids",
+        "//utils",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

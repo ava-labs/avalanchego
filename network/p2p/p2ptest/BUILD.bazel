@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "p2ptest",
+    srcs = ["client.go"],
+    importpath = "github.com/ava-labs/avalanchego/network/p2p/p2ptest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//snow/engine/common",
+        "//snow/engine/enginetest",
+        "//utils/logging",
+        "//utils/set",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "p2ptest_test",
+    srcs = ["client_test.go"],
+    embed = [":p2ptest"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//snow/engine/common",
+        "//utils/set",
+        "@com_github_stretchr_testify//require",
+    ],
+)

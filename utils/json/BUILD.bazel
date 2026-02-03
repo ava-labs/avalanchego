@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "json",
+    srcs = [
+        "codec.go",
+        "float32.go",
+        "float64.go",
+        "uint16.go",
+        "uint32.go",
+        "uint64.go",
+        "uint8.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/json",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_gorilla_rpc//v2:rpc",
+        "@com_github_gorilla_rpc//v2/json2",
+    ],
+)
+
+go_test(
+    name = "json_test",
+    srcs = ["float32_test.go"],
+    embed = [":json"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

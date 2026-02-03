@@ -1,0 +1,47 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+go_library(
+    name = "message",
+    srcs = [
+        "block_request.go",
+        "block_sync_summary.go",
+        "block_sync_summary_parser.go",
+        "block_sync_summary_provider.go",
+        "code_request.go",
+        "codec.go",
+        "handler.go",
+        "leafs_request.go",
+        "request.go",
+        "syncable.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//ids",
+        "//snow/engine/snowman/block",
+        "//utils/units",
+        "//utils/wrappers",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+    ],
+)
+
+graft_go_test_900s(
+    name = "message_test",
+    srcs = [
+        "block_request_test.go",
+        "block_sync_summary_test.go",
+        "code_request_test.go",
+        "leafs_request_test.go",
+    ],
+    embed = [":message"],
+    deps = [
+        "//snow/engine/snowman/block",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+    ],
+)

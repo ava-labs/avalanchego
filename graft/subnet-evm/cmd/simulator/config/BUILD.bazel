@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "config",
+    srcs = ["flags.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/config",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_spf13_pflag//:pflag",
+        "@com_github_spf13_viper//:viper",
+    ],
+)

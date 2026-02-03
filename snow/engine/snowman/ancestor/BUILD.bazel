@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ancestor",
+    srcs = ["tree.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/set",
+    ],
+)
+
+go_test(
+    name = "ancestor_test",
+    srcs = ["tree_test.go"],
+    embed = [":ancestor"],
+    deps = [
+        "//ids",
+        "//utils/set",
+        "@com_github_stretchr_testify//require",
+    ],
+)

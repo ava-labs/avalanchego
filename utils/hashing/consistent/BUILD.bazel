@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "consistent",
+    srcs = [
+        "hashable.go",
+        "ring.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/hashing/consistent",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/hashing",
+        "@com_github_google_btree//:btree",
+    ],
+)
+
+go_test(
+    name = "consistent_test",
+    srcs = ["ring_test.go"],
+    embed = [":consistent"],
+    deps = [
+        "//utils/hashing/hashingmock",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

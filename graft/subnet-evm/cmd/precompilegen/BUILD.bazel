@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "precompilegen_lib",
+    srcs = ["main.go"],
+    embedsrcs = ["template-readme.md"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/precompilegen",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//graft/subnet-evm/accounts/abi/bind",
+        "//graft/subnet-evm/accounts/abi/bind/precompilebind",
+        "//graft/subnet-evm/internal/flags",
+        "@com_github_ava_labs_libevm//cmd/utils",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_urfave_cli_v2//:cli",
+    ],
+)
+
+go_binary(
+    name = "precompilegen",
+    embed = [":precompilegen_lib"],
+    visibility = ["//visibility:public"],
+)

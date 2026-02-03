@@ -1,0 +1,52 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "info",
+    srcs = [
+        "client.go",
+        "service.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/api/info",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chains",
+        "//ids",
+        "//network",
+        "//network/peer",
+        "//snow/networking/benchlist",
+        "//snow/validators",
+        "//upgrade",
+        "//utils",
+        "//utils/constants",
+        "//utils/json",
+        "//utils/logging",
+        "//utils/rpc",
+        "//utils/set",
+        "//utils/units",
+        "//version",
+        "//vms",
+        "//vms/nftfx",
+        "//vms/platformvm/signer",
+        "//vms/propertyfx",
+        "//vms/secp256k1fx",
+        "@com_github_gorilla_rpc//v2:rpc",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "info_test",
+    srcs = [
+        "client_test.go",
+        "service_test.go",
+    ],
+    embed = [":info"],
+    deps = [
+        "//ids",
+        "//utils/logging",
+        "//utils/rpc",
+        "//vms/vmsmock",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

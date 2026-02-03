@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "linearcodec",
+    srcs = ["codec.go"],
+    importpath = "github.com/ava-labs/avalanchego/codec/linearcodec",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/reflectcodec",
+        "//utils/bimap",
+        "//utils/wrappers",
+    ],
+)
+
+go_test(
+    name = "linearcodec_test",
+    srcs = ["codec_test.go"],
+    embed = [":linearcodec"],
+    deps = [
+        "//codec",
+        "//codec/codectest",
+    ],
+)

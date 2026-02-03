@@ -1,0 +1,54 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "snowball",
+    srcs = [
+        "binary_slush.go",
+        "binary_snowball.go",
+        "binary_snowflake.go",
+        "consensus.go",
+        "factory.go",
+        "flat.go",
+        "nnary_slush.go",
+        "nnary_snowball.go",
+        "nnary_snowflake.go",
+        "parameters.go",
+        "tree.go",
+        "unary_snowball.go",
+        "unary_snowflake.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/consensus/snowball",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/bag",
+    ],
+)
+
+go_test(
+    name = "snowball_test",
+    srcs = [
+        "binary_snowball_test.go",
+        "binary_snowflake_test.go",
+        "consensus_performance_test.go",
+        "consensus_reversibility_test.go",
+        "consensus_test.go",
+        "flat_test.go",
+        "network_test.go",
+        "nnary_snowball_test.go",
+        "nnary_snowflake_test.go",
+        "parameters_test.go",
+        "snowflake_test.go",
+        "tree_test.go",
+        "unary_snowball_test.go",
+        "unary_snowflake_test.go",
+    ],
+    embed = [":snowball"],
+    deps = [
+        "//ids",
+        "//utils/bag",
+        "//utils/sampler",
+        "@com_github_stretchr_testify//require",
+        "@org_gonum_v1_gonum//mathext/prng",
+    ],
+)

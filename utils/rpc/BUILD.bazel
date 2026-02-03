@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "rpc",
+    srcs = [
+        "json.go",
+        "options.go",
+        "requester.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/rpc",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_gorilla_rpc//v2/json2"],
+)

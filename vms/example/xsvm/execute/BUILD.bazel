@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "execute",
+    srcs = [
+        "block.go",
+        "expects_context.go",
+        "genesis.go",
+        "tx.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/execute",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/engine/snowman/block",
+        "//utils/hashing",
+        "//utils/wrappers",
+        "//vms/example/xsvm/block",
+        "//vms/example/xsvm/genesis",
+        "//vms/example/xsvm/state",
+        "//vms/example/xsvm/tx",
+        "//vms/platformvm/warp",
+    ],
+)
