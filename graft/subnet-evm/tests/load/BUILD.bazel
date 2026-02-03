@@ -1,0 +1,18 @@
+load("//.bazel:defs.bzl", "graft_go_test_900s")
+
+graft_go_test_900s(
+    name = "load_test",
+    srcs = ["load_test.go"],
+    tags = ["manual"],  # keep
+    deps = [
+        "//graft/subnet-evm/tests",
+        "//graft/subnet-evm/tests/utils",
+        "//ids",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//utils/set",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+    ],
+)

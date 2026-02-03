@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "upgrade_test",
+    srcs = ["upgrade_test.go"],
+    tags = ["manual"],  # keep
+    deps = [
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//tests/fixture/tmpnet/flags",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+    ],
+)
