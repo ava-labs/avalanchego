@@ -29,6 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
@@ -162,7 +164,9 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 
 	// Create the firewood syncer.
 	firewoodSyncer, err := NewFirewoodSyncer(
-		syncer.Config{},
+		syncer.Config{
+			Log: loggingtest.NewLogger(t, logging.Info),
+		},
 		dbFromState(t, clientState),
 		root,
 		codeQueue,

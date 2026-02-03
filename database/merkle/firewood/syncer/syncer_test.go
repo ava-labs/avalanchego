@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 )
 
 func Test_Firewood_Sync(t *testing.T) {
@@ -81,7 +83,9 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 	}()
 
 	syncer, err := New(
-		Config{},
+		Config{
+			Log: loggingtest.NewLogger(t, logging.Info),
+		},
 		clientDB,
 		root,
 		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(serverDB)),
@@ -158,7 +162,9 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 		}
 	}, numRequestsBeforeUpdate)
 	syncer, err := New(
-		Config{},
+		Config{
+			Log: loggingtest.NewLogger(t, logging.Info),
+		},
 		clientDB,
 		firstRoot,
 		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler),

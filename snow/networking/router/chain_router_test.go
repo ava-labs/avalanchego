@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -204,7 +205,7 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
 		ids.EmptyNodeID,
-		logging.NoWarn{}, // If an error log is emitted, the test will fail
+		loggingtest.NewLogger(t, logging.Warn),
 		nil,
 		time.Second,
 		set.Set[ids.ID]{},

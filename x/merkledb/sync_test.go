@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -48,7 +49,7 @@ func Test_Creation(t *testing.T) {
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(db, rangeProofMarshaler)),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(db, rangeProofMarshaler, changeProofMarshaler)),
 			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
+			Log:                   loggingtest.NewLogger(t, logging.Info),
 		},
 		prometheus.NewRegistry(),
 	)
@@ -268,7 +269,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					ChangeProofClient:     changeProofClient,
 					TargetRoot:            syncRoot,
 					SimultaneousWorkLimit: 5,
-					Log:                   logging.NoLog{},
+					Log:                   loggingtest.NewLogger(t, logging.Info),
 				},
 				prometheus.NewRegistry(),
 			)
@@ -348,7 +349,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
+			Log:                   loggingtest.NewLogger(t, logging.Info),
 		},
 		prometheus.NewRegistry(),
 	)
@@ -374,7 +375,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
+			Log:                   loggingtest.NewLogger(t, logging.Info),
 		},
 		prometheus.NewRegistry(),
 	)
@@ -457,7 +458,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
 			TargetRoot:            firstSyncRoot,
 			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
+			Log:                   loggingtest.NewLogger(t, logging.Info),
 		},
 		prometheus.NewRegistry(),
 	)
@@ -514,7 +515,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
 			TargetRoot:            root1,
 			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
+			Log:                   loggingtest.NewLogger(t, logging.Info),
 		},
 		prometheus.NewRegistry(),
 	)
