@@ -46,7 +46,7 @@ func newCodec(codecType CodecType) codec.Manager {
 	// Codec-specific configuration: skip count and LeafsRequest type.
 	var (
 		deprecatedSkipCount int
-		leafsRequestType any
+		leafsRequestType    any
 	)
 	switch codecType {
 	case CorethCodecType:
