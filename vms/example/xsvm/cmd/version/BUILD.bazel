@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "version",
+    srcs = ["cmd.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/version",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/constants",
+        "//version",
+        "//vms/example/xsvm",
+        "@com_github_spf13_cobra//:cobra",
+    ],
+)
