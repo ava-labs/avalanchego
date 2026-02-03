@@ -10,14 +10,13 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-
-	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
-var _ xsync.DB[*RangeProof, struct{}] = (*evmDB)(nil)
+var _ sync.DB[*RangeProof, struct{}] = (*evmDB)(nil)
 
 type CodeQueue interface {
 	AddCode(context.Context, []common.Hash) error
@@ -35,7 +34,7 @@ func NewEVM(
 	targetRoot ids.ID,
 	rangeProofClient *p2p.Client,
 	changeProofClient *p2p.Client,
-) (*xsync.Syncer[*RangeProof, struct{}], error) {
+) (*sync.Syncer[*RangeProof, struct{}], error) {
 	return newWithDB(
 		config,
 		&evmDB{
