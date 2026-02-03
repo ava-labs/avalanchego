@@ -2,7 +2,6 @@
 // See the file LICENSE for licensing terms.
 
 //go:build !linux
-// +build !linux
 
 package subprocess
 
