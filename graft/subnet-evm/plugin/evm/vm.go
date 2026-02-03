@@ -711,7 +711,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				BlockParser:      vm,
 			},
 		),
-		Enabled:             vm.config.StateSyncEnabled,
+		Enabled:             *vm.config.StateSyncEnabled,
 		SkipResume:          vm.config.StateSyncSkipResume,
 		MinBlocks:           vm.config.StateSyncMinBlocks,
 		RequestSize:         vm.config.StateSyncRequestSize,
