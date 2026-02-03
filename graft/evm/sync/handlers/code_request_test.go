@@ -87,12 +87,10 @@ func TestCodeRequestHandler(t *testing.T) {
 		},
 	}
 
-	for name, test := range tests {
-		utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
-			// Reset stats before each test
+	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		codeRequestHandler := NewCodeRequestHandler(database, c, testHandlerStats)
+		for name, test := range tests {
 			testHandlerStats.Reset()
-			codeRequestHandler := NewCodeRequestHandler(database, c, testHandlerStats)
-
 			t.Run(name, func(t *testing.T) {
 				request, expectedResponse := test.setup()
 				responseBytes, err := codeRequestHandler.OnCodeRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
@@ -112,6 +110,6 @@ func TestCodeRequestHandler(t *testing.T) {
 				}
 				test.verifyStats(t)
 			})
-		})
-	}
+		}
+	})
 }

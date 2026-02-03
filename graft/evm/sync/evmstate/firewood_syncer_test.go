@@ -188,6 +188,8 @@ func createDB(t *testing.T) state.Database {
 	triedbConfig := &triedb.Config{
 		DBOverride: config.BackendConstructor,
 	}
+	// Create the state database using libevm's state package, then wrap it with
+	// firewood.NewStateAccessor to avoid an import cycle between firewood and state packages.
 	internalState := state.NewDatabaseWithConfig(diskdb, triedbConfig)
 	tdb := internalState.TrieDB().Backend().(*firewood.TrieDB)
 	t.Cleanup(func() {
