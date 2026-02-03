@@ -34,6 +34,7 @@
           # The Nix packages provided in the environment
           packages = with pkgs; [
             # Build requirements
+            bazelisk
             git
             jujutsu
 
@@ -58,6 +59,7 @@
 
             # Linters
             shellcheck
+            buildifier
 
             # Protobuf
             buf

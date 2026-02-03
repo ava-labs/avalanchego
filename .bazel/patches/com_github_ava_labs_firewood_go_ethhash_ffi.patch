@@ -1,0 +1,77 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/BUILD.bazel
+@@ -0,0 +1,72 @@
++load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
++
++# Pre-built static library for firewood FFI
++cc_import(
++    name = "firewood_ffi_lib",
++    static_library = select({
++        "@io_bazel_rules_go//go/platform:darwin_amd64": "libs/x86_64-apple-darwin/libfirewood_ffi.a",
++        "@io_bazel_rules_go//go/platform:darwin_arm64": "libs/aarch64-apple-darwin/libfirewood_ffi.a",
++        "@io_bazel_rules_go//go/platform:linux_amd64": "libs/x86_64-unknown-linux-gnu/libfirewood_ffi.a",
++        "@io_bazel_rules_go//go/platform:linux_arm64": "libs/aarch64-unknown-linux-gnu/libfirewood_ffi.a",
++        "@io_bazel_rules_go//go/platform:android_amd64": "libs/x86_64-unknown-linux-gnu/libfirewood_ffi.a",
++        "@io_bazel_rules_go//go/platform:android_arm64": "libs/aarch64-unknown-linux-gnu/libfirewood_ffi.a",
++        "@io_bazel_rules_go//go/platform:ios_amd64": "libs/x86_64-apple-darwin/libfirewood_ffi.a",
++        "@io_bazel_rules_go//go/platform:ios_arm64": "libs/aarch64-apple-darwin/libfirewood_ffi.a",
++    }),
++    visibility = ["//visibility:public"],
++)
++
++# Wrapper cc_library to use with cdeps
++cc_library(
++    name = "firewood_ffi",
++    hdrs = ["firewood.h"],
++    deps = [":firewood_ffi_lib"],
++    linkopts = ["-lm"],
++    visibility = ["//visibility:public"],
++)
++
++go_library(
++    name = "ffi",
++    srcs = [
++        "batch_op.go",
++        "firewood.go",
++        "firewood.h",
++        "iterator.go",
++        "keepalive.go",
++        "maybe.go",
++        "memory.go",
++        "metrics.go",
++        "proofs.go",
++        "proposal.go",
++        "revision.go",
++    ],
++    cgo = True,
++    cdeps = [":firewood_ffi"],
++    importpath = "github.com/ava-labs/firewood-go-ethhash/ffi",
++    visibility = ["//visibility:public"],
++    deps = [
++        "@com_github_prometheus_client_golang//prometheus",
++        "@com_github_prometheus_client_model//go",
++        "@com_github_prometheus_common//expfmt",
++    ],
++)
++
++alias(
++    name = "go_default_library",
++    actual = ":ffi",
++    visibility = ["//visibility:public"],
++)
++
++go_test(
++    name = "ffi_test",
++    srcs = [
++        "firewood_test.go",
++        "metrics_test.go",
++        "proofs_test.go",
++    ],
++    embed = [":ffi"],
++    deps = [
++        "@com_github_prometheus_client_model//go",
++        "@com_github_stretchr_testify//require",
++    ],
++)

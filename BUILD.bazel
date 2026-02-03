@@ -1,0 +1,11 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/ava-labs/avalanchego
+# gazelle:exclude tools
+# gazelle:exclude .direnv
+# gazelle:proto disable_global
+
+gazelle(
+    name = "gazelle",
+    command = "update",
+)

@@ -12,6 +12,7 @@ EXCLUDE_DIRS=(
   graft    # Grafted modules have their own lint config
   .direnv  # direnv cache
   .idea    # GoLand
+  bazel-*  # Bazel output/symlink dirs at repo root
 )
 
 # Pre-build find exclusion args (root-level only)

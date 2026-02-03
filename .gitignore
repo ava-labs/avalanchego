@@ -1,3 +1,6 @@
+# Bazel symlinks
+/bazel-*
+
 *.log
 *~
 .DS_Store
@@ -68,4 +71,4 @@ __debug_*
 
 # polyrepo
 polyrepo.log
-firewood
+/firewood
