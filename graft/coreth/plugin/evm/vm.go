@@ -651,7 +651,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		State:         vm.State,
 		Client: client.New(
 			&client.Config{
-				NetworkClient:    vm.Network,
+				Network:          vm.Network,
 				Codec:            vm.networkCodec,
 				Stats:            stats.NewClientSyncerStats(leafMetricsNames),
 				StateSyncNodeIDs: stateSyncIDs,

@@ -89,7 +89,7 @@ func TestGetCode(t *testing.T) {
 				t.Parallel()
 				testNetClient := &testNetwork{}
 				stateSyncClient := New(&Config{
-					NetworkClient:    testNetClient,
+					Network:          testNetClient,
 					Codec:            c,
 					Stats:            clientstats.NewNoOpStats(),
 					StateSyncNodeIDs: nil,
@@ -314,7 +314,7 @@ func TestGetBlocks(t *testing.T) {
 				// Construct client
 				testNetClient := &testNetwork{}
 				stateSyncClient := New(&Config{
-					NetworkClient:    testNetClient,
+					Network:          testNetClient,
 					Codec:            c,
 					Stats:            clientstats.NewNoOpStats(),
 					StateSyncNodeIDs: nil,
@@ -729,7 +729,7 @@ func TestGetLeafs(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				client := New(&Config{
-					NetworkClient:    &testNetwork{},
+					Network:          &testNetwork{},
 					Codec:            c,
 					Stats:            clientstats.NewNoOpStats(),
 					StateSyncNodeIDs: nil,
@@ -773,7 +773,7 @@ func TestGetLeafsRetries(t *testing.T) {
 
 		const maxAttempts = 8
 		client := New(&Config{
-			NetworkClient:    testNetClient,
+			Network:          testNetClient,
 			Codec:            c,
 			Stats:            clientstats.NewNoOpStats(),
 			StateSyncNodeIDs: nil,
@@ -838,7 +838,7 @@ func TestStateSyncNodes(t *testing.T) {
 			ids.GenerateTestNodeID(),
 		}
 		client := New(&Config{
-			NetworkClient:    testNetClient,
+			Network:          testNetClient,
 			Codec:            c,
 			Stats:            clientstats.NewNoOpStats(),
 			StateSyncNodeIDs: stateSyncNodes,

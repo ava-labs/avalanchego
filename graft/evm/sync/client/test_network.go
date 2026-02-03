@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ NetworkClient = (*testNetwork)(nil)
+var _ Network = (*testNetwork)(nil)
 
 type testNetwork struct {
 	// captured request data

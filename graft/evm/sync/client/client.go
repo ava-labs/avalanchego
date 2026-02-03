@@ -51,9 +51,9 @@ var (
 )
 var _ Client = (*client)(nil)
 
-// NetworkClient defines the interface for sending sync requests over the network.
+// Network defines the interface for sending sync requests over the network.
 // This interface is implemented by the network layer in coreth and subnet-evm.
-type NetworkClient interface {
+type Network interface {
 	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
 	// node version greater than or equal to minVersion.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
@@ -91,7 +91,7 @@ type Client interface {
 type parseResponseFn func(codec codec.Manager, request message.Request, response []byte) (interface{}, int, error)
 
 type client struct {
-	networkClient    NetworkClient
+	network          Network
 	codec            codec.Manager
 	stateSyncNodes   []ids.NodeID
 	stateSyncNodeIdx uint32
@@ -100,7 +100,7 @@ type client struct {
 }
 
 type Config struct {
-	NetworkClient    NetworkClient
+	Network          Network
 	Codec            codec.Manager
 	Stats            stats.ClientSyncerStats
 	StateSyncNodeIDs []ids.NodeID
@@ -113,7 +113,7 @@ type EthBlockParser interface {
 
 func New(config *Config) *client {
 	return &client{
-		networkClient:  config.NetworkClient,
+		network:        config.Network,
 		codec:          config.Codec,
 		stats:          config.Stats,
 		stateSyncNodes: config.StateSyncNodeIDs,
@@ -337,14 +337,14 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			start    = time.Now()
 		)
 		if len(c.stateSyncNodes) == 0 {
-			response, nodeID, err = c.networkClient.SendSyncedAppRequestAny(ctx, StateSyncVersion, requestBytes)
+			response, nodeID, err = c.network.SendSyncedAppRequestAny(ctx, StateSyncVersion, requestBytes)
 		} else {
 			// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
 			// we do this every attempt to ensure we get a different node each time if possible.
 			nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
 			nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
 
-			response, err = c.networkClient.SendSyncedAppRequest(ctx, nodeID, requestBytes)
+			response, err = c.network.SendSyncedAppRequest(ctx, nodeID, requestBytes)
 		}
 		metric.UpdateRequestLatency(time.Since(start))
 
@@ -356,7 +356,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			ctx = append(ctx, "attempt", attempt, "request", request, "err", err)
 			log.Debug("request failed, retrying", ctx...)
 			metric.IncFailed()
-			c.networkClient.TrackBandwidth(nodeID, 0)
+			c.network.TrackBandwidth(nodeID, 0)
 			time.Sleep(failedRequestSleepInterval)
 			continue
 		} else {
@@ -364,14 +364,14 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			if err != nil {
 				lastErr = err
 				log.Debug("could not validate response, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
-				c.networkClient.TrackBandwidth(nodeID, 0)
+				c.network.TrackBandwidth(nodeID, 0)
 				metric.IncFailed()
 				metric.IncInvalidResponse()
 				continue
 			}
 
 			bandwidth := float64(len(response)) / (time.Since(start).Seconds() + epsilon)
-			c.networkClient.TrackBandwidth(nodeID, bandwidth)
+			c.network.TrackBandwidth(nodeID, bandwidth)
 			metric.IncSucceeded()
 			metric.IncReceived(int64(numElements))
 			return responseIntf, nil
