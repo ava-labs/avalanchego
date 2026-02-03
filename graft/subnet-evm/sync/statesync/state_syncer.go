@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 
 	syncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 )
@@ -91,7 +92,12 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		storageTriesDone: make(chan struct{}),
 		done:             make(chan error, 1),
 	}
-	ss.syncer = syncclient.NewCallbackLeafSyncer(config.Client, ss.segments, config.RequestSize)
+	ss.syncer = syncclient.NewCallbackLeafSyncer(
+		config.Client,
+		ss.segments,
+		config.RequestSize,
+		message.SubnetEVMLeafsRequestType,
+	)
 	ss.codeSyncer = newCodeSyncer(CodeSyncerConfig{
 		DB:                       config.DB,
 		Client:                   config.Client,

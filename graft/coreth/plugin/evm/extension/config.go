@@ -16,11 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
-	"github.com/ava-labs/avalanchego/graft/evm/config"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -34,7 +34,6 @@ import (
 var (
 	errNilConfig              = errors.New("nil extension config")
 	errNilSyncSummaryProvider = errors.New("nil sync summary provider")
-	errNilSyncableParser      = errors.New("nil syncable parser")
 	errNilClock               = errors.New("nil clock")
 )
 
@@ -137,16 +136,12 @@ type Config struct {
 	// for the VM to be used in consensus engine.
 	// Callback functions can be nil.
 	ConsensusCallbacks dummy.ConsensusCallbacks
-	// SyncSummaryProvider is the sync summary provider to use
-	// for the VM to be used in syncer.
-	// It's required and should be non-nil
-	SyncSummaryProvider types.SummaryProvider
+	// SyncSummaryProvider provides and parses state sync summaries.
+	// It's required and should be non-nil.
+	SyncSummaryProvider message.SyncSummaryProvider
 	// SyncExtender can extend the syncer to handle custom sync logic.
 	// It's optional and can be nil
 	SyncExtender types.Extender
-	// SyncableParser is to parse summary messages from the network.
-	// It's required and should be non-nil
-	SyncableParser message.SyncableParser
 	// BlockExtender allows the VM extension to create an extension to handle block processing events.
 	// It's optional and can be nil
 	BlockExtender BlockExtender
@@ -167,9 +162,6 @@ func (c *Config) Validate() error {
 	}
 	if c.SyncSummaryProvider == nil {
 		return errNilSyncSummaryProvider
-	}
-	if c.SyncableParser == nil {
-		return errNilSyncableParser
 	}
 	if c.Clock == nil {
 		return errNilClock

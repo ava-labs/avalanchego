@@ -53,10 +53,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
@@ -64,6 +62,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/config"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -75,6 +75,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
@@ -294,7 +295,7 @@ func (vm *VM) Initialize(
 	}
 	vm.logger = corethLogger
 
-	log.Info("Initializing Coreth VM", "Version", Version, "libevm version", ethparams.LibEVMVersion, "Config", vm.config)
+	log.Info("Initializing Coreth VM", "Version", version.Current.Semantic(), "libevm version", ethparams.LibEVMVersion, "Config", vm.config)
 
 	if deprecateMsg != "" {
 		log.Warn("Deprecation Warning", "msg", deprecateMsg)
@@ -420,7 +421,7 @@ func (vm *VM) Initialize(
 
 	vm.chainConfig = g.Config
 
-	vm.networkCodec = message.Codec
+	vm.networkCodec = message.CorethCodec
 	vm.Network, err = network.NewNetwork(vm.ctx, appSender, vm.networkCodec, vm.config.MaxOutboundActiveRequests, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
@@ -521,7 +522,7 @@ func (vm *VM) initializeMetrics() error {
 
 func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 	nodecfg := &node.Config{
-		CorethVersion:         Version,
+		CorethVersion:         version.Current.Semantic(),
 		KeyStoreDir:           vm.config.KeystoreDirectory,
 		ExternalSigner:        vm.config.KeystoreExternalSigner,
 		InsecureUnlockAllowed: vm.config.KeystoreInsecureUnlockAllowed,
@@ -657,17 +658,17 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				BlockParser:      vm,
 			},
 		),
-		Enabled:            stateSyncEnabled,
-		SkipResume:         vm.config.StateSyncSkipResume,
-		MinBlocks:          vm.config.StateSyncMinBlocks,
-		RequestSize:        vm.config.StateSyncRequestSize,
-		LastAcceptedHeight: lastAcceptedHeight, // TODO clean up how this is passed around
-		ChainDB:            vm.chaindb,
-		VerDB:              vm.versiondb,
-		MetadataDB:         vm.metadataDB,
-		Acceptor:           vm,
-		Parser:             vm.extensionConfig.SyncableParser,
-		Extender:           vm.extensionConfig.SyncExtender,
+		Enabled:             stateSyncEnabled,
+		SkipResume:          vm.config.StateSyncSkipResume,
+		MinBlocks:           vm.config.StateSyncMinBlocks,
+		RequestSize:         vm.config.StateSyncRequestSize,
+		LastAcceptedHeight:  lastAcceptedHeight, // TODO clean up how this is passed around
+		ChainDB:             vm.chaindb,
+		VerDB:               vm.versiondb,
+		MetadataDB:          vm.metadataDB,
+		Acceptor:            vm,
+		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
+		Extender:            vm.extensionConfig.SyncExtender,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
@@ -1011,7 +1012,7 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 }
 
 func (*VM) Version(context.Context) (string, error) {
-	return Version, nil
+	return version.Current.Semantic(), nil
 }
 
 // CreateHandlers makes new http handlers that can handle API calls

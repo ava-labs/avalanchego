@@ -55,40 +55,8 @@ inputs:
 runs:
   using: composite
   steps:
-    # - Ensure promtail and prometheus are available
-    # - Avoid using the install-nix custom action since a relative
-    #   path wouldn't be resolveable from other repos and an absolute
-    #   path would require setting a version.
-    # - TODO(marun) Switch to a relative reference to the install-nix
-    #   custom action if/when no external repos use this action.
-    - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
-      with:
-        github_access_token: ${{ inputs.github_token }}
-    - run: $GITHUB_ACTION_PATH/nix-develop.sh --command echo "dependencies installed"
-      shell: bash
-    # Cache Go modules (architecture-independent)
-    - uses: actions/cache@v4
-      id: go-mod-cache
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum', 'tools/go.sum') }}
-        restore-keys: ${{ runner.os }}-go-mod-
-    # Cache Go build cache (architecture-specific)
-    - uses: actions/cache@v4
-      with:
-        path: ~/.cache/go-build
-        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.sum', 'tools/go.sum') }}
-        restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
-    # Download modules only on cache miss
-    - run: $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download
-      if: steps.go-mod-cache.outputs.cache-hit != 'true'
-      shell: bash
-    - run: |
-        if [[ -f tools/go.mod ]]; then
-          $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download -modfile=tools/go.mod
-        fi
-      if: steps.go-mod-cache.outputs.cache-hit != 'true'
-      shell: bash
+    # Install nix and ensure promtail and prometheus are available
+    - uses: ./.github/actions/install-nix
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
@@ -107,7 +75,7 @@ runs:
     - name: Run command
       shell: bash
       # --impure ensures the env vars are accessible to the command
-      run: $GITHUB_ACTION_PATH/nix-develop.sh --impure --command bash -x ${{ inputs.run }}
+      run: nix develop --impure --command bash -x ${{ inputs.run }}
       working-directory: ${{ inputs.working_directory }}
       env:
         # Always collect metrics locally even when nodes are running in kube to enable collection from the test workload
@@ -130,20 +98,11 @@ runs:
         GH_RUN_NUMBER: ${{ inputs.run_number }}
         GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
-    # This step is duplicated from upload-tmpnet-artifact for the same
-    # reason as the nix installation. There doesn't appear to be an
-    # easy way to compose custom actions for use by other repos
-    # without running into versioning issues.
     - name: Upload tmpnet data
       if: always() && (inputs.runtime == 'process')
-      uses: actions/upload-artifact@v4
+      uses: ./.github/actions/upload-tmpnet-artifact
       with:
         name: ${{ inputs.artifact_prefix }}-tmpnet-data
-        path: |
-          ~/.tmpnet/networks
-          ~/.tmpnet/prometheus/prometheus.log
-          ~/.tmpnet/promtail/promtail.log
-        if-no-files-found: error
     - name: Export kind logs
       if: always() && (inputs.runtime == 'kube')
       shell: bash

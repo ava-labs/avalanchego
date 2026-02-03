@@ -1,14 +1,14 @@
 module github.com/ava-labs/avalanchego
 
 // CLI tools intended for invocation with `go tool` should be added to
-// tools/go.mod to avoid polluting the main module's dependencies. See
-// tools/go.mod for usage details.
+// tools/external/go.mod to avoid polluting the main module's dependencies. See
+// tools/external/go.mod for usage details.
 
 // - Changes to the minimum golang version must also be replicated in:
 //
 // The following go.mod files:
 //   - go.mod (here)
-//   - tools/go.mod
+//   - tools/external/go.mod
 //   - graft/evm/go.mod
 //   - graft/coreth/go.mod
 //   - graft/subnet-evm/go.mod
@@ -20,7 +20,7 @@ module github.com/ava-labs/avalanchego
 //   - nix/go/default.nix (update version and sha256 for supported arches)
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
-//   - Consider updating the version of golangci-lint (see tools/go.mod)
+//   - Consider updating the version of golangci-lint (see tools/external/go.mod)
 go 1.24.12
 
 require (
@@ -31,7 +31,7 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca
 	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
-	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
+	github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593

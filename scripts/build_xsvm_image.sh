@@ -29,7 +29,9 @@ if [[ "${XSVM_IMAGE}" == *"/"* ]]; then
   DOCKER_CMD+=("--push")
 fi
 
-GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
+# Use head -1 because go workspaces list multiple modules; CI validates
+# all modules use the same Go version.
+GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 
 "${DOCKER_CMD[@]}" --build-arg GO_VERSION="${GO_VERSION}" --build-arg AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_IMAGE}:${image_tag}" \
   -t "${XSVM_IMAGE}" -f ./vms/example/xsvm/Dockerfile .

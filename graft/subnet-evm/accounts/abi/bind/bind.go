@@ -40,7 +40,7 @@ import (
 	"text/template"
 	"unicode"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/log"
 )
 
