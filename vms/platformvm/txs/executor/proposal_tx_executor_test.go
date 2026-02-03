@@ -57,10 +57,11 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
-		staker, err := state.NewCurrentStaker(
+		staker, err := state.NewCurrentValidator(
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
+			0,
 			0,
 		)
 		require.NoError(err)
@@ -93,10 +94,11 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
-		staker, err := state.NewCurrentStaker(
+		staker, err := state.NewCurrentValidator(
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
+			0,
 			0,
 		)
 		require.NoError(err)
@@ -422,10 +424,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	}
 
 	addValTx := addDSTx.Unsigned.(*txs.AddValidatorTx)
-	staker, err := state.NewCurrentStaker(
+	staker, err := state.NewCurrentValidator(
 		addDSTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		0,
 		0,
 	)
 	require.NoError(err)
@@ -606,10 +609,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	require.NoError(err)
 
 	addSubnetValTx := subnetTx.Unsigned.(*txs.AddSubnetValidatorTx)
-	staker, err = state.NewCurrentStaker(
+	staker, err = state.NewCurrentValidator(
 		subnetTx.ID(),
 		addSubnetValTx,
 		addSubnetValTx.StartTime(),
+		0,
 		0,
 	)
 	require.NoError(err)
@@ -760,10 +764,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		addSubnetValTx := subnetTx.Unsigned.(*txs.AddSubnetValidatorTx)
-		staker, err = state.NewCurrentStaker(
+		staker, err := state.NewCurrentValidator(
 			subnetTx.ID(),
 			addSubnetValTx,
 			addSubnetValTx.StartTime(),
+			0,
 			0,
 		)
 		require.NoError(err)
@@ -887,10 +892,11 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
-		staker, err := state.NewCurrentStaker(
+		staker, err := state.NewCurrentValidator(
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
+			0,
 			0,
 		)
 		require.NoError(err)
