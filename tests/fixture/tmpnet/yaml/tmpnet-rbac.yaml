@@ -28,6 +28,10 @@ rules:
 - apiGroups: ["networking.k8s.io"]
   resources: ["ingresses"]
   verbs: ["get", "create"]
+# Enable Traefik middleware creation for path stripping
+- apiGroups: ["traefik.io"]
+  resources: ["middlewares"]
+  verbs: ["get", "create", "update", "patch"]
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["get"]

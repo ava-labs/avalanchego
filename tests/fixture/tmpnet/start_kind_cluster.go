@@ -41,11 +41,11 @@ const (
 	missingContextMsg = `context "` + KindKubeconfigContext + `" does not exist`
 
 	// Ingress controller constants
-	ingressNamespace      = "ingress-nginx"
-	ingressReleaseName    = "ingress-nginx"
-	ingressChartRepo      = "https://kubernetes.github.io/ingress-nginx"
-	ingressChartName      = "ingress-nginx/ingress-nginx"
-	ingressControllerName = "ingress-nginx-controller"
+	ingressNamespace      = "traefik"
+	ingressReleaseName    = "traefik"
+	ingressChartRepo      = "https://traefik.github.io/charts"
+	ingressChartName      = "traefik/traefik"
+	ingressControllerName = "traefik"
 	// This must match the nodePort configured in scripts/kind-with-registry.sh
 	ingressNodePort = 30791
 
@@ -328,30 +328,30 @@ func createServiceAccountKubeconfig(
 	return nil
 }
 
-// deployIngressController deploys the nginx ingress controller using Helm.
+// deployIngressController deploys the Traefik ingress controller using Helm.
 func deployIngressController(ctx context.Context, log logging.Logger, configPath string, configContext string) error {
-	log.Info("checking if nginx ingress controller is already running")
+	log.Info("checking if traefik ingress controller is already running")
 
 	isRunning, err := isIngressControllerRunning(ctx, log, configPath, configContext)
 	if err != nil {
-		return stacktrace.Errorf("failed to check nginx ingress controller status: %w", err)
+		return stacktrace.Errorf("failed to check traefik ingress controller status: %w", err)
 	}
 	if isRunning {
-		log.Info("nginx ingress controller already running")
+		log.Info("traefik ingress controller already running")
 		return nil
 	}
 
-	log.Info("deploying nginx ingress controller using Helm")
+	log.Info("deploying traefik ingress controller using Helm")
 
-	// Add the helm repo for ingress-nginx
-	if err := runHelmCommand(ctx, "repo", "add", "ingress-nginx", ingressChartRepo); err != nil {
+	// Add the helm repo for traefik
+	if err := runHelmCommand(ctx, "repo", "add", "traefik", ingressChartRepo); err != nil {
 		return stacktrace.Errorf("failed to add helm repo: %w", err)
 	}
 	if err := runHelmCommand(ctx, "repo", "update"); err != nil {
 		return stacktrace.Errorf("failed to update helm repos: %w", err)
 	}
 
-	// Install nginx-ingress with values set directly via flags
+	// Install traefik with values set directly via flags
 	// Using fixed nodePort 30791 for cross-platform compatibility
 	args := []string{
 		"install",
@@ -360,25 +360,30 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 		"--namespace", ingressNamespace,
 		"--create-namespace",
 		"--wait",
-		"--set", "controller.service.type=NodePort",
+		"--set", "service.type=NodePort",
 		// This port value must match the port configured in scripts/kind-with-registry.sh
-		"--set", fmt.Sprintf("controller.service.nodePorts.http=%d", ingressNodePort),
-		"--set", "controller.admissionWebhooks.enabled=false",
-		"--set", "controller.config.proxy-read-timeout=600",
-		"--set", "controller.config.proxy-send-timeout=600",
-		"--set", "controller.config.proxy-body-size=0",
-		"--set", "controller.config.proxy-http-version=1.1",
-		"--set", "controller.metrics.enabled=true",
+		"--set", fmt.Sprintf("ports.web.nodePort=%d", ingressNodePort),
+		"--set", "ports.websecure.expose.default=false",
+		"--set", "ingressClass.enabled=true",
+		"--set", "providers.kubernetesIngress.enabled=true",
+		// Configure Traefik to publish ingress status from its own service.
+		// Without this, Traefik doesn't populate Status.LoadBalancer.Ingress on Ingress
+		// resources, causing waitForIngressReadiness to timeout.
+		"--set", "providers.kubernetesIngress.publishedService.enabled=true",
+		"--set", "ports.web.transport.respondingTimeouts.readTimeout=600s",
+		"--set", "ports.web.transport.respondingTimeouts.writeTimeout=600s",
+		"--set", "ports.web.transport.respondingTimeouts.idleTimeout=600s",
+		"--set", "metrics.prometheus.enabled=true",
 	}
 
 	if err := runHelmCommand(ctx, args...); err != nil {
-		return stacktrace.Errorf("failed to install nginx-ingress: %w", err)
+		return stacktrace.Errorf("failed to install traefik: %w", err)
 	}
 
-	return waitForDeployment(ctx, log, configPath, configContext, ingressNamespace, ingressControllerName, "nginx ingress controller")
+	return waitForDeployment(ctx, log, configPath, configContext, ingressNamespace, ingressControllerName, "traefik ingress controller")
 }
 
-// isIngressControllerRunning checks if the nginx ingress controller is already running.
+// isIngressControllerRunning checks if the traefik ingress controller is already running.
 func isIngressControllerRunning(ctx context.Context, log logging.Logger, configPath string, configContext string) (bool, error) {
 	clientset, err := GetClientset(log, configPath, configContext)
 	if err != nil {
@@ -483,7 +488,7 @@ func deployChaosMesh(ctx context.Context, log logging.Logger, configPath string,
 		"--set", "dashboard.securityMode=false",
 		"--set", "controllerManager.leaderElection.enabled=false",
 		"--set", "dashboard.ingress.enabled=true",
-		"--set", "dashboard.ingress.ingressClassName=nginx",
+		"--set", "dashboard.ingress.ingressClassName=traefik",
 		"--set", "dashboard.ingress.hosts[0].name=" + chaosMeshDashboardHost,
 	}
 
