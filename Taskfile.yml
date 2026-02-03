@@ -95,24 +95,36 @@ tasks:
       - task: check-clean-branch
 
   check-go-mod-tidy:
-    desc: Checks that go.mod, go.sum and go.work.sum are up-to-date (requires a clean git working tree)
+    desc: Checks that go.mod, go.sum, go.work.sum, and MODULE.bazel use_repo() are up-to-date (requires a clean git working tree)
     cmds:
-      - cmd: go mod tidy
+      # GOWORK=off is required because lint tooling runs with GOWORK=off
+      # (see scripts/run_tool.sh) and dependency resolution differs when
+      # the workspace is enabled vs disabled.
+      #
+      # NOTE: Using explicit 'cd' instead of Task's 'dir:' directive because
+      # 'dir:' doesn't properly isolate the go.work context, causing go mod tidy
+      # to miss some indirect dependency go.mod hashes in go.sum.
+      - cmd: GOWORK=off go mod tidy
       - task: check-clean-branch
-      - cmd: go mod tidy
-        dir: tools/external
+      # GOWORK=off is required because tools/external is not part of the workspace
+      # and go will otherwise find go.work by walking up the tree
+      - cmd: cd tools/external && GOWORK=off go mod tidy
       - task: check-clean-branch
-      - cmd: go mod tidy
-        dir: graft/evm
+      # GOWORK=off is required for graft modules because lint tooling runs
+      # with GOWORK=off (see scripts/run_tool.sh) and dependency resolution
+      # differs when the workspace is enabled vs disabled.
+      - cmd: cd graft/evm && GOWORK=off go mod tidy
       - task: check-clean-branch
-      - cmd: go mod tidy
-        dir: graft/coreth
+      - cmd: cd graft/coreth && GOWORK=off go mod tidy
       - task: check-clean-branch
-      - cmd: go mod tidy
-        dir: graft/subnet-evm
+      - cmd: cd graft/subnet-evm && GOWORK=off go mod tidy
       - task: check-clean-branch
       - task: sync-go-work
       - task: check-clean-branch
+
+  check-go-version:
+    desc: Verify Go version consistency across go.mod, MODULE.bazel, nix/go/default.nix, and graft modules
+    cmd: ./scripts/check_go_version.sh
 
   create-kind-cluster:
     desc: Creates the default kind cluster
@@ -154,15 +166,23 @@ tasks:
   go-mod-tidy:
     desc: Ensures go.mod, go.sum and go.work.sum are up-to-date
     cmds:
-      - cmd: go mod tidy
-      - cmd: go mod tidy
-        dir: tools/external
-      - cmd: go mod tidy
-        dir: graft/evm
-      - cmd: go mod tidy
-        dir: graft/coreth
-      - cmd: go mod tidy
-        dir: graft/subnet-evm
+      # GOWORK=off is required because lint tooling runs with GOWORK=off
+      # (see scripts/run_tool.sh) and dependency resolution differs when
+      # the workspace is enabled vs disabled.
+      #
+      # NOTE: Using explicit 'cd' instead of Task's 'dir:' directive because
+      # 'dir:' doesn't properly isolate the go.work context, causing go mod tidy
+      # to miss some indirect dependency go.mod hashes in go.sum.
+      - cmd: GOWORK=off go mod tidy
+      # GOWORK=off is required because tools/external is not part of the workspace
+      # and go will otherwise find go.work by walking up the tree
+      - cmd: cd tools/external && GOWORK=off go mod tidy
+      # GOWORK=off is required for graft modules because lint tooling runs
+      # with GOWORK=off (see scripts/run_tool.sh) and dependency resolution
+      # differs when the workspace is enabled vs disabled.
+      - cmd: cd graft/evm && GOWORK=off go mod tidy
+      - cmd: cd graft/coreth && GOWORK=off go mod tidy
+      - cmd: cd graft/subnet-evm && GOWORK=off go mod tidy
       - task: sync-go-work
 
   install-nix:
@@ -183,6 +203,8 @@ tasks:
       - lint
       - lint-action
       - lint-shell
+      - check-go-version
+      - check-go-mod-tidy
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -190,6 +212,8 @@ tasks:
       - task: lint
       - task: lint-action
       - task: lint-shell
+      - task: check-go-version
+      - task: check-go-mod-tidy
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
