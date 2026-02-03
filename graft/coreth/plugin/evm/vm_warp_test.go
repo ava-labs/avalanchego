@@ -577,6 +577,27 @@ func testReceiveWarpMessageWithScheme(t *testing.T, scheme string) {
 	}
 }
 
+type warpTestSigner struct {
+	nodeID    ids.NodeID
+	secret    bls.Signer
+	signature *bls.Signature
+	weight    uint64
+}
+
+func makeVdrSet(signers []warpTestSigner) validators.WarpSet {
+	vdrs := validators.WarpSet{}
+	for _, s := range signers {
+		pk := s.secret.PublicKey()
+		vdrs.Validators = append(vdrs.Validators, &validators.Warp{
+			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+			Weight:         s.weight,
+			NodeIDs:        []ids.NodeID{s.nodeID},
+		})
+		vdrs.TotalWeight += s.weight
+	}
+	return vdrs
+}
+
 func testReceiveWarpMessage(
 	t *testing.T, vm *VM,
 	sourceChainID ids.ID,
@@ -600,21 +621,14 @@ func testReceiveWarpMessage(
 		addressedPayload.Bytes(),
 	)
 	require.NoError(err)
-
-	type signer struct {
-		nodeID    ids.NodeID
-		secret    bls.Signer
-		signature *bls.Signature
-		weight    uint64
-	}
 	weight := uint64(50)
-	newSigner := func() signer {
+	newSigner := func() warpTestSigner {
 		secret, err := localsigner.New()
 		require.NoError(err)
 		sig, err := secret.Sign(unsignedMessage.Bytes())
 		require.NoError(err)
 
-		return signer{
+		return warpTestSigner{
 			nodeID:    ids.GenerateTestNodeID(),
 			secret:    secret,
 			signature: sig,
@@ -622,11 +636,11 @@ func testReceiveWarpMessage(
 		}
 	}
 
-	primarySigners := []signer{
+	primarySigners := []warpTestSigner{
 		newSigner(),
 		newSigner(),
 	}
-	subnetSigners := []signer{
+	subnetSigners := []warpTestSigner{
 		newSigner(),
 		newSigner(),
 	}
@@ -655,17 +669,6 @@ func testReceiveWarpMessage(
 		GetWarpValidatorSetsF: func(_ context.Context, height uint64) (map[ids.ID]validators.WarpSet, error) {
 			if height < minimumValidPChainHeight {
 				return nil, getValidatorSetTestErr
-			}
-
-			vdrs := validators.WarpSet{}
-			for _, s := range signers {
-				pk := s.secret.PublicKey()
-				vdrs.Validators = append(vdrs.Validators, &validators.Warp{
-					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-					Weight:         s.weight,
-					NodeIDs:        []ids.NodeID{s.nodeID},
-				})
-				vdrs.TotalWeight += s.weight
 			}
 
 			return map[ids.ID]validators.WarpSet{
