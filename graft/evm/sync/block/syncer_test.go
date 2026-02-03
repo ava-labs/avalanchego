@@ -172,7 +172,8 @@ func newTestEnvironment(t *testing.T, numBlocks int, c codec.Manager) *testEnvir
 func (e *testEnvironment) prePopulateBlocks(blockHeights []int) error {
 	batch := e.chainDB.NewBatch()
 	for _, height := range blockHeights {
-		if height < len(e.blocks) {
+		if height <= len(e.blocks) {
+			// blocks[0] is block number 1, blocks[1] is block number 2, etc.
 			block := e.blocks[height]
 			rawdb.WriteBlock(batch, block)
 			rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
