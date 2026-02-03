@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "e2e",
+    srcs = ["ignore.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/e2e",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "e2e_test",
+    srcs = ["e2e_test.go"],
+    tags = ["manual"],  # keep
+    deps = [
+        "//config",
+        "//graft/coreth/plugin/evm",
+        "//tests/e2e/banff",
+        "//tests/e2e/c",
+        "//tests/e2e/faultinjection",
+        "//tests/e2e/p",
+        "//tests/e2e/vms",
+        "//tests/e2e/x",
+        "//tests/e2e/x/transfer",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//upgrade/upgradetest",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)

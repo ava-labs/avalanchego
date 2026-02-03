@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "e2e_test",
+    srcs = ["e2e_test.go"],
+    tags = ["manual"],  # keep
+    deps = [
+        "//config",
+        "//ids",
+        "//tests",
+        "//tests/fixture/bootstrapmonitor",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//tests/fixture/tmpnet/flags",
+        "//utils/constants",
+        "//utils/logging",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+        "@io_k8s_api//apps/v1:apps",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_api//rbac/v1:rbac",
+        "@io_k8s_apimachinery//pkg/api/errors",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_client_go//kubernetes",
+        "@io_k8s_client_go//rest",
+        "@org_uber_go_zap//:zap",
+    ],
+)

@@ -1,0 +1,12 @@
+--- /dev/null
++++ crypto/secp256k1/libsecp256k1/BUILD.bazel
+@@ -0,0 +1,9 @@
++# gazelle:ignore
++cc_library(
++    name = "libsecp256k1",
++    hdrs = glob([
++        "**/*.c",
++        "**/*.h",
++    ]),
++    visibility = ["//crypto/secp256k1:__pkg__"],
++)

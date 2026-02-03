@@ -42,6 +42,14 @@ jobs:
       - name: test-fuzz
         shell: bash
         run: ./scripts/run_task.sh test-fuzz
+  Bazel_Unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Run unit tests with Bazel
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test
   e2e:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -109,6 +117,24 @@ jobs:
         with:
           run: ./scripts/run_task.sh test-e2e-existing-ci
           artifact_prefix: e2e-existing-network
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  Bazel_e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run e2e tests with Bazel-built binary
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh bazel-test-e2e-ci
+          artifact_prefix: e2e-bazel
+          filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
