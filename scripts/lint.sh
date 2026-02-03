@@ -2,13 +2,42 @@
 
 set -euo pipefail
 
-# This script does not perform any linting on the graft subdirectory.
-IGNORE_PATH="graft"
-
 if ! [[ "$0" =~ scripts/lint.sh ]]; then
   echo "must be run from repository root"
   exit 255
 fi
+
+CONFIG_FILE=".golangci.yml"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  >&2 echo "error: $CONFIG_FILE not found; cannot determine directories to exclude from linting."
+  exit 255
+fi
+
+# Parse skip-dirs from .golangci.yml (single source of truth)
+# Extract directory names from the skip-dirs list under the run: section
+EXCLUDE_DIRS=()
+while IFS= read -r dir; do
+  [[ -n "$dir" ]] && EXCLUDE_DIRS+=("$dir")
+done < <(
+  sed -n '/^  skip-dirs:/,/^  [a-zA-Z]/p' "$CONFIG_FILE" \
+    | grep '^\s*-' \
+    | sed 's/^\s*-\s*//' \
+    | sed 's/\s*#.*//'
+)
+
+if [[ ${#EXCLUDE_DIRS[@]} -eq 0 ]]; then
+  >&2 echo "error: no skip-dirs found in $CONFIG_FILE; please verify its format."
+  exit 255
+fi
+
+# Pre-build exclusion arrays once for use across functions
+FIND_EXCLUDES=()
+GREP_EXCLUDES=()
+for dir in "${EXCLUDE_DIRS[@]}"; do
+  FIND_EXCLUDES+=(! -path "./${dir}/*")
+  GREP_EXCLUDES+=(--exclude-dir="$dir")
+done
 
 # The -P option is not supported by the grep version installed by
 # default on macos. Since `-o errexit` is ignored in an if
@@ -57,7 +86,7 @@ function test_license_header {
       ! -path './**/*mock/*.go' \
       ! -name '*.canoto.go' \
       ! -name '*.bindings.go' \
-      ! -path "./${IGNORE_PATH}/*"
+      "${FIND_EXCLUDES[@]}"
     )
 
   # shellcheck disable=SC2086
@@ -68,21 +97,21 @@ function test_license_header {
 }
 
 function test_single_import {
-  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" 'import \(\n\t".*"\n\)' .; then
+  if grep -R -zo -P "${GREP_EXCLUDES[@]}" 'import \(\n\t".*"\n\)' .; then
     echo ""
     return 1
   fi
 }
 
 function test_require_error_is_no_funcs_as_params {
-  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
+  if grep -R -zo -P "${GREP_EXCLUDES[@]}" 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
     echo ""
     return 1
   fi
 }
 
 function test_require_no_error_inline_func {
-  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
+  if grep -R -zo -P "${GREP_EXCLUDES[@]}" '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
     echo ""
     echo "Checking that a function with a single error return doesn't error should be done in-line."
     echo ""
@@ -92,7 +121,7 @@ function test_require_no_error_inline_func {
 
 # Ref: https://go.dev/doc/effective_go#blank_implements
 function test_interface_compliance_nil {
-  if grep -R -o -P --exclude-dir="${IGNORE_PATH}" '_ .+? = &.+?\{\}' .; then
+  if grep -R -o -P "${GREP_EXCLUDES[@]}" '_ .+? = &.+?\{\}' .; then
     echo ""
     echo "Interface compliance checks need to be of the form:"
     echo "  var _ json.Marshaler = (*RawMessage)(nil)"
@@ -102,8 +131,14 @@ function test_interface_compliance_nil {
 }
 
 function test_import_testing_only_in_tests {
-  ROOT=$( git rev-parse --show-toplevel )
-  NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' ! -path "${ROOT}/tests/*" ! -path "${ROOT}/${IGNORE_PATH}/*" );
+  local root
+  root=$(git rev-parse --show-toplevel)
+  # Build exclusions with absolute paths (ROOT prefix)
+  local exclude_paths=(! -path "${root}/tests/*")
+  for dir in "${EXCLUDE_DIRS[@]}"; do
+    exclude_paths+=(! -path "${root}/${dir}/*")
+  done
+  NON_TEST_GO_FILES=$(find "${root}" -iname '*.go' ! -iname '*_test.go' "${exclude_paths[@]}");
 
   IMPORT_TESTING=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"');
   IMPORT_TESTIFY=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/stretchr/testify');

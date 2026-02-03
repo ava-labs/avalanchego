@@ -19,6 +19,13 @@ run:
   build-tags:
     - test
 
+  # Directories to skip (in addition to defaults like vendor, third_party, etc.)
+  skip-dirs:
+    - graft    # Grafted modules have their own lint config
+    - .direnv  # direnv cache
+    - .idea    # GoLand
+  skip-dirs-use-default: true
+
 issues:
   # Make issues output unique by line.
   uniq-by-line: false
