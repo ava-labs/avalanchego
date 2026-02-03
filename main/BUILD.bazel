@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "main_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/main",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//app",
+        "//config",
+        "//graft/coreth/plugin/evm",
+        "//version",
+        "@com_github_spf13_pflag//:pflag",
+        "@org_golang_x_term//:term",
+    ],
+)
+
+go_binary(
+    name = "avalanchego",  # keep
+    embed = [":main_lib"],
+    visibility = ["//visibility:public"],
+    x_defs = {
+        # keep
+        "github.com/ava-labs/avalanchego/version.GitCommit": "{STABLE_GIT_COMMIT}",
+    },
+)

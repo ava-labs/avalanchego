@@ -1,0 +1,9 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/ava-labs/avalanchego/graft/coreth
+# gazelle:map_kind go_test graft_go_test_900s //.bazel:defs.bzl
+
+gazelle(
+    name = "gazelle",
+    command = "update",
+)
