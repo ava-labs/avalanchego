@@ -13,10 +13,6 @@ import (
 const (
 	Version        = uint16(0)
 	maxMessageSize = 2*units.MiB - 64*units.KiB // Subtract 64 KiB from p2p network cap to leave room for encoding overhead from AvalancheGo
-
-	// warpSkipRegistrations is the number of deprecated Warp request/response types to skip
-	// See https://github.com/ava-labs/coreth/pull/999
-	warpSkipRegistrations = 3
 )
 
 // CodecType identifies the codec variant to use for message serialization.
@@ -78,7 +74,7 @@ func newCodec(codecType CodecType) codec.Manager {
 	// Skip 3 registrations for deprecated Warp types:
 	// MessageSignatureRequest, BlockSignatureRequest, SignatureResponse
 	// See https://github.com/ava-labs/coreth/pull/999
-	c.SkipRegistrations(warpSkipRegistrations)
+	c.SkipRegistrations(3)
 
 	errs.Add(mgr.RegisterCodec(Version, c))
 
