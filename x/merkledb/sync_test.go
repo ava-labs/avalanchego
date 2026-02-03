@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -277,10 +278,10 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			require.NotNil(syncer)
 
 			// Start syncing from the server
-			errChan := make(chan error, 1)
-			go func() {
-				errChan <- syncer.Sync(ctx)
-			}()
+			var eg errgroup.Group
+			eg.Go(func() error {
+				return syncer.Sync(ctx)
+			})
 
 			// Simulate writes on the server
 			//
@@ -306,13 +307,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			}
 
 			// Block until all syncing is done
-			require.NoErrorf(<-errChan, "%T.Sync()", syncer)
+			require.NoErrorf(eg.Wait(), "%T.Sync()", syncer)
 
 			// We should have the same resulting root as the server
-			wantRoot, err := dbToSync.GetMerkleRoot(t.Context())
+			wantRoot, err := dbToSync.GetMerkleRoot(ctx)
 			require.NoError(err)
 
-			gotRoot, err := db.GetMerkleRoot(t.Context())
+			gotRoot, err := db.GetMerkleRoot(ctx)
 			require.NoError(err)
 			require.Equal(wantRoot, gotRoot)
 		})
@@ -337,7 +338,8 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	)
 	require.NoError(err)
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	syncer, err := xsync.NewSyncer(
 		db,
 		xsync.Config[*RangeProof, *ChangeProof]{
@@ -361,8 +363,9 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.Eventually(func() bool {
 		return db.NewIterator().Next()
 	}, 5*time.Second, 5*time.Millisecond)
-	syncer.Close()
+	cancel()
 
+	ctx = t.Context()
 	newSyncer, err := xsync.NewSyncer(
 		db,
 		xsync.Config[*RangeProof, *ChangeProof]{
@@ -379,9 +382,9 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(newSyncer)
 
-	require.NoError(newSyncer.Sync(t.Context()))
+	require.NoError(newSyncer.Sync(ctx))
 
-	newRoot, err := db.GetMerkleRoot(t.Context())
+	newRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 	require.Equal(syncRoot, newRoot)
 }

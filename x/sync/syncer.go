@@ -195,10 +195,11 @@ func NewSyncer[R any, C any](
 }
 
 // Sync initiates the trie syncing process and blocks until one of the following occurs:
-// - sync is complete.
-// - sync fatally errored.
-// - [ctx] is canceled.
-// If [ctx] is canceled, returns [ctx].Err().
+//   - sync is complete.
+//   - sync fatally errored.
+//   - ctx is canceled.
+//
+// If ctx is canceled, returns ctx.Err().
 func (s *Syncer[_, _]) Sync(ctx context.Context) error {
 	ctx, err := s.setup(ctx)
 	if err != nil {
@@ -274,7 +275,7 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 			if s.processingWorkItems == 0 {
 				// There's no work to do, and there are no work items being processed
 				// which could cause work to be added, so we're done.
-				return // [s.workLock] released by defer.
+				break // [s.workLock] released by defer.
 			}
 			// There's no work to do.
 			// Note that if [s].Close() is called, or [ctx] is canceled,
@@ -289,23 +290,11 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 	}
 }
 
-// Close will stop the syncing process
-func (s *Syncer[_, _]) Close() {
-	s.workLock.Lock()
-	defer s.workLock.Unlock()
-
-	s.close()
-}
-
 // close is called when there is a fatal error or sync is complete.
 // [workLock] must be held
 func (s *Syncer[_, _]) close() {
 	s.closeOnce.Do(func() {
-		// Don't process any more work items.
-		// Drop currently processing work items.
-		if s.cancelCtx != nil {
-			s.cancelCtx()
-		}
+		s.cancelCtx()
 
 		// ensure any goroutines waiting for work from the heaps gets released
 		s.unprocessedWork.Close()
@@ -718,8 +707,11 @@ func (s *Syncer[_, _]) setError(err error) {
 	s.config.Log.Error("sync errored", zap.Error(err))
 	s.fatalError = err
 	// Call in goroutine because we might be holding [s.workLock]
-	// which [s.Close] will try to acquire.
-	go s.Close()
+	go func() {
+		s.workLock.Lock()
+		defer s.workLock.Unlock()
+		s.close()
+	}()
 }
 
 // Mark that we've fetched all the key-value pairs in the range
