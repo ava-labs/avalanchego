@@ -195,11 +195,11 @@ func NewSyncer[R any, C any](
 }
 
 // Sync initiates the trie syncing process and blocks until one of the following occurs:
-//   - sync is complete.
-//   - sync fatally errored.
+//   - [Syncer.Sync] is complete.
+//   - [Syncer.Sync] fatally errored.
 //   - ctx is canceled.
 //
-// If ctx is canceled, returns ctx.Err().
+// If ctx is canceled, returns [context.Context.Err].
 func (s *Syncer[_, _]) Sync(ctx context.Context) error {
 	ctx, err := s.setup(ctx)
 	if err != nil {
@@ -275,7 +275,7 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 			if s.processingWorkItems == 0 {
 				// There's no work to do, and there are no work items being processed
 				// which could cause work to be added, so we're done.
-				break // [s.workLock] released by defer.
+				return // [s.workLock] released by defer.
 			}
 			// There's no work to do.
 			// Note that if [s].Close() is called, or [ctx] is canceled,
