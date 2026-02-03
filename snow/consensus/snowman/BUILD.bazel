@@ -1,0 +1,59 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "snowman",
+    srcs = [
+        "block.go",
+        "consensus.go",
+        "factory.go",
+        "metrics.go",
+        "oracle_block.go",
+        "snowman_block.go",
+        "topological.go",
+        "traced_consensus.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/consensus/snowman",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/health",
+        "//ids",
+        "//snow",
+        "//snow/consensus/snowball",
+        "//trace",
+        "//utils/bag",
+        "//utils/linked",
+        "//utils/logging",
+        "//utils/math",
+        "//utils/metric",
+        "//utils/set",
+        "//utils/wrappers",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@io_opentelemetry_go_otel//attribute",
+        "@io_opentelemetry_go_otel_trace//:trace",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "snowman_test",
+    srcs = [
+        "consensus_test.go",
+        "mixed_test.go",
+        "mocks_generate_test.go",
+        "network_test.go",
+        "topological_test.go",
+    ],
+    embed = [":snowman"],
+    deps = [
+        "//ids",
+        "//snow/consensus/snowball",
+        "//snow/consensus/snowman/snowmantest",
+        "//snow/snowtest",
+        "//utils",
+        "//utils/bag",
+        "//utils/sampler",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_gonum_v1_gonum//mathext/prng",
+    ],
+)

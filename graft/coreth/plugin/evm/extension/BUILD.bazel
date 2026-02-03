@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "extension",
+    srcs = ["config.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/versiondb",
+        "//graft/coreth/consensus/dummy",
+        "//graft/coreth/eth",
+        "//graft/coreth/params",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/plugin/evm/config",
+        "//graft/coreth/sync/engine",
+        "//graft/coreth/sync/handlers",
+        "//graft/coreth/sync/types",
+        "//graft/evm/message",
+        "//ids",
+        "//network/p2p",
+        "//snow/consensus/snowman",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//utils/timer/mockable",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)

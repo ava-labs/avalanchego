@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "messagemock",
+    srcs = ["outbound_message_builder.go"],
+    importpath = "github.com/ava-labs/avalanchego/message/messagemock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//message",
+        "//proto/pb/p2p",
+        "//utils/ips",
+        "@org_uber_go_mock//gomock",
+    ],
+)

@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "faultinjection",
+    srcs = ["duplicate_node_id.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/e2e/faultinjection",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/info",
+        "//config",
+        "//ids",
+        "//tests",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//utils/set",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+    ],
+)

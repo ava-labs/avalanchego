@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "handlermock",
+    srcs = ["handler.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/networking/handler/handlermock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//snow/networking/handler",
+        "@org_uber_go_mock//gomock",
+    ],
+)

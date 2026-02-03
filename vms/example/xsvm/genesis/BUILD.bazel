@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "genesis",
+    srcs = [
+        "codec.go",
+        "genesis.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/genesis",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/hashing",
+        "//vms/example/xsvm/block",
+    ],
+)
+
+go_test(
+    name = "genesis_test",
+    srcs = ["genesis_test.go"],
+    embed = [":genesis"],
+    deps = [
+        "//ids",
+        "@com_github_stretchr_testify//require",
+    ],
+)

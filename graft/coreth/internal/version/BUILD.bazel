@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "version",
+    srcs = [
+        "vcs.go",
+        "version.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/internal/version",
+    visibility = ["//graft/coreth:__subpackages__"],
+    deps = ["@com_github_ava_labs_libevm//params"],
+)

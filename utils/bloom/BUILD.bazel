@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "bloom",
+    srcs = [
+        "filter.go",
+        "hasher.go",
+        "metrics.go",
+        "optimal.go",
+        "read_filter.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/bloom",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_prometheus_client_golang//prometheus"],
+)
+
+go_test(
+    name = "bloom_test",
+    srcs = [
+        "filter_test.go",
+        "hasher_test.go",
+        "optimal_test.go",
+        "read_filter_test.go",
+    ],
+    embed = [":bloom"],
+    deps = [
+        "//ids",
+        "//utils/units",
+        "@com_github_stretchr_testify//require",
+    ],
+)

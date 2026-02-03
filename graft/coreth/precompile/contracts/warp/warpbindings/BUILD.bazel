@@ -1,0 +1,8 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "warpbindings",
+    srcs = ["compile.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp/warpbindings",
+    visibility = ["//visibility:public"],
+)

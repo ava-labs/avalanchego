@@ -1,0 +1,58 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "validators",
+    srcs = [
+        "connector.go",
+        "logger.go",
+        "manager.go",
+        "set.go",
+        "state.go",
+        "traced_state.go",
+        "validator.go",
+        "warp.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/validators",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//ids",
+        "//trace",
+        "//utils",
+        "//utils/crypto/bls",
+        "//utils/formatting",
+        "//utils/json",
+        "//utils/logging",
+        "//utils/math",
+        "//utils/sampler",
+        "//utils/set",
+        "//version",
+        "//vms/types",
+        "@io_opentelemetry_go_otel//attribute",
+        "@io_opentelemetry_go_otel_trace//:trace",
+        "@org_golang_x_exp//maps",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "validators_test",
+    srcs = [
+        "manager_test.go",
+        "mocks_generate_test.go",
+        "set_test.go",
+        "state_test.go",
+        "warp_test.go",
+    ],
+    embed = [":validators"],
+    deps = [
+        "//ids",
+        "//snow/validators/validatorstest",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/math",
+        "//utils/set",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "meterdb",
+    srcs = ["db.go"],
+    importpath = "github.com/ava-labs/avalanchego/database/heightindexdb/meterdb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "meterdb_test",
+    srcs = ["db_test.go"],
+    embed = [":meterdb"],
+    deps = [
+        "//database",
+        "//database/heightindexdb/memdb",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_model//go",
+        "@com_github_stretchr_testify//require",
+    ],
+)

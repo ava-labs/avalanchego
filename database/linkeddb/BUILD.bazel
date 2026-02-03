@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "linkeddb",
+    srcs = [
+        "codec.go",
+        "linkeddb.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/database/linkeddb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//codec",
+        "//codec/linearcodec",
+        "//database",
+    ],
+)
+
+go_test(
+    name = "linkeddb_test",
+    srcs = [
+        "db_test.go",
+        "linkeddb_test.go",
+    ],
+    embed = [":linkeddb"],
+    deps = [
+        "//database",
+        "//database/dbtest",
+        "//database/memdb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

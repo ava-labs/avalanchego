@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "modules",
+    srcs = [
+        "module.go",
+        "registerer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/constants",
+        "//graft/evm/utils",
+        "//graft/subnet-evm/precompile/contract",
+        "@com_github_ava_labs_libevm//common",
+    ],
+)
+
+graft_go_test(
+    name = "modules_test",
+    srcs = ["registerer_test.go"],
+    embed = [":modules"],
+    deps = [
+        "//graft/evm/constants",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+    ],
+)

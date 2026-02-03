@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "memdb",
+    srcs = ["database.go"],
+    importpath = "github.com/ava-labs/avalanchego/database/heightindexdb/memdb",
+    visibility = ["//visibility:public"],
+    deps = ["//database"],
+)
+
+go_test(
+    name = "memdb_test",
+    srcs = ["database_test.go"],
+    embed = [":memdb"],
+    deps = [
+        "//database",
+        "//database/heightindexdb/dbtest",
+    ],
+)

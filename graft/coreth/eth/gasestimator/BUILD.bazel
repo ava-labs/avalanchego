@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "gasestimator",
+    srcs = ["gasestimator.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/eth/gasestimator",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/core",
+        "//graft/coreth/params",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)

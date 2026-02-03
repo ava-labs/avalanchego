@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "get-p-chain-balance_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/get-p-chain-balance",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//utils/constants",
+        "//utils/formatting/address",
+        "//utils/set",
+        "//wallet/chain/p/builder",
+        "//wallet/chain/p/wallet",
+        "//wallet/subnet/primary",
+        "//wallet/subnet/primary/common",
+    ],
+)
+
+go_binary(
+    name = "get-p-chain-balance",
+    embed = [":get-p-chain-balance_lib"],
+    visibility = ["//visibility:public"],
+)

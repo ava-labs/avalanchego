@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "bimap",
+    srcs = ["bimap.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/bimap",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "@org_golang_x_exp//maps",
+    ],
+)
+
+go_test(
+    name = "bimap_test",
+    srcs = ["bimap_test.go"],
+    embed = [":bimap"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

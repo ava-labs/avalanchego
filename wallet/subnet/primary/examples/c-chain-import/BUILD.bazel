@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "c-chain-import_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/c-chain-import",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//utils/constants",
+        "//utils/units",
+        "//vms/components/avax",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "c-chain-import",
+    embed = [":c-chain-import_lib"],
+    visibility = ["//visibility:public"],
+)

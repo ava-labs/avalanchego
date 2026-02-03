@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "node",
+    srcs = [
+        "config.go",
+        "process_context.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/config/node",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/server",
+        "//chains",
+        "//genesis",
+        "//ids",
+        "//network",
+        "//snow/networking/benchlist",
+        "//snow/networking/router",
+        "//snow/networking/tracker",
+        "//subnets",
+        "//trace",
+        "//upgrade",
+        "//utils/logging",
+        "//utils/profiler",
+        "//utils/set",
+        "//utils/timer",
+    ],
+)
+
+go_test(
+    name = "node_test",
+    srcs = ["process_context_test.go"],
+    embed = [":node"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

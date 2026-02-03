@@ -1,0 +1,15 @@
+load("//.bazel:defs.bzl", "graft_go_test")
+
+graft_go_test(
+    name = "tempextrastest_test",
+    srcs = ["tempextras_test.go"],
+    deps = [
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+    ],
+)

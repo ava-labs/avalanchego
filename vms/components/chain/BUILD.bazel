@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "chain",
+    srcs = [
+        "block.go",
+        "state.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/components/chain",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//cache/metercacher",
+        "//database",
+        "//ids",
+        "//snow/consensus/snowman",
+        "//snow/engine/snowman/block",
+        "//utils/constants",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "chain_test",
+    srcs = ["state_test.go"],
+    embed = [":chain"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow/consensus/snowman",
+        "//snow/consensus/snowman/snowmantest",
+        "//snow/snowtest",
+        "//utils/hashing",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

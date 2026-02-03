@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "client",
+    srcs = [
+        "client.go",
+        "utils.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api",
+        "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/config",
+        "//ids",
+        "//utils/formatting",
+        "//utils/formatting/address",
+        "//utils/json",
+        "//utils/rpc",
+        "@com_github_ava_labs_libevm//common",
+        "@org_golang_x_exp//slog",
+    ],
+)

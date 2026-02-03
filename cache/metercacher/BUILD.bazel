@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "metercacher",
+    srcs = [
+        "cache.go",
+        "metrics.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/cache/metercacher",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "metercacher_test",
+    srcs = ["cache_test.go"],
+    embed = [":metercacher"],
+    deps = [
+        "//cache",
+        "//cache/cachetest",
+        "//cache/lru",
+        "//ids",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

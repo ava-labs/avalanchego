@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "avalanche",
+    srcs = [
+        "test_vertex.go",
+        "vertex.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/consensus/avalanche",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//snow/choices",
+        "//snow/consensus/snowstorm",
+    ],
+)

@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ethconfig",
+    srcs = [
+        "config.go",
+        "gen_config.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/eth/ethconfig",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/core/txpool/blobpool",
+        "//graft/subnet-evm/core/txpool/legacypool",
+        "//graft/subnet-evm/eth/gasprice",
+        "//graft/subnet-evm/miner",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)
