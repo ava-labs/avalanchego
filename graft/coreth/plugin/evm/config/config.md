@@ -63,7 +63,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 |--------|------|-------------|---------|
 | `admin-api-enabled` | bool | Enables the Admin API |  `false` |
 | `admin-api-dir` | string | Specifies the directory for the Admin API to use to store CPU/Mem/Lock Profiles | `""` |
-| `warp-api-enabled` | bool | Enable the Warp API for cross-chain messaging | `false` |
+| `warp-api-enabled` | bool | Enable the Warp API for cross-chain messaging | `true` |
 
 ### API Limits and Security
 
