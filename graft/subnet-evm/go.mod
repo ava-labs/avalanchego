@@ -82,7 +82,9 @@ require (
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
 	github.com/ferranbt/fastssz v0.1.2 // indirect
+	github.com/fjl/gencodec v0.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/garslo/gogen v0.0.0-20170306192744-1d203ffc1f61 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/gballet/go-verkle v0.1.1-0.20231031103413-a67434b50f46 // indirect
 	github.com/getsentry/sentry-go v0.35.0 // indirect
@@ -201,10 +203,14 @@ require (
 )
 
 // The following tools are managed here instead of in tools/external/go.mod
-// because they are already direct dependencies of the main module.
+// because they are already direct dependencies of the main module, or
+// because they need to parse types from this module (gencodec) and
+// workspace mode forbids -modfile.
 tool (
 	github.com/ava-labs/libevm/rlp/rlpgen
+	github.com/fjl/gencodec
 	github.com/onsi/ginkgo/v2/ginkgo
+	go.uber.org/mock/mockgen
 )
 
 replace github.com/ava-labs/avalanchego => ../../
