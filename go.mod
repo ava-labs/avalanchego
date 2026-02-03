@@ -31,8 +31,8 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca
 	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
-	github.com/ava-labs/libevm v1.13.15-0.20260104032733-ab2c5f27be83
-	github.com/ava-labs/strevm v0.0.0-20260121211112-75b36e7813f6
+	github.com/ava-labs/libevm v1.13.15-0.20260128160829-e673c7097059
+	github.com/ava-labs/strevm v0.0.0-20260203220045-861d58a10e43
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593

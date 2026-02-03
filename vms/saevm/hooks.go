@@ -4,12 +4,17 @@
 package saevm
 
 import (
+	"encoding/json"
+	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
@@ -69,3 +74,34 @@ func (*Hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) e
 }
 
 func (*Hooks) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) {}
+
+// ParseGenesis processes genesis bytes to apply Avalanche network upgrades
+// that activate EVM forks (Berlin, London, Shanghai, Cancun, etc.).
+func (*Hooks) ParseGenesis(snowCtx *snow.Context, genesisBytes []byte) (*core.Genesis, error) {
+	genesis := new(core.Genesis)
+	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
+		return nil, fmt.Errorf("parsing genesis: %w", err)
+	}
+
+	// Populate the Avalanche config extras to enable EVM fork activation
+	configExtra := params.GetExtra(genesis.Config)
+	configExtra.AvalancheContext = extras.AvalancheContext{
+		SnowCtx: snowCtx,
+	}
+	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(snowCtx.NetworkUpgrades)
+
+	snowCtx.Log.Info(fmt.Sprintf("Network upgrades: %+v", snowCtx.NetworkUpgrades))
+
+	if err := configExtra.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid chain config: %w", err)
+	}
+
+	// Align Ethereum upgrades to Avalanche upgrades
+	// This maps: ApricotPhase3Plus->Berlin, ApricotPhase5->London,
+	//            Cortina->Shanghai, Durango->Cancun
+	if err := params.SetEthUpgrades(genesis.Config); err != nil {
+		return nil, fmt.Errorf("setting eth upgrades: %w", err)
+	}
+
+	return genesis, nil
+}
