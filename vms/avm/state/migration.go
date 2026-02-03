@@ -131,10 +131,7 @@ func (f *FirewoodMigration) Migrate(
 	log.Debug("deleting utxos")
 	itr := prevUTXODB.NewIteratorWithStart(lastMigratedUTXO[:])
 	for itr.Next() {
-		utxoID, err := ids.ToID(itr.Key())
-		if err != nil {
-			return nil, nil, fmt.Errorf("parsing utxo id: %w", err)
-		}
+		utxoID := ids.ID(itr.Key())
 
 		if err := next.PutLastMigratedUTXO(utxoID); err != nil {
 			return nil, nil, fmt.Errorf("putting last migrated utxo: %w", err)
@@ -169,10 +166,7 @@ func (f *FirewoodMigration) Migrate(
 
 	itr = prevTxDB.NewIteratorWithStart(lastMigratedTx[:])
 	for itr.Next() {
-		txID, err := ids.ToID(itr.Key())
-		if err != nil {
-			return nil, nil, fmt.Errorf("parsing tx id: %w", err)
-		}
+		txID := ids.ID(itr.Key())
 
 		if err := next.PutLastMigratedTx(txID); err != nil {
 			return nil, nil, fmt.Errorf("putting last migrated tx: %w", err)
@@ -205,10 +199,7 @@ func (f *FirewoodMigration) Migrate(
 
 	itr = prevBlockDB.NewIteratorWithStart(lastMigratedBlk[:])
 	for itr.Next() {
-		blkID, err := ids.ToID(itr.Key())
-		if err != nil {
-			return nil, nil, fmt.Errorf("parsing block id: %w", err)
-		}
+		blkID := ids.ID(itr.Key())
 
 		blk, err := parser.ParseBlock(itr.Value())
 		if err != nil {
@@ -397,12 +388,7 @@ func (m *migrationState) GetLastMigratedUTXO() (ids.ID, error) {
 		return ids.ID{}, err
 	}
 
-	utxoID, err := ids.ToID(utxoIDBytes)
-	if err != nil {
-		return ids.ID{}, err
-	}
-
-	return utxoID, nil
+	return ids.ID(utxoIDBytes), nil
 }
 
 func (m *migrationState) PutLastMigratedUTXO(utxoID ids.ID) error {
@@ -418,12 +404,7 @@ func (m *migrationState) GetLastMigratedTx() (ids.ID, error) {
 		return ids.ID{}, err
 	}
 
-	txID, err := ids.ToID(txIDBytes)
-	if err != nil {
-		return ids.ID{}, err
-	}
-
-	return txID, nil
+	return ids.ID(txIDBytes), nil
 }
 
 func (m *migrationState) PutLastMigratedTx(txID ids.ID) error {
@@ -443,12 +424,7 @@ func (m *migrationState) GetLastMigratedBlock() (ids.ID, error) {
 		return ids.ID{}, err
 	}
 
-	blkID, err := ids.ToID(blkIDBytes)
-	if err != nil {
-		return ids.ID{}, err
-	}
-
-	return blkID, nil
+	return ids.ID(blkIDBytes), nil
 }
 
 func (m *migrationState) PutLastMigratedBlock(blkID ids.ID) error {
