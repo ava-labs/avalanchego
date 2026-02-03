@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
-	"github.com/ava-labs/avalanchego/graft/evm/config"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -58,7 +58,7 @@ type ExtensibleVM interface {
 	// Ethereum returns the Ethereum service
 	Ethereum() *eth.Ethereum
 	// Config returns the configuration for the VM
-	Config() config.CChainConfig
+	Config() config.Config
 	// MetricRegistry returns the metric registry for the VM
 	MetricRegistry() *prometheus.Registry
 	// ReadLastAccepted returns the last accepted block hash and height

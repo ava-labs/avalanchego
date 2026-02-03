@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/graft/evm/config"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
@@ -71,7 +71,7 @@ func (vm *VM) Blockchain() *core.BlockChain {
 	return vm.blockChain
 }
 
-func (vm *VM) Config() config.L1Config {
+func (vm *VM) Config() config.Config {
 	return vm.config
 }
 

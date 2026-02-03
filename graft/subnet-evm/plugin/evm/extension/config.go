@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/graft/evm/config"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
@@ -53,7 +53,7 @@ type ExtensibleVM interface {
 	// Blockchain returns the blockchain client
 	Blockchain() *core.BlockChain
 	// Config returns the configuration for the VM
-	Config() config.L1Config
+	Config() config.Config
 	// MetricRegistry returns the metric registry for the VM
 	MetricRegistry() *prometheus.Registry
 	// ReadLastAccepted returns the last accepted block hash and height

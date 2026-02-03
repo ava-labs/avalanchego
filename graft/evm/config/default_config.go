@@ -7,11 +7,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-
-	"github.com/ava-labs/avalanchego/database/pebbledb"
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
-
-	avaxutils "github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -26,13 +21,16 @@ const (
 	TxGossipBloomChurnMultiplier         = 3
 )
 
-// newDefaultCommonConfig returns a CommonConfig with sensible defaults shared by both C-Chain and L1.
-func newDefaultCommonConfig() CommonConfig {
-	return CommonConfig{
-		AllowUnprotectedTxHashes: []common.Hash{
-			common.HexToHash("0xfefb2da535e927b85fe68eb81cb2e4a5827c905f78381a01ef2322aa9b0aee8e"), // EIP-1820: https://eips.ethereum.org/EIPS/eip-1820
-		},
-		EnabledEthAPIs: []string{
+// SetDefaults applies default values to fields that are still zero-valued.
+func (c *BaseConfig) SetDefaults() {
+	// Special slice fields with non-empty defaults
+	if len(c.AllowUnprotectedTxHashes) == 0 {
+		c.AllowUnprotectedTxHashes = []common.Hash{
+			common.HexToHash("0xfefb2da535e927b85fe68eb81cb2e4a5827c905f78381a01ef2322aa9b0aee8e"), // EIP-1820
+		}
+	}
+	if len(c.EnabledEthAPIs) == 0 {
+		c.EnabledEthAPIs = []string{
 			"eth",
 			"eth-filter",
 			"net",
@@ -40,94 +38,126 @@ func newDefaultCommonConfig() CommonConfig {
 			"internal-eth",
 			"internal-blockchain",
 			"internal-transaction",
-		},
-		// Provides 2 minutes of buffer (2s block target) for a commit delay
-		AcceptorQueueLimit:        64,
-		Pruning:                   true,
-		CommitInterval:            defaultCommitInterval,
-		TrieCleanCache:            512,
-		TrieDirtyCache:            512,
-		TrieDirtyCommitTarget:     20,
-		TriePrefetcherParallelism: 16,
-		SnapshotCache:             256,
-		StateSyncCommitInterval:   defaultCommitInterval * 4,
-		SnapshotWait:              false,
-		RPCGasCap:                 50_000_000, // 50M Gas Limit
-		RPCTxFeeCap:               100,        // 100 AVAX
-		MetricsExpensiveEnabled:   true,
-		// Default to no maximum API call duration
-		APIMaxDuration: wrapDuration(0),
-		// Default to no maximum WS CPU usage
-		WSCPURefillRate: wrapDuration(0),
-		// Default to no maximum WS CPU usage
-		WSCPUMaxStored: wrapDuration(0),
-		// Default to no maximum on the number of blocks per getLogs request
-		MaxBlocksPerRequest:         0,
-		ContinuousProfilerFrequency: wrapDuration(15 * time.Minute),
-		ContinuousProfilerMaxFiles:  5,
-		PushGossipPercentStake:      .9,
-		PushGossipNumValidators:     100,
-		PushGossipNumPeers:          0,
-		PushRegossipNumValidators:   10,
-		PushRegossipNumPeers:        0,
-		PushGossipFrequency:         wrapDuration(100 * time.Millisecond),
-		PullGossipFrequency:         wrapDuration(1 * time.Second),
-		RegossipFrequency:           wrapDuration(30 * time.Second),
-		// Default size (MB) for the offline pruner to use
-		OfflinePruningBloomFilterSize:   uint64(512),
-		LogLevel:                        "info",
-		LogJSONFormat:                   false,
-		MaxOutboundActiveRequests:       16,
-		PopulateMissingTriesParallelism: 1024,
-		StateSyncServerTrieCache:        64, // MB
-		AcceptedCacheSize:               32, // blocks
-		// StateSyncMinBlocks is the minimum number of blocks the blockchain
-		// should be ahead of local last accepted to perform state sync.
-		// This constant is chosen so normal bootstrapping is preferred when it would
-		// be faster than state sync.
-		// time assumptions:
-		// - normal bootstrap processing time: ~14 blocks / second
-		// - state sync time: ~6 hrs.
-		StateSyncMinBlocks: 300_000,
-		// the number of key/values to ask peers for per request
-		StateSyncRequestSize: 1024,
-		StateHistory:         uint64(32),
-		// Estimated block count in 24 hours with 2s block accept period
-		HistoricalProofQueryWindow: uint64(24 * time.Hour / (2 * time.Second)),
-		// Mempool settings
-		TxPoolPriceLimit:   1,
-		TxPoolPriceBump:    10,
-		TxPoolAccountSlots: 16,
-		TxPoolGlobalSlots:  4096 + 1024, // urgent + floating queue capacity with 4:1 ratio,
-		TxPoolAccountQueue: 64,
-		TxPoolGlobalQueue:  1024,
-		TxPoolLifetime:     wrapDuration(10 * time.Minute),
-		// RPC settings
-		BatchRequestLimit:    1000,
-		BatchResponseMaxSize: 25 * 1000 * 1000, // 25MB
+		}
 	}
-}
 
-func NewDefaultCChainConfig() CChainConfig {
-	return CChainConfig{
-		CommonConfig: newDefaultCommonConfig(),
-		// Price Option Defaults (C-Chain specific)
-		PriceOptionSlowFeePercentage: uint64(95),
-		PriceOptionFastFeePercentage: uint64(105),
-		PriceOptionMaxTip:            uint64(20 * utils.GWei),
+	// Numeric fields with non-zero defaults
+	if c.AcceptorQueueLimit == 0 {
+		c.AcceptorQueueLimit = 64 // Provides 2 minutes of buffer (2s block target) for a commit delay
 	}
-}
-
-func NewDefaultL1Config() L1Config {
-	cfg := newDefaultCommonConfig()
-	// Subnet EVM defaults to state sync disabled (unlike C-Chain which enables at genesis)
-	cfg.StateSyncEnabled = avaxutils.PointerTo(false)
-	return L1Config{
-		CommonConfig: cfg,
-		// Subnet EVM API settings
-		ValidatorsAPIEnabled: true,
-		// Database settings
-		DatabaseType: pebbledb.Name,
+	if c.CommitInterval == 0 {
+		c.CommitInterval = defaultCommitInterval
+	}
+	if c.TrieCleanCache == 0 {
+		c.TrieCleanCache = 512
+	}
+	if c.TrieDirtyCache == 0 {
+		c.TrieDirtyCache = 512
+	}
+	if c.TrieDirtyCommitTarget == 0 {
+		c.TrieDirtyCommitTarget = 20
+	}
+	if c.TriePrefetcherParallelism == 0 {
+		c.TriePrefetcherParallelism = 16
+	}
+	if c.SnapshotCache == 0 {
+		c.SnapshotCache = 256
+	}
+	if c.StateSyncCommitInterval == 0 {
+		c.StateSyncCommitInterval = defaultCommitInterval * 4
+	}
+	if c.RPCGasCap == 0 {
+		c.RPCGasCap = 50_000_000 // 50M Gas Limit
+	}
+	if c.RPCTxFeeCap == 0 {
+		c.RPCTxFeeCap = 100 // 100 AVAX
+	}
+	if c.ContinuousProfilerFrequency.Duration == 0 {
+		c.ContinuousProfilerFrequency = wrapDuration(15 * time.Minute)
+	}
+	if c.ContinuousProfilerMaxFiles == 0 {
+		c.ContinuousProfilerMaxFiles = 5
+	}
+	if c.PushGossipPercentStake == 0 {
+		c.PushGossipPercentStake = .9
+	}
+	if c.PushGossipNumValidators == 0 {
+		c.PushGossipNumValidators = 100
+	}
+	if c.PushRegossipNumValidators == 0 {
+		c.PushRegossipNumValidators = 10
+	}
+	if c.PushGossipFrequency.Duration == 0 {
+		c.PushGossipFrequency = wrapDuration(100 * time.Millisecond)
+	}
+	if c.PullGossipFrequency.Duration == 0 {
+		c.PullGossipFrequency = wrapDuration(1 * time.Second)
+	}
+	if c.RegossipFrequency.Duration == 0 {
+		c.RegossipFrequency = wrapDuration(30 * time.Second)
+	}
+	if c.OfflinePruningBloomFilterSize == 0 {
+		c.OfflinePruningBloomFilterSize = 512
+	}
+	if c.LogLevel == "" {
+		c.LogLevel = "info"
+	}
+	if c.MaxOutboundActiveRequests == 0 {
+		c.MaxOutboundActiveRequests = 16
+	}
+	if c.PopulateMissingTriesParallelism == 0 {
+		c.PopulateMissingTriesParallelism = 1024
+	}
+	if c.StateSyncServerTrieCache == 0 {
+		c.StateSyncServerTrieCache = 64
+	}
+	if c.AcceptedCacheSize == 0 {
+		c.AcceptedCacheSize = 32
+	}
+	if c.StateSyncMinBlocks == 0 {
+		c.StateSyncMinBlocks = 300_000
+	}
+	if c.StateSyncRequestSize == 0 {
+		c.StateSyncRequestSize = 1024
+	}
+	if c.StateHistory == 0 {
+		c.StateHistory = 32
+	}
+	if c.HistoricalProofQueryWindow == 0 {
+		c.HistoricalProofQueryWindow = uint64(24 * time.Hour / (2 * time.Second))
+	}
+	if c.TxPoolPriceLimit == 0 {
+		c.TxPoolPriceLimit = 1
+	}
+	if c.TxPoolPriceBump == 0 {
+		c.TxPoolPriceBump = 10
+	}
+	if c.TxPoolAccountSlots == 0 {
+		c.TxPoolAccountSlots = 16
+	}
+	if c.TxPoolGlobalSlots == 0 {
+		c.TxPoolGlobalSlots = 4096 + 1024 // urgent + floating queue capacity with 4:1 ratio
+	}
+	if c.TxPoolAccountQueue == 0 {
+		c.TxPoolAccountQueue = 64
+	}
+	if c.TxPoolGlobalQueue == 0 {
+		c.TxPoolGlobalQueue = 1024
+	}
+	if c.TxPoolLifetime.Duration == 0 {
+		c.TxPoolLifetime = wrapDuration(10 * time.Minute)
+	}
+	if c.BatchRequestLimit == 0 {
+		c.BatchRequestLimit = 1000
+	}
+	if c.BatchResponseMaxSize == 0 {
+		c.BatchResponseMaxSize = 25 * 1000 * 1000 // 25MB
+	}
+	if !c.Pruning {
+		c.Pruning = true
+	}
+	if !c.MetricsExpensiveEnabled {
+		c.MetricsExpensiveEnabled = true
 	}
 }
 

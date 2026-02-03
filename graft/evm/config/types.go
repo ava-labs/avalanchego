@@ -10,8 +10,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/spf13/cast"
-
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 // Duration wraps time.Duration to support JSON unmarshaling from both
@@ -39,8 +37,8 @@ func (d Duration) String() string {
 	return d.Duration.String()
 }
 
-// CommonConfig contains configuration fields shared between CChainConfig and L1Config.
-type CommonConfig struct {
+// BaseConfig contains configuration fields shared by all EVM-based chain implementations.
+type BaseConfig struct {
 	// MinDelayTarget is the minimum delay between blocks (in milliseconds) that this node will attempt to use
 	// when creating blocks. If this config is not specified, the node will
 	// default to use the parent block's target delay per second.
@@ -190,44 +188,4 @@ type CommonConfig struct {
 
 	// Database Scheme
 	StateScheme string `json:"state-scheme"`
-}
-
-// CChainConfig contains C-Chain specific configuration.
-type CChainConfig struct {
-	CommonConfig
-
-	// GasTarget is the target gas per second that this node will attempt to use
-	// when creating blocks. If this config is not specified, the node will
-	// default to use the parent block's target gas per second.
-	GasTarget *gas.Gas `json:"gas-target,omitempty"`
-
-	// Price Option Settings (C-Chain specific)
-	PriceOptionSlowFeePercentage uint64 `json:"price-options-slow-fee-percentage"`
-	PriceOptionFastFeePercentage uint64 `json:"price-options-fast-fee-percentage"`
-	PriceOptionMaxTip            uint64 `json:"price-options-max-tip"`
-}
-
-// L1Config contains L1 (subnet-evm) specific configuration.
-type L1Config struct {
-	CommonConfig
-
-	// Airdrop
-	AirdropFile string `json:"airdrop"`
-
-	// Subnet EVM APIs
-	ValidatorsAPIEnabled bool `json:"validators-api-enabled"`
-
-	// Gossip Settings (L1 specific)
-	PriorityRegossipAddresses []common.Address `json:"priority-regossip-addresses"`
-
-	// Address for Tx Fees (must be empty if not supported by blockchain)
-	FeeRecipient string `json:"feeRecipient"`
-
-	// Database settings (L1 specific)
-	UseStandaloneDatabase *bool  `json:"use-standalone-database"`
-	DatabaseConfigContent string `json:"database-config"`
-	DatabaseConfigFile    string `json:"database-config-file"`
-	DatabaseType          string `json:"database-type"`
-	DatabasePath          string `json:"database-path"`
-	DatabaseReadOnly      bool   `json:"database-read-only"`
 }

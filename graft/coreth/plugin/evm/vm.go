@@ -60,7 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/coreth/warp"
-	"github.com/ava-labs/avalanchego/graft/evm/config"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
@@ -183,7 +183,7 @@ type VM struct {
 	// with an efficient caching layer.
 	*chain.State
 
-	config config.CChainConfig
+	config config.Config
 
 	chainID     *big.Int
 	genesisHash common.Hash
@@ -270,7 +270,7 @@ func (vm *VM) Initialize(
 	vm.ctx = chainCtx
 	vm.clock = vm.extensionConfig.Clock
 
-	cfg, deprecateMsg, err := config.GetConfig(configBytes, vm.ctx.NetworkID, config.NewDefaultCChainConfig)
+	cfg, deprecateMsg, err := config.GetConfig(configBytes, vm.ctx.NetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get config: %w", err)
 	}

@@ -41,7 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/graft/evm/config"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
@@ -184,7 +184,7 @@ type VM struct {
 	// with an efficient caching layer.
 	*chain.State
 
-	config config.L1Config
+	config config.Config
 
 	chainID     *big.Int
 	genesisHash common.Hash
@@ -279,7 +279,7 @@ func (vm *VM) Initialize(
 ) error {
 	vm.ctx = chainCtx
 
-	cfg, deprecateMsg, err := config.GetConfig(configBytes, vm.ctx.NetworkID, config.NewDefaultL1Config)
+	cfg, deprecateMsg, err := config.GetConfig(configBytes, vm.ctx.NetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get config: %w", err)
 	}
