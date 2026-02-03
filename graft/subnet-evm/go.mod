@@ -1,16 +1,16 @@
 module github.com/ava-labs/avalanchego/graft/subnet-evm
 
 // CLI tools intended for invocation with `go tool` should be added to
-// tools/go.mod to avoid polluting the main module's dependencies. See
+// tools/external/go.mod to avoid polluting the main module's dependencies. See
 // CONTRIBUTING.md for more details.
 
 // - Changes to the minimum golang version must also be replicated in:
 //   - go.mod (here)
-//   - tools/go.mod
+//   - tools/external/go.mod
 //   - RELEASES.md
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
-//   - Consider updating the version of golangci-lint (see tools/go.mod)
+//   - Consider updating the version of golangci-lint (see tools/external/go.mod)
 go 1.24.12
 
 require (
@@ -18,7 +18,7 @@ require (
 	github.com/ava-labs/avalanchego v1.14.1-antithesis-docker-image-fix
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
-	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
+	github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3
 	github.com/gorilla/rpc v1.2.0
@@ -82,7 +82,9 @@ require (
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
 	github.com/ferranbt/fastssz v0.1.2 // indirect
+	github.com/fjl/gencodec v0.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/garslo/gogen v0.0.0-20170306192744-1d203ffc1f61 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/gballet/go-verkle v0.1.1-0.20231031103413-a67434b50f46 // indirect
 	github.com/getsentry/sentry-go v0.35.0 // indirect
@@ -200,11 +202,15 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-// The following tools are managed here instead of in tools/go.mod
-// because they are already direct dependencies of the main module.
+// The following tools are managed here instead of in tools/external/go.mod
+// because they are already direct dependencies of the main module, or
+// because they need to parse types from this module (gencodec) and
+// workspace mode forbids -modfile.
 tool (
 	github.com/ava-labs/libevm/rlp/rlpgen
+	github.com/fjl/gencodec
 	github.com/onsi/ginkgo/v2/ginkgo
+	go.uber.org/mock/mockgen
 )
 
 replace github.com/ava-labs/avalanchego => ../../

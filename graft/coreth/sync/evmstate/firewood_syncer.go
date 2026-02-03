@@ -11,13 +11,13 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/avalanchego/firewood/syncer"
+	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 
-	xsync "github.com/ava-labs/avalanchego/x/sync"
+	merklesync "github.com/ava-labs/avalanchego/database/merkle/sync"
 )
 
 var (
@@ -26,7 +26,7 @@ var (
 )
 
 type FirewoodSyncer struct {
-	s         *xsync.Syncer[*syncer.RangeProof, struct{}]
+	s         *merklesync.Syncer[*syncer.RangeProof, struct{}]
 	codeQueue *code.Queue
 	// finalizeOnce is initialized in the constructor to make Finalize idempotent.
 	finalizeOnce func() error

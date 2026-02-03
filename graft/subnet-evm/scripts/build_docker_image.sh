@@ -94,7 +94,9 @@ if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
     "${SUBNET_EVM_PATH}"/../../scripts/build_image.sh
 fi
 
-GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
+# Use head -1 because go workspaces list multiple modules; CI validates
+# all modules use the same Go version.
+GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 
 # Use repo root as context so Dockerfile can access graft/ directory
 echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based on AvalancheGo@$image_tag"

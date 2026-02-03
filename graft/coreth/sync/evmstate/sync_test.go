@@ -22,11 +22,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
@@ -56,9 +56,9 @@ func testSync(t *testing.T, test syncTest) {
 	clientEthDB, ok := clientDB.DiskDB().(ethdb.Database)
 	require.Truef(t, ok, "%T is not an ethdb.Database", clientDB.DiskDB())
 
-	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverDB.TrieDB(), message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
-	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
-	mockClient := client.NewTestClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
+	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverDB.TrieDB(), message.StateTrieKeyLength, nil, message.CorethCodec, handlerstats.NewNoopHandlerStats())
+	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
+	mockClient := client.NewTestClient(message.CorethCodec, leafsRequestHandler, codeRequestHandler, nil)
 	// Set intercept functions for the mock client
 	mockClient.GetLeafsIntercept = test.GetLeafsIntercept
 	mockClient.GetCodeIntercept = test.GetCodeIntercept
@@ -142,7 +142,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with code and storage": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, numAccounts)
+				root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, numAccounts)
 				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 		},
@@ -179,7 +179,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"failed to fetch code": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
 				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, numAccountsSmall)
+				root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, numAccountsSmall)
 				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
 			GetCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {
@@ -207,7 +207,7 @@ func TestCancelSync(t *testing.T) {
 		prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 			// Create trie with 2000 accounts (more than one leaf request)
 			serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-			root := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, 2000)
+			root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, 2000)
 			return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 		},
 		expectedError: context.Canceled,
@@ -231,7 +231,7 @@ type interruptLeafsIntercept struct {
 // response for the first [numRequest] requests for leafs from [root].
 // After that, all requests for leafs from [root] return [errInterrupted].
 func (i *interruptLeafsIntercept) getLeafsIntercept(request message.LeafsRequest, response message.LeafsResponse) (message.LeafsResponse, error) {
-	if request.Root == i.root {
+	if request.RootHash() == i.root {
 		if numRequests := i.numRequests.Add(1); numRequests > i.interruptAfter {
 			return message.LeafsResponse{}, errInterrupted
 		}

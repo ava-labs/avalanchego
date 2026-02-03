@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
@@ -57,7 +58,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client/stats"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
@@ -445,7 +445,7 @@ func (vm *VM) Initialize(
 		vm.ethConfig.Miner.Etherbase = constants.BlackholeAddr
 	}
 
-	vm.networkCodec = message.Codec
+	vm.networkCodec = message.SubnetEVMCodec
 	vm.Network, err = network.NewNetwork(vm.ctx, appSender, vm.networkCodec, vm.config.MaxOutboundActiveRequests, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
@@ -711,17 +711,17 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				BlockParser:      vm,
 			},
 		),
-		Enabled:            vm.config.StateSyncEnabled,
-		SkipResume:         vm.config.StateSyncSkipResume,
-		MinBlocks:          vm.config.StateSyncMinBlocks,
-		RequestSize:        vm.config.StateSyncRequestSize,
-		LastAcceptedHeight: lastAcceptedHeight, // TODO clean up how this is passed around
-		ChaindDB:           vm.chaindb,
-		VerDB:              vm.versiondb,
-		MetadataDB:         vm.metadataDB,
-		Acceptor:           vm,
-		Parser:             vm.extensionConfig.SyncableParser,
-		Extender:           nil,
+		Enabled:             vm.config.StateSyncEnabled,
+		SkipResume:          vm.config.StateSyncSkipResume,
+		MinBlocks:           vm.config.StateSyncMinBlocks,
+		RequestSize:         vm.config.StateSyncRequestSize,
+		LastAcceptedHeight:  lastAcceptedHeight, // TODO clean up how this is passed around
+		ChaindDB:            vm.chaindb,
+		VerDB:               vm.versiondb,
+		MetadataDB:          vm.metadataDB,
+		Acceptor:            vm,
+		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
+		Extender:            nil,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
@@ -1294,8 +1294,7 @@ func (vm *VM) ReadLastAccepted() (common.Hash, uint64, error) {
 func defaultExtensions() *extension.Config {
 	return &extension.Config{
 		Clock:               &mockable.Clock{},
-		SyncSummaryProvider: &message.BlockSyncSummaryProvider{},
-		SyncableParser:      message.NewBlockSyncSummaryParser(),
+		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.SubnetEVMCodec),
 	}
 }
 

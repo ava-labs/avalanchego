@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/metrics"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
 
 var (
@@ -102,9 +102,9 @@ func (c *clientSyncerStats) GetMetric(msgIntf message.Request) (MessageMetric, e
 	case message.CodeRequest:
 		return c.codeRequestMetric, nil
 	case message.LeafsRequest:
-		metric, ok := c.leafMetrics[msg.NodeType]
+		metric, ok := c.leafMetrics[msg.LeafType()]
 		if !ok {
-			return nil, fmt.Errorf("invalid leafs request for node type: %T", msg.NodeType)
+			return nil, fmt.Errorf("invalid leafs request for node type: %T", msg.LeafType())
 		}
 		return metric, nil
 	default:

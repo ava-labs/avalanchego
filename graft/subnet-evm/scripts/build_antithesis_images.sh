@@ -38,8 +38,9 @@ if [[ -z "${IMAGE_TAG}" ]]; then
 fi
 
 # The dockerfiles don't specify the golang version to minimize the changes required to bump
-# the version. Instead, the golang version is provided as an argument.
-GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
+# the version. Instead, the golang version is provided as an argument. Use head -1 because
+# go workspaces list multiple modules; CI validates all modules use the same Go version.
+GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 
 # Import common functions used to build images for antithesis test setups
 # shellcheck source=/dev/null

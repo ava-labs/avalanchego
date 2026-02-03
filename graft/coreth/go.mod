@@ -1,7 +1,7 @@
 module github.com/ava-labs/avalanchego/graft/coreth
 
 // CLI tools intended for invocation with `go tool` should be added to
-// tools/go.mod to avoid polluting the main module's dependencies. See
+// tools/external/go.mod to avoid polluting the main module's dependencies. See
 // CONTRIBUTING.md for more details.
 
 // See ../../go.mod for guidelines on updating the Go version.
@@ -11,7 +11,7 @@ require (
 	github.com/ava-labs/avalanchego v1.14.1-0.20251120155522-df4a8e531761
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
-	github.com/ava-labs/libevm v1.13.15-0.20251210210615-b8e76562a300
+	github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3
 	github.com/google/go-cmp v0.7.0
@@ -68,7 +68,9 @@ require (
 	github.com/dop251/goja v0.0.0-20230806174421-c933cf95e127 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
+	github.com/fjl/gencodec v0.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/garslo/gogen v0.0.0-20170306192744-1d203ffc1f61 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/gballet/go-verkle v0.1.1-0.20231031103413-a67434b50f46 // indirect
 	github.com/getsentry/sentry-go v0.35.0 // indirect
@@ -175,11 +177,15 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-// The following tools are managed here instead of in tools/go.mod
-// because they are already direct dependencies of the main module.
+// The following tools are managed here instead of in tools/external/go.mod
+// because they are already direct dependencies of the main module, or
+// because they need to parse types from this module (gencodec) and
+// workspace mode forbids -modfile.
 tool (
 	github.com/ava-labs/libevm/rlp/rlpgen
+	github.com/fjl/gencodec
 	github.com/onsi/ginkgo/v2/ginkgo
+	go.uber.org/mock/mockgen
 )
 
 replace (
