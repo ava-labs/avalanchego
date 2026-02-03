@@ -197,9 +197,9 @@ func NewSyncer[R any, C any](
 // Sync initiates the trie syncing process and blocks until one of the following occurs:
 //   - [Syncer.Sync] is complete.
 //   - [Syncer.Sync] fatally errored.
-//   - ctx is canceled.
+//   - `ctx` is canceled.
 //
-// If ctx is canceled, returns [context.Context.Err].
+// If `ctx` is canceled, returns [context.Context.Err].
 func (s *Syncer[_, _]) Sync(ctx context.Context) error {
 	ctx, err := s.setup(ctx)
 	if err != nil {
