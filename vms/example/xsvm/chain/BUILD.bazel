@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "chain",
+    srcs = [
+        "block.go",
+        "chain.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/chain",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/versiondb",
+        "//ids",
+        "//snow",
+        "//snow/consensus/snowman",
+        "//snow/engine/snowman/block",
+        "//utils/set",
+        "//vms/example/xsvm/block",
+        "//vms/example/xsvm/execute",
+        "//vms/example/xsvm/state",
+    ],
+)

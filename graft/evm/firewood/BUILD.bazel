@@ -1,0 +1,54 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "firewood",
+    srcs = [
+        "account_trie.go",
+        "metrics.go",
+        "state.go",
+        "storage_trie.go",
+        "triedb.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/firewood",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//trie/trienode",
+        "@com_github_ava_labs_libevm//trie/triestate",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_ava_labs_libevm//triedb/database",
+    ],
+)
+
+graft_go_test(
+    name = "firewood_test",
+    srcs = [
+        "hash_test.go",
+        "triedb_test.go",
+    ],
+    embed = [":firewood"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_ava_labs_libevm//trie/trienode",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
+)

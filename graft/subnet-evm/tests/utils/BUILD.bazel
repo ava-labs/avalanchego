@@ -1,0 +1,37 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "utils",
+    srcs = [
+        "command.go",
+        "constants.go",
+        "proposervm.go",
+        "subnet.go",
+        "tmpnet.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/tests/utils",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/health",
+        "//api/info",
+        "//config",
+        "//genesis",
+        "//graft/subnet-evm/accounts/abi/bind",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/ethclient",
+        "//graft/subnet-evm/plugin/evm",
+        "//graft/subnet-evm/plugin/evm/upgrade/legacy",
+        "//ids",
+        "//tests/fixture/tmpnet",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_go_cmd_cmd//:cmd",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+    ],
+)

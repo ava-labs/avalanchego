@@ -1,0 +1,59 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "gossip",
+    srcs = [
+        "bloom.go",
+        "gossip.go",
+        "handler.go",
+        "message.go",
+        "set.go",
+        "system.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/network/p2p/gossip",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//ids",
+        "//network/p2p",
+        "//proto/pb/sdk",
+        "//snow/engine/common",
+        "//utils/bloom",
+        "//utils/buffer",
+        "//utils/logging",
+        "//utils/set",
+        "//utils/units",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_golang_google_protobuf//proto",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "gossip_test",
+    srcs = [
+        "bloom_test.go",
+        "gossip_test.go",
+        "set_test.go",
+    ],
+    embed = [":gossip"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//proto/pb/sdk",
+        "//snow/engine/enginetest",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//utils/bloom",
+        "//utils/constants",
+        "//utils/logging",
+        "//utils/set",
+        "//utils/units",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/testutil",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_x_sync//errgroup",
+    ],
+)

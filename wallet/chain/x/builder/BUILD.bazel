@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "builder",
+    srcs = [
+        "builder.go",
+        "builder_with_options.go",
+        "constants.go",
+        "context.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/wallet/chain/x/builder",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//utils",
+        "//utils/constants",
+        "//utils/logging",
+        "//utils/math",
+        "//utils/set",
+        "//vms/avm/block",
+        "//vms/avm/fxs",
+        "//vms/avm/txs",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/nftfx",
+        "//vms/propertyfx",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary/common",
+    ],
+)

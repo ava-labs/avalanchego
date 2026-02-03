@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "utxotest",
+    srcs = ["utxotest.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/common/utxotest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/constants",
+        "//vms/components/avax",
+        "//wallet/subnet/primary/common",
+        "@com_github_stretchr_testify//require",
+    ],
+)

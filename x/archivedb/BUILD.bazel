@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "archivedb",
+    srcs = [
+        "batch.go",
+        "db.go",
+        "key.go",
+        "reader.go",
+        "value.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/x/archivedb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/health",
+        "//database",
+        "//utils/wrappers",
+    ],
+)
+
+go_test(
+    name = "archivedb_test",
+    srcs = [
+        "db_test.go",
+        "key_test.go",
+        "prefix_test.go",
+    ],
+    embed = [":archivedb"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

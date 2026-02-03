@@ -1,0 +1,50 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "miner",
+    srcs = [
+        "miner.go",
+        "ordering.go",
+        "worker.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/miner",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/consensus",
+        "//graft/coreth/core",
+        "//graft/coreth/core/extstate",
+        "//graft/coreth/core/txpool",
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customheader",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//graft/coreth/plugin/evm/upgrade/cortina",
+        "//graft/coreth/precompile/precompileconfig",
+        "//utils/timer/mockable",
+        "//utils/units",
+        "//vms/evm/acp176",
+        "//vms/evm/predicate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//consensus/misc/eip4844",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+graft_go_test(
+    name = "miner_test",
+    srcs = ["ordering_test.go"],
+    embed = [":miner"],
+    deps = [
+        "//graft/coreth/core/txpool",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)

@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "buffer",
+    srcs = [
+        "bounded_nonblocking_queue.go",
+        "unbounded_blocking_deque.go",
+        "unbounded_deque.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/buffer",
+    visibility = ["//visibility:public"],
+    deps = ["//utils"],
+)
+
+go_test(
+    name = "buffer_test",
+    srcs = [
+        "bounded_nonblocking_queue_test.go",
+        "unbounded_blocking_deque_test.go",
+        "unbounded_deque_test.go",
+    ],
+    embed = [":buffer"],
+    deps = ["@com_github_stretchr_testify//require"],
+)
