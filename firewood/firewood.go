@@ -62,6 +62,7 @@ func (c *changes) Get(key []byte) ([]byte, bool) {
 type DB struct {
 	db                *ffi.Database
 	height            uint64
+	heightInitialized bool
 	heightKey         []byte
 	pending           changes
 }
@@ -90,6 +91,7 @@ func New(path string, height uint64) (*DB, error) {
 	return &DB{
 		db:                db,
 		height:            height,
+		heightInitialized: heightBytes != nil,
 		heightKey:         heightKey,
 	}, nil
 }
@@ -127,8 +129,8 @@ func (db *DB) Delete(key []byte) {
 // Height returns the last height of [DB] written to by [DB.Flush].
 //
 // If this returns false, the height has not been initialized yet.
-func (db *DB) Height() uint64 {
-	return db.height
+func (db *DB) Height() (uint64, bool) {
+	return db.height, db.heightInitialized
 }
 
 // Root returns the merkle root of the state on disk ignoring pending writes.
@@ -161,6 +163,10 @@ func (db *DB) Flush() error {
 	}
 
 	db.pending = changes{}
+
+	if !db.heightInitialized {
+		db.heightInitialized = true
+	}
 
 	return nil
 }

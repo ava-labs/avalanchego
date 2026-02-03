@@ -33,14 +33,12 @@ func (f *firewoodDB) Repair(ctx context.Context, vm VM, s State) error {
 		return fmt.Errorf("getting last accepted block: %w", err)
 	}
 
-	var replayStartHeight int
-	if firewoodHeight := f.db.Height(); {
-		// A height of zero means that we have not flushed any data to firewood yet,
-		// so we need to replay all blocks including genesis.
-		replayStartHeight = -1
-	} else {
-		replayStartHeight = int(firewoodHeight)
+	firewoodHeight, ok := f.db.Height()
+	if !ok {
+		return nil
 	}
+
+	replayStartHeight := int(firewoodHeight)
 
 	// Replay any blocks until the last accepted height to synchronize the chain
 	// and local dbs.
@@ -96,7 +94,7 @@ type firewoodBatch struct {
 }
 
 func (f *firewoodBatch) Write() error {
-	chainDBHeight := f.firewoodDB.Height()
+	chainDBHeight, ok := f.firewoodDB.Height()
 	if !ok && f.nextStateHeight > 1 {
 		// This should always be initialized after the first (non-genesis) block is
 		// accepted.

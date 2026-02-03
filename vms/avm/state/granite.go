@@ -11,11 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// Deprecated: after the firewood db migration this type should no longer be
-// used.
-//
 // NoChainDB is used before the Firewood migration when chain state was kept in
 // the same database as the rest of the state.
+//
+// Deprecated: after the firewood db migration this type should no longer be
+// used.
 type NoChainDB struct {
 	VersionDB *versiondb.Database
 }
