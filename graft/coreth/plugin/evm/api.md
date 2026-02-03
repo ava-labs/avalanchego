@@ -335,7 +335,7 @@ avax.getUTXOs({
         address: string,
         utxo: string
     },
-    numFetched: number,
+    numFetched: string,
     encoding: string
 }
 ```
