@@ -21,8 +21,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/network"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -136,8 +136,9 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 	leafsRequest := reqIntf.(message.LeafsRequest)
 
 	// Ensure the response does not contain more than the maximum requested number of leaves.
-	if len(leafsResponse.Keys) > int(leafsRequest.Limit) || len(leafsResponse.Vals) > int(leafsRequest.Limit) {
-		return nil, 0, fmt.Errorf("%w: (%d) > %d)", errTooManyLeaves, len(leafsResponse.Keys), leafsRequest.Limit)
+	limit := leafsRequest.KeyLimit()
+	if len(leafsResponse.Keys) > int(limit) || len(leafsResponse.Vals) > int(limit) {
+		return nil, 0, fmt.Errorf("%w: (%d) > %d)", errTooManyLeaves, len(leafsResponse.Keys), limit)
 	}
 
 	// An empty response (no more keys) requires a merkle proof
@@ -159,7 +160,7 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 		}
 	}
 
-	firstKey := leafsRequest.Start
+	firstKey := leafsRequest.StartKey()
 	if len(leafsResponse.Keys) > 0 {
 		lastKey := leafsResponse.Keys[len(leafsResponse.Keys)-1]
 
@@ -171,7 +172,7 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 	// VerifyRangeProof verifies that the key-value pairs included in [leafResponse] are all of the keys within the range from start
 	// to the last key returned.
 	// Also ensures the keys are in monotonically increasing order
-	more, err := trie.VerifyRangeProof(leafsRequest.Root, firstKey, leafsResponse.Keys, leafsResponse.Vals, proof)
+	more, err := trie.VerifyRangeProof(leafsRequest.RootHash(), firstKey, leafsResponse.Keys, leafsResponse.Vals, proof)
 	if err != nil {
 		return nil, 0, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
