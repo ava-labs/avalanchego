@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "snowmanmock",
+    srcs = ["block.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmanmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "@org_uber_go_mock//gomock",
+    ],
+)
