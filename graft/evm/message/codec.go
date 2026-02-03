@@ -25,12 +25,8 @@ type CodecType int
 
 const (
 	// CorethCodecType is used for C-Chain state sync messages.
-	// It skips 3 type registrations (deprecated gossip types and sync summary type)
-	// and uses CorethLeafsRequest wire format.
 	CorethCodecType CodecType = iota
 	// SubnetEVMCodecType is used for Subnet-EVM state sync messages.
-	// It skips 2 type registrations (deprecated gossip types)
-	// and uses SubnetEVMLeafsRequest wire format.
 	SubnetEVMCodecType
 )
 
@@ -47,44 +43,41 @@ func init() {
 }
 
 func newCodec(codecType CodecType) codec.Manager {
+	// Codec-specific configuration: skip count and LeafsRequest type.
+	var (
+		deprecatedSkipCount int
+		leafsRequestType any
+	)
+	switch codecType {
+	case CorethCodecType:
+		deprecatedSkipCount = 3 // deprecated gossip types and sync summary type
+		leafsRequestType = CorethLeafsRequest{}
+	case SubnetEVMCodecType:
+		deprecatedSkipCount = 2 // deprecated gossip types
+		leafsRequestType = SubnetEVMLeafsRequest{}
+	default:
+		panic("unknown codec type")
+	}
+
 	mgr := codec.NewManager(maxMessageSize)
 	c := linearcodec.NewDefault()
 
+	// Skip registrations to maintain type ID compatibility after removing deprecated types.
+	c.SkipRegistrations(deprecatedSkipCount)
+
 	errs := wrappers.Errs{}
-
-	// Skip registration to keep registeredTypes unchanged after legacy gossip deprecation
-	// Gossip types and sync summary type removed from codec
-	switch codecType {
-	case SubnetEVMCodecType:
-		// Skip 2 registrations for deprecated gossip types
-		c.SkipRegistrations(2)
-	default:
-		// Skip 3 registrations for deprecated gossip types and sync summary type
-		c.SkipRegistrations(3)
-	}
-
 	errs.Add(
-		// state sync types
 		c.RegisterType(BlockRequest{}),
 		c.RegisterType(BlockResponse{}),
-	)
-
-	// Register the concrete leafs request type for the wire format.
-	// Must register concrete type, not interface, for codec to serialize correctly.
-	switch codecType {
-	case SubnetEVMCodecType:
-		errs.Add(c.RegisterType(SubnetEVMLeafsRequest{}))
-	default:
-		errs.Add(c.RegisterType(CorethLeafsRequest{}))
-	}
-
-	errs.Add(
+		c.RegisterType(leafsRequestType),
 		c.RegisterType(LeafsResponse{}),
 		c.RegisterType(CodeRequest{}),
 		c.RegisterType(CodeResponse{}),
 	)
 
-	// Deprecated Warp request/response types are skipped
+	// Skip 3 registrations for deprecated Warp types:
+	// MessageSignatureRequest, BlockSignatureRequest, SignatureResponse
+	// See https://github.com/ava-labs/coreth/pull/999
 	c.SkipRegistrations(warpSkipRegistrations)
 
 	errs.Add(mgr.RegisterCodec(Version, c))
