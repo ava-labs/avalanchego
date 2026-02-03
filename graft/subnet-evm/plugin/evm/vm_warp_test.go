@@ -679,15 +679,19 @@ func testReceiveWarpMessage(
 				return nil, getValidatorSetTestErr
 			}
 
-			vdrs := validators.WarpSet{}
-			for _, s := range signers {
-				pk := s.secret.PublicKey()
-				vdrs.Validators = append(vdrs.Validators, &validators.Warp{
-					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-					Weight:         s.weight,
-					NodeIDs:        []ids.NodeID{s.nodeID},
-				})
-				vdrs.TotalWeight += s.weight
+			makeVdrSet := func(signers []signer) validators.WarpSet {
+				vdrs := validators.WarpSet{}
+				for _, s := range signers {
+					pk := s.secret.PublicKey()
+					vdrs.Validators = append(vdrs.Validators, &validators.Warp{
+						PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+						Weight:         s.weight,
+						NodeIDs:        []ids.NodeID{s.nodeID},
+					})
+					vdrs.TotalWeight += s.weight
+				}
+				avagoUtils.Sort(vdrs.Validators)
+				return vdrs
 			}
 
 			return map[ids.ID]validators.WarpSet{
