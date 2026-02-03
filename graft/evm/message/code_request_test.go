@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 )
 
 // TestMarshalCodeRequest requires that the structure or serialization logic hasn't changed, primarily to
@@ -25,7 +25,7 @@ func TestMarshalCodeRequest(t *testing.T) {
 
 	base64CodeRequest := "AAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAHNvbWUgY29kZSBwbHM="
 
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		codeRequestBytes, err := c.Marshal(message.Version, codeRequest)
 		require.NoError(t, err)
 		require.Equal(t, base64CodeRequest, base64.StdEncoding.EncodeToString(codeRequestBytes))
@@ -53,7 +53,7 @@ func TestMarshalCodeResponse(t *testing.T) {
 	}
 
 	base64CodeResponse := "AAAAAAABAAAAMlL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJgYVa2GgdDYbR6R4AFnk5y2aU"
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		codeResponseBytes, err := c.Marshal(message.Version, codeResponse)
 		require.NoError(t, err)
 		require.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))

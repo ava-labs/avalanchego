@@ -12,12 +12,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 func TestMarshalBlockSyncSummary(t *testing.T) {
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		blockSyncSummary, err := message.NewBlockSyncSummary(c, common.Hash{1}, 2, common.Hash{3})
 		require.NoError(t, err)
 

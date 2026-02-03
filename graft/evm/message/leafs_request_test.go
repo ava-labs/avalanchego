@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 )
 
 const (
@@ -91,7 +91,7 @@ func TestMarshalLeafsResponse(t *testing.T) {
 
 	leafsResponse := newLeafsResponseFixture(t, r)
 
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		leafsResponseBytes, err := c.Marshal(message.Version, leafsResponse)
 		require.NoError(t, err)
 		require.Equal(t, leafsResponseFixtureB64, base64.StdEncoding.EncodeToString(leafsResponseBytes))
