@@ -317,17 +317,17 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	g, err := parseGenesis(chainCtx, genesisBytes)
+	parsedGenesis, err := parseGenesis(chainCtx, genesisBytes)
 	if err != nil {
 		return err
 	}
 
 	// vm.ChainConfig() should be available for wrapping VMs before vm.initializeChain()
-	vm.chainConfig = g.Config
-	vm.chainID = g.Config.ChainID
+	vm.chainConfig = parsedGenesis.Config
+	vm.chainID = parsedGenesis.Config.ChainID
 
 	vm.ethConfig = ethconfig.NewDefaultConfig()
-	vm.ethConfig.Genesis = g
+	vm.ethConfig.Genesis = parsedGenesis
 	vm.ethConfig.NetworkId = vm.chainID.Uint64()
 	vm.genesisHash = vm.ethConfig.Genesis.ToBlock().Hash() // must create genesis hash before [vm.ReadLastAccepted]
 	lastAcceptedHash, lastAcceptedHeight, err := vm.ReadLastAccepted()
@@ -418,7 +418,7 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	vm.chainConfig = g.Config
+	vm.chainConfig = parsedGenesis.Config
 
 	vm.networkCodec = message.Codec
 	vm.Network, err = network.NewNetwork(vm.ctx, appSender, vm.networkCodec, vm.config.MaxOutboundActiveRequests, vm.sdkMetrics)

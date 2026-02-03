@@ -16,12 +16,16 @@ var _ vms.Factory = (*Factory)(nil)
 
 type Factory struct{}
 
-func (*Factory) New(logging.Logger) (interface{}, error) {
+func (*Factory) New(logger logging.Logger) (interface{}, error) {
 	mempoolConfig := legacypool.DefaultConfig
 	mempoolConfig.NoLocals = true
-	return adaptor.Convert(sae.NewSinceGenesis(sae.Config{
+	logger.Info("Creating new SAE since genesis")
+	res := adaptor.Convert(sae.NewSinceGenesis(sae.Config{
 		Hooks:         &Hooks{},
 		MempoolConfig: mempoolConfig,
 		TrieDBConfig:  triedb.HashDefaults,
-	})), nil
+	}))
+
+	logger.Info("Successfully created new SAE since genesis")
+	return res, nil
 }
