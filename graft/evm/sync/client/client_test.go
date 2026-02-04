@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/ids"
 
 	clientstats "github.com/ava-labs/avalanchego/graft/evm/sync/client/stats"
@@ -84,7 +84,7 @@ func TestGetCode(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				testNetClient := &testNetwork{}
@@ -305,7 +305,7 @@ func TestGetBlocks(t *testing.T) {
 		},
 	}
 	for name, test := range tests {
-		utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 			blocksRequestHandler := handlers.NewBlockRequestHandler(buildGetter(blocks), c, handlerstats.NewNoopHandlerStats())
 
 			t.Run(name, func(t *testing.T) {
@@ -712,7 +712,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 	}
 	for name, test := range tests {
-		utilstest.ForEachCodec(t, func(codecName string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(codecName string, c codec.Manager) {
 			leafReqType := message.CorethLeafsRequestType
 			if codecName == subnetEVMCodecName {
 				leafReqType = message.SubnetEVMLeafsRequestType
@@ -756,7 +756,7 @@ func TestGetLeafsRetries(t *testing.T) {
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	root, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100_000, common.HashLength)
 
-	utilstest.ForEachCodec(t, func(codecName string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(codecName string, c codec.Manager) {
 		leafReqType := message.CorethLeafsRequestType
 		if codecName == subnetEVMCodecName {
 			leafReqType = message.SubnetEVMLeafsRequestType
@@ -823,7 +823,7 @@ func TestGetLeafsRetries(t *testing.T) {
 }
 
 func TestStateSyncNodes(t *testing.T) {
-	utilstest.ForEachCodec(t, func(codecName string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(codecName string, c codec.Manager) {
 		leafReqType := message.CorethLeafsRequestType
 		if codecName == subnetEVMCodecName {
 			leafReqType = message.SubnetEVMLeafsRequestType

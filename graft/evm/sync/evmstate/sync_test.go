@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
@@ -193,7 +193,7 @@ func TestSimpleSyncCases(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+			messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 				testSync(t, test, c)
 			})
 		})
@@ -202,7 +202,7 @@ func TestSimpleSyncCases(t *testing.T) {
 
 func TestCancelSync(t *testing.T) {
 	t.Parallel()
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		r := rand.New(rand.NewSource(1))
 		ctx, cancel := context.WithCancel(t.Context())
 		t.Cleanup(cancel)
@@ -247,7 +247,7 @@ func (i *interruptLeafsIntercept) getLeafsIntercept(request message.LeafsRequest
 
 func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 	t.Parallel()
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		r := rand.New(rand.NewSource(1))
 		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 		root, _ := synctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, 2000, 3)
@@ -276,7 +276,7 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 
 func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 	t.Parallel()
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		r := rand.New(rand.NewSource(1))
 		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -311,7 +311,7 @@ func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 
 func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 	t.Parallel()
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		r := rand.New(rand.NewSource(1))
 		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -355,7 +355,7 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 
 func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testing.T) {
 	t.Parallel()
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		r := rand.New(rand.NewSource(1))
 		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -390,7 +390,7 @@ func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testi
 
 func TestResumeSyncLargeStorageTrieWithSpreadOutDuplicatesInterrupted(t *testing.T) {
 	t.Parallel()
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		r := rand.New(rand.NewSource(1))
 		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -496,7 +496,7 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+			messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 				testSyncerSyncsToNewRoot(t, test.deleteBetweenSyncs, c)
 			})
 		})

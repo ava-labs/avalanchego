@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats/statstest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -219,7 +219,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		"cancelled context dropped": {
 			prepareTestFn: func(_ codec.Manager, leafReqType message.LeafsRequestType) (context.Context, message.LeafsRequest) {
 				ctx, cancel := context.WithCancel(t.Context())
-				cancel() // cancel immediately
+				cancel()
 
 				return ctx, newLeafsRequest(t,
 					leafReqType,
@@ -731,7 +731,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		utilstest.ForEachCodec(t, func(codecName string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(codecName string, c codec.Manager) {
 			leafReqType := message.CorethLeafsRequestType
 			if codecName == "subnet-evm" {
 				leafReqType = message.SubnetEVMLeafsRequestType

@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats/statstest"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/ids"
 
 	ethparams "github.com/ava-labs/libevm/params"
@@ -87,7 +87,7 @@ func TestCodeRequestHandler(t *testing.T) {
 		},
 	}
 
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		codeRequestHandler := NewCodeRequestHandler(database, c, testHandlerStats)
 		for name, test := range tests {
 			testHandlerStats.Reset()

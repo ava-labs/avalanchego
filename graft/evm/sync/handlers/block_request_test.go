@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats/statstest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
@@ -127,7 +127,7 @@ func TestBlockRequestHandler(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
 				executeBlockRequestTest(t, test, blocks, c)
@@ -174,7 +174,7 @@ func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
 				executeBlockRequestTest(t, test, blocks, c)
@@ -193,7 +193,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	// convert into map
 	blocksDB := synctest.BlockMap(blocks)
 
-	utilstest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
 		cancelAfterNumRequests := 2
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
