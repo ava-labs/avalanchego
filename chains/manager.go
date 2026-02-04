@@ -1527,8 +1527,8 @@ func (m *manager) Shutdown() {
 	m.Log.Info("shutting down chain manager")
 	m.chainsQueue.Close()
 	close(m.chainCreatorShutdownCh)
-	m.chainCreatorExited.Wait()
 	m.ManagerConfig.Router.Shutdown(context.TODO())
+	m.chainCreatorExited.Wait()
 }
 
 // LookupVM returns the ID of the VM associated with an alias
