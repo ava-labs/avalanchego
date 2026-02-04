@@ -22,9 +22,9 @@ type SyncMetrics interface {
 
 type noopMetrics struct{}
 
-func (m *noopMetrics) RequestFailed()    {}
-func (m *noopMetrics) RequestMade()      {}
-func (m *noopMetrics) RequestSucceeded() {}
+func (noopMetrics) RequestFailed()    {}
+func (noopMetrics) RequestMade()      {}
+func (noopMetrics) RequestSucceeded() {}
 
 type metrics struct {
 	requestsFailed    prometheus.Counter
@@ -33,6 +33,9 @@ type metrics struct {
 }
 
 func NewMetrics(namespace string, reg prometheus.Registerer) (SyncMetrics, error) {
+	if reg == nil {
+		return noopMetrics{}, nil
+	}
 	m := metrics{
 		requestsFailed: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,

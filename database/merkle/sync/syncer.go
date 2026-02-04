@@ -98,9 +98,10 @@ type Syncer[R any, C any] struct {
 	// The database to sync.
 	db DB[R, C]
 
-	target         ids.ID
-	syncTargetLock sync.RWMutex
-	config         Config
+	target     ids.ID
+	targetLock sync.RWMutex
+
+	config Config
 
 	workLock sync.Mutex
 	// The number of work items currently being processed.
@@ -179,15 +180,9 @@ func NewSyncer[R any, C any](
 		config.SimultaneousWorkLimit = defaultSimultaneousWorkLimit
 	}
 
-	var metrics SyncMetrics
-	if config.Registerer == nil {
-		metrics = &noopMetrics{}
-	} else {
-		var err error
-		metrics, err = NewMetrics("sync", config.Registerer)
-		if err != nil {
-			return nil, err
-		}
+	metrics, err := NewMetrics("sync", config.Registerer)
+	if err != nil {
+		return nil, err
 	}
 
 	s := &Syncer[R, C]{
@@ -668,8 +663,8 @@ func (s *Syncer[_, _]) error() error {
 }
 
 func (s *Syncer[_, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
-	s.syncTargetLock.Lock()
-	defer s.syncTargetLock.Unlock()
+	s.targetLock.Lock()
+	defer s.targetLock.Unlock()
 
 	s.workLock.Lock()
 	defer s.workLock.Unlock()
@@ -707,8 +702,8 @@ func (s *Syncer[_, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 }
 
 func (s *Syncer[_, _]) getTargetRoot() ids.ID {
-	s.syncTargetLock.RLock()
-	defer s.syncTargetLock.RUnlock()
+	s.targetLock.RLock()
+	defer s.targetLock.RUnlock()
 
 	return s.target
 }
@@ -756,8 +751,8 @@ func (s *Syncer[_, _]) completeWorkItem(
 
 	// Process [work] while holding [syncTargetLock] to ensure that object
 	// is added to the right queue, even if a target update is triggered
-	s.syncTargetLock.RLock()
-	defer s.syncTargetLock.RUnlock()
+	s.targetLock.RLock()
+	defer s.targetLock.RUnlock()
 
 	stale := s.target != rootID
 	if stale {
