@@ -79,21 +79,6 @@ func BlockMap(blocks []*types.Block) map[common.Hash]*types.Block {
 	return m
 }
 
-// BlockProviderFunc returns a function suitable for handlers.TestBlockProvider.GetBlockFn
-// that looks up blocks by height and verifies the hash matches.
-func BlockProviderFunc(blocks []*types.Block) func(common.Hash, uint64) *types.Block {
-	return func(hash common.Hash, height uint64) *types.Block {
-		if height >= uint64(len(blocks)) {
-			return nil
-		}
-		block := blocks[height]
-		if block.Hash() != hash {
-			return nil
-		}
-		return block
-	}
-}
-
 func newGenesisBlock(gasLimit uint64) *types.Block {
 	header := &types.Header{
 		Number:      big.NewInt(0),

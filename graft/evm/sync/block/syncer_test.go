@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
@@ -147,7 +148,16 @@ func newTestEnvironment(t *testing.T, numBlocks int, c codec.Manager) *testEnvir
 	blocks := synctest.GenerateTestBlocks(t, numBlocks, nil)
 
 	blockProvider := &handlers.TestBlockProvider{
-		GetBlockFn: synctest.BlockProviderFunc(blocks),
+		GetBlockFn: func(hash common.Hash, height uint64) *types.Block {
+			if height >= uint64(len(blocks)) {
+				return nil
+			}
+			block := blocks[height]
+			if block.Hash() != hash {
+				return nil
+			}
+			return block
+		},
 	}
 
 	blockHandler := handlers.NewBlockRequestHandler(
