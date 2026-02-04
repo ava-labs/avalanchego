@@ -1959,7 +1959,7 @@ func (s *state) loadCurrentValidators() error {
 		err = s.uptimeTrackerState.LoadUptime(staker.NodeID)
 		switch {
 		case errors.Is(err, database.ErrNotFound):
-			// Fallback to old metadata , this will mark it for migration.
+			// Fallback to old metadata, this will mark it for migration.
 			s.uptimeTrackerState.SetUptime(
 				staker.NodeID,
 				metadata.UpDuration,

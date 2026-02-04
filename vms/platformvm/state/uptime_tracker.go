@@ -17,6 +17,8 @@ type uptimeData struct {
 	lastUpdated time.Time // in-memory convenience form
 }
 
+// UptimeTrackerState tracks primary network validators' uptime.
+// Important: it's not thread-safe.
 type UptimeTrackerState struct {
 	validatorsUptime map[ids.NodeID]*uptimeData
 	modified         map[ids.NodeID]struct{}
