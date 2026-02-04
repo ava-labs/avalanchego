@@ -67,7 +67,7 @@ linters:
     - govet
     - importas
     - ineffassign
-    - mirror
+    - mirror 
     - misspell
     - nakedret
     - nilerr
