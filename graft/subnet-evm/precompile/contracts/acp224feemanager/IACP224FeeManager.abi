@@ -22,11 +22,6 @@
           },
           {
             "internalType": "uint256",
-            "name": "maxCapacityFactor",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
             "name": "timeToDouble",
             "type": "uint256"
           }
@@ -46,11 +41,6 @@
           {
             "internalType": "uint256",
             "name": "minGasPrice",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "maxCapacityFactor",
             "type": "uint256"
           },
           {
@@ -113,11 +103,6 @@
           {
             "internalType": "uint256",
             "name": "minGasPrice",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "maxCapacityFactor",
             "type": "uint256"
           },
           {
@@ -204,11 +189,6 @@
           {
             "internalType": "uint256",
             "name": "minGasPrice",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "maxCapacityFactor",
             "type": "uint256"
           },
           {

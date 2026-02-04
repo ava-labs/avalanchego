@@ -11,7 +11,6 @@ interface IACP224FeeManager is IAllowList {
     struct FeeConfig {
         uint256 targetGas; // Target gas consumption per second
         uint256 minGasPrice; // Minimum gas price in wei
-        uint256 maxCapacityFactor; // Maximum capacity factor (C = factor * T)
         uint256 timeToDouble; // Time in seconds for gas price to double at max capacity
     }
 
