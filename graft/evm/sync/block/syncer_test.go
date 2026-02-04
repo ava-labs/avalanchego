@@ -194,8 +194,7 @@ func (e *testEnvironment) prePopulateBlocks(blockHeights []int) error {
 
 // createSyncer creates a block syncer with the given configuration
 func (e *testEnvironment) createSyncer(fromHeight uint64, blocksToFetch uint64) (*BlockSyncer, error) {
-	// Use >= because we access e.blocks[fromHeight] below.
-	if fromHeight >= uint64(len(e.blocks)) {
+	if fromHeight > uint64(len(e.blocks)) {
 		return nil, fmt.Errorf("fromHeight %d exceeds available blocks %d", fromHeight, len(e.blocks))
 	}
 
