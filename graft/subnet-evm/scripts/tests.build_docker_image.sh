@@ -10,7 +10,6 @@ SUBNET_EVM_PATH=$(
   cd .. && pwd
 )
 # Load the constants
-# shellcheck source=graft/subnet-evm/scripts/constants.sh disable=SC1091
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
 build_and_test() {
@@ -43,6 +42,7 @@ build_and_test() {
   docker images
 
   # Check all of the images expected to have been built
+  # shellcheck disable=SC2154
   local target_images=(
     "$imagename:$imgtag"
     "$imagename:$commit_hash"

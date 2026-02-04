@@ -11,7 +11,6 @@ SUBNET_EVM_PATH=$(
 REPO_ROOT="$SUBNET_EVM_PATH/../.."
 
 # Load the constants
-# shellcheck source=graft/subnet-evm/scripts/constants.sh disable=SC1091
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
 if [[ $# -eq 1 ]]; then

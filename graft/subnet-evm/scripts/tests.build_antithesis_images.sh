@@ -17,7 +17,6 @@ set -euo pipefail
 SUBNET_EVM_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 # Discover the default tag that will be used for the image
-# shellcheck source=graft/subnet-evm/scripts/constants.sh disable=SC1091
 source "${SUBNET_EVM_PATH}"/scripts/constants.sh
 # shellcheck disable=SC2154
 export IMAGE_TAG="${commit_hash}"
