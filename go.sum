@@ -77,8 +77,8 @@ github.com/ava-labs/libevm v1.13.15-0.20260128160829-e673c7097059 h1:3l75HBUnvVe
 github.com/ava-labs/libevm v1.13.15-0.20260128160829-e673c7097059/go.mod h1:oyJdZfpQTc9fVzAbDry+QRYeiCbw8s/kGaDUsEMpb4I=
 github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19 h1:S6oFasZsplNmw8B2S8cMJQMa62nT5ZKGzZRdCpd+5qQ=
 github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
-github.com/ava-labs/strevm v0.0.0-20260203220045-861d58a10e43 h1:bgE9RFfwTY8DWFSCmi5GtSmdezZHvl5OEa6LwqswwXU=
-github.com/ava-labs/strevm v0.0.0-20260203220045-861d58a10e43/go.mod h1:HBnrfm1vCnVqdDqP9ddK9WLKEJ/FRqbKPP+fYA68nmc=
+github.com/ava-labs/strevm v0.0.0-20260204221548-d898e9b8557f h1:Akp+KgoUl97upYHDXcqwXFZqo4vsZ30JlcamZTuCYrk=
+github.com/ava-labs/strevm v0.0.0-20260204221548-d898e9b8557f/go.mod h1:HBnrfm1vCnVqdDqP9ddK9WLKEJ/FRqbKPP+fYA68nmc=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
