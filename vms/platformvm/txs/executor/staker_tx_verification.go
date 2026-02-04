@@ -1038,15 +1038,13 @@ func verifySetAutoRestakeConfigTx(
 		return nil, err
 	}
 
-	if tx.HasPeriod {
-		duration := time.Duration(tx.Period) * time.Second
-		switch {
-		case duration > 0 && duration < validatorRules.minStakeDuration:
-			return nil, ErrStakeTooShort
+	duration := time.Duration(tx.Period) * time.Second
+	switch {
+	case duration > 0 && duration < validatorRules.minStakeDuration:
+		return nil, ErrStakeTooShort
 
-		case duration > validatorRules.maxStakeDuration:
-			return nil, ErrStakeTooLong
-		}
+	case duration > validatorRules.maxStakeDuration:
+		return nil, ErrStakeTooLong
 	}
 
 	validator, err := chainState.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())

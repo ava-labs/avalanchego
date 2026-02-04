@@ -1405,13 +1405,8 @@ func (e *standardTxExecutor) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfig
 		return err
 	}
 
-	if tx.HasAutoRestakeShares {
-		validator.AutoRestakeShares = tx.AutoRestakeShares
-	}
-
-	if tx.HasPeriod {
-		validator.ContinuationPeriod = time.Duration(tx.Period) * time.Second
-	}
+	validator.AutoRestakeShares = tx.AutoRestakeShares
+	validator.ContinuationPeriod = time.Duration(tx.Period) * time.Second
 
 	return e.state.UpdateCurrentValidator(validator)
 }
