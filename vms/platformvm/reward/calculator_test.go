@@ -171,6 +171,67 @@ func TestRewardsMint(t *testing.T) {
 	require.Equal(t, maxSupply-initialSupply, rewards)
 }
 
+func TestProportionalAmount(t *testing.T) {
+	tests := []struct {
+		name        string
+		amount      uint64
+		numerator   uint64
+		denominator uint64
+		expected    uint64
+		expectedErr bool
+	}{
+		{
+			name:        "division by zero",
+			amount:      100,
+			numerator:   5,
+			denominator: 0,
+			expectedErr: true,
+		},
+		{
+			name:        "basic case 1",
+			amount:      100,
+			numerator:   3,
+			denominator: 10,
+			expected:    30,
+		},
+		{
+			name:        "basic case 2",
+			amount:      250,
+			numerator:   4,
+			denominator: 50,
+			expected:    20,
+		},
+		{
+			name:        "precision",
+			amount:      7,
+			numerator:   3,
+			denominator: 10,
+			expected:    2,
+		},
+		{
+			name:        "overflow",
+			amount:      math.MaxUint64,
+			numerator:   2,
+			denominator: 10,
+			expected:    math.MaxUint64/5 - 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			result, err := ProportionalAmount(test.amount, test.numerator, test.denominator)
+			if test.expectedErr {
+				require.Error(err) //nolint:forbidigo
+				return
+			}
+			require.NoError(err)
+			require.Equal(test.expected, result)
+		})
+	}
+}
+
 func TestSplit(t *testing.T) {
 	tests := []struct {
 		amount        uint64

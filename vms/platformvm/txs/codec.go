@@ -48,6 +48,7 @@ func init() {
 		errs.Add(
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
+			RegisterHeliconTypes(c),
 		)
 	}
 
@@ -127,8 +128,15 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&SetL1ValidatorWeightTx{}),
 		targetCodec.RegisterType(&IncreaseL1ValidatorBalanceTx{}),
 		targetCodec.RegisterType(&DisableL1ValidatorTx{}),
+	)
+}
 
-		// TODO ACP-236: move to proper upgrade
+// RegisterHeliconTypes registers the type information for transactions that
+// were valid during the Helcion series of upgrades.
+func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
+	return errors.Join(
 		targetCodec.RegisterType(&AddContinuousValidatorTx{}),
+		targetCodec.RegisterType(&SetAutoRestakeConfigTx{}),
+		targetCodec.RegisterType(&RewardContinuousValidatorTx{}),
 	)
 }

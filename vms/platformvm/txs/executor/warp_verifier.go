@@ -78,6 +78,10 @@ func (*warpVerifier) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return nil
 }
 
+func (*warpVerifier) RewardContinuousValidatorTx(*txs.RewardContinuousValidatorTx) error {
+	return nil
+}
+
 func (*warpVerifier) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	return nil
 }
@@ -120,6 +124,14 @@ func (w *warpVerifier) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) erro
 
 func (w *warpVerifier) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
 	return w.verify(tx.Message)
+}
+
+func (*warpVerifier) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	return nil
+}
+
+func (*warpVerifier) SetAutoRestakeConfigTx(*txs.SetAutoRestakeConfigTx) error {
+	return nil
 }
 
 func (w *warpVerifier) verify(message []byte) error {
