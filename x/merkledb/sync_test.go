@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -42,15 +40,12 @@ func Test_Creation(t *testing.T) {
 	ctx := t.Context()
 	syncer, err := sync.NewSyncer(
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(db, rangeProofMarshaler)),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(db, rangeProofMarshaler, changeProofMarshaler)),
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		ids.Empty,
+		sync.Config{},
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(db, rangeProofMarshaler)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(db, rangeProofMarshaler, changeProofMarshaler)),
+		rangeProofMarshaler,
+		changeProofMarshaler,
 	)
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -261,16 +256,12 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 			syncer, err := sync.NewSyncer(
 				db,
-				sync.Config[*RangeProof, *ChangeProof]{
-					RangeProofMarshaler:   rangeProofMarshaler,
-					ChangeProofMarshaler:  changeProofMarshaler,
-					RangeProofClient:      rangeProofClient,
-					ChangeProofClient:     changeProofClient,
-					TargetRoot:            syncRoot,
-					SimultaneousWorkLimit: 5,
-					Log:                   logging.NoLog{},
-				},
-				prometheus.NewRegistry(),
+				syncRoot,
+				sync.Config{},
+				rangeProofClient,
+				changeProofClient,
+				rangeProofMarshaler,
+				changeProofMarshaler,
 			)
 
 			require.NoError(err)
@@ -341,16 +332,12 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	defer cancel()
 	syncer, err := sync.NewSyncer(
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
-			TargetRoot:            syncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		syncRoot,
+		sync.Config{},
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
+		rangeProofMarshaler,
+		changeProofMarshaler,
 	)
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -367,16 +354,12 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	ctx = t.Context()
 	newSyncer, err := sync.NewSyncer(
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
-			TargetRoot:            syncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		syncRoot,
+		sync.Config{},
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
+		rangeProofMarshaler,
+		changeProofMarshaler,
 	)
 	require.NoError(err)
 	require.NotNil(newSyncer)
@@ -450,16 +433,12 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 	syncer, err = sync.NewSyncer(
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
-			TargetRoot:            firstSyncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		firstSyncRoot,
+		sync.Config{},
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
+		rangeProofMarshaler,
+		changeProofMarshaler,
 	)
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -507,16 +486,12 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	}, 0)
 	syncer, err = sync.NewSyncer(
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
-			TargetRoot:            root1,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		root1,
+		sync.Config{},
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
+		rangeProofMarshaler,
+		changeProofMarshaler,
 	)
 	require.NoError(err)
 

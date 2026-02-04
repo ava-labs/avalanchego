@@ -10,8 +10,87 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
+
+type emptyDB struct {
+	DB[struct{}, struct{}]
+}
+
+type emptyMarshaler struct {
+	Marshaler[struct{}]
+}
+
+func Test_SyncerInitialization(t *testing.T) {
+	db := &emptyDB{}
+	m := &emptyMarshaler{}
+	c := p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, p2p.NoOpHandler{})
+
+	tests := []struct {
+		name        string
+		init        func() (*Syncer[struct{}, struct{}], error)
+		expectedErr error
+	}{
+		{
+			name: "all good",
+			init: func() (*Syncer[struct{}, struct{}], error) {
+				return NewSyncer[struct{}, struct{}](db, ids.Empty, Config{}, c, c, m, m)
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "no database",
+			init: func() (*Syncer[struct{}, struct{}], error) {
+				return NewSyncer[struct{}, struct{}](nil, ids.Empty, Config{}, c, c, m, m)
+			},
+			expectedErr: ErrNoDatabaseProvided,
+		},
+		{
+			name: "no range proof marshaler",
+			init: func() (*Syncer[struct{}, struct{}], error) {
+				return NewSyncer[struct{}, struct{}](db, ids.Empty, Config{}, c, c, nil, m)
+			},
+			expectedErr: ErrNoRangeProofMarshalerProvided,
+		},
+		{
+			name: "no change proof marshaler",
+			init: func() (*Syncer[struct{}, struct{}], error) {
+				return NewSyncer[struct{}, struct{}](db, ids.Empty, Config{}, c, c, m, nil)
+			},
+			expectedErr: ErrNoChangeProofMarshalerProvided,
+		},
+		{
+			name: "no range proof client",
+			init: func() (*Syncer[struct{}, struct{}], error) {
+				return NewSyncer[struct{}, struct{}](db, ids.Empty, Config{}, nil, c, m, m)
+			},
+			expectedErr: ErrNoRangeProofClientProvided,
+		},
+		{
+			name: "no change proof client",
+			init: func() (*Syncer[struct{}, struct{}], error) {
+				return NewSyncer[struct{}, struct{}](db, ids.Empty, Config{}, c, nil, m, m)
+			},
+			expectedErr: ErrNoChangeProofClientProvided,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			syncer, err := tt.init()
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+				require.Nil(t, syncer)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, syncer)
+			}
+		})
+	}
+}
 
 func Test_Midpoint(t *testing.T) {
 	require := require.New(t)
