@@ -81,23 +81,12 @@ func TestSetAutoRestakeConfigTxSyntacticVerify(t *testing.T) {
 				autoRestakeShares := uint32(2_000_000)
 
 				return &SetAutoRestakeConfigTx{
-					BaseTx:               validBaseTx,
-					TxID:                 ids.GenerateTestID(),
-					AutoRestakeShares:    autoRestakeShares,
-					HasAutoRestakeShares: true,
+					BaseTx:            validBaseTx,
+					TxID:              ids.GenerateTestID(),
+					AutoRestakeShares: autoRestakeShares,
 				}
 			},
 			err: errTooManyRestakeShares,
-		},
-		{
-			name: "err no updated fields",
-			txFunc: func(*gomock.Controller) *SetAutoRestakeConfigTx {
-				return &SetAutoRestakeConfigTx{
-					BaseTx: validBaseTx,
-					TxID:   ids.GenerateTestID(),
-				}
-			},
-			err: errNoUpdatedFields,
 		},
 		{
 			name: "invalid BaseTx",
@@ -105,10 +94,9 @@ func TestSetAutoRestakeConfigTxSyntacticVerify(t *testing.T) {
 				autoRestakeShares := uint32(500_000)
 
 				return &SetAutoRestakeConfigTx{
-					BaseTx:               invalidBaseTx,
-					TxID:                 ids.GenerateTestID(),
-					AutoRestakeShares:    autoRestakeShares,
-					HasAutoRestakeShares: true,
+					BaseTx:            invalidBaseTx,
+					TxID:              ids.GenerateTestID(),
+					AutoRestakeShares: autoRestakeShares,
 				}
 			},
 			err: avax.ErrWrongNetworkID,

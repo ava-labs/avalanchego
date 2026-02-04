@@ -1665,12 +1665,10 @@ func (b *builder) NewSetAutoRestakeConfigTx(
 			Outs:         outputs,
 			Memo:         memo,
 		}},
-		TxID:                 txID,
-		Auth:                 auth,
-		AutoRestakeShares:    autoRestakeSharesVal,
-		HasAutoRestakeShares: autoRestakeShares != nil,
-		Period:               periodVal,
-		HasPeriod:            period != nil,
+		TxID:              txID,
+		Auth:              auth,
+		AutoRestakeShares: autoRestakeSharesVal,
+		Period:            periodVal,
 	}
 	return tx, b.initCtx(tx)
 }

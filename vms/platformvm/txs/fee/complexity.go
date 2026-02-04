@@ -235,6 +235,7 @@ var (
 			wrappers.LongLen + // weight
 			wrappers.IntLen + // auto-restake shares
 			wrappers.LongLen, // period
+		gas.DBRead:  2, // check current validator + check pending validator (duplicate check)
 		gas.DBWrite: 3, // put staker + write weight diff + write pk diff
 	}
 
@@ -244,9 +245,7 @@ var (
 			wrappers.IntLen + // auth typeID
 			wrappers.IntLen + // authCredential typeID
 			wrappers.IntLen + // auto-restake shares
-			wrappers.BoolLen + // has auto-restake shares
-			wrappers.LongLen + // period
-			wrappers.BoolLen, // has period
+			wrappers.LongLen, // period
 		gas.DBRead:  2, // read tx + read staker
 		gas.DBWrite: 1, // update staker
 	}
