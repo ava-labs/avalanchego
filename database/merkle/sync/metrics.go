@@ -5,13 +5,12 @@ package sync
 
 import (
 	"errors"
-	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
-	_ SyncMetrics = (*mockMetrics)(nil)
+	_ SyncMetrics = (*noopMetrics)(nil)
 	_ SyncMetrics = (*metrics)(nil)
 )
 
@@ -21,33 +20,11 @@ type SyncMetrics interface {
 	RequestSucceeded()
 }
 
-type mockMetrics struct {
-	lock              sync.Mutex
-	requestsFailed    int
-	requestsMade      int
-	requestsSucceeded int
-}
+type noopMetrics struct{}
 
-func (m *mockMetrics) RequestFailed() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.requestsFailed++
-}
-
-func (m *mockMetrics) RequestMade() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.requestsMade++
-}
-
-func (m *mockMetrics) RequestSucceeded() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.requestsSucceeded++
-}
+func (noopMetrics) RequestFailed()    {}
+func (noopMetrics) RequestMade()      {}
+func (noopMetrics) RequestSucceeded() {}
 
 type metrics struct {
 	requestsFailed    prometheus.Counter
@@ -56,6 +33,9 @@ type metrics struct {
 }
 
 func NewMetrics(namespace string, reg prometheus.Registerer) (SyncMetrics, error) {
+	if reg == nil {
+		return noopMetrics{}, nil
+	}
 	m := metrics{
 		requestsFailed: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
