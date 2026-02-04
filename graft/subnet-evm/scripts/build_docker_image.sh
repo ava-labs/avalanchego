@@ -13,19 +13,21 @@ set -euo pipefail
 # Reference: https://docs.docker.com/build/building/multi-platform/
 PLATFORMS="${PLATFORMS:-}"
 
-# If set to non-empty, the image will be published to the registry
+# If set to non-empty, the image will be published to the registry.
 PUBLISH="${PUBLISH:-}"
 
+# Directory above this script
 SUBNET_EVM_PATH=$(
   cd "$(dirname "${BASH_SOURCE[0]}")"
   cd .. && pwd
 )
 
-# shellcheck source=graft/subnet-evm/scripts/constants.sh disable=SC1091
+# Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
-# Tag the image as 'latest' if set to true and building from master branch.
-# Prevents manual builds with older versions from being tagged as latest.
+# ALLOW_TAG_LATEST is used to tag the image as 'latest' if set to true.
+# It only works if the image is built from the master branch. This is to avoid
+# tagging images from a manual triggered build as 'latest' with older avalanchego versions.
 ALLOW_TAG_LATEST="${ALLOW_TAG_LATEST:-}"
 
 # buildx (BuildKit) improves the speed and UI of builds over the legacy builder and
@@ -33,51 +35,53 @@ ALLOW_TAG_LATEST="${ALLOW_TAG_LATEST:-}"
 #
 # Reference: https://docs.docker.com/build/buildkit/
 DOCKER_CMD="docker buildx build"
-push=0
+ispush=0
 if [[ -n "${PUBLISH}" ]]; then
   echo "Pushing $IMAGE_NAME:$BUILD_IMAGE_ID"
-  push=1
+  ispush=1
   # A populated DOCKER_USERNAME env var triggers login
   if [[ -n "${DOCKER_USERNAME:-}" ]]; then
     echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
   fi
 fi
 
+# Build a specified platform image if requested
 if [[ -n "${PLATFORMS}" ]]; then
   DOCKER_CMD="${DOCKER_CMD} --platform=${PLATFORMS}"
-  # Multi-arch images must be pushed to a registry
-  if [[ "$PLATFORMS" == *,* ]]; then
+  if [[ "$PLATFORMS" == *,* ]]; then ## Multi-arch
     if [[ "${IMAGE_NAME}" != *"/"* ]]; then
       echo "ERROR: Multi-arch images (multi-platform) must be pushed to a registry."
       exit 1
     fi
-    push=1
+    ispush=1
   fi
 fi
 
-if [[ $push -eq 1 ]]; then
+if [[ $ispush -eq 1 ]]; then
   DOCKER_CMD="${DOCKER_CMD} --push"
 else
+  ## Single arch
+  #
   # Building a single-arch image with buildx and having the resulting image show up
   # in the local store of docker images (ala 'docker build') requires explicitly
   # loading it from the buildx store with '--load'.
   DOCKER_CMD="${DOCKER_CMD} --load"
 fi
 
-VM_ID="${VM_ID:-${DEFAULT_VM_ID}}"
+VM_ID=${VM_ID:-"${DEFAULT_VM_ID}"}
 
-# Default to the release image. Override when testing against unreleased versions.
+# Default to the release image. Will need to be overridden when testing against unreleased versions.
 AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_NODE_IMAGE:-${AVALANCHEGO_IMAGE_NAME}:${image_tag}}"
 
-# Build the avalanchego image if it cannot be pulled. This usually happens when
-# the version is not yet merged since the image is published post-merge.
+# Build the avalanchego image if it cannot be pulled. This will usually be due to
+# image_tag being not yet merged since the image is published post-merge.
 if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
   # Build a multi-arch avalanchego image if the subnet-evm image build is multi-arch
   BUILD_MULTI_ARCH="$([[ "$PLATFORMS" =~ , ]] && echo 1 || echo "")"
 
-  # Use an image name without a repository (i.e. without 'avaplatform/' prefix) to build a
-  # local single-arch image that will not be pushed.
-  # Use an image name with a repository to build a multi-arch image that will be pushed.
+  # - Use a image name without a repository (i.e. without 'avaplatform/' prefix ) to build a
+  #   local single-arch image that will not be pushed.
+  # - Use a image name with a repository to build a multi-arch image that will be pushed.
   AVALANCHEGO_LOCAL_IMAGE_NAME="${AVALANCHEGO_LOCAL_IMAGE_NAME:-avalanchego}"
 
   if [[ -n "${BUILD_MULTI_ARCH}" && "${AVALANCHEGO_LOCAL_IMAGE_NAME}" != *"/"* ]]; then
@@ -88,21 +92,22 @@ if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
   AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}:${image_tag}"
   echo "Building ${AVALANCHEGO_NODE_IMAGE} locally"
 
+  AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
   SKIP_BUILD_RACE=1 \
     DOCKER_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}" \
     BUILD_MULTI_ARCH="${BUILD_MULTI_ARCH}" \
-    "${SUBNET_EVM_PATH}"/../../scripts/build_image.sh
+    "${AVALANCHE_PATH}"/scripts/build_image.sh
 fi
 
 # Use head -1 because go workspaces list multiple modules; CI validates
 # all modules use the same Go version.
 GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 
+echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based of AvalancheGo@$image_tag"
 # Use repo root as context so Dockerfile can access graft/ directory
-echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based on AvalancheGo@$image_tag"
-# shellcheck disable=SC2154
+AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
 ${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${commit_hash}" \
-  "${SUBNET_EVM_PATH}/../.." -f "$SUBNET_EVM_PATH/Dockerfile" \
+  "$AVALANCHE_PATH" -f "$SUBNET_EVM_PATH/Dockerfile" \
   --build-arg GO_VERSION="${GO_VERSION}" \
   --build-arg AVALANCHEGO_NODE_IMAGE="$AVALANCHEGO_NODE_IMAGE" \
   --build-arg SUBNET_EVM_COMMIT="$git_commit" \
