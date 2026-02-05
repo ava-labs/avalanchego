@@ -188,6 +188,20 @@ func TestProportionalAmount(t *testing.T) {
 			expectedErr: true,
 		},
 		{
+			name:        "amount is zero",
+			amount:      0,
+			numerator:   4,
+			denominator: 50,
+			expected:    0,
+		},
+		{
+			name:        "numerator is zero",
+			amount:      250,
+			numerator:   0,
+			denominator: 50,
+			expected:    0,
+		},
+		{
 			name:        "basic case 1",
 			amount:      100,
 			numerator:   3,
