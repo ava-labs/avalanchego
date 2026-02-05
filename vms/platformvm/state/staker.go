@@ -132,7 +132,7 @@ func (s *Staker) ValidateMutation(ms *Staker) error {
 	return nil
 }
 
-func (s Staker) immutableFieldsAreUnmodified(ms *Staker) bool {
+func (s *Staker) immutableFieldsAreUnmodified(ms *Staker) bool {
 	publicKeysEqual := (s.PublicKey == nil && ms.PublicKey == nil) ||
 		(s.PublicKey != nil && s.PublicKey.Equals(ms.PublicKey))
 
