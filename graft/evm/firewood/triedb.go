@@ -142,6 +142,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		ffi.WithFreeListCacheEntries(config.FreeListCacheEntries),
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithReadCacheStrategy(config.CacheStrategy),
+		ffi.WithDeferredPersistenceCommitCount(4096),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())
