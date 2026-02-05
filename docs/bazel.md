@@ -22,7 +22,63 @@ task bazel-gazelle-generate
 task bazel-clean
 ```
 
+## Why Bazel?
+
+1. **Hermetic builds** - Reproducible builds regardless of host environment
+2. **Incremental compilation** - Only rebuild what changed
+3. **Parallel execution** - Efficient use of multi-core systems
+4. **Caching** - Local and remote build caching
+5. **Multi-language** - Single build system for Go, Solidity, Rust, protobuf, etc.
+
 ## Architecture Overview
+
+### Toolchain Strategy
+
+The build uses `go_sdk.download()` to download a specific Go version,
+ensuring reproducible builds without requiring a Nix shell:
+
+```python
+go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.24.12")
+```
+
+**Approaches considered:**
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| `go_sdk.download()` (chosen) | Reproducible, no nix required for builds | Go version must be synced manually across go.mod files |
+| `go_sdk.host()` | Single source of truth via nix | Requires nix shell, not hermetic outside nix |
+| `rules_nixpkgs_go` | Bazel calls Nix directly, fully hermetic | **Incompatible with rules_go v0.56+** (toolchain API mismatch) |
+
+> **Note:** rules_nixpkgs_go v0.13.0 was attempted but is incompatible
+> with rules_go v0.56.0+. The rules_go toolchain API changed to require
+> a `pack` attribute that rules_nixpkgs_go doesn't provide.
+> See: https://github.com/tweag/rules_nixpkgs/issues/667
+
+### Version Pinning
+
+| Tool | Version | Pin Mechanism | Rationale |
+|------|---------|---------------|-----------|
+| Bazel | 8.0.1 | `.bazelversion` + bazelisk | Current LTS with native bzlmod support |
+| Go | 1.24.12 | `MODULE.bazel` go_sdk.download | Project requirement |
+| rules_go | 0.56.0 | `MODULE.bazel` | **Critical**: Last version supporting Go 1.24.x |
+| gazelle | 0.45.0 | `MODULE.bazel` | Compatible with rules_go 0.56.0 |
+
+**Go 1.25 upgrade note:** Go 1.25 removed the `pack` tool from the Go
+distribution, which rules_go v0.56.x relies on. When upgrading to Go
+1.25+, also upgrade rules_go to v0.57.0+ (which no longer depends on
+external `pack`).
+
+### Why Bazel 8?
+
+| Factor | Bazel 7 | Bazel 8 |
+|--------|---------|---------|
+| bzlmod | Optional | Default |
+| LTS status | Older | Current |
+| WORKSPACE | Default | Deprecated (still works) |
+
+Bazel 8 is the current LTS with native bzlmod support. This repository
+uses pure bzlmod (MODULE.bazel) without WORKSPACE files.
 
 ### Multi-Module Structure
 
@@ -39,6 +95,65 @@ Each module has its own `go.mod` with `replace` directives pointing to
 sibling modules. Bazel handles cross-module imports via `go.work` and
 gazelle prefix directives.
 
+### CGO Dependencies
+
+Several dependencies require special handling for CGO compilation in
+Bazel's sandboxed environment.
+
+#### blst (BLS Signatures)
+
+**Problem:** Complex CGO with assembly files that gazelle cannot handle.
+
+**Solution:** Disable gazelle and use a custom BUILD file via patch:
+```python
+go_deps.gazelle_override(build_file_generation = "off", path = "github.com/supranational/blst")
+go_deps.module_override(patches = ["//.bazel/patches:com_github_supranational_blst.patch"], ...)
+```
+
+The patch is based on [Prysm's blst.BUILD](https://github.com/prysmaticlabs/prysm/blob/develop/third_party/blst/blst.BUILD).
+BLS signatures are performance-critical for Avalanche consensus.
+
+#### gnark-crypto (BLS12-381 for KZG)
+
+**Problem:** Assembly files use cross-package `#include` directives:
+```asm
+#include "../../../field/asm/element_4w/element_4w_arm64.s"
+```
+Bazel's sandboxed builds don't allow relative includes across package boundaries.
+
+**Solution:** Patch assembly files to convert `.s` includes to `.h` includes,
+allowing them to work within Bazel's sandbox:
+```python
+go_deps.module_override(
+    patches = ["//.bazel/patches:com_github_consensys_gnark_crypto_asm_includes.patch"],
+    path = "github.com/consensys/gnark-crypto",
+)
+```
+
+**Dependency chain:**
+```
+avalanchego → libevm → kzg4844 → go-kzg-4844 → gnark-crypto
+```
+
+gnark-crypto is used for KZG blob commitments (EIP-4844).
+
+#### libevm (secp256k1)
+
+**Problem:** Gazelle-generated BUILD file doesn't include libsecp256k1 C sources.
+
+**Solution:** Patch to add textual headers for the C sources and exclude
+the directory from gazelle:
+```python
+go_deps.gazelle_override(directives = ["gazelle:exclude crypto/secp256k1/**"], path = "github.com/ava-labs/libevm")
+```
+
+#### firewood-go-ethhash FFI
+
+**Problem:** Pre-built static libraries with `-L` paths that don't work
+in Bazel's sandbox.
+
+**Solution:** Patch to use `cc_import` for proper static library linking.
+
 ### Key Configuration Files
 
 | File | Purpose | Safe to Delete? |
@@ -47,9 +162,11 @@ gazelle prefix directives.
 | `MODULE.bazel.lock` | Locked dependency versions | Yes (regenerated) |
 | `.bazelrc` | Bazel build flags and settings | **No** |
 | `.bazelignore` | Directories excluded from Bazel (`.direnv`) | **No** |
+| `.bazelversion` | Bazel version pin (used by bazelisk) | **No** |
 | `BUILD.bazel` (root) | Gazelle config: prefix, exclusions (`tools/`), proto disable | **No** |
 | `.bazel/patches/*.patch` | Fixes for external dependencies | **No** |
 | `.bazel/defs.bzl` | Custom test macros for graft module timeouts | **No** |
+| `scripts/bazel_workspace_status.sh` | Git commit stamping for releases | **No** |
 
 ### BUILD.bazel Files with Custom Content
 
@@ -337,10 +454,35 @@ task bazel-gazelle-generate
 Check `.bazelrc` for required CGO flags. CGO is enabled via
 `--action_env=CGO_ENABLED=1`.
 
+If you see errors related to CGO dependencies (blst, gnark-crypto,
+secp256k1), verify that:
+1. Patches in `.bazel/patches/` are applied correctly in `MODULE.bazel`
+2. The `gazelle_override` with `build_file_generation = "off"` is set
+   for packages with custom BUILD files
+
+### gnark-crypto assembly errors
+
+If you see errors like:
+```
+#include: open /field/asm/element_4w/element_4w_arm64.s: no such file or directory
+```
+
+This indicates the gnark-crypto assembly patch isn't being applied. Check:
+1. The patch file exists: `.bazel/patches/com_github_consensys_gnark_crypto_asm_includes.patch`
+2. `MODULE.bazel` has the `module_override` applying the patch
+3. Try `task bazel-clean-all` to clear cached BUILD files
+
 ### Build cache issues
 
+Try a full cache clean:
 ```bash
 task bazel-clean-all
+```
+
+If builds still fail after cleaning, check if `MODULE.bazel.lock` needs regenerating:
+```bash
+rm MODULE.bazel.lock
+task bazel-mod-tidy
 ```
 
 ### "duplicate target" errors
@@ -384,17 +526,32 @@ bazel build //main:avalanchego                    # Dev build (no stamp, cached)
 bazel build --config=release //main:avalanchego   # Release build (stamped)
 ```
 
+## Known Limitations
+
+1. **Go/rules_go version coupling** - Upgrading to Go 1.25+ requires
+   also upgrading rules_go to v0.57.0+ (see Version Pinning section)
+
+2. **gnark-crypto assembly patches** - The assembly include patches need
+   maintenance when upgrading gnark-crypto versions
+
+3. **Manual Go version sync** - Go version must be kept in sync across:
+   - `MODULE.bazel` (`go_sdk.download(version = "...")`)
+   - `go.mod` files
+   - `nix/go/default.nix` (if using nix shell)
+
 ## Future Improvements
 
 The following improvements are planned or under consideration:
 
-### Remote Caching
+### Remote Caching and Execution
 
-Currently only local disk cache is configured
-(`~/.cache/bazel-disk-cache`). Remote caching would enable:
+Remote caching would enable:
 - Cache sharing between CI runs
 - Faster builds for new team members
 - Cross-machine cache reuse
+
+`go_sdk.download()` enables remote execution since the Go toolchain is
+hermetic and reproducible.
 
 Implementation: Add BuildBuddy, Buildkite or similar remote cache service.
 
@@ -405,22 +562,12 @@ Implementation: Add BuildBuddy, Buildkite or similar remote cache service.
 - **Retain non-Bazel coverage** - Keep traditional `go build` CI jobs
   to support third-party consumers who don't use Bazel
 
-### gnark-crypto Assembly Handling
-
-gnark-crypto uses Go assembly with relative `#include` paths, which do
-not work in Bazel sandboxes. A patch in `.bazel/patches/` rewrites those
-includes so the asm can build under Bazel.
-
-Potential follow-ups:
-- Upstream the include-path fix to consensys/gnark-crypto
-- Drop the patch once upstream releases a Bazel-compatible layout
-
 ### Patch Maintenance
 
 External dependency patches in `.bazel/patches/` should be reviewed periodically:
 - Check if upstream projects have improved Bazel support
 - Test patches against dependency updates
-- Consider upstreaming BUILD files where feasible
+- Consider upstreaming BUILD files where feasible (especially gnark-crypto)
 
 ### Test Configuration
 
