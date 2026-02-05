@@ -33,6 +33,7 @@ const (
 	initialRetryWait            = 10 * time.Millisecond
 	maxRetryWait                = time.Second
 	retryWaitFactor             = 1.5 // Larger --> timeout grows more quickly
+	logInterval                 = time.Minute
 )
 
 var (
@@ -259,6 +260,8 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 		s.workLock.Unlock()
 	}()
 
+	go s.logProgress()
+
 	// Keep doing work until we're closed, done or [ctx] is canceled.
 	s.workLock.Lock()
 	for {
@@ -285,6 +288,24 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 			s.processingWorkItems++
 			work := s.unprocessedWork.GetWork()
 			go s.doWork(ctx, work)
+		}
+	}
+}
+
+func (s *Syncer[_, _]) logProgress() {
+	ticker := time.NewTicker(logInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.doneChan:
+			return
+		case <-ticker.C:
+			s.workLock.Lock()
+			root := s.getTargetRoot()
+			percentage := s.unprocessedWork.Status(root)
+			s.workLock.Unlock()
+			s.config.Log.Info("syncing progress", zap.Float64("percent complete", percentage), zap.Stringer("target root", root))
 		}
 	}
 }
