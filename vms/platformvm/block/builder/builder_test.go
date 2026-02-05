@@ -12,6 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -621,6 +623,108 @@ func TestGetNextStakerToReward(t *testing.T) {
 			}
 			require.Equal(tt.expectedTxID, txID)
 			require.Equal(tt.expectedShouldReward, shouldReward)
+		})
+	}
+}
+
+func TestNewRewardTxForStaker(t *testing.T) {
+	var (
+		networkID = uint32(1337)
+		chainID   = ids.GenerateTestID()
+	)
+
+	ctx := &snow.Context{
+		ChainID:   chainID,
+		NetworkID: networkID,
+	}
+
+	validBaseTx := txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		},
+	}
+
+	blsSK, err := localsigner.New()
+	require.NoError(t, err)
+
+	blsPOP, err := signer.NewProofOfPossession(blsSK)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		stakerTxFunc   func(require *require.Assertions) *txs.Tx
+		timestamp      time.Time
+		expectedTxType any
+	}{
+		{
+			name: "continuous staker returns RewardContinuousValidatorTx",
+			stakerTxFunc: func(require *require.Assertions) *txs.Tx {
+				utx := &txs.AddContinuousValidatorTx{
+					BaseTx:                validBaseTx,
+					ValidatorNodeID:       ids.GenerateTestNodeID(),
+					Period:                1,
+					Wght:                  2,
+					Signer:                blsPOP,
+					StakeOuts:             []*avax.TransferableOutput{},
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+					DelegationShares:      reward.PercentDenominator,
+					ConfigOwner:           &secp256k1fx.OutputOwners{},
+				}
+
+				tx, err := txs.NewSigned(utx, txs.Codec, nil)
+				require.NoError(err)
+				return tx
+			},
+			timestamp:      time.Unix(1000, 0),
+			expectedTxType: &txs.RewardContinuousValidatorTx{},
+		},
+		{
+			name: "fixed staker returns RewardValidatorTx",
+			stakerTxFunc: func(require *require.Assertions) *txs.Tx {
+				utx := &txs.AddPermissionlessValidatorTx{
+					BaseTx: validBaseTx,
+					Validator: txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						End:    uint64(time.Now().Add(time.Hour).Unix()),
+						Wght:   2,
+					},
+					Subnet:                ids.GenerateTestID(),
+					Signer:                blsPOP,
+					StakeOuts:             []*avax.TransferableOutput{},
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+					DelegationShares:      reward.PercentDenominator,
+				}
+
+				tx, err := txs.NewSigned(utx, txs.Codec, nil)
+				require.NoError(err)
+				return tx
+			},
+			timestamp:      time.Unix(1000, 0),
+			expectedTxType: &txs.RewardValidatorTx{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			stakerTx := tt.stakerTxFunc(require)
+
+			rewardTx, err := NewRewardTxForStaker(ctx, stakerTx, tt.timestamp)
+			require.NoError(err)
+			require.NotNil(rewardTx)
+			require.IsType(tt.expectedTxType, rewardTx.Unsigned)
+
+			switch utx := rewardTx.Unsigned.(type) {
+			case *txs.RewardContinuousValidatorTx:
+				require.Equal(stakerTx.ID(), utx.TxID)
+				require.Equal(uint64(tt.timestamp.Unix()), utx.Timestamp)
+			case *txs.RewardValidatorTx:
+				require.Equal(stakerTx.ID(), utx.TxID)
+			}
 		})
 	}
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -174,6 +175,16 @@ func NewContinuousStaker(
 	}
 
 	endTime := startTime.Add(continuationPeriod)
+
+	weight, err := math.Add(staker.Weight(), accruedRewards)
+	if err != nil {
+		return nil, err
+	}
+	weight, err = math.Add(weight, accruedDelegateeRewards)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Staker{
 		Validator: Validator{
 			DelegateeReward: delegateeReward,
@@ -188,7 +199,7 @@ func NewContinuousStaker(
 		NodeID:          staker.NodeID(),
 		PublicKey:       publicKey,
 		SubnetID:        staker.SubnetID(),
-		Weight:          staker.Weight() + accruedRewards + accruedDelegateeRewards,
+		Weight:          weight,
 		StartTime:       startTime,
 		EndTime:         endTime,
 		PotentialReward: potentialReward,
