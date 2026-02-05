@@ -111,7 +111,16 @@ jobs:
           # echo "==> gh CLI version:"
           # gh --version
 
-          echo "==> Testing gh exit code on HTTP 422 error:"
+          echo "==> Testing gh exit code on HTTP error:"
+          if ! command -v gh &> /dev/null; then
+            echo "gh CLI not installed - installing..."
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt-get update
+            sudo apt-get install gh -y
+          fi
+
+          echo "gh version: $(gh --version | head -1)"
           set +e  # Temporarily disable errexit to capture exit code
           output=$(gh workflow run non-existent-workflow.yml 2>&1)
           exit_code=$?
