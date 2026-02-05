@@ -1993,6 +1993,8 @@ func (s *state) loadCurrentValidators() error {
 				metadata.AutoRestakeShares,
 				time.Duration(metadata.ContinuationPeriod)*time.Second,
 			)
+		default:
+			return fmt.Errorf("unknown staker tx type %T", tTx)
 		}
 		if err != nil {
 			return err
@@ -2750,7 +2752,6 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				weightDiff: weightDiff,
 			}
 			if pk != nil {
-				//	I think both [prevPublicKey] and [newPublicKey] will by [pkBytes]
 				pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 				if diff.validatorStatus != added {
 					change.prevPublicKey = pkBytes
