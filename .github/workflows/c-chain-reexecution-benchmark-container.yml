@@ -99,16 +99,22 @@ jobs:
           echo "==> Shell options (should show 'on' for errexit, pipefail, nounset):"
           set -o | grep -E "errexit|pipefail|nounset"
 
-          errexit=$(set -o | grep errexit | awk '{print $2}')
-          pipefail=$(set -o | grep pipefail | awk '{print $2}')
+          # Use pattern matching to be robust against different whitespace formats
+          errexit_line=$(set -o | grep "^errexit")
+          pipefail_line=$(set -o | grep "^pipefail")
 
-          if [[ "$errexit" != "on" ]] || [[ "$pipefail" != "on" ]]; then
+          if [[ "$errexit_line" == *on* ]] && [[ "$pipefail_line" == *on* ]]; then
+            echo "==> Verified: errexit and pipefail are enabled"
+            echo "If a command prints an error but script continues, the command returned exit code 0."
+          else
             echo "::error::Shell error handling not configured correctly"
+            echo "errexit_line: '$errexit_line'"
+            echo "pipefail_line: '$pipefail_line'"
             exit 1
           fi
 
-          echo "==> Verified: errexit=$errexit, pipefail=$pipefail"
-          echo "If a command prints an error but script continues, the command returned exit code 0."
+          echo "==> gh CLI version:"
+          gh --version
       - name: Install ARC Dependencies
         shell: bash
         run: |
