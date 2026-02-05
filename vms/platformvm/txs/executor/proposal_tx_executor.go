@@ -468,20 +468,12 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	}
 
 	// Provide the accrued delegatee rewards from successful delegations here.
-	delegateeReward, err := e.onCommitState.GetDelegateeReward(
-		validator.SubnetID,
-		validator.NodeID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
-	}
-
-	if delegateeReward == 0 {
+	if validator.DelegateeReward == 0 {
 		return nil
 	}
 
 	delegationRewardsOwner := uValidatorTx.DelegationRewardsOwner()
-	outIntf, err := e.backend.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+	outIntf, err := e.backend.Fx.CreateOutput(validator.DelegateeReward, delegationRewardsOwner)
 	if err != nil {
 		return fmt.Errorf("failed to create output: %w", err)
 	}
@@ -599,28 +591,24 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 
 	// Reward the delegatee here
 	if e.backend.Config.UpgradeConfig.IsCortinaActivated(validator.StartTime) {
-		previousDelegateeReward, err := e.onCommitState.GetDelegateeReward(
-			validator.SubnetID,
-			validator.NodeID,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to get delegatee reward: %w", err)
-		}
-
 		// Invariant: The rewards calculator can never return a
 		//            [potentialReward] that would overflow the
 		//            accumulated rewards.
-		newDelegateeReward := previousDelegateeReward + delegateeReward
+		newDelegateeReward, err := math.Add(validator.DelegateeReward, delegateeReward)
+		if err != nil {
+			return err
+		}
+
+		// Make a copy to avoid mutating the shared parent state object.
+		// The commit and abort states share the same parent, so modifying
+		// the validator directly would affect both states.
+		validatorCopy := *validator
 
 		// For any validators starting after [CortinaTime], we defer rewarding the
 		// [reward] until their staking period is over.
-		err = e.onCommitState.SetDelegateeReward(
-			validator.SubnetID,
-			validator.NodeID,
-			newDelegateeReward,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to update delegatee reward: %w", err)
+		validatorCopy.DelegateeReward = newDelegateeReward
+		if err := e.onCommitState.UpdateCurrentValidator(&validatorCopy); err != nil {
+			return err
 		}
 	} else {
 		// For any validators who started prior to [CortinaTime], we issue the

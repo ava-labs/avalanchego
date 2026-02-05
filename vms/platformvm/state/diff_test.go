@@ -1206,3 +1206,86 @@ func TestDiffUpdateValidator(t *testing.T) {
 		actualStakers,
 	)
 }
+
+func TestDiffResetContinuousValidatorCycle(t *testing.T) {
+	require := require.New(t)
+
+	subnetID := ids.GenerateTestID()
+
+	state := newTestState(t, memdb.New())
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+
+	blsKey, err := localsigner.New()
+	require.NoError(err)
+
+	continuousValidator := &Staker{
+		ContinuousValidator: ContinuousValidator{
+			AccruedRewards:          10,
+			AccruedDelegateeRewards: 5,
+			AutoRestakeShares:       100_000,
+			ContinuationPeriod:      14 * 24 * time.Hour,
+		},
+		TxID:            ids.GenerateTestID(),
+		NodeID:          ids.GenerateTestNodeID(),
+		PublicKey:       blsKey.PublicKey(),
+		SubnetID:        subnetID,
+		Weight:          10,
+		StartTime:       time.Unix(1, 0),
+		EndTime:         time.Unix(2, 0),
+		PotentialReward: 100,
+		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
+	}
+	require.NoError(d.PutCurrentValidator(continuousValidator))
+
+	err = d.ResetContinuousValidatorCycle(
+		continuousValidator,
+		continuousValidator.Weight-1,
+		continuousValidator.PotentialReward,
+		continuousValidator.AccruedRewards,
+		continuousValidator.AccruedDelegateeRewards,
+	)
+	require.ErrorIs(err, ErrInvalidStakerMutation)
+
+	newWeight := continuousValidator.Weight + 10
+	newPotentialReward := continuousValidator.PotentialReward + 15
+	newAccruedRewards := continuousValidator.AccruedRewards + 20
+	newAccruedDelegateeRewards := continuousValidator.AccruedDelegateeRewards + 25
+
+	expectedStartTime := continuousValidator.EndTime
+	expectedEndTime := continuousValidator.EndTime.Add(continuousValidator.ContinuationPeriod)
+	require.NoError(
+		d.ResetContinuousValidatorCycle(
+			continuousValidator,
+			newWeight,
+			newPotentialReward,
+			newAccruedRewards,
+			newAccruedDelegateeRewards,
+		),
+	)
+
+	continuousValidator, err = d.GetCurrentValidator(subnetID, continuousValidator.NodeID)
+	require.NoError(err)
+
+	require.Equal(newWeight, continuousValidator.Weight)
+	require.Equal(newPotentialReward, continuousValidator.PotentialReward)
+	require.Equal(newAccruedRewards, continuousValidator.AccruedRewards)
+	require.Equal(newAccruedDelegateeRewards, continuousValidator.AccruedDelegateeRewards)
+	require.Equal(expectedStartTime, continuousValidator.StartTime)
+	require.Equal(expectedEndTime, continuousValidator.EndTime)
+	require.Equal(expectedEndTime, continuousValidator.NextTime)
+
+	updatedValidator := *continuousValidator
+	updatedValidator.ContinuationPeriod = 0
+
+	require.NoError(d.UpdateCurrentValidator(&updatedValidator))
+
+	err = d.ResetContinuousValidatorCycle(
+		&updatedValidator,
+		newWeight,
+		newPotentialReward,
+		newAccruedRewards,
+		newAccruedDelegateeRewards,
+	)
+	require.ErrorIs(err, errContinuationPeriodIsZero, err)
+}
