@@ -136,6 +136,27 @@ func TestBaseStakersUpdateValidator(t *testing.T) {
 	require.Equal(&mutatedStaker, returnedStaker)
 }
 
+func TestBaseStakersUpdateValidatorBTreeOrdering(t *testing.T) {
+	require := require.New(t)
+
+	v := newBaseStakers()
+	staker := newTestStaker(t)
+
+	v.PutValidator(staker)
+
+	// Update with different NextTime (which is used in Staker.Less comparison)
+	mutatedStaker := *staker
+	mutatedStaker.NextTime = staker.NextTime.Add(time.Hour)
+	mutatedStaker.Weight = staker.Weight + 10
+	v.UpdateValidator(&mutatedStaker)
+
+	// Verify only one staker exists in the btree (not two)
+	stakerIterator := v.GetStakerIterator()
+	stakers := iterator.ToSlice(stakerIterator)
+	require.Len(stakers, 1)
+	require.Equal(&mutatedStaker, stakers[0])
+}
+
 func TestBaseStakersDelegator(t *testing.T) {
 	require := require.New(t)
 	staker := newTestStaker(t)
@@ -282,6 +303,32 @@ func TestDiffStakersDeleteValidator(t *testing.T) {
 	})
 }
 
+func TestDiffStakersUpdateValidatorBTreeOrdering(t *testing.T) {
+	require := require.New(t)
+
+	v := diffStakers{}
+	staker := newTestStaker(t)
+
+	require.NoError(v.PutValidator(staker))
+
+	// Update with different NextTime (which is used in Staker.Less comparison)
+	mutatedStaker := *staker
+	mutatedStaker.NextTime = staker.NextTime.Add(time.Hour)
+	mutatedStaker.Weight = staker.Weight + 10
+	v.UpdateValidator(staker, &mutatedStaker)
+
+	// Verify only one staker exists in addedOrModifiedStakers (not two)
+	stakerIterator := v.GetStakerIterator(iterator.Empty[*Staker]{})
+	stakers := iterator.ToSlice(stakerIterator)
+	require.Len(stakers, 1)
+	require.Equal(&mutatedStaker, stakers[0])
+
+	// Also verify GetValidator returns the updated staker
+	returnedStaker, status := v.GetValidator(staker.SubnetID, staker.NodeID)
+	require.Equal(added, status)
+	require.Equal(&mutatedStaker, returnedStaker)
+}
+
 func TestDiffStakersGetStakerIterator(t *testing.T) {
 	require := require.New(t)
 
@@ -354,12 +401,10 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 	delegator.SubnetID = staker.SubnetID
 	delegator.NodeID = staker.NodeID
 
-	mutatedStaker := *staker
-	mutatedStaker.Weight += 10
-
 	v := newBaseStakers()
 
 	{
+		// Add validator
 		v.PutValidator(staker)
 		diffValidator := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
 		weightDiff, err := diffValidator.WeightDiff()
@@ -367,32 +412,32 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 		require.NoError(err)
 		require.False(weightDiff.Decrease)
 		require.Equal(staker.Weight, weightDiff.Amount)
-	}
 
-	{
+		// Add delegator
 		v.PutDelegator(delegator)
-		diffValidator := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-		weightDiff, err := diffValidator.WeightDiff()
+		diffValidator = v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+		weightDiff, err = diffValidator.WeightDiff()
 
 		require.NoError(err)
 		require.False(weightDiff.Decrease)
 		require.Equal(staker.Weight+delegator.Weight, weightDiff.Amount)
-	}
 
-	{
+		// Update validator (increase weight)
+		mutatedStaker := *staker
+		mutatedStaker.Weight += 10
+
 		v.UpdateValidator(&mutatedStaker)
-		diffValidator := v.getOrCreateValidatorDiff(mutatedStaker.SubnetID, mutatedStaker.NodeID)
-		weightDiff, err := diffValidator.WeightDiff()
+		diffValidator = v.getOrCreateValidatorDiff(mutatedStaker.SubnetID, mutatedStaker.NodeID)
+		weightDiff, err = diffValidator.WeightDiff()
 
 		require.NoError(err)
 		require.False(weightDiff.Decrease)
 		require.Equal(mutatedStaker.Weight+delegator.Weight, weightDiff.Amount)
-	}
 
-	{
+		// Delete delegator
 		v.DeleteDelegator(delegator)
-		diffValidator := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-		weightDiff, err := diffValidator.WeightDiff()
+		diffValidator = v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+		weightDiff, err = diffValidator.WeightDiff()
 
 		require.NoError(err)
 		require.False(weightDiff.Decrease)
@@ -402,9 +447,14 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 	maps.Clear(v.validatorDiffs)
 
 	{
+		// Delegate delegator
+		delegator := newTestStaker(t)
+		delegator.SubnetID = staker.SubnetID
+		delegator.NodeID = staker.NodeID
+
 		v.DeleteDelegator(delegator)
 
-		diffValidator := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+		diffValidator := v.getOrCreateValidatorDiff(delegator.SubnetID, delegator.NodeID)
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
@@ -413,6 +463,7 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 	}
 
 	{
+		// Delete validator
 		v.DeleteValidator(staker)
 
 		diffValidator := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
@@ -424,29 +475,58 @@ func TestBaseStakersWeightDiff(t *testing.T) {
 	}
 
 	{
-		staker = newTestStaker(t)
-		v.PutValidator(staker)
-		v.DeleteValidator(staker)
-
-		diffValidator := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-		weightDiff, err := diffValidator.WeightDiff()
-
-		require.NoError(err)
-		require.True(weightDiff.Decrease)
-		require.Equal(staker.Weight, weightDiff.Amount)
-	}
-
-	{
+		// Put, update and delete validator
 		staker = newTestStaker(t)
 		v.PutValidator(staker)
 
 		mutatedStaker := *staker
 		mutatedStaker.Weight += 10
-		v.UpdateValidator(staker)
-		v.DeleteValidator(staker)
+		v.UpdateValidator(&mutatedStaker)
 
 		diffValidator := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
 		weightDiff, err := diffValidator.WeightDiff()
+
+		require.NoError(err)
+		require.False(weightDiff.Decrease)
+		require.Equal(mutatedStaker.Weight, weightDiff.Amount)
+
+		v.DeleteValidator(&mutatedStaker)
+
+		diffValidator = v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+		weightDiff, err = diffValidator.WeightDiff()
+
+		require.NoError(err)
+		require.Equal(uint64(0), weightDiff.Amount)
+	}
+
+	{
+		// Put and update validator
+		staker = newTestStaker(t)
+		v.PutValidator(staker)
+
+		mutatedStaker := *staker
+		mutatedStaker.Weight += 10
+		v.UpdateValidator(&mutatedStaker)
+
+		diffValidator := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+		weightDiff, err := diffValidator.WeightDiff()
+
+		require.NoError(err)
+		require.False(weightDiff.Decrease)
+		require.Equal(mutatedStaker.Weight, weightDiff.Amount)
+
+		maps.Clear(v.validatorDiffs)
+
+		// Update and delete
+		staker = &mutatedStaker
+
+		mutatedStaker = *staker
+		mutatedStaker.Weight += 10
+		v.UpdateValidator(&mutatedStaker)
+		v.DeleteValidator(&mutatedStaker)
+
+		diffValidator = v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+		weightDiff, err = diffValidator.WeightDiff()
 
 		require.NoError(err)
 		require.True(weightDiff.Decrease)
@@ -462,12 +542,10 @@ func TestDiffStakersWeightDiff(t *testing.T) {
 	delegator.SubnetID = staker.SubnetID
 	delegator.NodeID = staker.NodeID
 
-	mutatedStaker := *staker
-	mutatedStaker.Weight += 10
-
 	v := diffStakers{}
 
 	{
+		// Add validator
 		require.NoError(v.PutValidator(staker))
 		diffValidator := v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
 		weightDiff, err := diffValidator.WeightDiff()
@@ -475,36 +553,118 @@ func TestDiffStakersWeightDiff(t *testing.T) {
 		require.NoError(err)
 		require.False(weightDiff.Decrease)
 		require.Equal(staker.Weight, weightDiff.Amount)
-	}
 
-	{
+		// Add delegator
 		v.PutDelegator(delegator)
-		diffValidator := v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-		weightDiff, err := diffValidator.WeightDiff()
+		diffValidator = v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+		weightDiff, err = diffValidator.WeightDiff()
 
 		require.NoError(err)
 		require.False(weightDiff.Decrease)
 		require.Equal(staker.Weight+delegator.Weight, weightDiff.Amount)
-	}
 
-	{
+		// Update validator (increase weight)
+		mutatedStaker := *staker
+		mutatedStaker.Weight += 10
+
 		v.UpdateValidator(staker, &mutatedStaker)
-		diffValidator := v.getOrCreateDiff(mutatedStaker.SubnetID, mutatedStaker.NodeID)
-		weightDiff, err := diffValidator.WeightDiff()
+		diffValidator = v.getOrCreateDiff(mutatedStaker.SubnetID, mutatedStaker.NodeID)
+		weightDiff, err = diffValidator.WeightDiff()
 
 		require.NoError(err)
 		require.False(weightDiff.Decrease)
 		require.Equal(mutatedStaker.Weight+delegator.Weight, weightDiff.Amount)
+
+		// Delete delegator
+		v.DeleteDelegator(delegator)
+		diffValidator = v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+		weightDiff, err = diffValidator.WeightDiff()
+
+		require.NoError(err)
+		require.False(weightDiff.Decrease)
+		require.Equal(mutatedStaker.Weight, weightDiff.Amount)
+	}
+
+	v = diffStakers{}
+
+	{
+		// Delete delegator
+		delegator := newTestStaker(t)
+
+		v.DeleteDelegator(delegator)
+
+		diffValidator := v.getOrCreateDiff(delegator.SubnetID, delegator.NodeID)
+		weightDiff, err := diffValidator.WeightDiff()
+
+		require.NoError(err)
+		require.True(weightDiff.Decrease)
+		require.Equal(delegator.Weight, weightDiff.Amount)
 	}
 
 	{
+		// Delete validator
+		staker := newTestStaker(t)
+		delegator := newTestStaker(t)
+		delegator.SubnetID = staker.SubnetID
+		delegator.NodeID = staker.NodeID
+
 		v.DeleteDelegator(delegator)
+		v.DeleteValidator(staker)
+
+		diffValidator := v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+		weightDiff, err := diffValidator.WeightDiff()
+
+		require.NoError(err)
+		require.True(weightDiff.Decrease)
+		require.Equal(staker.Weight+delegator.Weight, weightDiff.Amount)
+	}
+
+	v = diffStakers{}
+
+	{
+		// Put, update and delete validator.
+		staker := newTestStaker(t)
+		require.NoError(v.PutValidator(staker))
+
+		mutatedStaker := *staker
+		mutatedStaker.Weight += 10
+		v.UpdateValidator(staker, &mutatedStaker)
+
 		diffValidator := v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
 		weightDiff, err := diffValidator.WeightDiff()
 
 		require.NoError(err)
 		require.False(weightDiff.Decrease)
 		require.Equal(mutatedStaker.Weight, weightDiff.Amount)
+
+		v.DeleteValidator(&mutatedStaker)
+
+		diffValidator = v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+		weightDiff, err = diffValidator.WeightDiff()
+
+		require.NoError(err)
+		require.Equal(uint64(0), weightDiff.Amount)
+	}
+
+	v = diffStakers{}
+
+	{
+		// Update and delete existing validator.
+		staker := newTestStaker(t)
+		originalWeight := staker.Weight
+
+		mutatedStaker := *staker
+		mutatedStaker.Weight += 10
+		v.UpdateValidator(staker, &mutatedStaker)
+
+		v.DeleteValidator(&mutatedStaker)
+
+		diffValidator := v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+		weightDiff, err := diffValidator.WeightDiff()
+
+		require.NoError(err)
+		require.True(weightDiff.Decrease)
+		require.Equal(originalWeight, weightDiff.Amount)
 	}
 }
 

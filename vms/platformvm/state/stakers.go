@@ -162,11 +162,16 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.validatorStatus == modified {
-		validatorDiff.oldWeight = 0
+	switch validatorDiff.validatorStatus {
+	case added:
+		validatorDiff.validatorStatus = unmodified
+		validatorDiff.validator = nil
+	default:
+		// For modified: keep [oldWeight] to preserve original weight
+		// For unmodified: [oldWeight] is already 0
+		validatorDiff.validatorStatus = deleted
+		validatorDiff.validator = staker
 	}
-	validatorDiff.validatorStatus = deleted
-	validatorDiff.validator = staker
 
 	v.stakers.Delete(staker)
 }
@@ -174,6 +179,10 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 // Invariant: [mutatedValidator] is a valid mutation.
 func (v *baseStakers) UpdateValidator(mutatedValidator *Staker) {
 	validator := v.getOrCreateValidator(mutatedValidator.SubnetID, mutatedValidator.NodeID)
+
+	// Delete old validator, because staker.Less(..) is using mutable field [NextTime],
+	// that means ReplaceOrInsert(..) will not find the duplicate staker.
+	v.stakers.Delete(validator.validator)
 
 	validatorDiff := v.getOrCreateValidatorDiff(mutatedValidator.SubnetID, mutatedValidator.NodeID)
 	if validatorDiff.validatorStatus == unmodified {
@@ -316,7 +325,12 @@ func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
 		}
 	case deleted:
 		weightDiff.Decrease = true
-		weightDiff.Amount = d.validator.Weight
+		if d.oldWeight > 0 {
+			// was modified before deleted, use original weight.
+			weightDiff.Amount = d.oldWeight
+		} else {
+			weightDiff.Amount = d.validator.Weight
+		}
 	}
 
 	for _, staker := range d.deletedDelegators {
@@ -391,7 +405,7 @@ func (s *diffStakers) DeleteValidator(staker *Staker) {
 		s.addedOrModifiedStakers.Delete(validatorDiff.validator)
 		validatorDiff.validatorStatus = deleted
 		validatorDiff.validator = staker
-		validatorDiff.oldWeight = 0
+		// Keep oldWeight to preserve original weight for WeightDiff calculation
 		if s.deletedStakers == nil {
 			s.deletedStakers = make(map[ids.ID]*Staker)
 		}
@@ -418,8 +432,17 @@ func (s *diffStakers) UpdateValidator(
 	switch validatorDiff.validatorStatus {
 	case added, modified:
 		// Keep the same [validatorDiff.validatorStatus].
+
+		// Delete old validator, because staker.Less(..) is using mutable field [NextTime],
+		// that means ReplaceOrInsert(..) will not find the duplicate staker.
+		s.addedOrModifiedStakers.Delete(validatorDiff.validator)
 		validatorDiff.validator = mutatedValidator
 		s.addedOrModifiedStakers.ReplaceOrInsert(mutatedValidator)
+
+		// Update modifiedStakers map reference if this was a modified validator
+		//if validatorDiff.validatorStatus == modified {
+		//	s.modifiedStakers[mutatedValidator.TxID] = mutatedValidator
+		//}
 
 	case unmodified:
 		validatorDiff.validator = mutatedValidator

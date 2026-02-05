@@ -789,7 +789,6 @@ func TestValidatorWeightDiff(t *testing.T) {
 	}
 }
 
-// todo: test that weights are computed properly per subnet, per nodeid and even total weight
 func TestState_ApplyValidatorDiffs(t *testing.T) {
 	require := require.New(t)
 
