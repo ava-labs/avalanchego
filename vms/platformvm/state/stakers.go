@@ -439,11 +439,6 @@ func (s *diffStakers) UpdateValidator(
 		validatorDiff.validator = mutatedValidator
 		s.addedOrModifiedStakers.ReplaceOrInsert(mutatedValidator)
 
-		// Update modifiedStakers map reference if this was a modified validator
-		//if validatorDiff.validatorStatus == modified {
-		//	s.modifiedStakers[mutatedValidator.TxID] = mutatedValidator
-		//}
-
 	case unmodified:
 		validatorDiff.validator = mutatedValidator
 		validatorDiff.validatorStatus = modified
