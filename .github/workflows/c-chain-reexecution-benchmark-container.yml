@@ -117,20 +117,6 @@ jobs:
           # Required for Nix builds on ARC runners
           TMPDIR: /tmp
           NIX_BUILD_TOP: /tmp
-      - name: Verify shell error handling
-        run: |
-          set -euo pipefail
-          
-          echo "GH_VERSION: $(gh --version)"
-        
-          # Diagnostic: Verify that set -e catches bare command failures.
-          echo "Shell: errexit=$(set -o | grep errexit | awk '{print $2}'), pipefail=$(set -o | grep pipefail | awk '{print $2}')"
-
-          # Test: set -e must catch bare failing command
-          set +e
-          ( set -euo pipefail; /bin/false; echo "BUG: set -e failed" )
-          [[ $? -ne 0 ]] && echo "PASS: set -e catches bare command failure"
-          set -e
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:

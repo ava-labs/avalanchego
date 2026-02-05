@@ -139,6 +139,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-nix
+      - name: Verify shell error handling
+        run: |
+          set -euo pipefail
+          echo "==> Shell options: errexit=$([[ -o errexit ]] && echo on || echo off), pipefail=$([[ -o pipefail ]] && echo on || echo off)"
+          
+          echo "==> gh CLI version:"
+          gh --version
+          
+          echo "==> Test: Trigger 422 error (missing required input 'runner')"
+          echo "Running: gh workflow run c-chain-reexecution-benchmark-container.yml"
+          set +e
+          output=$(gh workflow run c-chain-reexecution-benchmark-container.yml 2>&1)
+          exit_code=$?
+          set -e
+          echo "Output: $output"
+          echo "Exit code: $exit_code"
+          
+          if [[ $exit_code -eq 0 ]]; then
+            echo "::warning::gh returned exit code 0 despite HTTP 422 - THIS IS THE BUG"
+          else
+            echo "==> PASS: gh returns non-zero ($exit_code) on HTTP 422"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Runs all lint checks
         shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh lint-all-ci
