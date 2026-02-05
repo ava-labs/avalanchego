@@ -5,7 +5,6 @@ package sync
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 
 	"github.com/google/btree"
@@ -161,12 +160,21 @@ func (wh *workHeap) Len() int {
 	return wh.innerHeap.Len()
 }
 
+// statusBytes is the number of bytes of the keyspace to consider
+// when calculating the progress percentage.
+// Keys larger than this will be truncated.
+const statusBytes = 64
+
+var (
+	totalSpace      = new(big.Int).Lsh(big.NewInt(1), statusBytes*8)
+	totalSpaceFloat = new(big.Float).SetInt(totalSpace)
+)
+
 // Status returns the approximate percentage of work in the heap
 // for a given [ids.ID] root, relative to the entire keyspace.
 // If there are many keys larger than 64 bytes, the returned percentage
 // may be inaccurate.
 func (wh *workHeap) Status(root ids.ID) float64 {
-	const maxIntSize = 64
 	progress := new(big.Int)
 	wh.sortedItems.Ascend(func(item *workItem) bool {
 		if item.localRootID != root {
@@ -174,15 +182,15 @@ func (wh *workHeap) Status(root ids.ID) float64 {
 		}
 
 		// Determine the start value (0x0 if no value)
-		start := maybeToBig(item.start, maxIntSize)
+		start := maybeToBig(item.start, statusBytes)
 		if start == nil {
 			start = big.NewInt(0)
 		}
 
 		// Determine the end value (max if no value)
-		end := maybeToBig(item.end, maxIntSize)
+		end := maybeToBig(item.end, statusBytes)
 		if end == nil {
-			end = new(big.Int).Lsh(big.NewInt(1), uint(maxIntSize*8)) // 2^(maxSize*8)
+			end = new(big.Int).Lsh(big.NewInt(1), uint(statusBytes*8)) // 2^(maxSize*8)
 		}
 
 		// Add complete range size: end - start
@@ -193,13 +201,9 @@ func (wh *workHeap) Status(root ids.ID) float64 {
 	})
 
 	// Calculate total key space size (2^256 for 32-byte keys)
-	totalSpace := new(big.Int).Lsh(big.NewInt(1), maxIntSize*8)
-	fmt.Println("progress:", progress.String(), progress.Bytes())
-	fmt.Println("total space:", totalSpace.String(), totalSpace.Bytes())
 
 	// Calculate percentage: (progress / totalSpace) * 100
 	progressFloat := new(big.Float).SetInt(progress)
-	totalSpaceFloat := new(big.Float).SetInt(totalSpace)
 	progressFloat.Quo(progressFloat, totalSpaceFloat)
 	progressFloat.Mul(progressFloat, big.NewFloat(100))
 
