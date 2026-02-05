@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package saevm
@@ -9,16 +9,17 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/strevm/hook"
+
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 var _ hook.Points = (*Hooks)(nil)
@@ -37,7 +38,7 @@ func (h *Hooks) BuildHeader(parent *types.Header) *types.Header {
 	return &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number, common.Big1),
-		Time:       uint64(now.Unix()), //nolint:gosec // Known non-negative
+		Time:       uint64(now.Unix()),
 	}
 }
 
@@ -49,10 +50,10 @@ func (*Hooks) BuildBlock(
 	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
 }
 
-func (h *Hooks) BlockRebuilderFrom(b *types.Block) hook.BlockBuilder {
+func (*Hooks) BlockRebuilderFrom(b *types.Block) hook.BlockBuilder {
 	return &Hooks{
 		Now: func() time.Time {
-			return time.Unix(int64(b.Time()), 0) //nolint:gosec // Won't overflow for a few millennia
+			return time.Unix(int64(b.Time()), 0)
 		},
 	}
 }
@@ -61,7 +62,7 @@ func (*Hooks) GasTargetAfter(*types.Header) gas.Gas {
 	return 1_000_000
 }
 
-func (*Hooks) SubSecondBlockTime(hdr *types.Header) time.Duration {
+func (*Hooks) SubSecondBlockTime(*types.Header) time.Duration {
 	return 0
 }
 

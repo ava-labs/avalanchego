@@ -95,12 +95,9 @@ tasks:
       - task: check-clean-branch
 
   check-go-mod-tidy:
-    desc: Checks that go.mod and go.sum are up-to-date (requires a clean git working tree)
+    desc: Checks that go module configuration is consistent (requires a clean git working tree)
     cmds:
-      - cmd: go mod tidy
-      - task: check-clean-branch
-      - cmd: go mod tidy
-        dir: tools
+      - task: go-mod-tidy
       - task: check-clean-branch
 
   create-kind-cluster:
@@ -140,6 +137,28 @@ tasks:
     desc: Runs ginkgo against the current working directory
     cmd: ./bin/ginkgo build {{.USER_WORKING_DIR}}
 
+  go-mod-tidy:
+    desc: Ensures that go module configuration is consistent
+    cmds:
+      # GOWORK=off is required because lint tooling runs with GOWORK=off
+      # (see scripts/run_tool.sh) and dependency resolution differs when
+      # the workspace is enabled vs disabled.
+      #
+      # NOTE: Using explicit 'cd' instead of Task's 'dir:' directive because
+      # 'dir:' doesn't properly isolate the go.work context, causing go mod tidy
+      # to miss some indirect dependency go.mod hashes in go.sum.
+      - cmd: GOWORK=off go mod tidy
+      # GOWORK=off is required because tools/external is not part of the workspace
+      # and go will otherwise find go.work by walking up the tree
+      - cmd: cd tools/external && GOWORK=off go mod tidy
+      # GOWORK=off is required for graft modules because lint tooling runs
+      # with GOWORK=off (see scripts/run_tool.sh) and dependency resolution
+      # differs when the workspace is enabled vs disabled.
+      - cmd: cd graft/evm && GOWORK=off go mod tidy
+      - cmd: cd graft/coreth && GOWORK=off go mod tidy
+      - cmd: cd graft/subnet-evm && GOWORK=off go mod tidy
+      - task: sync-go-work
+
   install-nix:
     desc: Installs nix with an OS-appropriate installer
     cmd: ./scripts/install_nix.sh
@@ -158,6 +177,7 @@ tasks:
       - lint
       - lint-action
       - lint-shell
+      - check-go-mod-tidy
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -165,6 +185,7 @@ tasks:
       - task: lint
       - task: lint-action
       - task: lint-shell
+      - task: check-go-mod-tidy
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
@@ -174,9 +195,20 @@ tasks:
     desc: Runs shellcheck to check sanity of shell scripts
     cmd: ./scripts/shellcheck.sh
 
+  run-polyrepo:
+    desc: "Run polyrepo for orchestrating local dependencies. Example: LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123 task run-polyrepo"
+    cmd: ./scripts/run_polyrepo.sh {{.CLI_ARGS}}
+
   setup-chain-data:
     desc: Sets up C-Chain test data (blocks from S3, state from S3 or empty for genesis).
     cmd: ./scripts/setup_cchain_data.sh
+
+  sync-go-work:
+    desc: Downloads module dependencies and syncs go.work.sum
+    cmds:
+      - cmd: go mod download
+      # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
+      - cmd: GOWORK="" go work sync
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests

@@ -27,9 +27,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmerrors"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
@@ -152,7 +152,6 @@ func (vm *VM) Initialize(
 	extensionConfig := &extension.Config{
 		ConsensusCallbacks:         vm.createConsensusCallbacks(),
 		BlockExtender:              blockExtender,
-		SyncableParser:             atomicsync.NewSummaryParser(),
 		SyncExtender:               syncExtender,
 		SyncSummaryProvider:        syncProvider,
 		ExtraSyncLeafHandlerConfig: atomicLeafTypeConfig,
@@ -245,7 +244,7 @@ func (vm *VM) Initialize(
 	atomicTrie := vm.AtomicBackend.AtomicTrie()
 	syncProvider.Initialize(atomicTrie)
 	syncExtender.Initialize(vm.AtomicBackend, atomicTrie, vm.InnerVM.Config().StateSyncRequestSize)
-	leafHandler.Initialize(atomicTrie.TrieDB(), atomicstate.TrieKeyLength, message.Codec)
+	leafHandler.Initialize(atomicTrie.TrieDB(), atomicstate.TrieKeyLength, message.CorethCodec)
 
 	vm.SecpCache = secp256k1.NewRecoverCache(secpCacheSize)
 

@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -28,13 +28,13 @@ func TestMarshalSummary(t *testing.T) {
 	expectedID := ids.FromStringOrPanic("256pj4a3SBG5kervhxKfeKpNRcVR1xk5BzTpkTkybkM8uMPu6Q")
 	require.Equal(t, expectedID, atomicSummary.ID())
 
-	parser := NewSummaryParser()
+	provider := &SummaryProvider{}
 	called := false
 	acceptImplTest := func(message.Syncable) (block.StateSyncMode, error) {
 		called = true
 		return block.StateSyncSkipped, nil
 	}
-	s, err := parser.Parse(atomicSummary.Bytes(), acceptImplTest)
+	s, err := provider.Parse(atomicSummary.Bytes(), acceptImplTest)
 	require.NoError(t, err, "failed to parse summary")
 	require.Equal(t, atomicSummary.GetBlockHash(), s.GetBlockHash())
 	require.Equal(t, atomicSummary.Height(), s.Height())

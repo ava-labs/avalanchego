@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
@@ -187,7 +188,8 @@ func FillAccounts(
 			acc = onAccount(t, i, key.Address, acc, storageTr)
 			root, nodes, err := storageTr.Commit(false)
 			require.NoError(t, err)
-			if root != types.EmptyRootHash {
+			// If the storage trie was used, update the account's storage root and pass nodes to TrieDB.
+			if nodes != nil {
 				require.NoError(t, mergedSet.Merge(nodes))
 				acc.Root = root
 			}
@@ -200,13 +202,14 @@ func FillAccounts(
 	newRoot, nodes, err := tr.Commit(true)
 	require.NoError(t, err)
 	require.NoError(t, mergedSet.Merge(nodes))
-	require.NoError(t, s.TrieDB().Update(newRoot, root, 0, mergedSet, nil))
+	updateOpts := stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{}) // block hashes required for Firewood
+	require.NoError(t, s.TrieDB().Update(newRoot, root, 0, mergedSet, nil, updateOpts))
 	require.NoError(t, s.TrieDB().Commit(newRoot, false))
 	return newRoot, accounts
 }
 
-func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.Database, numAccounts int) common.Hash {
-	newRoot, _ := FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
+func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.Database, root common.Hash, numAccounts int) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
+	return FillAccounts(t, r, serverDB, root, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
 		codeBytes := make([]byte, 256)
 		_, err := r.Read(codeBytes)
 		require.NoError(t, err, "error reading random code bytes")
@@ -219,7 +222,6 @@ func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.D
 		FillStorageForAccount(t, r, 16, addr, storageTr)
 		return account
 	})
-	return newRoot
 }
 
 // FillStorageForAccount adds [numStorageKeys] random key-value pairs to the storage trie for [addr] in [storageTr].
