@@ -31,8 +31,8 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca
 	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
-	github.com/ava-labs/libevm v1.13.15-0.20260128160829-e673c7097059
-	github.com/ava-labs/strevm v0.0.0-20260204221548-d898e9b8557f
+	github.com/ava-labs/libevm v1.13.15-0.20260205195518-8b90483ae5dc
+	github.com/ava-labs/strevm v0.0.0-20260205215745-3095b80c03e6
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -98,6 +98,7 @@ require (
 require (
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 )
 

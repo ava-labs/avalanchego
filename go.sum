@@ -333,12 +333,12 @@ github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPd
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0 h1:Tt65C051dK7rE9VcJbi6zfit/ubsAqjC/H2vYMDmXfY=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0/go.mod h1:DkSDp/7LjADrNJ0Aj2dgFDPFTtn+9herXcABeZubmQk=
-github.com/ava-labs/libevm v1.13.15-0.20260128160829-e673c7097059 h1:3l75HBUnvVeSjs1ikoA8LUu8eo/A7NTgacuy1qUvQuk=
-github.com/ava-labs/libevm v1.13.15-0.20260128160829-e673c7097059/go.mod h1:oyJdZfpQTc9fVzAbDry+QRYeiCbw8s/kGaDUsEMpb4I=
+github.com/ava-labs/libevm v1.13.15-0.20260205195518-8b90483ae5dc h1:+karnD4bOvSsfb4BsXS8j3cC2N+6NqUV1LX1+B38IWc=
+github.com/ava-labs/libevm v1.13.15-0.20260205195518-8b90483ae5dc/go.mod h1:oyJdZfpQTc9fVzAbDry+QRYeiCbw8s/kGaDUsEMpb4I=
 github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19 h1:S6oFasZsplNmw8B2S8cMJQMa62nT5ZKGzZRdCpd+5qQ=
 github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
-github.com/ava-labs/strevm v0.0.0-20260204221548-d898e9b8557f h1:Akp+KgoUl97upYHDXcqwXFZqo4vsZ30JlcamZTuCYrk=
-github.com/ava-labs/strevm v0.0.0-20260204221548-d898e9b8557f/go.mod h1:HBnrfm1vCnVqdDqP9ddK9WLKEJ/FRqbKPP+fYA68nmc=
+github.com/ava-labs/strevm v0.0.0-20260205215745-3095b80c03e6 h1:U5tthiaDBfZZldP864F/9xZPR8BnZ/7jr1ImOO+yH1w=
+github.com/ava-labs/strevm v0.0.0-20260205215745-3095b80c03e6/go.mod h1:CcG7Q2HlTQpLRVa4OBME7ZjbGcIMFu69sQVhmYRjXgg=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
@@ -603,7 +603,6 @@ github.com/gogo/protobuf v1.2.0/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7a
 github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
 github.com/gogo/status v1.1.0/go.mod h1:BFv9nrluPLmrS0EmGVvLaPNmRosr9KapBYd5/hpY1WM=
-github.com/golang-jwt/jwt v3.2.2+incompatible h1:IfV12K8xAKAnZqdXVzCZ+TOjboZ2keLg81eXfW3O+oY=
 github.com/golang-jwt/jwt v3.2.2+incompatible/go.mod h1:8pz2t5EyA70fFQQSrl6XZXzqecmYZeUEB8OUGHkxJ+I=
 github.com/golang-jwt/jwt/v4 v4.5.2 h1:YtQM7lnr8iZ+j5q71MGKkNw9Mn7AjHM68uc9g5fXeUI=
 github.com/golang-jwt/jwt/v4 v4.5.2/go.mod h1:m21LjoU+eqJr34lmDMbreY2eSTRJ1cv77w39/MY0Ch0=
