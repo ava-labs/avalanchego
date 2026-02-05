@@ -13,7 +13,7 @@ module github.com/ava-labs/avalanchego/tools/external
 //   - go tool -modfile=tools/external/go.mod [tool] [args]
 //   - ./scripts/run_tool.sh [tool] [args]
 
-go 1.24.12
+go 1.25.7
 
 tool (
 	github.com/fjl/gencodec

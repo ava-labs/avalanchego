@@ -11,7 +11,7 @@ module github.com/ava-labs/avalanchego/graft/subnet-evm
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
 //   - Consider updating the version of golangci-lint (see tools/external/go.mod)
-go 1.24.12
+go 1.25.7
 
 require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
