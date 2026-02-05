@@ -485,7 +485,9 @@ func (e *proposalTxExecutor) RewardContinuousValidatorTx(tx *txs.RewardContinuou
 	e.onAbortState.DeleteCurrentValidator(stakerToReward)
 
 	if stakerToReward.ContinuationPeriod > 0 {
-		// Running continuous staker.
+		// Running continuous staker: validator will continue to the next cycle.
+		// On commit: restake rewards (based on AutoRestakeShares) and start new cycle.
+		// On abort: return stake + accrued rewards, forfeit current cycle's rewards.
 
 		// Create UTXOs for [onAbortState].
 		if err = e.createUTXOsContinuousValidatorOnAbort(validatorTx, stakerToReward); err != nil {
@@ -501,6 +503,8 @@ func (e *proposalTxExecutor) RewardContinuousValidatorTx(tx *txs.RewardContinuou
 		return nil
 	}
 
+	// Graceful exit: validator requested to stop (ContinuationPeriod == 0).
+	// Return stake + all rewards on both commit and abort paths.
 	if err := e.createUTXOsContinuousValidatorOnGracefulExit(continuousStaker.(txs.ValidatorTx), stakerToReward); err != nil {
 		return err
 	}
@@ -789,7 +793,7 @@ func (e *proposalTxExecutor) createUTXOsContinuousValidatorOnAbort(uValidatorTx 
 		outputIndexOffset++
 	}
 
-	// Create UTXOs for accrrued delegatee rewards.
+	// Create UTXOs for accrued delegatee rewards.
 	totalDelegateeRewards, err := math.Add(validator.DelegateeReward, validator.AccruedDelegateeRewards)
 	if err != nil {
 		return err
@@ -1137,6 +1141,7 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 		return 0, 0, err
 	}
 
+	// Distribute available space proportionally between validation and delegatee rewards.
 	restakableValidationReward, err := reward.ProportionalAmount(rewards, restakingAvailability, totalRestakingRewards)
 	if err != nil {
 		return 0, 0, err

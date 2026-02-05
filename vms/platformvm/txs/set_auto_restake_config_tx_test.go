@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,7 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify/verifymock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
+
+var errInvalidAuth = errors.New("invalid auth")
 
 func TestSetAutoRestakeConfigTxSyntacticVerify(t *testing.T) {
 	require := require.New(t)
@@ -87,6 +92,22 @@ func TestSetAutoRestakeConfigTxSyntacticVerify(t *testing.T) {
 				}
 			},
 			err: errTooManyRestakeShares,
+		},
+		{
+			name: "invalid auth",
+			txFunc: func(ctrl *gomock.Controller) *SetAutoRestakeConfigTx {
+				invalidAuth := verifymock.NewVerifiable(ctrl)
+				invalidAuth.EXPECT().Verify().Return(errInvalidAuth)
+
+				return &SetAutoRestakeConfigTx{
+					BaseTx:            validBaseTx,
+					TxID:              ids.GenerateTestID(),
+					Auth:              invalidAuth,
+					AutoRestakeShares: reward.PercentDenominator,
+					Period:            0,
+				}
+			},
+			err: errInvalidAuth,
 		},
 		{
 			name: "invalid BaseTx",
