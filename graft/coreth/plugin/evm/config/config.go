@@ -5,6 +5,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/graft/evm/config"
@@ -14,6 +15,11 @@ import (
 
 const (
 	defaultCommitInterval = 4096
+)
+
+var (
+	ErrNonLocalCommitInterval   = errors.New("non-local network cannot use custom commit interval")
+	ErrNonLocalSyncableInterval = errors.New("non-local network cannot use custom syncable interval")
 )
 
 // Config contains configuration for the C-Chain.
@@ -56,10 +62,10 @@ func (c *Config) Validate(networkID uint32) error {
 	// Ensure that non-standard commit interval is not allowed for production networks
 	if constants.ProductionNetworkIDs.Contains(networkID) {
 		if c.CommitInterval != defaultCommitInterval {
-			return fmt.Errorf("cannot start non-local network with commit interval %d different than %d", c.CommitInterval, defaultCommitInterval)
+			return fmt.Errorf("%w: got %d, want %d", ErrNonLocalCommitInterval, c.CommitInterval, defaultCommitInterval)
 		}
 		if c.StateSyncCommitInterval != defaultCommitInterval*4 {
-			return fmt.Errorf("cannot start non-local network with syncable interval %d different than %d", c.StateSyncCommitInterval, defaultCommitInterval*4)
+			return fmt.Errorf("%w: got %d, want %d", ErrNonLocalSyncableInterval, c.StateSyncCommitInterval, defaultCommitInterval*4)
 		}
 	}
 
@@ -67,6 +73,6 @@ func (c *Config) Validate(networkID uint32) error {
 }
 
 // Deprecate returns a string of deprecation messages for Config.
-func (c *Config) Deprecate() string {
+func (*Config) Deprecate() string {
 	return ""
 }

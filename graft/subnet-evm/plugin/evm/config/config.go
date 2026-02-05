@@ -61,6 +61,6 @@ func (c *Config) Validate(_ uint32) error {
 }
 
 // Deprecate returns a string of deprecation messages for Config.
-func (c *Config) Deprecate() string {
+func (*Config) Deprecate() string {
 	return ""
 }

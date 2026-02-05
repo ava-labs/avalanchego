@@ -71,7 +71,7 @@ func TestUnmarshalConfigErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var got Config
 			err := json.Unmarshal(tt.givenJSON, &got)
-			require.Error(t, err)
+			require.NotNil(t, err) //nolint:forbidigo // JSON unmarshal errors don't have sentinel values
 		})
 	}
 }
@@ -146,7 +146,7 @@ func TestGetConfig(t *testing.T) {
 func TestGetConfigValidation(t *testing.T) {
 	t.Run("negative transaction history rejected", func(t *testing.T) {
 		_, _, err := GetConfig([]byte(`{"transaction-history": -1}`), constants.LocalID)
-		require.Error(t, err)
+		require.NotNil(t, err) //nolint:forbidigo // JSON unmarshal errors don't have sentinel values
 	})
 
 	t.Run("valid config accepted", func(t *testing.T) {
