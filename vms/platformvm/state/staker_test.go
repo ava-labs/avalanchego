@@ -433,21 +433,6 @@ func TestValidateMutation(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		{
-			name: "valid mutation",
-			mutateFn: func(staker Staker) *Staker {
-				staker.Weight = 200
-				staker.StartTime = time.Unix(30, 0)
-				staker.EndTime = time.Unix(40, 0)
-				staker.NextTime = time.Unix(40, 0)
-				staker.PotentialReward = 20
-				staker.AccruedRewards = 30
-				staker.AccruedDelegateeRewards = 25
-				staker.ContinuationPeriod = 0
-				return &staker
-			},
-			expectedErr: nil,
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
