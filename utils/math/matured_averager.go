@@ -9,19 +9,21 @@ import "time"
 // been running for at least the half-life duration.
 type maturedAverager struct {
 	Averager
-	halflife     time.Duration
+	halfLife     time.Duration
 	startTime    time.Time
 	lastObserved time.Time
 	hasObserved  bool
 }
 
+var _ Averager = (*maturedAverager)(nil)
+
 // NewMaturedAverager creates a new matured averager that wraps the provided
-// averager. It returns zero from Read() until at least halflife duration has
+// averager. It returns zero from [averager.Read] until at least `halfLife“ duration has
 // passed since the first Observe call.
-func NewMaturedAverager(halflife time.Duration, averager Averager) Averager {
+func NewMaturedAverager(halfLife time.Duration, averager Averager) Averager {
 	return &maturedAverager{
 		Averager: averager,
-		halflife: halflife,
+		halfLife: halfLife,
 	}
 }
 
@@ -42,7 +44,7 @@ func (a *maturedAverager) Read() float64 {
 
 	// Check if enough time has passed since the first observation
 	elapsed := a.lastObserved.Sub(a.startTime)
-	if elapsed < a.halflife {
+	if elapsed < a.halfLife {
 		return 0
 	}
 

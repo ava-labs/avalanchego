@@ -17,8 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const acceptanceTimeSmoothingFactor = 5 * time.Minute
-
 type processingStart struct {
 	time       time.Time
 	pollNumber uint64
@@ -65,8 +63,8 @@ type metrics struct {
 	// numSuccessfulPolls keeps track of the number of polls that succeeded
 	numSuccessfulPolls prometheus.Counter
 
-	// avgAcceptanceTime tracks the average acceptance time
-	avgAcceptanceTime math.Averager
+	// avgAcceptanceLatency tracks the average acceptance time
+	avgAcceptanceLatency math.Averager
 }
 
 func newMetrics(
@@ -75,6 +73,7 @@ func newMetrics(
 	lastAcceptedHeight uint64,
 	lastAcceptedTime time.Time,
 ) (*metrics, error) {
+	acceptanceHalfLife := 5 * time.Minute
 	errs := wrappers.Errs{}
 	m := &metrics{
 		log:                      log,
@@ -150,9 +149,9 @@ func newMetrics(
 			Name: "polls_failed",
 			Help: "number of failed polls",
 		}),
-		avgAcceptanceTime: math.NewMaturedAverager(
-			acceptanceTimeSmoothingFactor,
-			math.NewUninitializedAverager(acceptanceTimeSmoothingFactor),
+		avgAcceptanceLatency: math.NewMaturedAverager(
+			acceptanceHalfLife,
+			math.NewUninitializedAverager(acceptanceHalfLife),
 		),
 	}
 
@@ -219,7 +218,7 @@ func (m *metrics) Accepted(
 
 	builtDuration := now.Sub(timestamp)
 	m.buildLatencyAccepted.Add(float64(builtDuration))
-	m.avgAcceptanceTime.Observe(float64(builtDuration), now)
+	m.avgAcceptanceLatency.Observe(float64(builtDuration), now)
 	m.consensusLatencies.Observe(float64(processingDuration))
 }
 
@@ -260,5 +259,5 @@ func (m *metrics) FailedPoll() {
 }
 
 func (m *metrics) GetAverageAcceptanceTime() time.Duration {
-	return time.Duration(m.avgAcceptanceTime.Read())
+	return time.Duration(m.avgAcceptanceLatency.Read())
 }
