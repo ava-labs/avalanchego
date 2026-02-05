@@ -8,8 +8,8 @@ import (
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 
+	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/x/sync"
 )
 
 var (

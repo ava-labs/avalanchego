@@ -6,7 +6,7 @@ package syncer
 import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 
-	"github.com/ava-labs/avalanchego/x/sync"
+	"github.com/ava-labs/avalanchego/database/merkle/sync"
 )
 
 // NewGetRangeProofHandler returns a handler that services GetRangeProof requests

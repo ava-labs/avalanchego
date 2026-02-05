@@ -19,12 +19,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/firewood/syncer"
+	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/code"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
@@ -145,8 +145,8 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	t.Helper()
 	// Create the mock P2P client that serves range proofs and change proofs from the server DB.
 	var (
-		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
-		mockClient         = statesyncclient.NewTestClient(message.Codec, nil, codeRequestHandler, nil)
+		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
+		mockClient         = statesyncclient.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
 		serverDB           = dbFromState(t, serverState)
 		rHandler           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetRangeProofHandler(serverDB))
 		cHandler           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetChangeProofHandler(serverDB))
