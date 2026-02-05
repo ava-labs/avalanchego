@@ -92,95 +92,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-      - name: Verify shell error handling
-        run: |
-          set -euo pipefail
-          echo "==> Shell options:"
-          set -o | grep -E "errexit|pipefail|nounset"
-
-          echo ""
-          echo "==> TEST 1: set -e catches direct command failure"
-          echo "Running: /bin/false (should exit immediately)"
-          set +e
-          (
-            set -euo pipefail
-            /bin/false
-            echo "ERROR: This should NOT print - set -e failed to catch /bin/false"
-          )
-          test1_exit=$?
-          set -e
-          if [[ $test1_exit -ne 0 ]]; then
-            echo "PASS: Subshell exited with code $test1_exit (set -e caught /bin/false)"
-          else
-            echo "FAIL: Subshell exited with code 0"
-          fi
-
-          echo ""
-          echo "==> TEST 2: set -e does NOT catch failure inside \$(command substitution)"
-          echo "Running: output=\$(/bin/false) - does set -e catch this?"
-          set +e
-          (
-            set -euo pipefail
-            output=$(/bin/false)
-            echo "Script continued after \$(/bin/false) - exit code was: $?"
-            echo "This proves set -e does NOT catch errors in command substitution!"
-          )
-          test2_exit=$?
-          set -e
-          echo "Subshell exit code: $test2_exit"
-
-          echo ""
-          echo "==> TEST 3: Explicit || pattern catches command substitution failure"
-          echo "Running: output=\$(/bin/false) || exit 1"
-          set +e
-          (
-            set -euo pipefail
-            output=$(/bin/false) || { echo "Caught failure with ||"; exit 1; }
-            echo "ERROR: This should NOT print"
-          )
-          test3_exit=$?
-          set -e
-          if [[ $test3_exit -ne 0 ]]; then
-            echo "PASS: Explicit || caught the failure (exit code $test3_exit)"
-          else
-            echo "FAIL: || did not catch failure"
-          fi
-
-          echo ""
-          echo "==> TEST 4: gh workflow run with command substitution (simulating original bug)"
-          if ! command -v gh &> /dev/null; then
-            echo "gh CLI not installed - installing..."
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            sudo apt-get update
-            sudo apt-get install gh -y
-          fi
-          echo "gh version: $(gh --version | head -1)"
-
-          echo ""
-          echo "Running: output=\$(gh workflow run non-existent-workflow.yml 2>&1)"
-          set +e
-          (
-            set -euo pipefail
-            output=$(gh workflow run non-existent-workflow.yml 2>&1)
-            echo "Script continued after gh failure!"
-            echo "Output was: $output"
-            echo "This is why the original bug occurred - set -e doesn't catch \$() failures"
-          )
-          test4_exit=$?
-          set -e
-          echo "Subshell exit code: $test4_exit"
-
-          echo ""
-          echo "==> SUMMARY"
-          echo "- set -e catches direct command failures: YES"
-          echo "- set -e catches \$(command) failures: NO"
-          echo "- Explicit || or 'if !' catches \$(command) failures: YES"
-          echo ""
-          echo "CONCLUSION: Always use explicit error handling for commands in \$() substitution:"
-          echo '  output=$(command) || { echo "error"; exit 1; }'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Install ARC Dependencies
         shell: bash
         run: |
@@ -206,6 +117,20 @@ jobs:
           # Required for Nix builds on ARC runners
           TMPDIR: /tmp
           NIX_BUILD_TOP: /tmp
+      - name: Verify shell error handling
+        run: |
+          set -euo pipefail
+          
+          echo "GH_VERSION: $(gh --version)"
+        
+          # Diagnostic: Verify that set -e catches bare command failures.
+          echo "Shell: errexit=$(set -o | grep errexit | awk '{print $2}'), pipefail=$(set -o | grep pipefail | awk '{print $2}')"
+
+          # Test: set -e must catch bare failing command
+          set +e
+          ( set -euo pipefail; /bin/false; echo "BUG: set -e failed" )
+          [[ $? -ne 0 ]] && echo "PASS: set -e catches bare command failure"
+          set -e
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
