@@ -145,7 +145,6 @@ var (
 	errShuttingDownVM                             = errors.New("shutting down VM")
 	errFirewoodSnapshotCacheDisabled              = errors.New("snapshot cache must be disabled for Firewood")
 	errFirewoodOfflinePruningUnsupported          = errors.New("offline pruning is not supported for Firewood")
-	errFirewoodStateSyncUnsupported               = errors.New("state sync is not yet supported for Firewood")
 	errFirewoodMissingTrieRepopulationUnsupported = errors.New("missing trie repopulation is not supported for Firewood")
 )
 
@@ -402,9 +401,6 @@ func (vm *VM) Initialize(
 		}
 		if vm.config.OfflinePruning {
 			return errFirewoodOfflinePruningUnsupported
-		}
-		if vm.config.StateSyncEnabled == nil || *vm.config.StateSyncEnabled {
-			return errFirewoodStateSyncUnsupported
 		}
 		if vm.config.PopulateMissingTries != nil {
 			return errFirewoodMissingTrieRepopulationUnsupported
