@@ -403,6 +403,22 @@ bazel test --config=noshuffle //...
 bazel test --config=fast //...
 ```
 
+#### Test Timeouts
+
+Bazel has four timeout categories. `.bazelrc` sets the durations via
+`--test_timeout=short,moderate,long,eternal`:
+
+| Category | Duration | Used By |
+|----------|----------|---------|
+| short | 60s | - |
+| moderate | 120s | Root module tests (default for `go_test`) |
+| long | 900s | Graft module tests (via `graft_go_test` macro) |
+| eternal | 3600s | - |
+
+The `graft_go_test` macro sets `timeout = "long"` so graft tests
+get the 900s budget. Root module tests use the default `"moderate"`
+category (120s). See Custom Test Macros for how this is wired up.
+
 #### Non-Unit Tests and the `manual` Tag
 
 Tests that are not unit tests (e2e tests, integration tests, load
