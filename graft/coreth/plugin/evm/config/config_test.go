@@ -11,8 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/config"
-	evmutils "github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+
+	evmutils "github.com/ava-labs/avalanchego/graft/evm/utils"
 )
 
 func TestUnmarshalConfig(t *testing.T) {
@@ -59,7 +60,7 @@ func TestUnmarshalConfigErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var got Config
 			err := json.Unmarshal(tt.givenJSON, &got)
-			require.NotNil(t, err) //nolint:forbidigo // JSON unmarshal errors don't have sentinel values
+			require.Error(t, err)
 		})
 	}
 }
@@ -140,7 +141,7 @@ func TestGetConfigValidation(t *testing.T) {
 
 	t.Run("negative transaction history rejected", func(t *testing.T) {
 		_, _, err := GetConfig([]byte(`{"transaction-history": -1}`), constants.LocalID)
-		require.NotNil(t, err) //nolint:forbidigo // JSON unmarshal errors don't have sentinel values
+		require.Error(t, err)
 	})
 }
 
