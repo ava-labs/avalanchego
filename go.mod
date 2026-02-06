@@ -4,16 +4,10 @@ module github.com/ava-labs/avalanchego
 // tools/external/go.mod to avoid polluting the main module's dependencies. See
 // tools/external/go.mod for usage details.
 
-// - Changes to the minimum golang version must also be replicated in:
+// - To update the go version across all go.mod and go.work files:
+//     task update-go-version -- <version>
 //
-// The following go.mod files:
-//   - go.mod (here)
-//   - tools/external/go.mod
-//   - graft/evm/go.mod
-//   - graft/coreth/go.mod
-//   - graft/subnet-evm/go.mod
-//
-// and
+// - The following files must also be updated manually:
 //   - CONTRIBUTING.md
 //   - README.md
 //   - RELEASES.md
