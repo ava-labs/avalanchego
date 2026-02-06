@@ -1,103 +1,137 @@
-diff --git a/BUILD.bazel b/BUILD.bazel
+diff --git a/bindings/BUILD.bazel b/bindings/BUILD.bazel
 new file mode 100644
 --- /dev/null
-+++ b/BUILD.bazel
-@@ -0,0 +1,69 @@
++++ b/bindings/BUILD.bazel
+@@ -0,0 +1,9 @@
 +# gazelle:ignore
-+# Custom BUILD file for github.com/supranational/blst
-+
-+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
++# Header library for blst C bindings
 +
 +cc_library(
-+    name = "blst_headers",
-+    hdrs = [
-+        "bindings/blst.h",
-+        "bindings/blst_aux.h",
-+    ],
-+    includes = ["bindings"],
-+    visibility = ["//visibility:public"],
++    name = "bindings",
++    hdrs = glob(["*.h"], allow_empty = True),
++    includes = ["."],
++    visibility = ["//:__subpackages__"],
 +)
-+
-+cc_library(
-+    name = "asm_hdrs",
-+    hdrs = glob([
-+        "build/**/*.s",
-+        "build/**/*.S",
-+    ], allow_empty = True, exclude = ["build/assembly.s"]),
-+)
-+
-+cc_library(
-+    name = "asm",
-+    srcs = select({
-+        "@io_bazel_rules_go//go/platform:amd64": ["build/assembly.S"],
-+        "@io_bazel_rules_go//go/platform:arm64": ["build/assembly.S"],
-+        "//conditions:default": [],
-+    }),
-+    copts = [
-+        "-O2",
-+        "-D__BLST_PORTABLE__",
-+    ] + select({
-+        "@io_bazel_rules_go//go/platform:amd64": ["-mno-avx", "-D__ADX__"],
-+        "//conditions:default": [],
-+    }),
-+    deps = [":asm_hdrs"],
-+    linkstatic = True,
-+)
-+
-+cc_library(
-+    name = "src_hdrs",
-+    hdrs = glob(["src/*.h"]),
-+    textual_hdrs = glob(["src/*.c"], exclude = ["src/server.c"]),
-+    includes = ["src"],
-+)
+diff --git a/src/BUILD.bazel b/src/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/src/BUILD.bazel
+@@ -0,0 +1,10 @@
++# gazelle:ignore
++# Source library for blst - headers and C files for unity build
 +
 +cc_library(
 +    name = "src",
-+    srcs = ["src/server.c"],
-+    deps = [":src_hdrs"],
-+    copts = ["-O2", "-D__BLST_PORTABLE__"],
++    hdrs = glob(["*.h"], allow_empty = True),
++    textual_hdrs = glob(["*.c"], allow_empty = True),
++    includes = ["."],
++    visibility = ["//:__subpackages__"],
 +)
+diff --git a/build/BUILD.bazel b/build/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/build/BUILD.bazel
+@@ -0,0 +1,14 @@
++# gazelle:ignore
++# Assembly and build file library for blst
 +
-+# Library for CGO - includes server.c as textual header for unity build
 +cc_library(
-+    name = "blst_cgo",
-+    textual_hdrs = ["src/server.c"] + glob(["src/*.h"]) + glob(["src/*.c"], exclude = ["src/server.c"]),
-+    includes = ["src"],
-+    deps = [":blst_headers", ":asm"],
-+    visibility = ["//visibility:public"],
++    name = "build_cc",
++    hdrs = glob([
++        "**/*.c",
++        "**/*.h",
++        "**/*.S",
++        "**/*.s",
++    ], allow_empty = True),
++    includes = ["."],
++    visibility = ["//:__subpackages__"],
 +)
+diff --git a/bindings/vectors/BUILD.bazel b/bindings/vectors/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/bindings/vectors/BUILD.bazel
+@@ -0,0 +1,8 @@
++# gazelle:ignore
++# Test vectors for blst
 +
-+cc_library(
-+    name = "blst",
-+    deps = [":blst_cgo"],
-+    visibility = ["//visibility:public"],
++filegroup(
++    name = "vectors",
++    srcs = glob(["hash_to_curve/*.json"], allow_empty = True),
++    visibility = ["//:__subpackages__"],
 +)
 diff --git a/bindings/go/BUILD.bazel b/bindings/go/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/bindings/go/BUILD.bazel
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,83 @@
 +# gazelle:ignore
 +# Go bindings for blst library
++#
++# Compiler flags are derived from the CGO directives in blst.go:13-16.
 +
 +load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
++
++COPTS = [
++    "-O2",
++    "-D__BLST_PORTABLE__",
++    "-D__BLST_CGO__",
++    "-fno-builtin-memcpy",
++    "-fno-builtin-memset",
++] + select({
++    "@io_bazel_rules_go//go/platform:amd64": [
++        "-D__ADX__",
++        "-mno-avx",
++    ],
++    "@io_bazel_rules_go//go/platform:mips64": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "@io_bazel_rules_go//go/platform:mips64le": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "@io_bazel_rules_go//go/platform:ppc64": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "@io_bazel_rules_go//go/platform:ppc64le": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "@io_bazel_rules_go//go/platform:riscv64": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "@io_bazel_rules_go//go/platform:s390x": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "//conditions:default": [],
++})
++
++cc_library(
++    name = "cgo",
++    srcs = [
++        "cgo_assembly.S",
++        "cgo_server.c",
++    ],
++    copts = COPTS,
++    deps = [
++        "//bindings",
++        "//build:build_cc",
++        "//src",
++    ],
++    visibility = ["//visibility:private"],
++)
 +
 +go_library(
 +    name = "go",
 +    srcs = [
 +        "blst.go",
-+        "cgo_server.c",
++        "rb_tree.go",
 +    ],
 +    cgo = True,
-+    cdeps = ["//:blst_cgo"],
-+    copts = [
-+        "-D__BLST_CGO__",
-+        "-O2",
-+        "-D__BLST_PORTABLE__",
-+    ] + select({
-+        "@io_bazel_rules_go//go/platform:amd64": ["-mno-avx", "-D__ADX__"],
-+        "//conditions:default": [],
-+    }),
++    cdeps = [
++        ":cgo",
++        "//bindings",
++        "//build:build_cc",
++        "//src",
++    ],
++    copts = COPTS,
 +    importpath = "github.com/supranational/blst/bindings/go",
 +    visibility = ["//visibility:public"],
 +)
@@ -106,9 +140,10 @@ new file mode 100644
 +    name = "go_test",
 +    srcs = [
 +        "blst_htoc_test.go",
++        "blst_miller_loop_test.go",
 +        "blst_minpk_test.go",
 +        "blst_minsig_test.go",
 +    ],
 +    embed = [":go"],
-+    data = glob(["hash_to_curve/*.json"], allow_empty = True),
++    data = ["//bindings/vectors:vectors"],
 +)
