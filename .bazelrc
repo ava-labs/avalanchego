@@ -2,7 +2,9 @@
 
 # Test settings (match scripts/build_test.sh)
 test --test_output=errors
-test --test_timeout=120
+# Per-category timeouts: short,moderate,long,eternal
+# "long" covers graft modules (coreth, evm, subnet-evm) via graft_go_test macro
+test --test_timeout=60,120,900,3600
 # Set HOME for tests that need it (e.g., config tests that expand $HOME/.avalanchego)
 test --test_env=HOME
 
