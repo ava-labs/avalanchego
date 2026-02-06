@@ -221,7 +221,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `metrics-expensive-enabled` | bool | Enable expensive debug-level metrics; this includes Firewood metrics | `true` |
+| `metrics-expensive-enabled` | bool | Enable expensive debug-level metrics | `true` |
 
 ## Security and Access
 
@@ -259,7 +259,6 @@ Configuration is provided as a JSON object. All fields are optional unless other
 > **WARNING**: `firewood` and `path` schemes are untested in production. Using `path` is strongly discouraged. To use `firewood`, you must also set the following config options:
 >
 > - `populate-missing-tries: nil`
-> - `state-sync-enabled: false`
 > - `snapshot-cache: 0`
 
 Failing to set these options will result in errors on VM initialization. Additionally, not all APIs are available - see these portions of the config documentation for more details.
