@@ -16,8 +16,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 )
 
 var _ types.Syncer = (*mockSyncer)(nil)
