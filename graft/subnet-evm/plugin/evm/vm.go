@@ -646,7 +646,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	syncStats := handlerstats.GetOrRegisterHandlerStats(metrics.Enabled)
 
 	switch scheme := vm.ethConfig.StateScheme; scheme {
-	case rawdb.HashScheme:
+	case rawdb.HashScheme, "":
 		// Create standalone EVM TrieDB (read only) for serving leafs requests.
 		// We create a standalone TrieDB here, so that it has a standalone cache from the one
 		// used by the node when processing blocks.
