@@ -18,8 +18,8 @@ type maturedAverager struct {
 var _ Averager = (*maturedAverager)(nil)
 
 // NewMaturedAverager creates a new matured averager that wraps the provided
-// averager. It returns zero from [averager.Read] until at least `halfLife“ duration has
-// passed since the first Observe call.
+// `averager`. It returns zero from [Averager.Read] until at least `halfLife` duration has
+// passed since the first [Averager.Observe] call.
 func NewMaturedAverager(halfLife time.Duration, averager Averager) Averager {
 	return &maturedAverager{
 		Averager: averager,
