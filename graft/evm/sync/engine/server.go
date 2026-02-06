@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -32,6 +33,9 @@ type BlockChain interface {
 
 	// ResetToStateSyncedBlock resets the blockchain to the given synced block.
 	ResetToStateSyncedBlock(block *types.Block) error
+
+	// TrieDB returns the database used for storing the state trie.
+	TrieDB() *triedb.Database
 }
 
 // SummaryProvider provides state summaries for blocks.

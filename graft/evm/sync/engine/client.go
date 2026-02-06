@@ -14,15 +14,20 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/vms/avm/network"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	blocksync "github.com/ava-labs/avalanchego/graft/evm/sync/block"
@@ -97,6 +102,8 @@ type ClientConfig struct {
 	Acceptor   BlockAcceptor
 	VerDB      *versiondb.Database
 	MetadataDB database.Database
+	Network    network.Network
+	SnowCtx    *snow.Context
 
 	// Extension points.
 	SyncSummaryProvider message.SyncSummaryProvider
@@ -394,14 +401,36 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		return nil, fmt.Errorf("failed to create code syncer: %w", err)
 	}
 
-	stateSyncer, err := evmstate.NewSyncer(
-		c.config.Client, c.config.ChainDB,
-		summary.GetBlockRoot(),
-		codeQueue, c.config.RequestSize,
-		c.config.LeafsRequestType,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
+	var stateSyncer types.Syncer
+	if tdb, ok := c.config.Chain.BlockChain().TrieDB().Backend().(*firewood.TrieDB); ok {
+		registerer, err := metrics.MakeAndRegister(c.config.SnowCtx.Metrics, "firewood_sync")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create firewood syncer metrics registerer: %w", err)
+		}
+		stateSyncer, err = evmstate.NewFirewoodSyncer(
+			syncer.Config{
+				Log:            c.config.SnowCtx.Log,
+				Registerer:     registerer,
+				StateSyncNodes: c.config.Client.StateSyncNodes(),
+			},
+			tdb.Firewood,
+			summary.GetBlockRoot(),
+			codeQueue,
+			c.config.Client,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create firewood syncer: %w", err)
+		}
+	} else {
+		stateSyncer, err = evmstate.NewSyncer(
+			c.config.Client, c.config.ChainDB,
+			summary.GetBlockRoot(),
+			codeQueue, c.config.RequestSize,
+			c.config.LeafsRequestType,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
+		}
 	}
 
 	syncers := []types.Syncer{blockSyncer, codeSyncer, stateSyncer}

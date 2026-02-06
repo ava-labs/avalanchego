@@ -353,6 +353,7 @@ func setupTestInfrastructure(t *testing.T, serverTrieDB *triedb.Database) (conte
 		handlers.NewLeafsRequestHandler(serverTrieDB, state.TrieKeyLength, nil, message.CorethCodec, handlerstats.NewNoopHandlerStats()),
 		nil,
 		nil,
+		nil,
 	)
 
 	clientDB := versiondb.New(memdb.New())
