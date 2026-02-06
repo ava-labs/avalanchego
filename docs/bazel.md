@@ -61,7 +61,7 @@ go_sdk.download(version = "1.24.12")
 |------|---------|---------------|-----------|
 | Bazel | 8.0.1 | `.bazelversion` + bazelisk | Current LTS with native bzlmod support |
 | Go | 1.24.12 | `MODULE.bazel` go_sdk.download | Project requirement |
-| rules_go | 0.56.0 | `MODULE.bazel` | Last version supporting Go 1.24.x |
+| rules_go | 0.56.0 | `MODULE.bazel` | Requires `pack` tool (removed in Go 1.25; see upgrade note) |
 | gazelle | 0.45.0 | `MODULE.bazel` | Compatible with rules_go 0.56.0 |
 
 **Go 1.25 upgrade note:** Go 1.25 removed the `pack` tool from the Go
@@ -95,77 +95,17 @@ Each module has its own `go.mod` with `replace` directives pointing to
 sibling modules. Bazel handles cross-module imports via `go.work` and
 gazelle prefix directives.
 
-### CGO Dependencies
-
-Several dependencies require special handling for CGO compilation in
-Bazel's sandboxed environment.
-
-#### blst (BLS Signatures)
-
-**Problem:** Complex CGO with assembly files that gazelle cannot handle.
-
-**Solution:** Disable gazelle and use a custom BUILD file via patch:
-```python
-go_deps.gazelle_override(build_file_generation = "off", path = "github.com/supranational/blst")
-go_deps.module_override(patches = ["//.bazel/patches:com_github_supranational_blst.patch"], ...)
-```
-
-The patch provides custom BUILD files for blst's subdirectories, handling
-the unity-build compilation model and cross-platform assembly selection.
-Compiler flags are derived from the CGO directives in `blst.go`.
-BLS signatures are performance-critical for Avalanche consensus.
-
-#### gnark-crypto (BLS12-381 for KZG)
-
-**Problem:** Assembly files use cross-package `#include` directives:
-```asm
-#include "../../../field/asm/element_4w/element_4w_arm64.s"
-```
-Bazel's sandboxed builds don't allow relative includes across package boundaries.
-
-**Solution:** Patch assembly files to convert `.s` includes to `.h` includes,
-allowing them to work within Bazel's sandbox:
-```python
-go_deps.module_override(
-    patches = ["//.bazel/patches:com_github_consensys_gnark_crypto_asm_includes.patch"],
-    path = "github.com/consensys/gnark-crypto",
-)
-```
-
-**Dependency chain:**
-```
-avalanchego → libevm → kzg4844 → go-kzg-4844 → gnark-crypto
-```
-
-gnark-crypto is used for KZG blob commitments (EIP-4844).
-
-#### libevm (secp256k1)
-
-**Problem:** Gazelle-generated BUILD file doesn't include libsecp256k1 C sources.
-
-**Solution:** Patch to add textual headers for the C sources and exclude
-the directory from gazelle:
-```python
-go_deps.gazelle_override(directives = ["gazelle:exclude crypto/secp256k1/**"], path = "github.com/ava-labs/libevm")
-```
-
-#### firewood-go-ethhash FFI
-
-**Problem:** Pre-built static libraries with `-L` paths that don't work
-in Bazel's sandbox.
-
-**Solution:** Patch to use `cc_import` for proper static library linking.
-
 ### Key Configuration Files
 
 | File | Purpose | Safe to Delete? |
 |------|---------|-----------------|
 | `MODULE.bazel` | Bazel module definition, dependencies, patches | **No** |
 | `MODULE.bazel.lock` | Locked dependency versions | Yes (regenerated) |
+| `go.work` | Go workspace aggregating all modules (used by `go_deps`) | **No** |
 | `.bazelrc` | Bazel build flags and settings | **No** |
 | `.bazelignore` | Directories excluded from Bazel (`.direnv`) | **No** |
 | `.bazelversion` | Bazel version pin (used by bazelisk) | **No** |
-| `BUILD.bazel` (root) | Gazelle config: prefix, exclusions (`tools/`), proto disable | **No** |
+| `BUILD.bazel` (root) | Gazelle config: prefix, exclusions, proto disable | **No** |
 | `.bazel/patches/*.patch` | Fixes for external dependencies | **No** |
 | `.bazel/defs.bzl` | Custom test macros for graft module timeouts | **No** |
 | `scripts/bazel_workspace_status.sh` | Git commit stamping for releases | **No** |
@@ -177,7 +117,7 @@ custom content that would be lost if deleted:
 
 | File | Custom Content |
 |------|---------------|
-| `BUILD.bazel` (root) | Gazelle directives (`prefix`, `exclude`, `proto`) |
+| `BUILD.bazel` (root) | Gazelle directives (prefix, exclude, proto) + `gazelle()` rule |
 | `main/BUILD.bazel` | `x_defs` for Git commit stamping |
 | `graft/coreth/BUILD.bazel` | `gazelle:prefix`, `gazelle:map_kind` for test timeouts |
 | `graft/evm/BUILD.bazel` | `gazelle:prefix`, `gazelle:map_kind` for test timeouts |
@@ -189,7 +129,8 @@ content (like `x_defs`), use `# keep` comments to prevent gazelle from
 removing them:
 
 ```python
-x_defs = {  # keep
+x_defs = {
+    # keep
     "github.com/ava-labs/avalanchego/version.GitCommit": "{STABLE_GIT_COMMIT}",
 },
 ```
@@ -229,21 +170,14 @@ directive:
 ### Custom Test Macros via `gazelle:map_kind`
 
 The graft modules (coreth, evm, subnet-evm) have longer test timeouts
-than the root module. To handle this, custom test macros are defined
-in `.bazel/defs.bzl`:
-
-| Macro | Timeout | Used By |
-|-------|---------|---------|
-| `graft_go_test_900s` | 900s (long) | coreth, subnet-evm |
-| `graft_go_test_600s` | 900s (closest to 600s) | evm |
-
-Gazelle automatically uses these macros via `gazelle:map_kind`
-directives in each graft module's root BUILD.bazel:
+than the root module. Each graft module's root BUILD.bazel uses a
+`gazelle:map_kind` directive to remap `go_test` to the `graft_go_test`
+macro (defined in `.bazel/defs.bzl`, Bazel "long" timeout, 900s):
 
 ```python
 # graft/coreth/BUILD.bazel
 # gazelle:prefix github.com/ava-labs/avalanchego/graft/coreth
-# gazelle:map_kind go_test graft_go_test_900s //.bazel:defs.bzl
+# gazelle:map_kind go_test graft_go_test //.bazel:defs.bzl
 ```
 
 This remaps all `go_test` targets in that subtree to use the custom
@@ -266,16 +200,123 @@ automatically.
 
 ### Patched Dependencies
 
-Some dependencies require patches for Bazel compatibility:
+Some dependencies require patches for Bazel compatibility. Patches are
+in `.bazel/patches/` and applied in `MODULE.bazel`.
+
+#### Patching strategies
+
+Ordered from least to most invasive:
+
+1. **Gazelle directives** (`gazelle_override` with directives)
+   Guide gazelle's BUILD file generation with directives like
+   `gazelle:exclude` to skip problematic directories. Use when
+   excluding certain source files is sufficient.
+
+2. **Sandbox relaxation** (`tags = ["no-sandbox"]`)
+   Disable sandboxing on specific targets so they can access
+   undeclared inputs (e.g., cross-package assembly includes). Use when
+   the build tool needs files that can't be declared as Bazel
+   dependencies due to tooling limitations. Trade-off: loses
+   hermeticity on those targets; incompatible with remote execution.
+
+3. **BUILD file augmentation** (patch on gazelle output)
+   Patch the gazelle-generated BUILD files to add missing sources,
+   flags, or attributes. Use when gazelle gets most things right but
+   misses something specific.
+
+4. **Custom BUILD files** (`build_file_generation = "off"` + patch)
+   Replace gazelle-generated BUILD files entirely. Use when the
+   dependency has complex build requirements (CGO, assembly,
+   non-standard layout) that gazelle can't handle.
 
 | Dependency | Issue | Solution |
 |------------|-------|----------|
-| `supranational/blst` | Complex CGO with assembly | Custom BUILD.bazel via patch |
-| `ava-labs/libevm` | Missing C sources for secp256k1 | Patch to add sources |
-| `consensys/gnark-crypto` | Assembly include paths | Patch asm includes for Bazel sandboxing |
-| `firewood-go-ethhash/ffi` | Pre-built static libraries | Custom BUILD.bazel via patch |
+| `ava-labs/libevm` | Missing C sources for secp256k1 | BUILD augmentation + gazelle directive excludes secp256k1 dir |
+| `firewood-go-ethhash/ffi` | Pre-built static libraries | Custom BUILD files with `cc_import` |
+| `supranational/blst` | Complex CGO with assembly | Custom BUILD files (gazelle disabled) |
+| `consensys/gnark-crypto` | Assembly cross-package includes | `no-sandbox` on bls12-381 `fp` and `fr` targets |
 
-Patches are in the `.bazel/patches/` directory and applied in `MODULE.bazel`.
+#### libevm (secp256k1)
+
+**Problem:** Gazelle-generated BUILD file doesn't include libsecp256k1 C
+sources.
+
+**Solution:** BUILD augmentation + gazelle directives. Two patches add
+C sources to the gazelle-generated BUILD files for `libsecp256k1` and
+`secp256k1`; a directive excludes the secp256k1 directory from
+generation:
+```python
+go_deps.module_override(
+    patches = [
+        "//.bazel/patches:com_github_ava_labs_libevm_libsecp256k1.patch",
+        "//.bazel/patches:com_github_ava_labs_libevm_secp256k1.patch",
+    ],
+    path = "github.com/ava-labs/libevm",
+)
+go_deps.gazelle_override(
+    directives = ["gazelle:exclude crypto/secp256k1/**"],
+    path = "github.com/ava-labs/libevm",
+)
+```
+
+#### firewood-go-ethhash FFI
+
+**Problem:** Pre-built static libraries with `-L` paths that don't work
+in Bazel's sandbox.
+
+**Solution:** Custom BUILD files with `cc_import` for proper static
+library linking. Gazelle can't generate these rules for pre-built
+libraries.
+
+#### blst (BLS Signatures)
+
+**Problem:** Complex CGO with assembly files that gazelle cannot handle.
+
+**Solution:** Custom BUILD files replacing gazelle output entirely.
+Gazelle is disabled and a patch provides custom BUILD files handling
+blst's unity-build compilation model with platform-specific assembly
+selection. Compiler flags are derived from the CGO directives in
+`blst.go`:
+```python
+go_deps.module_override(
+    patch_strip = 1,
+    patches = ["//.bazel/patches:com_github_supranational_blst.patch"],
+    path = "github.com/supranational/blst",
+)
+go_deps.gazelle_override(
+    build_file_generation = "off",
+    path = "github.com/supranational/blst",
+)
+```
+BLS signatures are performance-critical for Avalanche consensus.
+
+#### gnark-crypto (BLS12-381 for KZG)
+
+**Problem:** Assembly files use cross-package `#include` directives:
+```asm
+#include "../../../field/asm/element_4w/element_4w_arm64.s"
+```
+Bazel's sandboxed builds don't allow relative includes across package
+boundaries.
+
+**Solution:** Sandbox relaxation via `tags = ["no-sandbox"]` on the
+bls12-381 `fp` and `fr` targets, allowing the Go assembler to resolve
+relative includes from the full source tree in the execroot. Only
+bls12-381 is patched since it's the only curve in the dependency graph.
+This is simpler than duplicating assembly files or providing custom
+BUILD files for the entire module
+(see [rules_go#3636](https://github.com/bazel-contrib/rules_go/issues/3636)).
+```python
+go_deps.module_override(
+    patches = ["//.bazel/patches:com_github_consensys_gnark_crypto_asm_includes.patch"],
+    path = "github.com/consensys/gnark-crypto",
+)
+```
+
+**Dependency chain:**
+`avalanchego → libevm → kzg4844 → go-kzg-4844 → gnark-crypto`
+
+gnark-crypto is used for KZG blob commitments (EIP-4844).
 
 ### Protocol Buffers
 
@@ -379,12 +420,14 @@ grep -v tests/e2e | grep -v tests/upgrade | grep -v tests/fixture/bootstrapmonit
 | Subnet-EVM load tests | `graft/subnet-evm/tests/load/BUILD.bazel` |
 | Coreth warp tests | `graft/coreth/tests/warp/BUILD.bazel` |
 
-**When adding new non-unit tests**, add the manual tag:
+**When adding new non-unit tests**, add the manual tag. Use `go_test`
+in your BUILD.bazel -- in graft modules, `gazelle:map_kind` will
+automatically rewrite it to `graft_go_test`:
 ```python
 go_test(
     name = "my_e2e_test",
     srcs = ["my_e2e_test.go"],
-    tags = ["manual"],  # Not a unit test
+    tags = ["manual"],  # keep -- not a unit test
     deps = [...],
 )
 ```
@@ -393,7 +436,7 @@ go_test(
 
 ```bash
 # Update BUILD files
-task bazel-gazelle-generate                 # or: bazel run //:gazelle
+task bazel-gazelle-generate                 # runs gazelle for all modules
 
 # Format BUILD files
 task bazel-fmt                     # or: buildifier -r .
@@ -498,28 +541,18 @@ file.
 CGO is enabled via environment variables in `.bazelrc`:
 
 ```
-build --action_env=CGO_ENABLED=1
 build --action_env=CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
+build --action_env=CGO_ENABLED=1
 ```
 
-Some packages require specific CGO flags (e.g., BLST
-cryptography). These are configured in `.bazelrc` or handled via
-patches.
+Dependency-specific CGO issues are handled via patches (see
+Patched Dependencies above).
 
 ## Version Stamping
 
 The main binary includes Git commit information via `x_defs` in
-`main/BUILD.bazel`:
-
-```python
-go_binary(
-    name = "avalanchego",
-    embed = [":main_lib"],
-    x_defs = {
-        "github.com/ava-labs/avalanchego/version.GitCommit": "{STABLE_GIT_COMMIT}",
-    },
-)
-```
+`main/BUILD.bazel` (see BUILD.bazel Files with Custom Content above
+for the `# keep` annotation pattern).
 
 Stamping is enabled via the `release` config in `.bazelrc`:
 
@@ -533,12 +566,14 @@ bazel build --config=release //main:avalanchego   # Release build (stamped)
 1. **Go/rules_go version coupling** - Upgrading to Go 1.25+ requires
    also upgrading rules_go to v0.57.0+ (see Version Pinning section)
 
-2. **gnark-crypto assembly patches** - The assembly include patches need
-   maintenance when upgrading gnark-crypto versions
+2. **gnark-crypto sandbox relaxation** - The `no-sandbox` tags on bls12-381
+   targets (see "Sandbox relaxation" strategy above) mean those compilations
+   are not hermetically sandboxed. This is acceptable for a pinned dependency
+   but incompatible with remote execution.
 
 3. **Manual Go version sync** - Go version must be kept in sync across:
    - `MODULE.bazel` (`go_sdk.download(version = "...")`)
-   - `go.mod` files
+   - `go.work` and `go.mod` files
    - `nix/go/default.nix` (if using nix shell)
 
 ## Future Improvements
@@ -569,13 +604,18 @@ Implementation: Add BuildBuddy, Buildkite or similar remote cache service.
 External dependency patches in `.bazel/patches/` should be reviewed periodically:
 - Check if upstream projects have improved Bazel support
 - Test patches against dependency updates
-- Consider upstreaming BUILD files where feasible (especially gnark-crypto)
+- Consider upstreaming BUILD files where feasible
+- Monitor [rules_go#3636](https://github.com/bazel-contrib/rules_go/issues/3636) for
+  proper cross-package asm include support (would remove gnark-crypto's sandbox relaxation)
 
 ### Test Configuration
 
 Graft modules already have custom test timeouts via `gazelle:map_kind`
-(see "Custom Test Macros" section). Consider further stratification:
-- Root module unit tests: shorter timeout (60s instead of 120s)
+(see "Custom Test Macros" section). Note that `gazelle:map_kind`
+applies to all `go_test` targets in the subtree, including non-unit
+tests. This is harmless today since Bazel only runs unit tests, but
+may need revisiting if non-unit tests move to Bazel. Consider further
+stratification:
 - Integration tests: medium timeout (300s)
 - E2E tests: explicit long timeout (currently use `manual` tag)
 
