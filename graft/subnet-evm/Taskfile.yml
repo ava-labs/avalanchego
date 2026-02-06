@@ -12,7 +12,7 @@ tasks:
 
   build:
     desc: Compile Subnet EVM binary with git commit and static linking flags
-    cmd: ./scripts/build.sh {{.CLI_ARGS}} 
+    cmd: ./scripts/build.sh {{.CLI_ARGS}}
 
   build-antithesis-images:
     desc: Build Docker images for antithesis testing including avalanchego node and subnet-evm builder images
@@ -28,7 +28,7 @@ tasks:
 
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
-    cmd: ./scripts/build_test.sh 
+    cmd: ./scripts/build_test.sh
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
@@ -94,7 +94,7 @@ tasks:
     desc: Generates Go bindings from Solidity contracts (searches for all compile.go files)
     cmds:
       - cmd: find . -type f -name 'gen_*binding.go' -exec grep -l '^// Code generated - DO NOT EDIT\.$' {} \; | xargs -r rm
-      - cmd: find . -type f \( -name '*.abi' -o -name '*.bin' \) ! -path '*/artifacts/*' ! -path '*/setup-solc_downloads/*' | xargs -r rm
+      - cmd: find . -type f \( -name '*.abi' -o -name '*.bin' \) ! -path '*/artifacts/*' | xargs -r rm
       - cmd: find . -type f -name 'compile.go' -execdir go generate {} \;
 
   lint:
@@ -120,14 +120,14 @@ tasks:
       - task: check-generate-mocks
       - task: check-generate-rlp
       - task: check-generate-bindings
-  
+
   lint-fix:
     desc: Run golangci-lint with auto-fix where possible
     cmd: ../evm/scripts/lint_fix.sh
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
-    cmd: ./scripts/shellcheck.sh
+    cmd: ../../scripts/shellcheck.sh
 
   test-build-antithesis-images:
     desc: Test antithesis images build
