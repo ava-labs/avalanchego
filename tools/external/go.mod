@@ -12,7 +12,8 @@ module github.com/ava-labs/avalanchego/tools/external
 // - Run a tool
 //   - go tool -modfile=tools/external/go.mod [tool] [args]
 //   - ./scripts/run_tool.sh [tool] [args]
-
+//
+// See ../../go.mod for guidelines on updating the Go version.
 go 1.24.12
 
 tool (

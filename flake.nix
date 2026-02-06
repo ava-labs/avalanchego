@@ -54,6 +54,9 @@
             kind                                       # Kubernetes-in-Docker
             kubernetes-helm                            # Helm CLI (Kubernetes package manager)
 
+            # JSON processing
+            jq
+
             # Linters
             shellcheck
 
