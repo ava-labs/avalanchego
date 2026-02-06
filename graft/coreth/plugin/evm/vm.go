@@ -29,7 +29,6 @@ import (
 
 	// Force-load precompiles to trigger registration
 	_ "github.com/ava-labs/avalanchego/graft/coreth/precompile/registry"
-
 	// Force-load tracer engine to trigger registration
 	//
 	// We must import this package (not referenced elsewhere) so that the native "callTracer"

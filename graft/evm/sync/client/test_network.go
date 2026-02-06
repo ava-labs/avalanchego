@@ -25,13 +25,11 @@ type testNetwork struct {
 	nodesRequested []ids.NodeID
 }
 
-// P2PNetwork implements Network.
-func (t *testNetwork) P2PNetwork() *p2p.Network {
+func (*testNetwork) P2PNetwork() *p2p.Network {
 	panic("P2PNetwork unimplemented")
 }
 
-// P2PValidators implements Network.
-func (t *testNetwork) P2PValidators() *p2p.Validators {
+func (*testNetwork) P2PValidators() *p2p.Validators {
 	panic("P2PValidators unimplemented")
 }
 
