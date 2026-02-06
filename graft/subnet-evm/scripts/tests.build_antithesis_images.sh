@@ -18,13 +18,13 @@ SUBNET_EVM_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 # Discover the default tag that will be used for the image
 source "${SUBNET_EVM_PATH}"/scripts/constants.sh
-export IMAGE_TAG="${DOCKERHUB_TAG}"
+# shellcheck disable=SC2154
+export IMAGE_TAG="${commit_hash}"
 
 # Build the images
 bash -x "${SUBNET_EVM_PATH}"/scripts/build_antithesis_images.sh
 
 # Test the images
-AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
 export IMAGE_NAME="antithesis-subnet-evm-config"
 export DEBUG="${DEBUG:-}"
 set -x
