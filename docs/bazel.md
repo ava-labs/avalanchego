@@ -50,10 +50,10 @@ go_sdk.download(version = "1.24.12")
 | `go_sdk.host()` | Single source of truth via nix | Requires nix shell, not hermetic outside nix |
 | `rules_nixpkgs_go` | Bazel calls Nix directly, fully hermetic | **Incompatible with rules_go v0.56+** (toolchain API mismatch) |
 
-> **Note:** rules_nixpkgs_go v0.13.0 was attempted but is incompatible
-> with rules_go v0.56.0+. The rules_go toolchain API changed to require
-> a `pack` attribute that rules_nixpkgs_go doesn't provide.
-> See: https://github.com/tweag/rules_nixpkgs/issues/667
+> **Note:** rules_nixpkgs_go v0.13.0 proved incompatible with rules_go
+> v0.56.0+. The rules_go toolchain API changed to require a `pack`
+> attribute that rules_nixpkgs_go doesn't provide.  See:
+> https://github.com/tweag/rules_nixpkgs/issues/667
 
 ### Version Pinning
 
@@ -61,7 +61,7 @@ go_sdk.download(version = "1.24.12")
 |------|---------|---------------|-----------|
 | Bazel | 8.0.1 | `.bazelversion` + bazelisk | Current LTS with native bzlmod support |
 | Go | 1.24.12 | `MODULE.bazel` go_sdk.download | Project requirement |
-| rules_go | 0.56.0 | `MODULE.bazel` | **Critical**: Last version supporting Go 1.24.x |
+| rules_go | 0.56.0 | `MODULE.bazel` | Last version supporting Go 1.24.x |
 | gazelle | 0.45.0 | `MODULE.bazel` | Compatible with rules_go 0.56.0 |
 
 **Go 1.25 upgrade note:** Go 1.25 removed the `pack` tool from the Go
@@ -77,8 +77,8 @@ external `pack`).
 | LTS status | Older | Current |
 | WORKSPACE | Default | Deprecated (still works) |
 
-Bazel 8 is the current LTS with native bzlmod support. This repository
-uses pure bzlmod (MODULE.bazel) without WORKSPACE files.
+Bazel 8 is the current LTS with native bzlmod support. bzlmod replaces
+the legacy use of WORKSPACE files.
 
 ### Multi-Module Structure
 
