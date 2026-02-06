@@ -1,6 +1,6 @@
-load("//.bazel:defs.bzl", "graft_go_test_900s")
+load("//.bazel:defs.bzl", "graft_go_test")
 
-graft_go_test_900s(
+graft_go_test(
     name = "warp_test",
     srcs = ["warp_test.go"],
     embedsrcs = ["genesis.json"],

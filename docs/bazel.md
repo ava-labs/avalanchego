@@ -138,6 +138,12 @@ x_defs = {
 **Rule of thumb**: Don't delete BUILD.bazel files that contain gazelle
 directives or `# keep` comments.
 
+**Caveat**: `task bazel-gazelle-delete` skips files with `# keep`
+comments, and gazelle's update mode does not rename existing function
+calls. This means changes to `gazelle:map_kind` directives (e.g.,
+renaming a macro) won't propagate to `# keep` files automatically --
+they need a manual find-and-replace.
+
 ## Gazelle
 
 [Gazelle](https://github.com/bazelbuild/bazel-gazelle) automatically
