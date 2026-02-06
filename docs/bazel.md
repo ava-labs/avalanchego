@@ -110,7 +110,9 @@ go_deps.gazelle_override(build_file_generation = "off", path = "github.com/supra
 go_deps.module_override(patches = ["//.bazel/patches:com_github_supranational_blst.patch"], ...)
 ```
 
-The patch is based on [Prysm's blst.BUILD](https://github.com/prysmaticlabs/prysm/blob/develop/third_party/blst/blst.BUILD).
+The patch provides custom BUILD files for blst's subdirectories, handling
+the unity-build compilation model and cross-platform assembly selection.
+Compiler flags are derived from the CGO directives in `blst.go`.
 BLS signatures are performance-critical for Avalanche consensus.
 
 #### gnark-crypto (BLS12-381 for KZG)
