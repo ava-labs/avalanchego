@@ -713,7 +713,7 @@ func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
 	return vm.ctx.Metrics.Register(chainStateMetricsPrefix, chainStateRegisterer)
 }
 
-func (vm *VM) SetState(_ context.Context, state snow.State) error {
+func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	switch state {
 	case snow.StateSyncing:
 		vm.bootstrapped.Set(false)
@@ -721,7 +721,7 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	case snow.Bootstrapping:
 		return vm.onBootstrapStarted()
 	case snow.NormalOp:
-		return vm.onNormalOperationsStarted()
+		return vm.onNormalOperationsStarted(ctx)
 	default:
 		return snow.ErrUnknownState
 	}
@@ -744,19 +744,19 @@ func (vm *VM) onBootstrapStarted() error {
 }
 
 // onNormalOperationsStarted marks this VM as bootstrapped
-func (vm *VM) onNormalOperationsStarted() error {
+func (vm *VM) onNormalOperationsStarted(ctx context.Context) error {
 	if vm.bootstrapped.Get() {
 		return nil
 	}
 	vm.bootstrapped.Set(true)
 	// Initialize goroutines related to block building
 	// once we enter normal operation as there is no need to handle mempool gossip before this point.
-	return vm.initBlockBuilding()
+	return vm.initBlockBuilding(ctx)
 }
 
 // initBlockBuilding starts goroutines to manage block building
-func (vm *VM) initBlockBuilding() error {
-	ctx, cancel := context.WithCancel(context.TODO())
+func (vm *VM) initBlockBuilding(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
 	vm.cancel = cancel
 
 	ethTxPool, err := NewGossipEthTxPool(vm.txPool, vm.sdkMetrics)
