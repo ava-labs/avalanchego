@@ -11,9 +11,6 @@ set -euo pipefail
 # Directory above this script
 SUBNET_EVM_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
-# Path to the avalanchego repository root (now the parent of graft/)
-AVALANCHE_PATH=$( cd "${SUBNET_EVM_PATH}"; cd ../.. && pwd )
-
 source "${SUBNET_EVM_PATH}"/scripts/constants.sh
 
 # Use the current repo's commit hash for the avalanchego image tag

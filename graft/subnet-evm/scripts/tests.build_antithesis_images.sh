@@ -25,7 +25,6 @@ export IMAGE_TAG="${commit_hash}"
 bash -x "${SUBNET_EVM_PATH}"/scripts/build_antithesis_images.sh
 
 # Test the images
-AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
 export IMAGE_NAME="antithesis-subnet-evm-config"
 export DEBUG="${DEBUG:-}"
 set -x

@@ -8,7 +8,6 @@ SUBNET_EVM_PATH=$(
     cd "$(dirname "${BASH_SOURCE[0]}")"
     cd .. && pwd
 )
-REPO_ROOT="$SUBNET_EVM_PATH/../.."
 
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
@@ -16,7 +15,7 @@ source "$SUBNET_EVM_PATH"/scripts/constants.sh
 if [[ $# -eq 1 ]]; then
     BINARY_PATH=$1
 elif [[ $# -eq 0 ]]; then
-    BINARY_PATH="${AVALANCHEGO_BUILD_PATH:-$REPO_ROOT/build}/subnet-evm"
+    BINARY_PATH="${AVALANCHEGO_BUILD_PATH:-$AVALANCHE_PATH/build}/subnet-evm"
 else
     echo "Invalid arguments to build subnet-evm. Requires zero (default binary path) or one argument to specify the binary path."
     exit 1
@@ -31,7 +30,7 @@ go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_com
 # Symlink to both global and local plugin directories to simplify
 # usage for testing. The local directory should be preferred but the
 # global directory remains supported for backwards compatibility.
-LOCAL_PLUGIN_PATH="$REPO_ROOT/build/plugins"
+LOCAL_PLUGIN_PATH="$AVALANCHE_PATH/build/plugins"
 GLOBAL_PLUGIN_PATH="${HOME}/.avalanchego/plugins"
 for plugin_dir in "${GLOBAL_PLUGIN_PATH}" "${LOCAL_PLUGIN_PATH}"; do
     PLUGIN_PATH="${plugin_dir}/${DEFAULT_VM_ID}"

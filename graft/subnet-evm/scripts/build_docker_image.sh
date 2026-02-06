@@ -92,7 +92,6 @@ if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
   AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}:${image_tag}"
   echo "Building ${AVALANCHEGO_NODE_IMAGE} locally"
 
-  AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
   SKIP_BUILD_RACE=1 \
     DOCKER_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}" \
     BUILD_MULTI_ARCH="${BUILD_MULTI_ARCH}" \
@@ -105,7 +104,6 @@ GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 
 echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based of AvalancheGo@$image_tag"
 # Use repo root as context so Dockerfile can access graft/ directory
-AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
 # shellcheck disable=SC2154
 ${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${commit_hash}" \
   "$AVALANCHE_PATH" -f "$SUBNET_EVM_PATH/Dockerfile" \
