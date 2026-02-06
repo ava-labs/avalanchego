@@ -42,8 +42,9 @@ tasks:
       done
 
   bazel-gazelle-generate:
-    desc: Regenerate BUILD files with Gazelle (all modules)
+    desc: Ensure BUILD files are up-to-date by deleting and generating with Gazelle (all modules)
     cmds:
+      - task: bazel-gazelle-delete
       - bazel run //:gazelle
       - bazel run //graft/coreth:gazelle
       - bazel run //graft/evm:gazelle
