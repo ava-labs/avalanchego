@@ -1,0 +1,40 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "benchlist",
+    srcs = [
+        "benchable.go",
+        "benchlist.go",
+        "manager.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/networking/benchlist",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/metrics",
+        "//ids",
+        "//snow",
+        "//snow/validators",
+        "//utils/heap",
+        "//utils/math",
+        "//utils/set",
+        "//utils/timer/mockable",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "benchlist_test",
+    srcs = [
+        "benchable_test.go",
+        "benchlist_test.go",
+    ],
+    embed = [":benchlist"],
+    deps = [
+        "//ids",
+        "//snow/snowtest",
+        "//snow/validators",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

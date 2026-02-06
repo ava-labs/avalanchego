@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "choices",
+    srcs = [
+        "decidable.go",
+        "status.go",
+        "test_decidable.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/choices",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/wrappers",
+    ],
+)
+
+go_test(
+    name = "choices_test",
+    srcs = ["status_test.go"],
+    embed = [":choices"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

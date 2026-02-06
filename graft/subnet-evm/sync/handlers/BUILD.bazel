@@ -1,0 +1,68 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "handlers",
+    srcs = [
+        "block_request.go",
+        "code_request.go",
+        "handler.go",
+        "leafs_request.go",
+        "test_providers.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//graft/evm/core/state/snapshot",
+        "//graft/evm/message",
+        "//graft/evm/utils",
+        "//graft/subnet-evm/sync/handlers/stats",
+        "//graft/subnet-evm/sync/syncutils",
+        "//ids",
+        "//utils/units",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//ethdb/memorydb",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//triedb",
+    ],
+)
+
+graft_go_test(
+    name = "handlers_test",
+    srcs = [
+        "block_request_test.go",
+        "code_request_test.go",
+        "leafs_request_test.go",
+    ],
+    embed = [":handlers"],
+    deps = [
+        "//graft/evm/core/state/snapshot",
+        "//graft/evm/message",
+        "//graft/evm/sync/synctest",
+        "//graft/subnet-evm/consensus/dummy",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "//graft/subnet-evm/sync/handlers/stats",
+        "//graft/subnet-evm/sync/handlers/stats/statstest",
+        "//ids",
+        "//utils/units",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//ethdb/memorydb",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

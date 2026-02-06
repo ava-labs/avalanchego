@@ -1,0 +1,42 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "sampler",
+    srcs = [
+        "rand.go",
+        "uniform.go",
+        "uniform_replacer.go",
+        "weighted.go",
+        "weighted_heap.go",
+        "weighted_without_replacement.go",
+        "weighted_without_replacement_generic.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/sampler",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "//utils/math",
+        "@org_gonum_v1_gonum//mathext/prng",
+    ],
+)
+
+go_test(
+    name = "sampler_test",
+    srcs = [
+        "rand_test.go",
+        "uniform_benchmark_test.go",
+        "uniform_test.go",
+        "weighted_benchmark_test.go",
+        "weighted_heap_test.go",
+        "weighted_test.go",
+        "weighted_without_replacement_benchmark_test.go",
+        "weighted_without_replacement_test.go",
+    ],
+    embed = [":sampler"],
+    deps = [
+        "//utils/math",
+        "@com_github_stretchr_testify//require",
+        "@com_github_thepudds_fzgen//fuzzer",
+        "@org_gonum_v1_gonum//mathext/prng",
+    ],
+)

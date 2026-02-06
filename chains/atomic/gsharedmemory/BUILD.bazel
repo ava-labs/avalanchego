@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "gsharedmemory",
+    srcs = [
+        "filtered_batch.go",
+        "shared_memory_client.go",
+        "shared_memory_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chains/atomic",
+        "//database",
+        "//ids",
+        "//proto/pb/sharedmemory",
+        "//utils/set",
+    ],
+)
+
+go_test(
+    name = "gsharedmemory_test",
+    srcs = ["shared_memory_test.go"],
+    embed = [":gsharedmemory"],
+    deps = [
+        "//chains/atomic",
+        "//chains/atomic/atomictest",
+        "//database",
+        "//database/memdb",
+        "//database/prefixdb",
+        "//ids",
+        "//proto/pb/sharedmemory",
+        "//vms/rpcchainvm/grpcutils",
+        "@com_github_stretchr_testify//require",
+    ],
+)

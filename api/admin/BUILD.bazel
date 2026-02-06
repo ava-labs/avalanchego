@@ -1,0 +1,55 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "admin",
+    srcs = [
+        "client.go",
+        "key_value_reader.go",
+        "service.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/api/admin",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api",
+        "//api/server",
+        "//chains",
+        "//database",
+        "//database/rpcdb",
+        "//ids",
+        "//proto/pb/rpcdb",
+        "//utils",
+        "//utils/constants",
+        "//utils/formatting",
+        "//utils/json",
+        "//utils/logging",
+        "//utils/perms",
+        "//utils/profiler",
+        "//utils/rpc",
+        "//vms",
+        "//vms/registry",
+        "@com_github_gorilla_rpc//v2:rpc",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "admin_test",
+    srcs = [
+        "client_test.go",
+        "service_test.go",
+    ],
+    embed = [":admin"],
+    deps = [
+        "//api",
+        "//database/memdb",
+        "//ids",
+        "//proto/pb/rpcdb",
+        "//utils/formatting",
+        "//utils/logging",
+        "//utils/rpc",
+        "//vms/registry/registrymock",
+        "//vms/vmsmock",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "syncutils",
+    srcs = ["iterators.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/syncutils",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/core/state/snapshot",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+    ],
+)

@@ -1,0 +1,47 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "propertyfx",
+    srcs = [
+        "burn_operation.go",
+        "credential.go",
+        "factory.go",
+        "fx.go",
+        "mint_operation.go",
+        "mint_output.go",
+        "owned_output.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/propertyfx",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//vms/components/verify",
+        "//vms/fx",
+        "//vms/secp256k1fx",
+    ],
+)
+
+go_test(
+    name = "propertyfx_test",
+    srcs = [
+        "burn_operation_test.go",
+        "credential_test.go",
+        "factory_test.go",
+        "fx_test.go",
+        "mint_operation_test.go",
+        "mint_output_test.go",
+        "owned_output_test.go",
+    ],
+    embed = [":propertyfx"],
+    deps = [
+        "//codec/linearcodec",
+        "//ids",
+        "//utils/crypto/secp256k1",
+        "//utils/hashing",
+        "//utils/logging",
+        "//vms/components/verify",
+        "//vms/secp256k1fx",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -1,0 +1,56 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "block",
+    srcs = [
+        "abort_block.go",
+        "atomic_block.go",
+        "block.go",
+        "codec.go",
+        "commit_block.go",
+        "common_block.go",
+        "mock_block.go",
+        "parse.go",
+        "proposal_block.go",
+        "standard_block.go",
+        "visitor.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/block",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//ids",
+        "//snow",
+        "//utils/hashing",
+        "//utils/wrappers",
+        "//vms/platformvm/txs",
+        "@org_uber_go_mock//gomock",
+    ],
+)
+
+go_test(
+    name = "block_test",
+    srcs = [
+        "abort_block_test.go",
+        "atomic_block_test.go",
+        "commit_block_test.go",
+        "mocks_generate_test.go",
+        "parse_test.go",
+        "proposal_block_test.go",
+        "serialization_test.go",
+        "standard_block_test.go",
+    ],
+    embed = [":block"],
+    deps = [
+        "//codec",
+        "//ids",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+        "@com_github_stretchr_testify//require",
+    ],
+)

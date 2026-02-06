@@ -1,0 +1,64 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "atomic",
+    srcs = [
+        "codec.go",
+        "export_tx.go",
+        "gossip.go",
+        "import_tx.go",
+        "metadata.go",
+        "params.go",
+        "status.go",
+        "tx.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chains/atomic",
+        "//codec",
+        "//codec/linearcodec",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/plugin/evm/upgrade/ap0",
+        "//graft/coreth/plugin/evm/upgrade/ap5",
+        "//ids",
+        "//network/p2p/gossip",
+        "//snow",
+        "//utils",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//utils/hashing",
+        "//utils/math",
+        "//utils/set",
+        "//utils/units",
+        "//utils/wrappers",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+graft_go_test(
+    name = "atomic_test",
+    srcs = [
+        "gossip_test.go",
+        "tx_test.go",
+    ],
+    embed = [":atomic"],
+    deps = [
+        "//graft/coreth/plugin/evm/upgrade/ap5",
+        "//ids",
+        "//utils/crypto/secp256k1",
+        "//utils/math",
+        "//utils/units",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/secp256k1fx",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
+)

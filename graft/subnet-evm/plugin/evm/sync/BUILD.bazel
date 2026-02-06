@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "sync",
+    srcs = [
+        "client.go",
+        "executor_static.go",
+        "server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/versiondb",
+        "//graft/evm/core/state/snapshot",
+        "//graft/evm/message",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/eth",
+        "//graft/subnet-evm/sync/client",
+        "//graft/subnet-evm/sync/statesync",
+        "//ids",
+        "//snow/engine/snowman/block",
+        "//vms/components/chain",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)

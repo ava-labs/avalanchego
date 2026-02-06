@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "subnets",
+    srcs = [
+        "config.go",
+        "no_op_allower.go",
+        "subnet.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/subnets",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/consensus/snowball",
+        "//snow/engine/common",
+        "//utils/set",
+    ],
+)
+
+go_test(
+    name = "subnets_test",
+    srcs = [
+        "config_test.go",
+        "subnet_test.go",
+    ],
+    embed = [":subnets"],
+    deps = [
+        "//ids",
+        "//snow/consensus/snowball",
+        "//utils/set",
+        "@com_github_stretchr_testify//require",
+    ],
+)

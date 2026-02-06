@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "status",
+    srcs = [
+        "blockchain_status.go",
+        "status.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/status",
+    visibility = ["//visibility:public"],
+    deps = ["//vms/components/verify"],
+)
+
+go_test(
+    name = "status_test",
+    srcs = [
+        "blockchain_status_test.go",
+        "status_test.go",
+    ],
+    embed = [":status"],
+    deps = ["@com_github_stretchr_testify//require"],
+)
