@@ -215,6 +215,8 @@ type Config struct {
 	RequiredAvailableDiskSpacePercentage uint64 `json:"requiredAvailableDiskSpacePercentage"`
 	WarningAvailableDiskSpacePercentage  uint64 `json:"warningAvailableDiskSpacePercentage"`
 
+	WarningAvailableMemoryPercentage uint64 `json:"warningAvailableMemoryPercentage"`
+
 	TraceConfig trace.Config `json:"traceConfig"`
 
 	// See comment on [UseCurrentHeight] in platformvm.Config
