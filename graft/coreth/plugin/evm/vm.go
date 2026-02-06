@@ -29,6 +29,7 @@ import (
 
 	// Force-load precompiles to trigger registration
 	_ "github.com/ava-labs/avalanchego/graft/coreth/precompile/registry"
+
 	// Force-load tracer engine to trigger registration
 	//
 	// We must import this package (not referenced elsewhere) so that the native "callTracer"
@@ -41,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
@@ -58,6 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/coreth/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
@@ -582,13 +585,16 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 // If state sync is disabled, this function will wipe any ongoing summary from
 // disk to ensure that we do not continue syncing from an invalid snapshot.
 func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
-	// Create standalone EVM TrieDB (read only) for serving leafs requests.
-	// We create a standalone TrieDB here, so that it has a standalone cache from the one
-	// used by the node when processing blocks.
-	// However, Firewood does not support multiple TrieDBs, so we use the same one.
-	evmTrieDB := vm.eth.BlockChain().TrieDB()
-	if vm.ethConfig.StateScheme != customrawdb.FirewoodScheme {
-		evmTrieDB = triedb.NewDatabase(
+	leafHandlers := make(LeafHandlers)
+	leafMetricsNames := make(map[message.NodeType]string)
+	syncStats := handlerstats.GetOrRegisterHandlerStats(metrics.Enabled)
+
+	switch scheme := vm.ethConfig.StateScheme; scheme {
+	case rawdb.HashScheme:
+		// Create standalone EVM TrieDB (read only) for serving leafs requests.
+		// We create a standalone TrieDB here, so that it has a standalone cache from the one
+		// used by the node when processing blocks.
+		evmTrieDB := triedb.NewDatabase(
 			vm.chaindb,
 			&triedb.Config{
 				DBOverride: hashdb.Config{
@@ -596,22 +602,33 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				}.BackendConstructor,
 			},
 		)
+		// register default leaf request handler for state trie
+		stateLeafRequestConfig := &extension.LeafRequestConfig{
+			LeafType:   message.StateTrieNode,
+			MetricName: "sync_state_trie_leaves",
+			Handler: handlers.NewLeafsRequestHandler(evmTrieDB,
+				message.StateTrieKeyLength,
+				vm.blockChain, vm.networkCodec,
+				syncStats,
+			),
+		}
+		leafHandlers[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.Handler
+		leafMetricsNames[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.MetricName
+	case customrawdb.FirewoodScheme:
+		tdb, ok := vm.eth.BlockChain().TrieDB().Backend().(*firewood.TrieDB)
+		if !ok {
+			return fmt.Errorf("expected a %T with %s scheme, got %T", tdb, customrawdb.FirewoodScheme, vm.eth.BlockChain().TrieDB().Backend())
+		}
+		n := vm.Network.P2PNetwork()
+		if err := n.AddHandler(p2p.FirewoodRangeProofHandlerID, syncer.NewGetRangeProofHandler(tdb.Firewood)); err != nil {
+			return fmt.Errorf("adding firewood range proof handler: %w", err)
+		}
+		if err := n.AddHandler(p2p.FirewoodChangeProofHandlerID, syncer.NewGetChangeProofHandler(tdb.Firewood)); err != nil {
+			return fmt.Errorf("adding firewood change proof handler: %w", err)
+		}
+	default:
+		// PathDB is not supported.
 	}
-	leafHandlers := make(LeafHandlers)
-	leafMetricsNames := make(map[message.NodeType]string)
-	// register default leaf request handler for state trie
-	syncStats := handlerstats.GetOrRegisterHandlerStats(metrics.Enabled)
-	stateLeafRequestConfig := &extension.LeafRequestConfig{
-		LeafType:   message.StateTrieNode,
-		MetricName: "sync_state_trie_leaves",
-		Handler: handlers.NewLeafsRequestHandler(evmTrieDB,
-			message.StateTrieKeyLength,
-			vm.blockChain, vm.networkCodec,
-			syncStats,
-		),
-	}
-	leafHandlers[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.Handler
-	leafMetricsNames[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.MetricName
 
 	extraLeafConfig := vm.extensionConfig.ExtraSyncLeafHandlerConfig
 	if extraLeafConfig != nil {

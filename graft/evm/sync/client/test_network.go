@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -22,6 +23,16 @@ type testNetwork struct {
 	callback       func() // callback is called prior to processing each test call
 	requestErr     []error
 	nodesRequested []ids.NodeID
+}
+
+// P2PNetwork implements Network.
+func (t *testNetwork) P2PNetwork() *p2p.Network {
+	panic("P2PNetwork unimplemented")
+}
+
+// P2PValidators implements Network.
+func (t *testNetwork) P2PValidators() *p2p.Validators {
+	panic("P2PValidators unimplemented")
 }
 
 func (t *testNetwork) SendSyncedAppRequestAny(_ context.Context, _ *version.Application, _ []byte) ([]byte, ids.NodeID, error) {
