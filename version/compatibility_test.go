@@ -122,4 +122,8 @@ func TestCompatibility(t *testing.T) {
 			require.Equal(t, test.expected, compatibility.Compatible(peer))
 		})
 	}
+	t.Run("nil_peer_after_upgrade", func(t *testing.T) {
+		compatibility.clock.Set(upgradeTime)
+		require.False(t, compatibility.Compatible(nil), "nil peer should return false, not panic")
+	})
 }

@@ -28,6 +28,10 @@ type Compatibility struct {
 // This means that the version is connectable and that consensus messages can be
 // made to the peer.
 func (c *Compatibility) Compatible(peer *Application) bool {
+	if peer == nil {
+		return false
+	}
+
 	if c.Current.Major < peer.Major {
 		return false // If we are on an older major version, we are incompatible.
 	}
