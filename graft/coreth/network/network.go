@@ -157,12 +157,16 @@ func NewNetwork(
 	}, nil
 }
 
-func (n *network) Sample(ctx context.Context, limit int) []ids.NodeID {
+func (n *network) Sample(_ context.Context, limit int) []ids.NodeID {
+	if limit != 1 {
+		log.Warn("Sample called with limit > 1, but only 1 peer will be returned", "limit", limit)
+	}
+
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	node, ok, err := n.peers.GetAnyPeer(nil)
 	if err != nil {
-		log.Crit("error getting peer from peer tracker", "error", err)
+		log.Error("error getting peer from peer tracker", "error", err)
 		return nil
 	}
 	if !ok {
