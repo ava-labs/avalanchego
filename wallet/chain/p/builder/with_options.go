@@ -342,7 +342,7 @@ func (w *withOptions) NewAddContinuousValidatorTx(
 func (w *withOptions) NewSetAutoRestakeConfigTx(
 	txID ids.ID,
 	autoRestakeShares uint32,
-	period uint64,
+	period time.Duration,
 	options ...common.Option,
 ) (*txs.SetAutoRestakeConfigTx, error) {
 	return w.builder.NewSetAutoRestakeConfigTx(

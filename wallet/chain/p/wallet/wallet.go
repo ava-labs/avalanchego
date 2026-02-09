@@ -325,7 +325,7 @@ type Wallet interface {
 	IssueSetAutoRestakeConfigTx(
 		txID ids.ID,
 		autoRestakeShares uint32,
-		period uint64,
+		period time.Duration,
 		options ...common.Option,
 	) (*txs.Tx, error)
 
@@ -661,7 +661,7 @@ func (w *wallet) IssueAddContinuousValidatorTx(
 func (w *wallet) IssueSetAutoRestakeConfigTx(
 	txID ids.ID,
 	autoRestakeShares uint32,
-	period uint64,
+	period time.Duration,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewSetAutoRestakeConfigTx(

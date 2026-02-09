@@ -4626,18 +4626,18 @@ func TestStandardExecutorSetAutoRestakeConfigTx(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		newPeriod            uint64
+		newPeriod            time.Duration
 		newAutoRestakeShares uint32
 	}{
 		{
 			name:                 "updated period and auto-restake shares",
 			newAutoRestakeShares: uint32(300_000),
-			newPeriod:            uint64((30 * 24 * time.Hour).Seconds()),
+			newPeriod:            30 * 24 * time.Hour,
 		},
 		{
 			name:                 "period 0 (exit requested)",
 			newAutoRestakeShares: uint32(300_000),
-			newPeriod:            uint64(0),
+			newPeriod:            0,
 		},
 	}
 
@@ -4666,7 +4666,7 @@ func TestStandardExecutorSetAutoRestakeConfigTx(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(tt.newAutoRestakeShares, validator.AutoRestakeShares)
-			require.Equal(tt.newPeriod, uint64(validator.ContinuationPeriod.Seconds()))
+			require.Equal(tt.newPeriod, validator.ContinuationPeriod)
 		})
 	}
 }
