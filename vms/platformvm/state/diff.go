@@ -268,7 +268,7 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	// validator.
 	newValidator, status := d.currentStakerDiffs.GetValidator(subnetID, nodeID)
 	switch status {
-	case added, modified:
+	case added:
 		return newValidator, nil
 	case deleted:
 		return nil, database.ErrNotFound
@@ -321,12 +321,19 @@ func (d *diff) UpdateCurrentValidator(mutatedValidator *Staker) error {
 		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
 	}
 
-	d.currentStakerDiffs.UpdateValidator(oldValidator, mutatedValidator)
+	if err := d.DeleteCurrentValidator(oldValidator); err != nil {
+		return err
+	}
+	if err := d.PutCurrentValidator(mutatedValidator); err != nil {
+		return err
+	}
+	// return d.currentStakerDiffs.UpdateValidator(oldValidator, mutatedValidator)
+
 	return nil
 }
 
-func (d *diff) DeleteCurrentValidator(staker *Staker) {
-	d.currentStakerDiffs.DeleteValidator(staker)
+func (d *diff) DeleteCurrentValidator(staker *Staker) error {
+	return d.currentStakerDiffs.DeleteValidator(staker)
 }
 
 func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
@@ -389,7 +396,7 @@ func (d *diff) PutPendingValidator(staker *Staker) error {
 }
 
 func (d *diff) DeletePendingValidator(staker *Staker) {
-	d.pendingStakerDiffs.DeleteValidator(staker)
+	_ = d.pendingStakerDiffs.DeleteValidator(staker)
 }
 
 func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
@@ -615,9 +622,7 @@ func (d *diff) Apply(baseState Chain) error {
 					return err
 				}
 			case deleted:
-				baseState.DeleteCurrentValidator(validatorDiff.validator)
-			case modified:
-				if err := baseState.UpdateCurrentValidator(validatorDiff.validator); err != nil {
+				if err := baseState.DeleteCurrentValidator(validatorDiff.validator); err != nil {
 					return err
 				}
 			}
@@ -649,8 +654,6 @@ func (d *diff) Apply(baseState Chain) error {
 				}
 			case deleted:
 				baseState.DeletePendingValidator(validatorDiff.validator)
-			case modified:
-				return errors.New("modifying pending stakers not supported")
 			}
 
 			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)

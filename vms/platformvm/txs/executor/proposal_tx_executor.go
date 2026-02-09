@@ -383,8 +383,12 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		}
 
 		// Handle staker lifecycle.
-		e.onCommitState.DeleteCurrentValidator(stakerToReward)
-		e.onAbortState.DeleteCurrentValidator(stakerToReward)
+		if err := e.onCommitState.DeleteCurrentValidator(stakerToReward); err != nil {
+			return err
+		}
+		if err := e.onAbortState.DeleteCurrentValidator(stakerToReward); err != nil {
+			return err
+		}
 	case txs.DelegatorTx:
 		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
 			return err

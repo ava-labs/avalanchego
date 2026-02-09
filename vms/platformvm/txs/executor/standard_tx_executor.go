@@ -517,7 +517,9 @@ func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 	}
 
 	if isCurrentValidator {
-		e.state.DeleteCurrentValidator(staker)
+		if err := e.state.DeleteCurrentValidator(staker); err != nil {
+			return err
+		}
 	} else {
 		e.state.DeletePendingValidator(staker)
 	}

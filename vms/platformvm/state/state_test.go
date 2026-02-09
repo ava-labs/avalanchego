@@ -425,7 +425,7 @@ func TestState_writeStakers(t *testing.T) {
 				} else {
 					switch {
 					case staker.Priority.IsCurrentValidator():
-						state.DeleteCurrentValidator(staker)
+						require.NoError(state.DeleteCurrentValidator(staker))
 					case staker.Priority.IsPendingValidator():
 						state.DeletePendingValidator(staker)
 					case staker.Priority.IsCurrentDelegator():
@@ -987,7 +987,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 			})
 		}
 		for _, removed := range diff.removedValidators {
-			d.DeleteCurrentValidator(&removed)
+			require.NoError(d.DeleteCurrentValidator(&removed))
 
 			expectedValidators.Remove(subnetIDNodeID{
 				subnetID: removed.SubnetID,
@@ -2436,7 +2436,7 @@ func TestStateUpdateValidator(t *testing.T) {
 				stakerToRemove := currentStakerIterator.Value()
 				currentStakerIterator.Release()
 
-				state.DeleteCurrentValidator(stakerToRemove)
+				require.NoError(state.DeleteCurrentValidator(stakerToRemove))
 			},
 			expectedErr: database.ErrNotFound,
 		},

@@ -73,7 +73,6 @@ var (
 	CurrentPrefix                           = []byte("current")
 	PendingPrefix                           = []byte("pending")
 	ValidatorPrefix                         = []byte("validator")
-	ValidatorUptimePrefix                   = []byte("validatorUptime")
 	DelegatorPrefix                         = []byte("delegator")
 	SubnetValidatorPrefix                   = []byte("subnetValidator")
 	SubnetDelegatorPrefix                   = []byte("subnetDelegator")
@@ -376,8 +375,6 @@ type stateBlk struct {
 type state struct {
 	validatorState
 
-	uptimeTrackerState *UptimeTrackerState
-
 	validators validators.Manager
 	ctx        *snow.Context
 	upgrades   upgrade.Config
@@ -417,7 +414,6 @@ type state struct {
 	validatorsDB                 database.Database
 	currentValidatorsDB          database.Database
 	currentValidatorBaseDB       database.Database
-	currentValidatorUptimeDB     database.Database
 	currentValidatorList         linkeddb.LinkedDB
 	currentDelegatorBaseDB       database.Database
 	currentDelegatorList         linkeddb.LinkedDB
@@ -607,7 +603,6 @@ func New(
 
 	currentValidatorsDB := prefixdb.New(CurrentPrefix, validatorsDB)
 	currentValidatorBaseDB := prefixdb.New(ValidatorPrefix, currentValidatorsDB)
-	currentValidatorUptimeDB := prefixdb.New(ValidatorUptimePrefix, currentValidatorsDB)
 	currentDelegatorBaseDB := prefixdb.New(DelegatorPrefix, currentValidatorsDB)
 	currentSubnetValidatorBaseDB := prefixdb.New(SubnetValidatorPrefix, currentValidatorsDB)
 	currentSubnetDelegatorBaseDB := prefixdb.New(SubnetDelegatorPrefix, currentValidatorsDB)
@@ -761,8 +756,6 @@ func New(
 	s := &state{
 		validatorState: newValidatorState(),
 
-		uptimeTrackerState: NewUptimeTrackerState(currentValidatorUptimeDB),
-
 		validators: validators,
 		ctx:        ctx,
 		upgrades:   upgrades,
@@ -799,7 +792,6 @@ func New(
 		validatorsDB:                        validatorsDB,
 		currentValidatorsDB:                 currentValidatorsDB,
 		currentValidatorBaseDB:              currentValidatorBaseDB,
-		currentValidatorUptimeDB:            currentValidatorUptimeDB,
 		currentValidatorList:                linkeddb.NewDefault(currentValidatorBaseDB),
 		currentDelegatorBaseDB:              currentDelegatorBaseDB,
 		currentDelegatorList:                linkeddb.NewDefault(currentDelegatorBaseDB),
@@ -1010,11 +1002,7 @@ func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 }
 
 func (s *state) PutCurrentValidator(staker *Staker) error {
-	s.currentStakers.PutValidator(staker)
-	if staker.SubnetID == constants.PrimaryNetworkID {
-		s.uptimeTrackerState.SetUptime(staker.NodeID, 0, staker.StartTime)
-	}
-	return nil
+	return s.currentStakers.PutValidator(staker)
 }
 
 func (s *state) UpdateCurrentValidator(staker *Staker) error {
@@ -1027,15 +1015,20 @@ func (s *state) UpdateCurrentValidator(staker *Staker) error {
 		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
 	}
 
-	s.currentStakers.UpdateValidator(staker)
+	// return s.currentStakers.UpdateValidator(staker)
+	if err := s.DeleteCurrentValidator(oldValidator); err != nil {
+		return err
+	}
+
+	if err := s.PutCurrentValidator(staker); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (s *state) DeleteCurrentValidator(staker *Staker) {
-	s.currentStakers.DeleteValidator(staker)
-	if staker.SubnetID == constants.PrimaryNetworkID {
-		s.uptimeTrackerState.DeleteUptime(staker.NodeID)
-	}
+func (s *state) DeleteCurrentValidator(staker *Staker) error {
+	return s.currentStakers.DeleteValidator(staker)
 }
 
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
@@ -1059,12 +1052,11 @@ func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 }
 
 func (s *state) PutPendingValidator(staker *Staker) error {
-	s.pendingStakers.PutValidator(staker)
-	return nil
+	return s.pendingStakers.PutValidator(staker)
 }
 
 func (s *state) DeletePendingValidator(staker *Staker) {
-	s.pendingStakers.DeleteValidator(staker)
+	_ = s.pendingStakers.DeleteValidator(staker)
 }
 
 func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
@@ -1940,7 +1932,9 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := validatorIt.Value()
-		metadata := &validatorMetadata{}
+		metadata := &validatorMetadata{
+			txID: txID,
+		}
 		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
 			// Populate [StakerStartTime] using the tx as a default in the event
 			// it was added pre-durango and is not stored in the database.
@@ -1968,20 +1962,6 @@ func (s *state) loadCurrentValidators() error {
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
 		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
-
-		// Load uptime from new DB, fallback to old metadata for migration
-		err = s.uptimeTrackerState.LoadUptime(staker.NodeID)
-		switch {
-		case errors.Is(err, database.ErrNotFound):
-			// Fallback to old metadata , this will mark it for migration.
-			s.uptimeTrackerState.SetUptime(
-				staker.NodeID,
-				metadata.UpDuration,
-				time.Unix(int64(metadata.LastUpdated), 0),
-			)
-		case err != nil:
-			return err
-		}
 	}
 
 	subnetValidatorIt := s.currentSubnetValidatorList.NewIterator()
@@ -2287,7 +2267,6 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeExpiry(),
 		s.updateValidatorManager(updateValidators),
 		s.writeValidatorDiffs(height),
-		s.uptimeTrackerState.WriteUptime(UptimeCodecVersion0),
 		s.writeCurrentStakers(codecVersion),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
@@ -2322,7 +2301,6 @@ func (s *state) Close() error {
 		s.currentSubnetDelegatorBaseDB.Close(),
 		s.currentDelegatorBaseDB.Close(),
 		s.currentValidatorBaseDB.Close(),
-		s.currentValidatorUptimeDB.Close(),
 		s.currentValidatorsDB.Close(),
 		s.validatorsDB.Close(),
 		s.txDB.Close(),
@@ -2859,9 +2837,14 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 				// in the same block that the validator was added.
 				startTime := uint64(staker.StartTime.Unix())
 				metadata := &validatorMetadata{
-					txID:            staker.TxID,
-					StakerStartTime: startTime,
-					PotentialReward: staker.PotentialReward,
+					txID:        staker.TxID,
+					lastUpdated: staker.StartTime,
+
+					UpDuration:               0,
+					LastUpdated:              startTime,
+					StakerStartTime:          startTime,
+					PotentialReward:          staker.PotentialReward,
+					PotentialDelegateeReward: 0,
 				}
 
 				metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
@@ -2874,33 +2857,6 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 				}
 
 				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
-			case modified:
-				staker := validatorDiff.validator
-
-				// Preserve existing delegatee reward.
-				existingDelegateeReward, err := s.validatorState.GetDelegateeReward(subnetID, nodeID)
-				if err != nil {
-					return fmt.Errorf("failed to get existing delegatee reward: %w", err)
-				}
-
-				metadata := &validatorMetadata{
-					txID:                     staker.TxID,
-					StakerStartTime:          uint64(staker.StartTime.Unix()),
-					PotentialReward:          staker.PotentialReward,
-					PotentialDelegateeReward: existingDelegateeReward,
-				}
-
-				metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
-				if err != nil {
-					return fmt.Errorf("failed to serialize modified validator: %w", err)
-				}
-
-				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
-					return fmt.Errorf("failed to write modified validator to list: %w", err)
-				}
-
-				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
-
 			case deleted:
 				if err := validatorDB.Delete(validatorDiff.validator.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
@@ -3460,16 +3416,11 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 }
 
 func (s *state) GetUptime(vdrID ids.NodeID) (time.Duration, time.Time, error) {
-	return s.uptimeTrackerState.GetUptime(vdrID)
+	return s.validatorState.GetUptime(vdrID, constants.PrimaryNetworkID)
 }
 
 func (s *state) SetUptime(vdrID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
-	if !s.uptimeTrackerState.Exists(vdrID) {
-		return database.ErrNotFound
-	}
-
-	s.uptimeTrackerState.SetUptime(vdrID, upDuration, lastUpdated)
-	return nil
+	return s.validatorState.SetUptime(vdrID, constants.PrimaryNetworkID, upDuration, lastUpdated)
 }
 
 func markInitialized(db database.KeyValueWriter) error {

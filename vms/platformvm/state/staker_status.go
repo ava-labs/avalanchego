@@ -7,7 +7,6 @@ const (
 	unmodified diffValidatorStatus = iota
 	added
 	deleted
-	modified
 )
 
 type diffValidatorStatus uint8
