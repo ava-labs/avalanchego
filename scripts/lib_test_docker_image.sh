@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # shellcheck disable=SC2034
+
 # Start a local Docker registry and multiplatform builder for testing multi-arch
 # image builds. Sets REGISTRY_PORT as a side effect for use by the caller.
 function start_test_registry {
@@ -14,6 +15,7 @@ function start_test_registry {
   docker buildx create --use --name ci-builder --driver-opt network=host
 
   # Ensure registry and builder cleanup on teardown
+  # shellcheck disable=SC2329
   function cleanup {
     echo "stopping local docker registry"
     docker stop "${REGISTRY_CONTAINER_ID}"
