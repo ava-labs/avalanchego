@@ -250,48 +250,6 @@ To execute a benchmark with any of these options, you must use a compatible `CUR
 
 The `CONFIG` parameter currently only supports pre-defined configs and not passing a full JSON blob in, so that we can define corresponding names for each config option. The config name is attached as a label to the exported metrics and included in the name of the sub-benchmark (used by GitHub Action Benchmark to separate historical results with different configs).
 
-## Testing with Custom Dependency Versions
-
-The benchmarks support testing with custom versions of `libevm` and `firewood` dependencies. This is useful for:
-- Testing unreleased versions before merging
-- Benchmarking performance changes in dependencies
-- Reproducing issues with specific dependency versions
-
-### Local Usage
-
-**Prerequisite**: You must be in a nix shell (`nix develop`).
-
-Use `run_polyrepo.sh` to set up custom dependencies via environment variables:
-- `LIBEVM_REF` - Git ref for libevm (runs `go get` and `go mod tidy`)
-- `FIREWOOD_REF` - Git ref for firewood (runs `polyrepo sync firewood@FIREWOOD_REF`)
-
-```bash
-# Both libevm and firewood
-LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123def ./scripts/run_polyrepo.sh
-
-# Only firewood
-FIREWOOD_REF=abc123def ./scripts/run_polyrepo.sh
-
-# Only libevm
-LIBEVM_REF=v1.2.3 ./scripts/run_polyrepo.sh
-
-# Then run the benchmark
-./scripts/run_task.sh test-cchain-reexecution -- firewood-101-250k
-```
-
-### CI Usage
-
-Use `with-dependencies` to specify custom versions. Either or both can be provided:
-
-```bash
-gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
-  -f test=firewood-101-250k \
-  -f with-dependencies="firewood=abc123,libevm=v1.2.3" \
-  -f runner=blacksmith-4vcpu-ubuntu-2404
-```
-
-See [Trigger Workflow Dispatch with GitHub CLI](#trigger-workflow-dispatch-with-github-cli) for more examples.
-
 ## Metrics
 
 The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
@@ -365,18 +323,6 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
   -f timeout-minutes=60
 ```
 
-### Using Custom Dependency Versions
-
-Use `with-dependencies` to specify `firewood=<ref>` and/or `libevm=<ref>`:
-
-```bash
-gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
-  -f test=firewood-101-250k \
-  -f with-dependencies="firewood=abc123def,libevm=v1.2.3" \
-  -f runner=blacksmith-4vcpu-ubuntu-2404 \
-  -f timeout-minutes=60
-```
-
 ### Using Custom Parameters
 
 ```bash
@@ -388,14 +334,4 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
   -f config=default \
   -f runner=ubuntu-latest \
   -f timeout-minutes=360
-```
-
-### Pushing Post-Execution State to S3
-
-```bash
-gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
-  -f test=hashdb-101-250k \
-  -f runner=blacksmith-4vcpu-ubuntu-2404 \
-  -f push-post-state=s3://avalanchego-bootstrap-testing/cchain-current-state-new/ \
-  -f timeout-minutes=60
 ```

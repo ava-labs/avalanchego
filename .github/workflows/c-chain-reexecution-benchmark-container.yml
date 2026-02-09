@@ -31,9 +31,6 @@ on:
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
         default: 30
-      with-dependencies:
-        description: 'Dependencies to use (e.g., "firewood=abc123" or "firewood=abc,libevm=xyz")'
-        default: ''
 
   # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
   # entry in the corresponding JSON file.
@@ -52,12 +49,9 @@ jobs:
         shell: bash -x {0}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            FIREWOOD_REF="" LIBEVM_REF=""
-            [[ "${{ github.event.inputs.with-dependencies }}" =~ firewood=([^,]+) ]] && FIREWOOD_REF="${BASH_REMATCH[1]}"
-            [[ "${{ github.event.inputs.with-dependencies }}" =~ libevm=([^,]+) ]] && LIBEVM_REF="${BASH_REMATCH[1]}"
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s, "firewood-ref": "%s", "libevm-ref": "%s" }] }\n' \
+              printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
                 "${{ github.event.inputs.test }}" \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
@@ -65,9 +59,7 @@ jobs:
                 "${{ github.event.inputs.current-state-dir-src }}" \
                 "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.runner }}" \
-                "${{ github.event.inputs.timeout-minutes }}" \
-                "$FIREWOOD_REF" \
-                "$LIBEVM_REF"
+                "${{ github.event.inputs.timeout-minutes }}"
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
@@ -90,6 +82,8 @@ jobs:
       id-token: write
       contents: write
     runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
     steps:
       - uses: actions/checkout@v4
       - name: Install ARC Dependencies
@@ -100,23 +94,6 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
-      # Nix is required before calling polyrepo
-      # c-chain-reexecution-benchmark's Nix install will be skipped; installation is idempotent.
-      - name: Install Nix
-        if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
-        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Configure dependency versions
-        if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
-        shell: nix develop --command bash {0}
-        run: ./scripts/run_task.sh run-polyrepo
-        env:
-          LIBEVM_REF: ${{ matrix.libevm-ref }}
-          FIREWOOD_REF: ${{ matrix.firewood-ref }}
-          # Required for Nix builds on ARC runners
-          TMPDIR: /tmp
-          NIX_BUILD_TOP: /tmp
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
@@ -130,8 +107,7 @@ jobs:
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          push-github-action-benchmark: ${{ (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master')) && matrix.firewood-ref == '' }}
-          skip-benchmark-comparison: ${{ matrix.firewood-ref != '' || matrix.libevm-ref != '' }}
+          push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
           aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
