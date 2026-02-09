@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 
-# Ignore warnings about variables appearing unused since this file is not the consumer of the variables it defines.
 # shellcheck disable=SC2034
-
-# This script defines a helper function for Docker image test scripts. It is
-# intended to be sourced rather than executed.
-
 # Start a local Docker registry and multiplatform builder for testing multi-arch
 # image builds. Sets REGISTRY_PORT as a side effect for use by the caller.
 function start_test_registry {

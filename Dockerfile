@@ -2,8 +2,6 @@
 # to minimize the cost of version changes.
 ARG GO_VERSION=INVALID # This value is not intended to be used but silences a warning
 
-# AVALANCHEGO_NODE_IMAGE is only used by the subnet-evm target.
-# BuildKit skips unused stages, so this arg is not evaluated for --target=avalanchego.
 ARG AVALANCHEGO_NODE_IMAGE="invalid-image"
 
 # ============= Base Stage ================
