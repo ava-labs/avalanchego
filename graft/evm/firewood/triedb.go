@@ -211,6 +211,8 @@ func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	clear(t.tree.blockHashes)
 	t.tree.blockHashes[blockHash] = struct{}{}
 	t.tree.height = height
+	root, _ := t.Firewood.Root()
+	t.tree.root = common.Hash(root)
 }
 
 // Scheme returns the scheme of the database.
@@ -448,7 +450,7 @@ func (t *TrieDB) createProposal(parent *proposal, ops []ffi.BatchOp) (*proposal,
 
 	// Edge case: genesis block
 	block := parent.height + 1
-	if _, ok := parent.blockHashes[common.Hash{}]; ok && parent.root == types.EmptyRootHash {
+	if _, ok := parent.blockHashes[common.Hash{}]; ok && block == 1 {
 		block = 0
 	}
 

@@ -63,6 +63,7 @@ type SyncedNetworkClient interface {
 type Network interface {
 	validators.Connector
 	common.AppHandler
+	p2p.NodeSampler
 
 	SyncedNetworkClient
 
@@ -153,6 +154,20 @@ func NewNetwork(
 		appStats:                   stats.NewRequestHandlerStats(),
 		p2pValidators:              p2pValidators,
 	}, nil
+}
+
+func (n *network) Sample(ctx context.Context, limit int) []ids.NodeID {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	node, ok, err := n.peers.GetAnyPeer(nil)
+	if err != nil {
+		log.Crit("error getting peer from peer tracker", "error", err)
+		return nil
+	}
+	if !ok {
+		return nil
+	}
+	return []ids.NodeID{node}
 }
 
 // SendAppRequestAny synchronously sends request to an arbitrary peer with a

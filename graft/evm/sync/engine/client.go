@@ -403,7 +403,7 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 
 	var stateSyncer types.Syncer
 	if tdb, ok := c.config.Chain.BlockChain().TrieDB().Backend().(*firewood.TrieDB); ok {
-		registerer, err := metrics.MakeAndRegister(c.config.SnowCtx.Metrics, "firewood_sync")
+		registerer, err := metrics.MakeAndRegister(c.config.SnowCtx.Metrics, "sync_firewood")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create firewood syncer metrics registerer: %w", err)
 		}

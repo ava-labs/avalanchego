@@ -714,6 +714,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		StateSyncDone: vm.stateSyncDone,
 		Chain:         newChainContextAdapter(vm.eth),
 		State:         vm.State,
+		SnowCtx:       vm.ctx,
 		Client: client.New(
 			&client.Config{
 				Network:          vm.Network,

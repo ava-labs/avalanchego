@@ -55,6 +55,8 @@ var _ Client = (*client)(nil)
 // Network defines the interface for sending sync requests over the network.
 // This interface is implemented by the network layer in coreth and subnet-evm.
 type Network interface {
+	p2p.NodeSampler
+
 	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
 	// node version greater than or equal to minVersion.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
@@ -71,9 +73,6 @@ type Network interface {
 
 	// P2PNetwork returns the unabstracted [p2p.Network].
 	P2PNetwork() *p2p.Network
-
-	// P2PValidators returns the p2p.Validators used to select peers for sending requests.
-	P2PValidators() *p2p.Validators
 }
 
 // Client synchronously fetches data from the network to fulfill state sync requests.
@@ -135,7 +134,7 @@ func New(config *Config) *client {
 }
 
 func (c *client) AddClient(handlerID uint64) *p2p.Client {
-	return c.network.P2PNetwork().NewClient(handlerID, c.network.P2PValidators())
+	return c.network.P2PNetwork().NewClient(handlerID, c.network)
 }
 
 func (c *client) StateSyncNodes() []ids.NodeID {

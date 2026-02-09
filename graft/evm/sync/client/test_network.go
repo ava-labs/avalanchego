@@ -29,8 +29,8 @@ func (*testNetwork) P2PNetwork() *p2p.Network {
 	panic("P2PNetwork unimplemented")
 }
 
-func (*testNetwork) P2PValidators() *p2p.Validators {
-	panic("P2PValidators unimplemented")
+func (*testNetwork) Sample(context.Context, int) []ids.NodeID {
+	panic("Sample unimplemented")
 }
 
 func (t *testNetwork) SendSyncedAppRequestAny(_ context.Context, _ *version.Application, _ []byte) ([]byte, ids.NodeID, error) {
