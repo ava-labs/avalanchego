@@ -37,7 +37,7 @@ require (
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
 	github.com/compose-spec/compose-go v1.20.2
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
-	github.com/google/btree v1.1.2
+	github.com/google/btree v1.1.3
 	github.com/google/renameio/v2 v2.0.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.0
@@ -51,7 +51,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/mr-tron/base58 v1.2.0
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
-	github.com/onsi/ginkgo/v2 v2.13.1
+	github.com/onsi/ginkgo/v2 v2.23.3
 	github.com/pires/go-proxyproto v0.6.2
 	github.com/prometheus/client_golang v1.23.0
 	github.com/prometheus/client_model v0.6.2
@@ -94,10 +94,13 @@ require (
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
-require github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000 // indirect
+require (
+	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000 // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
+)
 
 require (
-	github.com/Microsoft/go-winio v0.6.1 // indirect
+	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
 	github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19
@@ -117,7 +120,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
-	github.com/dlclark/regexp2 v1.7.0 // indirect
+	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dop251/goja v0.0.0-20230806174421-c933cf95e127 // indirect
@@ -135,9 +138,8 @@ require (
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
-	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
-	github.com/gofrs/flock v0.8.1 // indirect
+	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
@@ -159,9 +161,9 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.17 // indirect
-	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/mitchellh/pointerstructure v1.2.0 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
@@ -175,7 +177,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
-	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sagikazarmark/locafero v0.9.0 // indirect
@@ -220,3 +222,9 @@ replace github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
 replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
 
 replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
+
+// Workaround for genproto ambiguous import conflict.
+// cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
+// Modern packages use split modules (genproto/googleapis/rpc, etc.).
+// Force use of newer split genproto to resolve ambiguity.
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1

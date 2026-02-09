@@ -6,7 +6,7 @@ package engine
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
 
 var _ Executor = (*staticExecutor)(nil)
