@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
-	"k8s.io/utils/ptr"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -4627,25 +4626,18 @@ func TestStandardExecutorSetAutoRestakeConfigTx(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		newPeriod            *uint64
-		newAutoRestakeShares *uint32
+		newPeriod            uint64
+		newAutoRestakeShares uint32
 	}{
 		{
-			name:      "updated period",
-			newPeriod: utils.PointerTo(uint64((30 * 24 * time.Hour).Seconds())),
-		},
-		{
-			name:                 "updated auto-restake shares",
-			newAutoRestakeShares: utils.PointerTo(uint32(300_000)),
-		},
-		{
 			name:                 "updated period and auto-restake shares",
-			newAutoRestakeShares: utils.PointerTo(uint32(300_000)),
-			newPeriod:            utils.PointerTo(uint64((30 * 24 * time.Hour).Seconds())),
+			newAutoRestakeShares: uint32(300_000),
+			newPeriod:            uint64((30 * 24 * time.Hour).Seconds()),
 		},
 		{
-			name:      "period 0 (exit requested)",
-			newPeriod: utils.PointerTo(uint64(0)),
+			name:                 "period 0 (exit requested)",
+			newAutoRestakeShares: uint32(300_000),
+			newPeriod:            uint64(0),
 		},
 	}
 
@@ -4673,13 +4665,8 @@ func TestStandardExecutorSetAutoRestakeConfigTx(t *testing.T) {
 			validator, err := diff.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 			require.NoError(err)
 
-			if tt.newAutoRestakeShares != nil {
-				require.Equal(*tt.newAutoRestakeShares, validator.AutoRestakeShares)
-			}
-
-			if tt.newPeriod != nil {
-				require.Equal(*tt.newPeriod, uint64(validator.ContinuationPeriod.Seconds()))
-			}
+			require.Equal(tt.newAutoRestakeShares, validator.AutoRestakeShares)
+			require.Equal(tt.newPeriod, uint64(validator.ContinuationPeriod.Seconds()))
 		})
 	}
 }
@@ -4831,7 +4818,7 @@ func TestStandardExecutorSetAutoRestakeConfigTxErrors(t *testing.T) {
 			diff, err := state.NewDiffOn(env.state)
 			require.NoError(err)
 
-			tx, err := wallet.IssueSetAutoRestakeConfigTx(addContValidatorTx.ID(), ptr.To(uint32(0)), ptr.To(uint64(0)))
+			tx, err := wallet.IssueSetAutoRestakeConfigTx(addContValidatorTx.ID(), 0, 0)
 			require.NoError(err)
 
 			if tt.updateState != nil {

@@ -330,8 +330,8 @@ func (w *withOptions) IssueAddContinuousValidatorTx(
 
 func (w *withOptions) IssueSetAutoRestakeConfigTx(
 	txID ids.ID,
-	autoRestakeShares *uint32,
-	period *uint64,
+	autoRestakeShares uint32,
+	period uint64,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	return w.wallet.IssueSetAutoRestakeConfigTx(
