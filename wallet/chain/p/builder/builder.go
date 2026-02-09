@@ -336,8 +336,8 @@ type Builder interface {
 
 	NewSetAutoRestakeConfigTx(
 		txID ids.ID,
-		autoRestakeShares *uint32,
-		period *uint64,
+		autoRestakeShares uint32,
+		period uint64,
 		options ...common.Option,
 	) (*txs.SetAutoRestakeConfigTx, error)
 }
@@ -1604,8 +1604,8 @@ func (b *builder) NewAddContinuousValidatorTx(
 
 func (b *builder) NewSetAutoRestakeConfigTx(
 	txID ids.ID,
-	autoRestakeShares *uint32,
-	period *uint64,
+	autoRestakeShares uint32,
+	period uint64,
 	options ...common.Option,
 ) (*txs.SetAutoRestakeConfigTx, error) {
 	toBurn := map[ids.ID]uint64{}
@@ -1647,16 +1647,6 @@ func (b *builder) NewSetAutoRestakeConfigTx(
 		return nil, err
 	}
 
-	var autoRestakeSharesVal uint32
-	if autoRestakeShares != nil {
-		autoRestakeSharesVal = *autoRestakeShares
-	}
-
-	var periodVal uint64
-	if period != nil {
-		periodVal = *period
-	}
-
 	tx := &txs.SetAutoRestakeConfigTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,
@@ -1667,8 +1657,8 @@ func (b *builder) NewSetAutoRestakeConfigTx(
 		}},
 		TxID:              txID,
 		Auth:              auth,
-		AutoRestakeShares: autoRestakeSharesVal,
-		Period:            periodVal,
+		AutoRestakeShares: autoRestakeShares,
+		Period:            period,
 	}
 	return tx, b.initCtx(tx)
 }
