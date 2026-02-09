@@ -3056,3 +3056,95 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	_, err = proVM.BuildBlock(t.Context())
 	require.NoError(err)
 }
+
+func TestBuildBlockFallback(t *testing.T) {
+	require := require.New(t)
+
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(t.Context()))
+	}()
+
+	proVM.ctx.SubnetID = ids.GenerateTestID()
+
+	someNodeID := ids.GenerateTestNodeID()
+
+	coreBlk0 := snowmantest.BuildChild(snowmantest.Genesis)
+	coreBlk1 := snowmantest.BuildChild(coreBlk0)
+
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case coreBlk0.ID():
+			return coreBlk0, nil
+		case coreBlk1.ID():
+			return coreBlk1, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
+		case bytes.Equal(b, coreBlk0.Bytes()):
+			return coreBlk0, nil
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+
+	// First, build and accept coreBlk0 through the proposerVM so it exists in State
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk0, nil
+	}
+
+	proBlk0, err := proVM.BuildBlock(t.Context())
+	require.NoError(err)
+	require.NoError(proBlk0.Verify(t.Context()))
+	require.NoError(proVM.SetPreference(t.Context(), proBlk0.ID()))
+	require.NoError(proBlk0.Accept(t.Context()))
+
+	// Now change the validator set to exclude this node
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		return map[ids.NodeID]*validators.GetValidatorOutput{
+			someNodeID: {
+				NodeID: someNodeID,
+				Weight: 10,
+			},
+		}, nil
+	}
+
+	// Set up to build coreBlk1
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk1, nil
+	}
+	coreVM.WaitForEventF = func(context.Context) (common.Message, error) {
+		return common.PendingTxs, nil
+	}
+
+	proVM.Clock.Set(coreBlk0.Timestamp().Add(time.Second))
+
+	// ProposerVM cannot build a block because this node is not among the validator set.
+	impatientContext, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
+	_, err = proVM.WaitForEvent(impatientContext)
+	cancel()
+	require.ErrorIs(err, context.DeadlineExceeded)
+
+	// However, it can build the block when we activate the fallback setting.
+	proVM.Config.FallbackNonValidatorCanPropose = true
+	proVM.Config.FallbackProposerMaxWaitTime = time.Millisecond * 100
+
+	msg, err := proVM.WaitForEvent(context.Background())
+	require.NoError(err)
+	require.Equal(common.PendingTxs, msg)
+
+	statefulBlock1, err := proVM.BuildBlock(t.Context())
+	require.NoError(err)
+
+	require.NoError(statefulBlock1.Verify(t.Context()))
+}

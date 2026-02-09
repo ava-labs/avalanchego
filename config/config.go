@@ -1352,6 +1352,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.ProposerMinBlockDelay = v.GetDuration(ProposerVMMinBlockDelayKey)
 	nodeConfig.SubnetConfigs = subnetConfigs
 
+	nodeConfig.FallbackNonValidatorCanPropose = v.GetBool(FallbackNonValidatorCanPropose)
+	nodeConfig.FallbackProposerMaxWaitTime = v.GetDuration(FallbackNonValidatorProposerMaxWaitTime)
+
 	// Benchlist
 	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.ConsensusParameters)
 	if err != nil {

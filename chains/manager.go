@@ -225,6 +225,9 @@ type ManagerConfig struct {
 	FrontierPollFrequency   time.Duration
 	ConsensusAppConcurrency int
 
+	FallbackNonValidatorCanPropose bool
+	FallbackProposerMaxWaitTime    time.Duration
+
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
 	BootstrapMaxTimeGetAncestors time.Duration
@@ -1191,12 +1194,14 @@ func (m *manager) createSnowmanChain(
 	proposerVM := proposervm.New(
 		vm,
 		proposervm.Config{
-			Upgrades:            m.Upgrades,
-			MinBlkDelay:         minBlockDelay,
-			NumHistoricalBlocks: numHistoricalBlocks,
-			StakingLeafSigner:   m.StakingTLSSigner,
-			StakingCertLeaf:     m.StakingTLSCert,
-			Registerer:          proposervmReg,
+			FallbackProposerMaxWaitTime:    m.FallbackProposerMaxWaitTime,
+			FallbackNonValidatorCanPropose: m.FallbackNonValidatorCanPropose,
+			Upgrades:                       m.Upgrades,
+			MinBlkDelay:                    minBlockDelay,
+			NumHistoricalBlocks:            numHistoricalBlocks,
+			StakingLeafSigner:              m.StakingTLSSigner,
+			StakingCertLeaf:                m.StakingTLSCert,
+			Registerer:                     proposervmReg,
 		},
 	)
 
