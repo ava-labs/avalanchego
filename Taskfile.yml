@@ -50,9 +50,8 @@ tasks:
     cmd: ./scripts/build.sh -r
 
   build-subnet-evm-image:
-    desc: Builds docker image for subnet-evm
-    dir: graft/subnet-evm
-    cmd: ./scripts/build_docker_image.sh
+    desc: Builds docker image for subnet-evm (builds avalanchego first if needed)
+    cmd: TARGET=subnet-evm ./scripts/build_image.sh
 
   build-tmpnetctl:
     desc: Builds tmpnetctl
