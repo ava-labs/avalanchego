@@ -19,11 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-var (
-	_ sync.DB[*RangeProof, struct{}] = (*database)(nil)
-
-	defaultSimultaneousWorkLimit = 8
-)
+var _ sync.DB[*RangeProof, struct{}] = (*database)(nil)
 
 // database wraps a Firewood [ffi.Database] to implement the xsync.DB interface.
 type database struct {
@@ -48,29 +44,20 @@ func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p
 }
 
 func newWithDB(config Config, db sync.DB[*RangeProof, struct{}], targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
-	if config.Registerer == nil {
-		config.Registerer = prometheus.NewRegistry()
-	}
-	if config.Log == nil {
-		config.Log = logging.NoLog{}
-	}
-	if config.SimultaneousWorkLimit == 0 {
-		config.SimultaneousWorkLimit = defaultSimultaneousWorkLimit
-	}
 	return sync.NewSyncer(
 		db,
-		sync.Config[*RangeProof, struct{}]{
-			RangeProofMarshaler:   rangeProofMarshaler{},
-			ChangeProofMarshaler:  changeProofMarshaler{},
+		targetRoot,
+		sync.Config{
 			EmptyRoot:             ids.ID(types.EmptyRootHash),
-			RangeProofClient:      rangeProofClient,
-			ChangeProofClient:     changeProofClient,
+			Registerer:            config.Registerer,
 			SimultaneousWorkLimit: config.SimultaneousWorkLimit,
 			Log:                   config.Log,
-			TargetRoot:            targetRoot,
 			StateSyncNodes:        config.StateSyncNodes,
 		},
-		config.Registerer,
+		rangeProofClient,
+		changeProofClient,
+		rangeProofMarshaler{},
+		changeProofMarshaler{},
 	)
 }
 
