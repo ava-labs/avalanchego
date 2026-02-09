@@ -308,13 +308,17 @@ func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, e
 }
 
 func (d *diff) PutCurrentValidator(staker *Staker) error {
+	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err == nil {
+		return fmt.Errorf("staker with tx id %s already exists", staker.TxID)
+	}
+
 	return d.currentStakerDiffs.PutValidator(staker)
 }
 
 func (d *diff) UpdateCurrentValidator(mutatedValidator *Staker) error {
 	oldValidator, err := d.GetCurrentValidator(mutatedValidator.SubnetID, mutatedValidator.NodeID)
 	if err != nil {
-		return err
+		return fmt.Errorf("getting validator with tx id %s: %w", mutatedValidator.TxID, err)
 	}
 
 	if err := oldValidator.ValidateMutation(mutatedValidator); err != nil {
@@ -333,6 +337,10 @@ func (d *diff) UpdateCurrentValidator(mutatedValidator *Staker) error {
 }
 
 func (d *diff) DeleteCurrentValidator(staker *Staker) error {
+	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); errors.Is(err, database.ErrNotFound) {
+		return fmt.Errorf("staker with tx id %s should not exist", staker.TxID)
+	}
+
 	return d.currentStakerDiffs.DeleteValidator(staker)
 }
 

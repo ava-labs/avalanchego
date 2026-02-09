@@ -93,6 +93,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
 	onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentValidator(gomock.Any(), gomock.Any()).AnyTimes()
 
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(
 		iterator.FromSlice(&state.Staker{
@@ -167,6 +168,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
 	onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentValidator(gomock.Any(), gomock.Any()).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: banffParentBlk,

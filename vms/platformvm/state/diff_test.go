@@ -388,6 +388,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
+	state.EXPECT().GetCurrentValidator(gomock.Any(), gomock.Any()).AnyTimes()
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)

@@ -270,7 +270,7 @@ func TestDiffStakersDeleteValidator(t *testing.T) {
 		require.NoError(v.UpdateValidator(staker, staker))
 
 		returnedStaker, status := v.GetValidator(staker.SubnetID, staker.NodeID)
-		require.Equal(0, status)
+		require.Equal(unmodified, status)
 		require.Equal(staker, returnedStaker)
 
 		require.NoError(v.DeleteValidator(staker))
