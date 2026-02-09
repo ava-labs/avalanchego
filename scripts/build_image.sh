@@ -17,7 +17,7 @@ set -euo pipefail
 # DOCKER_IMAGE=localhost:5001/avalanchego ./scripts/build_image.sh                      # Build and push to private registry
 # DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_MASTER=1 ./scripts/build_image.sh   # Push with tag `master`
 # TARGET=subnet-evm ./scripts/build_image.sh                                            # Build local subnet-evm image
-# TARGET=subnet-evm DOCKER_IMAGE=avaplatform/subnet-evm ./scripts/build_image.sh       # Build and push subnet-evm
+# TARGET=subnet-evm DOCKER_IMAGE=avaplatform/subnet-evm_avalanchego ./scripts/build_image.sh # Build and push subnet-evm
 
 # Multi-arch builds require Docker Buildx and QEMU. buildx should be enabled by
 # default in the version of docker included with Ubuntu 22.04, and qemu can be
@@ -71,7 +71,7 @@ case "${TARGET}" in
     target_build_args=(--build-arg "AVALANCHEGO_COMMIT=${git_commit}")
     ;;
   subnet-evm)
-    DOCKER_IMAGE="${DOCKER_IMAGE:-subnet-evm}"
+    DOCKER_IMAGE="${DOCKER_IMAGE:-subnet-evm_avalanchego}"
     SKIP_BUILD_RACE=1
 
     # Determine the base avalanchego node image. Priority:
