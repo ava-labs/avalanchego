@@ -356,13 +356,17 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Start syncing from the server, will be cancelled by the range proof handler
-	require.NoError(syncer.Sync(ctx))
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return syncer.Sync(ctx)
+	})
 
 	// Wait until we've processed some work before closing
 	require.Eventually(func() bool {
 		return db.NewIterator().Next()
 	}, 5*time.Second, 5*time.Millisecond)
 	cancel()
+	require.ErrorIsf(eg.Wait(), context.Canceled, "%T.Sync()", syncer)
 
 	ctx = t.Context()
 	newSyncer, err := sync.NewSyncer(

@@ -278,9 +278,8 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 				return // [s.workLock] released by defer.
 			}
 			// There's no work to do.
-			// Note that if [s].Close() is called, or [ctx] is canceled,
-			// Close() will be called, which will broadcast on [s.unprocessedWorkCond],
-			// which will cause Wait() to return, and this goroutine to exit.
+			// Note that if [ctx] is canceled, [s.close] will be called,
+			// which will signal [s.unprocessedWorkCond], unblocking this goroutine.
 			s.unprocessedWorkCond.Wait()
 		default:
 			s.processingWorkItems++
