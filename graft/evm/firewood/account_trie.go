@@ -5,6 +5,7 @@ package firewood
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -199,6 +200,7 @@ func (a *accountTrie) DeleteStorage(addr common.Address, key []byte) error {
 func (a *accountTrie) Hash() common.Hash {
 	hash, err := a.hash()
 	if err != nil {
+		fmt.Println(err)
 		log.Error("Failed to hash account trie", "error", err)
 		return common.Hash{}
 	}
