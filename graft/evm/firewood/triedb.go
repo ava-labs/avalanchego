@@ -448,9 +448,9 @@ func (t *TrieDB) createProposal(parent *proposal, ops []ffi.BatchOp) (*proposal,
 		return nil, fmt.Errorf("create proposal from parent root %s: %w", parent.root.Hex(), err)
 	}
 
-	// Edge case: genesis block
+	// Edge case: we know the genesis block has an empty parent hash.
 	block := parent.height + 1
-	if _, ok := parent.blockHashes[common.Hash{}]; ok && block == 1 {
+	if _, ok := parent.blockHashes[common.Hash{}]; ok && parent.height == 0 {
 		block = 0
 	}
 

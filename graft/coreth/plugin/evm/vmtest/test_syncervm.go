@@ -346,25 +346,23 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	generateAndAcceptBlocks(t, serverVM, numBlocks, testSetup.GenFn, nil, cb)
 
 	// make some accounts
-	r := rand.New(rand.NewSource(1))
-	currentRoot := serverVM.Ethereum().BlockChain().LastAcceptedBlock().Root()
 	var (
-		root                  common.Hash
-		accounts, allAccounts map[*utilstest.Key]*types.StateAccount
+		r                           = rand.New(rand.NewSource(1))
+		currentRoot                 = serverVM.Ethereum().BlockChain().LastAcceptedBlock().Root()
+		root                        common.Hash
+		fundedAccounts, allAccounts map[*utilstest.Key]*types.StateAccount
 	)
 	if test.StateScheme == customrawdb.FirewoodScheme {
 		tdb, ok := serverVM.Ethereum().BlockChain().TrieDB().Backend().(*firewood.TrieDB)
 		require.True(ok)
-		tdb.SetHashAndHeight(common.Hash{}, 0)
-		root, allAccounts = synctest.FillAccountsWithStorageAndCode(t, r, serverVM.Ethereum().BlockChain().StateCache(), currentRoot, 1000)
-		accounts = make(map[*utilstest.Key]*types.StateAccount)
-		for key, account := range allAccounts {
-			if len(account.CodeHash) == 0 || bytes.Equal(account.CodeHash, types.EmptyCodeHash[:]) {
-				accounts[key] = account
-			}
+		tdb.SetHashAndHeight(common.Hash{}, 0) // must be set for FillAccountsWithStorageAndCode to work
+	}
+	root, allAccounts = synctest.FillAccountsWithStorageAndCode(t, r, serverVM.Ethereum().BlockChain().StateCache(), currentRoot, 1000)
+	fundedAccounts = make(map[*utilstest.Key]*types.StateAccount)
+	for key, account := range allAccounts {
+		if len(account.CodeHash) == 0 || bytes.Equal(account.CodeHash, types.EmptyCodeHash[:]) {
+			fundedAccounts[key] = account
 		}
-	} else {
-		root, accounts = synctest.FillAccountsWithOverlappingStorage(t, r, serverVM.Ethereum().BlockChain().StateCache(), types.EmptyRootHash, 1000, 16)
 	}
 
 	// patch serverVM's lastAcceptedBlock to have the new root
@@ -381,9 +379,6 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	require.NoError(serverVM.SetLastAcceptedBlock(internalBlock.Block))
 	require.NoError(serverVM.PutLastAcceptedID(internalBlock.ID()))
 	require.NoError(serverVM.VersionDB().Commit())
-	if tdb, ok := serverVM.Ethereum().BlockChain().TrieDB().Backend().(*firewood.TrieDB); ok {
-		tdb.SetHashAndHeight(patchedBlock.Hash(), patchedBlock.NumberU64())
-	}
 
 	// initialise [syncerVM] with blank genesis state
 	// we also override [syncerVM]'s commit interval so the atomic trie works correctly.
@@ -459,7 +454,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 			AppSender: serverTest.AppSender,
 			SnowCtx:   serverTest.Ctx,
 		},
-		fundedAccounts: accounts,
+		fundedAccounts: fundedAccounts,
 		syncerVM:       syncerVMSetup,
 	}
 }
@@ -686,8 +681,11 @@ func generateAndAcceptBlocks(t *testing.T, vm extension.InnerVM, numBlocks int, 
 			accepted(block)
 		}
 	}
+
 	lastAccepted := vm.Ethereum().BlockChain().LastAcceptedBlock()
 	c := vm.Ethereum().BlockChain().StateCache()
+
+	// Firewood's state lives on disk, so we must copy the entire state into a new state cache, unlike HashDB.
 	if vm.Config().StateScheme == customrawdb.FirewoodScheme {
 		memdb := utilstest.CopyEthDB(t, vm.Ethereum().ChainDb())
 		tdb := triedb.NewDatabase(memdb, &triedb.Config{
@@ -696,6 +694,7 @@ func generateAndAcceptBlocks(t *testing.T, vm extension.InnerVM, numBlocks int, 
 		tdb.Backend().(*firewood.TrieDB).SetHashAndHeight(lastAccepted.Hash(), lastAccepted.NumberU64())
 		c = extstate.NewDatabaseWithNodeDB(memdb, tdb)
 	}
+
 	_, _, err := core.GenerateChainFromStateCache(
 		vm.Ethereum().BlockChain().Config(),
 		lastAccepted,
