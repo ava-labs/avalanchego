@@ -337,7 +337,7 @@ type Builder interface {
 	NewSetAutoRestakeConfigTx(
 		txID ids.ID,
 		autoRestakeShares uint32,
-		period uint64,
+		period time.Duration,
 		options ...common.Option,
 	) (*txs.SetAutoRestakeConfigTx, error)
 }
@@ -1605,7 +1605,7 @@ func (b *builder) NewAddContinuousValidatorTx(
 func (b *builder) NewSetAutoRestakeConfigTx(
 	txID ids.ID,
 	autoRestakeShares uint32,
-	period uint64,
+	period time.Duration,
 	options ...common.Option,
 ) (*txs.SetAutoRestakeConfigTx, error) {
 	toBurn := map[ids.ID]uint64{}
@@ -1658,7 +1658,7 @@ func (b *builder) NewSetAutoRestakeConfigTx(
 		TxID:              txID,
 		Auth:              auth,
 		AutoRestakeShares: autoRestakeShares,
-		Period:            period,
+		Period:            uint64(period.Seconds()),
 	}
 	return tx, b.initCtx(tx)
 }
