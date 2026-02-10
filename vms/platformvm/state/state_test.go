@@ -2479,7 +2479,7 @@ func TestStateUpdateValidator(t *testing.T) {
 				test.updateValidator(&validator)
 			}
 
-			// err = state.UpdateCurrentValidator(&validator)
+			err = state.UpdateCurrentValidator(&validator)
 			require.ErrorIs(err, test.expectedErr)
 		})
 	}

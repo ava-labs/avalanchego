@@ -277,7 +277,10 @@ func TestDiffStakersUpdateValidatorBTreeOrdering(t *testing.T) {
 	mutatedStaker := *staker
 	mutatedStaker.NextTime = staker.NextTime.Add(time.Hour)
 	mutatedStaker.Weight = staker.Weight + 10
-	// require.NoError(v.UpdateValidator(staker, &mutatedStaker))
+	prevStaker, gotStatus := v.GetValidator(staker.SubnetID, staker.NodeID)
+	require.Equal(added, gotStatus)
+	require.NoError(v.DeleteValidator(prevStaker))
+	require.NoError(v.PutValidator(&mutatedStaker))
 
 	// Verify only one staker exists in addedOrModifiedStakers (not two)
 	stakerIterator := v.GetStakerIterator(iterator.Empty[*Staker]{})
