@@ -3,7 +3,8 @@
 set -euo pipefail
 
 AVALANCHE_PATH="$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )"
-"${AVALANCHE_PATH}"/scripts/run_tool.sh actionlint "${@}"
+# Only lint top-level workflow files (excludes non-workflow YAML like nfpm configs in subdirectories)
+"${AVALANCHE_PATH}"/scripts/run_tool.sh actionlint "${AVALANCHE_PATH}"/.github/workflows/*.yml "${AVALANCHE_PATH}"/.github/workflows/*.yaml "${@}"
 
 echo "Checking use of scripts/* in GitHub Actions workflows..."
 SCRIPT_USAGE=
