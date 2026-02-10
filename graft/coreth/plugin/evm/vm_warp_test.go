@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
@@ -125,7 +124,7 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 	// Verify that the constructed block contains the expected log with an unsigned warp message in the log data
 	ethBlock1 := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
 	require.Len(ethBlock1.Transactions(), 1)
-	receipts := rawdb.ReadReceipts(vm.chaindb, ethBlock1.Hash(), ethBlock1.NumberU64(), ethBlock1.Time(), vm.chainConfig)
+	receipts := vm.blockChain.GetReceiptsByHash(ethBlock1.Hash())
 	require.Len(receipts, 1)
 
 	require.Len(receipts[0].Logs, 1)
