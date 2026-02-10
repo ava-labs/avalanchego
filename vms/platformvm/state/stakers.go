@@ -41,10 +41,6 @@ type CurrentStakers interface {
 	// Invariant: [staker] is currently a CurrentValidator
 	DeleteCurrentValidator(staker *Staker) error
 
-	// UpdateCurrentValidator updates the [staker] describing a validator to the
-	// staker set. Only specific mutable fields can be updated.
-	UpdateCurrentValidator(staker *Staker) error
-
 	// SetDelegateeReward sets the accrued delegation rewards for [nodeID] on
 	// [subnetID] to [amount].
 	SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error
@@ -173,25 +169,6 @@ func (v *baseStakers) DeleteValidator(staker *Staker) error {
 	validatorDiff.validator = staker
 
 	v.stakers.Delete(staker)
-	return nil
-}
-
-// Invariant: [mutatedValidator] is a valid mutation.
-func (v *baseStakers) UpdateValidator(mutatedValidator *Staker) error {
-	oldValidator, err := v.GetValidator(mutatedValidator.SubnetID, mutatedValidator.NodeID)
-	if err != nil {
-		return fmt.Errorf("getting previous validator: %w", err)
-	}
-
-	// TODO how is the update handled in delete/add
-	if err := v.DeleteValidator(oldValidator); err != nil {
-		return err
-	}
-
-	if err := v.PutValidator(mutatedValidator); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -339,6 +316,7 @@ func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
 
 // GetValidator attempts to fetch the validator with the given subnetID and
 // nodeID.
+// TODO
 // Invariant: Assumes that the validator will never be removed and then added.
 func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, diffValidatorStatus) {
 	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
@@ -384,24 +362,6 @@ func (s *diffStakers) DeleteValidator(staker *Staker) error {
 			s.deletedStakers = make(map[ids.ID]*Staker)
 		}
 		s.deletedStakers[staker.TxID] = staker
-	}
-
-	return nil
-}
-
-// Invariants:
-//   - [oldValidator] must be an existing validator
-//   - [mutatedValidator] must be a valid mutation of [oldValidator].
-func (s *diffStakers) UpdateValidator(
-	oldValidator *Staker,
-	mutatedValidator *Staker,
-) error {
-	if err := s.DeleteValidator(oldValidator); err != nil {
-		return err
-	}
-
-	if err := s.PutValidator(mutatedValidator); err != nil {
-		return err
 	}
 
 	return nil

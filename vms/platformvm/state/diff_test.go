@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -388,7 +387,6 @@ func TestDiffCurrentValidator(t *testing.T) {
 	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
-	state.EXPECT().GetCurrentValidator(gomock.Any(), gomock.Any()).Return(nil, database.ErrNotFound).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -1041,169 +1039,4 @@ func TestDiffStacking(t *testing.T) {
 	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
 	require.Equal(owner3, owner)
-}
-
-func TestDiffUpdateValidatorErrors(t *testing.T) {
-	tests := []struct {
-		name            string
-		updateValidator func(*Staker)
-		updateState     func(*require.Assertions, Diff)
-		expectedErr     error
-	}{
-		{
-			name: "invalid mutation",
-			updateValidator: func(validator *Staker) {
-				validator.Weight = 5
-			},
-			expectedErr: ErrInvalidStakerMutation,
-		},
-		{
-			name: "invalid staker mutation",
-			updateValidator: func(staker *Staker) {
-				staker.Weight -= 1
-			},
-			expectedErr: ErrInvalidStakerMutation,
-		},
-		{
-			name: "staker not found",
-			updateValidator: func(staker *Staker) {
-				staker.NodeID = ids.GenerateTestNodeID()
-			},
-			expectedErr: database.ErrNotFound,
-		},
-		{
-			name: "missing validator",
-			updateValidator: func(validator *Staker) {
-				validator.NodeID = ids.GenerateTestNodeID()
-			},
-			expectedErr: database.ErrNotFound,
-		},
-		{
-			name: "deleted validator",
-			updateState: func(require *require.Assertions, diff Diff) {
-				currentStakerIterator, err := diff.GetCurrentStakerIterator()
-				require.NoError(err)
-				require.True(currentStakerIterator.Next())
-
-				stakerToRemove := currentStakerIterator.Value()
-				currentStakerIterator.Release()
-
-				require.NoError(diff.DeleteCurrentValidator(stakerToRemove))
-			},
-			expectedErr: database.ErrNotFound,
-		},
-		{
-			name: "valid mutation",
-			updateValidator: func(validator *Staker) {
-				validator.Weight = 15
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			state := newTestState(t, memdb.New())
-
-			blsKey, err := localsigner.New()
-			require.NoError(err)
-
-			currentValidator := &Staker{
-				TxID:      ids.GenerateTestID(),
-				NodeID:    ids.GenerateTestNodeID(),
-				PublicKey: blsKey.PublicKey(),
-				SubnetID:  ids.GenerateTestID(),
-				Weight:    10,
-				StartTime: time.Unix(1, 0),
-				EndTime:   time.Unix(2, 0),
-				NextTime:  time.Unix(2, 0),
-				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
-			}
-			require.NoError(state.PutCurrentValidator(currentValidator))
-
-			d, err := NewDiffOn(state)
-			require.NoError(err)
-
-			if test.updateState != nil {
-				test.updateState(require, d)
-			}
-
-			validator := *currentValidator
-			if test.updateValidator != nil {
-				test.updateValidator(&validator)
-			}
-
-			err = d.UpdateCurrentValidator(&validator)
-			require.ErrorIs(err, test.expectedErr)
-		})
-	}
-}
-
-func TestDiffUpdateValidator(t *testing.T) {
-	require := require.New(t)
-
-	subnetID := ids.GenerateTestID()
-
-	state := newTestState(t, memdb.New())
-	d, err := NewDiffOn(state)
-	require.NoError(err)
-
-	blsKey, err := localsigner.New()
-	require.NoError(err)
-
-	validator := &Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: blsKey.PublicKey(),
-		SubnetID:  subnetID,
-		Weight:    10,
-		StartTime: time.Unix(1, 0),
-		EndTime:   time.Unix(20, 0),
-		NextTime:  time.Unix(20, 0),
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
-	}
-
-	require.NoError(d.PutCurrentValidator(validator))
-
-	// First update
-	mutatedValidator := *validator
-	mutatedValidator.Weight = 35
-
-	require.NoError(d.UpdateCurrentValidator(&mutatedValidator))
-
-	currentValidator, err := d.GetCurrentValidator(subnetID, validator.NodeID)
-	require.NoError(err)
-
-	require.Equal(uint64(35), currentValidator.Weight)
-
-	// Second update
-	mutatedValidator = *currentValidator
-	mutatedValidator.Weight = 45
-
-	require.NoError(d.UpdateCurrentValidator(&mutatedValidator))
-
-	currentValidator, err = d.GetCurrentValidator(subnetID, validator.NodeID)
-	require.NoError(err)
-
-	require.Equal(uint64(45), currentValidator.Weight)
-
-	// Check state after diff is applied
-	expectedStakersIterator, err := d.GetCurrentStakerIterator()
-	require.NoError(err)
-
-	expectedStakers := iterator.ToSlice(expectedStakersIterator)
-	expectedStakersIterator.Release()
-
-	require.NoError(d.Apply(state))
-
-	actualStakersIterator, err := state.GetCurrentStakerIterator()
-	require.NoError(err)
-	actualStakers := iterator.ToSlice(actualStakersIterator)
-	actualStakersIterator.Release()
-
-	require.Equal(
-		expectedStakers,
-		actualStakers,
-	)
 }

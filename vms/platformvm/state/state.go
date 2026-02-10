@@ -1005,28 +1005,6 @@ func (s *state) PutCurrentValidator(staker *Staker) error {
 	return s.currentStakers.PutValidator(staker)
 }
 
-func (s *state) UpdateCurrentValidator(staker *Staker) error {
-	oldValidator, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-	if err != nil {
-		return err
-	}
-
-	if err := oldValidator.ValidateMutation(staker); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
-	}
-
-	// return s.currentStakers.UpdateValidator(staker)
-	if err := s.DeleteCurrentValidator(oldValidator); err != nil {
-		return err
-	}
-
-	if err := s.PutCurrentValidator(staker); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (s *state) DeleteCurrentValidator(staker *Staker) error {
 	return s.currentStakers.DeleteValidator(staker)
 }

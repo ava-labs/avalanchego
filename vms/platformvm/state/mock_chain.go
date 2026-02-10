@@ -710,20 +710,6 @@ func (mr *MockChainMockRecorder) SetTimestamp(tm any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockChain)(nil).SetTimestamp), tm)
 }
 
-// UpdateCurrentValidator mocks base method.
-func (m *MockChain) UpdateCurrentValidator(staker *Staker) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateCurrentValidator", staker)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateCurrentValidator indicates an expected call of UpdateCurrentValidator.
-func (mr *MockChainMockRecorder) UpdateCurrentValidator(staker any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentValidator", reflect.TypeOf((*MockChain)(nil).UpdateCurrentValidator), staker)
-}
-
 // WeightOfL1Validators mocks base method.
 func (m *MockChain) WeightOfL1Validators(subnetID ids.ID) (uint64, error) {
 	m.ctrl.T.Helper()

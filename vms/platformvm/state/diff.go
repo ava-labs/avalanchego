@@ -315,27 +315,6 @@ func (d *diff) PutCurrentValidator(staker *Staker) error {
 	return d.currentStakerDiffs.PutValidator(staker)
 }
 
-func (d *diff) UpdateCurrentValidator(mutatedValidator *Staker) error {
-	oldValidator, err := d.GetCurrentValidator(mutatedValidator.SubnetID, mutatedValidator.NodeID)
-	if err != nil {
-		return fmt.Errorf("getting validator with tx id %s: %w", mutatedValidator.TxID, err)
-	}
-
-	if err := oldValidator.ValidateMutation(mutatedValidator); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
-	}
-
-	if err := d.DeleteCurrentValidator(oldValidator); err != nil {
-		return err
-	}
-	if err := d.PutCurrentValidator(mutatedValidator); err != nil {
-		return err
-	}
-	// return d.currentStakerDiffs.UpdateValidator(oldValidator, mutatedValidator)
-
-	return nil
-}
-
 func (d *diff) DeleteCurrentValidator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); errors.Is(err, database.ErrNotFound) {
 		return fmt.Errorf("staker with tx id %s should not exist", staker.TxID)

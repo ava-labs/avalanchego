@@ -1057,20 +1057,6 @@ func (mr *MockStateMockRecorder) UTXOIDs(addr, previous, limit any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOIDs", reflect.TypeOf((*MockState)(nil).UTXOIDs), addr, previous, limit)
 }
 
-// UpdateCurrentValidator mocks base method.
-func (m *MockState) UpdateCurrentValidator(staker *Staker) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateCurrentValidator", staker)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateCurrentValidator indicates an expected call of UpdateCurrentValidator.
-func (mr *MockStateMockRecorder) UpdateCurrentValidator(staker any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentValidator", reflect.TypeOf((*MockState)(nil).UpdateCurrentValidator), staker)
-}
-
 // WeightOfL1Validators mocks base method.
 func (m *MockState) WeightOfL1Validators(subnetID ids.ID) (uint64, error) {
 	m.ctrl.T.Helper()
