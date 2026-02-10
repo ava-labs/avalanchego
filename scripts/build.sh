@@ -28,10 +28,10 @@ done
 REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Configure the build environment
 source "${REPO_ROOT}"/scripts/constants.sh
-# Determine the git commit hash to use for the build
-source "${REPO_ROOT}"/scripts/git_commit.sh
+# Determine the commit hash to use for the build
+source "${REPO_ROOT}"/scripts/vcs.sh
 
 echo "Building AvalancheGo with [$(go version)]..."
 go build ${race} -o "${avalanchego_path}" \
-   -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" \
+   -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$vcs_commit $static_ld_flags" \
    "${REPO_ROOT}"/main
