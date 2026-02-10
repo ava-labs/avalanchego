@@ -109,7 +109,7 @@ ${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${commit_hash}" \
   --build-arg VM_ID="$VM_ID"
 
 # Tag latest when pushing to a registry and the tag is a stable release (vMAJOR.MINOR.PATCH)
-if [[ "${IMAGE_NAME}" == *"/"* && $CURRENT_BRANCH =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if [[ "${IMAGE_NAME}" == *"/"* && $image_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Tagging current image as $IMAGE_NAME:latest"
   docker buildx imagetools create -t "$IMAGE_NAME:latest" "$IMAGE_NAME:$BUILD_IMAGE_ID"
 fi
