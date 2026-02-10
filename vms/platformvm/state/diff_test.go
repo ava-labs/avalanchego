@@ -1352,7 +1352,6 @@ func TestDiffResetContinuousValidatorCycleResetsUptime(t *testing.T) {
 
 	// Apply the diff to the state
 	require.NoError(d.Apply(state))
-	//require.NoError(state.Commit())
 
 	// Verify uptime was reset to 0 with the new start time (which is the old end time)
 	upDuration, lastUpdated, err := state.GetUptime(continuousValidator.NodeID)
