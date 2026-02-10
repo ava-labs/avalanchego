@@ -367,6 +367,7 @@ func (s *diffStakers) DeleteValidator(staker *Staker) error {
 	return nil
 }
 
+
 func (s *diffStakers) GetDelegatorIterator(
 	parentIterator iterator.Iterator[*Staker],
 	subnetID ids.ID,
