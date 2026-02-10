@@ -13,6 +13,7 @@ AVALANCHE_PATH=$(cd "$SUBNET_EVM_PATH" && cd ../.. && pwd)
 
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
+# shellcheck disable=SC1091
 source "$AVALANCHE_PATH"/scripts/lib_test_docker_image.sh
 
 build_and_test() {
