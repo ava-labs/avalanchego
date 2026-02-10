@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -66,6 +67,9 @@ type diff struct {
 
 	// map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
 	modifiedUTXOs map[ids.ID]*avax.UTXO
+
+	// map of NodeID -> StartTime for continuous validators that need uptime reset after cycle restart
+	uptimeResets map[ids.NodeID]time.Time
 }
 
 func NewDiff(
@@ -313,6 +317,12 @@ func (d *diff) ResetContinuousValidatorCycle(
 	}
 
 	d.currentStakerDiffs.UpdateValidator(validator, &mutatedValidator)
+
+	if d.uptimeResets == nil {
+		d.uptimeResets = map[ids.NodeID]time.Time{}
+	}
+	d.uptimeResets[validator.NodeID] = mutatedValidator.StartTime
+
 	return nil
 }
 
@@ -621,6 +631,14 @@ func (d *diff) Apply(baseState Chain) error {
 
 			for _, delegator := range validatorDiff.deletedDelegators {
 				baseState.DeleteCurrentDelegator(delegator)
+			}
+		}
+	}
+	// Apply uptime resets for continuous validators that restarted their cycle
+	if s, ok := baseState.(uptime.State); ok {
+		for nodeID, startTime := range d.uptimeResets {
+			if err := s.SetUptime(nodeID, 0, startTime); err != nil {
+				return err
 			}
 		}
 	}
