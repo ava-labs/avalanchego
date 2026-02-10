@@ -15,12 +15,8 @@ tasks:
     cmd: ./scripts/build_test.sh
 
   check-clean-branch:
-    desc: Checks that the git working tree is clean
-    cmds:
-      - cmd: git add --all
-      - cmd: git update-index --really-refresh >> /dev/null
-      - cmd: git status --short # Show the status of the working tree.
-      - cmd: git diff-index --quiet HEAD # Exits if any uncommitted changes are found.
+    desc: Checks that the working tree is clean
+    cmd: ../../scripts/check_clean_branch.sh
 
   check-generate-codec:
     desc: Checks that generated codec files are up-to-date (requires a clean git working tree)

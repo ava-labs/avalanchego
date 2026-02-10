@@ -12,8 +12,8 @@ set -euo pipefail
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 source "$AVALANCHE_PATH"/scripts/constants.sh
-source "$AVALANCHE_PATH"/scripts/git_commit.sh
-source "$AVALANCHE_PATH"/scripts/image_tag.sh
+source "$AVALANCHE_PATH"/scripts/vcs.sh
+image_tag="$(vcs_branch_or_tag)"
 
 build_and_test() {
   local image_name=$1
@@ -36,9 +36,9 @@ build_and_test() {
 
   # Check all of the images expected to have been built
   local target_images=(
-    "$image_name:$commit_hash"
+    "$image_name:$vcs_commit_short"
     "$image_name:$image_tag"
-    "$image_name:$commit_hash-r"
+    "$image_name:$vcs_commit_short-r"
     "$image_name:$image_tag-r"
   )
 

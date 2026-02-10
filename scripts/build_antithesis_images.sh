@@ -20,7 +20,7 @@ fi
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 source "${AVALANCHE_PATH}"/scripts/constants.sh
-source "${AVALANCHE_PATH}"/scripts/git_commit.sh
+source "${AVALANCHE_PATH}"/scripts/vcs.sh
 
 # Import common functions used to build images for antithesis test setups
 source "${AVALANCHE_PATH}"/scripts/lib_build_antithesis_images.sh
@@ -31,7 +31,7 @@ IMAGE_PREFIX="${IMAGE_PREFIX:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
 if [[ -z "${IMAGE_TAG}" ]]; then
   # Default to tagging with the commit hash
-  IMAGE_TAG="${commit_hash}"
+  IMAGE_TAG="${vcs_commit_short}"
 fi
 
 # The dockerfiles don't specify the golang version to minimize the changes required to bump
@@ -42,7 +42,7 @@ GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 # Helper to simplify calling build_builder_image for test setups in this repo
 function build_builder_image_for_avalanchego {
   echo "Building builder image"
-  build_antithesis_builder_image "${GO_VERSION}" "antithesis-avalanchego-builder:${IMAGE_TAG}" "${AVALANCHE_PATH}" "${AVALANCHE_PATH}"
+  build_antithesis_builder_image "${GO_VERSION}" "antithesis-avalanchego-builder:${IMAGE_TAG}" "${AVALANCHE_PATH}" "${AVALANCHE_PATH}" "${vcs_commit_short}"
 }
 
 # Helper to simplify calling build_antithesis_images for test setups in this repo
@@ -59,7 +59,7 @@ function build_antithesis_images_for_avalanchego {
   fi
   build_antithesis_images "${GO_VERSION}" "${image_prefix}" "antithesis-${test_setup}" "${IMAGE_TAG}" "${IMAGE_TAG}" \
                           "${AVALANCHE_PATH}/tests/antithesis/${test_setup}/Dockerfile" "${uninstrumented_node_dockerfile}" \
-                          "${AVALANCHE_PATH}" "${node_only}" "${git_commit}"
+                          "${AVALANCHE_PATH}" "${node_only}" "${vcs_commit}"
 }
 
 if [[ "${TEST_SETUP}" == "avalanchego" ]]; then

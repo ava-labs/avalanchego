@@ -11,7 +11,8 @@ if ! [[ "$0" =~ scripts/build_xsvm_image.sh ]]; then
   exit 255
 fi
 
-source ./scripts/image_tag.sh
+source ./scripts/vcs.sh
+image_tag="$(vcs_branch_or_tag)"
 
 AVALANCHEGO_IMAGE="${AVALANCHEGO_IMAGE:-avalanchego}"
 XSVM_IMAGE="${XSVM_IMAGE:-avalanchego-xsvm}"

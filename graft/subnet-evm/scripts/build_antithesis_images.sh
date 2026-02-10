@@ -14,7 +14,9 @@ SUBNET_EVM_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 source "${SUBNET_EVM_PATH}"/scripts/constants.sh
 
 # Use the current repo's commit hash for the avalanchego image tag
-AVALANCHEGO_IMAGE_TAG="$(git rev-parse HEAD | cut -c1-8)"
+# shellcheck disable=SC1091
+source "${SUBNET_EVM_PATH}/../../scripts/vcs.sh"
+AVALANCHEGO_IMAGE_TAG="$(vcs_commit_hash_short)"
 
 # Build avalanchego node image from the parent repo
 pushd "${AVALANCHE_PATH}" > /dev/null
@@ -29,7 +31,7 @@ if [[ -z "${IMAGE_TAG}" ]]; then
   # Default to tagging with the commit hash
   source "${SUBNET_EVM_PATH}"/scripts/constants.sh
   # shellcheck disable=SC2154
-  IMAGE_TAG="${git_commit::8}"
+  IMAGE_TAG="${vcs_commit_short}"
 fi
 
 # The dockerfiles don't specify the golang version to minimize the changes required to bump
@@ -42,7 +44,7 @@ GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 source "${AVALANCHE_PATH}"/scripts/lib_build_antithesis_images.sh
 
 # Build the builder image with repo root as context (where graft/ lives)
-build_antithesis_builder_image "${GO_VERSION}" "antithesis-subnet-evm-builder:${IMAGE_TAG}" "${AVALANCHE_PATH}" "${AVALANCHE_PATH}"
+build_antithesis_builder_image "${GO_VERSION}" "antithesis-subnet-evm-builder:${IMAGE_TAG}" "${AVALANCHE_PATH}" "${AVALANCHE_PATH}" "${vcs_commit_short}"
 
 # Ensure avalanchego and subnet-evm binaries are available to create an initial db state that includes subnets.
 pushd "${AVALANCHE_PATH}" && ./scripts/build.sh && popd

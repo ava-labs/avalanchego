@@ -71,8 +71,8 @@ tasks:
     cmd: ./scripts/build_xsvm_image.sh
 
   check-clean-branch:
-    desc: Checks that the git working tree is clean
-    cmd: .github/workflows/check-clean-branch.sh
+    desc: Checks that the working tree is clean
+    cmd: ./scripts/check_clean_branch.sh
 
   check-generate-canoto:
     desc: Checks that generated canoto is up-to-date (requires a clean git working tree)
@@ -199,6 +199,7 @@ tasks:
       - check-go-version
       - check-require-directives
       - check-require-directives-round-trip
+      - test-vcs
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -210,6 +211,7 @@ tasks:
       - task: check-go-version
       - task: check-require-directives
       - task: check-require-directives-round-trip
+      - task: test-vcs-ci
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
@@ -394,6 +396,14 @@ tasks:
     cmds:
       - task: build
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
+
+  test-vcs:
+    desc: Tests vcs.sh functions in both git and jj contexts
+    cmd: ./scripts/tests.vcs.sh --all
+
+  test-vcs-ci:
+    desc: Tests vcs.sh in both git and jj contexts. WARNING - will run 'jj git init --colocate' if not already a jj repo.
+    cmd: ./scripts/tests.vcs.sh --all --init
 
   update-go-version:
     desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"
