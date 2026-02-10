@@ -100,6 +100,10 @@ tasks:
       - task: go-mod-tidy
       - task: check-clean-branch
 
+  check-go-version:
+    desc: Checks that go version directives are consistent across all modules
+    cmd: ./scripts/check_go_version.sh
+
   create-kind-cluster:
     desc: Creates the default kind cluster
     cmd: bash -x ./scripts/start_kind_cluster.sh {{.CLI_ARGS}}
@@ -178,6 +182,7 @@ tasks:
       - lint-action
       - lint-shell
       - check-go-mod-tidy
+      - check-go-version
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -186,6 +191,7 @@ tasks:
       - task: lint-action
       - task: lint-shell
       - task: check-go-mod-tidy
+      - task: check-go-version
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
@@ -348,3 +354,9 @@ tasks:
     cmds:
       - task: build
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
+
+  update-go-version:
+    desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.24.12)"
+    cmds:
+      - cmd: ./scripts/set_go_version.sh {{.CLI_ARGS}}
+      - task: go-mod-tidy

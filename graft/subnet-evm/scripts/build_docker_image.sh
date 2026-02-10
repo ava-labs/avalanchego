@@ -66,10 +66,10 @@ fi
 VM_ID=${VM_ID:-"${DEFAULT_VM_ID}"}
 
 # Default to the release image. Will need to be overridden when testing against unreleased versions.
-AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_NODE_IMAGE:-${AVALANCHEGO_IMAGE_NAME}:${AVALANCHE_VERSION}}"
+AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_NODE_IMAGE:-${AVALANCHEGO_IMAGE_NAME}:${image_tag}}"
 
 # Build the avalanchego image if it cannot be pulled. This will usually be due to
-# AVALANCHE_VERSION being not yet merged since the image is published post-merge.
+# image_tag being not yet merged since the image is published post-merge.
 if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
   # Build a multi-arch avalanchego image if the subnet-evm image build is multi-arch
   BUILD_MULTI_ARCH="$([[ "$PLATFORMS" =~ , ]] && echo 1 || echo "")"
@@ -84,10 +84,9 @@ if ! docker pull "${AVALANCHEGO_NODE_IMAGE}"; then
     exit 1
   fi
 
-  AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}:${AVALANCHE_VERSION}"
+  AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}:${image_tag}"
   echo "Building ${AVALANCHEGO_NODE_IMAGE} locally"
 
-  AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
   SKIP_BUILD_RACE=1 \
     DOCKER_IMAGE="${AVALANCHEGO_LOCAL_IMAGE_NAME}" \
     BUILD_MULTI_ARCH="${BUILD_MULTI_ARCH}" \
@@ -98,15 +97,15 @@ fi
 # all modules use the same Go version.
 GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 
-echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based of AvalancheGo@$AVALANCHE_VERSION"
+echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based of AvalancheGo@$image_tag"
 # Use repo root as context so Dockerfile can access graft/ directory
-AVALANCHE_PATH="${SUBNET_EVM_PATH}/../.."
-${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${DOCKERHUB_TAG}" \
+# shellcheck disable=SC2154
+${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${commit_hash}" \
   "$AVALANCHE_PATH" -f "$SUBNET_EVM_PATH/Dockerfile" \
   --build-arg GO_VERSION="${GO_VERSION}" \
   --build-arg AVALANCHEGO_NODE_IMAGE="$AVALANCHEGO_NODE_IMAGE" \
-  --build-arg SUBNET_EVM_COMMIT="$SUBNET_EVM_COMMIT" \
-  --build-arg CURRENT_BRANCH="$CURRENT_BRANCH" \
+  --build-arg SUBNET_EVM_COMMIT="$git_commit" \
+  --build-arg CURRENT_BRANCH="$image_tag" \
   --build-arg VM_ID="$VM_ID"
 
 # Tag latest when pushing to a registry and the tag is a stable release (vMAJOR.MINOR.PATCH)
