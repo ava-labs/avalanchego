@@ -580,10 +580,10 @@ func TestAtomicTrie_AcceptTrie(t *testing.T) {
 			t.Parallel()
 
 			versionDB := versiondb.New(memdb.New())
-			atomicTrieDB := prefixdb.New(atomicTrieDBPrefix, versionDB)
+			atomicTrieStorage := prefixdb.New(atomicTrieStoragePrefix, versionDB)
 			metadataDB := prefixdb.New(atomicTrieMetaDBPrefix, versionDB)
 			const lastAcceptedHeight = 0 // no effect
-			atomicTrie, err := newAtomicTrie(atomicTrieDB, metadataDB, atomictest.TestTxCodec,
+			atomicTrie, err := newAtomicTrie(atomicTrieStorage, metadataDB, atomictest.TestTxCodec,
 				lastAcceptedHeight, testCase.commitInterval)
 			require.NoError(t, err)
 			atomicTrie.lastAcceptedRoot = testCase.lastAcceptedRoot

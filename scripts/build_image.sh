@@ -40,7 +40,6 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 TARGET="${TARGET:-avalanchego}"
 SKIP_BUILD_RACE="${SKIP_BUILD_RACE:-}"
 FORCE_TAG_MASTER="${FORCE_TAG_MASTER:-}"
-ALLOW_TAG_LATEST="${ALLOW_TAG_LATEST:-}"
 
 # If set to non-empty, prompts the building of a multi-arch image when the image
 # name indicates use of a registry.
@@ -172,7 +171,8 @@ if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
       fi
       ;;
     subnet-evm)
-      if [[ $image_tag == "master" && "${ALLOW_TAG_LATEST}" == true ]]; then
+      # Tag latest for release versions (vMAJOR.MINOR.PATCH)
+      if [[ $image_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "Tagging $DOCKER_IMAGE:latest"
         docker buildx imagetools create -t "$DOCKER_IMAGE:latest" "$DOCKER_IMAGE:$commit_hash"
       fi
