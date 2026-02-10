@@ -11,7 +11,7 @@ require (
 	github.com/ava-labs/avalanchego v1.14.2-0.20260112194842-874bc6c9d305
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
-	github.com/ava-labs/libevm v1.13.15-0.20260128160829-e673c7097059
+	github.com/ava-labs/libevm v1.13.15-0.20260205195518-8b90483ae5dc
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3
 	github.com/google/go-cmp v0.7.0
