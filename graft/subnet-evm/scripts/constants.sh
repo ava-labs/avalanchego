@@ -17,9 +17,8 @@ AVALANCHE_PATH=$(cd "$SUBNET_EVM_PATH" && cd ../.. && pwd)
 # shellcheck disable=SC1091
 source "$AVALANCHE_PATH"/scripts/constants.sh
 # shellcheck disable=SC1091
-source "$AVALANCHE_PATH"/scripts/git_commit.sh
-# shellcheck disable=SC1091
-source "$AVALANCHE_PATH"/scripts/image_tag.sh
+source "$AVALANCHE_PATH"/scripts/vcs.sh
+image_tag="$(vcs_branch_or_tag)"
 
 # Subnet-EVM specific constants
 GOPATH="$(go env GOPATH)"

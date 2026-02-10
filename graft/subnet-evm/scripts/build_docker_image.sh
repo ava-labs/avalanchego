@@ -100,11 +100,11 @@ GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based of AvalancheGo@$image_tag"
 # Use repo root as context so Dockerfile can access graft/ directory
 # shellcheck disable=SC2154
-${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${commit_hash}" \
+${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${vcs_commit_short}" \
   "$AVALANCHE_PATH" -f "$SUBNET_EVM_PATH/Dockerfile" \
   --build-arg GO_VERSION="${GO_VERSION}" \
   --build-arg AVALANCHEGO_NODE_IMAGE="$AVALANCHEGO_NODE_IMAGE" \
-  --build-arg SUBNET_EVM_COMMIT="$git_commit" \
+  --build-arg SUBNET_EVM_COMMIT="$vcs_commit" \
   --build-arg CURRENT_BRANCH="$image_tag" \
   --build-arg VM_ID="$VM_ID"
 
