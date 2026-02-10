@@ -552,15 +552,15 @@ func (vm *VM) shouldFallbackToEmergencyProposer(parentTimestamp time.Time) bool 
 		return false
 	}
 
-	vm.ctx.Log.Debug("checking if we should fallback to emergency block proposer",
-		zap.Time("parent timestamp", parentTimestamp),
-		zap.Duration("fallback proposer max wait time", vm.Config.FallbackProposerMaxWaitTime),
-		zap.Bool("fallback non validator can propose", vm.Config.FallbackNonValidatorCanPropose))
-
 	// make sure the setting is enabled
 	if !vm.Config.FallbackNonValidatorCanPropose || vm.Config.FallbackProposerMaxWaitTime <= 0 {
 		return false
 	}
+
+	vm.ctx.Log.Debug("checking if we should fallback to emergency block proposer",
+		zap.Time("parent timestamp", parentTimestamp),
+		zap.Duration("fallback proposer max wait time", vm.Config.FallbackProposerMaxWaitTime),
+		zap.Bool("fallback non validator can propose", vm.Config.FallbackNonValidatorCanPropose))
 
 	now := vm.Clock.Time()
 
