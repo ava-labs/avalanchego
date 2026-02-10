@@ -1,0 +1,9 @@
+name: subnet-evm
+arch: "${ARCH}"
+version: "${VERSION}"
+maintainer: Stephen Buttolph <stephen@avalabs.org>
+description: Subnet-EVM plugin for AvalancheGo
+license: BSD-3-Clause
+contents:
+  - src: ./build/subnet-evm
+    dst: /usr/local/bin/subnet-evm

@@ -38,6 +38,8 @@ tmp/
 *.fls
 *.gz
 *.pdf
+*.rpm
+*.deb
 
 .coverage
 

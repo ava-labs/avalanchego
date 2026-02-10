@@ -1,0 +1,9 @@
+name: avalanchego
+arch: "${ARCH}"
+version: "${VERSION}"
+maintainer: Stephen Buttolph <stephen@avalabs.org>
+description: The Avalanche platform binaries
+license: BSD-3-Clause
+contents:
+  - src: ./build/avalanchego
+    dst: /usr/local/bin/avalanchego

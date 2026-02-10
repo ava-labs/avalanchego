@@ -1,0 +1,79 @@
+name: build-arm64-rpm-packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to include in artifact name'
+        required: true
+  push:
+    tags:
+      - "*"
+
+jobs:
+  build-arm64-rpm-package:
+    runs-on: custom-arm64-jammy
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - run: go version
+
+      - name: Build the avalanchego binaries
+        run: ./scripts/run_task.sh build
+
+      - name: Build subnet-evm plugin
+        working-directory: ./graft/subnet-evm
+        run: ./scripts/run_task.sh build "${GITHUB_WORKSPACE}/build/subnet-evm"
+
+      - name: Install aws cli
+        run: sudo snap install aws-cli --classic
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
+          aws-region: us-east-1
+
+      - name: Try to get tag from git
+        if: "${{ github.event.inputs.tag == '' }}"
+        id: get_tag_from_git
+        run: |
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Try to get tag from workflow dispatch
+        if: "${{ github.event.inputs.tag != '' }}"
+        id: get_tag_from_workflow
+        run: |
+          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Create RPM packages
+        run: ./.github/workflows/build-rpm-pkg.sh
+        env:
+          PKG_ROOT: /tmp/avalanchego
+          TAG: ${{ env.TAG }}
+          BUCKET: ${{ secrets.BUCKET }}
+          ARCH: "arm64"
+
+      - name: Save avalanchego RPM as Github artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: avalanchego-rpm-arm64
+          path: /tmp/avalanchego/avalanchego-${{ env.TAG }}.arm64.rpm
+
+      - name: Save subnet-evm RPM as Github artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: subnet-evm-rpm-arm64
+          path: /tmp/avalanchego/subnet-evm-${{ env.TAG }}.arm64.rpm
+
+      - name: Cleanup
+        run: |
+          rm -rf ./build
+          rm -rf /tmp/avalanchego
