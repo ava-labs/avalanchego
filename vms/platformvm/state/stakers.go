@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
 	ErrInvalidStakerMutation     = errors.New("invalid staker mutation")
 )
 
@@ -145,6 +144,10 @@ func (v *baseStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 }
 
 func (v *baseStakers) PutValidator(staker *Staker) error {
+	if _, err := v.GetValidator(staker.SubnetID, staker.NodeID); !errors.Is(err, database.ErrNotFound) {
+		return fmt.Errorf("staker %v already exists", staker.TxID)
+	}
+
 	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 	validator.validator = staker
 
@@ -157,6 +160,10 @@ func (v *baseStakers) PutValidator(staker *Staker) error {
 }
 
 func (v *baseStakers) DeleteValidator(staker *Staker) error {
+	if _, err := v.GetValidator(staker.SubnetID, staker.NodeID); errors.Is(err, database.ErrNotFound) {
+		return fmt.Errorf("staker %v already does not exist", staker.TxID)
+	}
+
 	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 	validator.validator = nil
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
@@ -171,8 +178,13 @@ func (v *baseStakers) DeleteValidator(staker *Staker) error {
 
 // Invariant: [mutatedValidator] is a valid mutation.
 func (v *baseStakers) UpdateValidator(mutatedValidator *Staker) error {
+	oldValidator, err := v.GetValidator(mutatedValidator.SubnetID, mutatedValidator.NodeID)
+	if err != nil {
+		return fmt.Errorf("getting previous validator: %w", err)
+	}
+
 	// TODO how is the update handled in delete/add
-	if err := v.DeleteValidator(mutatedValidator); err != nil {
+	if err := v.DeleteValidator(oldValidator); err != nil {
 		return err
 	}
 
@@ -347,12 +359,6 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 
 func (s *diffStakers) PutValidator(staker *Staker) error {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.validatorStatus == deleted {
-		// Enforce the invariant that a validator cannot be added after being
-		// deleted.
-		return ErrAddingStakerAfterDeletion
-	}
-
 	validatorDiff.validatorStatus = added
 	validatorDiff.validator = staker
 
@@ -390,6 +396,14 @@ func (s *diffStakers) UpdateValidator(
 	oldValidator *Staker,
 	mutatedValidator *Staker,
 ) error {
+	if err := s.DeleteValidator(oldValidator); err != nil {
+		return err
+	}
+
+	if err := s.PutValidator(mutatedValidator); err != nil {
+		return err
+	}
+
 	return nil
 }
 
