@@ -1,5 +1,6 @@
 module github.com/ava-labs/avalanchego/graft/evm
 
+// See ../../go.mod for guidelines on updating the Go version.
 go 1.24.12
 
 require (
