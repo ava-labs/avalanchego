@@ -75,9 +75,9 @@ build_and_test() {
 VM_ID="${VM_ID:-${DEFAULT_VM_ID}}"
 
 echo "checking build of single-arch image"
-build_and_test "subnet-evm" "${VM_ID}" false "avalanchego"
+build_and_test "subnet-evm_avalanchego" "${VM_ID}" false "avalanchego"
 
 start_test_registry
 
 echo "checking build of multi-arch images"
-build_and_test "localhost:${REGISTRY_PORT}/subnet-evm" "${VM_ID}" true "localhost:${REGISTRY_PORT}/avalanchego"
+build_and_test "localhost:${REGISTRY_PORT}/subnet-evm_avalanchego" "${VM_ID}" true "localhost:${REGISTRY_PORT}/avalanchego"
