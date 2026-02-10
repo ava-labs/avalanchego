@@ -5,12 +5,16 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/spf13/cast"
 )
+
+var ErrInvalidDuration = errors.New("invalid duration")
 
 // Duration wraps time.Duration to support JSON unmarshaling from both
 // string formats ("1m", "5s") and integer nanoseconds.
@@ -23,13 +27,17 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Duration.String())
 }
 
-func (d *Duration) UnmarshalJSON(data []byte) (err error) {
+func (d *Duration) UnmarshalJSON(data []byte) error {
 	var v any
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
-	d.Duration, err = cast.ToDurationE(v)
-	return err
+	dur, err := cast.ToDurationE(v)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidDuration, err)
+	}
+	d.Duration = dur
+	return nil
 }
 
 // String returns the duration as a string.

@@ -42,27 +42,18 @@ func TestUnmarshalConfig(t *testing.T) {
 }
 
 func TestUnmarshalConfigErrors(t *testing.T) {
-	tests := []struct {
-		name      string
-		givenJSON []byte
-	}{
-		{
-			name:      "bad durations",
-			givenJSON: []byte(`{"api-max-duration": "bad-duration"}`),
-		},
-		{
-			name:      "negative transaction history",
-			givenJSON: []byte(`{"transaction-history": -1}`),
-		},
-	}
+	t.Run("bad durations", func(t *testing.T) {
+		var got Config
+		err := json.Unmarshal([]byte(`{"api-max-duration": "bad-duration"}`), &got)
+		require.ErrorIs(t, err, config.ErrInvalidDuration)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var got Config
-			err := json.Unmarshal(tt.givenJSON, &got)
-			require.Error(t, err)
-		})
-	}
+	t.Run("negative transaction history", func(t *testing.T) {
+		var got Config
+		err := json.Unmarshal([]byte(`{"transaction-history": -1}`), &got)
+		var target *json.UnmarshalTypeError
+		require.ErrorAs(t, err, &target)
+	})
 }
 
 func TestGetConfig(t *testing.T) {
@@ -141,7 +132,8 @@ func TestGetConfigValidation(t *testing.T) {
 
 	t.Run("negative transaction history rejected", func(t *testing.T) {
 		_, _, err := GetConfig([]byte(`{"transaction-history": -1}`), constants.LocalID)
-		require.Error(t, err)
+		var target *json.UnmarshalTypeError
+		require.ErrorAs(t, err, &target)
 	})
 }
 
