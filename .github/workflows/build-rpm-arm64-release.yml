@@ -65,13 +65,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: avalanchego-rpm-arm64
-          path: /tmp/avalanchego/avalanchego-${{ env.TAG }}.arm64.rpm
+          path: /tmp/avalanchego/avalanchego-${{ env.TAG }}-arm64.rpm
 
       - name: Save subnet-evm RPM as Github artifact
         uses: actions/upload-artifact@v4
         with:
           name: subnet-evm-rpm-arm64
-          path: /tmp/avalanchego/subnet-evm-${{ env.TAG }}.arm64.rpm
+          path: /tmp/avalanchego/subnet-evm-${{ env.TAG }}-arm64.rpm
 
       - name: Cleanup
         run: |

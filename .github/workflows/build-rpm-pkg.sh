@@ -27,14 +27,14 @@ echo "Building avalanchego RPM..."
 nfpm package \
   --config "$NFPM_CONFIG_DIR/avalanchego.yml" \
   --packager rpm \
-  --target "$OUTPUT_DIR/avalanchego-${TAG}.${ARCH}.rpm"
+  --target "$OUTPUT_DIR/avalanchego-${TAG}-${ARCH}.rpm"
 
 echo "Building subnet-evm RPM..."
 nfpm package \
   --config "$NFPM_CONFIG_DIR/subnet-evm.yml" \
   --packager rpm \
-  --target "$OUTPUT_DIR/subnet-evm-${TAG}.${ARCH}.rpm"
+  --target "$OUTPUT_DIR/subnet-evm-${TAG}-${ARCH}.rpm"
 
 echo "Uploading RPMs to S3..."
-aws s3 cp "$OUTPUT_DIR/avalanchego-${TAG}.${ARCH}.rpm" "s3://${BUCKET}/linux/rpms/${ARCH}/"
-aws s3 cp "$OUTPUT_DIR/subnet-evm-${TAG}.${ARCH}.rpm" "s3://${BUCKET}/linux/rpms/${ARCH}/"
+aws s3 cp "$OUTPUT_DIR/avalanchego-${TAG}-${ARCH}.rpm" "s3://${BUCKET}/linux/rpms/${ARCH}/"
+aws s3 cp "$OUTPUT_DIR/subnet-evm-${TAG}-${ARCH}.rpm" "s3://${BUCKET}/linux/rpms/${ARCH}/"
