@@ -37,6 +37,7 @@
           packages = with pkgs; [
             # Build requirements
             git
+            jujutsu
 
             # Task runner
             go-task

@@ -45,7 +45,7 @@ build_and_test() {
   # shellcheck disable=SC2154
   local target_images=(
     "$imagename:$imgtag"
-    "$imagename:$commit_hash"
+    "$imagename:$vcs_commit_short"
   )
   IFS=',' read -r -a archarray <<<"$arches"
   for arch in "${archarray[@]}"; do

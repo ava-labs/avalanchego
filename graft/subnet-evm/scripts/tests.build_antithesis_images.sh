@@ -19,7 +19,7 @@ SUBNET_EVM_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Discover the default tag that will be used for the image
 source "${SUBNET_EVM_PATH}"/scripts/constants.sh
 # shellcheck disable=SC2154
-export IMAGE_TAG="${commit_hash}"
+export IMAGE_TAG="${vcs_commit_short}"
 
 # Build the images
 bash -x "${SUBNET_EVM_PATH}"/scripts/build_antithesis_images.sh
