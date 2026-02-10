@@ -301,9 +301,9 @@ func (s *Syncer[_, _]) logProgress() {
 		case <-s.doneChan:
 			return
 		case <-ticker.C:
-			s.workLock.Lock()
 			root := s.getTargetRoot()
-			percentage := s.unprocessedWork.Status(root)
+			s.workLock.Lock()
+			percentage := s.processedWork.Status(root)
 			s.workLock.Unlock()
 			s.config.Log.Info("syncing progress", zap.Float64("percent complete", percentage), zap.Stringer("target root", root))
 		}

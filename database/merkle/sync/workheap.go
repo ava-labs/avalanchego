@@ -221,7 +221,7 @@ func maybeToBig(b maybe.Maybe[[]byte], maxLength int) *big.Int {
 		s = s[:maxLength]
 	}
 
-	// Pad with zeros to the left.
+	// Right-pad with zeros so that short keys occupy the most significant bytes.
 	padded := make([]byte, maxLength)
 	copy(padded, s)
 
