@@ -156,7 +156,7 @@ const (
 	ProposerVMUseCurrentHeightKey                        = "proposervm-use-current-height"
 	ProposerVMMinBlockDelayKey                           = "proposervm-min-block-delay"
 	FallbackNonValidatorCanProposeKey                    = "proposervm-fallback-nonvalidator-can-propose"
-	FallbackNonValidatorProposerMaxWaitTimeKey           = "proposervm-fallback-nonvalidator-wait-time"
+	FallbackNonValidatorProposerMaxWaitTimeKey           = "proposervm-fallback-nonvalidator-max-wait-time"
 	FdLimitKey                                           = "fd-limit"
 	IndexEnabledKey                                      = "index-enabled"
 	IndexAllowIncompleteKey                              = "index-allow-incomplete"

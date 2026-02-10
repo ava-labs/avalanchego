@@ -579,6 +579,8 @@ func (vm *VM) shouldFallbackToEmergencyProposer(parentTimestamp time.Time) bool 
 		return false
 	}
 
+	vm.ctx.Log.Debug("Enough time has passed since the last time we have built a block, can fallback to emergency block proposer")
+
 	return true
 }
 
