@@ -10,6 +10,9 @@ if ! [[ "$0" =~ scripts/lint.sh ]]; then
   exit 255
 fi
 
+# shellcheck disable=SC1091
+source ./scripts/vcs.sh
+
 # The -P option is not supported by the grep version installed by
 # default on macos. Since `-o errexit` is ignored in an if
 # conditional, triggering the problem here ensures script failure when
@@ -102,7 +105,7 @@ function test_interface_compliance_nil {
 }
 
 function test_import_testing_only_in_tests {
-  ROOT=$( git rev-parse --show-toplevel )
+  ROOT=$( vcs_repo_root )
   NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' ! -path "${ROOT}/tests/*" ! -path "${ROOT}/${IGNORE_PATH}/*" );
 
   IMPORT_TESTING=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"');
