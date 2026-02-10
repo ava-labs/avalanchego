@@ -1408,7 +1408,14 @@ func (e *standardTxExecutor) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfig
 	validator.AutoRestakeShares = tx.AutoRestakeShares
 	validator.ContinuationPeriod = time.Duration(tx.Period) * time.Second
 
-	return e.state.UpdateCurrentValidator(validator)
+	if err := e.state.UpdateCurrentValidator(validator); err != nil {
+		return err
+	}
+
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+
+	return nil
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].

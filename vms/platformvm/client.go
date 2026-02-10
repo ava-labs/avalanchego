@@ -653,12 +653,37 @@ func GetDeactivationOwners(
 	return deactivationOwners, nil
 }
 
+func GetContinuousValidatorsOwners(
+	c *Client,
+	ctx context.Context,
+	nodeIDs ...ids.NodeID,
+) (map[ids.ID]fx.Owner, error) {
+	owners := map[ids.ID]fx.Owner{}
+
+	validators, err := c.GetCurrentValidators(ctx, constants.PrimaryNetworkID, nodeIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, v := range validators {
+		if v.ConfigOwner != nil {
+			owners[v.TxID] = &secp256k1fx.OutputOwners{
+				Locktime:  v.ConfigOwner.Locktime,
+				Threshold: v.ConfigOwner.Threshold,
+				Addrs:     v.ConfigOwner.Addresses,
+			}
+		}
+	}
+	return owners, nil
+}
+
 // GetOwners returns the union of GetSubnetOwners and GetDeactivationOwners.
 func GetOwners(
 	c *Client,
 	ctx context.Context,
 	subnetIDs []ids.ID,
 	validationIDs []ids.ID,
+	continuousValidators []ids.NodeID,
 ) (map[ids.ID]fx.Owner, error) {
 	subnetOwners, err := GetSubnetOwners(c, ctx, subnetIDs...)
 	if err != nil {
@@ -668,9 +693,14 @@ func GetOwners(
 	if err != nil {
 		return nil, err
 	}
+	continuousValidatorsOwners, err := GetContinuousValidatorsOwners(c, ctx, continuousValidators...)
+	if err != nil {
+		return nil, err
+	}
 
 	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners))
 	maps.Copy(owners, subnetOwners)
 	maps.Copy(owners, deactivationOwners)
+	maps.Copy(owners, continuousValidatorsOwners)
 	return owners, nil
 }

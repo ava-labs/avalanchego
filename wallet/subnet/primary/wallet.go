@@ -66,6 +66,8 @@ type WalletConfig struct {
 	// Validation IDs that the wallet should know about to be able to generate
 	// transactions.
 	ValidationIDs []ids.ID // optional
+
+	ContinuousValidatorsNodeIDs []ids.NodeID
 }
 
 // MakeWallet returns a wallet that supports issuing transactions to the chains
@@ -97,7 +99,7 @@ func MakeWallet(
 		return nil, err
 	}
 
-	owners, err := platformvm.GetOwners(avaxState.PClient, ctx, config.SubnetIDs, config.ValidationIDs)
+	owners, err := platformvm.GetOwners(avaxState.PClient, ctx, config.SubnetIDs, config.ValidationIDs, config.ContinuousValidatorsNodeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +150,7 @@ func MakePWallet(
 		return nil, err
 	}
 
-	owners, err := platformvm.GetOwners(client, ctx, config.SubnetIDs, config.ValidationIDs)
+	owners, err := platformvm.GetOwners(client, ctx, config.SubnetIDs, config.ValidationIDs, config.ContinuousValidatorsNodeIDs)
 	if err != nil {
 		return nil, err
 	}

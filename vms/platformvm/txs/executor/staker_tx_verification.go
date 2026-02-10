@@ -1018,11 +1018,6 @@ func verifySetAutoRestakeConfigTx(
 		return nil, err
 	}
 
-	if !backend.Bootstrapped.Get() {
-		// Not bootstrapped yet -- don't need to do full verification.
-		return nil, nil
-	}
-
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
 		return nil, ErrMissingStakerTx
@@ -1031,20 +1026,6 @@ func verifySetAutoRestakeConfigTx(
 	continuousStakerTx, ok := stakerTx.Unsigned.(txs.ContinuousStaker)
 	if !ok {
 		return nil, fmt.Errorf("%w: %T", ErrInvalidStakerTxType, stakerTx.Unsigned)
-	}
-
-	validatorRules, err := getValidatorRules(backend, chainState, continuousStakerTx.SubnetID())
-	if err != nil {
-		return nil, err
-	}
-
-	duration := time.Duration(tx.Period) * time.Second
-	switch {
-	case duration > 0 && duration < validatorRules.minStakeDuration:
-		return nil, ErrStakeTooShort
-
-	case duration > validatorRules.maxStakeDuration:
-		return nil, ErrStakeTooLong
 	}
 
 	validator, err := chainState.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
@@ -1060,6 +1041,25 @@ func verifySetAutoRestakeConfigTx(
 		// This can happen if a validator restaked with the same node id.
 		// In this case, TxID should be the latest transaction of the continuous validator.
 		return nil, fmt.Errorf("%w: wrong tx id", ErrInvalidStakerTx)
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return validator, nil
+	}
+
+	validatorRules, err := getValidatorRules(backend, chainState, continuousStakerTx.SubnetID())
+	if err != nil {
+		return nil, err
+	}
+
+	duration := time.Duration(tx.Period) * time.Second
+	switch {
+	case duration > 0 && duration < validatorRules.minStakeDuration:
+		return nil, ErrStakeTooShort
+
+	case duration > validatorRules.maxStakeDuration:
+		return nil, ErrStakeTooLong
 	}
 
 	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, continuousStakerTx.Owner(), tx.Auth)
