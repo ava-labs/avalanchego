@@ -41,6 +41,7 @@ var (
 	_                     Network              = (*network)(nil)
 	_                     validators.Connector = (*network)(nil)
 	_                     common.AppHandler    = (*network)(nil)
+	_                     p2p.NodeSampler      = (*network)(nil)
 )
 
 // SyncedNetworkClient defines ability to send request / response through the Network
@@ -63,6 +64,7 @@ type SyncedNetworkClient interface {
 type Network interface {
 	validators.Connector
 	common.AppHandler
+	p2p.NodeSampler
 
 	SyncedNetworkClient
 
@@ -153,6 +155,24 @@ func NewNetwork(
 		appStats:                   stats.NewRequestHandlerStats(),
 		p2pValidators:              p2pValidators,
 	}, nil
+}
+
+func (n *network) Sample(_ context.Context, limit int) []ids.NodeID {
+	if limit != 1 {
+		log.Warn("Sample called with limit > 1, but only 1 peer will be returned", "limit", limit)
+	}
+
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	node, ok, err := n.peers.GetAnyPeer(nil)
+	if err != nil {
+		log.Error("error getting peer from peer tracker", "error", err)
+		return nil
+	}
+	if !ok {
+		return nil
+	}
+	return []ids.NodeID{node}
 }
 
 // SendAppRequestAny synchronously sends request to an arbitrary peer with a

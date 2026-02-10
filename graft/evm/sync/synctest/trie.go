@@ -210,13 +210,15 @@ func FillAccounts(
 
 func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.Database, root common.Hash, numAccounts int) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
 	return FillAccounts(t, r, serverDB, root, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
-		codeBytes := make([]byte, 256)
-		_, err := r.Read(codeBytes)
-		require.NoError(t, err, "error reading random code bytes")
+		if r.Intn(2) == 0 {
+			codeBytes := make([]byte, 256)
+			_, err := r.Read(codeBytes)
+			require.NoError(t, err, "error reading random code bytes")
 
-		codeHash := crypto.Keccak256Hash(codeBytes)
-		rawdb.WriteCode(serverDB.DiskDB(), codeHash, codeBytes)
-		account.CodeHash = codeHash[:]
+			codeHash := crypto.Keccak256Hash(codeBytes)
+			rawdb.WriteCode(serverDB.DiskDB(), codeHash, codeBytes)
+			account.CodeHash = codeHash[:]
+		}
 
 		// now create state trie
 		FillStorageForAccount(t, r, 16, addr, storageTr)

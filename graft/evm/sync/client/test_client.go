@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 )
 
 var (
@@ -40,6 +41,8 @@ type TestClient struct {
 	// GetBlocksIntercept is called on every GetBlocks request if set to a non-nil callback.
 	// The returned response will be returned by TestClient to the caller.
 	GetBlocksIntercept func(blockReq message.BlockRequest, blocks types.Blocks) (types.Blocks, error)
+
+	clients map[uint64]*p2p.Client
 }
 
 func NewTestClient(
@@ -47,13 +50,27 @@ func NewTestClient(
 	leafHandler handlers.LeafRequestHandler,
 	codesHandler *handlers.CodeRequestHandler,
 	blocksHandler *handlers.BlockRequestHandler,
+	clients map[uint64]*p2p.Client,
 ) *TestClient {
 	return &TestClient{
 		codec:         codec,
 		leafsHandler:  leafHandler,
 		codesHandler:  codesHandler,
 		blocksHandler: blocksHandler,
+		clients:       clients,
 	}
+}
+
+func (ml *TestClient) AddClient(handlerID uint64) *p2p.Client {
+	client, exists := ml.clients[handlerID]
+	if !exists {
+		panic(fmt.Sprintf("no client for handler ID %d", handlerID))
+	}
+	return client
+}
+
+func (*TestClient) StateSyncNodes() []ids.NodeID {
+	return nil
 }
 
 func (ml *TestClient) GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error) {
