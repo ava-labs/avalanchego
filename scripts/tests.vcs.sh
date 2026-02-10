@@ -114,6 +114,7 @@ run_tests_here() {
 CLEANUP_DIRS=()
 CLEANUP_JJ_WORKSPACES=()
 JJ_INIT=false
+JJ_CREATED=false
 
 cleanup() {
   for ws in "${CLEANUP_JJ_WORKSPACES[@]}"; do
@@ -122,8 +123,8 @@ cleanup() {
   for dir in "${CLEANUP_DIRS[@]}"; do
     rm -rf "${dir}"
   done
-  # Remove .jj if we created it (don't leave it in a CI checkout)
-  if [[ "${JJ_INIT}" == true ]]; then
+  # Remove .jj only if we created it during this run
+  if [[ "${JJ_CREATED}" == true ]]; then
     rm -rf "${AVALANCHE_PATH}/.jj"
   fi
 }
@@ -151,6 +152,7 @@ run_tests_all() {
       # CI: colocate jj on top of the git clone so we can create a workspace
       echo "--- Initializing jj colocated repo ---"
       jj git init --colocate 2>/dev/null
+      JJ_CREATED=true
     else
       echo "SKIP: not a jj repo (use --init to colocate), skipping jj tests"
       return
@@ -158,12 +160,13 @@ run_tests_all() {
   fi
 
   if command -v jj >/dev/null 2>&1 && jj root --quiet >/dev/null 2>&1; then
-    local jj_tmpdir
+    local jj_tmpdir jj_workspace_name
     jj_tmpdir="$(mktemp -d)"
+    jj_workspace_name="test-vcs-${jj_tmpdir##*/}"
     CLEANUP_DIRS+=("${jj_tmpdir}")
-    echo "--- Creating temporary jj workspace in ${jj_tmpdir} ---"
-    jj workspace add "${jj_tmpdir}/repo" 2>/dev/null
-    CLEANUP_JJ_WORKSPACES+=("${jj_tmpdir##*/}/repo" "repo")
+    echo "--- Creating temporary jj workspace in ${jj_tmpdir} (name: ${jj_workspace_name}) ---"
+    jj workspace add --name "${jj_workspace_name}" "${jj_tmpdir}/repo" 2>/dev/null
+    CLEANUP_JJ_WORKSPACES+=("${jj_workspace_name}")
     pushd "${jj_tmpdir}/repo" >/dev/null
     run_tests "jj"
     popd >/dev/null

@@ -398,7 +398,7 @@ tasks:
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
 
   test-vcs:
-    desc: Tests vcs.sh functions in both git and jj contexts
+    desc: Tests vcs.sh in git context and, if already a jj repo, jj context (use test-vcs-ci to force jj init)
     cmd: ./scripts/tests.vcs.sh --all
 
   test-vcs-ci:
