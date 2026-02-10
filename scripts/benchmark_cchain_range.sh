@@ -67,6 +67,9 @@ Available tests:
   hashdb-101-250k                   - Blocks 101-250k with hashdb
   hashdb-archive-101-250k           - Blocks 101-250k with hashdb archive
   hashdb-33m-33m500k                - Blocks 33m-33.5m with hashdb
+  hashdb-69m-69m100k                - Blocks 69m-69.1m with hashdb
+  hashdb-archive-69m-69m100k        - Blocks 69m-69.1m with hashdb archive
+  hashdb-archive-ssc-69m-69m100k    - Blocks 69m-69.1m with hashdb archive from a statesynced checkpoint
   firewood-101-250k                 - Blocks 101-250k with firewood
   firewood-archive-101-250k         - Blocks 101-250k with firewood archive
   firewood-33m-33m500k              - Blocks 33m-33.5m with firewood
@@ -109,6 +112,26 @@ if [[ -n "$TEST_NAME" ]]; then
             CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-full-33m}"
             START_BLOCK="${START_BLOCK:-33000001}"
             END_BLOCK="${END_BLOCK:-33500000}"
+            ;;
+        hashdb-69m-69m100k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-69m-70m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-full-69m}"
+            START_BLOCK="${START_BLOCK:-69000001}"
+            END_BLOCK="${END_BLOCK:-69100000}"
+            ;;
+        hashdb-archive-69m-69m100k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-69m-70m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-archive-69m}"
+            START_BLOCK="${START_BLOCK:-69000001}"
+            END_BLOCK="${END_BLOCK:-69100000}"
+            CONFIG="${CONFIG:-archive}"
+            ;;
+        hashdb-archive-ssc-69m-69m100k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-69m-70m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-statesync-checkpoint-69m}"
+            START_BLOCK="${START_BLOCK:-69000001}"
+            END_BLOCK="${END_BLOCK:-69100000}"
+            CONFIG="${CONFIG:-archive}"
             ;;
         firewood-101-250k)
             BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-1m-ldb}"
