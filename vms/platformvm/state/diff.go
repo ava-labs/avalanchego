@@ -312,15 +312,17 @@ func (d *diff) PutCurrentValidator(staker *Staker) error {
 		return fmt.Errorf("staker with tx id %s already exists", staker.TxID)
 	}
 
-	return d.currentStakerDiffs.PutValidator(staker)
+	d.currentStakerDiffs.PutValidator(staker)
+	return nil
 }
 
 func (d *diff) DeleteCurrentValidator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); errors.Is(err, database.ErrNotFound) {
-		return fmt.Errorf("staker with tx id %s should not exist", staker.TxID)
+		return fmt.Errorf("staker with tx id %s already does not exist", staker.TxID)
 	}
 
-	return d.currentStakerDiffs.DeleteValidator(staker)
+	d.currentStakerDiffs.DeleteValidator(staker)
+	return nil
 }
 
 func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
@@ -379,11 +381,12 @@ func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 }
 
 func (d *diff) PutPendingValidator(staker *Staker) error {
-	return d.pendingStakerDiffs.PutValidator(staker)
+	d.pendingStakerDiffs.PutValidator(staker)
+	return nil
 }
 
 func (d *diff) DeletePendingValidator(staker *Staker) {
-	_ = d.pendingStakerDiffs.DeleteValidator(staker)
+	d.pendingStakerDiffs.DeleteValidator(staker)
 }
 
 func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
@@ -601,18 +604,21 @@ func (d *diff) Apply(baseState Chain) error {
 			return err
 		}
 	}
+
+	for op := range d.currentStakerDiffs.ValidatorOps() {
+		if op.Delete {
+			if err := baseState.DeleteCurrentValidator(op.Validator); err != nil {
+				return err
+			}
+		} else {
+			if err := baseState.PutCurrentValidator(op.Validator); err != nil {
+				return err
+			}
+		}
+	}
+
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
-			switch validatorDiff.validatorStatus {
-			case added:
-				if err := baseState.PutCurrentValidator(validatorDiff.validator); err != nil {
-					return err
-				}
-			case deleted:
-				if err := baseState.DeleteCurrentValidator(validatorDiff.validator); err != nil {
-					return err
-				}
-			}
 
 			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
 			for addedDelegatorIterator.Next() {

@@ -1002,11 +1002,27 @@ func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 }
 
 func (s *state) PutCurrentValidator(staker *Staker) error {
-	return s.currentStakers.PutValidator(staker)
+	if _, err := s.currentStakers.GetValidator(
+		staker.SubnetID,
+		staker.NodeID,
+	); !errors.Is(err, database.ErrNotFound) {
+		return errors.New("staker already exists")
+	}
+
+	s.currentStakers.PutValidator(staker)
+	return nil
 }
 
 func (s *state) DeleteCurrentValidator(staker *Staker) error {
-	return s.currentStakers.DeleteValidator(staker)
+	if _, err := s.currentStakers.GetValidator(
+		staker.SubnetID,
+		staker.NodeID,
+	); errors.Is(err, database.ErrNotFound) {
+		return fmt.Errorf("staker %v already does not exist", staker.TxID)
+	}
+
+	s.currentStakers.DeleteValidator(staker)
+	return nil
 }
 
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
@@ -1030,11 +1046,12 @@ func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 }
 
 func (s *state) PutPendingValidator(staker *Staker) error {
-	return s.pendingStakers.PutValidator(staker)
+	s.pendingStakers.PutValidator(staker)
+	return nil
 }
 
 func (s *state) DeletePendingValidator(staker *Staker) {
-	_ = s.pendingStakers.DeleteValidator(staker)
+	s.pendingStakers.DeleteValidator(staker)
 }
 
 func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
