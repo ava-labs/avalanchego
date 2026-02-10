@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -60,7 +58,6 @@ func (b *builder) SetPreference(preferred ids.ID) {
 }
 
 func (b *builder) AddTx(_ context.Context, newTx *tx.Tx) error {
-	b.chainContext.Log.Info("adding tx to builder")
 	// TODO: verify [tx] against the currently preferred state
 	txID, err := newTx.ID()
 	if err != nil {
@@ -80,13 +77,10 @@ func (b *builder) WaitForEvent(ctx context.Context) (common.Message, error) {
 	defer b.pendingTxsCond.L.Unlock()
 
 	for b.pendingTxs.Len() == 0 {
-		b.chainContext.Log.Info("waiting for tx to be added to builder")
 		if err := b.pendingTxsCond.Wait(ctx); err != nil {
 			return 0, err
 		}
 	}
-
-	b.chainContext.Log.Info("returning pending txs")
 
 	return common.PendingTxs, nil
 }
@@ -151,8 +145,5 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 
 		wipBlock.Txs = append(wipBlock.Txs, currentTx)
 	}
-
-	b.chainContext.Log.Info("built block", zap.Int("num txs", len(wipBlock.Txs)))
-
 	return b.chain.NewBlock(&wipBlock)
 }

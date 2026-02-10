@@ -3139,7 +3139,9 @@ func TestBuildBlockFallback(t *testing.T) {
 	proVM.Config.FallbackNonValidatorCanPropose = true
 	proVM.Config.FallbackProposerMaxWaitTime = time.Millisecond * 100
 
-	msg, err := proVM.WaitForEvent(context.Background())
+	patientContext, cancel := context.WithTimeout(t.Context(), time.Second*30)
+	defer cancel()
+	msg, err := proVM.WaitForEvent(patientContext)
 	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
 

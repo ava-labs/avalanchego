@@ -457,8 +457,8 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 			return vm.ChainVM.WaitForEvent(ctx)
 		}
 
-		if vm.ctx.SubnetID != constants.PrimaryNetworkID && vm.FallbackProposerMaxWaitTime > 0 && vm.FallbackNonValidatorCanPropose {
-			duration = min(duration, vm.FallbackProposerMaxWaitTime)
+		if vm.ctx.SubnetID != constants.PrimaryNetworkID && vm.Config.FallbackProposerMaxWaitTime > 0 && vm.Config.FallbackNonValidatorCanPropose {
+			duration = min(duration, vm.Config.FallbackProposerMaxWaitTime)
 			vm.ctx.Log.Debug("Waiting until we should fallback to emergency block proposer", zap.Duration("duration", duration))
 		}
 
@@ -520,7 +520,7 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 			vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
 
 			if vm.shouldFallbackToEmergencyProposer(parentTimestamp) {
-				nextStartTime = parentTimestamp.Add(vm.FallbackProposerMaxWaitTime)
+				nextStartTime = parentTimestamp.Add(vm.Config.FallbackProposerMaxWaitTime)
 			}
 		}
 	} else {
@@ -566,7 +566,7 @@ func (vm *VM) shouldFallbackToEmergencyProposer(parentTimestamp time.Time) bool 
 
 	// Sanity check, make sure the parent block's timestamp is earlier than the current time.
 	if !now.After(parentTimestamp) {
-		vm.ctx.Log.Debug("Parent block's timestamp is not later than the current time, cannot fallback to emergency block proposer")
+		vm.ctx.Log.Debug("Parent block's timestamp is later than the current time, cannot fallback to emergency block proposer")
 		return false
 	}
 
