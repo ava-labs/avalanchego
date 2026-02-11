@@ -382,7 +382,9 @@ func (db *Database) Delete(key []byte) error {
 }
 
 func (db *Database) Close() error {
-	db.migrator.stop()
+	if db.migrator != nil {
+		db.migrator.stop()
+	}
 	if !db.heightDBsReady {
 		return db.Database.Close()
 	}
