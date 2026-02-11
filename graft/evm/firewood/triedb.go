@@ -117,6 +117,7 @@ func DefaultConfig(dir string) TrieDBConfig {
 		FreeListCacheEntries: 200_000,
 		RevisionsInMemory:    80_000,
 		CacheStrategy:        ffi.CacheAllReads,
+		Archive:              false,
 	}
 }
 
