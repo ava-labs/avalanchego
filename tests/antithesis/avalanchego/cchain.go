@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -17,6 +18,8 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	ethereum "github.com/ava-labs/libevm"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
@@ -197,8 +200,28 @@ func (w *cchainWorkload) issueCChainTransfer(ctx context.Context) {
 	w.confirmCChainTx(ctx, tx)
 }
 
-// confirmCChainTx fetches the transaction, receipt, and containing block from
-// every node and verifies the data matches what was sent.
+// awaitCChainTxReceipt polls the node until the transaction receipt is
+// available or the context is cancelled.
+func awaitCChainTxReceipt(ctx context.Context, client *ethclient.Client, txHash ethcommon.Hash) (*types.Receipt, error) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		receipt, err := client.TransactionReceipt(ctx, txHash)
+		if err == nil {
+			return receipt, nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+// confirmCChainTx waits for each node to have the transaction, then verifies
+// data integrity across all nodes.
 func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Transaction) {
 	txHash := sentTx.Hash()
 
@@ -213,6 +236,49 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 			return
 		}
 
+		// Wait for the transaction receipt on this node.
+		receipt, err := awaitCChainTxReceipt(ctx, client, txHash)
+		if err != nil {
+			w.log.Warn("timed out waiting for C-chain transaction on node",
+				zap.String("uri", uri),
+				zap.Stringer("txID", txHash),
+				zap.Error(err),
+			)
+			return
+		}
+
+		// Verify receipt fields.
+		if receipt.TxHash != txHash {
+			w.log.Error("C-chain receipt tx hash mismatch",
+				zap.String("uri", uri),
+				zap.Stringer("expected", txHash),
+				zap.Stringer("actual", receipt.TxHash),
+			)
+			assert.Unreachable("C-chain receipt tx hash mismatch", map[string]any{
+				"worker":   w.id,
+				"uri":      uri,
+				"expected": txHash,
+				"actual":   receipt.TxHash,
+			})
+			return
+		}
+
+		if receipt.Status != types.ReceiptStatusSuccessful {
+			w.log.Error("C-chain transaction receipt indicates failure",
+				zap.String("uri", uri),
+				zap.Stringer("txID", txHash),
+				zap.Uint64("status", receipt.Status),
+			)
+			assert.Unreachable("C-chain transaction receipt indicates failure", map[string]any{
+				"worker": w.id,
+				"uri":    uri,
+				"txID":   txHash,
+				"status": receipt.Status,
+			})
+			return
+		}
+
+		// Verify transaction data.
 		fetchedTx, _, err := client.TransactionByHash(ctx, txHash)
 		if err != nil {
 			w.log.Warn("failed to fetch C-chain transaction by hash",
@@ -220,12 +286,13 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 				zap.Stringer("txID", txHash),
 				zap.Error(err),
 			)
-			assert.Unreachable("failed to fetch C-chain transaction by hash", map[string]any{
-				"worker": w.id,
-				"uri":    uri,
-				"txID":   txHash,
-				"err":    err,
-			})
+			if errors.Is(err, ethereum.NotFound) {
+				assert.Unreachable("C-chain transaction not found after receipt confirmed", map[string]any{
+					"worker": w.id,
+					"uri":    uri,
+					"txID":   txHash,
+				})
+			}
 			return
 		}
 
@@ -312,53 +379,7 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 			return
 		}
 
-		receipt, err := client.TransactionReceipt(ctx, txHash)
-		if err != nil {
-			w.log.Warn("failed to fetch C-chain transaction receipt",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Error(err),
-			)
-			assert.Unreachable("failed to fetch C-chain transaction receipt", map[string]any{
-				"worker": w.id,
-				"uri":    uri,
-				"txID":   txHash,
-				"err":    err,
-			})
-			return
-		}
-
-		if receipt.TxHash != txHash {
-			w.log.Error("C-chain receipt tx hash mismatch",
-				zap.String("uri", uri),
-				zap.Stringer("expected", txHash),
-				zap.Stringer("actual", receipt.TxHash),
-			)
-			assert.Unreachable("C-chain receipt tx hash mismatch", map[string]any{
-				"worker":   w.id,
-				"uri":      uri,
-				"expected": txHash,
-				"actual":   receipt.TxHash,
-			})
-			return
-		}
-
-		if receipt.Status != types.ReceiptStatusSuccessful {
-			w.log.Error("C-chain transaction receipt indicates failure",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Uint64("status", receipt.Status),
-			)
-			assert.Unreachable("C-chain transaction receipt indicates failure", map[string]any{
-				"worker": w.id,
-				"uri":    uri,
-				"txID":   txHash,
-				"status": receipt.Status,
-			})
-			return
-		}
-
-		// Fetch the block by both number and hash to cross-check consistency.
+		// Verify block data consistency.
 		blockByNum, err := client.BlockByNumber(ctx, receipt.BlockNumber)
 		if err != nil {
 			w.log.Warn("failed to fetch block by number",
@@ -367,13 +388,14 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 				zap.Stringer("blockNumber", receipt.BlockNumber),
 				zap.Error(err),
 			)
-			assert.Unreachable("failed to fetch block by number", map[string]any{
-				"worker":      w.id,
-				"uri":         uri,
-				"txID":        txHash,
-				"blockNumber": receipt.BlockNumber,
-				"err":         err,
-			})
+			if errors.Is(err, ethereum.NotFound) {
+				assert.Unreachable("block not found by number after receipt confirmed", map[string]any{
+					"worker":      w.id,
+					"uri":         uri,
+					"txID":        txHash,
+					"blockNumber": receipt.BlockNumber,
+				})
+			}
 			return
 		}
 
@@ -385,13 +407,14 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 				zap.Stringer("blockHash", receipt.BlockHash),
 				zap.Error(err),
 			)
-			assert.Unreachable("failed to fetch block by hash", map[string]any{
-				"worker":    w.id,
-				"uri":       uri,
-				"txID":      txHash,
-				"blockHash": receipt.BlockHash,
-				"err":       err,
-			})
+			if errors.Is(err, ethereum.NotFound) {
+				assert.Unreachable("block not found by hash after receipt confirmed", map[string]any{
+					"worker":    w.id,
+					"uri":       uri,
+					"txID":      txHash,
+					"blockHash": receipt.BlockHash,
+				})
+			}
 			return
 		}
 
@@ -462,7 +485,7 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 		)
 	}
 
-	w.log.Info("confirmed C-chain transaction",
+	w.log.Info("confirmed C-chain transaction on all nodes",
 		zap.Stringer("txID", txHash),
 	)
 	assert.Reachable("confirmed C-chain transaction on all nodes", map[string]any{
