@@ -1,0 +1,130 @@
+name: build-rpm-packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build RPMs for'
+        required: true
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - ".github/packaging/**"
+      - ".github/workflows/build-rpm-release.yml"
+
+jobs:
+  test-packaging:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run packaging tests
+        run: ./scripts/run_task.sh packaging:test
+        shell: bash
+
+  build-rpm:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+            rpm_arch: x86_64
+          - arch: arm64
+            runner: custom-arm64-jammy
+            rpm_arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-go-for-project
+
+      - name: Get tag
+        id: get_tag
+        run: |
+          if [[ -n "${{ github.event.inputs.tag }}" ]]; then
+            echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
+          else
+            # PR builds: synthetic tag for smoke testing the build pipeline
+            echo "TAG=v0.0.0-pr.${GITHUB_SHA::8}" >> "$GITHUB_ENV"
+          fi
+        shell: bash
+
+      - name: Import GPG key
+        if: github.event_name != 'pull_request'
+        id: gpg_key
+        run: |
+          GPG_KEY_FILE="$(mktemp)"
+          echo "${{ secrets.RPM_GPG_PRIVATE_KEY }}" > "${GPG_KEY_FILE}"
+          echo "GPG_KEY_FILE=${GPG_KEY_FILE}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Build RPMs
+        run: ./scripts/run_task.sh packaging:build-rpms
+        env:
+          TAG: ${{ env.TAG }}
+          RPM_ARCH: ${{ matrix.rpm_arch }}
+          RPM_GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
+          NFPM_RPM_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
+
+      - name: Configure AWS credentials
+        if: github.event_name != 'pull_request'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
+          aws-region: us-east-1
+
+      - name: Upload RPMs to S3
+        if: github.event_name != 'pull_request'
+        run: |
+          aws s3 cp "build/rpm/avalanchego-${TAG}-${{ matrix.rpm_arch }}.rpm" \
+            "s3://${BUCKET}/linux/rpms/${{ matrix.rpm_arch }}/"
+          aws s3 cp "build/rpm/subnet-evm-${TAG}-${{ matrix.rpm_arch }}.rpm" \
+            "s3://${BUCKET}/linux/rpms/${{ matrix.rpm_arch }}/"
+        env:
+          BUCKET: ${{ secrets.BUCKET }}
+        shell: bash
+
+      - name: Upload GPG public key to S3
+        if: github.event_name != 'pull_request' && matrix.arch == 'amd64'
+        run: |
+          aws s3 cp "build/rpm/RPM-GPG-KEY-avalanchego" \
+            "s3://${BUCKET}/linux/rpms/RPM-GPG-KEY-avalanchego"
+        env:
+          BUCKET: ${{ secrets.BUCKET }}
+        shell: bash
+
+      - name: Validate S3 RPMs
+        if: github.event_name != 'pull_request'
+        run: ./scripts/run_task.sh packaging:validate-s3-rpms
+        env:
+          TAG: ${{ env.TAG }}
+          RPM_ARCH: ${{ matrix.rpm_arch }}
+          BUCKET: ${{ secrets.BUCKET }}
+
+      - name: Upload RPMs as artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpms-${{ matrix.rpm_arch }}
+          path: |
+            build/rpm/avalanchego-${{ env.TAG }}-${{ matrix.rpm_arch }}.rpm
+            build/rpm/subnet-evm-${{ env.TAG }}-${{ matrix.rpm_arch }}.rpm
+            build/rpm/RPM-GPG-KEY-avalanchego
+
+      - name: Cleanup
+        run: |
+          if [[ -n "${GPG_KEY_FILE:-}" ]]; then
+            rm -f "${GPG_KEY_FILE}"
+          fi
+          rm -rf build/rpm
+        shell: bash

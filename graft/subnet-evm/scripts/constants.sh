@@ -25,6 +25,7 @@ source "$AVALANCHE_PATH"/scripts/image_tag.sh
 GOPATH="$(go env GOPATH)"
 DEFAULT_PLUGIN_DIR="${HOME}/.avalanchego/plugins"
 DEFAULT_VM_NAME="subnet-evm"
+# NOTE: This value is sourced by RPM packaging scripts (.github/packaging/).
 DEFAULT_VM_ID="srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
 
 # Docker image names

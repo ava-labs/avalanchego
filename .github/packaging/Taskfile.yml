@@ -1,0 +1,118 @@
+# RPM packaging tasks for avalanchego and subnet-evm.
+#
+# Builds RPMs inside a Rocky Linux 9 container (glibc 2.34) with GPG signing.
+# All tasks require TAG to be set to a git tag (e.g., TAG=v1.14.1).
+
+version: '3'
+
+vars:
+  # Go version from the project's go.mod.
+  PACKAGING_GO_VERSION:
+    sh: go list -m -f '{{ "{{.GoVersion}}" }}' | head -1
+  # Map uname -m to RPM arch names (arm64 -> aarch64).
+  PACKAGING_HOST_ARCH:
+    sh: |
+      arch=$(uname -m)
+      case "${arch}" in
+        x86_64) echo "x86_64" ;;
+        arm64)  echo "aarch64" ;;
+        *)      echo "${arch}" ;;
+      esac
+  # Git commit hash, resolved on host (container may not have .git for worktrees).
+  PACKAGING_GIT_COMMIT:
+    sh: git rev-parse HEAD
+  PACKAGING_DOCKER_IMAGE: avalanchego-rpm-builder
+  PACKAGING_OUTPUT_DIR: '{{.ROOT_DIR}}/build/rpm'
+
+tasks:
+  default:
+    desc: Lists available packaging tasks
+    silent: true
+    cmd: task --list | grep packaging
+
+  build-rpms:
+    desc: Builds RPMs for both avalanchego and subnet-evm (requires TAG)
+    cmds:
+      - task: build-avalanchego-rpm
+      - task: build-subnet-evm-rpm
+
+  build-builder-docker-image:
+    desc: Builds the RPM builder Docker image
+    internal: true
+    cmds:
+      - cmd: >-
+          docker build
+          --build-arg GO_VERSION={{.PACKAGING_GO_VERSION}}
+          -t {{.PACKAGING_DOCKER_IMAGE}}
+          {{.ROOT_DIR}}/.github/packaging/
+
+  build-avalanchego-rpm:
+    desc: Builds RPM for avalanchego (requires TAG)
+    vars:
+      RPM_ARCH: '{{.RPM_ARCH | default .PACKAGING_HOST_ARCH}}'
+      RPM_TAG: '{{.TAG | default ""}}'
+    preconditions:
+      - sh: '[[ -n "{{.RPM_TAG}}" ]]'
+        msg: "TAG must be set (e.g., TAG=v1.14.1 task packaging:build-avalanchego-rpm)"
+    deps: [build-builder-docker-image]
+    cmds:
+      - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
+      - cmd: >-
+          docker run --rm
+          -v {{.ROOT_DIR}}:/build
+          -v {{.PACKAGING_OUTPUT_DIR}}:/output
+          {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
+          -e PACKAGE=avalanchego
+          -e VERSION={{trimPrefix "v" .RPM_TAG}}
+          -e TAG={{.RPM_TAG}}
+          -e RPM_ARCH={{.RPM_ARCH}}
+          -e OUTPUT_DIR=/output
+          -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
+          {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
+          {{.PACKAGING_DOCKER_IMAGE}}
+          .github/packaging/scripts/build-rpm.sh
+
+  build-subnet-evm-rpm:
+    desc: Builds RPM for subnet-evm (requires TAG)
+    vars:
+      RPM_ARCH: '{{.RPM_ARCH | default .PACKAGING_HOST_ARCH}}'
+      RPM_TAG: '{{.TAG | default ""}}'
+    preconditions:
+      - sh: '[[ -n "{{.RPM_TAG}}" ]]'
+        msg: "TAG must be set (e.g., TAG=v1.14.1 task packaging:build-subnet-evm-rpm)"
+    deps: [build-builder-docker-image]
+    cmds:
+      - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
+      - cmd: >-
+          docker run --rm
+          -v {{.ROOT_DIR}}:/build
+          -v {{.PACKAGING_OUTPUT_DIR}}:/output
+          {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
+          -e PACKAGE=subnet-evm
+          -e VERSION={{trimPrefix "v" .RPM_TAG}}
+          -e TAG={{.RPM_TAG}}
+          -e RPM_ARCH={{.RPM_ARCH}}
+          -e OUTPUT_DIR=/output
+          -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
+          {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
+          {{.PACKAGING_DOCKER_IMAGE}}
+          .github/packaging/scripts/build-rpm.sh
+
+  test:
+    desc: Runs packaging unit tests
+    cmds:
+      - cmd: '{{.ROOT_DIR}}/.github/packaging/scripts/extract-changelog_test.sh'
+
+  validate-s3-rpms:
+    desc: Validates RPMs uploaded to S3 by downloading and testing in a fresh container
+    preconditions:
+      - sh: '[[ -n "${TAG:-}" ]]'
+        msg: "TAG must be set"
+      - sh: '[[ -n "${RPM_ARCH:-}" ]]'
+        msg: "RPM_ARCH must be set"
+      - sh: '[[ -n "${BUCKET:-}" ]]'
+        msg: "BUCKET must be set"
+    cmds:
+      - cmd: '{{.ROOT_DIR}}/.github/packaging/scripts/validate-s3-rpm.sh'
