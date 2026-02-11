@@ -150,8 +150,7 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 	}
 }
 
-// Start launches [numWorkers] worker goroutines to process LeafSyncTasks from [c.tasks].
-// onFailure is called if the sync completes with an error.
+// Sync launches [numWorkers] worker goroutines to process LeafSyncTasks from [c.tasks].
 func (c *CallbackSyncer) Sync(ctx context.Context) error {
 	// Start the worker threads with the desired context.
 	eg, egCtx := errgroup.WithContext(ctx)

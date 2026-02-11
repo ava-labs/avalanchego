@@ -15,22 +15,22 @@ import (
 // FuncSyncer adapts a function to the simple Syncer shape used in tests. It is
 // useful for defining small, behavior-driven syncers inline.
 type FuncSyncer struct {
-	fn func(ctx context.Context) error
+	name string
+	id   string
+	fn   func(ctx context.Context) error
 }
 
 // Sync calls the wrapped function and returns its result.
 func (f FuncSyncer) Sync(ctx context.Context) error { return f.fn(ctx) }
-
-// Name returns the provided name or a default if unspecified.
-func (FuncSyncer) Name() string { return "Test Name" }
-func (FuncSyncer) ID() string   { return "test_id" }
+func (f FuncSyncer) Name() string                   { return f.name }
+func (f FuncSyncer) ID() string                     { return f.id }
 
 var _ types.Syncer = FuncSyncer{}
 
 // NewBarrierSyncer returns a syncer that signals startedWG.Done() when Sync begins,
 // then blocks until releaseCh is closed (returns nil) or ctx is canceled (returns ctx.Err).
-func NewBarrierSyncer(startedWG *sync.WaitGroup, releaseCh <-chan struct{}) FuncSyncer {
-	return FuncSyncer{fn: func(ctx context.Context) error {
+func NewBarrierSyncer(name string, startedWG *sync.WaitGroup, releaseCh <-chan struct{}) FuncSyncer {
+	return FuncSyncer{name: name, id: name, fn: func(ctx context.Context) error {
 		if startedWG != nil {
 			startedWG.Done()
 		}
@@ -45,8 +45,8 @@ func NewBarrierSyncer(startedWG *sync.WaitGroup, releaseCh <-chan struct{}) Func
 
 // NewErrorSyncer returns a syncer that signals startedWG.Done() when Sync begins,
 // then blocks until trigger is closed (returns errToReturn) or ctx is canceled (returns ctx.Err).
-func NewErrorSyncer(startedWG *sync.WaitGroup, trigger <-chan struct{}, errToReturn error) FuncSyncer {
-	return FuncSyncer{fn: func(ctx context.Context) error {
+func NewErrorSyncer(name string, startedWG *sync.WaitGroup, trigger <-chan struct{}, errToReturn error) FuncSyncer {
+	return FuncSyncer{name: name, id: name, fn: func(ctx context.Context) error {
 		if startedWG != nil {
 			startedWG.Done()
 		}
@@ -61,8 +61,8 @@ func NewErrorSyncer(startedWG *sync.WaitGroup, trigger <-chan struct{}, errToRet
 
 // NewCancelAwareSyncer returns a syncer that signals startedWG.Done() when Sync begins,
 // then blocks until ctx is canceled (returns ctx.Err) or timeout elapses (returns timeout error).
-func NewCancelAwareSyncer(startedWG *sync.WaitGroup, timeout time.Duration) FuncSyncer {
-	return FuncSyncer{fn: func(ctx context.Context) error {
+func NewCancelAwareSyncer(name string, startedWG *sync.WaitGroup, timeout time.Duration) FuncSyncer {
+	return FuncSyncer{name: name, id: name, fn: func(ctx context.Context) error {
 		if startedWG != nil {
 			startedWG.Done()
 		}

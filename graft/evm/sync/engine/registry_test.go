@@ -42,16 +42,6 @@ func (m *mockSyncer) Sync(context.Context) error {
 func (m *mockSyncer) Name() string { return m.name }
 func (m *mockSyncer) ID() string   { return m.name }
 
-// namedSyncer adapts an existing syncer with a provided name to satisfy Syncer with Name().
-type namedSyncer struct {
-	name   string
-	syncer types.Syncer
-}
-
-func (n *namedSyncer) Sync(ctx context.Context) error { return n.syncer.Sync(ctx) }
-func (n *namedSyncer) Name() string                   { return n.name }
-func (n *namedSyncer) ID() string                     { return n.name }
-
 // syncerConfig describes a test syncer setup for RunSyncerTasks table tests.
 type syncerConfig struct {
 	name      string
@@ -209,8 +199,7 @@ func TestSyncerRegistry_ConcurrentStart(t *testing.T) {
 
 		for i := 0; i < numBarrierSyncers; i++ {
 			name := fmt.Sprintf("BarrierSyncer-%d", i)
-			s := &namedSyncer{name: name, syncer: NewBarrierSyncer(&allStartedWG, releaseCh)}
-			require.NoError(t, registry.Register(s))
+			require.NoError(t, registry.Register(NewBarrierSyncer(name, &allStartedWG, releaseCh)))
 		}
 
 		doneCh := startSyncersAsync(registry, ctx, newTestClientSummary(t, c))
@@ -236,7 +225,7 @@ func TestSyncerRegistry_ErrorPropagatesAndCancelsOthers(t *testing.T) {
 		errFirst := errors.New("test error")
 		var errorSyncerStartedWG sync.WaitGroup
 		errorSyncerStartedWG.Add(1)
-		errorSyncer := &namedSyncer{name: "ErrorSyncer-0", syncer: NewErrorSyncer(&errorSyncerStartedWG, trigger, errFirst)}
+		errorSyncer := NewErrorSyncer("ErrorSyncer-0", &errorSyncerStartedWG, trigger, errFirst)
 		require.NoError(t, registry.Register(errorSyncer))
 
 		// Cancel-aware syncers to verify cancellation propagation.
@@ -282,7 +271,7 @@ func TestSyncerRegistry_FirstErrorWinsAcrossMany(t *testing.T) {
 				errFirst = errInstance
 			}
 			name := fmt.Sprintf("ErrorSyncer-%d", i)
-			require.NoError(t, registry.Register(&namedSyncer{name: name, syncer: NewErrorSyncer(&allErrorSyncersStartedWG, trigger, errInstance)}))
+			require.NoError(t, registry.Register(NewErrorSyncer(name, &allErrorSyncersStartedWG, trigger, errInstance)))
 		}
 
 		doneCh := startSyncersAsync(registry, ctx, newTestClientSummary(t, c))
@@ -417,10 +406,7 @@ func TestSyncerRegistry_MixedCancellationAndSuccess(t *testing.T) {
 		releaseCh := make(chan struct{})
 		var successWG sync.WaitGroup
 		successWG.Add(1)
-		require.NoError(t, registry.Register(&namedSyncer{
-			name:   "SuccessSyncer",
-			syncer: NewBarrierSyncer(&successWG, releaseCh),
-		}))
+		require.NoError(t, registry.Register(NewBarrierSyncer("SuccessSyncer", &successWG, releaseCh)))
 
 		// Create syncers that will be cancelled.
 		const numCancelSyncers = 2
@@ -458,10 +444,8 @@ func registerCancelAwareSyncers(t *testing.T, registry *SyncerRegistry, numSynce
 	var startedWG sync.WaitGroup
 	startedWG.Add(numSyncers)
 	for i := 0; i < numSyncers; i++ {
-		require.NoError(t, registry.Register(&namedSyncer{
-			name:   fmt.Sprintf("Syncer-%d", i),
-			syncer: NewCancelAwareSyncer(&startedWG, timeout),
-		}))
+		name := fmt.Sprintf("Syncer-%d", i)
+		require.NoError(t, registry.Register(NewCancelAwareSyncer(name, &startedWG, timeout)))
 	}
 	return &startedWG
 }
