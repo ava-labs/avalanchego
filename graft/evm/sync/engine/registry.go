@@ -25,14 +25,14 @@ type syncerTask struct {
 
 // SyncerRegistry manages a collection of syncers for sequential execution.
 type SyncerRegistry struct {
-	syncers         []syncerTask
-	registeredNames map[string]bool // Track registered IDs to prevent duplicates.
+	syncers       []syncerTask
+	registeredIDs map[string]bool // Track registered IDs to prevent duplicates.
 }
 
 // NewSyncerRegistry creates a new empty syncer registry.
 func NewSyncerRegistry() *SyncerRegistry {
 	return &SyncerRegistry{
-		registeredNames: make(map[string]bool),
+		registeredIDs: make(map[string]bool),
 	}
 }
 
@@ -40,11 +40,11 @@ func NewSyncerRegistry() *SyncerRegistry {
 // Returns an error if a syncer with the same name is already registered.
 func (r *SyncerRegistry) Register(syncer types.Syncer) error {
 	id := syncer.ID()
-	if r.registeredNames[id] {
+	if r.registeredIDs[id] {
 		return fmt.Errorf("%w with id '%s'", errSyncerAlreadyRegistered, id)
 	}
 
-	r.registeredNames[id] = true
+	r.registeredIDs[id] = true
 	r.syncers = append(r.syncers, syncerTask{syncer.Name(), syncer})
 
 	return nil

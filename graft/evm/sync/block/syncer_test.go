@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
@@ -96,7 +97,7 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 				env := newTestEnvironment(t, tt.numBlocks, c)
@@ -121,7 +122,7 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 func TestBlockSyncer_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		env := newTestEnvironment(t, 10, c)
 		syncer, err := env.createSyncer(5, 3)
 		require.NoError(t, err)

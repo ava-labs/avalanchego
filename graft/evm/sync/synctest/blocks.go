@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/params"
@@ -68,15 +67,6 @@ func GenerateTestBlocks(t *testing.T, numBlocks int, cfg *BlockGeneratorConfig) 
 	}
 
 	return blocks
-}
-
-// BlockMap creates a map from block hash to block for quick lookups.
-func BlockMap(blocks []*types.Block) map[common.Hash]*types.Block {
-	m := make(map[common.Hash]*types.Block, len(blocks))
-	for _, block := range blocks {
-		m[block.Hash()] = block
-	}
-	return m
 }
 
 func newGenesisBlock(gasLimit uint64) *types.Block {

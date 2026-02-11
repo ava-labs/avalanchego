@@ -29,8 +29,6 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-const subnetEVMCodecName = "subnet-evm"
-
 func TestGetCode(t *testing.T) {
 	tests := map[string]struct {
 		setupRequest func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte)
@@ -84,7 +82,7 @@ func TestGetCode(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				testNetClient := &testNetwork{}
@@ -305,7 +303,7 @@ func TestGetBlocks(t *testing.T) {
 		},
 	}
 	for name, test := range tests {
-		messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 			blocksRequestHandler := handlers.NewBlockRequestHandler(buildGetter(blocks), c, handlerstats.NewNoopHandlerStats())
 
 			t.Run(name, func(t *testing.T) {
@@ -380,7 +378,7 @@ func TestGetLeafs(t *testing.T) {
 	}{
 		"full response for small (single request) trie": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					smallTrieRoot,
 					common.Hash{},
@@ -405,7 +403,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"too many leaves in response": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					smallTrieRoot,
 					common.Hash{},
@@ -416,7 +414,7 @@ func TestGetLeafs(t *testing.T) {
 				)
 			},
 			response: func(t *testing.T, _ codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte {
-				modifiedRequest := newLeafsRequest(t,
+				modifiedRequest := mustNewLeafsRequest(t,
 					leafReqType,
 					request.RootHash(),
 					request.AccountHash(),
@@ -435,7 +433,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"partial response to request for entire trie (full leaf limit)": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					largeTrieRoot,
 					common.Hash{},
@@ -460,7 +458,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"partial response to request for middle range of trie (full leaf limit)": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					largeTrieRoot,
 					common.Hash{},
@@ -485,7 +483,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"full response from near end of trie to end of trie (less than leaf limit)": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					largeTrieRoot,
 					common.Hash{},
@@ -510,7 +508,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"full response for intermediate range of trie (less than leaf limit)": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					largeTrieRoot,
 					common.Hash{},
@@ -535,7 +533,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"removed first key in response": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					largeTrieRoot,
 					common.Hash{},
@@ -564,7 +562,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"removed first key in response and replaced proof": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					largeTrieRoot,
 					common.Hash{},
@@ -581,7 +579,7 @@ func TestGetLeafs(t *testing.T) {
 				var leafResponse message.LeafsResponse
 				_, err = c.Unmarshal(response, &leafResponse)
 				require.NoError(t, err)
-				modifiedRequest := newLeafsRequest(t,
+				modifiedRequest := mustNewLeafsRequest(t,
 					leafReqType,
 					request.RootHash(),
 					request.AccountHash(),
@@ -598,7 +596,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"removed last key in response": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					largeTrieRoot,
 					common.Hash{},
@@ -626,7 +624,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"removed key from middle of response": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					largeTrieRoot,
 					common.Hash{},
@@ -655,7 +653,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"corrupted value in middle of response": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					largeTrieRoot,
 					common.Hash{},
@@ -683,7 +681,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 		"all proof keys removed from response": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
-				return newLeafsRequest(t,
+				return mustNewLeafsRequest(t,
 					leafReqType,
 					largeTrieRoot,
 					common.Hash{},
@@ -712,11 +710,7 @@ func TestGetLeafs(t *testing.T) {
 		},
 	}
 	for name, test := range tests {
-		messagetest.ForEachCodec(t, func(codecName string, c codec.Manager) {
-			leafReqType := message.CorethLeafsRequestType
-			if codecName == subnetEVMCodecName {
-				leafReqType = message.SubnetEVMLeafsRequestType
-			}
+		messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
 			handler := handlers.NewLeafsRequestHandler(
 				trieDB,
 				message.StateTrieKeyLength,
@@ -756,11 +750,7 @@ func TestGetLeafsRetries(t *testing.T) {
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	root, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100_000, common.HashLength)
 
-	messagetest.ForEachCodec(t, func(codecName string, c codec.Manager) {
-		leafReqType := message.CorethLeafsRequestType
-		if codecName == subnetEVMCodecName {
-			leafReqType = message.SubnetEVMLeafsRequestType
-		}
+	messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
 		handler := handlers.NewLeafsRequestHandler(
 			trieDB,
 			message.StateTrieKeyLength,
@@ -779,7 +769,7 @@ func TestGetLeafsRetries(t *testing.T) {
 			BlockParser:      newTestBlockParser(),
 		})
 
-		request := newLeafsRequest(t,
+		request := mustNewLeafsRequest(t,
 			leafReqType,
 			root,
 			common.Hash{},
@@ -823,11 +813,7 @@ func TestGetLeafsRetries(t *testing.T) {
 }
 
 func TestStateSyncNodes(t *testing.T) {
-	messagetest.ForEachCodec(t, func(codecName string, c codec.Manager) {
-		leafReqType := message.CorethLeafsRequestType
-		if codecName == subnetEVMCodecName {
-			leafReqType = message.SubnetEVMLeafsRequestType
-		}
+	messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
 		testNetClient := &testNetwork{}
 
 		stateSyncNodes := []ids.NodeID{
@@ -869,10 +855,10 @@ func TestStateSyncNodes(t *testing.T) {
 	})
 }
 
-// newLeafsRequest creates a new LeafsRequest for testing.
+// mustNewLeafsRequest creates a new LeafsRequest for testing.
 // When account is common.Hash{} (empty), it creates an account trie request.
 // When account is set to a specific account hash, it creates a storage trie request for that account.
-func newLeafsRequest(
+func mustNewLeafsRequest(
 	t *testing.T,
 	leafReqType message.LeafsRequestType,
 	root common.Hash,

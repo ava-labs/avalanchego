@@ -47,7 +47,7 @@ type syncTest struct {
 	GetCodeIntercept  func([]common.Hash, [][]byte) ([][]byte, error)
 }
 
-func testSync(t *testing.T, test syncTest, c codec.Manager) {
+func testSync(t *testing.T, test syncTest, c codec.Manager, leafReqType message.LeafsRequestType) {
 	t.Helper()
 	ctx := t.Context()
 	if test.ctx != nil {
@@ -80,6 +80,7 @@ func testSync(t *testing.T, test syncTest, c codec.Manager) {
 		root,
 		fetcher,
 		testRequestSize,
+		leafReqType,
 		WithBatchSize(1000), // Use a lower batch size in order to get test coverage of batches being written early.
 	)
 	require.NoError(t, err, "failed to create state syncer")
@@ -102,9 +103,9 @@ func testSync(t *testing.T, test syncTest, c codec.Manager) {
 
 // testSyncResumes tests a series of syncTests work as expected, invoking a callback function after each
 // successive step.
-func testSyncResumes(t *testing.T, steps []syncTest, stepCallback func(), c codec.Manager) {
+func testSyncResumes(t *testing.T, steps []syncTest, stepCallback func(), c codec.Manager, leafReqType message.LeafsRequestType) {
 	for _, test := range steps {
-		testSync(t, test, c)
+		testSync(t, test, c, leafReqType)
 		stepCallback()
 	}
 }
@@ -193,8 +194,8 @@ func TestSimpleSyncCases(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
-				testSync(t, test, c)
+			messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
+				testSync(t, test, c, leafReqType)
 			})
 		})
 	}
@@ -202,7 +203,7 @@ func TestSimpleSyncCases(t *testing.T) {
 
 func TestCancelSync(t *testing.T) {
 	t.Parallel()
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
 		r := rand.New(rand.NewSource(1))
 		ctx, cancel := context.WithCancel(t.Context())
 		t.Cleanup(cancel)
@@ -220,7 +221,7 @@ func TestCancelSync(t *testing.T) {
 				cancel()
 				return lr, nil
 			},
-		}, c)
+		}, c, leafReqType)
 	})
 }
 
@@ -247,7 +248,7 @@ func (i *interruptLeafsIntercept) getLeafsIntercept(request message.LeafsRequest
 
 func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 	t.Parallel()
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
 		r := rand.New(rand.NewSource(1))
 		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 		root, _ := synctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, 2000, 3)
@@ -262,7 +263,7 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 			},
 			expectedError:     errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
-		}, c)
+		}, c, leafReqType)
 
 		require.GreaterOrEqual(t, intercept.numRequests.Load(), uint32(2))
 
@@ -270,13 +271,13 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 				return clientDB, serverDB, root
 			},
-		}, c)
+		}, c, leafReqType)
 	})
 }
 
 func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 	t.Parallel()
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
 		r := rand.New(rand.NewSource(1))
 		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -299,19 +300,19 @@ func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 			},
 			expectedError:     errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
-		}, c)
+		}, c, leafReqType)
 
 		testSync(t, syncTest{
 			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 				return clientDB, serverDB, root
 			},
-		}, c)
+		}, c, leafReqType)
 	})
 }
 
 func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 	t.Parallel()
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
 		r := rand.New(rand.NewSource(1))
 		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -341,7 +342,7 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 			},
 			expectedError:     errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
-		}, c)
+		}, c, leafReqType)
 
 		<-snapshot.WipeSnapshot(clientDB.DiskDB(), false)
 
@@ -349,13 +350,13 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 				return clientDB, serverDB, root2
 			},
-		}, c)
+		}, c, leafReqType)
 	})
 }
 
 func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testing.T) {
 	t.Parallel()
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
 		r := rand.New(rand.NewSource(1))
 		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -378,19 +379,19 @@ func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testi
 			},
 			expectedError:     errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
-		}, c)
+		}, c, leafReqType)
 
 		testSync(t, syncTest{
 			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 				return clientDB, serverDB, root
 			},
-		}, c)
+		}, c, leafReqType)
 	})
 }
 
 func TestResumeSyncLargeStorageTrieWithSpreadOutDuplicatesInterrupted(t *testing.T) {
 	t.Parallel()
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
 		r := rand.New(rand.NewSource(1))
 		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -412,13 +413,13 @@ func TestResumeSyncLargeStorageTrieWithSpreadOutDuplicatesInterrupted(t *testing
 			},
 			expectedError:     errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
-		}, c)
+		}, c, leafReqType)
 
 		testSync(t, syncTest{
 			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 				return clientDB, serverDB, root
 			},
-		}, c)
+		}, c, leafReqType)
 	})
 }
 
@@ -496,14 +497,14 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
-				testSyncerSyncsToNewRoot(t, test.deleteBetweenSyncs, c)
+			messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
+				testSyncerSyncsToNewRoot(t, test.deleteBetweenSyncs, c, leafReqType)
 			})
 		})
 	}
 }
 
-func testSyncerSyncsToNewRoot(t *testing.T, deleteBetweenSyncs func(*testing.T, common.Hash, state.Database), c codec.Manager) {
+func testSyncerSyncsToNewRoot(t *testing.T, deleteBetweenSyncs func(*testing.T, common.Hash, state.Database), c codec.Manager, leafReqType message.LeafsRequestType) {
 	r := rand.New(rand.NewSource(1))
 	clientDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
@@ -534,7 +535,7 @@ func testSyncerSyncsToNewRoot(t *testing.T, deleteBetweenSyncs func(*testing.T, 
 		<-snapshot.WipeSnapshot(clientDB.DiskDB(), false)
 
 		deleteBetweenSyncs(t, root1, clientDB)
-	}, c)
+	}, c, leafReqType)
 }
 
 // assertDBConsistency checks [serverTrieDB] and [clientTrieDB] have the same EVM state trie at [root],

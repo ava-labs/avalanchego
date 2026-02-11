@@ -40,7 +40,7 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 	testHandlerStats := &statstest.TestHandlerStats{}
 
 	// convert into map
-	blocksDB := synctest.BlockMap(blocks)
+	blocksDB := blockMap(blocks)
 	blockProvider := &TestBlockProvider{
 		GetBlockFn: func(hash common.Hash, height uint64) *types.Block {
 			blk, ok := blocksDB[hash]
@@ -127,7 +127,7 @@ func TestBlockRequestHandler(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
 				executeBlockRequestTest(t, test, blocks, c)
@@ -174,7 +174,7 @@ func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+		messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
 				executeBlockRequestTest(t, test, blocks, c)
@@ -191,9 +191,9 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	require.Len(t, blocks, 12)
 
 	// convert into map
-	blocksDB := synctest.BlockMap(blocks)
+	blocksDB := blockMap(blocks)
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		cancelAfterNumRequests := 2
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
@@ -235,4 +235,13 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 			require.Equal(t, blocks[len(blocks)-i-1].Hash(), block.Hash())
 		}
 	})
+}
+
+// blockMap creates a map from block hash to block for quick lookups.
+func blockMap(blocks []*types.Block) map[common.Hash]*types.Block {
+	m := make(map[common.Hash]*types.Block, len(blocks))
+	for _, block := range blocks {
+		m[block.Hash()] = block
+	}
+	return m
 }

@@ -87,7 +87,7 @@ func TestCodeRequestHandler(t *testing.T) {
 		},
 	}
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		codeRequestHandler := NewCodeRequestHandler(database, c, testHandlerStats)
 		for name, test := range tests {
 			testHandlerStats.Reset()

@@ -349,12 +349,12 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 		metric.UpdateRequestLatency(time.Since(start))
 
 		if err != nil {
-			ctx := make([]any, 0, 8)
+			logCtx := make([]any, 0, 8)
 			if nodeID != ids.EmptyNodeID {
-				ctx = append(ctx, "nodeID", nodeID)
+				logCtx = append(logCtx, "nodeID", nodeID)
 			}
-			ctx = append(ctx, "attempt", attempt, "request", request, "err", err)
-			log.Debug("request failed, retrying", ctx...)
+			logCtx = append(logCtx, "attempt", attempt, "request", request, "err", err)
+			log.Debug("request failed, retrying", logCtx...)
 			metric.IncFailed()
 			c.network.TrackBandwidth(nodeID, 0)
 			time.Sleep(failedRequestSleepInterval)

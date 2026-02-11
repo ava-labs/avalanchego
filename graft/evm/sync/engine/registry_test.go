@@ -166,7 +166,7 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+			messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 				registry := NewSyncerRegistry()
 				mockSyncers := make([]*mockSyncer, len(tt.syncers))
 
@@ -194,7 +194,7 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 func TestSyncerRegistry_ConcurrentStart(t *testing.T) {
 	t.Parallel()
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		registry := NewSyncerRegistry()
 
 		ctx, cancel := context.WithCancel(t.Context())
@@ -225,7 +225,7 @@ func TestSyncerRegistry_ConcurrentStart(t *testing.T) {
 func TestSyncerRegistry_ErrorPropagatesAndCancelsOthers(t *testing.T) {
 	t.Parallel()
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		registry := NewSyncerRegistry()
 
 		ctx, cancel := context.WithCancel(t.Context())
@@ -259,7 +259,7 @@ func TestSyncerRegistry_ErrorPropagatesAndCancelsOthers(t *testing.T) {
 func TestSyncerRegistry_FirstErrorWinsAcrossMany(t *testing.T) {
 	t.Parallel()
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		registry := NewSyncerRegistry()
 
 		ctx, cancel := context.WithCancel(t.Context())
@@ -302,7 +302,7 @@ func TestSyncerRegistry_NoSyncersRegistered(t *testing.T) {
 	t.Parallel()
 
 	registry := NewSyncerRegistry()
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		ctx, cancel := context.WithCancel(t.Context())
 		t.Cleanup(cancel)
 
@@ -339,7 +339,7 @@ func TestSyncerRegistry_ContextCancellationErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+			messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 				registry := NewSyncerRegistry()
 
 				startedWG := registerCancelAwareSyncers(t, registry, tt.numSyncers, tt.syncerTimeout)
@@ -374,7 +374,7 @@ func TestSyncerRegistry_ContextCancellationErrors(t *testing.T) {
 func TestSyncerRegistry_EarlyReturnOnAlreadyCancelledContext(t *testing.T) {
 	t.Parallel()
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		registry := NewSyncerRegistry()
 
 		// Create and immediately cancel context.
@@ -407,7 +407,7 @@ func TestSyncerRegistry_EarlyReturnOnAlreadyCancelledContext(t *testing.T) {
 func TestSyncerRegistry_MixedCancellationAndSuccess(t *testing.T) {
 	t.Parallel()
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		registry := NewSyncerRegistry()
 
 		ctx, cancel := context.WithCancel(t.Context())

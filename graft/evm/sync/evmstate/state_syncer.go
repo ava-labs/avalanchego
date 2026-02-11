@@ -81,14 +81,7 @@ func WithBatchSize(n uint) SyncerOption {
 	})
 }
 
-// WithLeafsRequestType sets the leafs request type (coreth or subnet-evm wire format).
-func WithLeafsRequestType(t message.LeafsRequestType) SyncerOption {
-	return options.Func[stateSync](func(s *stateSync) {
-		s.leafsRequestType = t
-	})
-}
-
-func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue, leafsRequestSize uint16, opts ...SyncerOption) (types.Syncer, error) {
+func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...SyncerOption) (types.Syncer, error) {
 	if leafsRequestSize == 0 {
 		return nil, errLeafsRequestSizeRequired
 	}
@@ -101,7 +94,7 @@ func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQu
 		snapshot:         snapshot.NewDiskLayer(db),
 		stats:            newTrieSyncStats(),
 		triesInProgress:  make(map[common.Hash]*trieToSync),
-		leafsRequestType: message.CorethLeafsRequestType, // default to coreth wire format
+		leafsRequestType: leafsRequestType,
 
 		// [triesInProgressSem] is used to keep the number of tries syncing
 		// less than or equal to [defaultNumWorkers].

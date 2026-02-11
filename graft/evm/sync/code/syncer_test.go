@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
@@ -100,7 +101,7 @@ func TestCodeSyncerSingleCodeHash(t *testing.T) {
 	t.Parallel()
 	codeBytes := utils.RandomBytes(100)
 	codeHash := crypto.Keccak256Hash(codeBytes)
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		testCodeSyncer(t, codeSyncerTest{
 			codeRequestHashes: [][]common.Hash{{codeHash}},
 			codeByteSlices:    [][]byte{codeBytes},
@@ -120,7 +121,7 @@ func TestCodeSyncerManyCodeHashes(t *testing.T) {
 		codeByteSlices = append(codeByteSlices, codeBytes)
 	}
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		testCodeSyncer(t, codeSyncerTest{
 			queueCapacity:     10,
 			codeRequestHashes: [][]common.Hash{codeHashes[0:100], codeHashes[100:2000], codeHashes[2000:2005], codeHashes[2005:]},
@@ -134,7 +135,7 @@ func TestCodeSyncerRequestErrors(t *testing.T) {
 	codeBytes := utils.RandomBytes(100)
 	codeHash := crypto.Keccak256Hash(codeBytes)
 	errDummy := errors.New("dummy error")
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		testCodeSyncer(t, codeSyncerTest{
 			codeRequestHashes: [][]common.Hash{{codeHash}},
 			codeByteSlices:    [][]byte{codeBytes},
@@ -150,7 +151,7 @@ func TestCodeSyncerAddsInProgressCodeHashes(t *testing.T) {
 	t.Parallel()
 	codeBytes := utils.RandomBytes(100)
 	codeHash := crypto.Keccak256Hash(codeBytes)
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		clientDB := rawdb.NewMemoryDatabase()
 		require.NoError(t, customrawdb.WriteCodeToFetch(clientDB, codeHash))
 		testCodeSyncer(t, codeSyncerTest{
@@ -173,7 +174,7 @@ func TestCodeSyncerAddsMoreInProgressThanQueueSize(t *testing.T) {
 		codeByteSlices = append(codeByteSlices, codeBytes)
 	}
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		db := rawdb.NewMemoryDatabase()
 		for _, codeHash := range codeHashes {
 			require.NoError(t, customrawdb.WriteCodeToFetch(db, codeHash))

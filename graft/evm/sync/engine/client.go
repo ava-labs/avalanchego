@@ -116,7 +116,7 @@ type ClientConfig struct {
 	SkipResume         bool
 
 	// LeafsRequestType specifies the wire format for leafs requests.
-	// Defaults to CorethLeafsRequestType if not set.
+	// Must be set explicitly by the caller.
 	LeafsRequestType message.LeafsRequestType
 }
 
@@ -398,7 +398,7 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		c.config.Client, c.config.ChainDB,
 		summary.GetBlockRoot(),
 		codeQueue, c.config.RequestSize,
-		evmstate.WithLeafsRequestType(c.config.LeafsRequestType),
+		c.config.LeafsRequestType,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
