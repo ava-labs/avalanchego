@@ -52,13 +52,15 @@ var (
 			},
 		},
 		StakingConfig: StakingConfig{
-			UptimeRequirement: .8, // 80%
-			MinValidatorStake: 2 * units.KiloAvax,
-			MaxValidatorStake: 3 * units.MegaAvax,
-			MinDelegatorStake: 25 * units.Avax,
-			MinDelegationFee:  20000, // 2%
-			MinStakeDuration:  2 * 7 * 24 * time.Hour,
-			MaxStakeDuration:  365 * 24 * time.Hour,
+			UptimeRequirement:             .8, // 80%
+			UptimeExpectationIncrease:     .1, // 10%
+			UptimeExpectationIncreaseTime: time.Date(2026, 3, 14, 16, 0, 0, 0, time.UTC),
+			MinValidatorStake:             2 * units.KiloAvax,
+			MaxValidatorStake:             3 * units.MegaAvax,
+			MinDelegatorStake:             25 * units.Avax,
+			MinDelegationFee:              20000, // 2%
+			MinStakeDuration:              2 * 7 * 24 * time.Hour,
+			MaxStakeDuration:              365 * 24 * time.Hour,
 			RewardConfig: reward.Config{
 				MaxConsumptionRate: .12 * reward.PercentDenominator,
 				MinConsumptionRate: .10 * reward.PercentDenominator,

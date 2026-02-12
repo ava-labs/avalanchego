@@ -66,6 +66,13 @@ type Internal struct {
 	// UptimePercentage is the minimum uptime required to be rewarded for staking
 	UptimePercentage float64
 
+	// UptimeExpectationIncrease is the percentage increase in uptime above UptimePercentage that is expected starting
+	// from UptimeExpectationIncreaseTime
+	UptimeExpectationIncrease float64
+
+	// UptimeExpectationIncreaseTime is the time at which UptimeExpectationIncrease starts to take effect
+	UptimeExpectationIncreaseTime time.Time
+
 	// Minimum amount of time to allow a staker to stake
 	MinStakeDuration time.Duration
 

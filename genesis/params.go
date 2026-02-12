@@ -15,6 +15,10 @@ import (
 type StakingConfig struct {
 	// Staking uptime requirements
 	UptimeRequirement float64 `json:"uptimeRequirement"`
+	// Increase in uptime requirements starting from UptimeExpectationIncreaseTime
+	UptimeExpectationIncrease float64 `json:"uptimeExpectationIncrease"`
+	// Time at which UptimeExpectationIncrease starts to take effect
+	UptimeExpectationIncreaseTime time.Time `json:"uptimeExpectationIncreaseTime"`
 	// Minimum stake, in nAVAX, required to validate the primary network
 	MinValidatorStake uint64 `json:"minValidatorStake"`
 	// Maximum stake, in nAVAX, allowed to be placed on a single validator in
