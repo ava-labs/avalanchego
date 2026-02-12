@@ -113,8 +113,8 @@ type TrieDBConfig struct {
 func DefaultConfig(dir string) TrieDBConfig {
 	return TrieDBConfig{
 		DatabaseDir:          dir,
-		CacheSizeBytes:       10240 * 1024, // 10MB
-		FreeListCacheEntries: 200_000,
+		CacheSizeBytes:       1024 * 1024, // 1MB
+		FreeListCacheEntries: 40_000,
 		RevisionsInMemory:    80_000,
 		CacheStrategy:        ffi.CacheAllReads,
 		Archive:              false,
