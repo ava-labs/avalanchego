@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "paramstest",
+    srcs = ["forks.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/params",
+        "//upgrade/upgradetest",
+    ],
+)

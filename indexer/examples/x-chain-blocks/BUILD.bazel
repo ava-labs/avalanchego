@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "x-chain-blocks_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/indexer/examples/x-chain-blocks",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//ids",
+        "//indexer",
+        "//vms/proposervm/block",
+        "//wallet/chain/x/builder",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "x-chain-blocks",
+    embed = [":x-chain-blocks_lib"],
+    visibility = ["//visibility:public"],
+)

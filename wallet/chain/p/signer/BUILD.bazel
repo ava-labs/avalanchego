@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "signer",
+    srcs = [
+        "signer.go",
+        "visitor.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/wallet/chain/p/signer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//utils/constants",
+        "//utils/crypto/keychain",
+        "//utils/crypto/secp256k1",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/platformvm/fx",
+        "//vms/platformvm/stakeable",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+    ],
+)

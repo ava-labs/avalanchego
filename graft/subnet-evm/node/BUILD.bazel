@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "node",
+    srcs = [
+        "api.go",
+        "config.go",
+        "defaults.go",
+        "errors.go",
+        "node.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/node",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/rpc",
+        "//graft/subnet-evm/internal/debug",
+        "@com_github_ava_labs_libevm//accounts",
+        "@com_github_ava_labs_libevm//accounts/external",
+        "@com_github_ava_labs_libevm//accounts/keystore",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//log",
+    ],
+)

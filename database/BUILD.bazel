@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "database",
+    srcs = [
+        "batch.go",
+        "common.go",
+        "database.go",
+        "errors.go",
+        "helpers.go",
+        "iterator.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/database",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/health",
+        "//ids",
+    ],
+)
+
+go_test(
+    name = "database_test",
+    srcs = [
+        "helpers_test.go",
+        "mocks_generate_test.go",
+    ],
+    embed = [":database"],
+    deps = [
+        "//database/memdb",
+        "//utils",
+        "@com_github_stretchr_testify//require",
+    ],
+)

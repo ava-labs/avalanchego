@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "bls",
+    srcs = [
+        "ciphersuite.go",
+        "public.go",
+        "signature.go",
+        "signer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/crypto/bls",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_supranational_blst//bindings/go"],
+)
+
+go_test(
+    name = "bls_test",
+    srcs = [
+        "bls_benchmark_test.go",
+        "bls_test.go",
+        "public_test.go",
+        "signature_test.go",
+    ],
+    embed = [":bls"],
+    deps = [
+        "//utils",
+        "//utils/crypto/bls/blstest",
+        "@com_github_stretchr_testify//require",
+        "@com_github_supranational_blst//bindings/go",
+    ],
+)

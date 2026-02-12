@@ -1,0 +1,39 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "syncer",
+    srcs = [
+        "evm_syncer.go",
+        "handler.go",
+        "proof.go",
+        "syncer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/database/merkle/firewood/syncer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database/merkle/sync",
+        "//ids",
+        "//network/p2p",
+        "//utils/logging",
+        "//utils/maybe",
+        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "syncer_test",
+    srcs = ["syncer_test.go"],
+    embed = [":syncer"],
+    deps = [
+        "//database/merkle/sync",
+        "//database/merkle/sync/synctest",
+        "//ids",
+        "//network/p2p/p2ptest",
+        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

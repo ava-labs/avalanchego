@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "main_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/main",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//graft/evm/log",
+        "//graft/subnet-evm/cmd/simulator/config",
+        "//graft/subnet-evm/cmd/simulator/load",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_spf13_pflag//:pflag",
+    ],
+)
+
+go_binary(
+    name = "main",
+    embed = [":main_lib"],
+    visibility = ["//visibility:public"],
+)

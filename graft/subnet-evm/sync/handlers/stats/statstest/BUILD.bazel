@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "statstest",
+    srcs = ["test_stats.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats/statstest",
+    visibility = ["//visibility:public"],
+    deps = ["//graft/subnet-evm/sync/handlers/stats"],
+)

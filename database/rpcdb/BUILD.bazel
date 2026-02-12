@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "rpcdb",
+    srcs = [
+        "db_client.go",
+        "db_server.go",
+        "errors.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/database/rpcdb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//proto/pb/rpcdb",
+        "//utils",
+        "//utils/set",
+        "//utils/units",
+        "@org_golang_google_protobuf//types/known/emptypb",
+    ],
+)
+
+go_test(
+    name = "rpcdb_test",
+    srcs = ["db_test.go"],
+    embed = [":rpcdb"],
+    deps = [
+        "//database/corruptabledb",
+        "//database/dbtest",
+        "//database/memdb",
+        "//proto/pb/rpcdb",
+        "//utils/logging",
+        "//vms/rpcchainvm/grpcutils",
+        "@com_github_stretchr_testify//require",
+    ],
+)

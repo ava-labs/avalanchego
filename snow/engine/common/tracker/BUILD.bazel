@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "tracker",
+    srcs = [
+        "accepted.go",
+        "peers.go",
+        "startup.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/common/tracker",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/validators",
+        "//utils/crypto/bls",
+        "//utils/set",
+        "//version",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_golang_x_exp//maps",
+    ],
+)
+
+go_test(
+    name = "tracker_test",
+    srcs = [
+        "accepted_test.go",
+        "peers_test.go",
+    ],
+    embed = [":tracker"],
+    deps = [
+        "//ids",
+        "//version",
+        "@com_github_stretchr_testify//require",
+    ],
+)

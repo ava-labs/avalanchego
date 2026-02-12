@@ -1,0 +1,64 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "sync",
+    srcs = [
+        "extender.go",
+        "leaf_handler.go",
+        "summary.go",
+        "summary_provider.go",
+        "syncer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/sync",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//database/versiondb",
+        "//graft/coreth/plugin/evm/atomic/state",
+        "//graft/coreth/sync/handlers",
+        "//graft/coreth/sync/handlers/stats",
+        "//graft/coreth/sync/leaf",
+        "//graft/coreth/sync/types",
+        "//graft/evm/message",
+        "//ids",
+        "//snow/engine/snowman/block",
+        "//utils/wrappers",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//libevm/options",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//triedb",
+    ],
+)
+
+graft_go_test(
+    name = "sync_test",
+    srcs = [
+        "summary_test.go",
+        "syncer_test.go",
+    ],
+    embed = [":sync"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "//database/versiondb",
+        "//graft/coreth/plugin/evm/atomic/atomictest",
+        "//graft/coreth/plugin/evm/atomic/state",
+        "//graft/coreth/sync/client",
+        "//graft/coreth/sync/handlers",
+        "//graft/coreth/sync/handlers/stats",
+        "//graft/coreth/sync/leaf",
+        "//graft/evm/message",
+        "//graft/evm/sync/synctest",
+        "//ids",
+        "//snow/engine/snowman/block",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

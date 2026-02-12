@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "blockmock",
+    srcs = [
+        "build_block_with_context_chain_vm.go",
+        "chain_vm.go",
+        "full_vm.go",
+        "state_syncable_vm.go",
+        "with_verify_context.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/consensus/snowman",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//version",
+        "@org_uber_go_mock//gomock",
+    ],
+)

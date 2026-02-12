@@ -1,0 +1,45 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "vertex",
+    srcs = [
+        "builder.go",
+        "codec.go",
+        "manager.go",
+        "parser.go",
+        "stateless_vertex.go",
+        "storage.go",
+        "vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//codec/reflectcodec",
+        "//ids",
+        "//snow/consensus/avalanche",
+        "//snow/consensus/snowstorm",
+        "//snow/engine/snowman/block",
+        "//utils",
+        "//utils/hashing",
+        "//utils/units",
+        "//vms/components/verify",
+    ],
+)
+
+go_test(
+    name = "vertex_test",
+    srcs = [
+        "builder_test.go",
+        "mocks_generate_test.go",
+        "parser_test.go",
+        "stateless_vertex_test.go",
+    ],
+    embed = [":vertex"],
+    deps = [
+        "//codec",
+        "//ids",
+        "@com_github_stretchr_testify//require",
+    ],
+)

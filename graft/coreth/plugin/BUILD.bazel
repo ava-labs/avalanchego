@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "plugin_lib",
+    srcs = [
+        "keys.go",
+        "main.go",
+        "params.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//graft/coreth/plugin/evm",
+        "//graft/coreth/plugin/factory",
+        "//utils/logging",
+        "//utils/ulimit",
+        "//version",
+        "//vms/rpcchainvm",
+        "@com_github_spf13_pflag//:pflag",
+        "@com_github_spf13_viper//:viper",
+    ],
+)
+
+go_binary(
+    name = "plugin",
+    embed = [":plugin_lib"],
+    visibility = ["//visibility:public"],
+)

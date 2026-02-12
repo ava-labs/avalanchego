@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "logging",
+    srcs = [
+        "color.go",
+        "config.go",
+        "factory.go",
+        "format.go",
+        "level.go",
+        "log.go",
+        "logger.go",
+        "sanitize.go",
+        "test_log.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/logging",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@in_gopkg_natefinch_lumberjack_v2//:lumberjack_v2",
+        "@org_golang_x_exp//maps",
+        "@org_golang_x_term//:term",
+        "@org_uber_go_zap//:zap",
+        "@org_uber_go_zap//zapcore",
+    ],
+)
+
+go_test(
+    name = "logging_test",
+    srcs = ["log_test.go"],
+    embed = [":logging"],
+    deps = [
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+        "@org_uber_go_zap//zapcore",
+    ],
+)

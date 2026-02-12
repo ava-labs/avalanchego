@@ -1,0 +1,54 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "syncer",
+    srcs = [
+        "config.go",
+        "state_syncer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/snowman/syncer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//proto/pb/p2p",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/engine/common/tracker",
+        "//snow/engine/snowman/block",
+        "//snow/validators",
+        "//utils/logging",
+        "//utils/math",
+        "//utils/set",
+        "//version",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "syncer_test",
+    srcs = [
+        "state_syncer_test.go",
+        "utils_test.go",
+    ],
+    embed = [":syncer"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/engine/common/tracker",
+        "//snow/engine/enginetest",
+        "//snow/engine/snowman/block",
+        "//snow/engine/snowman/block/blocktest",
+        "//snow/engine/snowman/getter",
+        "//snow/snowtest",
+        "//snow/validators",
+        "//utils/hashing",
+        "//utils/logging",
+        "//utils/set",
+        "//version",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "cb58",
+    srcs = ["cb58.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/cb58",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/hashing",
+        "@com_github_mr_tron_base58//base58",
+    ],
+)
+
+go_test(
+    name = "cb58_test",
+    srcs = ["cb58_test.go"],
+    embed = [":cb58"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

@@ -1,0 +1,46 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "txpool",
+    srcs = [
+        "mempool.go",
+        "metrics.go",
+        "tx_heap.go",
+        "txs.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/txpool",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache/lru",
+        "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/config",
+        "//ids",
+        "//network/p2p/gossip",
+        "//snow",
+        "//utils/bloom",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+graft_go_test(
+    name = "txpool_test",
+    srcs = [
+        "mempool_test.go",
+        "tx_heap_test.go",
+    ],
+    embed = [":txpool"],
+    deps = [
+        "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/atomic/atomictest",
+        "//graft/coreth/plugin/evm/config",
+        "//snow/snowtest",
+        "//utils/bloom",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

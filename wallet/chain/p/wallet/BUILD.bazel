@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "wallet",
+    srcs = [
+        "backend.go",
+        "backend_visitor.go",
+        "wallet.go",
+        "with_options.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/wallet/chain/p/wallet",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//utils/constants",
+        "//utils/crypto/bls",
+        "//utils/set",
+        "//vms/components/avax",
+        "//vms/platformvm/fx",
+        "//vms/platformvm/signer",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/message",
+        "//vms/platformvm/warp/payload",
+        "//vms/secp256k1fx",
+        "//wallet/chain/p/builder",
+        "//wallet/chain/p/signer",
+        "//wallet/subnet/primary/common",
+    ],
+)

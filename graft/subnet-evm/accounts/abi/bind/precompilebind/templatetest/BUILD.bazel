@@ -1,0 +1,11 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "templatetest",
+    srcs = [
+        "precompile_config_test_template.go",
+        "precompile_contract_test_template.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind/precompilebind/templatetest",
+    visibility = ["//visibility:public"],
+)

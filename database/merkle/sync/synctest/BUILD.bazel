@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "synctest",
+    srcs = ["handlers.go"],
+    importpath = "github.com/ava-labs/avalanchego/database/merkle/sync/synctest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//snow/engine/common",
+    ],
+)

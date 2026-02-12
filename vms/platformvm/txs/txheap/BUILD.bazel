@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "txheap",
+    srcs = [
+        "by_end_time.go",
+        "heap.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/heap",
+        "//vms/platformvm/txs",
+    ],
+)
+
+go_test(
+    name = "txheap_test",
+    srcs = ["by_end_time_test.go"],
+    embed = [":txheap"],
+    deps = [
+        "//ids",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+        "@com_github_stretchr_testify//require",
+    ],
+)

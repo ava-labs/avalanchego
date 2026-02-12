@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "prefixdb",
+    srcs = ["db.go"],
+    importpath = "github.com/ava-labs/avalanchego/database/prefixdb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//utils",
+        "//utils/hashing",
+    ],
+)
+
+go_test(
+    name = "prefixdb_test",
+    srcs = ["db_test.go"],
+    embed = [":prefixdb"],
+    deps = [
+        "//database/dbtest",
+        "//database/memdb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

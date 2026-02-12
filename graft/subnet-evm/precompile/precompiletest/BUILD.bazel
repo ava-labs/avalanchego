@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "precompiletest",
+    srcs = [
+        "test_config.go",
+        "test_precompile.go",
+        "test_predicate.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/utils/utilstest",
+        "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/core/extstate",
+        "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/precompile/contract",
+        "//graft/subnet-evm/precompile/modules",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "//vms/evm/predicate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)
