@@ -335,9 +335,16 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			return
 		}
 
-		// If the failure message comes from a timeout, clear it. Otherwise, this indicates an early,
-		// internal failure and we should wait for either a successful response or a timeout to clear
-		// the request.
+		// Clear the request if:
+		// 1. It's a timeout - the request has definitively failed
+		// 2. It's a peer-sent AppError - this is a terminal response from the peer
+		//
+		// Don't clear if it's an early internal failure (e.g., Get*Failed, QueryFailed)
+		// where we want to wait for either a successful response or timeout.
+		//
+		// Note: Peers never send *Failed messages (Get*Failed, QueryFailed, etc.) - those
+		// are only generated internally. AppError is the only message in FailedToResponseOps
+		// that can be sent by peers.
 		if timeout || !internal {
 			cr.timedRequests.Delete(uniqueRequestID)
 			cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
