@@ -38,7 +38,6 @@ tasks:
       TEST_SETUP: xsvm
     cmd: bash -x ./scripts/build_antithesis_images.sh
 
-
   build-bootstrap-monitor:
     desc: Builds bootstrap-monitor
     cmd: ./scripts/build_bootstrap_monitor.sh
