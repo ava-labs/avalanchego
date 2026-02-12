@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/vms/avm/network"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	blocksync "github.com/ava-labs/avalanchego/graft/evm/sync/block"
@@ -102,7 +101,6 @@ type ClientConfig struct {
 	Acceptor   BlockAcceptor
 	VerDB      *versiondb.Database
 	MetadataDB database.Database
-	Network    network.Network
 	SnowCtx    *snow.Context
 
 	// Extension points.

@@ -622,7 +622,8 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 			return fmt.Errorf("adding firewood change proof handler: %w", err)
 		}
 	default:
-		// PathDB is not supported.
+		log.Warn("state sync is not supported for this scheme, no leaf handlers will be registered", "scheme", scheme)
+		return nil
 	}
 
 	extraLeafConfig := vm.extensionConfig.ExtraSyncLeafHandlerConfig
