@@ -2216,6 +2216,7 @@ func TestArchivalQueries(t *testing.T) {
 
 				require.NoError(blk.Accept(ctx))
 			}
+			vm.blockChain.DrainAcceptorQueue()
 
 			handlers, err := vm.CreateHandlers(ctx)
 			require.NoError(err)

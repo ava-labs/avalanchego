@@ -30,7 +30,7 @@ var (
 	atomicTxIDDBPrefix         = []byte("atomicTxDB")
 	atomicHeightTxDBPrefix     = []byte("atomicHeightTxDB")
 	atomicRepoMetadataDBPrefix = []byte("atomicRepoMetadataDB")
-	atomicTrieDBPrefix         = []byte("atomicTrieDB")
+	atomicTrieStoragePrefix    = []byte("atomicTrieDB")
 	atomicTrieMetaDBPrefix     = []byte("atomicTrieMetaDB")
 
 	appliedSharedMemoryCursorKey = []byte("atomicTrieLastAppliedToSharedMemory")
@@ -53,7 +53,7 @@ type AtomicRepository struct {
 
 	metadataDB database.Database // Underlying database containing the atomic trie metadata
 
-	atomicTrieDB database.Database // Underlying database containing the atomic trie
+	atomicTrieStorage database.Database // Raw database storage for atomic trie (unwrapped)
 
 	// [db] is used to commit to the underlying versiondb.
 	db *versiondb.Database
@@ -66,7 +66,7 @@ func NewAtomicTxRepository(
 	db *versiondb.Database, codec codec.Manager, lastAcceptedHeight uint64,
 ) (*AtomicRepository, error) {
 	repo := &AtomicRepository{
-		atomicTrieDB:               prefixdb.New(atomicTrieDBPrefix, db),
+		atomicTrieStorage:          prefixdb.New(atomicTrieStoragePrefix, db),
 		metadataDB:                 prefixdb.New(atomicTrieMetaDBPrefix, db),
 		acceptedAtomicTxDB:         prefixdb.New(atomicTxIDDBPrefix, db),
 		acceptedAtomicTxByHeightDB: prefixdb.New(atomicHeightTxDBPrefix, db),

@@ -25,11 +25,6 @@ SUBNET_EVM_PATH=$(
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
-# ALLOW_TAG_LATEST is used to tag the image as 'latest' if set to true.
-# It only works if the image is built from the master branch. This is to avoid
-# tagging images from a manual triggered build as 'latest' with older avalanchego versions.
-ALLOW_TAG_LATEST="${ALLOW_TAG_LATEST:-}"
-
 # buildx (BuildKit) improves the speed and UI of builds over the legacy builder and
 # simplifies creation of multi-arch images.
 #
@@ -113,7 +108,8 @@ ${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${commit_hash}" \
   --build-arg CURRENT_BRANCH="$image_tag" \
   --build-arg VM_ID="$VM_ID"
 
-if [[ -n "${PUBLISH}" && $image_tag == "master" && $ALLOW_TAG_LATEST == true ]]; then
+# Tag latest when pushing to a registry and the tag is a stable release (vMAJOR.MINOR.PATCH)
+if [[ "${IMAGE_NAME}" == *"/"* && $image_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Tagging current image as $IMAGE_NAME:latest"
   docker buildx imagetools create -t "$IMAGE_NAME:latest" "$IMAGE_NAME:$BUILD_IMAGE_ID"
 fi
