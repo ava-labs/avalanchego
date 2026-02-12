@@ -40,6 +40,7 @@ var (
 type TransformSubnetTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
+
 	// ID of the Subnet to transform
 	// Restrictions:
 	// - Must not be the Primary Network ID

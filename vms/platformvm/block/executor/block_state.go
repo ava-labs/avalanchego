@@ -24,6 +24,7 @@ type proposalBlockState struct {
 // Note that not all fields will be set for a given block.
 type blockState struct {
 	proposalBlockState
+
 	statelessBlock block.Block
 
 	onAcceptState state.Diff

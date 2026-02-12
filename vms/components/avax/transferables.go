@@ -63,6 +63,7 @@ type TransferableOut interface {
 
 type TransferableOutput struct {
 	Asset `serialize:"true"`
+
 	// FxID has serialize false because we don't want this to be encoded in bytes
 	FxID ids.ID          `serialize:"false" json:"fxID"`
 	Out  TransferableOut `serialize:"true"  json:"output"`
@@ -140,6 +141,7 @@ func IsSortedTransferableOutputs(outs []*TransferableOutput, c codec.Manager) bo
 type TransferableInput struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
+
 	// FxID has serialize false because we don't want this to be encoded in bytes
 	FxID ids.ID         `serialize:"false" json:"fxID"`
 	In   TransferableIn `serialize:"true"  json:"input"`

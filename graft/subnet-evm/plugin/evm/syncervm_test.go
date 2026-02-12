@@ -383,6 +383,7 @@ type syncVMSetup struct {
 
 type shutdownOnceVM struct {
 	*VM
+
 	shutdownOnce sync.Once
 }
 

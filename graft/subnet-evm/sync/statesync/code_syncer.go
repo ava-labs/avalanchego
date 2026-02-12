@@ -45,9 +45,9 @@ type CodeSyncerConfig struct {
 // codeSyncer syncs code bytes from the network in a separate thread.
 // Tracks outstanding requests in the DB, so that it will still fulfill them if interrupted.
 type codeSyncer struct {
-	lock sync.Mutex
-
 	CodeSyncerConfig
+
+	lock sync.Mutex
 
 	outstandingCodeHashes set.Set[ids.ID]  // Set of code hashes that we need to fetch from the network.
 	codeHashes            chan common.Hash // Channel of incoming code hash requests

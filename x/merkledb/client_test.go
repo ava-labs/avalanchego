@@ -125,6 +125,7 @@ func newFlakyChangeProofHandler(
 
 type flakyHandler struct {
 	p2p.Handler
+
 	c *counter
 }
 

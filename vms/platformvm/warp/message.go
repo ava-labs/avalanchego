@@ -8,7 +8,8 @@ import "fmt"
 // Message defines the standard format for a Warp message.
 type Message struct {
 	UnsignedMessage `serialize:"true"`
-	Signature       Signature `serialize:"true"`
+
+	Signature Signature `serialize:"true"`
 
 	bytes []byte
 }

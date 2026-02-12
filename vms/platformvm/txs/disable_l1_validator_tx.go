@@ -14,6 +14,7 @@ var _ UnsignedTx = (*DisableL1ValidatorTx)(nil)
 type DisableL1ValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
+
 	// ID corresponding to the validator
 	ValidationID ids.ID `serialize:"true" json:"validationID"`
 	// Authorizes this validator to be disabled

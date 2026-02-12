@@ -19,6 +19,7 @@ var _ pb.ValidatorStateServer = (*Server)(nil)
 
 type Server struct {
 	pb.UnsafeValidatorStateServer
+
 	state validators.State
 }
 

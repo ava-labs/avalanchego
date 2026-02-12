@@ -208,6 +208,7 @@ func (service *AvaxAPI) GetAtomicTxStatus(_ *http.Request, args *api.JSONTxID, r
 
 type FormattedTx struct {
 	api.FormattedTx
+
 	BlockHeight *json.Uint64 `json:"blockHeight,omitempty"`
 }
 

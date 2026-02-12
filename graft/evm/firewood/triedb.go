@@ -83,6 +83,7 @@ type possibleKey struct {
 // can be freed in a finalizer, this cannot be included in the tree structure.
 type proposal struct {
 	*proposalMeta
+
 	handle *ffi.Proposal
 }
 

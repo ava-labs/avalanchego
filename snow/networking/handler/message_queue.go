@@ -27,6 +27,7 @@ var _ MessageQueue = (*messageQueue)(nil)
 type Message struct {
 	// The original message from the peer
 	*message.InboundMessage
+
 	// The desired engine type to execute this message. If not specified,
 	// the current executing engine type is used.
 	EngineType p2p.EngineType

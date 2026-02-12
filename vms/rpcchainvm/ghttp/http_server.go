@@ -29,6 +29,7 @@ var (
 // Server is an http.Handler that is managed over RPC.
 type Server struct {
 	httppb.UnsafeHTTPServer
+
 	handler http.Handler
 }
 

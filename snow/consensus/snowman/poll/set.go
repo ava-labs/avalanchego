@@ -31,6 +31,7 @@ type pollHolder interface {
 
 type poll struct {
 	Poll
+
 	start time.Time
 }
 

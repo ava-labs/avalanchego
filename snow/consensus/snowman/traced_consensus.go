@@ -19,6 +19,7 @@ var _ Consensus = (*tracedConsensus)(nil)
 
 type tracedConsensus struct {
 	Consensus
+
 	tracer trace.Tracer
 }
 
