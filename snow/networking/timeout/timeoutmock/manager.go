@@ -95,18 +95,6 @@ func (mr *ManagerMockRecorder) RegisterRequest(nodeID, chainID, measureLatency, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterRequest", reflect.TypeOf((*Manager)(nil).RegisterRequest), nodeID, chainID, measureLatency, requestID, timeoutHandler)
 }
 
-// RegisterRequestToUnreachableValidator mocks base method.
-func (m *Manager) RegisterRequestToUnreachableValidator() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RegisterRequestToUnreachableValidator")
-}
-
-// RegisterRequestToUnreachableValidator indicates an expected call of RegisterRequestToUnreachableValidator.
-func (mr *ManagerMockRecorder) RegisterRequestToUnreachableValidator() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterRequestToUnreachableValidator", reflect.TypeOf((*Manager)(nil).RegisterRequestToUnreachableValidator))
-}
-
 // RegisterResponse mocks base method.
 func (m *Manager) RegisterResponse(nodeID ids.NodeID, chainID ids.ID, requestID ids.RequestID, op message.Op, latency time.Duration) {
 	m.ctrl.T.Helper()
