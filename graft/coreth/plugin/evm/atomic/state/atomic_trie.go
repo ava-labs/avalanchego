@@ -50,7 +50,7 @@ type AtomicTrie struct {
 // newAtomicTrie returns a new instance of a atomicTrie with a configurable commitHeightInterval, used in testing.
 // Initializes the trie before returning it.
 func newAtomicTrie(
-	atomicTrieDB avalanchedatabase.Database, metadataDB avalanchedatabase.Database,
+	atomicTrieStorage avalanchedatabase.Database, metadataDB avalanchedatabase.Database,
 	codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (*AtomicTrie, error) {
 	root, height, err := lastCommittedRootIfExists(metadataDB)
@@ -72,7 +72,7 @@ func newAtomicTrie(
 	}
 
 	trieDB := triedb.NewDatabase(
-		rawdb.NewDatabase(database.New(atomicTrieDB)),
+		rawdb.NewDatabase(database.New(atomicTrieStorage)),
 		&triedb.Config{
 			DBOverride: hashdb.Config{
 				CleanCacheSize: 64 * units.MiB, // Allocate 64MB of memory for clean cache
