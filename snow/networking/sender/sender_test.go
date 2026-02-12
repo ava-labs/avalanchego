@@ -1271,6 +1271,12 @@ func TestSender_Single_Request(t *testing.T) {
 					},
 				)
 
+				// Make sure we're expecting the correct outbound message.
+				tt.setMsgCreatorExpect(msgCreator)
+
+				// Make sure we're sending the message to the benched node
+				tt.setExternalSenderExpect(externalSender, set.Set[ids.NodeID]{})
+
 				tt.sendF(require, sender, destinationNodeID)
 			}
 
