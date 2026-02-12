@@ -33,7 +33,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
+	"github.com/ava-labs/libevm/accounts/abi"
 	{{- if .Contract.AllowList}}
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	{{- end}}

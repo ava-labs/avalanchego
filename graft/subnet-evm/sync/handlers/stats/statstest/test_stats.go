@@ -46,189 +46,189 @@ type TestHandlerStats struct {
 	LeafRequestProcessingTimeSum time.Duration
 }
 
-func (m *TestHandlerStats) Reset() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.BlockRequestCount = 0
-	m.MissingBlockHashCount = 0
-	m.BlocksReturnedSum = 0
-	m.BlockRequestProcessingTimeSum = 0
-	m.CodeRequestCount = 0
-	m.MissingCodeHashCount = 0
-	m.TooManyHashesRequested = 0
-	m.DuplicateHashesRequested = 0
-	m.CodeBytesReturnedSum = 0
-	m.CodeReadTimeSum = 0
-	m.LeafsRequestCount = 0
-	m.InvalidLeafsRequestCount = 0
-	m.LeafsReturnedSum = 0
-	m.MissingRootCount = 0
-	m.TrieErrorCount = 0
-	m.ProofErrorCount = 0
-	m.SnapshotReadErrorCount = 0
-	m.SnapshotReadAttemptCount = 0
-	m.SnapshotReadSuccessCount = 0
-	m.SnapshotSegmentValidCount = 0
-	m.SnapshotSegmentInvalidCount = 0
-	m.ProofValsReturned = 0
-	m.LeafsReadTime = 0
-	m.SnapshotReadTime = 0
-	m.GenerateRangeProofTime = 0
-	m.LeafRequestProcessingTimeSum = 0
+func (t *TestHandlerStats) Reset() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.BlockRequestCount = 0
+	t.MissingBlockHashCount = 0
+	t.BlocksReturnedSum = 0
+	t.BlockRequestProcessingTimeSum = 0
+	t.CodeRequestCount = 0
+	t.MissingCodeHashCount = 0
+	t.TooManyHashesRequested = 0
+	t.DuplicateHashesRequested = 0
+	t.CodeBytesReturnedSum = 0
+	t.CodeReadTimeSum = 0
+	t.LeafsRequestCount = 0
+	t.InvalidLeafsRequestCount = 0
+	t.LeafsReturnedSum = 0
+	t.MissingRootCount = 0
+	t.TrieErrorCount = 0
+	t.ProofErrorCount = 0
+	t.SnapshotReadErrorCount = 0
+	t.SnapshotReadAttemptCount = 0
+	t.SnapshotReadSuccessCount = 0
+	t.SnapshotSegmentValidCount = 0
+	t.SnapshotSegmentInvalidCount = 0
+	t.ProofValsReturned = 0
+	t.LeafsReadTime = 0
+	t.SnapshotReadTime = 0
+	t.GenerateRangeProofTime = 0
+	t.LeafRequestProcessingTimeSum = 0
 }
 
-func (m *TestHandlerStats) IncBlockRequest() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.BlockRequestCount++
+func (t *TestHandlerStats) IncBlockRequest() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.BlockRequestCount++
 }
 
-func (m *TestHandlerStats) IncMissingBlockHash() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.MissingBlockHashCount++
+func (t *TestHandlerStats) IncMissingBlockHash() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.MissingBlockHashCount++
 }
 
-func (m *TestHandlerStats) UpdateBlocksReturned(num uint16) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.BlocksReturnedSum += uint32(num)
+func (t *TestHandlerStats) UpdateBlocksReturned(num uint16) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.BlocksReturnedSum += uint32(num)
 }
 
-func (m *TestHandlerStats) UpdateBlockRequestProcessingTime(duration time.Duration) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.BlockRequestProcessingTimeSum += duration
+func (t *TestHandlerStats) UpdateBlockRequestProcessingTime(duration time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.BlockRequestProcessingTimeSum += duration
 }
 
-func (m *TestHandlerStats) IncCodeRequest() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.CodeRequestCount++
+func (t *TestHandlerStats) IncCodeRequest() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.CodeRequestCount++
 }
 
-func (m *TestHandlerStats) IncMissingCodeHash() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.MissingCodeHashCount++
+func (t *TestHandlerStats) IncMissingCodeHash() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.MissingCodeHashCount++
 }
 
-func (m *TestHandlerStats) IncTooManyHashesRequested() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.TooManyHashesRequested++
+func (t *TestHandlerStats) IncTooManyHashesRequested() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.TooManyHashesRequested++
 }
 
-func (m *TestHandlerStats) IncDuplicateHashesRequested() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.DuplicateHashesRequested++
+func (t *TestHandlerStats) IncDuplicateHashesRequested() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.DuplicateHashesRequested++
 }
 
-func (m *TestHandlerStats) UpdateCodeReadTime(duration time.Duration) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.CodeReadTimeSum += duration
+func (t *TestHandlerStats) UpdateCodeReadTime(duration time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.CodeReadTimeSum += duration
 }
 
-func (m *TestHandlerStats) UpdateCodeBytesReturned(bytes uint32) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.CodeBytesReturnedSum += bytes
+func (t *TestHandlerStats) UpdateCodeBytesReturned(bytes uint32) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.CodeBytesReturnedSum += bytes
 }
 
-func (m *TestHandlerStats) IncLeafsRequest() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.LeafsRequestCount++
+func (t *TestHandlerStats) IncLeafsRequest() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.LeafsRequestCount++
 }
 
-func (m *TestHandlerStats) IncInvalidLeafsRequest() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.InvalidLeafsRequestCount++
+func (t *TestHandlerStats) IncInvalidLeafsRequest() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.InvalidLeafsRequestCount++
 }
 
-func (m *TestHandlerStats) UpdateLeafsReturned(numLeafs uint16) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.LeafsReturnedSum += uint32(numLeafs)
+func (t *TestHandlerStats) UpdateLeafsReturned(numLeafs uint16) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.LeafsReturnedSum += uint32(numLeafs)
 }
 
-func (m *TestHandlerStats) UpdateLeafsRequestProcessingTime(duration time.Duration) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.LeafRequestProcessingTimeSum += duration
+func (t *TestHandlerStats) UpdateLeafsRequestProcessingTime(duration time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.LeafRequestProcessingTimeSum += duration
 }
 
-func (m *TestHandlerStats) UpdateReadLeafsTime(duration time.Duration) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.LeafsReadTime += duration
+func (t *TestHandlerStats) UpdateReadLeafsTime(duration time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.LeafsReadTime += duration
 }
 
-func (m *TestHandlerStats) UpdateGenerateRangeProofTime(duration time.Duration) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.GenerateRangeProofTime += duration
+func (t *TestHandlerStats) UpdateGenerateRangeProofTime(duration time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.GenerateRangeProofTime += duration
 }
 
-func (m *TestHandlerStats) UpdateSnapshotReadTime(duration time.Duration) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.SnapshotReadTime += duration
+func (t *TestHandlerStats) UpdateSnapshotReadTime(duration time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.SnapshotReadTime += duration
 }
 
-func (m *TestHandlerStats) UpdateRangeProofValsReturned(numProofVals int64) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.ProofValsReturned += numProofVals
+func (t *TestHandlerStats) UpdateRangeProofValsReturned(numProofVals int64) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.ProofValsReturned += numProofVals
 }
 
-func (m *TestHandlerStats) IncMissingRoot() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.MissingRootCount++
+func (t *TestHandlerStats) IncMissingRoot() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.MissingRootCount++
 }
 
-func (m *TestHandlerStats) IncTrieError() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.TrieErrorCount++
+func (t *TestHandlerStats) IncTrieError() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.TrieErrorCount++
 }
 
-func (m *TestHandlerStats) IncProofError() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.ProofErrorCount++
+func (t *TestHandlerStats) IncProofError() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.ProofErrorCount++
 }
 
-func (m *TestHandlerStats) IncSnapshotReadError() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.SnapshotReadErrorCount++
+func (t *TestHandlerStats) IncSnapshotReadError() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.SnapshotReadErrorCount++
 }
 
-func (m *TestHandlerStats) IncSnapshotReadAttempt() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.SnapshotReadAttemptCount++
+func (t *TestHandlerStats) IncSnapshotReadAttempt() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.SnapshotReadAttemptCount++
 }
 
-func (m *TestHandlerStats) IncSnapshotReadSuccess() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.SnapshotReadSuccessCount++
+func (t *TestHandlerStats) IncSnapshotReadSuccess() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.SnapshotReadSuccessCount++
 }
 
-func (m *TestHandlerStats) IncSnapshotSegmentValid() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.SnapshotSegmentValidCount++
+func (t *TestHandlerStats) IncSnapshotSegmentValid() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.SnapshotSegmentValidCount++
 }
 
-func (m *TestHandlerStats) IncSnapshotSegmentInvalid() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.SnapshotSegmentInvalidCount++
+func (t *TestHandlerStats) IncSnapshotSegmentInvalid() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.SnapshotSegmentInvalidCount++
 }
