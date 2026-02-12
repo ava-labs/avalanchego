@@ -133,8 +133,9 @@ func (s *Staker) ValidateMutation(ms *Staker) error {
 }
 
 func (s *Staker) immutableFieldsAreUnmodified(ms *Staker) bool {
-	publicKeysEqual := (s.PublicKey == nil && ms.PublicKey == nil) ||
-		(s.PublicKey != nil && s.PublicKey.Equals(ms.PublicKey))
+	bothPKNil := s.PublicKey == nil && ms.PublicKey == nil
+	bothPKNotNil := s.PublicKey != nil && ms.PublicKey != nil
+	publicKeysEqual := bothPKNil || (bothPKNotNil && s.PublicKey.Equals(ms.PublicKey))
 
 	return s.TxID == ms.TxID &&
 		s.NodeID == ms.NodeID &&
