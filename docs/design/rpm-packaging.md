@@ -4,7 +4,7 @@
 
 Ship signed RPM packages for avalanchego and subnet-evm targeting
 RHEL 9.x customers. Packages are built inside a Rocky Linux 9 container
-(glibc 2.34), signed with GPG, and distributed via S3.
+(glibc 2.34), signed with GPG, and published as GitHub Actions artifacts.
 
 ## Decisions
 
@@ -31,13 +31,9 @@ path uses the VM ID from `graft/subnet-evm/scripts/constants.sh`.
 ### Build tooling
 
 Packages are built with [nfpm](https://nfpm.goreleaser.com/) inside a
-Rocky Linux 9 container. The container installs Go (version from
-`go.mod`), nfpm, gcc, and rpm-sign/gnupg2 for signing.
-
-The build is orchestrated by a Taskfile at
+Rocky Linux 9 container. The build is orchestrated by a Taskfile at
 `.github/packaging/Taskfile.yml`, included from the root Taskfile as
-`packaging:`. It handles building the Docker image, compiling binaries,
-packaging RPMs, running tests, and post-upload S3 validation.
+`packaging:`.
 
 ### GPG signing
 
@@ -59,18 +55,15 @@ not the git tag, so it may not match RC tags. The smoke test verifies:
 ### CI workflow
 
 `.github/workflows/build-rpm-release.yml` triggers on tag push,
-`workflow_dispatch`, and `pull_request` (for paths under
-`.github/packaging/`). On PRs, the full build runs as a smoke test
-with an ephemeral GPG key and synthetic tag, but S3 upload and
-artifact publishing are skipped. Matrix strategy covers x86_64 and
-aarch64. Steps (for tag/dispatch triggers):
+`workflow_dispatch`, and `pull_request` (for paths under `.github/packaging/`
+and the workflow file itself). On PRs, the full build runs as a smoke test
+with an ephemeral GPG key and synthetic tag. Matrix strategy covers x86_64 and
+aarch64. Steps:
 
-1. Build RPMs via `scripts/run_task.sh packaging:build-rpms`
-2. Upload to `s3://${BUCKET}/linux/rpms/${RPM_ARCH}/`
-3. Upload GPG public key to `s3://${BUCKET}/linux/rpms/RPM-GPG-KEY-avalanchego`
-4. Validate: download from S3, verify signature, install, smoke test
-   in a fresh `rockylinux:9` container
-5. Upload RPMs as GitHub artifacts
+1. Build and validate RPMs via `scripts/run_task.sh packaging:test-build-rpms`
+   (builds both packages, then validates in a fresh `rockylinux:9`
+   container: signature verification, installation, smoke test)
+2. Upload RPMs and GPG public key as GitHub artifacts
 
 ### Architecture mapping
 
@@ -89,9 +82,9 @@ Docker's `TARGETARCH` (Go-style) for the Go download URL.
 We need to ship RPMs for RHEL/Fedora/Rocky, but CI builds and tests on
 Ubuntu. Different distros ship different glibc versions, so a
 dynamically-linked Ubuntu binary may not run on RHEL. CI tests on
-`ubuntu-latest` (Ubuntu 24.04, glibc 2.39). Target RPM distros range
-from RHEL 8 (glibc 2.28) to RHEL 9 (glibc 2.34). A binary linked
-against glibc 2.39 will not run on either.
+`ubuntu-latest` (Ubuntu 24.04, glibc 2.39). Target RPM distros could
+range from RHEL 8 (glibc 2.28) to RHEL 9 (glibc 2.34). A binary linked
+against glibc 2.39 would not run on either.
 
 ### Proposed Solution
 
@@ -108,7 +101,8 @@ catch regressions.
   multi-threaded workloads. Synthetic benchmarks show 2x-700x slowdowns
   for musl malloc under contention ([nickb.dev][1]). More broadly,
   musl multi-threaded performance can degrade significantly — a 30x
-  slowdown was observed in DataFusion query execution ([Andy Grove][2]).
+  slowdown was observed in multi-threaded benchmarks for a distributed
+  query engine ([Andy Grove][2]).
   With firewood using jemalloc and Go managing its own heap, the
   practical impact on this binary is unquantified but likely much
   smaller. No profiling has been done. Performance is critical for a
@@ -123,23 +117,20 @@ catch regressions.
 ### Portability via container builds (stopgap)
 
 Build inside a container matching the target glibc version (e.g.,
-`rockylinux:9` for glibc 2.34). GitHub Actions' `container:` directive
-makes this straightforward. This has a testing gap: CI currently tests
-on `ubuntu-latest` (glibc 2.39), so RPMs built in an older container
-include an effectively different and untested binary. To truly "test
-what we ship," CI would need to also run tests inside the same
-older-glibc container, potentially doubling CI overhead. For the
-stopgap phase (until bazel is implemented), this testing gap is
-probably acceptable. RPM smoke tests (install and run on target
-distro) could provide basic validation that the binary loads and
-starts. Full e2e testing on the target glibc is likely not worth the
-effort until Bazel enables testing against the same glibc version used
-for the release build.
+`rockylinux:9` for glibc 2.34). GitHub Actions' `container:` directive makes
+this straightforward. This has a testing gap: CI currently tests on
+`ubuntu-latest` (glibc 2.39), so RPMs built in an older container include an
+effectively different and untested binary. To truly "test what we ship," CI
+would need to also run tests inside the same older-glibc container,
+potentially doubling CI overhead. For now, this testing gap is probably
+acceptable. RPM smoke tests validate that the binary loads and runs correctly
+on the target platform. Full e2e testing on the target glibc is likely not
+worth the effort until Bazel enables testing against the same glibc version
+used for the release build.
 
 ### Bazel hermetic toolchain (target solution)
 
-Bazelification is a near-term goal (initial build PR is up, bazelified
-firewood in progress) but not immediately available.
+Bazelification is in progress but not immediately available.
 
 Bazel 8 with `hermetic_cc_toolchain` would solve the "test what you
 ship" problem without doubling CI or requiring containers. The
@@ -214,12 +205,12 @@ However, the risks are significant for this project:
 #### Static linking with glibc
 
 Would combine glibc's performance with static portability. The classic
-objections (NSS/iconv/dlopen, [RedHat][7]) don't actually apply to this
-stack: Go's `netgo`+`osusergo` build tags bypass NSS entirely, neither
-Go nor Rust uses iconv, and firewood's file I/O (mmap, pwrite, fsync)
-uses only thin syscall wrappers that work identically in static and
-dynamic builds. The CockroachDB TLS crash ([Schottdorf][8]) was
-triggered by NSS module loading, which `netgo`+`osusergo` eliminates.
+objections (NSS/iconv/dlopen, [RedHat][7]) don't actually apply to this stack:
+Go's `netgo`+`osusergo` build tags bypass NSS entirely, neither Go nor Rust
+uses iconv, and firewood's file I/O (mmap, pwrite, fsync) uses only thin
+syscall wrappers that work identically in static and dynamic builds. The
+CockroachDB thread-local-storage crash ([Schottdorf][8]) was triggered by NSS
+module loading, which `netgo`+`osusergo` eliminates.
 
 However, this approach is still not recommended: (1) you still must
 target a specific glibc version, so the portability benefit over dynamic
@@ -230,6 +221,32 @@ territory; (3) the Bazel hermetic toolchain with dynamic linking is
 strictly better, avoiding all static glibc edge cases while providing
 the same reproducibility.
 
+### Industry Practice: How Go Projects Ship Binaries
+
+A common misconception is that "distroless" container images imply
+static linking. In fact, Google's distroless project provides three
+image variants serving different linking models:
+
+| Image | Contents | Use case |
+|-------|----------|----------|
+| `distroless/static` | CA certs, tzdata only | Statically linked binaries (no libc) |
+| `distroless/base-nossl` | Above + **glibc** | Dynamically linked binaries |
+| `distroless/base` | Above + **glibc + libssl** | Dynamically linked binaries needing TLS |
+
+The vast majority of Go projects using `distroless/static` build with
+`CGO_ENABLED=0` — producing pure Go binaries with no libc dependency
+at all. This is not static glibc linking; it is no libc linking.
+
+Projects that require CGO (for C libraries like RocksDB, SQLite, GEOS,
+or in our case firewood FFI) fall into one of three camps. No
+well-known Go project statically links against glibc in production:
+
+| Strategy | Projects | Container base |
+|----------|----------|---------------|
+| Pure Go (`CGO_ENABLED=0`) | etcd, Kubernetes, Prometheus | `distroless/static` or `scratch` |
+| CGO + dynamic glibc | CockroachDB ([cockroach#3392][9]) | Red Hat UBI minimal |
+| CGO + static musl | Recommended for CGO projects needing static binaries ([DoltHub blog][10]) | `distroless/static` |
+
 [1]: https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance/
 [2]: https://andygrove.io/2020/05/why-musl-extremely-slow/
 [3]: https://github.com/ziglang/zig/issues/12833
@@ -238,3 +255,5 @@ the same reproducibility.
 [6]: https://honnef.co/articles/statically-compiled-go-programs-always-even-with-cgo-using-musl/
 [7]: https://developers.redhat.com/articles/2023/08/31/how-we-ensure-statically-linked-applications-stay-way
 [8]: https://tschottdorf.github.io/golang-static-linking-bug
+[9]: https://github.com/cockroachdb/cockroach/issues/3392
+[10]: https://www.dolthub.com/blog/2024-05-01-cgo-tradeoffs/

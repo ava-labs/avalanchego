@@ -1,7 +1,7 @@
 # RPM packaging tasks for avalanchego and subnet-evm.
 #
 # Builds RPMs inside a Rocky Linux 9 container (glibc 2.34) with GPG signing.
-# All tasks require TAG to be set to a git tag (e.g., TAG=v1.14.1).
+# PACKAGING_TAG defaults to v0.0.0 for local testing; set for release builds.
 
 version: '3'
 
@@ -21,6 +21,9 @@ vars:
   # Git commit hash, resolved on host (container may not have .git for worktrees).
   PACKAGING_GIT_COMMIT:
     sh: git rev-parse HEAD
+  # Default tag for local testing; overridden by CI for release builds.
+  PACKAGING_TAG:
+    sh: echo "${PACKAGING_TAG:-v0.0.0}"
   PACKAGING_DOCKER_IMAGE: avalanchego-rpm-builder
   PACKAGING_OUTPUT_DIR: '{{.ROOT_DIR}}/build/rpm'
 
@@ -31,7 +34,7 @@ tasks:
     cmd: task --list | grep packaging
 
   build-rpms:
-    desc: Builds RPMs for both avalanchego and subnet-evm (requires TAG)
+    desc: Builds RPMs for both avalanchego and subnet-evm
     cmds:
       - task: build-avalanchego-rpm
       - task: build-subnet-evm-rpm
@@ -47,13 +50,10 @@ tasks:
           {{.ROOT_DIR}}/.github/packaging/
 
   build-avalanchego-rpm:
-    desc: Builds RPM for avalanchego (requires TAG)
+    desc: Builds RPM for avalanchego
     vars:
       RPM_ARCH: '{{.RPM_ARCH | default .PACKAGING_HOST_ARCH}}'
-      RPM_TAG: '{{.TAG | default ""}}'
-    preconditions:
-      - sh: '[[ -n "{{.RPM_TAG}}" ]]'
-        msg: "TAG must be set (e.g., TAG=v1.14.1 task packaging:build-avalanchego-rpm)"
+      RPM_TAG: '{{.PACKAGING_TAG}}'
     deps: [build-builder-docker-image]
     cmds:
       - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
@@ -74,13 +74,10 @@ tasks:
           .github/packaging/scripts/build-rpm.sh
 
   build-subnet-evm-rpm:
-    desc: Builds RPM for subnet-evm (requires TAG)
+    desc: Builds RPM for subnet-evm
     vars:
       RPM_ARCH: '{{.RPM_ARCH | default .PACKAGING_HOST_ARCH}}'
-      RPM_TAG: '{{.TAG | default ""}}'
-    preconditions:
-      - sh: '[[ -n "{{.RPM_TAG}}" ]]'
-        msg: "TAG must be set (e.g., TAG=v1.14.1 task packaging:build-subnet-evm-rpm)"
+      RPM_TAG: '{{.PACKAGING_TAG}}'
     deps: [build-builder-docker-image]
     cmds:
       - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
@@ -100,19 +97,16 @@ tasks:
           {{.PACKAGING_DOCKER_IMAGE}}
           .github/packaging/scripts/build-rpm.sh
 
-  test:
-    desc: Runs packaging unit tests
+  test-build-rpms:
+    desc: Builds and validates RPMs end-to-end
     cmds:
-      - cmd: '{{.ROOT_DIR}}/.github/packaging/scripts/extract-changelog_test.sh'
+      - task: build-rpms
+      - task: validate-rpms
 
-  validate-s3-rpms:
-    desc: Validates RPMs uploaded to S3 by downloading and testing in a fresh container
-    preconditions:
-      - sh: '[[ -n "${TAG:-}" ]]'
-        msg: "TAG must be set"
-      - sh: '[[ -n "${RPM_ARCH:-}" ]]'
-        msg: "RPM_ARCH must be set"
-      - sh: '[[ -n "${BUCKET:-}" ]]'
-        msg: "BUCKET must be set"
+  validate-rpms:
+    desc: Validates built RPMs by installing and smoke testing in a fresh container
+    env:
+      TAG: '{{.PACKAGING_TAG}}'
+      GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
     cmds:
-      - cmd: '{{.ROOT_DIR}}/.github/packaging/scripts/validate-s3-rpm.sh'
+      - cmd: '{{.ROOT_DIR}}/.github/packaging/scripts/validate-rpm.sh'

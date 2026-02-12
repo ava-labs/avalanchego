@@ -7,11 +7,9 @@
 #   docker build --build-arg GO_VERSION=1.24.12 -t avalanchego-rpm-builder .github/packaging/
 #   docker run --rm -v .:/build -v ./build/rpm:/output avalanchego-rpm-builder ...
 
-ARG GO_VERSION=INVALID
-
 FROM rockylinux:9
 
-ARG GO_VERSION
+ARG GO_VERSION=INVALID
 ARG TARGETARCH
 
 # Install build dependencies

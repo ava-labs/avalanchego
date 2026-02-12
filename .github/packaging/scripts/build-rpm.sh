@@ -78,7 +78,14 @@ echo "Binary built at: ${BINARY_PATH}"
 
 # ── Step 2: Generate changelog ────────────────────────────────────
 
-"${PACKAGING_DIR}/scripts/extract-changelog.sh" "${VERSION}" "${REPO_ROOT}/RELEASES.md" "${NFPM_CHANGELOG}"
+cat > "${NFPM_CHANGELOG}" <<EOF
+---
+- semver: ${VERSION}
+  date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+  packager: Ava Labs <security@avalabs.org>
+  changes:
+    - note: "See https://github.com/ava-labs/avalanchego/releases/tag/v${VERSION}"
+EOF
 
 # ── Step 3: Set up GPG signing ────────────────────────────────────
 
@@ -91,6 +98,11 @@ if [[ -n "${RPM_GPG_KEY_FILE:-}" ]]; then
     gpg --batch --import "${RPM_GPG_KEY_FILE}"
     # Copy to well-known path for nfpm config
     cp "${RPM_GPG_KEY_FILE}" "${NFPM_SIGNING_KEY}"
+elif [[ -f "${NFPM_SIGNING_KEY}" ]]; then
+    # Reuse ephemeral key from a previous build (e.g., avalanchego built before subnet-evm)
+    echo "Reusing existing ephemeral GPG key"
+    gpg --batch --import "${NFPM_SIGNING_KEY}"
+    export NFPM_RPM_PASSPHRASE=""
 else
     echo "Generating ephemeral GPG key for signing"
 
@@ -136,50 +148,3 @@ nfpm package \
     --target "${RPM_PATH}"
 
 echo "RPM built: ${RPM_PATH}"
-
-# ── Step 5: Validate ──────────────────────────────────────────────
-
-echo "=== Validating ${RPM_FILENAME} ==="
-
-# Import public key and verify signature
-rpm --import "${GPG_PUBLIC_KEY}"
-rpm -K "${RPM_PATH}"
-echo "Signature verification passed"
-
-# Install the RPM
-rpm -ivh "${RPM_PATH}"
-echo "Installation succeeded"
-
-# Smoke test
-case "${PACKAGE}" in
-    avalanchego)
-        output=$(/var/opt/avalanchego/bin/avalanchego --version)
-        echo "avalanchego --version: ${output}"
-
-        if [[ "${output}" != avalanchego/* ]]; then
-            echo "ERROR: --version output does not start with 'avalanchego/'" >&2
-            exit 1
-        fi
-
-        # Verify git commit hash is present in output
-        # shellcheck disable=SC2154
-        short_commit="${git_commit::8}"
-        if [[ "${output}" != *"commit=${short_commit}"* ]]; then
-            echo "ERROR: --version output does not contain expected commit=${short_commit}" >&2
-            echo "Output: ${output}" >&2
-            exit 1
-        fi
-
-        echo "Smoke test passed: binary runs, correct commit"
-        ;;
-    subnet-evm)
-        plugin_path="/var/opt/avalanchego/plugins/${SUBNET_EVM_VM_ID}"
-        if [[ ! -x "${plugin_path}" ]]; then
-            echo "ERROR: plugin not found or not executable at ${plugin_path}" >&2
-            exit 1
-        fi
-        echo "Smoke test passed: plugin installed and executable"
-        ;;
-esac
-
-echo "=== ${PACKAGE} RPM build and validation complete ==="
