@@ -1955,17 +1955,8 @@ func (s *state) loadCurrentValidators() error {
 
 		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 
-		// Load uptime from new DB, fallback to old metadata for migration
-		err = s.uptimeTrackerState.LoadUptime(staker.NodeID)
-		switch {
-		case errors.Is(err, database.ErrNotFound):
-			// Fallback to old metadata, this will mark it for migration.
-			s.uptimeTrackerState.SetUptime(
-				staker.NodeID,
-				metadata.UpDuration,
-				time.Unix(int64(metadata.LastUpdated), 0),
-			)
-		case err != nil:
+		err = s.loadUptime(staker.NodeID, metadata)
+		if err != nil {
 			return err
 		}
 	}
@@ -3433,6 +3424,25 @@ func (s *state) SetUptime(vdrID ids.NodeID, upDuration time.Duration, lastUpdate
 	}
 
 	s.uptimeTrackerState.SetUptime(vdrID, upDuration, lastUpdated)
+	return nil
+}
+
+// loadUptime loads the uptime data for a validator from the uptime tracker database.
+// If the uptime data is not found in the new database, it falls back to the legacy
+// validator metadata and migrates the data by marking it for write on the next commit.
+func (s *state) loadUptime(nodeID ids.NodeID, metadata *validatorMetadata) error {
+	switch err := s.uptimeTrackerState.LoadUptime(nodeID); {
+	case errors.Is(err, database.ErrNotFound):
+		// Fallback to old metadata, this will mark it for migration.
+		s.uptimeTrackerState.SetUptime(
+			nodeID,
+			metadata.UpDuration,
+			time.Unix(int64(metadata.LastUpdated), 0),
+		)
+	case err != nil:
+		return err
+	}
+
 	return nil
 }
 

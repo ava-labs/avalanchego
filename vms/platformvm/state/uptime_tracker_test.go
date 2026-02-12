@@ -115,3 +115,19 @@ func TestUptimeTrackerState_WriteDeletesFromDB(t *testing.T) {
 	err := tracker2.LoadUptime(nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
+
+func TestUptimeTrackerState_Exists(t *testing.T) {
+	require := require.New(t)
+
+	tracker := NewUptimeTrackerState(memdb.New())
+
+	nodeID := ids.GenerateTestNodeID()
+
+	require.False(tracker.Exists(nodeID))
+
+	tracker.SetUptime(nodeID, 10*time.Hour, time.Unix(1000, 0))
+	require.True(tracker.Exists(nodeID))
+
+	tracker.DeleteUptime(nodeID)
+	require.False(tracker.Exists(nodeID))
+}
