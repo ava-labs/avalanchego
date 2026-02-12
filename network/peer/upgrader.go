@@ -4,6 +4,7 @@
 package peer
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"net"
@@ -59,7 +60,7 @@ func (t *tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staki
 }
 
 func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeID, net.Conn, *staking.Certificate, error) {
-	if err := conn.Handshake(); err != nil {
+	if err := conn.HandshakeContext(context.TODO()); err != nil {
 		return ids.EmptyNodeID, nil, nil, err
 	}
 

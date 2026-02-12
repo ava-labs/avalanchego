@@ -104,7 +104,7 @@ func TestBlockClientsWithIncorrectRSAKeys(t *testing.T) {
 				Certificates:       []tls.Certificate{testCase.genClientTLSCert()},
 			}
 
-			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 			require.NoError(t, err)
 			defer listener.Close()
 
@@ -119,9 +119,9 @@ func TestBlockClientsWithIncorrectRSAKeys(t *testing.T) {
 				return err
 			})
 
-			conn, err := tls.Dial("tcp", listener.Addr().String(), &clientConfig)
+			conn, err := (&tls.Dialer{Config: &clientConfig}).DialContext(t.Context(), "tcp", listener.Addr().String())
 			require.NoError(t, err)
-			require.NoError(t, conn.Handshake())
+			defer conn.Close()
 
 			err = eg.Wait()
 			require.ErrorIs(t, err, testCase.expectedErr)

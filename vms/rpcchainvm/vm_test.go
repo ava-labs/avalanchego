@@ -70,7 +70,7 @@ func helperProcess(s ...string) *exec.Cmd {
 		"TEST_PROCESS=1",
 	}
 	run := os.Args[0]
-	cmd := exec.Command(run, cs...)
+	cmd := exec.Command(run, cs...) //nolint:noctx // test helper, process lifecycle managed separately
 	env = append(env, os.Environ()...)
 	cmd.Env = env
 	return cmd

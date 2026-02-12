@@ -1044,7 +1044,7 @@ type RPCChainVMVersion struct {
 // getRPCVersion attempts to invoke the given command with the specified version arguments and
 // retrieve an rpcchainvm version from its output.
 func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (uint64, error) {
-	cmd := exec.Command(command, versionArgs...)
+	cmd := exec.CommandContext(context.Background(), command, versionArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, stacktrace.Errorf("command %q failed with output: %s", command, output)
