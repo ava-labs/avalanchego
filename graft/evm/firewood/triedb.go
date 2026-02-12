@@ -211,7 +211,10 @@ func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	clear(t.tree.blockHashes)
 	t.tree.blockHashes[blockHash] = struct{}{}
 	t.tree.height = height
-	root, _ := t.Firewood.Root()
+	root, err := t.Firewood.Root()
+	if err != nil {
+		log.Error("get root in SetHashAndHeight", "error", err)
+	}
 	t.tree.root = common.Hash(root)
 }
 
