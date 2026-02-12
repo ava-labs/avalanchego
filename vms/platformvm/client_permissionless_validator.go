@@ -46,6 +46,7 @@ type ClientL1Validator struct {
 type ClientPermissionlessValidator struct {
 	ClientStaker
 	ClientL1Validator
+
 	ValidationRewardOwner  *ClientOwner
 	DelegationRewardOwner  *ClientOwner
 	PotentialReward        *uint64
@@ -67,6 +68,7 @@ type ClientPermissionlessValidator struct {
 // ClientDelegator is the repr. of a delegator sent over client
 type ClientDelegator struct {
 	ClientStaker
+
 	RewardOwner     *ClientOwner
 	PotentialReward *uint64
 }

@@ -16,6 +16,7 @@ import (
 
 type insecureValidatorManager struct {
 	router.ExternalHandler
+
 	log    logging.Logger
 	vdrs   validators.Manager
 	weight uint64

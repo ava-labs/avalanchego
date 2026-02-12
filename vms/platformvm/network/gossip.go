@@ -59,6 +59,7 @@ func newGossipMempool(
 
 type gossipMempool struct {
 	*mempool.Mempool
+
 	log        logging.Logger
 	txVerifier TxVerifier
 

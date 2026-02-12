@@ -71,16 +71,16 @@ func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 type VM struct {
 	block.ChainVM
 	Config
+	state.State
+	proposer.Windower
+	tree.Tree
+	mockable.Clock
+
 	blockBuilderVM  block.BuildBlockWithContextChainVM
 	setPreferenceVM block.SetPreferenceWithContextChainVM
 	batchedVM       block.BatchedChainVM
 	ssVM            block.StateSyncableVM
 
-	state.State
-
-	proposer.Windower
-	tree.Tree
-	mockable.Clock
 	finishedBootstrappingAt time.Time
 
 	ctx *snow.Context

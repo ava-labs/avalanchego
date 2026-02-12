@@ -19,6 +19,7 @@ var (
 type IncreaseL1ValidatorBalanceTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
+
 	// ID corresponding to the validator
 	ValidationID ids.ID `serialize:"true" json:"validationID"`
 	// Balance <= sum($AVAX inputs) - sum($AVAX outputs) - TxFee

@@ -202,6 +202,7 @@ func basicCert() *x509.Certificate {
 
 type mockPrometheusCounter struct {
 	prometheus.Counter
+
 	onIncrement func()
 }
 

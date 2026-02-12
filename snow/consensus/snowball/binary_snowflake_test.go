@@ -53,9 +53,9 @@ func TestBinarySnowflake(t *testing.T) {
 }
 
 type binarySnowflakeTest struct {
-	require *require.Assertions
-
 	binarySnowflake
+
+	require *require.Assertions
 }
 
 func newBinarySnowflakeTest(t *testing.T, alphaPreference int, terminationConditions []terminationCondition) snowflakeTest[int] {

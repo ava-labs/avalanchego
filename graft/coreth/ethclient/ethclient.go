@@ -242,8 +242,9 @@ func (ec *Client) HeaderByNumber(ctx context.Context, number *big.Int) (*types.H
 }
 
 type rpcTransaction struct {
-	tx *types.Transaction
 	txExtraInfo
+
+	tx *types.Transaction
 }
 
 type txExtraInfo struct {

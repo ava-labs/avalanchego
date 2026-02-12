@@ -31,11 +31,11 @@ func NewUnboundedBlockingDeque[T any](initSize int) *UnboundedBlockingDeque[T] {
 
 // UnboundedBlockingDeque is a thread-safe blocking deque with unbounded growth.
 type UnboundedBlockingDeque[T any] struct {
+	Deque[T]
+
 	lock   sync.RWMutex
 	cond   *sync.Cond
 	closed bool
-
-	Deque[T]
 }
 
 // If the deque is closed returns false.

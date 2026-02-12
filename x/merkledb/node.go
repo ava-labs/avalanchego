@@ -25,6 +25,7 @@ type child struct {
 // node holds additional information on top of the dbNode that makes calculations easier to do
 type node struct {
 	dbNode
+
 	key         Key
 	valueDigest maybe.Maybe[[]byte]
 }

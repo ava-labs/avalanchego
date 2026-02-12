@@ -13,6 +13,7 @@ var _ UnsignedTx = (*SetL1ValidatorWeightTx)(nil)
 type SetL1ValidatorWeightTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
+
 	// Message is expected to be a signed Warp message containing an
 	// AddressedCall payload with the SetL1ValidatorWeight message.
 	Message types.JSONByteSlice `serialize:"true" json:"message"`

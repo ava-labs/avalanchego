@@ -68,6 +68,7 @@ var (
 // Info is the API service for unprivileged info on a node
 type Info struct {
 	Parameters
+
 	log          logging.Logger
 	validators   validators.Manager
 	myIP         *utils.Atomic[netip.AddrPort]

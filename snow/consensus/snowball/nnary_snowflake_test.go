@@ -105,9 +105,9 @@ func TestVirtuousNnarySnowflake(t *testing.T) {
 }
 
 type nnarySnowflakeTest struct {
-	require *require.Assertions
-
 	nnarySnowflake
+
+	require *require.Assertions
 }
 
 func newNnarySnowflakeTest(t *testing.T, alphaPreference int, terminationConditions []terminationCondition) snowflakeTest[ids.ID] {

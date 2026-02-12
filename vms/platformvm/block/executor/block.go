@@ -22,6 +22,7 @@ var (
 // Exported for testing in platformvm package.
 type Block struct {
 	block.Block
+
 	manager *manager
 }
 

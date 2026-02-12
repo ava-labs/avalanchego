@@ -16,6 +16,7 @@ var _ pb.SignerServer = (*Server)(nil)
 
 type Server struct {
 	pb.UnsafeSignerServer
+
 	signer warp.Signer
 }
 

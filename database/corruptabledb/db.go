@@ -157,6 +157,7 @@ func (db *Database) handleError(err error) error {
 // batch is a wrapper around the batch to contain sizes.
 type batch struct {
 	database.Batch
+
 	db *Database
 }
 
@@ -170,6 +171,7 @@ func (b *batch) Write() error {
 
 type iterator struct {
 	database.Iterator
+
 	db *Database
 }
 

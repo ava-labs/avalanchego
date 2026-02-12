@@ -394,6 +394,7 @@ type GetAssetDescriptionArgs struct {
 // GetAssetDescriptionReply defines the GetAssetDescription replies returned from the API
 type GetAssetDescriptionReply struct {
 	FormattedAssetID
+
 	Name         string        `json:"name"`
 	Symbol       string        `json:"symbol"`
 	Denomination avajson.Uint8 `json:"denomination"`
@@ -511,6 +512,7 @@ type Balance struct {
 
 type GetAllBalancesArgs struct {
 	api.JSONAddress
+
 	IncludePartial bool `json:"includePartial"`
 }
 
