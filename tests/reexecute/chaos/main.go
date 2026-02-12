@@ -239,7 +239,7 @@ func createReexecutionCmd(
 	endBlock uint64,
 	configName string,
 ) *exec.Cmd {
-	cmd := exec.Command("go", //nolint:noctx // process lifecycle is managed by caller
+	cmd := exec.Command("go",
 		"run",
 		"github.com/ava-labs/avalanchego/tests/reexecute/c",
 		"--config=firewood",

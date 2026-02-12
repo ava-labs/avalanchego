@@ -15,7 +15,7 @@ import (
 )
 
 func NewCmd(path string, args ...string) *exec.Cmd {
-	return exec.Command(path, args...) //nolint:noctx // process lifecycle is managed separately
+	return exec.Command(path, args...)
 }
 
 func stop(_ context.Context, log logging.Logger, cmd *exec.Cmd) {

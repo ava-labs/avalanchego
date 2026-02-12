@@ -437,7 +437,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
 	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(n.Config.ListenPort), 10))
-	listener, err := (&net.ListenConfig{}).Listen(context.Background(), constants.NetworkType, listenAddress)
+	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
 		return err
 	}
@@ -978,7 +978,7 @@ func (n *Node) initAPIServer() error {
 	}
 
 	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
-	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", listenAddress)
+	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
 	}

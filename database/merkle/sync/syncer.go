@@ -181,7 +181,7 @@ func NewSyncer[R any, C any](
 		return nil, err
 	}
 
-	m := &Syncer[R, C]{
+	s := &Syncer[R, C]{
 		db:              db,
 		config:          config,
 		doneChan:        make(chan struct{}),
@@ -189,17 +189,52 @@ func NewSyncer[R any, C any](
 		processedWork:   newWorkHeap(),
 		metrics:         metrics,
 	}
-	m.unprocessedWorkCond.L = &m.workLock
+	s.unprocessedWorkCond.L = &s.workLock
 
-	return m, nil
+	return s, nil
 }
 
-func (s *Syncer[_, _]) Start(ctx context.Context) error {
+// Sync initiates the trie syncing process and blocks until one of the following occurs:
+//   - [Syncer.Sync] is complete.
+//   - [Syncer.Sync] fatally errored.
+//   - `ctx` is canceled.
+//
+// If `ctx` is canceled, returns [context.Context.Err].
+func (s *Syncer[_, _]) Sync(ctx context.Context) error {
+	ctx, err := s.setup(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Blocks until syncing is done or canceled.
+	s.workLoop(ctx)
+
+	// There was a fatal error.
+	if err := s.error(); err != nil {
+		return err
+	}
+
+	root, err := s.db.GetMerkleRoot(ctx)
+	if err != nil {
+		return err
+	}
+
+	if targetRootID := s.getTargetRoot(); targetRootID != root {
+		// This should never happen.
+		return fmt.Errorf("%w: expected %s, got %s", ErrFinishedWithUnexpectedRoot, targetRootID, root)
+	}
+
+	s.config.Log.Info("completed", zap.Stringer("root", root))
+	return nil
+}
+
+// setup initiates the work queue and enables cancellation through a new context.
+func (s *Syncer[_, _]) setup(ctx context.Context) (context.Context, error) {
 	s.workLock.Lock()
 	defer s.workLock.Unlock()
 
 	if s.syncing {
-		return ErrAlreadyStarted
+		return ctx, ErrAlreadyStarted
 	}
 
 	s.config.Log.Info("starting sync", zap.Stringer("target root", s.config.TargetRoot))
@@ -210,17 +245,16 @@ func (s *Syncer[_, _]) Start(ctx context.Context) error {
 
 	s.syncing = true
 	ctx, s.cancelCtx = context.WithCancel(ctx)
-
-	go s.sync(ctx)
-	return nil
+	return ctx, nil
 }
 
-// sync awaits signal on [m.unprocessedWorkCond], which indicates that there
-// is work to do or syncing completes.  If there is work, sync will dispatch a goroutine to do
+// workLoop awaits signal on [s.unprocessedWorkCond], which indicates that there
+// is work to do or syncing completes.  If there is work, workLoop will dispatch a goroutine to do
 // the work.
-func (s *Syncer[_, _]) sync(ctx context.Context) {
+// Assumes [s.workLock] is not held.
+func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 	defer func() {
-		// Invariant: [m.workLock] is held when this goroutine begins.
+		// Invariant: [s.workLock] is held when this goroutine begins.
 		s.close()
 		s.workLock.Unlock()
 	}()
@@ -228,10 +262,11 @@ func (s *Syncer[_, _]) sync(ctx context.Context) {
 	// Keep doing work until we're closed, done or [ctx] is canceled.
 	s.workLock.Lock()
 	for {
-		// Invariant: [m.workLock] is held here.
+		// Invariant: [s.workLock] is held here.
 		switch {
 		case ctx.Err() != nil:
-			return // [m.workLock] released by defer.
+			s.setError(ctx.Err())
+			return // [s.workLock] released by defer.
 		case s.processingWorkItems >= s.config.SimultaneousWorkLimit:
 			// We're already processing the maximum number of work items.
 			// Wait until one of them finishes.
@@ -240,12 +275,11 @@ func (s *Syncer[_, _]) sync(ctx context.Context) {
 			if s.processingWorkItems == 0 {
 				// There's no work to do, and there are no work items being processed
 				// which could cause work to be added, so we're done.
-				return // [m.workLock] released by defer.
+				return // [s.workLock] released by defer.
 			}
 			// There's no work to do.
-			// Note that if [m].Close() is called, or [ctx] is canceled,
-			// Close() will be called, which will broadcast on [m.unprocessedWorkCond],
-			// which will cause Wait() to return, and this goroutine to exit.
+			// Note that if [ctx] is canceled, [s.close] will be called,
+			// which will signal [s.unprocessedWorkCond], unblocking this goroutine.
 			s.unprocessedWorkCond.Wait()
 		default:
 			s.processingWorkItems++
@@ -255,23 +289,11 @@ func (s *Syncer[_, _]) sync(ctx context.Context) {
 	}
 }
 
-// Close will stop the syncing process
-func (s *Syncer[_, _]) Close() {
-	s.workLock.Lock()
-	defer s.workLock.Unlock()
-
-	s.close()
-}
-
 // close is called when there is a fatal error or sync is complete.
 // [workLock] must be held
 func (s *Syncer[_, _]) close() {
 	s.closeOnce.Do(func() {
-		// Don't process any more work items.
-		// Drop currently processing work items.
-		if s.cancelCtx != nil {
-			s.cancelCtx()
-		}
+		s.cancelCtx()
 
 		// ensure any goroutines waiting for work from the heaps gets released
 		s.unprocessedWork.Close()
@@ -322,7 +344,7 @@ func (s *Syncer[_, _]) doWork(ctx context.Context, work *workItem) {
 }
 
 // Fetch and apply the change proof given by [work].
-// Assumes [m.workLock] is not held.
+// Assumes [s.workLock] is not held.
 func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 	targetRootID := s.getTargetRoot()
 
@@ -384,7 +406,7 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 }
 
 // Fetch and apply the range proof given by [work].
-// Assumes [m.workLock] is not held.
+// Assumes [s.workLock] is not held.
 func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := s.getTargetRoot()
 
@@ -623,42 +645,11 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 	return nil
 }
 
-func (s *Syncer[_, _]) Error() error {
+func (s *Syncer[_, _]) error() error {
 	s.errLock.Lock()
 	defer s.errLock.Unlock()
 
 	return s.fatalError
-}
-
-// Wait blocks until one of the following occurs:
-// - sync is complete.
-// - sync fatally errored.
-// - [ctx] is canceled.
-// If [ctx] is canceled, returns [ctx].Err().
-func (s *Syncer[_, _]) Wait(ctx context.Context) error {
-	select {
-	case <-s.doneChan:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-
-	// There was a fatal error.
-	if err := s.Error(); err != nil {
-		return err
-	}
-
-	root, err := s.db.GetMerkleRoot(ctx)
-	if err != nil {
-		return err
-	}
-
-	if targetRootID := s.getTargetRoot(); targetRootID != root {
-		// This should never happen.
-		return fmt.Errorf("%w: expected %s, got %s", ErrFinishedWithUnexpectedRoot, targetRootID, root)
-	}
-
-	s.config.Log.Info("completed", zap.Stringer("root", root))
-	return nil
 }
 
 func (s *Syncer[_, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
@@ -685,16 +676,16 @@ func (s *Syncer[_, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	// move all completed ranges into the work heap with high priority
 	shouldSignal := s.processedWork.Len() > 0
 	for s.processedWork.Len() > 0 {
-		// Note that [m.processedWork].Close() hasn't
-		// been called because we have [m.workLock]
-		// and we checked that [m.closed] is false.
+		// Note that [s.processedWork].Close() hasn't
+		// been called because we have [s.workLock]
+		// and we checked that [s.closed] is false.
 		currentItem := s.processedWork.GetWork()
 		currentItem.priority = highPriority
 		s.unprocessedWork.Insert(currentItem)
 	}
 	if shouldSignal {
 		// Only signal once because we only have 1 goroutine
-		// waiting on [m.unprocessedWorkCond].
+		// waiting on [s.unprocessedWorkCond].
 		s.unprocessedWorkCond.Signal()
 	}
 	return nil
@@ -714,9 +705,12 @@ func (s *Syncer[_, _]) setError(err error) {
 
 	s.config.Log.Error("sync errored", zap.Error(err))
 	s.fatalError = err
-	// Call in goroutine because we might be holding [m.workLock]
-	// which [m.Close] will try to acquire.
-	go s.Close()
+	// Call in goroutine because we might be holding [s.workLock]
+	go func() {
+		s.workLock.Lock()
+		defer s.workLock.Unlock()
+		s.close()
+	}()
 }
 
 // Mark that we've fetched all the key-value pairs in the range
@@ -731,13 +725,13 @@ func (s *Syncer[_, _]) setError(err error) {
 // [proofOfLargestKey] is the end proof for the range/change proof
 // that gave us the range up to and including [largestHandledKey].
 //
-// Assumes [m.workLock] is not held.
+// Assumes [s.workLock] is not held.
 func (s *Syncer[_, _]) completeWorkItem(
 	work *workItem,
 	largestHandledKey maybe.Maybe[[]byte],
 	rootID ids.ID,
 ) {
-	// nextStartKey being Nothing indicates that the entire range has been completed
+	// largestHandledKey being Nothing indicates that the entire range has been completed
 	if largestHandledKey.IsNothing() {
 		largestHandledKey = work.end
 	} else {
@@ -773,7 +767,7 @@ func (s *Syncer[_, _]) completeWorkItem(
 // Queue the given key range to be fetched and applied.
 // If there are sufficiently few unprocessed/processing work items,
 // splits the range into two items and queues them both.
-// Assumes [m.workLock] is not held.
+// Assumes [s.workLock] is not held.
 func (s *Syncer[_, _]) enqueueWork(work *workItem) {
 	s.workLock.Lock()
 	defer func() {
@@ -795,7 +789,7 @@ func (s *Syncer[_, _]) enqueueWork(work *workItem) {
 		// The range is too small to split.
 		// If we didn't have this check we would add work items
 		// [start, start] and [start, end]. Since start <= end, this would
-		// violate the invariant of [m.unprocessedWork] and [m.processedWork]
+		// violate the invariant of [s.unprocessedWork] and [s.processedWork]
 		// that there are no overlapping ranges.
 		s.unprocessedWork.Insert(work)
 		return

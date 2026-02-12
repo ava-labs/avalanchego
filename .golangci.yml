@@ -75,7 +75,7 @@ linters:
     # - modernize
     - nakedret
     - nilerr
-    - noctx
+    # - noctx
     - nolintlint
     - perfsprint
     - prealloc

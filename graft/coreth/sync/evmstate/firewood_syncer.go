@@ -27,6 +27,7 @@ var (
 
 type FirewoodSyncer struct {
 	s         *merklesync.Syncer[*syncer.RangeProof, struct{}]
+	cancel    context.CancelFunc
 	codeQueue *code.Queue
 	// finalizeOnce is initialized in the constructor to make Finalize idempotent.
 	finalizeOnce func() error
@@ -46,6 +47,7 @@ func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Has
 	}
 	f := &FirewoodSyncer{
 		s:         s,
+		cancel:    func() {}, // overwritten in Sync
 		codeQueue: codeQueue,
 	}
 	f.finalizeOnce = sync.OnceValue(f.finish)
@@ -53,12 +55,9 @@ func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Has
 }
 
 func (f *FirewoodSyncer) Sync(ctx context.Context) error {
-	if err := f.s.Start(ctx); err != nil {
-		return fmt.Errorf("starting syncer: %w", err)
-	}
-
-	if err := f.s.Wait(ctx); err != nil {
-		return fmt.Errorf("waiting for syncer: %w", err)
+	ctx, f.cancel = context.WithCancel(ctx)
+	if err := f.s.Sync(ctx); err != nil {
+		return err
 	}
 
 	return f.Finalize()
@@ -72,7 +71,7 @@ func (f *FirewoodSyncer) Finalize() error {
 // This is linked to the [sync.Once] in the constructor, and should not be called directly.
 func (f *FirewoodSyncer) finish() error {
 	// Ensure the syncer stops work and the code queue closes on exit.
-	f.s.Close()
+	f.cancel()
 	if err := f.codeQueue.Finalize(); err != nil {
 		return fmt.Errorf("finalizing code queue: %w", err)
 	}

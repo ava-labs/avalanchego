@@ -4,7 +4,6 @@
 package nat
 
 import (
-	"context"
 	"errors"
 	"net"
 	"net/netip"
@@ -42,7 +41,7 @@ func (r noRouter) ExternalIP() (netip.Addr, error) {
 }
 
 func getOutboundIP() (netip.Addr, error) {
-	conn, err := (&net.Dialer{}).DialContext(context.Background(), "udp", googleDNSServer)
+	conn, err := net.Dial("udp", googleDNSServer)
 	if err != nil {
 		return netip.Addr{}, err
 	}

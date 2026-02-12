@@ -150,7 +150,7 @@ func WaitForCompletion(
 
 // Determines the current disk usage for the specified directory
 func getDiskUsage(log logging.Logger, dir string) string {
-	cmd := exec.CommandContext(context.Background(), "du", "-sh", dir)
+	cmd := exec.Command("du", "-sh", dir)
 
 	// Create a buffer to capture stderr in case an unexpected error occurs
 	var stderr bytes.Buffer

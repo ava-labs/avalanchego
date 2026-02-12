@@ -89,8 +89,7 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, syncer.Start(ctx))
-	err = syncer.Wait(ctx)
+	err = syncer.Sync(ctx)
 	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
 		logDiff(t, serverDB, clientDB)
@@ -167,8 +166,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, syncer.Start(ctx))
-	err = syncer.Wait(ctx)
+	err = syncer.Sync(ctx)
 	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
 		logDiff(t, serverDB, clientDB)
