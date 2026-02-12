@@ -45,6 +45,10 @@ jobs:
   Bazel_Unit:
     runs-on: ubuntu-latest
     steps:
+      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be #v1.3.1
+        with:
+          tool-cache: true
+          docker-images: true
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - name: Run unit tests with Bazel
