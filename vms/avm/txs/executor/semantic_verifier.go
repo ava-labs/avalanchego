@@ -27,6 +27,7 @@ var (
 
 type SemanticVerifier struct {
 	*Backend
+
 	State state.ReadOnlyChain
 	Tx    *txs.Tx
 }

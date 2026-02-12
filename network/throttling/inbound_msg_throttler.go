@@ -45,6 +45,7 @@ type InboundMsgThrottler interface {
 type InboundMsgThrottlerConfig struct {
 	MsgByteThrottlerConfig   `json:"byteThrottlerConfig"`
 	BandwidthThrottlerConfig `json:"bandwidthThrottlerConfig"`
+
 	CPUThrottlerConfig       SystemThrottlerConfig `json:"cpuThrottlerConfig"`
 	DiskThrottlerConfig      SystemThrottlerConfig `json:"diskThrottlerConfig"`
 	MaxProcessingMsgsPerNode uint64                `json:"maxProcessingMsgsPerNode"`

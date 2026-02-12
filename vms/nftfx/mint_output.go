@@ -15,8 +15,8 @@ var _ verify.State = (*MintOutput)(nil)
 type MintOutput struct {
 	verify.IsState `json:"-"`
 
-	GroupID                  uint32 `serialize:"true" json:"groupID"`
-	secp256k1fx.OutputOwners `serialize:"true"`
+	GroupID                  uint32             `serialize:"true" json:"groupID"`
+	secp256k1fx.OutputOwners `serialize:"true"` //nolint:embeddedstructfieldcheck
 }
 
 // MarshalJSON marshals Amt and the embedded OutputOwners struct

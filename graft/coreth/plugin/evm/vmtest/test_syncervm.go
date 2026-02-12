@@ -442,11 +442,13 @@ type SyncVMSetup struct {
 
 type syncerVMSetup struct {
 	SyncVMSetup
+
 	shutdownOnceSyncerVM *shutdownOnceVM
 }
 
 type shutdownOnceVM struct {
 	extension.InnerVM
+
 	shutdownOnce sync.Once
 }
 

@@ -16,6 +16,7 @@ var _ block.Visitor = (*rejector)(nil)
 // being shutdown.
 type rejector struct {
 	*backend
+
 	addTxsToMempool bool
 }
 

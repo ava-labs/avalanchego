@@ -107,6 +107,7 @@ func (mc *mockCaller) CallContract(ctx context.Context, call ethereum.CallMsg, b
 
 type mockAcceptedCaller struct {
 	*mockCaller
+
 	acceptedCodeAtBytes        []byte
 	acceptedCodeAtErr          error
 	acceptedCodeAtCalled       bool
@@ -127,6 +128,7 @@ func (mc *mockAcceptedCaller) AcceptedCallContract(ctx context.Context, call eth
 
 type mockBlockHashCaller struct {
 	*mockCaller
+
 	codeAtHashBytes          []byte
 	codeAtHashErr            error
 	codeAtHashCalled         bool

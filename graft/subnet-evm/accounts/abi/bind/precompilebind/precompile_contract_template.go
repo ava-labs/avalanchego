@@ -15,6 +15,7 @@ type tmplPrecompileData struct {
 // tmplPrecompileContract contains the data needed to generate an individual contract binding.
 type tmplPrecompileContract struct {
 	*bind.TmplContract
+
 	AllowList   bool                        // Indicator whether the contract uses AllowList precompile
 	Funcs       map[string]*bind.TmplMethod // Contract functions that include both Calls + Transacts in tmplContract
 	ABIFilename string                      // Path to the ABI file

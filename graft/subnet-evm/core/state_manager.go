@@ -102,6 +102,7 @@ func (np *noPruningTrieWriter) Shutdown() error { return nil }
 
 type cappedMemoryTrieWriter struct {
 	TrieDB
+
 	memoryCap        common.StorageSize
 	targetCommitSize common.StorageSize
 	flushStepSize    common.StorageSize

@@ -14,6 +14,7 @@ var _ state.Database = (*stateAccessor)(nil)
 
 type stateAccessor struct {
 	state.Database
+
 	triedb *TrieDB
 }
 

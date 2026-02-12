@@ -14,9 +14,10 @@ var _ database.Batch = (*batch)(nil)
 // specified height and updates the last tracked height to be equal to this
 // batch's height.
 type batch struct {
+	database.BatchOps
+
 	db     *Database
 	height uint64
-	database.BatchOps
 }
 
 func (c *batch) Write() error {

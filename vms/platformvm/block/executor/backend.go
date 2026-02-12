@@ -20,6 +20,7 @@ var errConflictingParentTxs = errors.New("block contains a transaction that conf
 // Shared fields used by visitors.
 type backend struct {
 	*mempool.Mempool
+
 	// lastAccepted is the ID of the last block that had Accept() called on it.
 	lastAccepted ids.ID
 

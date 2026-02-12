@@ -83,6 +83,7 @@ var (
 // VMClient is an implementation of a VM that talks over RPC.
 type VMClient struct {
 	*chain.State
+
 	logger          logging.Logger
 	client          vmpb.VMClient
 	runtime         runtime.Stopper

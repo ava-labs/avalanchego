@@ -84,6 +84,7 @@ type ipAndTime struct {
 
 type inboundConnUpgradeThrottler struct {
 	InboundConnUpgradeThrottlerConfig
+
 	lock sync.Mutex
 	// Useful for faking time in tests
 	clock mockable.Clock

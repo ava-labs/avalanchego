@@ -329,6 +329,7 @@ func New(
 
 type wallet struct {
 	Client
+
 	builder builder.Builder
 	signer  walletsigner.Signer
 }

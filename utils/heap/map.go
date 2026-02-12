@@ -101,6 +101,7 @@ func (m *Map[K, V]) Fix(k K) {
 
 type indexedQueue[K comparable, V any] struct {
 	queue[entry[K, V]]
+
 	index map[K]int
 }
 

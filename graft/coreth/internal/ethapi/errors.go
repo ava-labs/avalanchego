@@ -39,6 +39,7 @@ import (
 // code and a binary data blob.
 type revertError struct {
 	error
+
 	reason string // revert reason hex encoded
 }
 

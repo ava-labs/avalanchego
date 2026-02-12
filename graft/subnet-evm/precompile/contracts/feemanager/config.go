@@ -18,6 +18,7 @@ var _ precompileconfig.Config = (*Config)(nil)
 type Config struct {
 	allowlist.AllowListConfig // Config for the fee config manager allow list
 	precompileconfig.Upgrade
+
 	InitialFeeConfig *commontype.FeeConfig `json:"initialFeeConfig,omitempty"` // initial fee config to be immediately activated
 }
 

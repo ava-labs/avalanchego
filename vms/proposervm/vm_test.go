@@ -1060,6 +1060,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 
 type wrappedBlock struct {
 	snowman.Block
+
 	verified bool
 }
 

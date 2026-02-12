@@ -55,14 +55,14 @@ var (
 
 type VM struct {
 	network.Atomic
-
 	config.Config
-
-	metrics avmmetrics.Metrics
-
 	avax.AddressManager
 	ids.Aliaser
 	utxo.Spender
+	// These values are only initialized after the chain has been linearized.
+	blockbuilder.Builder
+
+	metrics avmmetrics.Metrics
 
 	// Contains information of where this VM is executing
 	ctx *snow.Context
@@ -101,10 +101,8 @@ type VM struct {
 	awaitShutdown       sync.WaitGroup
 
 	networkConfig network.Config
-	// These values are only initialized after the chain has been linearized.
-	blockbuilder.Builder
-	chainManager blockexecutor.Manager
-	network      *network.Network
+	chainManager  blockexecutor.Manager
+	network       *network.Network
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {

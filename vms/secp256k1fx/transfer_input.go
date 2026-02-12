@@ -12,8 +12,8 @@ import (
 var ErrNoValueInput = errors.New("input has no value")
 
 type TransferInput struct {
-	Amt   uint64 `serialize:"true" json:"amount"`
-	Input `serialize:"true"`
+	Amt   uint64             `serialize:"true" json:"amount"`
+	Input `serialize:"true"` //nolint:embeddedstructfieldcheck
 }
 
 func (*TransferInput) InitCtx(*snow.Context) {}

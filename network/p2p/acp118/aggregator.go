@@ -26,6 +26,7 @@ var errFailedVerification = errors.New("failed verification")
 
 type indexedValidator struct {
 	*validators.Warp
+
 	Index int
 }
 

@@ -26,6 +26,7 @@ var (
 // being shutdown.
 type acceptor struct {
 	*backend
+
 	metrics    metrics.Metrics
 	validators validators.Manager
 }

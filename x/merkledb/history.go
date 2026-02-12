@@ -41,6 +41,7 @@ type change[T any] struct {
 // of when the change was made.
 type changeSummaryAndInsertNumber struct {
 	*changeSummary
+
 	// Another changeSummaryAndInsertNumber with a greater
 	// [insertNumber] means that change was after this one.
 	insertNumber uint64
