@@ -635,8 +635,15 @@ func (d *diff) Apply(baseState Chain) error {
 		}
 	}
 	// Apply uptime resets for continuous validators that restarted their cycle
-	if s, ok := baseState.(uptime.State); ok {
-		for nodeID, startTime := range d.uptimeResets {
+	for nodeID, startTime := range d.uptimeResets {
+		// If baseState is another diff, propagate the resets to it
+		if baseDiff, ok := baseState.(*diff); ok {
+			if baseDiff.uptimeResets == nil {
+				baseDiff.uptimeResets = make(map[ids.NodeID]time.Time)
+			}
+			baseDiff.uptimeResets[nodeID] = startTime
+		} else if s, ok := baseState.(uptime.State); ok {
+			// If it's the actual state, apply the reset
 			if err := s.SetUptime(nodeID, 0, startTime); err != nil {
 				return err
 			}
