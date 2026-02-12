@@ -21,7 +21,7 @@ import (
 )
 
 func NewCmd(path string, args ...string) *exec.Cmd {
-	cmd := exec.Command(path, args...) //nolint:noctx // process lifecycle is managed separately
+	cmd := exec.Command(path, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM}
 	return cmd
 }

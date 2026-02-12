@@ -17,7 +17,7 @@ var errNoIPsFound = errors.New("no IPs found")
 //
 // Note: IPv4 is preferred because `net.Listen` prefers IPv4.
 func Lookup(hostname string) (netip.Addr, error) {
-	ips, err := net.LookupIP(hostname) //nolint:noctx // need same IP handling
+	ips, err := net.LookupIP(hostname)
 	if err != nil {
 		return netip.Addr{}, err
 	}
