@@ -31,7 +31,7 @@ func main() {
 		utils.NewTmpnetSubnet("subnet-evm", genesisPath, utils.DefaultChainConfig, network.Nodes...),
 	}
 
-	if err := antithesis.GenerateComposeConfig(network, baseImageName); err != nil {
+	if err := antithesis.GenerateComposeConfig(network, baseImageName, 0); err != nil {
 		log.Fatalf("failed to generate compose config: %v", err)
 	}
 }

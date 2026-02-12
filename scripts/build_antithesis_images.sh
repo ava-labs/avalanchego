@@ -64,9 +64,19 @@ function build_antithesis_images_for_avalanchego {
 if [[ "${TEST_SETUP}" == "avalanchego" ]]; then
   build_builder_image_for_avalanchego
 
-  echo "Generating compose configuration for ${TEST_SETUP}"
-  gen_antithesis_compose_config "${IMAGE_TAG}" "${AVALANCHE_PATH}/tests/antithesis/avalanchego/gencomposeconfig" \
-                                "${AVALANCHE_PATH}/build/antithesis/avalanchego"
+  # Compose generation is only required when building all antithesis images.
+  # NODE_ONLY builds should avoid DB seeding/bootstrap work.
+  if [[ -z "${NODE_ONLY:-}" ]]; then
+    # Build the avalanchego binary so it can be used to bootstrap a tmpnet
+    # network and generate C-chain blocks for BlockDB migration testing.
+    echo "Building avalanchego binary for bootstrap DB seeding"
+    "${AVALANCHE_PATH}"/scripts/build.sh
+
+    echo "Generating compose configuration for ${TEST_SETUP}"
+    gen_antithesis_compose_config "${IMAGE_TAG}" "${AVALANCHE_PATH}/tests/antithesis/avalanchego/gencomposeconfig" \
+                                  "${AVALANCHE_PATH}/build/antithesis/avalanchego" \
+                                  "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego"
+  fi
 
   build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY:-}"
 else

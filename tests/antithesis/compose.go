@@ -34,10 +34,18 @@ var (
 	errPluginDirEnvVarNotSet  = errors.New(tmpnet.AvalancheGoPluginDirEnvName + " environment variable not set")
 )
 
-// Creates docker compose configuration for an antithesis test setup. Configuration is via env vars to
-// simplify usage by main entrypoints. If the provided network includes a subnet, the initial DB state for
-// the subnet will be created and written to the target path.
-func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error {
+// GenerateComposeConfig creates docker compose configuration for an antithesis
+// test setup. Configuration is via env vars to simplify usage by main
+// entrypoints.
+//
+// The bootstrap node's database is initialized when the network includes
+// subnets and/or cchainBlockCount > 0. Both are handled in a single
+// bootstrap:
+//   - Subnets: the DB is seeded with subnet state.
+//   - cchainBlockCount > 0: C-chain blocks are generated with BlockDB disabled
+//     (written to ethdb), then BlockDB is enabled in the compose config so
+//     nodes run the migration path on startup.
+func GenerateComposeConfig(network *tmpnet.Network, baseImageName string, cchainBlockCount int) error {
 	targetPath := os.Getenv(targetPathEnvName)
 	if len(targetPath) == 0 {
 		return errTargetPathEnvVarNotSet
@@ -48,44 +56,96 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 		return errImageTagEnvVarNotSet
 	}
 
-	// Subnet testing requires creating an initial db state for the bootstrap node
-	if len(network.Subnets) > 0 {
-		avalancheGoPath := os.Getenv(tmpnet.AvalancheGoPathEnvName)
-		if len(avalancheGoPath) == 0 {
-			return errAvalancheGoEvVarNotSet
-		}
-
-		// Plugin dir configured here is only used for initializing the bootstrap db.
-		pluginDir := os.Getenv(tmpnet.AvalancheGoPluginDirEnvName)
-		if len(pluginDir) == 0 {
-			return errPluginDirEnvVarNotSet
-		}
-
-		network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
-			Process: &tmpnet.ProcessRuntimeConfig{
-				AvalancheGoPath: avalancheGoPath,
-				PluginDir:       pluginDir,
-			},
-		}
-
-		bootstrapVolumePath, err := getBootstrapVolumePath(targetPath)
-		if err != nil {
-			return fmt.Errorf("failed to get bootstrap volume path: %w", err)
-		}
-
-		if err := initBootstrapDB(network, bootstrapVolumePath); err != nil {
-			return fmt.Errorf("failed to initialize db volumes: %w", err)
+	bootstrapDBSeeded := len(network.Subnets) > 0 || cchainBlockCount > 0
+	if bootstrapDBSeeded {
+		if err := initBootstrapForCompose(network, targetPath, cchainBlockCount); err != nil {
+			return err
 		}
 	}
 
 	nodeImageName := fmt.Sprintf("%s-node:%s", baseImageName, imageTag)
 	workloadImageName := fmt.Sprintf("%s-workload:%s", baseImageName, imageTag)
 
-	if err := initComposeConfig(network, nodeImageName, workloadImageName, targetPath); err != nil {
+	if err := initComposeConfig(network, nodeImageName, workloadImageName, targetPath, bootstrapDBSeeded); err != nil {
 		return fmt.Errorf("failed to generate compose config: %w", err)
 	}
 
 	return nil
+}
+
+// initBootstrapForCompose sets up the runtime config, bootstraps a local
+// network (optionally generating C-chain blocks for BlockDB migration
+// testing), and copies the resulting DB to the bootstrap node's volume path.
+func initBootstrapForCompose(network *tmpnet.Network, targetPath string, cchainBlockCount int) error {
+	avalancheGoPath := os.Getenv(tmpnet.AvalancheGoPathEnvName)
+	if len(avalancheGoPath) == 0 {
+		return errAvalancheGoEvVarNotSet
+	}
+
+	runtimeConfig := tmpnet.NodeRuntimeConfig{
+		Process: &tmpnet.ProcessRuntimeConfig{
+			AvalancheGoPath: avalancheGoPath,
+		},
+	}
+
+	// Subnet testing also requires the plugin directory.
+	if len(network.Subnets) > 0 {
+		pluginDir := os.Getenv(tmpnet.AvalancheGoPluginDirEnvName)
+		if len(pluginDir) == 0 {
+			return errPluginDirEnvVarNotSet
+		}
+		runtimeConfig.Process.PluginDir = pluginDir
+	}
+
+	network.DefaultRuntimeConfig = runtimeConfig
+
+	// When generating C-chain blocks for migration testing, temporarily
+	// disable BlockDB so blocks are written to ethdb (the old format).
+	if cchainBlockCount > 0 {
+		disableBlockDB(network)
+	}
+
+	bootstrapVolumePath, err := getBootstrapVolumePath(targetPath)
+	if err != nil {
+		return fmt.Errorf("failed to get bootstrap volume path: %w", err)
+	}
+
+	if err := initBootstrapDB(network, bootstrapVolumePath, cchainBlockCount); err != nil {
+		return fmt.Errorf("failed to initialize bootstrap DB: %w", err)
+	}
+
+	// Enable BlockDB for the compose config so nodes run migration on
+	// startup when they detect the existing ethdb blocks.
+	if cchainBlockCount > 0 {
+		enableBlockDB(network)
+	}
+
+	// Clear the runtime config so it doesn't leak into the compose output.
+	network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{}
+
+	return nil
+}
+
+// disableBlockDB sets block-database-enabled=false in the C-chain config,
+// ensuring blocks are written to ethdb during bootstrap seeding.
+func disableBlockDB(network *tmpnet.Network) {
+	setCChainConfig(network, "block-database-enabled", false)
+}
+
+// enableBlockDB sets block-database-enabled=true in the C-chain config,
+// so nodes will detect existing ethdb blocks and run migration on startup.
+func enableBlockDB(network *tmpnet.Network) {
+	setCChainConfig(network, "block-database-enabled", true)
+}
+
+func setCChainConfig(network *tmpnet.Network, key string, value any) {
+	if network.PrimaryChainConfigs == nil {
+		network.PrimaryChainConfigs = make(map[string]tmpnet.ConfigMap)
+	}
+	if network.PrimaryChainConfigs["C"] == nil {
+		network.PrimaryChainConfigs["C"] = make(tmpnet.ConfigMap)
+	}
+	network.PrimaryChainConfigs["C"][key] = value
 }
 
 // Initialize the given path with the docker compose configuration (compose file and
@@ -95,9 +155,10 @@ func initComposeConfig(
 	nodeImageName string,
 	workloadImageName string,
 	targetPath string,
+	bootstrapDBSeeded bool,
 ) error {
 	// Generate a compose project for the specified network
-	project, err := newComposeProject(network, nodeImageName, workloadImageName)
+	project, err := newComposeProject(network, nodeImageName, workloadImageName, bootstrapDBSeeded)
 	if err != nil {
 		return err
 	}
@@ -135,7 +196,7 @@ func initComposeConfig(
 
 // Create a new docker compose project for an antithesis test setup
 // for the provided network configuration.
-func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadImageName string) (*types.Project, error) {
+func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadImageName string, bootstrapDBSeeded bool) (*types.Project, error) {
 	networkName := "avalanche-testnet"
 	baseNetworkAddress := "10.0.20"
 
@@ -195,14 +256,16 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		trackSubnets := node.Flags[config.TrackSubnetsKey]
 		if len(trackSubnets) > 0 {
 			env[config.TrackSubnetsKey] = trackSubnets
-			if i == bootstrapIndex {
-				// DB volume for bootstrap node will need to initialized with the subnet
-				volumes = append(volumes, types.ServiceVolumeConfig{
-					Type:   types.VolumeTypeBind,
-					Source: fmt.Sprintf("./volumes/%s/db", serviceName),
-					Target: "/root/.avalanchego/db",
-				})
-			}
+		}
+
+		// Mount a DB volume for the bootstrap node when it has been pre-seeded
+		// (for subnet testing, BlockDB migration testing, etc).
+		if i == 0 && bootstrapDBSeeded {
+			volumes = append(volumes, types.ServiceVolumeConfig{
+				Type:   types.VolumeTypeBind,
+				Source: fmt.Sprintf("./volumes/%s/db", serviceName),
+				Target: "/root/.avalanchego/db",
+			})
 		}
 
 		if i == 0 {
