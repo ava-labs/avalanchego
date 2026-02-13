@@ -81,6 +81,7 @@ jobs:
           NFPM_RPM_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
 
       - name: Upload RPMs as artifacts
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: rpms-${{ matrix.rpm_arch }}
