@@ -87,6 +87,15 @@ docker run --rm \
             exit 1
         fi
 
+        # Smoke test subnet-evm version and commit
+        evm_output=$("${plugin}" --version)
+        echo "subnet-evm --version: ${evm_output}"
+        if [[ "${evm_output}" != *"@${short_commit}"* ]]; then
+            echo "ERROR: subnet-evm --version output does not contain expected @${short_commit}" >&2
+            echo "Output: ${evm_output}" >&2
+            exit 1
+        fi
+
         echo "All RPM validations passed"
     '
 
