@@ -3,9 +3,7 @@
 
 package config
 
-import (
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
-)
+import "github.com/ava-labs/avalanchego/graft/evm/utils"
 
 // setDefaults applies default values to fields that are still zero-valued.
 func (c *Config) setDefaults() {
