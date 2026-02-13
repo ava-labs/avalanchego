@@ -12,7 +12,7 @@ fi
 
 if [[ $# -ne 1 ]]; then
   echo "Usage: $0 <go-version>"
-  echo "Example: $0 1.24.12"
+  echo "Example: $0 1.25.7"
   exit 1
 fi
 
