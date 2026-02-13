@@ -765,7 +765,7 @@ func (vm *VM) initBlockBuilding() error {
 	}
 	vm.shutdownWg.Add(1)
 	go func() {
-		ethTxPool.Subscribe(ctx)
+		ethTxPool.UpdateBloomFilter(ctx)
 		vm.shutdownWg.Done()
 	}()
 
