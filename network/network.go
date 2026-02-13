@@ -74,7 +74,8 @@ type Network interface {
 	StartClose()
 
 	// Should only be called once, will run until either a fatal error occurs,
-	// or the network is closed.
+	// the network is closed, or [ctx] is canceled.
+	// Canceling [ctx] triggers [StartClose].
 	Dispatch(ctx context.Context) error
 
 	// Attempt to connect to this IP. The network will never stop attempting to
