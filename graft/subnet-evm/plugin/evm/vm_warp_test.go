@@ -20,6 +20,7 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
@@ -29,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -46,6 +46,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
@@ -156,21 +157,18 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 	unsignedMessage, err := warpcontract.UnpackSendWarpEventDataToMessage(logData)
 	require.NoError(err)
 
-	// Verify the signature cannot be fetched before the block is accepted
-	_, err = tvm.vm.warpBackend.GetMessageSignature(t.Context(), unsignedMessage)
-	require.ErrorIs(err, warp.ErrVerifyWarpMessage)
-	_, err = tvm.vm.warpBackend.GetBlockSignature(t.Context(), blk.ID())
-	require.ErrorIs(err, warp.ErrValidateBlock)
+	// Verify the message is not in the DB before the block is accepted
+	_, err = tvm.vm.warpMsgDB.Get(unsignedMessage.ID())
+	require.ErrorIs(err, database.ErrNotFound)
 
 	require.NoError(tvm.vm.SetPreference(t.Context(), blk.ID()))
 	require.NoError(blk.Accept(t.Context()))
 	tvm.vm.blockChain.DrainAcceptorQueue()
 
-	// Verify the message signature after accepting the block.
-	rawSignatureBytes, err := tvm.vm.warpBackend.GetMessageSignature(t.Context(), unsignedMessage)
+	// Verify the message is now in the DB after accepting the block
+	storedMessage, err := tvm.vm.warpMsgDB.Get(unsignedMessage.ID())
 	require.NoError(err)
-	blsSignature, err := bls.SignatureFromBytes(rawSignatureBytes)
-	require.NoError(err)
+	require.Equal(unsignedMessage.ID(), storedMessage.ID())
 
 	select {
 	case acceptedLogs := <-acceptedLogsChan:
@@ -180,22 +178,24 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 		require.Fail("Failed to read accepted logs from subscription")
 	}
 
-	// Verify the produced message signature is valid
+	// Verify we can sign the message and the signature is valid
+	signatureBytes, err := tvm.vm.ctx.WarpSigner.Sign(unsignedMessage)
+	require.NoError(err)
+	blsSignature, err := bls.SignatureFromBytes(signatureBytes)
+	require.NoError(err)
 	require.True(bls.Verify(tvm.vm.ctx.PublicKey, blsSignature, unsignedMessage.Bytes()))
 
-	// Verify the blockID will now be signed by the backend and produces a valid signature.
-	rawSignatureBytes, err = tvm.vm.warpBackend.GetBlockSignature(t.Context(), blk.ID())
-	require.NoError(err)
-	blsSignature, err = bls.SignatureFromBytes(rawSignatureBytes)
-	require.NoError(err)
-
+	// Verify we can sign a block hash payload
 	blockHashPayload, err := payload.NewHash(blk.ID())
 	require.NoError(err)
-	unsignedMessage, err = avalancheWarp.NewUnsignedMessage(tvm.vm.ctx.NetworkID, tvm.vm.ctx.ChainID, blockHashPayload.Bytes())
+	blockHashMessage, err := avalancheWarp.NewUnsignedMessage(tvm.vm.ctx.NetworkID, tvm.vm.ctx.ChainID, blockHashPayload.Bytes())
 	require.NoError(err)
 
-	// Verify the produced message signature is valid
-	require.True(bls.Verify(tvm.vm.ctx.PublicKey, blsSignature, unsignedMessage.Bytes()))
+	signatureBytes, err = tvm.vm.ctx.WarpSigner.Sign(blockHashMessage)
+	require.NoError(err)
+	blsSignature, err = bls.SignatureFromBytes(signatureBytes)
+	require.NoError(err)
+	require.True(bls.Verify(tvm.vm.ctx.PublicKey, blsSignature, blockHashMessage.Bytes()))
 }
 
 func TestValidateWarpMessage(t *testing.T) {
@@ -838,12 +838,16 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 	fork := upgradetest.Durango
 	tvm := newVM(t, testVMConfig{
 		fork:       &fork,
-		configJSON: getConfig(scheme, ""),
+		configJSON: getConfig(scheme, `"warp-api-enabled": true`),
 	})
 
 	defer func() {
 		require.NoError(t, tvm.vm.Shutdown(t.Context()))
 	}()
+
+	// Initialize the warp service by creating handlers
+	_, err := tvm.vm.CreateHandlers(t.Context())
+	require.NoError(t, err)
 
 	// Setup known message
 	knownPayload, err := payload.NewAddressedCall([]byte{0, 0, 0}, []byte("test"))
@@ -852,14 +856,14 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 	require.NoError(t, err)
 
 	// Add the known message and get its signature to confirm
-	require.NoError(t, tvm.vm.warpBackend.AddMessage(knownWarpMessage))
-	knownMessageSignature, err := tvm.vm.warpBackend.GetMessageSignature(t.Context(), knownWarpMessage)
+	require.NoError(t, tvm.vm.warpMsgDB.Add(knownWarpMessage))
+	knownMessageSignature, err := tvm.vm.warpService.GetMessageSignature(t.Context(), knownWarpMessage.ID())
 	require.NoError(t, err)
 
 	// Setup known block
 	lastAcceptedID, err := tvm.vm.LastAccepted(t.Context())
 	require.NoError(t, err)
-	knownBlockSignature, err := tvm.vm.warpBackend.GetBlockSignature(t.Context(), lastAcceptedID)
+	knownBlockSignature, err := tvm.vm.warpService.GetBlockSignature(t.Context(), lastAcceptedID)
 	require.NoError(t, err)
 
 	type testCase struct {
@@ -962,10 +966,11 @@ func TestClearWarpDB(t *testing.T) {
 	for _, payload := range payloads {
 		unsignedMsg, err := avalancheWarp.NewUnsignedMessage(vm.ctx.NetworkID, vm.ctx.ChainID, payload)
 		require.NoError(t, err)
-		require.NoError(t, vm.warpBackend.AddMessage(unsignedMsg))
+		require.NoError(t, vm.warpMsgDB.Add(unsignedMsg))
 		// ensure that the message was added
-		_, err = vm.warpBackend.GetMessageSignature(t.Context(), unsignedMsg)
+		storedMsg, err := vm.warpMsgDB.Get(unsignedMsg.ID())
 		require.NoError(t, err)
+		require.Equal(t, unsignedMsg.ID(), storedMsg.ID())
 		messages = append(messages, unsignedMsg)
 	}
 
@@ -979,9 +984,9 @@ func TestClearWarpDB(t *testing.T) {
 
 	// check messages are still present
 	for _, message := range messages {
-		bytes, err := vm.warpBackend.GetMessageSignature(t.Context(), message)
+		storedMsg, err := vm.warpMsgDB.Get(message.ID())
 		require.NoError(t, err)
-		require.NotEmpty(t, bytes)
+		require.Equal(t, message.ID(), storedMsg.ID())
 	}
 
 	require.NoError(t, vm.Shutdown(t.Context()))
@@ -998,7 +1003,7 @@ func TestClearWarpDB(t *testing.T) {
 
 	// ensure all messages have been deleted
 	for _, message := range messages {
-		_, err := vm.warpBackend.GetMessageSignature(t.Context(), message)
-		require.ErrorIs(t, err, &commonEng.AppError{Code: warp.ParseErrCode})
+		_, err := vm.warpMsgDB.Get(message.ID())
+		require.ErrorIs(t, err, database.ErrNotFound)
 	}
 }
