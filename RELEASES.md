@@ -6,6 +6,7 @@
 
 - Removed `pull-gossip-poll-size` from the X-chain and P-chain configs.
 - Removed `proposerMinBlockDelay` from subnet configs.
+- Increases Primary Network Validator uptime requirement to 90% for validators starting on or after February 15th, 2026.
 
 ### Fixes
 
