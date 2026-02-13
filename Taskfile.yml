@@ -9,6 +9,10 @@
 
 version: '3'
 
+includes:
+  packaging:
+    taskfile: .github/packaging/Taskfile.yml
+
 tasks:
   default: ./scripts/run_task.sh --list
 
