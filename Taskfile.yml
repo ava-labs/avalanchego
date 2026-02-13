@@ -360,7 +360,7 @@ tasks:
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
 
   update-go-version:
-    desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.24.12)"
+    desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"
     cmds:
       - cmd: ./scripts/set_go_version.sh {{.CLI_ARGS}}
       - task: go-mod-tidy
