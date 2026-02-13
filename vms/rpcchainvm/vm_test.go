@@ -198,7 +198,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			status, stopper, err := subprocess.Bootstrap(
 				t.Context(),
 				listener,
-				helperProcess(context.Background(), "dummy"),
+				helperProcess(t.Context(), "dummy"),
 				test.config,
 			)
 			if err == nil {

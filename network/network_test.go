@@ -281,7 +281,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		if i != 0 {
 			config := configs[0]
 			net.ManuallyTrack(
-				context.Background(),
+				t.Context(),
 				config.MyNodeID,
 				config.MyIPPort.Get(),
 			)
@@ -293,7 +293,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		}
 
 		eg.Go(func() error {
-			return net.Dispatch(context.Background())
+			return net.Dispatch(t.Context())
 		})
 	}
 
@@ -476,7 +476,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	require.NoError(err)
 
 	err = network.Track(
-		context.Background(),
+		t.Context(),
 		[]*ips.ClaimedIPPort{
 			ips.NewClaimedIPPort(
 				stakingCert,
@@ -548,14 +548,14 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 		if i != 0 {
 			config := configs[0]
 			net.ManuallyTrack(
-				context.Background(),
+				t.Context(),
 				config.MyNodeID,
 				config.MyIPPort.Get(),
 			)
 		}
 
 		eg.Go(func() error {
-			return net.Dispatch(context.Background())
+			return net.Dispatch(t.Context())
 		})
 	}
 
@@ -636,7 +636,7 @@ func testDialDeletesNonValidators(t *testing.T, connectToAllValidators bool) {
 			require.NoError(err)
 
 			require.NoError(net.Track(
-				context.Background(),
+				t.Context(),
 				[]*ips.ClaimedIPPort{
 					ips.NewClaimedIPPort(
 						stakingCert,
@@ -649,7 +649,7 @@ func testDialDeletesNonValidators(t *testing.T, connectToAllValidators bool) {
 		}
 
 		eg.Go(func() error {
-			return net.Dispatch(context.Background())
+			return net.Dispatch(t.Context())
 		})
 	}
 
@@ -712,12 +712,12 @@ func TestDialContext(t *testing.T) {
 		}
 	)
 
-	network.ManuallyTrack(context.Background(), neverDialedNodeID, neverDialedIP)
-	network.ManuallyTrack(context.Background(), dialedNodeID, dialedIP)
+	network.ManuallyTrack(t.Context(), neverDialedNodeID, neverDialedIP)
+	network.ManuallyTrack(t.Context(), dialedNodeID, dialedIP)
 
 	// Sanity check that when a non-cancelled context is given,
 	// we actually dial the peer.
-	network.dial(context.Background(), dialedNodeID, dialedTrackedIP)
+	network.dial(t.Context(), dialedNodeID, dialedTrackedIP)
 
 	gotDialedIPConn := make(chan struct{})
 	go func() {
@@ -729,7 +729,7 @@ func TestDialContext(t *testing.T) {
 	// Asset that when [n.onCloseCtx] is cancelled, dial returns immediately.
 	// That is, [neverDialedListener] doesn't accept a connection.
 	network.onCloseCtxCancel()
-	network.dial(context.Background(), neverDialedNodeID, neverDialedTrackedIP)
+	network.dial(t.Context(), neverDialedNodeID, neverDialedTrackedIP)
 
 	gotNeverDialedIPConn := make(chan struct{})
 	go func() {
@@ -790,14 +790,14 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 		if i != 0 {
 			config := configs[0]
 			net.ManuallyTrack(
-				context.Background(),
+				t.Context(),
 				config.MyNodeID,
 				config.MyIPPort.Get(),
 			)
 		}
 
 		eg.Go(func() error {
-			return net.Dispatch(context.Background())
+			return net.Dispatch(t.Context())
 		})
 	}
 
@@ -855,12 +855,12 @@ func TestGetAllPeers(t *testing.T) {
 
 	// Connect the non-validator peer to the validator network
 	nonValidatorNetwork.ManuallyTrack(
-		context.Background(),
+		t.Context(),
 		networks[0].config.MyNodeID,
 		networks[0].config.MyIPPort.Get(),
 	)
 	eg.Go(func() error {
-		return nonValidatorNetwork.Dispatch(context.Background())
+		return nonValidatorNetwork.Dispatch(t.Context())
 	})
 
 	{

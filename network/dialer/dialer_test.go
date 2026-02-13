@@ -34,7 +34,7 @@ func TestDialerDial(t *testing.T) {
 	require := require.New(t)
 
 	l, err := (&net.ListenConfig{}).Listen(
-		context.Background(),
+		t.Context(),
 		"tcp",
 		"127.0.0.1:0",
 	)

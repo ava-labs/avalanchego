@@ -4,7 +4,6 @@
 package ips
 
 import (
-	"context"
 	"net/netip"
 	"testing"
 
@@ -37,7 +36,7 @@ func TestLookup(t *testing.T) {
 		t.Run(tt.host, func(t *testing.T) {
 			require := require.New(t)
 
-			ip, err := Lookup(context.Background(), tt.host)
+			ip, err := Lookup(t.Context(), tt.host)
 			require.NoError(err)
 			require.Equal(tt.ip, ip)
 		})

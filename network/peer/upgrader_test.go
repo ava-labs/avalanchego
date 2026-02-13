@@ -16,7 +16,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 
 	_ "embed"
@@ -106,7 +105,7 @@ func TestBlockClientsWithIncorrectRSAKeys(t *testing.T) {
 			}
 
 			listener, err := (&net.ListenConfig{}).Listen(
-				context.Background(),
+				t.Context(),
 				"tcp",
 				"127.0.0.1:0",
 			)
@@ -120,19 +119,19 @@ func TestBlockClientsWithIncorrectRSAKeys(t *testing.T) {
 					return err
 				}
 
-				_, _, _, err = upgrader.Upgrade(context.Background(), conn)
+				_, _, _, err = upgrader.Upgrade(t.Context(), conn)
 				return err
 			})
 
 			conn, err := (&tls.Dialer{Config: &clientConfig}).DialContext(
-				context.Background(),
+				t.Context(),
 				"tcp",
 				listener.Addr().String(),
 			)
 			require.NoError(t, err)
 			tlsConn, ok := conn.(*tls.Conn)
 			require.True(t, ok)
-			require.NoError(t, tlsConn.HandshakeContext(context.Background()))
+			require.NoError(t, tlsConn.HandshakeContext(t.Context()))
 
 			err = eg.Wait()
 			require.ErrorIs(t, err, testCase.expectedErr)
