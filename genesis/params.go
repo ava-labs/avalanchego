@@ -4,6 +4,8 @@
 package genesis
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -12,9 +14,75 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
+var (
+	errInvalidUptimeRequirement           = errors.New("uptime requirement value must be in the range [0, 1]")
+	errUptimeRequirementTimeNotIncreasing = errors.New("uptime requirement schedule times must be strictly increasing")
+)
+
+// UptimeRequirementUpdate defines an update to primary network
+// uptime requirements. As of Time, Requirement is the new
+// minimum uptime percentage required to prefer rewarding a
+// given staker.
+type UptimeRequirementUpdate struct {
+	Time        time.Time `json:"time"`
+	Requirement float64   `json:"requirement"`
+}
+
+// UptimeRequirementConfig defines the uptime requirements for primary
+// network validators to receive rewards.
+type UptimeRequirementConfig struct {
+	// DefaultRequiredUptimePercentage is the default uptime required to be rewarded for staking.
+	DefaultRequiredUptimePercentage float64 `json:"defaultRequiredUptimePercentage"`
+
+	// RequiredUptimePercentageSchedule is the minimum uptime required to be rewarded for staking.
+	// The Time of each UptimeRequirementUpdate must be strictly after its predecessor.
+	RequiredUptimePercentageSchedule []UptimeRequirementUpdate `json:"requiredUptimePercentageSchedule"`
+}
+
+func (c *UptimeRequirementConfig) Verify() error {
+	// Requirement value must be in [0, 1].
+	if c.DefaultRequiredUptimePercentage < 0 || c.DefaultRequiredUptimePercentage > 1 {
+		return errInvalidUptimeRequirement
+	}
+
+	for i, update := range c.RequiredUptimePercentageSchedule {
+		// Requirement value must be in [0, 1].
+		if update.Requirement < 0 || update.Requirement > 1 {
+			return fmt.Errorf("%w at index %d: %f", errInvalidUptimeRequirement, i, update.Requirement)
+		}
+
+		// Times must be strictly increasing.
+		if i > 0 && !update.Time.After(c.RequiredUptimePercentageSchedule[i-1].Time) {
+			return fmt.Errorf("%w at index %d: %s is not after %s",
+				errUptimeRequirementTimeNotIncreasing,
+				i,
+				update.Time,
+				c.RequiredUptimePercentageSchedule[i-1].Time,
+			)
+		}
+	}
+
+	return nil
+}
+
+// RequiredUptime determines the required uptime to prefer rewarding a primary
+// network staker given the staker's start time. The requirement of the latest
+// UptimeRequirementUpdate to take effect at time before the stakerStartTime
+// is applied, if any exist.
+func (c *UptimeRequirementConfig) RequiredUptime(stakerStartTime time.Time) float64 {
+	requiredUptime := c.DefaultRequiredUptimePercentage
+	for _, requiredUptimeUpdate := range c.RequiredUptimePercentageSchedule {
+		if stakerStartTime.Before(requiredUptimeUpdate.Time) {
+			return requiredUptime
+		}
+		requiredUptime = requiredUptimeUpdate.Requirement
+	}
+	return requiredUptime
+}
+
 type StakingConfig struct {
 	// Staking uptime requirements
-	UptimeRequirement float64 `json:"uptimeRequirement"`
+	UptimeRequirementConfig UptimeRequirementConfig `json:"uptimeRequirementConfig"`
 	// Minimum stake, in nAVAX, required to validate the primary network
 	MinValidatorStake uint64 `json:"minValidatorStake"`
 	// Maximum stake, in nAVAX, allowed to be placed on a single validator in

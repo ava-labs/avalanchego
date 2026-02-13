@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
@@ -115,9 +116,11 @@ var (
 
 		CompressionType: constants.DefaultNetworkCompressionType,
 
-		UptimeCalculator:  uptime.NewManager(uptime.NewTestState(), &mockable.Clock{}),
-		UptimeMetricFreq:  30 * time.Second,
-		UptimeRequirement: .8,
+		UptimeCalculator: uptime.NewManager(uptime.NewTestState(), &mockable.Clock{}),
+		UptimeMetricFreq: 30 * time.Second,
+		UptimeRequirementConfig: genesis.UptimeRequirementConfig{
+			DefaultRequiredUptimePercentage: .8, // 80%
+		},
 
 		RequireValidatorToConnect: false,
 

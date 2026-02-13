@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -34,8 +35,9 @@ var (
 // options supports build new option blocks
 type options struct {
 	// inputs populated before calling this struct's methods:
-	log                     logging.Logger
-	primaryUptimePercentage float64
+	log logging.Logger
+	// determines required uptime percentage based on validator start time
+	primaryUptimePercentage func(time.Time) float64
 	uptimes                 uptime.Calculator
 	state                   state.Chain
 
@@ -165,7 +167,7 @@ func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
 		return false, fmt.Errorf("%w: %w", errFailedFetchingPrimaryStaker, err)
 	}
 
-	expectedUptimePercentage := o.primaryUptimePercentage
+	expectedUptimePercentage := o.primaryUptimePercentage(primaryNetworkValidator.StartTime)
 	if subnetID := staker.SubnetID(); subnetID != constants.PrimaryNetworkID {
 		transformSubnet, err := executor.GetTransformSubnetTx(o.state, subnetID)
 		if err != nil {

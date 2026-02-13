@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -63,8 +64,9 @@ type Internal struct {
 	// Minimum fee that can be charged for delegation
 	MinDelegationFee uint32
 
-	// UptimePercentage is the minimum uptime required to be rewarded for staking
-	UptimePercentage float64
+	// UptimeRequirementConfig defines the uptime requirements for stakers
+	// to receive rewards.
+	genesis.UptimeRequirementConfig
 
 	// Minimum amount of time to allow a staker to stake
 	MinStakeDuration time.Duration

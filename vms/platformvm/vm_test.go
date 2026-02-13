@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -130,7 +131,7 @@ func setupVM(
 	t *testing.T,
 	db database.Database,
 	f upgradetest.Fork,
-	uptimePercentage float64,
+	uptimeRequirementConfig genesis.UptimeRequirementConfig,
 ) (*VM, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 
@@ -138,20 +139,20 @@ func setupVM(
 	// to ensure test independence
 	latestForkTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
 	vm := &VM{Internal: config.Internal{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		SybilProtectionEnabled: true,
-		Validators:             validators.NewManager(),
-		DynamicFeeConfig:       defaultDynamicFeeConfig,
-		ValidatorFeeConfig:     defaultValidatorFeeConfig,
-		MinValidatorStake:      defaultMinValidatorStake,
-		MaxValidatorStake:      defaultMaxValidatorStake,
-		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(f, latestForkTime),
-		UptimePercentage:       uptimePercentage,
+		Chains:                  chains.TestManager,
+		UptimeLockedCalculator:  uptime.NewLockedCalculator(),
+		SybilProtectionEnabled:  true,
+		Validators:              validators.NewManager(),
+		DynamicFeeConfig:        defaultDynamicFeeConfig,
+		ValidatorFeeConfig:      defaultValidatorFeeConfig,
+		MinValidatorStake:       defaultMinValidatorStake,
+		MaxValidatorStake:       defaultMaxValidatorStake,
+		MinDelegatorStake:       defaultMinDelegatorStake,
+		MinStakeDuration:        defaultMinStakingDuration,
+		MaxStakeDuration:        defaultMaxStakingDuration,
+		RewardConfig:            defaultRewardConfig,
+		UpgradeConfig:           upgradetest.GetConfigWithUpgradeTime(f, latestForkTime),
+		UptimeRequirementConfig: uptimeRequirementConfig,
 	}}
 
 	if db == nil {
@@ -213,7 +214,7 @@ func setupVM(
 }
 
 func defaultVM(t *testing.T, f upgradetest.Fork) *VM {
-	vm, _, _ := setupVM(t, nil, f, 0)
+	vm, _, _ := setupVM(t, nil, f, genesis.UptimeRequirementConfig{})
 	return vm
 }
 
@@ -947,7 +948,7 @@ func TestCreateSubnet(t *testing.T) {
 // test asset import
 func TestAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, baseDB, mutableSharedMemory := setupVM(t, nil, upgradetest.Latest, 0)
+	vm, baseDB, mutableSharedMemory := setupVM(t, nil, upgradetest.Latest, genesis.UptimeRequirementConfig{})
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1719,7 +1720,9 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	// First VM: 20% uptime requirement
 	t.Run("first VM with 20% uptime", func(t *testing.T) {
 		const firstUptimePercentage = 20 // 20%
-		firstVM, _, _ := setupVM(t, db, upgradetest.Latest, firstUptimePercentage/100.)
+		firstVM, _, _ := setupVM(t, db, upgradetest.Latest, genesis.UptimeRequirementConfig{
+			DefaultRequiredUptimePercentage: firstUptimePercentage / 100.,
+		})
 
 		firstVM.ctx.Lock.Lock()
 		defer firstVM.ctx.Lock.Unlock()
@@ -1733,7 +1736,9 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	// Restart the VM with a larger uptime requirement
 	// At this point the validator has been validating for 20% uptime
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
-	secondVM, _, _ := setupVM(t, db, upgradetest.Latest, secondUptimePercentage/100.)
+	secondVM, _, _ := setupVM(t, db, upgradetest.Latest, genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: secondUptimePercentage / 100.,
+	})
 
 	secondVM.ctx.Lock.Lock()
 	defer secondVM.ctx.Lock.Unlock()
@@ -1755,7 +1760,9 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 }
 
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
-	vm, _, _ := setupVM(t, nil, upgradetest.Latest, .2)
+	vm, _, _ := setupVM(t, nil, upgradetest.Latest, genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: .2, // 20%
+	})
 
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
@@ -1772,6 +1779,44 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	acceptProposalOption(t, vm, proposal, abort)
 
 	// Verify validator was removed from current set with aborted status
+	verifyValidatorRemoved(t, vm, proposal, txID, status.Aborted)
+}
+
+func TestUptimeDisallowedWithScheduledIncrease(t *testing.T) {
+	// Set up schedule: 80% default, 90% after genesis validator start time
+	// Genesis validators start at DefaultValidatorStartTime, so they need 90%
+	uptimeConfig := genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: .8, // 80%
+		RequiredUptimePercentageSchedule: []genesis.UptimeRequirementUpdate{
+			{
+				Time:        genesistest.DefaultValidatorStartTime.Add(-time.Second), // Before validator starts
+				Requirement: .9,                                                      // 90%
+			},
+		},
+	}
+
+	vm, _, _ := setupVM(t, nil, upgradetest.Latest, uptimeConfig)
+
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	// Validator accumulates 85% uptime (above 80% default, below 90% scheduled requirement)
+	validatorDuration := genesistest.DefaultValidatorEndTime.Sub(genesistest.DefaultValidatorStartTime)
+	uptimeForReward := validatorDuration * 85 / 100 // 85%
+	vmStopTime := genesistest.DefaultValidatorStartTime.Add(uptimeForReward)
+	vm.clock.Set(vmStopTime)
+
+	// Fast forward to validator end time
+	vm.clock.Set(genesistest.DefaultValidatorEndTime)
+
+	// Verify abort is preferred since uptime (85%) is below scheduled requirement (90%)
+	proposal, _, abort, txID := buildRewardProposalBlock(t, vm)
+	verifyOracleBlockPreference(t, proposal, abort)
+
+	// Accept the abort block
+	acceptProposalOption(t, vm, proposal, abort)
+
+	// Verify validator was removed from current set
 	verifyValidatorRemoved(t, vm, proposal, txID, status.Aborted)
 }
 

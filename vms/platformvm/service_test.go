@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -63,7 +64,7 @@ var encodings = []formatting.Encoding{
 }
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := setupVM(t, nil, upgradetest.Latest, 0)
+	vm, _, mutableSharedMemory := setupVM(t, nil, upgradetest.Latest, genesis.UptimeRequirementConfig{})
 	initializeTestSubnet(t, vm)
 	return &Service{
 		vm:                    vm,
