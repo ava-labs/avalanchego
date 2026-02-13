@@ -24,7 +24,6 @@ func NewWarp(t testing.TB, weight uint64) *validators.Warp {
 	nodeID := ids.GenerateTestNodeID()
 	pk := sk.PublicKey()
 	return &validators.Warp{
-		PublicKey:      pk,
 		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 		Weight:         weight,
 		NodeIDs:        []ids.NodeID{nodeID},
@@ -48,7 +47,7 @@ func NewWarpSet(t testing.TB, n uint64) validators.WarpSet {
 func WarpToOutput(w *validators.Warp) *validators.GetValidatorOutput {
 	return &validators.GetValidatorOutput{
 		NodeID:    w.NodeIDs[0],
-		PublicKey: w.PublicKey,
+		PublicKey: w.PublicKey(),
 		Weight:    w.Weight,
 	}
 }
