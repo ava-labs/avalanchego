@@ -37,6 +37,7 @@
           packages = with pkgs; [
             # Build requirements
             git
+            bazelisk
 
             # Task runner
             go-task
@@ -59,6 +60,7 @@
 
             # Linters
             shellcheck
+            buildifier
 
             # Protobuf
             buf

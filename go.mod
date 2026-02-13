@@ -11,6 +11,7 @@ module github.com/ava-labs/avalanchego
 //   - CONTRIBUTING.md
 //   - README.md
 //   - RELEASES.md
+//   - docs/bazel.md
 //   - nix/go/default.nix (update version and sha256 for supported arches)
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):

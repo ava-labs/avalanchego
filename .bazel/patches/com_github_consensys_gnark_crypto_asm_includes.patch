@@ -1,0 +1,18 @@
+diff --git a/ecc/bls12-381/fp/BUILD.bazel b/ecc/bls12-381/fp/BUILD.bazel
+--- a/ecc/bls12-381/fp/BUILD.bazel
++++ b/ecc/bls12-381/fp/BUILD.bazel
+@@ -3,4 +3,5 @@
+ go_library(
+     name = "fp",
++    tags = ["no-sandbox"],
+     srcs = [
+         "arith.go",
+diff --git a/ecc/bls12-381/fr/BUILD.bazel b/ecc/bls12-381/fr/BUILD.bazel
+--- a/ecc/bls12-381/fr/BUILD.bazel
++++ b/ecc/bls12-381/fr/BUILD.bazel
+@@ -3,4 +3,5 @@
+ go_library(
+     name = "fr",
++    tags = ["no-sandbox"],
+     srcs = [
+         "arith.go",
