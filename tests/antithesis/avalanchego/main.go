@@ -12,11 +12,14 @@ import (
 
 	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
@@ -47,6 +50,9 @@ const NumKeys = 5
 // TODO(marun) Extract the common elements of test execution for reuse across test setups
 
 func main() {
+	// Required for coreth ethclient block deserialization.
+	evm.RegisterAllLibEVMExtras()
+
 	// TODO(marun) Support choosing the log format
 	tc := antithesis.NewInstrumentedTestContext(tests.NewDefaultLogger(""))
 	defer tc.RecoverAndExit()
@@ -133,13 +139,56 @@ func main() {
 		}
 	}
 
+	// Set up C-chain EVM workloads
+	ewoqECDSAKey := genesis.EWOQKey.ToECDSA()
+	genesisEthClient, err := ethclient.Dial(fmt.Sprintf("%s/ext/bc/C/rpc", c.URIs[0]))
+	require.NoError(err, "failed to dial C-chain RPC")
+
+	genesisCChainWorkload := &cchainWorkload{
+		id:     0,
+		log:    tests.NewDefaultLogger("cchain-worker 0"),
+		client: genesisEthClient,
+		key:    ewoqECDSAKey,
+		uris:   c.URIs,
+	}
+
+	cchainWorkloads := make([]*cchainWorkload, NumKeys)
+	cchainWorkloads[0] = genesisCChainWorkload
+
+	initialCChainAmount := uint64(1_000_000_000_000_000) // 0.001 AVAX per worker for gas
+	for i := 1; i < NumKeys; i++ {
+		key, err := crypto.ToECDSA(crypto.Keccak256([]byte("cchain-worker"), []byte{uint8(i)}))
+		require.NoError(err, "failed to generate C-chain key")
+
+		recipientAddr := crypto.PubkeyToAddress(key.PublicKey)
+		require.NoError(
+			transferCChainFunds(ctx, genesisEthClient, ewoqECDSAKey, recipientAddr, initialCChainAmount, tc.Log()),
+			"failed to fund C-chain worker",
+		)
+
+		client, err := ethclient.Dial(fmt.Sprintf("%s/ext/bc/C/rpc", c.URIs[i%len(c.URIs)]))
+		require.NoError(err, "failed to dial C-chain RPC")
+
+		cchainWorkloads[i] = &cchainWorkload{
+			id:     i,
+			log:    tests.NewDefaultLogger(fmt.Sprintf("cchain-worker %d", i)),
+			client: client,
+			key:    key,
+			uris:   c.URIs,
+		}
+	}
+
 	lifecycle.SetupComplete(map[string]any{
-		"msg":        "initialized workers",
-		"numWorkers": NumKeys,
+		"msg":              "initialized workers",
+		"numXPWorkers":     NumKeys,
+		"numCChainWorkers": NumKeys,
 	})
 
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
+	}
+	for _, cw := range cchainWorkloads {
+		go cw.run(ctx)
 	}
 	genesisWorkload.run(ctx)
 }
