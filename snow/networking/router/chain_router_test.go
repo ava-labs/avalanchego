@@ -1464,7 +1464,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 					return nil
 				}
 			},
-			setResponseHandler: func(t *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
+			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
 				engine.StateSummaryFrontierF = func(context.Context, ids.NodeID, uint32, []byte) error {
 					failedMessages <- struct{}{}
 					return nil
@@ -1489,7 +1489,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 					return nil
 				}
 			},
-			setResponseHandler: func(t *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
+			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
 				engine.AcceptedStateSummaryF = func(context.Context, ids.NodeID, uint32, set.Set[ids.ID]) error {
 					failedMessages <- struct{}{}
 					return nil
@@ -1514,7 +1514,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 					return nil
 				}
 			},
-			setResponseHandler: func(t *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
+			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
 				engine.AcceptedFrontierF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
 					failedMessages <- struct{}{}
 					return nil
@@ -1539,7 +1539,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 					return nil
 				}
 			},
-			setResponseHandler: func(t *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
+			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
 				engine.AcceptedF = func(context.Context, ids.NodeID, uint32, set.Set[ids.ID]) error {
 					failedMessages <- struct{}{}
 					return nil
@@ -1549,9 +1549,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 		{
 			name:       "Ancestors",
 			responseOp: message.AncestorsOp,
-			timeoutMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, engineType p2ppb.EngineType) *message.InboundMessage {
-				return message.InternalGetAncestorsFailed(nodeID, chainID, requestID, engineType)
-			},
+			timeoutMsg: message.InternalGetAncestorsFailed,
 			responseMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) *message.InboundMessage {
 				return &message.InboundMessage{
 					NodeID: nodeID,
@@ -1573,7 +1571,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 					return nil
 				}
 			},
-			setResponseHandler: func(t *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
+			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
 				engine.AncestorsF = func(context.Context, ids.NodeID, uint32, [][]byte) error {
 					failedMessages <- struct{}{}
 					return nil
@@ -1607,7 +1605,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 					return nil
 				}
 			},
-			setResponseHandler: func(t *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
+			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
 				engine.PutF = func(context.Context, ids.NodeID, uint32, []byte) error {
 					failedMessages <- struct{}{}
 					return nil
@@ -1632,7 +1630,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 					return nil
 				}
 			},
-			setResponseHandler: func(t *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
+			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
 				engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) error {
 					failedMessages <- struct{}{}
 					return nil
@@ -1659,7 +1657,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 					return nil
 				}
 			},
-			setResponseHandler: func(t *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
+			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
 				engine.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error {
 					failedMessages <- struct{}{}
 					return nil
@@ -1669,7 +1667,6 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		// Timeout path: early internal failure is handled once, then the timeout
 		// clears the outstanding request without invoking the response handler.
 		t.Run(tt.name+"/timeout", func(t *testing.T) {
