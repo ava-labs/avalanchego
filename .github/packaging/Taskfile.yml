@@ -6,6 +6,10 @@
 version: '3'
 
 vars:
+  # Repo root, computed from this Taskfile's location so that the
+  # packaging Taskfile works both as an include and standalone.
+  REPO_ROOT:
+    sh: cd "{{.TASKFILE_DIR}}/../.." && pwd
   # Go version from the project's go.mod.
   PACKAGING_GO_VERSION:
     sh: go list -m -f '{{ "{{.GoVersion}}" }}' | head -1
@@ -25,7 +29,7 @@ vars:
   PACKAGING_TAG:
     sh: echo "${PACKAGING_TAG:-v0.0.0}"
   PACKAGING_DOCKER_IMAGE: avalanchego-rpm-builder
-  PACKAGING_OUTPUT_DIR: '{{.ROOT_DIR}}/build/rpm'
+  PACKAGING_OUTPUT_DIR: '{{.REPO_ROOT}}/build/rpm'
 
 tasks:
   default:
@@ -45,9 +49,9 @@ tasks:
     env:
       GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
       DOCKER_IMAGE: '{{.PACKAGING_DOCKER_IMAGE}}'
-      CONTEXT_DIR: '{{.ROOT_DIR}}/.github/packaging'
+      CONTEXT_DIR: '{{.REPO_ROOT}}/.github/packaging'
     cmds:
-      - cmd: '{{.ROOT_DIR}}/.github/packaging/scripts/build-builder-image.sh'
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/build-builder-image.sh'
 
   build-avalanchego-rpm:
     desc: Builds RPM for avalanchego
@@ -59,7 +63,7 @@ tasks:
       - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
       - cmd: >-
           docker run --rm
-          -v {{.ROOT_DIR}}:/build
+          -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_OUTPUT_DIR}}:/output
           {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
           -e PACKAGE=avalanchego
@@ -83,7 +87,7 @@ tasks:
       - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
       - cmd: >-
           docker run --rm
-          -v {{.ROOT_DIR}}:/build
+          -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_OUTPUT_DIR}}:/output
           {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
           -e PACKAGE=subnet-evm
@@ -109,4 +113,4 @@ tasks:
       TAG: '{{.PACKAGING_TAG}}'
       GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
     cmds:
-      - cmd: '{{.ROOT_DIR}}/.github/packaging/scripts/validate-rpm.sh'
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-rpm.sh'

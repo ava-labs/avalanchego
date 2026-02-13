@@ -31,6 +31,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # When building an older tag via workflow_dispatch, the tag's tree
+      # may not contain the packaging scripts. Overlay them from the
+      # workflow branch so that packaging:test-build-rpms is available.
+      - name: Overlay packaging scripts from workflow branch
+        if: github.event.inputs.tag
+        uses: actions/checkout@v4
+        with:
+          path: .packaging-overlay
+          sparse-checkout: .github/packaging
+      - name: Apply packaging overlay
+        if: github.event.inputs.tag
+        run: |
+          cp -r .packaging-overlay/.github/packaging .github/packaging
+          rm -rf .packaging-overlay
+        shell: bash
 
       - uses: ./.github/actions/setup-go-for-project
 
@@ -56,7 +74,7 @@ jobs:
         shell: bash
 
       - name: Build and validate RPMs
-        run: ./scripts/run_task.sh packaging:test-build-rpms
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-rpms
         env:
           PACKAGING_TAG: ${{ env.TAG }}
           RPM_GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
