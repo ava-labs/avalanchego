@@ -8,11 +8,13 @@
 
   # Flake inputs
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2505.*.tar.gz";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    go-flake.url = "path:./nix/go";
+    go-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   # Flake outputs
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, go-flake }:
     let
       # Systems supported
       allSystems = [
@@ -39,8 +41,8 @@
             # Task runner
             go-task
 
-            # Local Go package
-            (import ./nix/go.nix { inherit pkgs; })
+            # Local Go package from nested flake
+            go-flake.packages.${pkgs.stdenv.hostPlatform.system}.default
 
             # Monitoring tools
             promtail                                   # Loki log shipper
@@ -52,6 +54,9 @@
             kind                                       # Kubernetes-in-Docker
             kubernetes-helm                            # Helm CLI (Kubernetes package manager)
 
+            # JSON processing
+            jq
+
             # Linters
             shellcheck
 
@@ -61,14 +66,14 @@
             protoc-gen-go-grpc
             protoc-gen-connect-go
 
+            # Line-oriented search tool
+            ripgrep
+
             # Solidity compiler
             solc
 
             # s5cmd for rapid s3 interactions
             s5cmd
-          ] ++ lib.optionals stdenv.isDarwin [
-            # macOS-specific frameworks
-            darwin.apple_sdk.frameworks.Security
           ];
 
           # Add scripts/ directory to PATH so kind-with-registry.sh is accessible

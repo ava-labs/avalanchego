@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
 
 import (
-	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -14,22 +13,22 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
-	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 func Test_Server_GetRangeProof(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
+	r := rand.New(rand.NewSource(now))
 
-	smallTrieDB, err := generateTrieWithMinKeyLen(t, r, xsync.DefaultRequestKeyLimit, 1)
+	smallTrieDB, err := generateTrieWithMinKeyLen(t, r, sync.DefaultRequestKeyLimit, 1)
 	require.NoError(t, err)
-	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
+	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(t.Context())
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -45,7 +44,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			name: "proof too large",
 			request: &pb.GetRangeProofRequest{
 				RootHash:   smallTrieRoot[:],
-				KeyLimit:   xsync.DefaultRequestKeyLimit,
+				KeyLimit:   sync.DefaultRequestKeyLimit,
 				BytesLimit: 1000,
 			},
 			proofNil:    true,
@@ -55,7 +54,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			name: "byteslimit is 0",
 			request: &pb.GetRangeProofRequest{
 				RootHash:   smallTrieRoot[:],
-				KeyLimit:   xsync.DefaultRequestKeyLimit,
+				KeyLimit:   sync.DefaultRequestKeyLimit,
 				BytesLimit: 0,
 			},
 			proofNil:    true,
@@ -66,7 +65,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			request: &pb.GetRangeProofRequest{
 				RootHash:   smallTrieRoot[:],
 				KeyLimit:   0,
-				BytesLimit: xsync.DefaultRequestByteSizeLimit,
+				BytesLimit: sync.DefaultRequestByteSizeLimit,
 			},
 			proofNil:    true,
 			expectedErr: p2p.ErrUnexpected,
@@ -75,8 +74,8 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			name: "keys out of order",
 			request: &pb.GetRangeProofRequest{
 				RootHash:   smallTrieRoot[:],
-				KeyLimit:   xsync.DefaultRequestKeyLimit,
-				BytesLimit: xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:   sync.DefaultRequestKeyLimit,
+				BytesLimit: sync.DefaultRequestByteSizeLimit,
 				StartKey:   &pb.MaybeBytes{Value: []byte{1}},
 				EndKey:     &pb.MaybeBytes{Value: []byte{0}},
 			},
@@ -87,26 +86,26 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			name: "response bounded by key limit",
 			request: &pb.GetRangeProofRequest{
 				RootHash:   smallTrieRoot[:],
-				KeyLimit:   2 * xsync.DefaultRequestKeyLimit,
-				BytesLimit: xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:   2 * sync.DefaultRequestKeyLimit,
+				BytesLimit: sync.DefaultRequestByteSizeLimit,
 			},
-			expectedResponseLen: xsync.DefaultRequestKeyLimit,
+			expectedResponseLen: sync.DefaultRequestKeyLimit,
 		},
 		{
 			name: "response bounded by byte limit",
 			request: &pb.GetRangeProofRequest{
 				RootHash:   smallTrieRoot[:],
-				KeyLimit:   xsync.DefaultRequestKeyLimit,
-				BytesLimit: 2 * xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:   sync.DefaultRequestKeyLimit,
+				BytesLimit: 2 * sync.DefaultRequestByteSizeLimit,
 			},
-			expectedMaxResponseBytes: xsync.DefaultRequestByteSizeLimit,
+			expectedMaxResponseBytes: sync.DefaultRequestByteSizeLimit,
 		},
 		{
 			name: "empty proof",
 			request: &pb.GetRangeProofRequest{
 				RootHash:   ids.Empty[:],
-				KeyLimit:   xsync.DefaultRequestKeyLimit,
-				BytesLimit: xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:   sync.DefaultRequestKeyLimit,
+				BytesLimit: sync.DefaultRequestByteSizeLimit,
 			},
 			proofNil:    true,
 			expectedErr: p2p.ErrUnexpected,
@@ -117,10 +116,10 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := xsync.NewGetRangeProofHandler(smallTrieDB, rangeProofMarshaler)
+			handler := sync.NewGetRangeProofHandler(smallTrieDB, rangeProofMarshaler)
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
-			responseBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
+			responseBytes, err := handler.AppRequest(t.Context(), test.nodeID, time.Time{}, requestBytes)
 			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
 				return
@@ -148,21 +147,23 @@ func Test_Server_GetRangeProof(t *testing.T) {
 }
 
 func Test_Server_GetChangeProof(t *testing.T) {
+	t.Skip("FLAKY: panic: test timed out after 2m0s")
+
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
+	r := rand.New(rand.NewSource(now))
 
 	serverDB, err := New(
-		context.Background(),
+		t.Context(),
 		memdb.New(),
 		newDefaultDBConfig(),
 	)
 	require.NoError(t, err)
-	startRoot, err := serverDB.GetMerkleRoot(context.Background())
+	startRoot, err := serverDB.GetMerkleRoot(t.Context())
 	require.NoError(t, err)
 
 	// create changes
-	for x := 0; x < xsync.DefaultRequestKeyLimit/2; x++ {
+	for x := 0; x < sync.DefaultRequestKeyLimit/2; x++ {
 		ops := make([]database.BatchOp, 0, 11)
 		// add some key/values
 		for i := 0; i < 10; i++ {
@@ -190,14 +191,14 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		it.Release()
 
 		view, err := serverDB.NewView(
-			context.Background(),
+			t.Context(),
 			ViewChanges{BatchOps: ops},
 		)
 		require.NoError(t, err)
-		require.NoError(t, view.CommitToDB(context.Background()))
+		require.NoError(t, view.CommitToDB(t.Context()))
 	}
 
-	endRoot, err := serverDB.GetMerkleRoot(context.Background())
+	endRoot, err := serverDB.GetMerkleRoot(t.Context())
 	require.NoError(t, err)
 
 	fakeRootID := ids.GenerateTestID()
@@ -216,7 +217,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			request: &pb.GetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      xsync.DefaultRequestKeyLimit,
+				KeyLimit:      sync.DefaultRequestKeyLimit,
 				BytesLimit:    10000,
 			},
 		},
@@ -225,27 +226,27 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			request: &pb.GetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      xsync.DefaultRequestKeyLimit,
-				BytesLimit:    xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:      sync.DefaultRequestKeyLimit,
+				BytesLimit:    sync.DefaultRequestByteSizeLimit,
 			},
-			expectedResponseLen: xsync.DefaultRequestKeyLimit,
+			expectedResponseLen: sync.DefaultRequestKeyLimit,
 		},
 		{
 			name: "partial response to request for entire trie (full leaf limit)",
 			request: &pb.GetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      xsync.DefaultRequestKeyLimit,
-				BytesLimit:    xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:      sync.DefaultRequestKeyLimit,
+				BytesLimit:    sync.DefaultRequestByteSizeLimit,
 			},
-			expectedResponseLen: xsync.DefaultRequestKeyLimit,
+			expectedResponseLen: sync.DefaultRequestKeyLimit,
 		},
 		{
 			name: "byteslimit is 0",
 			request: &pb.GetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      xsync.DefaultRequestKeyLimit,
+				KeyLimit:      sync.DefaultRequestKeyLimit,
 				BytesLimit:    0,
 			},
 			expectedErr: p2p.ErrUnexpected,
@@ -256,7 +257,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
 				KeyLimit:      0,
-				BytesLimit:    xsync.DefaultRequestByteSizeLimit,
+				BytesLimit:    sync.DefaultRequestByteSizeLimit,
 			},
 			expectedErr: p2p.ErrUnexpected,
 		},
@@ -265,8 +266,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			request: &pb.GetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      xsync.DefaultRequestKeyLimit,
-				BytesLimit:    xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:      sync.DefaultRequestKeyLimit,
+				BytesLimit:    sync.DefaultRequestByteSizeLimit,
 				StartKey:      &pb.MaybeBytes{Value: []byte{1}},
 				EndKey:        &pb.MaybeBytes{Value: []byte{0}},
 			},
@@ -277,20 +278,20 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			request: &pb.GetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      2 * xsync.DefaultRequestKeyLimit,
-				BytesLimit:    xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:      2 * sync.DefaultRequestKeyLimit,
+				BytesLimit:    sync.DefaultRequestByteSizeLimit,
 			},
-			expectedResponseLen: xsync.DefaultRequestKeyLimit,
+			expectedResponseLen: sync.DefaultRequestKeyLimit,
 		},
 		{
 			name: "bytes limit too large",
 			request: &pb.GetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      xsync.DefaultRequestKeyLimit,
-				BytesLimit:    2 * xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:      sync.DefaultRequestKeyLimit,
+				BytesLimit:    2 * sync.DefaultRequestByteSizeLimit,
 			},
-			expectedMaxResponseBytes: xsync.DefaultRequestByteSizeLimit,
+			expectedMaxResponseBytes: sync.DefaultRequestByteSizeLimit,
 		},
 		{
 			name: "insufficient history for change proof; return range proof",
@@ -299,10 +300,10 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				// to serve a change proof
 				StartRootHash: fakeRootID[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      xsync.DefaultRequestKeyLimit,
-				BytesLimit:    xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:      sync.DefaultRequestKeyLimit,
+				BytesLimit:    sync.DefaultRequestByteSizeLimit,
 			},
-			expectedMaxResponseBytes: xsync.DefaultRequestByteSizeLimit,
+			expectedMaxResponseBytes: sync.DefaultRequestByteSizeLimit,
 			expectRangeProof:         true,
 		},
 		{
@@ -312,10 +313,10 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				// to serve a change proof or range proof
 				StartRootHash: ids.Empty[:],
 				EndRootHash:   fakeRootID[:],
-				KeyLimit:      xsync.DefaultRequestKeyLimit,
-				BytesLimit:    xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:      sync.DefaultRequestKeyLimit,
+				BytesLimit:    sync.DefaultRequestByteSizeLimit,
 			},
-			expectedMaxResponseBytes: xsync.DefaultRequestByteSizeLimit,
+			expectedMaxResponseBytes: sync.DefaultRequestByteSizeLimit,
 			expectedErr:              p2p.ErrUnexpected,
 		},
 		{
@@ -323,10 +324,10 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			request: &pb.GetChangeProofRequest{
 				StartRootHash: fakeRootID[:],
 				EndRootHash:   ids.Empty[:],
-				KeyLimit:      xsync.DefaultRequestKeyLimit,
-				BytesLimit:    xsync.DefaultRequestByteSizeLimit,
+				KeyLimit:      sync.DefaultRequestKeyLimit,
+				BytesLimit:    sync.DefaultRequestByteSizeLimit,
 			},
-			expectedMaxResponseBytes: xsync.DefaultRequestByteSizeLimit,
+			expectedMaxResponseBytes: sync.DefaultRequestByteSizeLimit,
 			expectedErr:              p2p.ErrUnexpected,
 		},
 	}
@@ -335,11 +336,11 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := xsync.NewGetChangeProofHandler(serverDB, rangeProofMarshaler, changeProofMarshaler)
+			handler := sync.NewGetChangeProofHandler(serverDB, rangeProofMarshaler, changeProofMarshaler)
 
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
-			proofBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
+			proofBytes, err := handler.AppRequest(t.Context(), test.nodeID, time.Time{}, requestBytes)
 			require.ErrorIs(err, test.expectedErr)
 
 			if test.expectedErr != nil {

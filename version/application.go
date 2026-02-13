@@ -1,19 +1,15 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
 
 import (
-	"errors"
+	"cmp"
 	"fmt"
 	"sync"
 )
 
-var (
-	errDifferentMajor = errors.New("different major version")
-
-	_ fmt.Stringer = (*Application)(nil)
-)
+var _ fmt.Stringer = (*Application)(nil)
 
 type Application struct {
 	Name  string `json:"name"  yaml:"name"`
@@ -25,8 +21,6 @@ type Application struct {
 	str         string
 }
 
-// The only difference here between Application and Semantic is that Application
-// prepends the client name rather than "v".
 func (a *Application) String() string {
 	a.makeStrOnce.Do(a.initString)
 	return a.str
@@ -42,27 +36,31 @@ func (a *Application) initString() {
 	)
 }
 
-func (a *Application) Compatible(o *Application) error {
-	switch {
-	case a.Major > o.Major:
-		return errDifferentMajor
-	default:
-		return nil
+// Semantic returns the semantic version string (e.g., "v1.14.1")
+func (a *Application) Semantic() string {
+	return fmt.Sprintf("v%d.%d.%d", a.Major, a.Minor, a.Patch)
+}
+
+// SemanticWithCommit returns the semantic version string with an optional git commit suffix
+func (a *Application) SemanticWithCommit(gitCommit string) string {
+	v := a.Semantic()
+	if len(gitCommit) != 0 {
+		return fmt.Sprintf("%s@%s", v, gitCommit)
 	}
+	return v
 }
 
-func (a *Application) Before(o *Application) bool {
-	return a.Compare(o) < 0
-}
-
-// Compare returns a positive number if s > o, 0 if s == o, or a negative number
-// if s < o.
+// Compare returns
+//
+//	-1 if a is less than o,
+//	 0 if a equals o,
+//	+1 if a is greater than o.
 func (a *Application) Compare(o *Application) int {
-	if a.Major != o.Major {
-		return a.Major - o.Major
+	if c := cmp.Compare(a.Major, o.Major); c != 0 {
+		return c
 	}
-	if a.Minor != o.Minor {
-		return a.Minor - o.Minor
+	if c := cmp.Compare(a.Minor, o.Minor); c != 0 {
+		return c
 	}
-	return a.Patch - o.Patch
+	return cmp.Compare(a.Patch, o.Patch)
 }

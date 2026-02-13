@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -29,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -182,24 +184,7 @@ func (vm *VMClient) Initialize(
 		zap.String("address", serverAddr),
 	)
 
-	networkUpgrades := &vmpb.NetworkUpgrades{
-		ApricotPhase_1Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase1Time),
-		ApricotPhase_2Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase2Time),
-		ApricotPhase_3Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase3Time),
-		ApricotPhase_4Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase4Time),
-		ApricotPhase_4MinPChainHeight: chainCtx.NetworkUpgrades.ApricotPhase4MinPChainHeight,
-		ApricotPhase_5Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase5Time),
-		ApricotPhasePre_6Time:         grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhasePre6Time),
-		ApricotPhase_6Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase6Time),
-		ApricotPhasePost_6Time:        grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhasePost6Time),
-		BanffTime:                     grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.BanffTime),
-		CortinaTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.CortinaTime),
-		CortinaXChainStopVertexId:     chainCtx.NetworkUpgrades.CortinaXChainStopVertexID[:],
-		DurangoTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.DurangoTime),
-		EtnaTime:                      grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.EtnaTime),
-		FortunaTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.FortunaTime),
-		GraniteTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.GraniteTime),
-	}
+	networkUpgrades := getNetworkUpgrades(chainCtx.NetworkUpgrades)
 
 	resp, err := vm.client.Initialize(ctx, &vmpb.InitializeRequest{
 		NetworkId:       chainCtx.NetworkID,
@@ -267,6 +252,29 @@ func (vm *VMClient) Initialize(
 		},
 	)
 	return err
+}
+
+func getNetworkUpgrades(u upgrade.Config) *vmpb.NetworkUpgrades {
+	return &vmpb.NetworkUpgrades{
+		ApricotPhase_1Time:            grpcutils.TimestampFromTime(u.ApricotPhase1Time),
+		ApricotPhase_2Time:            grpcutils.TimestampFromTime(u.ApricotPhase2Time),
+		ApricotPhase_3Time:            grpcutils.TimestampFromTime(u.ApricotPhase3Time),
+		ApricotPhase_4Time:            grpcutils.TimestampFromTime(u.ApricotPhase4Time),
+		ApricotPhase_4MinPChainHeight: u.ApricotPhase4MinPChainHeight,
+		ApricotPhase_5Time:            grpcutils.TimestampFromTime(u.ApricotPhase5Time),
+		ApricotPhasePre_6Time:         grpcutils.TimestampFromTime(u.ApricotPhasePre6Time),
+		ApricotPhase_6Time:            grpcutils.TimestampFromTime(u.ApricotPhase6Time),
+		ApricotPhasePost_6Time:        grpcutils.TimestampFromTime(u.ApricotPhasePost6Time),
+		BanffTime:                     grpcutils.TimestampFromTime(u.BanffTime),
+		CortinaTime:                   grpcutils.TimestampFromTime(u.CortinaTime),
+		CortinaXChainStopVertexId:     u.CortinaXChainStopVertexID[:],
+		DurangoTime:                   grpcutils.TimestampFromTime(u.DurangoTime),
+		EtnaTime:                      grpcutils.TimestampFromTime(u.EtnaTime),
+		FortunaTime:                   grpcutils.TimestampFromTime(u.FortunaTime),
+		GraniteTime:                   grpcutils.TimestampFromTime(u.GraniteTime),
+		GraniteEpochDuration:          durationpb.New(u.GraniteEpochDuration),
+		HeliconTime:                   grpcutils.TimestampFromTime(u.HeliconTime),
+	}
 }
 
 func (vm *VMClient) newDBServer(db database.Database) *grpc.Server {
@@ -382,7 +390,7 @@ func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler
 		}
 
 		vm.conns = append(vm.conns, clientConn)
-		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn))
+		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn), vm.logger)
 	}
 	return handlers, nil
 }
@@ -403,7 +411,7 @@ func (vm *VMClient) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 	}
 
 	vm.conns = append(vm.conns, clientConn)
-	return ghttp.NewClient(httppb.NewHTTPClient(clientConn)), nil
+	return ghttp.NewClient(httppb.NewHTTPClient(clientConn), vm.logger), nil
 }
 
 func (vm *VMClient) WaitForEvent(ctx context.Context) (common.Message, error) {

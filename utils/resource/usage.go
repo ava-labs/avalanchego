@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package resource
@@ -41,6 +41,9 @@ type DiskUser interface {
 
 	// returns number of bytes available in the db volume
 	AvailableDiskBytes() uint64
+
+	// returns percentage free in the db volume
+	AvailableDiskPercentage() uint64
 }
 
 type User interface {
@@ -82,6 +85,8 @@ type manager struct {
 
 	availableDiskBytes uint64
 
+	availableDiskPercent uint64
+
 	closeOnce sync.Once
 	onClose   chan struct{}
 }
@@ -100,11 +105,12 @@ func NewManager(
 	}
 
 	m := &manager{
-		log:                log,
-		processMetrics:     processMetrics,
-		processes:          make(map[int]*proc),
-		onClose:            make(chan struct{}),
-		availableDiskBytes: math.MaxUint64,
+		log:                  log,
+		processMetrics:       processMetrics,
+		processes:            make(map[int]*proc),
+		onClose:              make(chan struct{}),
+		availableDiskBytes:   math.MaxUint64,
+		availableDiskPercent: 100,
 	}
 
 	go m.update(diskPath, frequency, cpuHalflife, diskHalflife)
@@ -130,6 +136,13 @@ func (m *manager) AvailableDiskBytes() uint64 {
 	defer m.usageLock.RUnlock()
 
 	return m.availableDiskBytes
+}
+
+func (m *manager) AvailableDiskPercentage() uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.availableDiskPercent
 }
 
 func (m *manager) TrackProcess(pid int) {
@@ -174,7 +187,7 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 		currentScaledReadUsage := newDiskWeight * currentReadUsage
 		currentScaledWriteUsage := newDiskWeight * currentWriteUsage
 
-		availableBytes, getBytesErr := storage.AvailableBytes(diskPath)
+		availableBytes, availablePercentage, getBytesErr := storage.AvailableBytes(diskPath)
 		if getBytesErr != nil {
 			m.log.Verbo("failed to lookup resource",
 				zap.String("resource", "system disk"),
@@ -190,6 +203,7 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 
 		if getBytesErr == nil {
 			m.availableDiskBytes = availableBytes
+			m.availableDiskPercent = availablePercentage
 		}
 
 		m.usageLock.Unlock()

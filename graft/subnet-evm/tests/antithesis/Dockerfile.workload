@@ -1,0 +1,29 @@
+# BUILDER_IMAGE_TAG should identify the builder image
+ARG BUILDER_IMAGE_TAG
+
+# AVALANCHEGO_NODE_IMAGE needs to identify an existing avalanchego node image and should include the tag
+ARG AVALANCHEGO_NODE_IMAGE
+
+# ============= Compilation Stage ================
+FROM antithesis-subnet-evm-builder:$BUILDER_IMAGE_TAG AS builder
+
+# The builder workdir will vary between instrumented and non-instrumented builders
+ARG BUILDER_WORKDIR
+
+WORKDIR $BUILDER_WORKDIR
+
+# Build the workload using module import path (go.work includes graft/subnet-evm)
+RUN go build -o ./graft/subnet-evm/build/workload \
+    github.com/ava-labs/avalanchego/graft/subnet-evm/tests/antithesis
+
+# ============= Cleanup Stage ================
+# Base the workflow on the node image to support bootstrap testing
+FROM $AVALANCHEGO_NODE_IMAGE AS execution
+
+# The builder workdir will vary between instrumented and non-instrumented builders
+ARG BUILDER_WORKDIR
+
+# Copy the executable into the container
+COPY --from=builder $BUILDER_WORKDIR/graft/subnet-evm/build/workload ./workload
+
+CMD [ "./workload" ]

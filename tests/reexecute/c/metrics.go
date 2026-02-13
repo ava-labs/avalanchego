@@ -1,15 +1,16 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package vm
+package main
 
 import (
 	"fmt"
-	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/tests"
 )
 
 type metricKind uint
@@ -44,6 +45,12 @@ var (
 	}
 )
 
+type topLevelMetric struct {
+	name  string
+	query string
+	kind  metricKind
+}
+
 func getMetricValue(registry prometheus.Gatherer, metric topLevelMetric) (float64, error) {
 	metricFamilies, err := registry.Gather()
 	if err != nil {
@@ -69,37 +76,32 @@ func getMetricValue(registry prometheus.Gatherer, metric topLevelMetric) (float6
 	return 0, fmt.Errorf("metric %s not found", query)
 }
 
-type topLevelMetric struct {
-	name  string
-	query string
-	kind  metricKind
-}
-
-func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
-	r := require.New(b)
+func getTopLevelMetrics(tc tests.TestContext, tool *benchmarkTool, registry prometheus.Gatherer, elapsed time.Duration) {
+	r := require.New(tc)
 
 	totalGas, err := getMetricValue(registry, gasMetric)
 	r.NoError(err)
 	r.NotZero(totalGas, "denominator metric %q has value 0", gasMetric.name)
 
 	var (
-		mgas    float64 = 1_000_000
-		ggas    float64 = 1_000_000_000
-		nsPerMs float64 = 1_000_000
+		mgas                      float64 = 1_000_000
+		ggas                      float64 = 1_000_000_000
+		nanosecondsPerMillisecond float64 = 1_000_000
 	)
 
 	mgasPerSecond := (totalGas / mgas) / elapsed.Seconds()
-	b.ReportMetric(mgasPerSecond, "mgas/s")
+	tool.addResult(mgasPerSecond, "mgas/s")
 
 	totalGGas := totalGas / ggas
-	msPerGGas := (float64(elapsed) / nsPerMs) / totalGGas
-	b.ReportMetric(msPerGGas, "ms/ggas")
+	msPerGGas := (float64(elapsed) / nanosecondsPerMillisecond) / totalGGas
+	tool.addResult(msPerGGas, "ms/ggas")
 
 	for _, metric := range meterVMMetrics {
-		metricVal, err := getMetricValue(registry, metric)
+		// MeterVM counters are in terms of nanoseconds
+		metricValNanoseconds, err := getMetricValue(registry, metric)
 		r.NoError(err)
 
-		metricValMS := (metricVal / nsPerMs) / totalGGas
-		b.ReportMetric(metricValMS, metric.name+"_ms/ggas")
+		msPerGGas := (metricValNanoseconds / nanosecondsPerMillisecond) / totalGGas
+		tool.addResult(msPerGGas, metric.name+"_ms/ggas")
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block_test
@@ -31,7 +31,7 @@ func TestGetAncestorsDatabaseNotFound(t *testing.T) {
 		require.Equal(someID, id)
 		return nil, database.ErrNotFound
 	}
-	containers, err := GetAncestors(context.Background(), logging.NoLog{}, vm, someID, 10, 10, 1*time.Second)
+	containers, err := GetAncestors(t.Context(), logging.NoLog{}, vm, someID, 10, 10, 1*time.Second)
 	require.NoError(err)
 	require.Empty(containers)
 }
@@ -47,7 +47,7 @@ func TestGetAncestorsPropagatesErrors(t *testing.T) {
 		require.Equal(someID, id)
 		return nil, errTest
 	}
-	containers, err := GetAncestors(context.Background(), logging.NoLog{}, vm, someID, 10, 10, 1*time.Second)
+	containers, err := GetAncestors(t.Context(), logging.NoLog{}, vm, someID, 10, 10, 1*time.Second)
 	require.Nil(containers)
 	require.ErrorIs(err, errTest)
 }

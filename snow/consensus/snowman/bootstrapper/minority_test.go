@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrapper
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -101,7 +100,7 @@ func TestMinorityGetPeers(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			peers := test.minority.GetPeers(context.Background())
+			peers := test.minority.GetPeers(t.Context())
 			require.Equal(test.expectedState, test.minority)
 			require.Equal(test.expectedPeers, peers)
 		})
@@ -189,7 +188,7 @@ func TestMinorityRecordOpinion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			err := test.minority.RecordOpinion(context.Background(), test.nodeID, test.blkIDs)
+			err := test.minority.RecordOpinion(t.Context(), test.nodeID, test.blkIDs)
 			require.Equal(test.expectedState, test.minority)
 			require.ErrorIs(err, test.expectedErr)
 		})
@@ -234,7 +233,7 @@ func TestMinorityResult(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			accepted, finalized := test.minority.Result(context.Background())
+			accepted, finalized := test.minority.Result(t.Context())
 			require.Equal(test.expectedAccepted, accepted)
 			require.Equal(test.expectedFinalized, finalized)
 		})

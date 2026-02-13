@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -56,8 +56,8 @@ func TestBeaconManager_DataRace(t *testing.T) {
 
 	for _, nodeID := range validatorIDs {
 		go func() {
-			b.Connected(nodeID, version.CurrentApp, constants.PrimaryNetworkID)
-			b.Connected(nodeID, version.CurrentApp, ids.GenerateTestID())
+			b.Connected(nodeID, version.Current, constants.PrimaryNetworkID)
+			b.Connected(nodeID, version.Current, ids.GenerateTestID())
 		}()
 	}
 	wg.Wait()

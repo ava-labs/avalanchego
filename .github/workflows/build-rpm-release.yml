@@ -1,0 +1,99 @@
+name: build-rpm-packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build RPMs for'
+        required: true
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - ".github/packaging/**"
+      - ".github/workflows/build-rpm-release.yml"
+
+jobs:
+  build-rpm:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+            rpm_arch: x86_64
+          - arch: arm64
+            runner: custom-arm64-jammy
+            rpm_arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # When building an older tag via workflow_dispatch, the tag's tree
+      # may not contain the packaging scripts. Overlay them from the
+      # workflow branch so that packaging:test-build-rpms is available.
+      - name: Overlay packaging scripts from workflow branch
+        if: github.event.inputs.tag
+        uses: actions/checkout@v4
+        with:
+          path: .packaging-overlay
+          sparse-checkout: .github/packaging
+      - name: Apply packaging overlay
+        if: github.event.inputs.tag
+        run: |
+          cp -r .packaging-overlay/.github/packaging .github/packaging
+          rm -rf .packaging-overlay
+        shell: bash
+
+      - uses: ./.github/actions/setup-go-for-project
+
+      - name: Get tag
+        run: |
+          if [[ -n "${{ github.event.inputs.tag }}" ]]; then
+            echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
+          else
+            # PR builds: synthetic tag for smoke testing the build pipeline
+            echo "TAG=v0.0.0-pr.${GITHUB_SHA::8}" >> "$GITHUB_ENV"
+          fi
+        shell: bash
+
+      - name: Import GPG key
+        if: github.event_name != 'pull_request'
+        run: |
+          GPG_KEY_FILE="$(mktemp)"
+          chmod 600 "${GPG_KEY_FILE}"
+          printf '%s' "${{ secrets.RPM_GPG_PRIVATE_KEY }}" > "${GPG_KEY_FILE}"
+          printf 'GPG_KEY_FILE=%s\n' "${GPG_KEY_FILE}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Build and validate RPMs
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-rpms
+        env:
+          PACKAGING_TAG: ${{ env.TAG }}
+          RPM_GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
+          NFPM_RPM_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
+
+      - name: Upload RPMs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpms-${{ matrix.rpm_arch }}
+          path: |
+            build/rpm/avalanchego-${{ env.TAG }}-${{ matrix.rpm_arch }}.rpm
+            build/rpm/subnet-evm-${{ env.TAG }}-${{ matrix.rpm_arch }}.rpm
+            build/rpm/RPM-GPG-KEY-avalanchego
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [[ -n "${GPG_KEY_FILE:-}" ]]; then
+            rm -f "${GPG_KEY_FILE}"
+          fi
+          rm -rf build/rpm
+        shell: bash

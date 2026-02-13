@@ -1,11 +1,10 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators_test
 
 import (
 	"bytes"
-	"context"
 	"math"
 	"testing"
 	"time"
@@ -125,7 +124,7 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 		{}, // Subnet staker was removed at height 2
 	}
 	for height, expected := range expectedValidators {
-		actual, err := m.GetValidatorSet(context.Background(), uint64(height), subnetID)
+		actual, err := m.GetValidatorSet(t.Context(), uint64(height), subnetID)
 		require.NoError(err)
 		require.Equal(expected, actual)
 	}
@@ -301,20 +300,14 @@ func TestGetWarpValidatorSets(t *testing.T) {
 		}, // Subnet was removed at height 3
 	}
 	for height, expected := range expectedValidators {
-		actual, err := m.GetWarpValidatorSets(context.Background(), uint64(height))
+		actual, err := m.GetWarpValidatorSets(t.Context(), uint64(height))
 		require.NoError(err)
 		require.Equal(expected, actual)
 
-		actualPrimaryNetwork, err := m.GetWarpValidatorSet(context.Background(), uint64(height), constants.PrimaryNetworkID)
-		require.NoError(err)
+		actualPrimaryNetwork := actual[constants.PrimaryNetworkID]
 		require.Equal(expected[constants.PrimaryNetworkID], actualPrimaryNetwork)
 
-		actualSubnet, err := m.GetWarpValidatorSet(context.Background(), uint64(height), subnetID)
-		if err != nil {
-			require.NotContains(expected, subnetID)
-			continue
-		}
-
+		actualSubnet := actual[subnetID]
 		// Treat nil and empty slices as the same
 		if len(actualSubnet.Validators) == 0 {
 			actualSubnet.Validators = nil

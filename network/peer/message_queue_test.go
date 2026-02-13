@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -18,7 +18,7 @@ func TestMessageQueue(t *testing.T) {
 
 	expectFail := false
 	q := NewBlockingMessageQueue(
-		SendFailedFunc(func(message.OutboundMessage) {
+		SendFailedFunc(func(*message.OutboundMessage) {
 			require.True(expectFail)
 		}),
 		logging.NoLog{},
@@ -26,7 +26,7 @@ func TestMessageQueue(t *testing.T) {
 	)
 
 	mc := newMessageCreator(t)
-	msgs := []message.OutboundMessage{}
+	msgs := []*message.OutboundMessage{}
 	numToSend := 10
 
 	// Assert that the messages are popped in the same order they were pushed
@@ -38,7 +38,7 @@ func TestMessageQueue(t *testing.T) {
 
 	go func() {
 		for i := 0; i < numToSend; i++ {
-			q.Push(context.Background(), msgs[i])
+			q.Push(t.Context(), msgs[i])
 		}
 	}()
 
@@ -53,7 +53,7 @@ func TestMessageQueue(t *testing.T) {
 	require.False(ok)
 
 	// Assert that Push returns false when the context is canceled
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	expectFail = true
 	gotOk := make(chan bool)
@@ -64,7 +64,7 @@ func TestMessageQueue(t *testing.T) {
 
 	// Assert that Push returns false when the queue is closed
 	go func() {
-		gotOk <- q.Push(context.Background(), msgs[0])
+		gotOk <- q.Push(t.Context(), msgs[0])
 	}()
 	q.Close()
 	require.False(<-gotOk)

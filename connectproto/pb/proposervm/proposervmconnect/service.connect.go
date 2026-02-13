@@ -36,6 +36,9 @@ const (
 	// ProposerVMGetProposedHeightProcedure is the fully-qualified name of the ProposerVM's
 	// GetProposedHeight RPC.
 	ProposerVMGetProposedHeightProcedure = "/proposervm.ProposerVM/GetProposedHeight"
+	// ProposerVMGetCurrentEpochProcedure is the fully-qualified name of the ProposerVM's
+	// GetCurrentEpoch RPC.
+	ProposerVMGetCurrentEpochProcedure = "/proposervm.ProposerVM/GetCurrentEpoch"
 )
 
 // ProposerVMClient is a client for the proposervm.ProposerVM service.
@@ -43,6 +46,9 @@ type ProposerVMClient interface {
 	// GetProposedHeight returns the P-Chain height that would be included in a
 	// block if it were proposed right now.
 	GetProposedHeight(context.Context, *connect.Request[proposervm.GetProposedHeightRequest]) (*connect.Response[proposervm.GetProposedHeightReply], error)
+	// GetCurrentEpoch returns the epoch that would be included in a block if it
+	// were proposed right now.
+	GetCurrentEpoch(context.Context, *connect.Request[proposervm.GetCurrentEpochRequest]) (*connect.Response[proposervm.GetCurrentEpochReply], error)
 }
 
 // NewProposerVMClient constructs a client for the proposervm.ProposerVM service. By default, it
@@ -62,12 +68,19 @@ func NewProposerVMClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(proposerVMMethods.ByName("GetProposedHeight")),
 			connect.WithClientOptions(opts...),
 		),
+		getCurrentEpoch: connect.NewClient[proposervm.GetCurrentEpochRequest, proposervm.GetCurrentEpochReply](
+			httpClient,
+			baseURL+ProposerVMGetCurrentEpochProcedure,
+			connect.WithSchema(proposerVMMethods.ByName("GetCurrentEpoch")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // proposerVMClient implements ProposerVMClient.
 type proposerVMClient struct {
 	getProposedHeight *connect.Client[proposervm.GetProposedHeightRequest, proposervm.GetProposedHeightReply]
+	getCurrentEpoch   *connect.Client[proposervm.GetCurrentEpochRequest, proposervm.GetCurrentEpochReply]
 }
 
 // GetProposedHeight calls proposervm.ProposerVM.GetProposedHeight.
@@ -75,11 +88,19 @@ func (c *proposerVMClient) GetProposedHeight(ctx context.Context, req *connect.R
 	return c.getProposedHeight.CallUnary(ctx, req)
 }
 
+// GetCurrentEpoch calls proposervm.ProposerVM.GetCurrentEpoch.
+func (c *proposerVMClient) GetCurrentEpoch(ctx context.Context, req *connect.Request[proposervm.GetCurrentEpochRequest]) (*connect.Response[proposervm.GetCurrentEpochReply], error) {
+	return c.getCurrentEpoch.CallUnary(ctx, req)
+}
+
 // ProposerVMHandler is an implementation of the proposervm.ProposerVM service.
 type ProposerVMHandler interface {
 	// GetProposedHeight returns the P-Chain height that would be included in a
 	// block if it were proposed right now.
 	GetProposedHeight(context.Context, *connect.Request[proposervm.GetProposedHeightRequest]) (*connect.Response[proposervm.GetProposedHeightReply], error)
+	// GetCurrentEpoch returns the epoch that would be included in a block if it
+	// were proposed right now.
+	GetCurrentEpoch(context.Context, *connect.Request[proposervm.GetCurrentEpochRequest]) (*connect.Response[proposervm.GetCurrentEpochReply], error)
 }
 
 // NewProposerVMHandler builds an HTTP handler from the service implementation. It returns the path
@@ -95,10 +116,18 @@ func NewProposerVMHandler(svc ProposerVMHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(proposerVMMethods.ByName("GetProposedHeight")),
 		connect.WithHandlerOptions(opts...),
 	)
+	proposerVMGetCurrentEpochHandler := connect.NewUnaryHandler(
+		ProposerVMGetCurrentEpochProcedure,
+		svc.GetCurrentEpoch,
+		connect.WithSchema(proposerVMMethods.ByName("GetCurrentEpoch")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/proposervm.ProposerVM/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProposerVMGetProposedHeightProcedure:
 			proposerVMGetProposedHeightHandler.ServeHTTP(w, r)
+		case ProposerVMGetCurrentEpochProcedure:
+			proposerVMGetCurrentEpochHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -110,4 +139,8 @@ type UnimplementedProposerVMHandler struct{}
 
 func (UnimplementedProposerVMHandler) GetProposedHeight(context.Context, *connect.Request[proposervm.GetProposedHeightRequest]) (*connect.Response[proposervm.GetProposedHeightReply], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("proposervm.ProposerVM.GetProposedHeight is not implemented"))
+}
+
+func (UnimplementedProposerVMHandler) GetCurrentEpoch(context.Context, *connect.Request[proposervm.GetCurrentEpochRequest]) (*connect.Response[proposervm.GetCurrentEpochReply], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("proposervm.ProposerVM.GetCurrentEpoch is not implemented"))
 }

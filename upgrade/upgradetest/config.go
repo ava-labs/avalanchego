@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package upgradetest
@@ -19,7 +19,9 @@ func GetConfig(fork Fork) upgrade.Config {
 // scheduled to be activated at the provided upgradeTime and all other forks to
 // be unscheduled.
 func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
-	c := upgrade.Config{}
+	c := upgrade.Config{
+		GraniteEpochDuration: upgrade.Default.GraniteEpochDuration,
+	}
 	// Initialize all forks to be unscheduled
 	SetTimesTo(&c, Latest, upgrade.UnscheduledActivationTime)
 	// Schedule the requested forks at the provided upgrade time
@@ -31,6 +33,9 @@ func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 // to the provided upgradeTime.
 func SetTimesTo(c *upgrade.Config, fork Fork, upgradeTime time.Time) {
 	switch fork {
+	case Helicon:
+		c.HeliconTime = upgradeTime
+		fallthrough
 	case Granite:
 		c.GraniteTime = upgradeTime
 		fallthrough

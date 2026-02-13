@@ -18,11 +18,6 @@ service ValidatorState {
   // subnets at the requested P-chain height. If a subnet doesn't have a valid
   // canonical warp validator set, it is omitted from the response.
   rpc GetWarpValidatorSets(GetWarpValidatorSetsRequest) returns (GetWarpValidatorSetsResponse);
-  // GetWarpValidatorSet returns the canonical warp validator set for the
-  // provided subnet at the requested P-chain height. If the subnet doesn't have
-  // a valid canonical warp validator set, either the returned set will be empty
-  // or an error may occur.
-  rpc GetWarpValidatorSet(GetWarpValidatorSetRequest) returns (GetWarpValidatorSetResponse);
   // GetValidatorSet returns the weights of the nodeIDs for the provided
   // subnet at the requested P-chain height.
   rpc GetValidatorSet(GetValidatorSetRequest) returns (GetValidatorSetResponse);
@@ -51,11 +46,6 @@ message GetWarpValidatorSetsRequest {
   uint64 height = 1;
 }
 
-message GetWarpValidatorSetRequest {
-  uint64 height = 1;
-  bytes subnet_id = 2;
-}
-
 message GetValidatorSetRequest {
   uint64 height = 1;
   bytes subnet_id = 2;
@@ -78,11 +68,6 @@ message Validator {
 
 message GetWarpValidatorSetsResponse {
   repeated WarpValidatorSet validator_sets = 1;
-}
-
-message GetWarpValidatorSetResponse {
-  uint64 total_weight = 1;
-  repeated WarpValidator validators = 2;
 }
 
 message WarpValidatorSet {

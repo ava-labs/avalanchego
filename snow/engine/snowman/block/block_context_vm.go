@@ -1,13 +1,14 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
 
-//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+//go:generate go tool canoto $GOFILE
 
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
@@ -37,6 +38,12 @@ type BuildBlockWithContextChainVM interface {
 	// This method will be called if and only if the proposervm is activated.
 	// Otherwise [BuildBlock] will be called.
 	BuildBlockWithContext(ctx context.Context, blockCtx *Context) (snowman.Block, error)
+}
+
+// SetPreferenceWithContextChainVM defines the interface a ChainVM can optionally
+// implement to consider the P-Chain height when setting preference.
+type SetPreferenceWithContextChainVM interface {
+	SetPreferenceWithContext(ctx context.Context, blkID ids.ID, blockCtx *Context) error
 }
 
 // WithVerifyContext defines the interface a Block can optionally implement to

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gvalidators
@@ -75,14 +75,14 @@ func TestGetMinimumHeight(t *testing.T) {
 	expectedHeight := uint64(1337)
 	state.server.EXPECT().GetMinimumHeight(gomock.Any()).Return(expectedHeight, nil)
 
-	height, err := state.client.GetMinimumHeight(context.Background())
+	height, err := state.client.GetMinimumHeight(t.Context())
 	require.NoError(err)
 	require.Equal(expectedHeight, height)
 
 	// Error path
 	state.server.EXPECT().GetMinimumHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
-	_, err = state.client.GetMinimumHeight(context.Background())
+	_, err = state.client.GetMinimumHeight(t.Context())
 	// TODO: require specific error
 	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
@@ -97,14 +97,14 @@ func TestGetCurrentHeight(t *testing.T) {
 	expectedHeight := uint64(1337)
 	state.server.EXPECT().GetCurrentHeight(gomock.Any()).Return(expectedHeight, nil)
 
-	height, err := state.client.GetCurrentHeight(context.Background())
+	height, err := state.client.GetCurrentHeight(t.Context())
 	require.NoError(err)
 	require.Equal(expectedHeight, height)
 
 	// Error path
 	state.server.EXPECT().GetCurrentHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
-	_, err = state.client.GetCurrentHeight(context.Background())
+	_, err = state.client.GetCurrentHeight(t.Context())
 	// TODO: require specific error
 	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
@@ -120,14 +120,14 @@ func TestGetSubnetID(t *testing.T) {
 	expectedSubnetID := ids.GenerateTestID()
 	state.server.EXPECT().GetSubnetID(gomock.Any(), chainID).Return(expectedSubnetID, nil)
 
-	subnetID, err := state.client.GetSubnetID(context.Background(), chainID)
+	subnetID, err := state.client.GetSubnetID(t.Context(), chainID)
 	require.NoError(err)
 	require.Equal(expectedSubnetID, subnetID)
 
 	// Error path
 	state.server.EXPECT().GetSubnetID(gomock.Any(), chainID).Return(expectedSubnetID, errCustom)
 
-	_, err = state.client.GetSubnetID(context.Background(), chainID)
+	_, err = state.client.GetSubnetID(t.Context(), chainID)
 	// TODO: require specific error
 	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
@@ -170,14 +170,14 @@ func TestGetValidatorSet(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 	state.server.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(expectedVdrs, nil)
 
-	vdrs, err := state.client.GetValidatorSet(context.Background(), height, subnetID)
+	vdrs, err := state.client.GetValidatorSet(t.Context(), height, subnetID)
 	require.NoError(err)
 	require.Equal(expectedVdrs, vdrs)
 
 	// Error path
 	state.server.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(expectedVdrs, errCustom)
 
-	_, err = state.client.GetValidatorSet(context.Background(), height, subnetID)
+	_, err = state.client.GetValidatorSet(t.Context(), height, subnetID)
 	// TODO: require specific error
 	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
@@ -216,7 +216,7 @@ func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetVal
 	state.server.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(vs, nil).AnyTimes()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := state.client.GetValidatorSet(context.Background(), height, subnetID)
+		_, err := state.client.GetValidatorSet(b.Context(), height, subnetID)
 		require.NoError(err)
 	}
 	b.StopTimer()
@@ -248,7 +248,7 @@ func TestGetWarpValidatorSets(t *testing.T) {
 		}
 		c := newClient(t, state)
 
-		_, err := c.GetWarpValidatorSets(context.Background(), height)
+		_, err := c.GetWarpValidatorSets(t.Context(), height)
 		require.Error(t, err) //nolint:forbidigo // returns grpc error
 	})
 
@@ -268,40 +268,8 @@ func TestGetWarpValidatorSets(t *testing.T) {
 		}
 		c := newClient(t, state)
 
-		vdrSets, err := c.GetWarpValidatorSets(context.Background(), height)
+		vdrSets, err := c.GetWarpValidatorSets(t.Context(), height)
 		require.NoError(err)
 		require.Equal(expectedVdrSets, vdrSets)
-	})
-}
-
-func TestGetWarpValidatorSet(t *testing.T) {
-	const height uint64 = 1337
-	t.Run("error", func(t *testing.T) {
-		state := &validatorstest.State{
-			CantGetWarpValidatorSets: true,
-		}
-		c := newClient(t, state)
-
-		_, err := c.GetWarpValidatorSet(context.Background(), height, ids.GenerateTestID())
-		require.Error(t, err) //nolint:forbidigo // returns grpc error
-	})
-
-	t.Run("valid", func(t *testing.T) {
-		require := require.New(t)
-
-		subnetID := ids.GenerateTestID()
-		expectedVdrSet := validatorstest.NewWarpSet(t, 3)
-		state := &validatorstest.State{
-			GetWarpValidatorSetF: func(_ context.Context, h uint64, s ids.ID) (validators.WarpSet, error) {
-				require.Equal(height, h)
-				require.Equal(subnetID, s)
-				return expectedVdrSet, nil
-			},
-		}
-		c := newClient(t, state)
-
-		vdrSet, err := c.GetWarpValidatorSet(context.Background(), height, subnetID)
-		require.NoError(err)
-		require.Equal(expectedVdrSet, vdrSet)
 	})
 }

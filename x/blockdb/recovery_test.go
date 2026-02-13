@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
@@ -12,6 +12,7 @@ import (
 	"github.com/DataDog/zstd"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
@@ -70,12 +71,11 @@ func TestRecovery_Success(t *testing.T) {
 				firstBlockOffset := uint64(sizeOfBlockEntryHeader) + uint64(firstBlockCompressedSize)
 
 				header := indexFileHeader{
-					Version:             IndexFileVersion,
-					MaxDataFileSize:     4 * 10 * 1024, // 10KB per file
-					MinHeight:           0,
-					MaxContiguousHeight: 0,
-					MaxHeight:           0,
-					NextWriteOffset:     firstBlockOffset,
+					Version:         IndexFileVersion,
+					MaxDataFileSize: 4 * 10 * 1024, // 10KB per file
+					MinHeight:       0,
+					MaxHeight:       0,
+					NextWriteOffset: firstBlockOffset,
 				}
 
 				// Write the header
@@ -135,7 +135,6 @@ func TestRecovery_Success(t *testing.T) {
 				}
 				blockSize := uint64(sizeOfBlockEntryHeader) + uint64(lastBlockCompressedSize)
 				header.NextWriteOffset -= blockSize
-				header.MaxContiguousHeight = 3
 				header.MaxHeight = 8
 
 				// Write the corrupted header back
@@ -199,7 +198,7 @@ func TestRecovery_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store, _ := newTestDatabase(t, config)
+			store := newDatabase(t, config)
 
 			blockHeights := []uint64{0, 1, 3, 6, 2, 8, 4}
 			blocks := make(map[uint64][]byte)
@@ -208,10 +207,10 @@ func TestRecovery_Success(t *testing.T) {
 				// Create 4KB blocks
 				block := fixedSizeBlock(t, 4*1024, height)
 
-				require.NoError(t, store.WriteBlock(height, block))
+				require.NoError(t, store.Put(height, block))
 				blocks[height] = block
 			}
-			checkDatabaseState(t, store, 8, 4)
+			checkDatabaseState(t, store, 8)
 			require.NoError(t, store.Close())
 
 			// Corrupt the index file according to the test case
@@ -219,17 +218,16 @@ func TestRecovery_Success(t *testing.T) {
 			require.NoError(t, tt.corruptIndex(indexPath, blocks))
 
 			// Reopen the database and test recovery
-			recoveredStore, err := New(config.WithIndexDir(store.config.IndexDir).WithDataDir(store.config.DataDir), store.log)
-			require.NoError(t, err)
-			defer recoveredStore.Close()
+			dir := store.config.DataDir
+			recoveredDB := newDatabase(t, config.WithIndexDir(dir).WithDataDir(dir))
 
 			// Verify blocks are readable
 			for _, height := range blockHeights {
-				readBlock, err := recoveredStore.ReadBlock(height)
+				readBlock, err := recoveredDB.Get(height)
 				require.NoError(t, err)
 				require.Equal(t, blocks[height], readBlock, "block %d should be the same", height)
 			}
-			checkDatabaseState(t, recoveredStore, 8, 4)
+			checkDatabaseState(t, recoveredDB, 8)
 		})
 	}
 }
@@ -420,8 +418,8 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 			name:               "missing data file at index 1",
 			blockHeights:       []uint64{0, 1, 2, 3, 4, 5},
 			disableCompression: true,
-			maxDataFileSize:    uint64Ptr(1024), // 1KB per file to force multiple files
-			blockSize:          512,             // 512 bytes per block
+			maxDataFileSize:    utils.PointerTo[uint64](1024), // 1KB per file to force multiple files
+			blockSize:          512,                           // 512 bytes per block
 			setupCorruption: func(store *Database, _ [][]byte) error {
 				// Delete the second data file (index 1)
 				dataFilePath := store.dataFilePath(1)
@@ -433,8 +431,8 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 		{
 			name:            "unexpected multiple data files when MaxDataFileSize is max uint64",
 			blockHeights:    []uint64{0, 1, 2},
-			maxDataFileSize: uint64Ptr(math.MaxUint64), // Single file mode
-			blockSize:       512,                       // 512 bytes per block
+			maxDataFileSize: utils.PointerTo[uint64](math.MaxUint64), // Single file mode
+			blockSize:       512,                                     // 512 bytes per block
 			setupCorruption: func(store *Database, _ [][]byte) error {
 				// Manually create a second data file to simulate corruption
 				secondDataFilePath := store.dataFilePath(1)
@@ -520,11 +518,10 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				config = config.WithMaxDataFileSize(*tt.maxDataFileSize)
 			}
 
-			store, cleanup := newTestDatabase(t, config)
+			store := newDatabase(t, config)
 			if tt.disableCompression {
 				store.compressor = compression.NewNoCompressor()
 			}
-			defer cleanup()
 
 			// Setup blocks
 			blocks := make([][]byte, len(tt.blockHeights))
@@ -534,7 +531,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				} else {
 					blocks[i] = randomBlock(t)
 				}
-				require.NoError(t, store.WriteBlock(height, blocks[i]))
+				require.NoError(t, store.Put(height, blocks[i]))
 			}
 			require.NoError(t, store.Close())
 
@@ -559,12 +556,11 @@ func resetIndexToBlock(store *Database, blockSize uint64, minHeight uint64) erro
 	defer indexFile.Close()
 
 	header := indexFileHeader{
-		Version:             IndexFileVersion,
-		MaxDataFileSize:     DefaultMaxDataFileSize,
-		MinHeight:           minHeight,
-		MaxContiguousHeight: minHeight,
-		MaxHeight:           minHeight,
-		NextWriteOffset:     uint64(sizeOfBlockEntryHeader) + blockSize,
+		Version:         IndexFileVersion,
+		MaxDataFileSize: DefaultMaxDataFileSize,
+		MinHeight:       minHeight,
+		MaxHeight:       minHeight,
+		NextWriteOffset: uint64(sizeOfBlockEntryHeader) + blockSize,
 	}
 
 	headerBytes, err := header.MarshalBinary()

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -47,8 +47,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
-
-	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 const (
@@ -82,7 +80,7 @@ type test struct {
 
 type environment struct {
 	blkManager Manager
-	mempool    txmempool.Mempool[*txs.Tx]
+	mempool    *mempool.Mempool
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Internal
@@ -152,7 +150,13 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.New("mempool", registerer)
+	res.mempool, err = mempool.New(
+		"mempool",
+		res.config.DynamicFeeConfig.Weights,
+		1_000_000,
+		res.ctx.AVAXAssetID,
+		registerer,
+	)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}

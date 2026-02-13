@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Implements X-chain transfer tests.
@@ -166,13 +166,13 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					}
 				}
 
-				testBalances := make([]uint64, 0)
+				testBalances := make([]uint64, len(wallets))
 				for i, w := range wallets {
 					balances, err := w.X().Builder().GetFTBalance()
 					require.NoError(err)
 
 					bal := balances[avaxAssetID]
-					testBalances = append(testBalances, bal)
+					testBalances[i] = bal
 
 					tc.Log().Info("balance in AVAX",
 						zap.Uint64("balance", bal),

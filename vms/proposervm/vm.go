@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/tree"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
@@ -70,9 +71,10 @@ func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 type VM struct {
 	block.ChainVM
 	Config
-	blockBuilderVM block.BuildBlockWithContextChainVM
-	batchedVM      block.BatchedChainVM
-	ssVM           block.StateSyncableVM
+	blockBuilderVM  block.BuildBlockWithContextChainVM
+	setPreferenceVM block.SetPreferenceWithContextChainVM
+	batchedVM       block.BatchedChainVM
+	ssVM            block.StateSyncableVM
 
 	state.State
 
@@ -123,14 +125,16 @@ func New(
 	config Config,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
+	setPreferenceVM, _ := vm.(block.SetPreferenceWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
-		ChainVM:        vm,
-		Config:         config,
-		blockBuilderVM: blockBuilderVM,
-		batchedVM:      batchedVM,
-		ssVM:           ssVM,
+		ChainVM:         vm,
+		Config:          config,
+		blockBuilderVM:  blockBuilderVM,
+		setPreferenceVM: setPreferenceVM,
+		batchedVM:       batchedVM,
+		ssVM:            ssVM,
 	}
 }
 
@@ -151,7 +155,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.State = baseState
-	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
+	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -370,7 +374,51 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		return vm.ChainVM.SetPreference(ctx, preferred)
 	}
 
+	preferredEpoch, err := blk.pChainEpoch(ctx)
+	if err != nil {
+		return err
+	}
+
 	innerBlkID := blk.getInnerBlk().ID()
+
+	// If the inner VM implements SetPreferenceWithContext, use it to set the
+	// preference with the P-Chain height to be used to verify a child of the
+	// preferred block.
+	if vm.setPreferenceVM != nil && preferredEpoch != (statelessblock.Epoch{}) {
+		// The P-Chain height used to verify a child of the preferred block will
+		// potentially be different than the P-Chain height used to verify the
+		// preferred block if the preferred block seals the current epoch.
+		preferredPChainHeight, err := blk.pChainHeight(ctx)
+		if err != nil {
+			return err
+		}
+
+		// The exact child timestamp doesn't matter here because we know Granite
+		// is already activated.
+		timestamp := blk.Timestamp()
+		nextEpoch := acp181.NewEpoch(
+			vm.Upgrades,
+			preferredPChainHeight,
+			preferredEpoch,
+			timestamp,
+			timestamp,
+		)
+		nextPChainHeight := nextEpoch.PChainHeight
+
+		if err := vm.setPreferenceVM.SetPreferenceWithContext(ctx, innerBlkID, &block.Context{
+			PChainHeight: nextPChainHeight,
+		}); err != nil {
+			return err
+		}
+
+		vm.ctx.Log.Debug("set preference with context",
+			zap.Stringer("blkID", preferred),
+			zap.Stringer("innerBlkID", innerBlkID),
+			zap.Uint64("pChainHeight", nextPChainHeight),
+		)
+		return nil
+	}
+
 	if err := vm.ChainVM.SetPreference(ctx, innerBlkID); err != nil {
 		return err
 	}
@@ -402,7 +450,8 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 			return vm.ChainVM.WaitForEvent(ctx)
 		}
 
-		duration := time.Until(timeToBuild)
+		now := vm.Clock.Time()
+		duration := timeToBuild.Sub(now)
 		if duration <= 0 {
 			vm.ctx.Log.Debug("Can build a block without waiting")
 			return vm.ChainVM.WaitForEvent(ctx)
@@ -504,7 +553,7 @@ func (vm *VM) getPreDurangoSlotTime(
 	// avoid fast runs of blocks there is an additional minimum delay that
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
-	// time, ProposerMinBlockDelay can be configured in the subnet config.
+	// time, ProposerMinBlockDelay can be configured in the node config.
 	delay = max(delay, vm.MinBlkDelay)
 	return parentTimestamp.Add(delay), nil
 }
@@ -528,14 +577,18 @@ func (vm *VM) getPostDurangoSlotTime(
 	// avoid fast runs of blocks there is an additional minimum delay that
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
-	// time, ProposerMinBlockDelay can be configured in the subnet config.
+	// time, ProposerMinBlockDelay can be configured in the node config.
+
 	switch {
 	case err == nil:
+		vm.ctx.Log.Debug("slot time", zap.Duration("delay", delay), zap.Duration("min block delay", vm.MinBlkDelay))
 		delay = max(delay, vm.MinBlkDelay)
 		return parentTimestamp.Add(delay), nil
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
+		vm.ctx.Log.Debug("anyone can propose", zap.Duration("min block delay", vm.MinBlkDelay), zap.Time("parent timestamp", parentTimestamp))
 		return parentTimestamp.Add(vm.MinBlkDelay), nil
 	default:
+		vm.ctx.Log.Debug("failed fetching the expected delay", zap.Error(err))
 		return time.Time{}, err
 	}
 }

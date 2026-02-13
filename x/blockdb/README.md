@@ -10,6 +10,7 @@ BlockDB is a specialized database optimized for blockchain blocks.
 - **Configurable Durability**: Optional `syncToDisk` mode guarantees immediate recoverability
 - **Automatic Recovery**: Detects and recovers unindexed blocks after unclean shutdowns
 - **Block Compression**: zstd compression for block data
+- **In-Memory Cache**: LRU cache for recently accessed blocks
 
 ## Design
 
@@ -55,10 +56,9 @@ Index File Header (64 bytes):
 │ Version                        │ 8 bytes │
 │ Max Data File Size             │ 8 bytes │
 │ Min Block Height               │ 8 bytes │
-│ Max Contiguous Height          │ 8 bytes │
 │ Max Block Height               │ 8 bytes │
 │ Next Write Offset              │ 8 bytes │
-│ Reserved                       │ 16 bytes│
+│ Reserved                       │ 24 bytes│
 └────────────────────────────────┴─────────┘
 
 Index Entry (16 bytes):
@@ -119,8 +119,8 @@ On startup, BlockDB checks for signs of an unclean shutdown by comparing the dat
 2. For each unindexed block found:
    - Validates the block entry header and checksum
    - Writes the corresponding index entry
-3. Calculates the max contiguous height and max block height
-4. Updates the index header with the updated max contiguous height, max block height, and next write offset
+3. Calculates the max block height
+4. Updates the index header with the updated max block height and next write offset
 
 ## Usage
 
@@ -148,16 +148,16 @@ defer db.Close()
 // Write a block
 height := uint64(100)
 blockData := []byte("block data")
-err := db.WriteBlock(height, blockData)
+err := db.Put(height, blockData)
 if err != nil {
     fmt.Println("Error writing block:", err)
     return
 }
 
 // Read a block
-blockData, err := db.ReadBlock(height)
+blockData, err := db.Get(height)
 if err != nil {
-    if errors.Is(err, blockdb.ErrBlockNotFound) {
+    if errors.Is(err, database.ErrNotFound) {
         fmt.Println("Block doesn't exist at this height")
         return
     }
@@ -168,7 +168,6 @@ if err != nil {
 
 ## TODO
 
-- Implement a block cache for recently accessed blocks
 - Use a buffered pool to avoid allocations on reads and writes
 - Add performance benchmarks
 - Consider supporting missing data files (currently we error if any data files are missing)

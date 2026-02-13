@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -45,6 +46,7 @@ type metrics struct {
 	// latAccepted tracks the number of nanoseconds that a block was processing
 	// before being accepted
 	latAccepted          metric.Averager
+	consensusLatencies   prometheus.Histogram
 	buildLatencyAccepted prometheus.Gauge
 
 	blockSizeRejectedSum prometheus.Gauge
@@ -60,6 +62,9 @@ type metrics struct {
 
 	// numSuccessfulPolls keeps track of the number of polls that succeeded
 	numSuccessfulPolls prometheus.Counter
+
+	// avgAcceptanceLatency tracks the average acceptance time
+	avgAcceptanceLatency math.Averager
 }
 
 func newMetrics(
@@ -68,6 +73,7 @@ func newMetrics(
 	lastAcceptedHeight uint64,
 	lastAcceptedTime time.Time,
 ) (*metrics, error) {
+	acceptanceHalfLife := 5 * time.Minute
 	errs := wrappers.Errs{}
 	m := &metrics{
 		log:                      log,
@@ -108,6 +114,11 @@ func newMetrics(
 			reg,
 			&errs,
 		),
+		consensusLatencies: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "consensus_latencies",
+			Help:    "times (in ns) from issuance of a block to acceptance, bucketed",
+			Buckets: prometheus.LinearBuckets(float64(time.Second), float64(time.Second), 4),
+		}),
 		buildLatencyAccepted: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "blks_build_accept_latency",
 			Help: "time (in ns) from the timestamp of a block to the time it was accepted",
@@ -138,6 +149,10 @@ func newMetrics(
 			Name: "polls_failed",
 			Help: "number of failed polls",
 		}),
+		avgAcceptanceLatency: math.NewMaturedAverager(
+			acceptanceHalfLife,
+			math.NewUninitializedAverager(acceptanceHalfLife),
+		),
 	}
 
 	// Initially set the metrics for the last accepted block.
@@ -152,6 +167,7 @@ func newMetrics(
 		reg.Register(m.numProcessing),
 		reg.Register(m.blockSizeAcceptedSum),
 		reg.Register(m.buildLatencyAccepted),
+		reg.Register(m.consensusLatencies),
 		reg.Register(m.blockSizeRejectedSum),
 		reg.Register(m.numSuccessfulPolls),
 		reg.Register(m.numFailedPolls),
@@ -202,6 +218,8 @@ func (m *metrics) Accepted(
 
 	builtDuration := now.Sub(timestamp)
 	m.buildLatencyAccepted.Add(float64(builtDuration))
+	m.avgAcceptanceLatency.Observe(float64(builtDuration), now)
+	m.consensusLatencies.Observe(float64(processingDuration))
 }
 
 func (m *metrics) Rejected(blkID ids.ID, pollNumber uint64, blockSize int) {
@@ -238,4 +256,8 @@ func (m *metrics) SuccessfulPoll() {
 
 func (m *metrics) FailedPoll() {
 	m.numFailedPolls.Inc()
+}
+
+func (m *metrics) GetAverageAcceptanceTime() time.Duration {
+	return time.Duration(m.avgAcceptanceLatency.Read())
 }

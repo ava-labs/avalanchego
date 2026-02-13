@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 
-	xsync "github.com/ava-labs/avalanchego/x/sync"
+	merklesync "github.com/ava-labs/avalanchego/database/merkle/sync"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
@@ -38,8 +38,8 @@ const (
 )
 
 var (
-	_ MerkleDB                            = (*merkleDB)(nil)
-	_ xsync.DB[*RangeProof, *ChangeProof] = (MerkleDB)(nil)
+	_ MerkleDB                                 = (*merkleDB)(nil)
+	_ merklesync.DB[*RangeProof, *ChangeProof] = (MerkleDB)(nil)
 
 	metadataPrefix         = []byte{0}
 	valueNodePrefix        = []byte{1}

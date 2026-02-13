@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ghttp
@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
@@ -76,7 +77,7 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 	conn, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(err)
 
-	client := NewClient(httppb.NewHTTPClient(conn))
+	client := NewClient(httppb.NewHTTPClient(conn), logging.NoLog{})
 
 	w := &httptest.ResponseRecorder{}
 	r := &http.Request{
@@ -167,7 +168,7 @@ func TestHttpResponse(t *testing.T) {
 				Body:      bytes.NewBuffer(nil),
 			}
 
-			client := NewClient(httppb.NewHTTPClient(conn))
+			client := NewClient(httppb.NewHTTPClient(conn), logging.NoLog{})
 			request := &http.Request{
 				Body:   io.NopCloser(strings.NewReader("foo")),
 				Header: tt.requestHeaders,

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposer
@@ -9,11 +9,13 @@ import (
 	"math/bits"
 	"time"
 
+	"go.uber.org/zap"
 	"gonum.org/v1/gonum/mathext/prng"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -101,11 +103,13 @@ type windower struct {
 	state       validators.State
 	subnetID    ids.ID
 	chainSource uint64
+	logger      logging.Logger
 }
 
-func New(state validators.State, subnetID, chainID ids.ID) Windower {
+func New(state validators.State, subnetID, chainID ids.ID, logger logging.Logger) Windower {
 	w := wrappers.Packer{Bytes: chainID[:]}
 	return &windower{
+		logger:      logger,
 		state:       state,
 		subnetID:    subnetID,
 		chainSource: w.UnpackLong(),
@@ -200,6 +204,10 @@ func (w *windower) MinDelayForProposer(
 	if err != nil {
 		return 0, err
 	}
+
+	w.logger.Debug("sampled validators for P-chain height",
+		zap.Uint64("pChainHeight", pChainHeight), zap.Int("numValidators", len(validators)))
+
 	if len(validators) == 0 {
 		return 0, ErrAnyoneCanPropose
 	}

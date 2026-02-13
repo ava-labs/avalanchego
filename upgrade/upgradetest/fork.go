@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package upgradetest
@@ -19,8 +19,9 @@ const (
 	Etna
 	Fortuna
 	Granite
+	Helicon
 
-	Latest = Granite
+	Latest Fork = iota - 1
 )
 
 // Fork is an enum of all the major network upgrades.
@@ -28,6 +29,8 @@ type Fork int
 
 func (f Fork) String() string {
 	switch f {
+	case Helicon:
+		return "Helicon"
 	case Granite:
 		return "Granite"
 	case Fortuna:

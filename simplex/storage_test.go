@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
 
 import (
-	"context"
 	"testing"
 
 	"github.com/ava-labs/simplex"
@@ -18,7 +17,7 @@ import (
 )
 
 func TestStorageNew(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	child := snowmantest.BuildChild(snowmantest.Genesis)
 	tests := []struct {
 		name           string
@@ -77,7 +76,7 @@ func TestStorageRetrieve(t *testing.T) {
 	require.NoError(t, err)
 
 	vm := newTestVM()
-	ctx := context.Background()
+	ctx := t.Context()
 	config := newEngineConfig(t, 4)
 	config.VM = vm
 	_, verifier := NewBLSAuth(config)
@@ -130,7 +129,7 @@ func TestStorageRetrieve(t *testing.T) {
 }
 
 func TestStorageIndexFails(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	genesis := newTestBlock(t, newBlockConfig{})
 	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
 	child2 := newTestBlock(t, newBlockConfig{prev: child1})
@@ -215,7 +214,7 @@ func TestStorageIndexFails(t *testing.T) {
 // TestIndexMismatchedChild tests that the previously indexed digest matches the
 // previous digest of the block being indexed.
 func TestIndexMismatchedChild(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	genesis := newTestBlock(t, newBlockConfig{})
 	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
 	child1Sibling := newTestBlock(t, newBlockConfig{prev: genesis})
@@ -250,7 +249,7 @@ func TestIndexMismatchedChild(t *testing.T) {
 
 // TestStorageIndexSuccess indexes 10 blocks and verifies that they can be retrieved.
 func TestStorageIndexSuccess(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	genesis := newTestBlock(t, newBlockConfig{})
 	configs := newNetworkConfigs(t, 4)
 

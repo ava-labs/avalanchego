@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package registry
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -57,7 +56,7 @@ func TestReload_Success(t *testing.T) {
 		Times(1).
 		Return(nil)
 
-	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
+	installedVMs, failedVMs, err := resources.vmRegistry.Reload(t.Context())
 	require.NoError(err)
 	require.ElementsMatch([]ids.ID{id3, id4}, installedVMs)
 	require.Empty(failedVMs)
@@ -71,7 +70,7 @@ func TestReload_GetNewVMsFails(t *testing.T) {
 
 	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errTest)
 
-	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
+	installedVMs, failedVMs, err := resources.vmRegistry.Reload(t.Context())
 	require.ErrorIs(err, errTest)
 	require.Empty(installedVMs)
 	require.Empty(failedVMs)
@@ -111,7 +110,7 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 		Times(1).
 		Return(nil)
 
-	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
+	installedVMs, failedVMs, err := resources.vmRegistry.Reload(t.Context())
 	require.NoError(err)
 	require.Len(failedVMs, 1)
 	require.ErrorIs(failedVMs[id3], errTest)

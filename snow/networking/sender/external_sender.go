@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender
@@ -15,7 +15,7 @@ import (
 // Right now this is implemented in the networking package
 type ExternalSender interface {
 	Send(
-		msg message.OutboundMessage,
+		msg *message.OutboundMessage,
 		config common.SendConfig,
 		subnetID ids.ID,
 		allower subnets.Allower,

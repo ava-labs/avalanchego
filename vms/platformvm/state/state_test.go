@@ -1,11 +1,10 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
 
 import (
 	"bytes"
-	"context"
 	"maps"
 	"math"
 	"math/rand"
@@ -1038,14 +1037,14 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 			{
 				primaryValidatorSet := copyValidatorSet(diff.expectedPrimaryValidatorSet)
 				require.NoError(state.ApplyValidatorWeightDiffs(
-					context.Background(),
+					t.Context(),
 					primaryValidatorSet,
 					currentHeight,
 					prevHeight+1,
 					constants.PrimaryNetworkID,
 				))
 				require.NoError(state.ApplyValidatorPublicKeyDiffs(
-					context.Background(),
+					t.Context(),
 					primaryValidatorSet,
 					currentHeight,
 					prevHeight+1,
@@ -1057,7 +1056,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 			{
 				legacySubnetValidatorSet := copyValidatorSet(diff.expectedSubnetValidatorSet)
 				require.NoError(state.ApplyValidatorWeightDiffs(
-					context.Background(),
+					t.Context(),
 					legacySubnetValidatorSet,
 					currentHeight,
 					prevHeight+1,
@@ -1075,7 +1074,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 				}
 
 				require.NoError(state.ApplyValidatorPublicKeyDiffs(
-					context.Background(),
+					t.Context(),
 					legacySubnetValidatorSet,
 					currentHeight,
 					prevHeight+1,
@@ -1087,7 +1086,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 			{
 				subnetValidatorSet := copyValidatorSet(diff.expectedSubnetValidatorSet)
 				require.NoError(state.ApplyValidatorWeightDiffs(
-					context.Background(),
+					t.Context(),
 					subnetValidatorSet,
 					currentHeight,
 					prevHeight+1,
@@ -1095,7 +1094,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 				))
 
 				require.NoError(state.ApplyValidatorPublicKeyDiffs(
-					context.Background(),
+					t.Context(),
 					subnetValidatorSet,
 					currentHeight,
 					prevHeight+1,
@@ -1114,13 +1113,13 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 					allValidatorSets[subnetID] = copyValidatorSet(diff.expectedSubnetValidatorSet)
 				}
 				require.NoError(state.ApplyAllValidatorWeightDiffs(
-					context.Background(),
+					t.Context(),
 					allValidatorSets,
 					currentHeight,
 					prevHeight+1,
 				))
 				require.NoError(state.ApplyAllValidatorPublicKeyDiffs(
-					context.Background(),
+					t.Context(),
 					allValidatorSets,
 					currentHeight,
 					prevHeight+1,
@@ -1464,7 +1463,6 @@ func TestPutAndGetFeeState(t *testing.T) {
 	require.NoError(err)
 	require.Equal(gas.State{}, defaultFeeState)
 
-	//nolint:gosec // This does not require a secure random number generator
 	expectedFeeState := gas.State{
 		Capacity: gas.Gas(rand.Uint64()),
 		Excess:   gas.Gas(rand.Uint64()),
@@ -2044,8 +2042,8 @@ func TestL1Validators(t *testing.T) {
 				reloadedEndValidatorSet := reloadedState.validators.GetMap(subnetID)
 				require.Equal(expectedEndValidatorSet, reloadedEndValidatorSet)
 
-				require.NoError(state.ApplyValidatorWeightDiffs(context.Background(), endValidatorSet, 1, 1, subnetID))
-				require.NoError(state.ApplyValidatorPublicKeyDiffs(context.Background(), endValidatorSet, 1, 1, subnetID))
+				require.NoError(state.ApplyValidatorWeightDiffs(t.Context(), endValidatorSet, 1, 1, subnetID))
+				require.NoError(state.ApplyValidatorPublicKeyDiffs(t.Context(), endValidatorSet, 1, 1, subnetID))
 
 				initialValidatorSet := l1ValdiatorsToValidatorSet(initialL1Validators, subnetID)
 				require.Equal(initialValidatorSet, endValidatorSet)
@@ -2389,7 +2387,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			require.NoError(state.Commit())
 
 			for _, subnetID := range subnetIDs {
-				baseStakers, currentValidators, height, err := state.GetCurrentValidators(context.Background(), subnetID)
+				baseStakers, currentValidators, height, err := state.GetCurrentValidators(t.Context(), subnetID)
 				require.NoError(err)
 				require.Equal(uint64(0), height)
 				require.Len(baseStakers, stakersLenBySubnetID[subnetID])

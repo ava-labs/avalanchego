@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -102,7 +102,7 @@ type Peer interface {
 	// Send attempts to send [msg] to the peer. The peer takes ownership of
 	// [msg] for reference counting. This returns false if the message is
 	// guaranteed not to be delivered to the peer.
-	Send(ctx context.Context, msg message.OutboundMessage) bool
+	Send(ctx context.Context, msg *message.OutboundMessage) bool
 
 	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
 	// on this peer's gossip routine. It is not guaranteed that a GetPeerList
@@ -143,6 +143,9 @@ type peer struct {
 	// version is the claimed version the peer is running that we received in
 	// the Handshake message.
 	version *version.Application
+	// upgradeTime is the claimed Unix timestamp (in seconds) of the most
+	// recently scheduled network upgrade from the Handshake message.
+	upgradeTime uint64
 	// trackedSubnets are the subnetIDs the peer sent us in the Handshake
 	// message. The primary network ID is always included.
 	trackedSubnets set.Set[ids.ID]
@@ -190,6 +193,9 @@ type peer struct {
 	// Unix time of the last message sent and received respectively
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
+
+	// lastPingSent is the milliseconds since 1970-01-01 UTC when the last ping was sent
+	lastPingSent int64
 
 	// getPeerListChan signals that we should attempt to send a GetPeerList to
 	// this peer
@@ -286,6 +292,7 @@ func (p *peer) Info() Info {
 		PublicIP:       p.ip.AddrPort,
 		ID:             p.id,
 		Version:        p.version.String(),
+		UpgradeTime:    p.upgradeTime,
 		LastSent:       p.LastSent(),
 		LastReceived:   p.LastReceived(),
 		ObservedUptime: json.Uint32(primaryUptime),
@@ -311,7 +318,7 @@ func (p *peer) ObservedUptime() uint32 {
 	return p.observedUptime.Get()
 }
 
-func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
+func (p *peer) Send(ctx context.Context, msg *message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
 }
 
@@ -526,10 +533,11 @@ func (p *peer) writeMessages(ctx context.Context) {
 		return
 	}
 
-	myVersion := p.VersionCompatibility.Version()
+	myVersion := p.VersionCompatibility.Current
 	knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
 
 	_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
+	requestAllSubnetIPs := areWeAPrimaryNetworkValidator || p.Config.ConnectToAllValidators
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
 		p.Clock.Unix(),
@@ -538,6 +546,7 @@ func (p *peer) writeMessages(ctx context.Context) {
 		uint32(myVersion.Major),
 		uint32(myVersion.Minor),
 		uint32(myVersion.Patch),
+		uint64(p.VersionCompatibility.UpgradeTime.Unix()),
 		mySignedIP.Timestamp,
 		mySignedIP.TLSSignature,
 		mySignedIP.BLSSignatureBytes,
@@ -546,7 +555,7 @@ func (p *peer) writeMessages(ctx context.Context) {
 		p.ObjectedACPs,
 		knownPeersFilter,
 		knownPeersSalt,
-		areWeAPrimaryNetworkValidator,
+		requestAllSubnetIPs,
 	)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
@@ -586,10 +595,10 @@ func (p *peer) writeMessages(ctx context.Context) {
 	}
 }
 
-func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
-	msgBytes := msg.Bytes()
+func (p *peer) writeMessage(writer io.Writer, msg *message.OutboundMessage) {
+	msgBytes := msg.Bytes
 	p.Log.Verbo("sending message",
-		zap.Stringer("op", msg.Op()),
+		zap.Stringer("op", msg.Op),
 		zap.Stringer("nodeID", p.id),
 		zap.Binary("messageBytes", msgBytes),
 	)
@@ -611,6 +620,10 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 			zap.Error(err),
 		)
 		return
+	}
+
+	if msg.Op == message.PingOp {
+		atomic.StoreInt64(&p.lastPingSent, p.Clock.Time().UnixMilli())
 	}
 
 	// Write the message
@@ -642,10 +655,11 @@ func (p *peer) sendNetworkMessages(ctx context.Context) {
 		case <-p.getPeerListChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
 			_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
+			requestAllSubnetIPs := areWeAPrimaryNetworkValidator || p.Config.ConnectToAllValidators
 			msg, err := p.Config.MessageCreator.GetPeerList(
 				knownPeersFilter,
 				knownPeersSalt,
-				areWeAPrimaryNetworkValidator,
+				requestAllSubnetIPs,
 			)
 			if err != nil {
 				p.Log.Error(failedToCreateMessageLog,
@@ -701,12 +715,12 @@ func (p *peer) sendNetworkMessages(ctx context.Context) {
 // changes. It's called when sending a Ping rather than in a validator set
 // callback to avoid signature verification on the P-chain accept path.
 func (p *peer) shouldDisconnect() bool {
-	if err := p.VersionCompatibility.Compatible(p.version); err != nil {
+	if !p.VersionCompatibility.Compatible(p.version) {
 		p.Log.Debug(disconnectingLog,
 			zap.String("reason", "version not compatible"),
 			zap.Stringer("nodeID", p.id),
+			zap.Stringer("myVersion", p.VersionCompatibility.Current),
 			zap.Stringer("peerVersion", p.version),
-			zap.Error(err),
 		)
 		return true
 	}
@@ -737,8 +751,8 @@ func (p *peer) shouldDisconnect() bool {
 	return false
 }
 
-func (p *peer) handle(ctx context.Context, msg message.InboundMessage) {
-	switch m := msg.Message().(type) { // Network-related message types
+func (p *peer) handle(ctx context.Context, msg *message.InboundMessage) {
+	switch m := msg.Message.(type) { // Network-related message types
 	case *p2p.Ping:
 		p.handlePing(m)
 		msg.OnFinishedHandling()
@@ -763,7 +777,7 @@ func (p *peer) handle(ctx context.Context, msg message.InboundMessage) {
 	if !p.finishedHandshake.Get() {
 		p.Log.Debug("dropping message",
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("messageOp", msg.Op),
 			zap.String("reason", "handshake isn't finished"),
 		)
 		msg.OnFinishedHandling()
@@ -771,7 +785,7 @@ func (p *peer) handle(ctx context.Context, msg message.InboundMessage) {
 	}
 
 	// Consensus and app-level messages
-	p.Router.HandleInbound(context.Background(), msg)
+	p.Router.HandleInbound(ctx, msg)
 }
 
 func (p *peer) handlePing(msg *p2p.Ping) {
@@ -818,7 +832,23 @@ func (p *peer) getUptime() uint32 {
 	return primaryUptimePercent
 }
 
-func (*peer) handlePong(*p2p.Pong) {}
+func (p *peer) handlePong(*p2p.Pong) {
+	pingSent := atomic.SwapInt64(&p.lastPingSent, 0)
+	if pingSent == 0 {
+		p.Log.Debug(malformedMessageLog,
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.PongOp),
+			zap.String("reason", "received unexpected pong"),
+		)
+		p.StartClose()
+		return
+	}
+
+	elapsed := p.Clock.Time().UnixMilli() - pingSent
+
+	p.Metrics.RTTCount.Inc()
+	p.Metrics.RTTSum.Add(float64(elapsed))
+}
 
 func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	if p.gotHandshake.Get() {
@@ -873,16 +903,19 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		Patch: int(msg.Client.GetPatch()),
 	}
 
-	if p.VersionCompatibility.Version().Before(p.version) {
+	if myVersion := p.VersionCompatibility.Current; myVersion.Compare(p.version) < 0 {
 		log := p.Log.Debug
 		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
 			log = p.Log.Info
 		}
 		log("peer attempting to connect with newer version. You may want to update your client",
 			zap.Stringer("nodeID", p.id),
+			zap.Stringer("myVersion", myVersion),
 			zap.Stringer("peerVersion", p.version),
 		)
 	}
+
+	p.upgradeTime = msg.UpgradeTime
 
 	// handle subnet IDs
 	if numTrackedSubnets := len(msg.TrackedSubnets); numTrackedSubnets > maxNumTrackedSubnets {
@@ -979,7 +1012,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	}
 
 	port := uint16(msg.IpPort)
-	if msg.IpPort == 0 {
+	if port == 0 {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.HandshakeOp),

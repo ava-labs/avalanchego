@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -247,4 +247,8 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 
 func (*preForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return 0, nil
+}
+
+func (*preForkBlock) pChainEpoch(context.Context) (block.Epoch, error) {
+	return block.Epoch{}, nil
 }

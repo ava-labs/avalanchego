@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -238,9 +238,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		// Signs warp messages
 		WarpSigner: warpSignerClient,
 
-		// The validator state is cached to avoid the gRPC overhead after
-		// epoching is activated.
-		ValidatorState: validators.NewCachedState(validatorStateClient, networkUpgrades.GraniteTime),
+		// The validator state is cached to avoid the gRPC overhead.
+		ValidatorState: validators.NewCachedState(validatorStateClient),
 		// TODO: support remaining snowman++ fields
 
 		ChainDataDir: req.ChainDataDir,
@@ -886,6 +885,10 @@ func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, e
 	if err != nil {
 		return upgrade.Config{}, err
 	}
+	cortinaXChainStopVertexID, err := ids.ToID(pbUpgrades.CortinaXChainStopVertexId)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
 	durango, err := grpcutils.TimestampAsTime(pbUpgrades.DurangoTime)
 	if err != nil {
 		return upgrade.Config{}, err
@@ -902,8 +905,8 @@ func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, e
 	if err != nil {
 		return upgrade.Config{}, err
 	}
-
-	cortinaXChainStopVertexID, err := ids.ToID(pbUpgrades.CortinaXChainStopVertexId)
+	graniteEpochDuration := pbUpgrades.GraniteEpochDuration.AsDuration()
+	helicon, err := grpcutils.TimestampAsTime(pbUpgrades.HeliconTime)
 	if err != nil {
 		return upgrade.Config{}, err
 	}
@@ -925,5 +928,7 @@ func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, e
 		EtnaTime:                     etna,
 		FortunaTime:                  fortuna,
 		GraniteTime:                  granite,
+		GraniteEpochDuration:         graniteEpochDuration,
+		HeliconTime:                  helicon,
 	}, nil
 }

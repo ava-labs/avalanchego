@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
@@ -31,11 +32,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	p2pmessage "github.com/ava-labs/avalanchego/message"
@@ -59,6 +62,8 @@ const (
 	expiryDelay = 5 * time.Minute
 	// P2P message requests timeout after 10 seconds
 	p2pTimeout = 10 * time.Second
+
+	timeToAdvancePChainWindow = 5 * platformvmvalidators.RecentlyAcceptedWindowTTL / 4
 )
 
 var _ = e2e.DescribePChain("[L1]", func() {
@@ -71,11 +76,13 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 		tc.By("loading the wallet")
 		var (
-			keychain   = env.NewKeychain()
-			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
-			pWallet    = baseWallet.P()
-			pClient    = platformvm.NewClient(nodeURI.URI)
-			owner      = &secp256k1fx.OutputOwners{
+			keychain       = env.NewKeychain()
+			baseWallet     = e2e.NewWallet(tc, keychain, nodeURI)
+			pWallet        = baseWallet.P()
+			pClient        = platformvm.NewClient(nodeURI.URI)
+			proposerClient = proposervm.NewJSONRPCClient(nodeURI.URI, "P")
+			infoClient     = info.NewClient(nodeURI.URI)
+			owner          = &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
 					keychain.Keys[0].Address(),
@@ -148,6 +155,20 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, platformapi.Height(height))
 			require.NoError(err)
 			require.Equal(expectedValidators, subnetValidators)
+
+			// Test GetAllValidatorsAt too, for coverage
+			flattenedExpectedValidators, err := snowvalidators.FlattenValidatorSet(expectedValidators) // for coverage
+			require.NoError(err)
+
+			// require.Equal will complain if one has a nil slice and the other
+			// has an empty slice. This avoids that issue.
+			if len(flattenedExpectedValidators.Validators) == 0 {
+				flattenedExpectedValidators.Validators = nil
+			}
+
+			allValidators, err := pClient.GetAllValidatorsAt(tc.DefaultContext(), platformapi.Height(height))
+			require.NoError(err)
+			require.Equal(flattenedExpectedValidators, allValidators[subnetID])
 		}
 		tc.By("verifying the Permissioned Subnet is configured as expected", func() {
 			tc.By("verifying the subnet reports as permissioned", func() {
@@ -184,7 +205,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		tc.By("connecting to the genesis validator")
 		var (
 			networkID           = env.GetNetwork().GetNetworkID()
-			genesisPeerMessages = buffer.NewUnboundedBlockingDeque[p2pmessage.InboundMessage](1)
+			genesisPeerMessages = buffer.NewUnboundedBlockingDeque[*p2pmessage.InboundMessage](1)
 		)
 		stakingAddress, cancel, err := subnetGenesisNode.GetAccessibleStakingAddress(tc.DefaultContext())
 		require.NoError(err)
@@ -193,11 +214,11 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			tc.DefaultContext(),
 			stakingAddress,
 			networkID,
-			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
+			router.InboundHandlerFunc(func(_ context.Context, m *p2pmessage.InboundMessage) {
 				tc.Log().Info("received a message",
-					zap.Stringer("op", m.Op()),
-					zap.Stringer("message", m.Message()),
-					zap.Stringer("from", m.NodeID()),
+					zap.Stringer("op", m.Op),
+					zap.Stringer("message", m.Message),
+					zap.Stringer("from", m.NodeID),
 				)
 				genesisPeerMessages.PushRight(m)
 			}),
@@ -342,9 +363,64 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		})
 
 		advanceProposerVMPChainHeight := func() {
-			// We must wait at least [RecentlyAcceptedWindowTTL] to ensure the
-			// next block will reference the last accepted P-chain height.
-			time.Sleep((5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4)
+			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+			require.NoError(err)
+
+			if !upgrades.IsGraniteActivated(time.Now()) {
+				// Wait to ensure the next block will reference the last
+				// accepted P-chain height.
+				time.Sleep(timeToAdvancePChainWindow)
+				return
+			}
+
+			epochBefore, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+			require.NoError(err)
+
+			tc.By("waiting", func() {
+				timeToAdvanceEpoch := max(timeToAdvancePChainWindow, upgrades.GraniteEpochDuration)
+				time.Sleep(timeToAdvanceEpoch)
+			})
+
+			tc.By("issuing a dummy tx to advance the epoch", func() {
+				tx, err := pWallet.IssueBaseTx(
+					[]*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{ID: pWallet.Builder().Context().AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 100 * units.MicroAvax,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 1,
+									Addrs: []ids.ShortID{
+										ids.GenerateTestShortID(),
+									},
+								},
+							},
+						},
+					},
+					tc.WithDefaultContext(),
+				)
+				require.NoError(err)
+
+				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNodeURI, func() {
+					var (
+						client = platformvm.NewClient(subnetGenesisNodeURI)
+						txID   = tx.ID()
+					)
+					tc.Eventually(
+						func() bool {
+							_, err := client.GetTx(tc.DefaultContext(), txID)
+							return err == nil
+						},
+						tests.DefaultTimeout,
+						e2e.DefaultPollingInterval,
+						"transaction not accepted",
+					)
+				})
+			})
+
+			epochAfter, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+			require.NoError(err)
+			require.Greater(epochAfter.PChainHeight, epochBefore.PChainHeight)
 		}
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
 
@@ -770,7 +846,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 func wrapWarpSignatureRequest(
 	msg *warp.UnsignedMessage,
 	justification []byte,
-) (p2pmessage.OutboundMessage, error) {
+) (*p2pmessage.OutboundMessage, error) {
 	p2pMessageFactory, err := p2pmessage.NewCreator(
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
@@ -801,10 +877,10 @@ func wrapWarpSignatureRequest(
 }
 
 func findMessage[T any](
-	q buffer.BlockingDeque[p2pmessage.InboundMessage],
-	parser func(p2pmessage.InboundMessage) (T, bool, error),
+	q buffer.BlockingDeque[*p2pmessage.InboundMessage],
+	parser func(*p2pmessage.InboundMessage) (T, bool, error),
 ) (T, bool, error) {
-	var messagesToReprocess []p2pmessage.InboundMessage
+	var messagesToReprocess []*p2pmessage.InboundMessage
 	defer func() {
 		slices.Reverse(messagesToReprocess)
 		for _, msg := range messagesToReprocess {
@@ -832,9 +908,9 @@ func findMessage[T any](
 
 // unwrapWarpSignature assumes the only type of AppResponses that will be
 // received are ACP-118 compliant responses.
-func unwrapWarpSignature(msg p2pmessage.InboundMessage) (*bls.Signature, bool, error) {
+func unwrapWarpSignature(msg *p2pmessage.InboundMessage) (*bls.Signature, bool, error) {
 	var appResponse *p2ppb.AppResponse
-	switch msg := msg.Message().(type) {
+	switch msg := msg.Message.(type) {
 	case *p2ppb.AppResponse:
 		appResponse = msg
 	case *p2ppb.AppError:

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -91,32 +91,32 @@ func Fuzz_SHA256_HashNode(f *testing.F) {
 		) {
 			require := require.New(t)
 			for _, bf := range validBranchFactors { // Create a random node
-				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
+				r := rand.New(rand.NewSource(int64(randSeed)))
 
 				children := map[byte]*child{}
-				numChildren := r.Intn(int(bf)) // #nosec G404
+				numChildren := r.Intn(int(bf))
 				for i := 0; i < numChildren; i++ {
-					compressedKeyLen := r.Intn(32) // #nosec G404
+					compressedKeyLen := r.Intn(32)
 					compressedKeyBytes := make([]byte, compressedKeyLen)
-					_, _ = r.Read(compressedKeyBytes) // #nosec G404
+					_, _ = r.Read(compressedKeyBytes)
 
 					children[byte(i)] = &child{
 						compressedKey: ToKey(compressedKeyBytes),
 						id:            ids.GenerateTestID(),
-						hasValue:      r.Intn(2) == 1, // #nosec G404
+						hasValue:      r.Intn(2) == 1,
 					}
 				}
 
-				hasValue := r.Intn(2) == 1 // #nosec G404
+				hasValue := r.Intn(2) == 1
 				value := maybe.Nothing[[]byte]()
 				if hasValue {
-					valueBytes := make([]byte, r.Intn(64)) // #nosec G404
-					_, _ = r.Read(valueBytes)              // #nosec G404
+					valueBytes := make([]byte, r.Intn(64))
+					_, _ = r.Read(valueBytes)
 					value = maybe.Some(valueBytes)
 				}
 
-				key := make([]byte, r.Intn(32)) // #nosec G404
-				_, _ = r.Read(key)              // #nosec G404
+				key := make([]byte, r.Intn(32))
+				_, _ = r.Read(key)
 
 				hv := &node{
 					key: ToKey(key),

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -10,27 +10,123 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewDefaultApplication(t *testing.T) {
-	require := require.New(t)
-
-	v := &Application{
-		Name:  Client,
-		Major: 1,
-		Minor: 2,
-		Patch: 3,
+func TestApplicationString(t *testing.T) {
+	tests := []struct {
+		app      *Application
+		expected string
+	}{
+		{
+			app: &Application{
+				Name:  Client,
+				Major: 0,
+				Minor: 0,
+				Patch: 1,
+			},
+			expected: "avalanchego/0.0.1",
+		},
+		{
+			app: &Application{
+				Name:  Client,
+				Major: 1,
+				Minor: 2,
+				Patch: 3,
+			},
+			expected: "avalanchego/1.2.3",
+		},
+		{
+			app: &Application{
+				Name:  "myClient",
+				Major: 10,
+				Minor: 20,
+				Patch: 30,
+			},
+			expected: "myClient/10.20.30",
+		},
 	}
 
-	require.Equal("avalanchego/1.2.3", v.String())
-	require.NoError(v.Compatible(v))
-	require.False(v.Before(v))
+	for _, test := range tests {
+		t.Run(test.expected, func(t *testing.T) {
+			require.Equal(t, test.expected, test.app.String())
+		})
+	}
 }
 
-func TestComparingVersions(t *testing.T) {
+func TestApplicationSemantic(t *testing.T) {
+	tests := []struct {
+		app  *Application
+		want string
+	}{
+		{
+			app: &Application{
+				Name:  Client,
+				Major: 0,
+				Minor: 0,
+				Patch: 1,
+			},
+			want: "v0.0.1",
+		},
+		{
+			app: &Application{
+				Name:  Client,
+				Major: 1,
+				Minor: 14,
+				Patch: 1,
+			},
+			want: "v1.14.1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			require.Equal(t, tt.want, tt.app.Semantic())
+		})
+	}
+}
+
+func TestApplicationSemanticWithCommit(t *testing.T) {
+	tests := []struct {
+		name      string
+		app       *Application
+		gitCommit string
+		want      string
+	}{
+		{
+			name: "without commit",
+			app: &Application{
+				Name:  Client,
+				Major: 1,
+				Minor: 14,
+				Patch: 1,
+			},
+			gitCommit: "",
+			want:      "v1.14.1",
+		},
+		{
+			name: "with commit",
+			app: &Application{
+				Name:  Client,
+				Major: 1,
+				Minor: 14,
+				Patch: 1,
+			},
+			gitCommit: "abc123",
+			want:      "v1.14.1@abc123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.app.SemanticWithCommit(tt.gitCommit)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestApplicationCompare(t *testing.T) {
 	tests := []struct {
 		myVersion   *Application
 		peerVersion *Application
-		compatible  bool
-		before      bool
+		expected    int
 	}{
 		{
 			myVersion: &Application{
@@ -45,8 +141,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			compatible: true,
-			before:     false,
+			expected: 0,
 		},
 		{
 			myVersion: &Application{
@@ -61,24 +156,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			compatible: true,
-			before:     false,
-		},
-		{
-			myVersion: &Application{
-				Name:  Client,
-				Major: 1,
-				Minor: 2,
-				Patch: 3,
-			},
-			peerVersion: &Application{
-				Name:  Client,
-				Major: 1,
-				Minor: 2,
-				Patch: 4,
-			},
-			compatible: true,
-			before:     true,
+			expected: 1,
 		},
 		{
 			myVersion: &Application{
@@ -93,24 +171,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			compatible: true,
-			before:     false,
-		},
-		{
-			myVersion: &Application{
-				Name:  Client,
-				Major: 1,
-				Minor: 2,
-				Patch: 3,
-			},
-			peerVersion: &Application{
-				Name:  Client,
-				Major: 1,
-				Minor: 3,
-				Patch: 3,
-			},
-			compatible: true,
-			before:     true,
+			expected: 1,
 		},
 		{
 			myVersion: &Application{
@@ -125,36 +186,14 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			compatible: false,
-			before:     false,
-		},
-		{
-			myVersion: &Application{
-				Name:  Client,
-				Major: 1,
-				Minor: 2,
-				Patch: 3,
-			},
-			peerVersion: &Application{
-				Name:  Client,
-				Major: 2,
-				Minor: 2,
-				Patch: 3,
-			},
-			compatible: true,
-			before:     true,
+			expected: 1,
 		},
 	}
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s %s", test.myVersion, test.peerVersion), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s_%s", test.myVersion, test.peerVersion), func(t *testing.T) {
 			require := require.New(t)
-			err := test.myVersion.Compatible(test.peerVersion)
-			if test.compatible {
-				require.NoError(err)
-			} else {
-				require.ErrorIs(err, errDifferentMajor)
-			}
-			require.Equal(test.before, test.myVersion.Before(test.peerVersion))
+			require.Equal(test.expected, test.myVersion.Compare(test.peerVersion))
+			require.Equal(-test.expected, test.peerVersion.Compare(test.myVersion))
 		})
 	}
 }

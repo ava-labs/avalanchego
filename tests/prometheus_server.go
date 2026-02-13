@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tests
@@ -6,6 +6,7 @@ package tests
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"time"
@@ -14,7 +15,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-const defaultPrometheusListenAddr = "127.0.0.1:0"
+const (
+	localhostAddr      = "127.0.0.1"
+	defaultMetricsPort = 0
+)
 
 // PrometheusServer is a HTTP server that serves Prometheus metrics from the provided
 // gahterer.
@@ -27,33 +31,37 @@ type PrometheusServer struct {
 
 // NewPrometheusServer creates and starts a Prometheus server with the provided gatherer
 // listening on 127.0.0.1:0 and serving /ext/metrics.
-func NewPrometheusServer(
-	ctx context.Context,
-	gatherer prometheus.Gatherer,
-) (*PrometheusServer, error) {
+func NewPrometheusServer(ctx context.Context, gatherer prometheus.Gatherer) (*PrometheusServer, error) {
+	return NewPrometheusServerWithPort(ctx, gatherer, defaultMetricsPort)
+}
+
+// NewPrometheusServerWithPort creates and starts a Prometheus server with the provided gatherer
+// listening on 127.0.0.1:port and serving /ext/metrics.
+func NewPrometheusServerWithPort(ctx context.Context, gatherer prometheus.Gatherer, port uint64) (*PrometheusServer, error) {
 	server := &PrometheusServer{
 		gatherer: gatherer,
 	}
 
-	if err := server.start(ctx); err != nil {
+	serverAddress := fmt.Sprintf("%s:%d", localhostAddr, port)
+	if err := server.start(ctx, serverAddress); err != nil {
 		return nil, err
 	}
 
 	return server, nil
 }
 
-// start the Prometheus server on a dynamic port.
-func (s *PrometheusServer) start(ctx context.Context) error {
+// start the Prometheus server on address.
+func (s *PrometheusServer) start(ctx context.Context, address string) error {
 	mux := http.NewServeMux()
 	mux.Handle("/ext/metrics", promhttp.HandlerFor(s.gatherer, promhttp.HandlerOpts{}))
 
 	listener, err := (&net.ListenConfig{}).Listen(
 		ctx,
 		"tcp",
-		defaultPrometheusListenAddr,
+		address,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to listen on %s: %w", address, err)
 	}
 
 	s.server = http.Server{

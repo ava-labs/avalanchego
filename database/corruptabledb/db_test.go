@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package corruptabledb
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -73,7 +72,7 @@ func TestCorruption(t *testing.T) {
 			return corruptableBatch.Write()
 		},
 		"corrupted healthcheck": func(db database.Database) error {
-			_, err := db.HealthCheck(context.Background())
+			_, err := db.HealthCheck(t.Context())
 			return err
 		},
 	}

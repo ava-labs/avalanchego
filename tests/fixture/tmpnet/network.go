@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -462,8 +462,9 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 		return stacktrace.Wrap(err)
 	}
 
-	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	if err := n.CreateSubnets(ctx, log, bootstrapNode, false /* restartRequired */); err != nil {
+	// Affected node IDs can be ignored because the bootstrap node will
+	// always be restarted and other nodes have yet to start.
+	if _, err := n.CreateSubnets(ctx, log, bootstrapNode); err != nil {
 		return stacktrace.Wrap(err)
 	}
 
@@ -480,12 +481,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 		bootstrapNode.Flags[config.SybilProtectionEnabledKey] = *existingSybilProtectionValue
 	}
 
-	// Ensure the bootstrap node is restarted to pick up subnet and chain configuration
-	//
-	// TODO(marun) This restart might be unnecessary if:
-	// - sybil protection didn't change
-	// - the node is not a subnet validator
-	log.Info("restarting bootstrap node",
+	log.Info("restarting bootstrap node to ensure sybil protection and subnet changes take effect",
 		zap.Stringer("nodeID", bootstrapNode.NodeID),
 	)
 	if err := bootstrapNode.Restart(ctx); err != nil {
@@ -620,14 +616,14 @@ func (n *Network) GetSubnet(name string) *Subnet {
 	return nil
 }
 
-// Ensure that each subnet on the network is created. If restartRequired is false, node restart
-// to pick up configuration changes becomes the responsibility of the caller.
-func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node, restartRequired bool) error {
+// Ensure that each subnet on the network is created. Returns the IDs of nodes whose configuration is affected by
+// subnet creation so that they can be restarted if already running.
+func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node) (set.Set[ids.NodeID], error) {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
 	apiURI := apiNode.GetAccessibleURI()
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
-			return stacktrace.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
+			return nil, stacktrace.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
 		}
 		if subnet.SubnetID != ids.Empty {
 			// The subnet already exists
@@ -642,7 +638,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 			// Allocate a pre-funded key and remove it from the network so it won't be used for
 			// other purposes
 			if len(n.PreFundedKeys) == 0 {
-				return stacktrace.Errorf("no pre-funded keys available to create subnet %q", subnet.Name)
+				return nil, stacktrace.Errorf("no pre-funded keys available to create subnet %q", subnet.Name)
 			}
 			subnet.OwningKey = n.PreFundedKeys[len(n.PreFundedKeys)-1]
 			n.PreFundedKeys = n.PreFundedKeys[:len(n.PreFundedKeys)-1]
@@ -650,7 +646,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 
 		// Create the subnet on the network
 		if err := subnet.Create(ctx, apiURI); err != nil {
-			return stacktrace.Wrap(err)
+			return nil, stacktrace.Wrap(err)
 		}
 
 		log.Info("created subnet",
@@ -660,7 +656,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 
 		// Persist the subnet configuration
 		if err := subnet.Write(n.GetSubnetDir()); err != nil {
-			return stacktrace.Wrap(err)
+			return nil, stacktrace.Wrap(err)
 		}
 
 		log.Info("wrote subnet configuration",
@@ -671,15 +667,18 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 	}
 
 	if len(createdSubnets) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Ensure the pre-funded key changes are persisted to disk
 	if err := n.Write(); err != nil {
-		return stacktrace.Wrap(err)
+		return nil, stacktrace.Wrap(err)
 	}
 
-	reconfiguredNodes := []*Node{}
+	// Track the set of nodes that will need to be restarted after subnet creation
+	reconfiguredNodes := set.Set[ids.NodeID]{}
+
+	// Update node configuration to track the new subnets
 	for _, node := range n.Nodes {
 		existingTrackedSubnets := node.Flags[config.TrackSubnetsKey]
 		trackedSubnets := n.TrackedSubnetsForNode(node.NodeID)
@@ -687,31 +686,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 			continue
 		}
 		node.Flags[config.TrackSubnetsKey] = trackedSubnets
-		reconfiguredNodes = append(reconfiguredNodes, node)
-	}
-
-	// TODO(samliok): remove the restart required parameter, and check if subnet configuration requires
-	// a restart instead.
-	if restartRequired {
-		log.Info("restarting node(s) to enable them to track the new subnet(s)")
-
-		runningNodes := make([]*Node, 0, len(reconfiguredNodes))
-		for _, node := range reconfiguredNodes {
-			if node.IsRunning() {
-				runningNodes = append(runningNodes, node)
-			}
-		}
-
-		if err := restartNodes(ctx, runningNodes); err != nil {
-			return stacktrace.Wrap(err)
-		}
-
-		if err := WaitForHealthyNodes(ctx, n.log, runningNodes); err != nil {
-			return stacktrace.Wrap(err)
-		}
-
-		// since we have restarted nodes, refetch the api uri in case it changed
-		apiURI = apiNode.GetAccessibleURI()
+		reconfiguredNodes.Add(node.NodeID)
 	}
 
 	// Add validators for the subnet
@@ -732,25 +707,24 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		if err := subnet.AddValidators(ctx, log, apiURI, validatorNodes...); err != nil {
-			return stacktrace.Wrap(err)
+			return nil, stacktrace.Wrap(err)
 		}
 	}
 
 	// Wait for nodes to become subnet validators
 	pChainClient := platformvm.NewClient(apiURI)
-	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
 		if err := WaitForActiveValidators(ctx, log, pChainClient, subnet); err != nil {
-			return stacktrace.Wrap(err)
+			return nil, stacktrace.Wrap(err)
 		}
 
 		// It should now be safe to create chains for the subnet
 		if err := subnet.CreateChains(ctx, log, apiURI); err != nil {
-			return stacktrace.Wrap(err)
+			return nil, stacktrace.Wrap(err)
 		}
 
 		if err := subnet.Write(n.GetSubnetDir()); err != nil {
-			return stacktrace.Wrap(err)
+			return nil, stacktrace.Wrap(err)
 		}
 		log.Info("wrote subnet configuration",
 			zap.String("name", subnet.Name),
@@ -761,33 +735,11 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		// subnet's validator nodes will need to be restarted for those nodes to read
 		// the newly written chain configuration and apply it to the chain(s).
 		if subnet.HasChainConfig() {
-			validatorsToRestart.Add(subnet.ValidatorIDs...)
+			reconfiguredNodes.Add(subnet.ValidatorIDs...)
 		}
 	}
 
-	if !restartRequired || len(validatorsToRestart) == 0 {
-		return nil
-	}
-
-	log.Info("restarting node(s) to pick up chain configuration")
-
-	// Restart nodes to allow configuration for the new chains to take effect
-	nodesToRestart := make([]*Node, 0, len(n.Nodes))
-	for _, node := range n.Nodes {
-		if validatorsToRestart.Contains(node.NodeID) {
-			nodesToRestart = append(nodesToRestart, node)
-		}
-	}
-
-	if err := restartNodes(ctx, nodesToRestart); err != nil {
-		return stacktrace.Wrap(err)
-	}
-
-	if err := WaitForHealthyNodes(ctx, log, nodesToRestart); err != nil {
-		return stacktrace.Wrap(err)
-	}
-
-	return nil
+	return reconfiguredNodes, nil
 }
 
 func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {

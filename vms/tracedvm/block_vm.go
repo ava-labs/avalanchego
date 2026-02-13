@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracedvm
@@ -20,17 +20,19 @@ import (
 )
 
 var (
-	_ block.ChainVM                      = (*blockVM)(nil)
-	_ block.BuildBlockWithContextChainVM = (*blockVM)(nil)
-	_ block.BatchedChainVM               = (*blockVM)(nil)
-	_ block.StateSyncableVM              = (*blockVM)(nil)
+	_ block.ChainVM                         = (*blockVM)(nil)
+	_ block.BuildBlockWithContextChainVM    = (*blockVM)(nil)
+	_ block.SetPreferenceWithContextChainVM = (*blockVM)(nil)
+	_ block.BatchedChainVM                  = (*blockVM)(nil)
+	_ block.StateSyncableVM                 = (*blockVM)(nil)
 )
 
 type blockVM struct {
 	block.ChainVM
-	buildBlockVM block.BuildBlockWithContextChainVM
-	batchedVM    block.BatchedChainVM
-	ssVM         block.StateSyncableVM
+	buildBlockVM    block.BuildBlockWithContextChainVM
+	setPreferenceVM block.SetPreferenceWithContextChainVM
+	batchedVM       block.BatchedChainVM
+	ssVM            block.StateSyncableVM
 	// ChainVM tags
 	initializeTag              string
 	buildBlockTag              string
@@ -46,6 +48,8 @@ type blockVM struct {
 	verifyWithContextTag       string
 	// BuildBlockWithContextChainVM tags
 	buildBlockWithContextTag string
+	// SetPreferenceWithContextChainVM tags
+	setPreferenceWithContextTag string
 	// BatchedChainVM tags
 	getAncestorsTag      string
 	batchedParseBlockTag string
@@ -62,11 +66,13 @@ type blockVM struct {
 
 func NewBlockVM(vm block.ChainVM, name string, tracer trace.Tracer) block.ChainVM {
 	buildBlockVM, _ := vm.(block.BuildBlockWithContextChainVM)
+	setPreferenceVM, _ := vm.(block.SetPreferenceWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &blockVM{
 		ChainVM:                       vm,
 		buildBlockVM:                  buildBlockVM,
+		setPreferenceVM:               setPreferenceVM,
 		batchedVM:                     batchedVM,
 		ssVM:                          ssVM,
 		initializeTag:                 name + ".initialize",
@@ -82,6 +88,7 @@ func NewBlockVM(vm block.ChainVM, name string, tracer trace.Tracer) block.ChainV
 		shouldVerifyWithContextTag:    name + ".shouldVerifyWithContext",
 		verifyWithContextTag:          name + ".verifyWithContext",
 		buildBlockWithContextTag:      name + ".buildBlockWithContext",
+		setPreferenceWithContextTag:   name + ".setPreferenceWithContext",
 		getAncestorsTag:               name + ".getAncestors",
 		batchedParseBlockTag:          name + ".batchedParseBlock",
 		getBlockIDAtHeightTag:         name + ".getBlockIDAtHeight",

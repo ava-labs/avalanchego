@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
@@ -49,6 +50,8 @@ type BlockHeight = uint64
 type BlockData = []byte
 
 var (
+	_ database.HeightIndex = (*Database)(nil)
+
 	_ encoding.BinaryMarshaler   = (*blockEntryHeader)(nil)
 	_ encoding.BinaryUnmarshaler = (*blockEntryHeader)(nil)
 	_ encoding.BinaryMarshaler   = (*indexEntry)(nil)
@@ -128,15 +131,14 @@ func (e *indexEntry) UnmarshalBinary(data []byte) error {
 
 // indexFileHeader is the header of the index file.
 type indexFileHeader struct {
-	Version             uint64
-	MaxDataFileSize     uint64
-	MinHeight           BlockHeight
-	MaxContiguousHeight BlockHeight
-	MaxHeight           BlockHeight
-	NextWriteOffset     uint64
-	// reserve remaining 16 bytes for future use while keeping the
+	Version         uint64
+	MaxDataFileSize uint64
+	MinHeight       BlockHeight
+	MaxHeight       BlockHeight
+	NextWriteOffset uint64
+	// reserve remaining 24 bytes for future use while keeping the
 	// size of the index file header multiple of sizeOfIndexEntry.
-	Reserved [16]byte
+	Reserved [24]byte
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler for indexFileHeader.
@@ -145,9 +147,8 @@ func (h indexFileHeader) MarshalBinary() ([]byte, error) {
 	binary.LittleEndian.PutUint64(buf[0:], h.Version)
 	binary.LittleEndian.PutUint64(buf[8:], h.MaxDataFileSize)
 	binary.LittleEndian.PutUint64(buf[16:], h.MinHeight)
-	binary.LittleEndian.PutUint64(buf[24:], h.MaxContiguousHeight)
-	binary.LittleEndian.PutUint64(buf[32:], h.MaxHeight)
-	binary.LittleEndian.PutUint64(buf[40:], h.NextWriteOffset)
+	binary.LittleEndian.PutUint64(buf[24:], h.MaxHeight)
+	binary.LittleEndian.PutUint64(buf[32:], h.NextWriteOffset)
 	return buf, nil
 }
 
@@ -162,17 +163,9 @@ func (h *indexFileHeader) UnmarshalBinary(data []byte) error {
 	h.Version = binary.LittleEndian.Uint64(data[0:])
 	h.MaxDataFileSize = binary.LittleEndian.Uint64(data[8:])
 	h.MinHeight = binary.LittleEndian.Uint64(data[16:])
-	h.MaxContiguousHeight = binary.LittleEndian.Uint64(data[24:])
-	h.MaxHeight = binary.LittleEndian.Uint64(data[32:])
-	h.NextWriteOffset = binary.LittleEndian.Uint64(data[40:])
+	h.MaxHeight = binary.LittleEndian.Uint64(data[24:])
+	h.NextWriteOffset = binary.LittleEndian.Uint64(data[32:])
 	return nil
-}
-
-type blockHeights struct {
-	// maxBlockHeight tracks the highest block height that has been written to the db, even if there are gaps in the sequence.
-	maxBlockHeight BlockHeight
-	// maxContiguousHeight tracks the highest block height known to be contiguously stored.
-	maxContiguousHeight BlockHeight
 }
 
 // Database stores blockchain blocks on disk and provides methods to read and write blocks.
@@ -192,8 +185,8 @@ type Database struct {
 	// fileOpenMu prevents race conditions when multiple threads try to open the same data file
 	fileOpenMu sync.Mutex
 
-	// blockHeights holds the max block height and max contiguous height
-	blockHeights atomic.Pointer[blockHeights]
+	// maxBlockHeight tracks the highest block height written
+	maxBlockHeight atomic.Uint64
 	// nextDataWriteOffset tracks the next position to write new data in the data file.
 	nextDataWriteOffset atomic.Uint64
 	// headerWriteOccupied prevents concurrent writes to the index header
@@ -204,7 +197,7 @@ type Database struct {
 // Parameters:
 //   - config: Configuration parameters
 //   - log: Logger instance for structured logging
-func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
+func New(config DatabaseConfig, log logging.Logger) (database.HeightIndex, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -238,6 +231,7 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		zap.String("dataDir", config.DataDir),
 		zap.Uint64("maxDataFileSize", config.MaxDataFileSize),
 		zap.Int("maxDataFiles", config.MaxDataFiles),
+		zap.Uint16("blockCacheSize", config.BlockCacheSize),
 	)
 
 	if err := s.openAndInitializeIndex(); err != nil {
@@ -257,41 +251,16 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		return nil, fmt.Errorf("recovery failed: %w", err)
 	}
 
-	heights := s.getBlockHeights()
+	maxHeight := s.maxBlockHeight.Load()
 	s.log.Info("BlockDB initialized successfully",
 		zap.Uint64("nextWriteOffset", s.nextDataWriteOffset.Load()),
-		zap.Uint64("maxContiguousHeight", heights.maxContiguousHeight),
-		zap.Uint64("maxBlockHeight", heights.maxBlockHeight),
+		zap.Uint64("maxBlockHeight", maxHeight),
 	)
 
+	if config.BlockCacheSize > 0 {
+		return newCacheDB(s, config.BlockCacheSize), nil
+	}
 	return s, nil
-}
-
-// MaxContiguousHeight returns the highest block height known to be contiguously stored.
-func (s *Database) MaxContiguousHeight() (height BlockHeight, found bool) {
-	heights := s.getBlockHeights()
-	if heights.maxContiguousHeight == unsetHeight {
-		return 0, false
-	}
-	return heights.maxContiguousHeight, true
-}
-
-func (s *Database) setBlockHeights(maxBlock, maxContiguous BlockHeight) {
-	heights := &blockHeights{
-		maxBlockHeight:      maxBlock,
-		maxContiguousHeight: maxContiguous,
-	}
-	s.blockHeights.Store(heights)
-}
-
-func (s *Database) updateBlockHeightsAtomically(updateFn func(*blockHeights) *blockHeights) {
-	for {
-		current := s.getBlockHeights()
-		updated := updateFn(current)
-		if s.blockHeights.CompareAndSwap(current, updated) {
-			break
-		}
-	}
 }
 
 // Close flushes pending writes and closes the store files.
@@ -300,7 +269,7 @@ func (s *Database) Close() error {
 	defer s.closeMu.Unlock()
 
 	if s.closed {
-		return nil
+		return database.ErrClosed
 	}
 	s.closed = true
 
@@ -315,16 +284,14 @@ func (s *Database) Close() error {
 	return err
 }
 
-// WriteBlock inserts a block into the store at the given height.
-func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
+// Put inserts a block into the store at the given height.
+func (s *Database) Put(height BlockHeight, block BlockData) error {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
 	if s.closed {
-		s.log.Error("Failed to write block: database is closed",
-			zap.Uint64("height", height),
-		)
-		return ErrDatabaseClosed
+		s.log.Error("Failed Put: database closed", zap.Uint64("height", height))
+		return database.ErrClosed
 	}
 
 	blockSize := len(block)
@@ -334,12 +301,6 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
 			zap.Int("blockSize", blockSize),
 		)
 		return fmt.Errorf("%w: block size cannot exceed %d bytes", ErrBlockTooLarge, math.MaxUint32)
-	}
-
-	blockDataLen := uint32(blockSize)
-	if blockDataLen == 0 {
-		s.log.Error("Failed to write block: empty block", zap.Uint64("height", height))
-		return ErrBlockEmpty
 	}
 
 	indexFileOffset, err := s.indexEntryOffset(height)
@@ -359,7 +320,7 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
 		)
 		return fmt.Errorf("failed to compress block data: %w", err)
 	}
-	blockDataLen = uint32(len(blockToWrite))
+	blockDataLen := uint32(len(blockToWrite))
 
 	sizeWithDataHeader, err := safemath.Add(sizeOfBlockEntryHeader, blockDataLen)
 	if err != nil {
@@ -405,8 +366,8 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
 		return err
 	}
 
-	if err := s.updateBlockHeights(height); err != nil {
-		s.log.Error("Failed to write block: error updating block heights",
+	if err := s.updateBlockMaxHeight(height); err != nil {
+		s.log.Error("Failed to write block: error updating max block height",
 			zap.Uint64("height", height),
 			zap.Error(err),
 		)
@@ -423,37 +384,31 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
 }
 
 // readBlockIndex reads the index entry for the given height.
-// It returns ErrBlockNotFound if the block does not exist.
+// It returns database.ErrNotFound if the block does not exist.
 func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 	var entry indexEntry
-	if s.closed {
-		s.log.Error("Failed to read block index: database is closed",
-			zap.Uint64("height", height),
-		)
-		return entry, ErrDatabaseClosed
-	}
 
 	// Skip the index entry read if we know the block is past the max height.
-	heights := s.getBlockHeights()
-	if heights.maxBlockHeight == unsetHeight {
+	maxHeight := s.maxBlockHeight.Load()
+	if maxHeight == unsetHeight {
 		s.log.Debug("Block not found",
 			zap.Uint64("height", height),
 			zap.String("reason", "no blocks written yet"),
 		)
-		return entry, fmt.Errorf("%w: no blocks written yet", ErrBlockNotFound)
+		return entry, fmt.Errorf("%w: no blocks written yet", database.ErrNotFound)
 	}
-	if height > heights.maxBlockHeight {
+	if height > maxHeight {
 		s.log.Debug("Block not found",
 			zap.Uint64("height", height),
-			zap.Uint64("maxHeight", heights.maxBlockHeight),
+			zap.Uint64("maxHeight", maxHeight),
 			zap.String("reason", "height beyond max"),
 		)
-		return entry, fmt.Errorf("%w: height %d is beyond max height %d", ErrBlockNotFound, height, heights.maxBlockHeight)
+		return entry, fmt.Errorf("%w: height %d is beyond max height %d", database.ErrNotFound, height, maxHeight)
 	}
 
 	entry, err := s.readIndexEntry(height)
 	if err != nil {
-		if errors.Is(err, ErrBlockNotFound) {
+		if errors.Is(err, database.ErrNotFound) {
 			s.log.Debug("Block not found",
 				zap.Uint64("height", height),
 				zap.String("reason", "no index entry found"),
@@ -471,11 +426,16 @@ func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 	return entry, nil
 }
 
-// ReadBlock retrieves a block by its height.
-// Returns ErrBlockNotFound if the block is not found.
-func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
+// Get retrieves a block by its height.
+// Returns database.ErrNotFound if the block is not found.
+func (s *Database) Get(height BlockHeight) (BlockData, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
+
+	if s.closed {
+		s.log.Error("Failed Get: database closed", zap.Uint64("height", height))
+		return nil, database.ErrClosed
+	}
 
 	indexEntry, err := s.readBlockIndex(height)
 	if err != nil {
@@ -530,14 +490,23 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 	return decompressed, nil
 }
 
-// HasBlock checks if a block exists at the given height.
-func (s *Database) HasBlock(height BlockHeight) (bool, error) {
+// Has checks if a block exists at the given height.
+func (s *Database) Has(height BlockHeight) (bool, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
+	if s.closed {
+		s.log.Error("Failed Has: database closed", zap.Uint64("height", height))
+		return false, database.ErrClosed
+	}
+
+	return s.hasWithoutLock(height)
+}
+
+func (s *Database) hasWithoutLock(height BlockHeight) (bool, error) {
 	_, err := s.readBlockIndex(height)
 	if err != nil {
-		if errors.Is(err, ErrBlockNotFound) {
+		if errors.Is(err, database.ErrNotFound) || errors.Is(err, ErrInvalidBlockHeight) {
 			return false, nil
 		}
 		s.log.Error("Failed to check if block exists: failed to read index entry",
@@ -547,6 +516,61 @@ func (s *Database) HasBlock(height BlockHeight) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (s *Database) getDataFileIndexForHeight(height BlockHeight) (int, error) {
+	entry, err := s.readBlockIndex(height)
+	if err != nil {
+		return 0, err
+	}
+	_, _, idx, err := s.getDataFileAndOffset(entry.Offset)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get data file index for height %d: %w", height, err)
+	}
+	return idx, nil
+}
+
+// Sync calls sync on all data files in the range [start, end],
+// assuming data are written in-order. If no data exists at start or end,
+// nothing is synced.
+func (s *Database) Sync(start, end uint64) error {
+	s.closeMu.RLock()
+	defer s.closeMu.RUnlock()
+
+	if s.closed {
+		s.log.Error("Failed Sync: database closed",
+			zap.Uint64("start", start),
+			zap.Uint64("end", end),
+		)
+		return database.ErrClosed
+	}
+
+	firstIdx, err := s.getDataFileIndexForHeight(start)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	lastIdx, err := s.getDataFileIndexForHeight(end)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	for idx := firstIdx; idx <= lastIdx; idx++ {
+		f, err := s.getOrOpenDataFile(idx)
+		if err != nil {
+			return fmt.Errorf("failed to open data file %d: %w", idx, err)
+		}
+		if err := f.Sync(); err != nil {
+			return fmt.Errorf("failed to sync data file %d: %w", idx, err)
+		}
+	}
+
+	return nil
 }
 
 func (s *Database) indexEntryOffset(height BlockHeight) (uint64, error) {
@@ -568,7 +592,7 @@ func (s *Database) indexEntryOffset(height BlockHeight) (uint64, error) {
 }
 
 // readIndexEntry reads the index entry for the given height from the index file.
-// Returns ErrBlockNotFound if the block does not exist.
+// Returns database.ErrNotFound if the block does not exist.
 func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	var entry indexEntry
 
@@ -580,10 +604,10 @@ func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	buf := make([]byte, sizeOfIndexEntry)
 	_, err = s.indexFile.ReadAt(buf, int64(offset))
 	if err != nil {
-		// Return ErrBlockNotFound if trying to read past the end of the index file
+		// Return database.ErrNotFound if trying to read past the end of the index file
 		// for a block that has not been indexed yet.
 		if errors.Is(err, io.EOF) {
-			return entry, fmt.Errorf("%w: EOF reading index entry at offset %d for height %d", ErrBlockNotFound, offset, height)
+			return entry, fmt.Errorf("%w: EOF reading index entry at offset %d for height %d", database.ErrNotFound, offset, height)
 		}
 		return entry, fmt.Errorf("failed to read index entry at offset %d for height %d: %w", offset, height, err)
 	}
@@ -592,7 +616,7 @@ func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	}
 
 	if entry.IsEmpty() {
-		return entry, fmt.Errorf("%w: empty index entry for height %d", ErrBlockNotFound, height)
+		return entry, fmt.Errorf("%w: empty index entry for height %d", database.ErrNotFound, height)
 	}
 
 	return entry, nil
@@ -638,9 +662,7 @@ func (s *Database) persistIndexHeaderInternal() error {
 
 	// Update the header with the current state of the database.
 	header.NextWriteOffset = s.nextDataWriteOffset.Load()
-	heights := s.getBlockHeights()
-	header.MaxContiguousHeight = heights.maxContiguousHeight
-	header.MaxHeight = heights.maxBlockHeight
+	header.MaxHeight = s.maxBlockHeight.Load()
 	headerBytes, err := header.MarshalBinary()
 	if err != nil {
 		return fmt.Errorf("failed to serialize header for writing state: %w", err)
@@ -649,17 +671,6 @@ func (s *Database) persistIndexHeaderInternal() error {
 		return fmt.Errorf("failed to write header state to index file: %w", err)
 	}
 	return nil
-}
-
-func (s *Database) getBlockHeights() *blockHeights {
-	heights := s.blockHeights.Load()
-	if heights == nil {
-		return &blockHeights{
-			maxBlockHeight:      unsetHeight,
-			maxContiguousHeight: unsetHeight,
-		}
-	}
-	return heights
 }
 
 // recover detects and recovers unindexed blocks by scanning data files and updating the index.
@@ -682,9 +693,9 @@ func (s *Database) recover() error {
 	}
 
 	// ensure no data files are missing
-	// If any data files are missing, we would need to recalculate the max height
-	// and max contiguous height. This can be supported in the future but for now
-	// to keep things simple, we will just error if the data files are not as expected.
+	// If any data files are missing, we would need to recalculate the max height.
+	// This can be supported in the future but for now to keep things simple,
+	// we will just error if the data files are not as expected.
 	for i := 0; i <= maxIndex; i++ {
 		if _, exists := dataFiles[i]; !exists {
 			return fmt.Errorf("%w: data file at index %d is missing", ErrCorrupted, i)
@@ -735,9 +746,12 @@ func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
 		zap.Uint64("endOffset", endOffset),
 	)
 
-	// Start scan from where the index left off.
-	currentScanOffset := startOffset
-	recoveredHeights := make([]BlockHeight, 0)
+	var (
+		// Start scan from where the index left off.
+		currentScanOffset   = startOffset
+		numRecoveredHeights int
+		maxRecoveredHeight  BlockHeight
+	)
 	for currentScanOffset < endOffset {
 		bh, err := s.recoverBlockAtOffset(currentScanOffset, endOffset)
 		if err != nil {
@@ -760,7 +774,8 @@ func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
 			zap.Uint32("blockSize", bh.Size),
 			zap.Uint64("dataOffset", currentScanOffset),
 		)
-		recoveredHeights = append(recoveredHeights, bh.Height)
+		numRecoveredHeights++
+		maxRecoveredHeight = max(maxRecoveredHeight, bh.Height)
 		blockTotalSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(bh.Size))
 		if err != nil {
 			return fmt.Errorf("recovery: overflow in block size calculation: %w", err)
@@ -772,10 +787,12 @@ func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
 	}
 	s.nextDataWriteOffset.Store(currentScanOffset)
 
-	// Update block heights based on recovered blocks
-	if len(recoveredHeights) > 0 {
-		if err := s.updateRecoveredBlockHeights(recoveredHeights); err != nil {
-			return fmt.Errorf("recovery: failed to update block heights: %w", err)
+	// Update the max block height if max recovered height is greater than
+	// the current max height.
+	if numRecoveredHeights > 0 {
+		currentMaxHeight := s.maxBlockHeight.Load()
+		if maxRecoveredHeight > currentMaxHeight || currentMaxHeight == unsetHeight {
+			s.maxBlockHeight.Store(maxRecoveredHeight)
 		}
 	}
 
@@ -783,12 +800,11 @@ func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
 		return fmt.Errorf("recovery: failed to save index header after recovery scan: %w", err)
 	}
 
-	heights := s.getBlockHeights()
+	maxHeight := s.maxBlockHeight.Load()
 	s.log.Info("Recovery: Scan finished",
-		zap.Int("recoveredBlocks", len(recoveredHeights)),
+		zap.Int("recoveredBlocks", numRecoveredHeights),
 		zap.Uint64("finalNextWriteOffset", s.nextDataWriteOffset.Load()),
-		zap.Uint64("maxContiguousBlockHeight", heights.maxContiguousHeight),
-		zap.Uint64("maxBlockHeight", heights.maxBlockHeight),
+		zap.Uint64("maxBlockHeight", maxHeight),
 	)
 	return nil
 }
@@ -929,14 +945,13 @@ func (s *Database) loadOrInitializeHeader() error {
 	if fileInfo.Size() == 0 {
 		s.log.Info("Index file is empty, writing initial index file header")
 		s.header = indexFileHeader{
-			Version:             IndexFileVersion,
-			MinHeight:           s.config.MinimumHeight,
-			MaxDataFileSize:     s.config.MaxDataFileSize,
-			MaxHeight:           unsetHeight,
-			MaxContiguousHeight: unsetHeight,
-			NextWriteOffset:     0,
+			Version:         IndexFileVersion,
+			MinHeight:       s.config.MinimumHeight,
+			MaxDataFileSize: s.config.MaxDataFileSize,
+			MaxHeight:       unsetHeight,
+			NextWriteOffset: 0,
 		}
-		s.setBlockHeights(unsetHeight, unsetHeight)
+		s.maxBlockHeight.Store(unsetHeight)
 
 		headerBytes, err := s.header.MarshalBinary()
 		if err != nil {
@@ -964,7 +979,7 @@ func (s *Database) loadOrInitializeHeader() error {
 		return fmt.Errorf("mismatched index file version: found %d, expected %d", s.header.Version, IndexFileVersion)
 	}
 	s.nextDataWriteOffset.Store(s.header.NextWriteOffset)
-	s.setBlockHeights(s.header.MaxHeight, s.header.MaxContiguousHeight)
+	s.maxBlockHeight.Store(s.header.MaxHeight)
 	s.logConfigAndHeaderMismatches()
 
 	return nil
@@ -1087,59 +1102,17 @@ func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockD
 	}
 }
 
-func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
-	s.updateBlockHeightsAtomically(func(current *blockHeights) *blockHeights {
-		updated := &blockHeights{
-			maxBlockHeight:      current.maxBlockHeight,
-			maxContiguousHeight: current.maxContiguousHeight,
+func (s *Database) updateBlockMaxHeight(writtenBlockHeight BlockHeight) error {
+	for {
+		maxHeight := s.maxBlockHeight.Load()
+		if writtenBlockHeight <= maxHeight && maxHeight != unsetHeight {
+			break
 		}
-
-		// Update max block height if needed
-		if writtenBlockHeight > current.maxBlockHeight || current.maxBlockHeight == unsetHeight {
-			updated.maxBlockHeight = writtenBlockHeight
+		if s.maxBlockHeight.CompareAndSwap(maxHeight, writtenBlockHeight) {
+			break
 		}
-
-		// Update max contiguous height logic
-		prevContiguousCandidate := uint64(unsetHeight)
-		if writtenBlockHeight > s.header.MinHeight {
-			prevContiguousCandidate = writtenBlockHeight - 1
-		}
-
-		if current.maxContiguousHeight == prevContiguousCandidate {
-			// We can extend the contiguous sequence. Try to extend it further
-			// by checking if the next height is also available, which would repair gaps in the sequence.
-			currentMax := writtenBlockHeight
-			for {
-				nextHeightToVerify, err := safemath.Add(currentMax, 1)
-				if err != nil {
-					s.log.Error("Failed to update block heights: overflow in height calculation",
-						zap.Uint64("currentMax", currentMax),
-						zap.Error(err),
-					)
-					break
-				}
-				// Check if we have indexed a block at the next height, which would extend our contiguous sequence
-				_, err = s.readIndexEntry(nextHeightToVerify)
-				if err != nil {
-					// If no block exists at this height, we've reached the end of our contiguous sequence
-					if errors.Is(err, ErrBlockNotFound) {
-						break
-					}
-
-					// log unexpected error
-					s.log.Error("Failed to update block heights: error reading index entry",
-						zap.Uint64("height", nextHeightToVerify),
-						zap.Error(err),
-					)
-					break
-				}
-				currentMax = nextHeightToVerify
-			}
-			updated.maxContiguousHeight = currentMax
-		}
-
-		return updated
-	})
+		// If CAS failed, retry with the new max height
+	}
 
 	// Check if we need to persist header on checkpoint interval
 	if writtenBlockHeight%s.config.CheckpointInterval == 0 {
@@ -1147,54 +1120,6 @@ func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
 			return fmt.Errorf("block %d written, but checkpoint failed: %w", writtenBlockHeight, err)
 		}
 	}
-
-	return nil
-}
-
-func (s *Database) updateRecoveredBlockHeights(recoveredHeights []BlockHeight) error {
-	if len(recoveredHeights) == 0 {
-		return nil
-	}
-
-	// Find the maximum block height among recovered blocks
-	maxRecoveredHeight := recoveredHeights[0]
-	for _, height := range recoveredHeights[1:] {
-		if height > maxRecoveredHeight {
-			maxRecoveredHeight = height
-		}
-	}
-
-	// Update max block height (no CAS needed since we're single-threaded during recovery)
-	currentHeights := s.getBlockHeights()
-	currentMaxHeight := currentHeights.maxBlockHeight
-	if maxRecoveredHeight > currentMaxHeight || currentMaxHeight == unsetHeight {
-		currentMaxHeight = maxRecoveredHeight
-	}
-
-	// Update max contiguous height by extending from current max contiguous height
-	currentMaxContiguous := currentHeights.maxContiguousHeight
-	nextHeightToVerify := s.header.MinHeight
-	if currentMaxContiguous != unsetHeight {
-		nextHeightToVerify = currentMaxContiguous + 1
-	}
-	for {
-		_, err := s.readIndexEntry(nextHeightToVerify)
-		if err != nil {
-			// If no block exists at this height, we've reached the end of our contiguous sequence
-			if errors.Is(err, ErrBlockNotFound) {
-				break
-			}
-
-			// Log unexpected error but continue
-			s.log.Error("Failed to update recovered block heights: error reading index entry",
-				zap.Uint64("height", nextHeightToVerify),
-				zap.Error(err),
-			)
-			return err
-		}
-		nextHeightToVerify++
-	}
-	s.setBlockHeights(currentMaxHeight, nextHeightToVerify-1)
 
 	return nil
 }

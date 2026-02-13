@@ -1,5 +1,81 @@
 # Release Notes
 
+## Pending (v1.14.2)
+
+### Config
+
+- Removed `pull-gossip-poll-size` from the X-chain and P-chain configs.
+- Removed `proposerMinBlockDelay` from subnet configs.
+
+### Fixes
+
+- Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space.
+- Updated minimum go version to `v1.25.7`.
+
+## [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1)
+
+This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `44` and is compatible with version `v1.14.0`.
+
+### Config
+
+- Added:
+  - `--system-tracker-disk-required-available-space-percentage`
+  - `--system-tracker-disk-warning-available-space-percentage`
+- Deprecated:
+  - `--system-tracker-disk-required-available-space`
+  - `--system-tracker-disk-warning-threshold-available-space`
+
+### EVM
+
+- Removed `avax.version` API
+- Removed `customethclient` package in favor of `ethclient` package and temporary type registrations (`WithTempRegisteredLibEVMExtras`)
+  - Removed blockHook extension in `ethclient` package.
+- Enabled Firewood to run with pruning disabled.
+  - This change modified the filepath of Firewood. Any nodes using Firewood will need to resync.
+
+### What's Changed
+
+The changelog is omitted, as the Coreth and Subnet-EVM repositories were grafted into the repository.
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.0...v1.14.1
+
+## [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0)
+
+This release schedules the activation of the following Avalanche Community Proposals (ACPs):
+- [ACP-181](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/181-p-chain-epoched-views/README.md) P-Chain Epoched Views
+- [ACP-204](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/204-precompile-secp256r1/README.md) Precompile for secp256r1 Curve Support
+- [ACP-226](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md) Dynamic Minimum Block Times
+
+The ACPs in this upgrade go into effect at 11 AM ET (4 PM UTC) on Wednesday, November 19th, 2025 on Mainnet.
+
+**All Mainnet nodes must upgrade before 11 AM ET, November 19th 2025.**
+
+The plugin version is updated to `44`; all plugins must update to be compatible.
+
+### LibEVM Hook Registration
+
+This release includes changes for how EVM modifications are registered with libevm. For consumers of avalanchego as a library, manual registration of libevm callbacks is now required.
+
+### APIs
+
+- Added support for specifying multiple `Avalanche-Api-Route` headers for more complex routing.
+- Added proposervm gRPC, connectrpc, and jsonrpc APIs for `GetProposedHeight` and `GetCurrentEpoch`.
+  - The gRPC and connectrpc APIs are routed by adding a second `Avalanche-Api-Route` header with the value `proposervm`.
+  - The jsonrpc APIs are added to all chains with the base endpoint `/proposervm`.
+- Added platformvm `platform.GetAllValidatorsAt` API.
+
+### Configs
+
+- Changed default `proposerMinBlockDelay` for L1s (other than Primary Network) to 0.
+
+### Fixes
+
+- Improved bootstrapping ETA predictions.
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.5...v1.14.0
+
 ## [v1.13.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.5)
 
 This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged.
@@ -4923,3 +4999,10 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 ### ProposerVM
 
 - Updated block `Delay` in `--staking-enabled=false` networks to be `0`.
+
+## Historical Note
+
+In the past, [subnet-evm](./graft/subnet-evm) and [coreth](./graft/coreth) were their own repositories. Their change logs are preserved for posterity here:
+
+- coreth [RELEASES.MD](https://github.com/ava-labs/coreth/blob/master/RELEASES.md)
+- subnet-evm [RELEASES.MD](https://github.com/ava-labs/subnet-evm/blob/master/RELEASES.md)

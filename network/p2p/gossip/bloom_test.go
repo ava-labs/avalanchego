@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
@@ -10,67 +10,61 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestBloomFilterRefresh(t *testing.T) {
+	const (
+		minTargetElements              = 1
+		targetFalsePositiveProbability = 0.000001
+	)
 	tests := []struct {
-		name                           string
-		minTargetElements              int
-		targetFalsePositiveProbability float64
-		resetFalsePositiveProbability  float64
-		resetCount                     uint64
-		add                            []*testTx
-		expected                       []*testTx
+		name                          string
+		resetFalsePositiveProbability float64
+		resetCount                    uint64
+		add                           []tx
+		expected                      []tx
 	}{
 		{
-			name:                           "no refresh",
-			minTargetElements:              1,
-			targetFalsePositiveProbability: 0.01,
-			resetFalsePositiveProbability:  1,
-			resetCount:                     0, // maxCount = 9223372036854775807
-			add: []*testTx{
-				{id: ids.ID{0}},
-				{id: ids.ID{1}},
-				{id: ids.ID{2}},
+			name:                          "no refresh",
+			resetFalsePositiveProbability: 1,
+			resetCount:                    0, // maxCount = 9223372036854775807
+			add: []tx{
+				{0},
+				{1},
+				{2},
 			},
-			expected: []*testTx{
-				{id: ids.ID{0}},
-				{id: ids.ID{1}},
-				{id: ids.ID{2}},
+			expected: []tx{
+				{0},
+				{1},
+				{2},
 			},
 		},
 		{
-			name:                           "refresh",
-			minTargetElements:              1,
-			targetFalsePositiveProbability: 0.01,
-			resetFalsePositiveProbability:  0.0000000000000001, // maxCount = 1
-			resetCount:                     1,
-			add: []*testTx{
-				{id: ids.ID{0}},
-				{id: ids.ID{1}},
-				{id: ids.ID{2}},
+			name:                          "refresh",
+			resetFalsePositiveProbability: 0.0000000000000001, // maxCount = 1
+			resetCount:                    1,
+			add: []tx{
+				{0},
+				{1},
+				{2},
 			},
-			expected: []*testTx{
-				{id: ids.ID{2}},
+			expected: []tx{
+				{2},
 			},
 		},
 		{
-			name:                           "multiple refresh",
-			minTargetElements:              1,
-			targetFalsePositiveProbability: 0.01,
-			resetFalsePositiveProbability:  0.0000000000000001, // maxCount = 1
-			resetCount:                     2,
-			add: []*testTx{
-				{id: ids.ID{0}},
-				{id: ids.ID{1}},
-				{id: ids.ID{2}},
-				{id: ids.ID{3}},
-				{id: ids.ID{4}},
+			name:                          "multiple refresh",
+			resetFalsePositiveProbability: 0.0000000000000001, // maxCount = 1
+			resetCount:                    2,
+			add: []tx{
+				{0},
+				{1},
+				{2},
+				{3},
+				{4},
 			},
-			expected: []*testTx{
-				{id: ids.ID{4}},
+			expected: []tx{
+				{4},
 			},
 		},
 	}
@@ -78,24 +72,27 @@ func TestBloomFilterRefresh(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", tt.minTargetElements, tt.targetFalsePositiveProbability, tt.resetFalsePositiveProbability)
+			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", minTargetElements, targetFalsePositiveProbability, tt.resetFalsePositiveProbability)
 			require.NoError(err)
 
 			var resetCount uint64
 			for _, item := range tt.add {
-				bloomBytes, saltBytes := bloom.Marshal()
-				initialBloomBytes := slices.Clone(bloomBytes)
-				initialSaltBytes := slices.Clone(saltBytes)
+				bloomFilter, salt := bloom.BloomFilter()
+				initialBloomBytes := slices.Clone(bloomFilter.Marshal())
+				initialSaltBytes := slices.Clone(salt[:])
 
 				reset, err := ResetBloomFilterIfNeeded(bloom, len(tt.add))
 				require.NoError(err)
 				if reset {
 					resetCount++
 				}
-				bloom.Add(item)
+				require.Equal(initialBloomBytes, bloomFilter.Marshal())
+				require.Equal(initialSaltBytes, salt[:])
 
-				require.Equal(initialBloomBytes, bloomBytes)
-				require.Equal(initialSaltBytes, saltBytes)
+				// If the bloom filter wasn't reset, adding an item may modify
+				// the returned bloom filter, so this must be done after the
+				// checks.
+				bloom.Add(item)
 			}
 
 			require.Equal(tt.resetCount, resetCount)

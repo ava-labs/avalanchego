@@ -7,6 +7,19 @@ if ! [[ "$0" =~ scripts/lint.sh ]]; then
   exit 255
 fi
 
+# Root-level directories to exclude from linting
+EXCLUDE_DIRS=(
+  graft    # Grafted modules have their own lint config
+  .direnv  # direnv cache
+  .idea    # GoLand
+)
+
+# Pre-build find exclusion args (root-level only)
+FIND_EXCLUDES=()
+for dir in "${EXCLUDE_DIRS[@]}"; do
+  FIND_EXCLUDES+=(! -path "./${dir}/*")
+done
+
 # The -P option is not supported by the grep version installed by
 # default on macos. Since `-o errexit` is ignored in an if
 # conditional, triggering the problem here ensures script failure when
@@ -29,11 +42,15 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
+TESTS=${TESTS:-"golangci_lint warn_testify_assert license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
   ./scripts/run_tool.sh golangci-lint run --config .golangci.yml
 }
+
+# Source shared helper for testify/assert warnings (provides test_warn_testify_assert)
+# shellcheck disable=SC1091
+source ./scripts/lint_warn_assert.sh
 
 # automatically checks license headers
 # to modify the file headers (if missing), remove "--verify" flag
@@ -49,7 +66,8 @@ function test_license_header {
       ! -name 'mocks_*.go' \
       ! -path './**/*mock/*.go' \
       ! -name '*.canoto.go' \
-      ! -name '*.bindings.go'
+      ! -name '*.bindings.go' \
+      "${FIND_EXCLUDES[@]}"
     )
 
   # shellcheck disable=SC2086
@@ -60,21 +78,21 @@ function test_license_header {
 }
 
 function test_single_import {
-  if grep -R -zo -P 'import \(\n\t".*"\n\)' .; then
+  if find . -type f -name '*.go' "${FIND_EXCLUDES[@]}" -print0 | xargs -0 grep -zo -P 'import \(\n\t".*"\n\)'; then
     echo ""
     return 1
   fi
 }
 
 function test_require_error_is_no_funcs_as_params {
-  if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
+  if find . -type f -name '*.go' "${FIND_EXCLUDES[@]}" -print0 | xargs -0 grep -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n'; then
     echo ""
     return 1
   fi
 }
 
 function test_require_no_error_inline_func {
-  if grep -R -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
+  if find . -type f -name '*.go' "${FIND_EXCLUDES[@]}" -print0 | xargs -0 grep -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)'; then
     echo ""
     echo "Checking that a function with a single error return doesn't error should be done in-line."
     echo ""
@@ -84,7 +102,7 @@ function test_require_no_error_inline_func {
 
 # Ref: https://go.dev/doc/effective_go#blank_implements
 function test_interface_compliance_nil {
-  if grep -R -o -P '_ .+? = &.+?\{\}' .; then
+  if find . -type f -name '*.go' "${FIND_EXCLUDES[@]}" -print0 | xargs -0 grep -o -P '_ .+? = &.+?\{\}'; then
     echo ""
     echo "Interface compliance checks need to be of the form:"
     echo "  var _ json.Marshaler = (*RawMessage)(nil)"
@@ -95,11 +113,16 @@ function test_interface_compliance_nil {
 
 function test_import_testing_only_in_tests {
   ROOT=$( git rev-parse --show-toplevel )
-  NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' ! -path "${ROOT}/tests/*" );
+  # Build exclusions with absolute paths (ROOT prefix)
+  local exclude_paths=(! -path "${ROOT}/tests/*")
+  for dir in "${EXCLUDE_DIRS[@]}"; do
+    exclude_paths+=(! -path "${ROOT}/${dir}/*")
+  done
+  NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' "${exclude_paths[@]}" );
 
   IMPORT_TESTING=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"');
   IMPORT_TESTIFY=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/stretchr/testify');
-  IMPORT_FROM_TESTS=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/ava-labs/avalanchego/tests/');
+  IMPORT_FROM_TESTS=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/ava-labs/avalanchego/.*?tests/');
   IMPORT_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '"github.com/ava-labs/avalanchego/.*?test"');
 
   # TODO(arr4n): send a PR to add support for build tags in `mockgen` and then enable this.

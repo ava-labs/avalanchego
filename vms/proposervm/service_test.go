@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,24 +16,20 @@ import (
 	"github.com/ava-labs/avalanchego/api/connectclient"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
 func TestConnectRPCService_GetProposedHeight(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-	)
 	const pChainHeight = 123
-	_, _, vm, _ := initTestProposerVM(t, activationTime, durangoTime, pChainHeight)
+	_, _, vm, _ := initTestProposerVM(t, upgradetest.Latest, pChainHeight)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	// Test through the exported NewHTTPHandler API
-	handler, err := vm.NewHTTPHandler(context.Background())
+	handler, err := vm.NewHTTPHandler(t.Context())
 	require.NoError(err)
 	require.NotNil(handler)
 
@@ -53,7 +48,7 @@ func TestConnectRPCService_GetProposedHeight(t *testing.T) {
 
 	// Test the GetProposedHeight endpoint
 	req := connect.NewRequest(&proposervm.GetProposedHeightRequest{})
-	resp, err := client.GetProposedHeight(context.Background(), req)
+	resp, err := client.GetProposedHeight(t.Context(), req)
 	require.NoError(err)
 	require.NotNil(resp)
 	require.NotNil(resp.Msg)
@@ -65,14 +60,10 @@ func TestConnectRPCService_GetProposedHeight(t *testing.T) {
 func TestJSONRPCService_GetProposedHeight(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-	)
 	const pChainHeight = 123
-	_, _, vm, _ := initTestProposerVM(t, activationTime, durangoTime, pChainHeight)
+	_, _, vm, _ := initTestProposerVM(t, upgradetest.Latest, pChainHeight)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	s := &jsonrpcService{vm: vm}

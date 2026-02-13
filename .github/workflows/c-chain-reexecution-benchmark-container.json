@@ -3,11 +3,7 @@
         "include": [
             {
                 "runner": "ubuntu-latest",
-                "config": "default",
-                "start-block": 101,
-                "end-block": 250000,
-                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
+                "test": "hashdb-101-250k",
                 "timeout-minutes": 30
             },
             {
@@ -15,8 +11,8 @@
                 "config": "default",
                 "start-block": 101,
                 "end-block": 250000,
-                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
+                "block-dir-src": "cchain-mainnet-blocks-1m-ldb",
+                "current-state-dir-src": "cchain-current-state-hashdb-full-100",
                 "timeout-minutes": 30
             }
         ]
@@ -25,20 +21,27 @@
         "include": [
             {
                 "runner": "avago-runner-m6i-4xlarge-ebs-fast",
-                "config": "default",
-                "start-block": 33000001,
-                "end-block": 33500000,
-                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-30m-40m-ldb/**",
-                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-33m/**",
+                "test": "hashdb-33m-33m500k",
                 "timeout-minutes": 1440
             },
             {
                 "runner": "avago-runner-i4i-4xlarge-local-ssd",
-                "config": "default",
-                "start-block": 33000001,
-                "end-block": 33500000,
-                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-30m-40m-ldb/**",
-                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-33m/**",
+                "test": "hashdb-33m-33m500k",
+                "timeout-minutes": 1440
+            },
+            {
+                "runner": "avago-runner-i4i-4xlarge-local-ssd",
+                "test": "hashdb-archive-ssc-69m-69m100k",
+                "timeout-minutes": 1440
+            },
+            {
+                "runner": "avago-runner-i4i-4xlarge-local-ssd",
+                "test": "hashdb-69m-69m100k",
+                "timeout-minutes": 1440
+            },
+            {
+                "runner": "avago-runner-i4i-16xlarge-local-ssd",
+                "test": "hashdb-archive-69m-69m100k",
                 "timeout-minutes": 1440
             }
         ]

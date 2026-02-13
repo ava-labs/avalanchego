@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -159,7 +159,7 @@ func newDefaultResourceTracker() tracker.ResourceTracker {
 	return tracker
 }
 
-func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
+func newTestNetwork(t *testing.T, count int, baseConfig Config) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
 	var (
 		dialer    = newTestDialer()
 		listeners = make([]*testListener, count)
@@ -179,7 +179,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		blsKey, err := localsigner.New()
 		require.NoError(t, err)
 
-		config := defaultConfig
+		config := baseConfig
 		config.TLSConfig = peer.TLSConfig(*tlsCert, nil)
 		config.MyNodeID = nodeID
 		config.MyIPPort = utils.NewAtomic(ip)
@@ -209,7 +209,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *errgroup.Group) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers), defaultConfig)
 
 	var (
 		networks = make([]*network, len(configs))
@@ -316,7 +316,7 @@ func TestNewNetwork(t *testing.T) {
 func TestIngressConnCount(t *testing.T) {
 	require := require.New(t)
 
-	emptyHandler := func(context.Context, message.InboundMessage) {}
+	emptyHandler := func(context.Context, *message.InboundMessage) {}
 
 	_, networks, eg := newFullyConnectedTestNetwork(
 		t, []router.InboundHandler{
@@ -343,7 +343,7 @@ func TestIngressConnCount(t *testing.T) {
 	for _, net := range networks {
 		connCount := net.IngressConnCount()
 		ingressConnCount.Add(connCount)
-		_, err := net.HealthCheck(context.Background())
+		_, err := net.HealthCheck(t.Context())
 		if connCount == 0 {
 			require.ErrorContains(err, ErrNoIngressConnections.Error()) //nolint
 		} else {
@@ -367,17 +367,17 @@ func TestIngressConnCount(t *testing.T) {
 func TestSend(t *testing.T) {
 	require := require.New(t)
 
-	received := make(chan message.InboundMessage)
+	received := make(chan *message.InboundMessage)
 	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
 		[]router.InboundHandler{
-			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
 				require.FailNow("unexpected message received")
 			}),
-			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
+			router.InboundHandlerFunc(func(_ context.Context, msg *message.InboundMessage) {
 				received <- msg
 			}),
-			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
 				require.FailNow("unexpected message received")
 			}),
 		},
@@ -401,7 +401,7 @@ func TestSend(t *testing.T) {
 	require.Equal(toSend, sentTo)
 
 	inboundGetMsg := <-received
-	require.Equal(message.GetOp, inboundGetMsg.Op())
+	require.Equal(message.GetOp, inboundGetMsg.Op)
 
 	for _, net := range networks {
 		net.StartClose()
@@ -412,17 +412,17 @@ func TestSend(t *testing.T) {
 func TestSendWithFilter(t *testing.T) {
 	require := require.New(t)
 
-	received := make(chan message.InboundMessage)
+	received := make(chan *message.InboundMessage)
 	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
 		[]router.InboundHandler{
-			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
 				require.FailNow("unexpected message received")
 			}),
-			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
+			router.InboundHandlerFunc(func(_ context.Context, msg *message.InboundMessage) {
 				received <- msg
 			}),
-			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
 				require.FailNow("unexpected message received")
 			}),
 		},
@@ -448,7 +448,7 @@ func TestSendWithFilter(t *testing.T) {
 	require.Contains(sentTo, validNodeID)
 
 	inboundGetMsg := <-received
-	require.Equal(message.GetOp, inboundGetMsg.Op())
+	require.Equal(message.GetOp, inboundGetMsg.Op)
 
 	for _, net := range networks {
 		net.StartClose()
@@ -504,7 +504,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2, defaultConfig)
 
 	networks := make([]Network, len(configs))
 	for i, config := range configs {
@@ -580,10 +580,12 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	require.NoError(eg.Wait())
 }
 
-func TestDialDeletesNonValidators(t *testing.T) {
+func testDialDeletesNonValidators(t *testing.T, connectToAllValidators bool) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
+	inputConfig := defaultConfig
+	inputConfig.ConnectToAllValidators = connectToAllValidators
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2, inputConfig)
 
 	vdrs := validators.NewManager()
 	for _, nodeID := range nodeIDs {
@@ -676,6 +678,15 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	require.NoError(eg.Wait())
 }
 
+func TestDialDeletesNonValidators(t *testing.T) {
+	t.Run("connectToAllValidators=false", func(t *testing.T) {
+		testDialDeletesNonValidators(t, false)
+	})
+	t.Run("connectToAllValidators=true", func(t *testing.T) {
+		testDialDeletesNonValidators(t, true)
+	})
+}
+
 // Test that cancelling the context passed into dial
 // causes dial to return immediately.
 func TestDialContext(t *testing.T) {
@@ -739,7 +750,7 @@ func TestDialContext(t *testing.T) {
 func TestAllowConnectionAsAValidator(t *testing.T) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2, defaultConfig)
 
 	networks := make([]Network, len(configs))
 	for i, config := range configs {
@@ -814,7 +825,7 @@ func TestGetAllPeers(t *testing.T) {
 	require := require.New(t)
 
 	// Create a non-validator peer
-	dialer, listeners, nonVdrNodeIDs, configs := newTestNetwork(t, 1)
+	dialer, listeners, nonVdrNodeIDs, configs := newTestNetwork(t, 1, defaultConfig)
 
 	configs[0].Beacons = validators.NewManager()
 	configs[0].Validators = validators.NewManager()

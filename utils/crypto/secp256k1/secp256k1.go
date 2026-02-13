@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1
@@ -262,11 +262,19 @@ func (k *PrivateKey) UnmarshalJSON(b []byte) error {
 	}
 
 	strNoQuotes := str[1:lastIndex]
-	if !strings.HasPrefix(strNoQuotes, PrivateKeyPrefix) {
+	return k.unmarshalText(strNoQuotes)
+}
+
+func (k *PrivateKey) UnmarshalText(text []byte) error {
+	return k.unmarshalText(string(text))
+}
+
+func (k *PrivateKey) unmarshalText(text string) error {
+	if !strings.HasPrefix(text, PrivateKeyPrefix) {
 		return errMissingKeyPrefix
 	}
 
-	strNoPrefix := strNoQuotes[len(PrivateKeyPrefix):]
+	strNoPrefix := text[len(PrivateKeyPrefix):]
 	keyBytes, err := cb58.Decode(strNoPrefix)
 	if err != nil {
 		return err
@@ -280,10 +288,6 @@ func (k *PrivateKey) UnmarshalJSON(b []byte) error {
 		bytes: keyBytes,
 	}
 	return nil
-}
-
-func (k *PrivateKey) UnmarshalText(text []byte) error {
-	return k.UnmarshalJSON(text)
 }
 
 // raw sig has format [v || r || s] whereas the sig has format [r || s || v]

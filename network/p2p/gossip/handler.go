@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
@@ -16,12 +16,24 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ p2p.Handler = (*Handler[*testTx])(nil)
+var _ p2p.Handler = (*Handler[Gossipable])(nil)
+
+// HandlerSet exposes the ability to add new values to the set in response to
+// pushed information and for responding to pull requests.
+//
+// TODO: Consider naming this interface based on what it provides rather than
+// how its used.
+type HandlerSet[T Gossipable] interface {
+	// Add adds a value to the set. Returns an error if v was not added.
+	Add(v T) error
+	// Iterate iterates over elements until f returns false.
+	Iterate(f func(v T) bool)
+}
 
 func NewHandler[T Gossipable](
 	log logging.Logger,
 	marshaller Marshaller[T],
-	set Set[T],
+	set HandlerSet[T],
 	metrics Metrics,
 	targetResponseSize int,
 ) *Handler[T] {
@@ -39,7 +51,7 @@ type Handler[T Gossipable] struct {
 	p2p.Handler
 	marshaller         Marshaller[T]
 	log                logging.Logger
-	set                Set[T]
+	set                HandlerSet[T]
 	metrics            Metrics
 	targetResponseSize int
 }

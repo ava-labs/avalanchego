@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package resource
@@ -9,6 +9,10 @@ import "math"
 var NoUsage User = noUsage{}
 
 type noUsage struct{}
+
+func (noUsage) AvailableDiskPercentage() uint64 {
+	return 100
+}
 
 func (noUsage) CPUUsage() float64 {
 	return 0

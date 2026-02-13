@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -125,15 +125,15 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 		return stacktrace.Errorf("writing node flags: %w", err)
 	}
 
-	// Ensure process is detached from the parent process so that an error in the
-	// parent will not affect the child.
+	// All arguments are provided in the flags file
 	cmd := exec.CommandContext(
 		context.WithoutCancel(ctx),
 		runtimeConfig.AvalancheGoPath,
-		// All arguments are provided in the flags file
 		"--config-file",
 		p.node.GetFlagsPath(),
 	) // #nosec G204
+
+	// Ensure process is detached from the parent process so that an error in the parent will not affect the child
 	configureDetachedProcess(cmd)
 
 	if err := cmd.Start(); err != nil {

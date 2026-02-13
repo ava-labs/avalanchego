@@ -29,23 +29,45 @@ issues:
   # Maximum count of issues with the same text.
   max-same-issues: 0
 
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - blank
+        - prefix(github.com/ava-labs/avalanchego)
+        - alias
+        - dot
+      custom-order: true
+  exclusions:
+    generated: lax
+
 linters:
   default: none
   enable:
     - asciicheck
+    - bidichk
     - bodyclose
     - copyloopvar
     - depguard
+    - durationcheck
     - errcheck
     - errorlint
     - forbidigo
     - goconst
+    - gocheckcompilerdirectives
     - gocritic
     - goprintffuncname
     - gosec
     - govet
     - importas
     - ineffassign
+    - mirror 
     - misspell
     - nakedret
     - nilerr
@@ -54,12 +76,14 @@ linters:
     - perfsprint
     - prealloc
     - predeclared
+    - reassign
     - revive
     - spancheck
     - staticcheck
     - tagalign
     - testifylint
     - unconvert
+    - usetesting
     - unparam
     - unused
     - usestdlibvars
@@ -73,8 +97,8 @@ linters:
               desc: github.com/ava-labs/avalanchego/utils/linked should be used instead.
             - pkg: github.com/golang/mock/gomock
               desc: go.uber.org/mock/gomock should be used instead.
-            - pkg: github.com/stretchr/testify/assert
-              desc: github.com/stretchr/testify/require should be used instead.
+            # Note: testify/assert is checked separately by test_warn_testify_assert
+            # in lint.sh to produce warnings instead of errors.
             - pkg: io/ioutil
               desc: io/ioutil is deprecated. Use package io or os instead.
     errorlint:
@@ -85,11 +109,15 @@ linters:
     forbidigo:
       # Forbid the following identifiers (list of regexp).
       forbid:
+        - pattern: assert\.Error$(# ErrorIs should be used instead)?
+        - pattern: assert\.ErrorContains$(# ErrorIs should be used instead)?
+        - pattern: assert\.EqualValues$(# Equal should be used instead)?
+        - pattern: assert\.NotEqualValues$(# NotEqual should be used instead)?
         - pattern: require\.Error$(# ErrorIs should be used instead)?
         - pattern: require\.ErrorContains$(# ErrorIs should be used instead)?
         - pattern: require\.EqualValues$(# Equal should be used instead)?
         - pattern: require\.NotEqualValues$(# NotEqual should be used instead)?
-        - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?
+        - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the assert and require libraries should be used instead)?
         - pattern: ^sort\.(Slice|Strings)$(# the slices package should be used instead)?
       # Exclude godoc examples from forbidigo checks.
       exclude-godoc-examples: false
@@ -199,6 +227,14 @@ linters:
       disable:
         - go-require
         - float-compare
+    usetesting:
+      os-create-temp:     true # Disallow `os.CreateTemp("", ...)`
+      os-mkdir-temp:      true # Disallow `os.MkdirTemp()`
+      os-setenv:          true # Disallow `os.Setenv()`
+      os-temp-dir:        true # Disallow `os.TempDir()`
+      os-chdir:           true # Disallow `os.Chdir()`
+      context-background: true # Disallow `context.Background()`
+      context-todo:       true # Disallow `context.TODO()`
     unused:
       # Mark all struct fields that have been written to as used.
       # Default: true
@@ -216,20 +252,13 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
-formatters:
-  enable:
-    - gci
-    - gofmt
-    - gofumpt
-  settings:
-    gci:
-      sections:
-        - standard
-        - default
-        - blank
-        - prefix(github.com/ava-labs/avalanchego)
-        - alias
-        - dot
-      custom-order: true
-  exclusions:
-    generated: lax
+    rules:
+      # Exclude some linters from running on test files.
+      # 1. Exclude the top level tests/ directory.
+      # 2. Exclude any file prefixed with test_ in any directory.
+      # 3. Exclude any directory suffixed with test.
+      # 4. Exclude any file suffixed with _test.go.
+      - path: "(^tests/)|(^(.*/)*test_[^/]*\\.go$)|(.*test/.*)|(.*_test\\.go$)"
+        linters:
+          - gosec
+          - prealloc

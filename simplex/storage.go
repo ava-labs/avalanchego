@@ -1,9 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
 
-//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+//go:generate go tool canoto $GOFILE
 
 import (
 	"context"
@@ -104,7 +104,7 @@ func (s *Storage) NumBlocks() uint64 {
 // Retrieve returns the block and finalization at [seq].
 // If [seq] is not found, returns simplex.ErrBlockNotFound.
 func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, error) {
-	// THe genesis block doesn't have a finalization, so we need to handle it specifically.
+	// The genesis block doesn't have a finalization, so we need to handle it specifically.
 	if seq == 0 {
 		return s.genesisBlock, simplex.Finalization{}, nil
 	}

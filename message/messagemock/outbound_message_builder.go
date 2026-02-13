@@ -46,10 +46,10 @@ func (m *OutboundMsgBuilder) EXPECT() *OutboundMsgBuilderMockRecorder {
 }
 
 // Accepted mocks base method.
-func (m *OutboundMsgBuilder) Accepted(chainID ids.ID, requestID uint32, containerIDs []ids.ID) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Accepted(chainID ids.ID, requestID uint32, containerIDs []ids.ID) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Accepted", chainID, requestID, containerIDs)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -61,10 +61,10 @@ func (mr *OutboundMsgBuilderMockRecorder) Accepted(chainID, requestID, container
 }
 
 // AcceptedFrontier mocks base method.
-func (m *OutboundMsgBuilder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerID ids.ID) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerID ids.ID) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AcceptedFrontier", chainID, requestID, containerID)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -76,10 +76,10 @@ func (mr *OutboundMsgBuilderMockRecorder) AcceptedFrontier(chainID, requestID, c
 }
 
 // AcceptedStateSummary mocks base method.
-func (m *OutboundMsgBuilder) AcceptedStateSummary(chainID ids.ID, requestID uint32, summaryIDs []ids.ID) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) AcceptedStateSummary(chainID ids.ID, requestID uint32, summaryIDs []ids.ID) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AcceptedStateSummary", chainID, requestID, summaryIDs)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -91,10 +91,10 @@ func (mr *OutboundMsgBuilderMockRecorder) AcceptedStateSummary(chainID, requestI
 }
 
 // Ancestors mocks base method.
-func (m *OutboundMsgBuilder) Ancestors(chainID ids.ID, requestID uint32, containers [][]byte) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Ancestors(chainID ids.ID, requestID uint32, containers [][]byte) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Ancestors", chainID, requestID, containers)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -106,10 +106,10 @@ func (mr *OutboundMsgBuilderMockRecorder) Ancestors(chainID, requestID, containe
 }
 
 // AppError mocks base method.
-func (m *OutboundMsgBuilder) AppError(chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) AppError(chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppError", chainID, requestID, errorCode, errorMessage)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -121,10 +121,10 @@ func (mr *OutboundMsgBuilderMockRecorder) AppError(chainID, requestID, errorCode
 }
 
 // AppGossip mocks base method.
-func (m *OutboundMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppGossip", chainID, msg)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -136,10 +136,10 @@ func (mr *OutboundMsgBuilderMockRecorder) AppGossip(chainID, msg any) *gomock.Ca
 }
 
 // AppRequest mocks base method.
-func (m *OutboundMsgBuilder) AppRequest(chainID ids.ID, requestID uint32, deadline time.Duration, msg []byte) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) AppRequest(chainID ids.ID, requestID uint32, deadline time.Duration, msg []byte) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequest", chainID, requestID, deadline, msg)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -151,10 +151,10 @@ func (mr *OutboundMsgBuilderMockRecorder) AppRequest(chainID, requestID, deadlin
 }
 
 // AppResponse mocks base method.
-func (m *OutboundMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppResponse", chainID, requestID, msg)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -166,10 +166,10 @@ func (mr *OutboundMsgBuilderMockRecorder) AppResponse(chainID, requestID, msg an
 }
 
 // Chits mocks base method.
-func (m *OutboundMsgBuilder) Chits(chainID ids.ID, requestID uint32, preferredID, preferredIDAtHeight, acceptedID ids.ID, acceptedHeight uint64) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Chits(chainID ids.ID, requestID uint32, preferredID, preferredIDAtHeight, acceptedID ids.ID, acceptedHeight uint64) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Chits", chainID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -181,10 +181,10 @@ func (mr *OutboundMsgBuilderMockRecorder) Chits(chainID, requestID, preferredID,
 }
 
 // Get mocks base method.
-func (m *OutboundMsgBuilder) Get(chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Get(chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", chainID, requestID, deadline, containerID)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -196,10 +196,10 @@ func (mr *OutboundMsgBuilderMockRecorder) Get(chainID, requestID, deadline, cont
 }
 
 // GetAccepted mocks base method.
-func (m *OutboundMsgBuilder) GetAccepted(chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) GetAccepted(chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAccepted", chainID, requestID, deadline, containerIDs)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -211,10 +211,10 @@ func (mr *OutboundMsgBuilderMockRecorder) GetAccepted(chainID, requestID, deadli
 }
 
 // GetAcceptedFrontier mocks base method.
-func (m *OutboundMsgBuilder) GetAcceptedFrontier(chainID ids.ID, requestID uint32, deadline time.Duration) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) GetAcceptedFrontier(chainID ids.ID, requestID uint32, deadline time.Duration) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAcceptedFrontier", chainID, requestID, deadline)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -226,10 +226,10 @@ func (mr *OutboundMsgBuilderMockRecorder) GetAcceptedFrontier(chainID, requestID
 }
 
 // GetAcceptedStateSummary mocks base method.
-func (m *OutboundMsgBuilder) GetAcceptedStateSummary(chainID ids.ID, requestID uint32, deadline time.Duration, heights []uint64) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) GetAcceptedStateSummary(chainID ids.ID, requestID uint32, deadline time.Duration, heights []uint64) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAcceptedStateSummary", chainID, requestID, deadline, heights)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -241,10 +241,10 @@ func (mr *OutboundMsgBuilderMockRecorder) GetAcceptedStateSummary(chainID, reque
 }
 
 // GetAncestors mocks base method.
-func (m *OutboundMsgBuilder) GetAncestors(chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, engineType p2p.EngineType) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) GetAncestors(chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, engineType p2p.EngineType) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAncestors", chainID, requestID, deadline, containerID, engineType)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -256,10 +256,10 @@ func (mr *OutboundMsgBuilderMockRecorder) GetAncestors(chainID, requestID, deadl
 }
 
 // GetPeerList mocks base method.
-func (m *OutboundMsgBuilder) GetPeerList(knownPeersFilter, knownPeersSalt []byte, requestAllSubnetIPs bool) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) GetPeerList(knownPeersFilter, knownPeersSalt []byte, requestAllSubnetIPs bool) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPeerList", knownPeersFilter, knownPeersSalt, requestAllSubnetIPs)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -271,10 +271,10 @@ func (mr *OutboundMsgBuilderMockRecorder) GetPeerList(knownPeersFilter, knownPee
 }
 
 // GetStateSummaryFrontier mocks base method.
-func (m *OutboundMsgBuilder) GetStateSummaryFrontier(chainID ids.ID, requestID uint32, deadline time.Duration) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) GetStateSummaryFrontier(chainID ids.ID, requestID uint32, deadline time.Duration) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStateSummaryFrontier", chainID, requestID, deadline)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -286,25 +286,25 @@ func (mr *OutboundMsgBuilderMockRecorder) GetStateSummaryFrontier(chainID, reque
 }
 
 // Handshake mocks base method.
-func (m *OutboundMsgBuilder) Handshake(networkID uint32, myTime uint64, ip netip.AddrPort, client string, major, minor, patch uint32, ipSigningTime uint64, ipNodeIDSig, ipBLSSig []byte, trackedSubnets []ids.ID, supportedACPs, objectedACPs []uint32, knownPeersFilter, knownPeersSalt []byte, requestAllSubnetIPs bool) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Handshake(networkID uint32, myTime uint64, ip netip.AddrPort, client string, major, minor, patch uint32, upgradeTime, ipSigningTime uint64, ipNodeIDSig, ipBLSSig []byte, trackedSubnets []ids.ID, supportedACPs, objectedACPs []uint32, knownPeersFilter, knownPeersSalt []byte, requestAllSubnetIPs bool) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Handshake", networkID, myTime, ip, client, major, minor, patch, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret := m.ctrl.Call(m, "Handshake", networkID, myTime, ip, client, major, minor, patch, upgradeTime, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Handshake indicates an expected call of Handshake.
-func (mr *OutboundMsgBuilderMockRecorder) Handshake(networkID, myTime, ip, client, major, minor, patch, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs any) *gomock.Call {
+func (mr *OutboundMsgBuilderMockRecorder) Handshake(networkID, myTime, ip, client, major, minor, patch, upgradeTime, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Handshake", reflect.TypeOf((*OutboundMsgBuilder)(nil).Handshake), networkID, myTime, ip, client, major, minor, patch, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Handshake", reflect.TypeOf((*OutboundMsgBuilder)(nil).Handshake), networkID, myTime, ip, client, major, minor, patch, upgradeTime, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs)
 }
 
 // PeerList mocks base method.
-func (m *OutboundMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bool) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bool) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PeerList", peers, bypassThrottling)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -316,10 +316,10 @@ func (mr *OutboundMsgBuilderMockRecorder) PeerList(peers, bypassThrottling any) 
 }
 
 // Ping mocks base method.
-func (m *OutboundMsgBuilder) Ping(primaryUptime uint32) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Ping(primaryUptime uint32) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Ping", primaryUptime)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -331,10 +331,10 @@ func (mr *OutboundMsgBuilderMockRecorder) Ping(primaryUptime any) *gomock.Call {
 }
 
 // Pong mocks base method.
-func (m *OutboundMsgBuilder) Pong() (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Pong() (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Pong")
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -346,10 +346,10 @@ func (mr *OutboundMsgBuilderMockRecorder) Pong() *gomock.Call {
 }
 
 // PullQuery mocks base method.
-func (m *OutboundMsgBuilder) PullQuery(chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, requestedHeight uint64) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) PullQuery(chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, requestedHeight uint64) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PullQuery", chainID, requestID, deadline, containerID, requestedHeight)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -361,10 +361,10 @@ func (mr *OutboundMsgBuilderMockRecorder) PullQuery(chainID, requestID, deadline
 }
 
 // PushQuery mocks base method.
-func (m *OutboundMsgBuilder) PushQuery(chainID ids.ID, requestID uint32, deadline time.Duration, container []byte, requestedHeight uint64) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) PushQuery(chainID ids.ID, requestID uint32, deadline time.Duration, container []byte, requestedHeight uint64) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PushQuery", chainID, requestID, deadline, container, requestedHeight)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -376,10 +376,10 @@ func (mr *OutboundMsgBuilderMockRecorder) PushQuery(chainID, requestID, deadline
 }
 
 // Put mocks base method.
-func (m *OutboundMsgBuilder) Put(chainID ids.ID, requestID uint32, container []byte) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Put(chainID ids.ID, requestID uint32, container []byte) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Put", chainID, requestID, container)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -391,10 +391,10 @@ func (mr *OutboundMsgBuilderMockRecorder) Put(chainID, requestID, container any)
 }
 
 // SimplexMessage mocks base method.
-func (m *OutboundMsgBuilder) SimplexMessage(msg *p2p.Simplex) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) SimplexMessage(msg *p2p.Simplex) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SimplexMessage", msg)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -406,10 +406,10 @@ func (mr *OutboundMsgBuilderMockRecorder) SimplexMessage(msg any) *gomock.Call {
 }
 
 // StateSummaryFrontier mocks base method.
-func (m *OutboundMsgBuilder) StateSummaryFrontier(chainID ids.ID, requestID uint32, summary []byte) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) StateSummaryFrontier(chainID ids.ID, requestID uint32, summary []byte) (*message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StateSummaryFrontier", chainID, requestID, summary)
-	ret0, _ := ret[0].(message.OutboundMessage)
+	ret0, _ := ret[0].(*message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
