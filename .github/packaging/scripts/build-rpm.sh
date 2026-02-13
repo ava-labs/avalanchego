@@ -33,6 +33,13 @@ echo "=== Building ${PACKAGE} RPM for ${RPM_ARCH} (tag: ${TAG}) ==="
 
 # ── Step 1: Build binary ──────────────────────────────────────────
 
+# In CI, the bind-mounted source tree is owned by the host user. Mark it
+# as safe so that git works inside the container (needed by older build
+# scripts that resolve the commit hash via git rather than AVALANCHEGO_COMMIT).
+if ! git -C "${REPO_ROOT}" rev-parse HEAD &>/dev/null; then
+    git config --global --add safe.directory "${REPO_ROOT}"
+fi
+
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/constants.sh"
 # shellcheck disable=SC1091
@@ -41,9 +48,8 @@ source "${REPO_ROOT}/scripts/git_commit.sh"
 # shellcheck disable=SC2154
 echo "Git commit: ${git_commit}"
 
-# Disable Go's automatic VCS stamping — the bind-mounted .git is owned by
-# the host user, causing git to fail inside the container. The commit hash
-# is passed explicitly via AVALANCHEGO_COMMIT and -ldflags instead.
+# Disable Go's automatic VCS stamping — the commit hash is passed
+# explicitly via AVALANCHEGO_COMMIT and -ldflags instead.
 export GOFLAGS="${GOFLAGS:-} -buildvcs=false"
 
 case "${PACKAGE}" in

@@ -65,17 +65,15 @@ docker run --rm \
         rpm -ivh "/rpms/subnet-evm-'"${TAG}"'-'"${RPM_ARCH}"'.rpm"
 
         # Smoke test avalanchego
+        full_commit="'"${GIT_COMMIT}"'"
         output=$(/var/opt/avalanchego/bin/avalanchego --version)
         echo "avalanchego --version: ${output}"
         if [[ "${output}" != avalanchego/* ]]; then
             echo "ERROR: --version output does not start with avalanchego/" >&2
             exit 1
         fi
-
-        # Verify git commit hash is present in output
-        short_commit="'"${GIT_COMMIT::8}"'"
-        if [[ "${output}" != *"commit=${short_commit}"* ]]; then
-            echo "ERROR: --version output does not contain expected commit=${short_commit}" >&2
+        if [[ "${output}" != *"${full_commit}"* ]]; then
+            echo "ERROR: avalanchego --version output does not contain expected commit ${full_commit}" >&2
             echo "Output: ${output}" >&2
             exit 1
         fi
@@ -90,8 +88,8 @@ docker run --rm \
         # Smoke test subnet-evm version and commit
         evm_output=$("${plugin}" --version)
         echo "subnet-evm --version: ${evm_output}"
-        if [[ "${evm_output}" != *"@${short_commit}"* ]]; then
-            echo "ERROR: subnet-evm --version output does not contain expected @${short_commit}" >&2
+        if [[ "${evm_output}" != *"${full_commit}"* ]]; then
+            echo "ERROR: subnet-evm --version output does not contain expected commit ${full_commit}" >&2
             echo "Output: ${evm_output}" >&2
             exit 1
         fi
