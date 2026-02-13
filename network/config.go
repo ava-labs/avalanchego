@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
@@ -148,9 +149,9 @@ type Config struct {
 	// observed average uptime metrics.
 	UptimeMetricFreq time.Duration `json:"uptimeMetricFreq"`
 
-	// UptimeRequirement is the fraction of time a validator must be online and
-	// responsive for us to vote that they should receive a staking reward.
-	UptimeRequirement float64 `json:"-"`
+	// UptimeRequirementConfig defines the required uptime percentages to
+	// reward primary network validators based on their start time.
+	genesis.UptimeRequirementConfig `json:"-"`
 
 	// RequireValidatorToConnect require that all connections must have at least
 	// one validator between the 2 peers. This can be useful to enable if the

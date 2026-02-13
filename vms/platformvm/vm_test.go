@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -249,18 +250,18 @@ func newWallet(t testing.TB, vm *VM, c walletConfig) wallet.Wallet {
 // setupUptimeTest creates and initializes a VM configured for uptime testing.
 // baseDB is used for atomic shared memory setup; if nil, db is used.
 // Returns the VM, context, and cleanup function.
-func setupUptimeTest(t *testing.T, db database.Database, baseDB database.Database, uptimePercentage float64) (*VM, *snow.Context, func()) {
+func setupUptimeTest(t *testing.T, db database.Database, baseDB database.Database, uptimeConfig genesis.UptimeRequirementConfig) (*VM, func()) {
 	if baseDB == nil {
 		baseDB = db
 	}
 
 	vm := &VM{Internal: config.Internal{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       uptimePercentage,
-		RewardConfig:           defaultRewardConfig,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
+		Chains:                  chains.TestManager,
+		UptimeRequirementConfig: uptimeConfig,
+		RewardConfig:            defaultRewardConfig,
+		Validators:              validators.NewManager(),
+		UptimeLockedCalculator:  uptime.NewLockedCalculator(),
+		UpgradeConfig:           upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)
@@ -292,7 +293,7 @@ func setupUptimeTest(t *testing.T, db database.Database, baseDB database.Databas
 		ctx.Lock.Unlock()
 	}
 
-	return vm, ctx, cleanup
+	return vm, cleanup
 }
 
 // verifyAbortPreferred builds a reward block and verifies that the abort option
@@ -1780,8 +1781,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// First VM: 20% uptime requirement
 	const firstUptimePercentage = 20 // 20%
+	firstUptimeConfig := genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: firstUptimePercentage / 100.,
+	}
+
 	firstDB := prefixdb.New([]byte{}, db)
-	firstVM, _, firstCleanup := setupUptimeTest(t, firstDB, db, firstUptimePercentage/100.)
+	firstVM, firstCleanup := setupUptimeTest(t, firstDB, db, firstUptimeConfig)
 
 	// Fast forward clock so that validators meet 20% uptime required for reward
 	durationForReward := genesistest.DefaultValidatorEndTime.Sub(genesistest.DefaultValidatorStartTime) * firstUptimePercentage / 100
@@ -1794,8 +1799,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Restart the VM with a larger uptime requirement
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
+	secondUptimeConfig := genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: secondUptimePercentage / 100.,
+	}
+
 	secondDB := prefixdb.New([]byte{}, db)
-	secondVM, _, secondCleanup := setupUptimeTest(t, secondDB, db, secondUptimePercentage/100.)
+	secondVM, secondCleanup := setupUptimeTest(t, secondDB, db, secondUptimeConfig)
 	defer secondCleanup()
 
 	secondVM.clock.Set(vmStopTime)
@@ -1815,7 +1824,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	latestForkTime = genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
-	vm, _, cleanup := setupUptimeTest(t, memdb.New(), nil, .2)
+
+	uptimeConfig := genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: .2, // 20%
+	}
+
+	vm, cleanup := setupUptimeTest(t, memdb.New(), nil, uptimeConfig)
 	defer cleanup()
 
 	// Fast forward clock to time for genesis validators to leave
@@ -1823,6 +1837,43 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.clock.Set(genesistest.DefaultValidatorEndTime)
 
 	// Verify abort is preferred since uptime (0%) is below requirement (20%)
+	proposal, abort, commit, txID := verifyAbortPreferred(t, vm)
+
+	// Accept the abort block
+	acceptAbortBlock(t, vm, proposal, abort, commit)
+
+	// Verify validator was removed from current set
+	verifyValidatorRemoved(t, vm, proposal, txID)
+}
+
+func TestUptimeDisallowedWithScheduledIncrease(t *testing.T) {
+	latestForkTime = genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
+
+	// Set up schedule: 80% default, 90% after genesis validator start time
+	// Genesis validators start at DefaultValidatorStartTime, so they need 90%
+	uptimeConfig := genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: .8, // 80%
+		RequiredUptimePercentageSchedule: []genesis.UptimeRequirementUpdate{
+			{
+				Time:        genesistest.DefaultValidatorStartTime.Add(-time.Second), // Before validator starts
+				Requirement: .9,                                                      // 90%
+			},
+		},
+	}
+
+	vm, cleanup := setupUptimeTest(t, memdb.New(), nil, uptimeConfig)
+	defer cleanup()
+
+	// Validator accumulates 85% uptime (above 80% default, below 90% scheduled requirement)
+	validatorDuration := genesistest.DefaultValidatorEndTime.Sub(genesistest.DefaultValidatorStartTime)
+	uptimeForReward := validatorDuration * 85 / 100 // 85%
+	vmStopTime := genesistest.DefaultValidatorStartTime.Add(uptimeForReward)
+	vm.clock.Set(vmStopTime)
+
+	// Fast forward to validator end time
+	vm.clock.Set(genesistest.DefaultValidatorEndTime)
+
+	// Verify abort is preferred since uptime (85%) is below scheduled requirement (90%)
 	proposal, abort, commit, txID := verifyAbortPreferred(t, vm)
 
 	// Accept the abort block

@@ -29,7 +29,6 @@ import (
 )
 
 var (
-	errInvalidUptimeRequirement    = errors.New("uptime requirement must be in the range [0, 1]")
 	errMinValidatorStakeAboveMax   = errors.New("minimum validator stake can't be greater than maximum validator stake")
 	errInvalidDelegationFee        = errors.New("delegation fee must be in the range [0, 1,000,000]")
 	errInvalidMinStakeDuration     = errors.New("min stake duration must be > 0")
@@ -97,8 +96,6 @@ type StakingConfig struct {
 
 func (c *StakingConfig) Verify() error {
 	switch {
-	case c.UptimeRequirement < 0 || c.UptimeRequirement > 1:
-		return errInvalidUptimeRequirement
 	case c.MinValidatorStake > c.MaxValidatorStake:
 		return errMinValidatorStakeAboveMax
 	case c.MinDelegationFee > 1_000_000:
@@ -114,7 +111,7 @@ func (c *StakingConfig) Verify() error {
 	case c.RewardConfig.MintingPeriod < c.MaxStakeDuration:
 		return errStakeMintingPeriodBelowMin
 	}
-	return nil
+	return c.StakingConfig.UptimeRequirementConfig.Verify()
 }
 
 type StakingSignerConfig struct {

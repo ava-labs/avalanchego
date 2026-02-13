@@ -52,7 +52,9 @@ var (
 			},
 		},
 		StakingConfig: StakingConfig{
-			UptimeRequirement: .8, // 80%
+			UptimeRequirementConfig: UptimeRequirementConfig{
+				DefaultRequiredUptimePercentage: .8, // 80%
+			},
 			MinValidatorStake: 2 * units.KiloAvax,
 			MaxValidatorStake: 3 * units.MegaAvax,
 			MinDelegatorStake: 25 * units.Avax,
