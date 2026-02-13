@@ -95,9 +95,6 @@ func NewDefaultConfig() Config {
 		// RPC settings
 		BatchRequestLimit:    1000,
 		BatchResponseMaxSize: 25 * 1000 * 1000, // 25MB
-
-		// Block database
-		BlockDatabaseEnabled: true,
 	}
 }
 
