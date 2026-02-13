@@ -247,7 +247,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	}
 	if forceNewHash {
 		// Ensure the build results in a new image hash by preventing use of a cached final stage
-		args = append(args, "--no-cache-filter", "execution")
+		args = append(args, "--no-cache-filter", "avalanchego")
 	}
 
 	cmd := exec.CommandContext(

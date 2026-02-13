@@ -39,8 +39,8 @@ jobs:
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-          IMAGE_NAME: avaplatform/subnet-evm
-          PLATFORMS: "linux/amd64,linux/arm64"
-          PUBLISH: 1
+          DOCKER_IMAGE: avaplatform/subnet-evm
+          BUILD_MULTI_ARCH: 1
           ALLOW_TAG_LATEST: ${{ github.event_name != 'workflow_dispatch' }}
+          AVALANCHEGO_NODE_IMAGE_REPO: ${{ secrets.DOCKER_REPO }}
         run: scripts/run_task.sh build-subnet-evm-image

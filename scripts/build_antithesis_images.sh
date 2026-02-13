@@ -34,11 +34,6 @@ if [[ -z "${IMAGE_TAG}" ]]; then
   IMAGE_TAG="${commit_hash}"
 fi
 
-# The dockerfiles don't specify the golang version to minimize the changes required to bump
-# the version. Instead, the golang version is provided as an argument. Use head -1 because
-# go workspaces list multiple modules; CI validates all modules use the same Go version.
-GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
-
 # Helper to simplify calling build_builder_image for test setups in this repo
 function build_builder_image_for_avalanchego {
   echo "Building builder image"
@@ -51,32 +46,31 @@ function build_antithesis_images_for_avalanchego {
   local image_prefix=$2
   local uninstrumented_node_dockerfile=$3
   local node_only=${4:-}
+  local uninstrumented_node_target=${5:-}
 
-  if [[ -z "${node_only}" ]]; then
+  if [[ -n "${node_only}" ]]; then
     echo "Building node image for ${test_setup}"
   else
     echo "Building images for ${test_setup}"
   fi
   build_antithesis_images "${GO_VERSION}" "${image_prefix}" "antithesis-${test_setup}" "${IMAGE_TAG}" "${IMAGE_TAG}" \
                           "${AVALANCHE_PATH}/tests/antithesis/${test_setup}/Dockerfile" "${uninstrumented_node_dockerfile}" \
-                          "${AVALANCHE_PATH}" "${node_only}" "${git_commit}"
+                          "${AVALANCHE_PATH}" "${node_only}" "${git_commit}" "${uninstrumented_node_target}"
 }
 
-if [[ "${TEST_SETUP}" == "avalanchego" ]]; then
-  build_builder_image_for_avalanchego
+build_builder_image_for_avalanchego
 
+if [[ "${TEST_SETUP}" == "avalanchego" ]]; then
   echo "Generating compose configuration for ${TEST_SETUP}"
   gen_antithesis_compose_config "${IMAGE_TAG}" "${AVALANCHE_PATH}/tests/antithesis/avalanchego/gencomposeconfig" \
                                 "${AVALANCHE_PATH}/build/antithesis/avalanchego"
 
-  build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY:-}"
+  build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY:-}" "avalanchego"
 else
-  build_builder_image_for_avalanchego
-
   # Only build the avalanchego node image to use as the base for the xsvm image. Provide an empty
   # image prefix (the 1st argument) to prevent the image from being pushed
   NODE_ONLY=1
-  build_antithesis_images_for_avalanchego avalanchego "" "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY}"
+  build_antithesis_images_for_avalanchego avalanchego "" "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY}" "avalanchego"
 
   # Ensure avalanchego and xsvm binaries are available to create an initial db state that includes subnets.
   echo "Building binaries required for configuring the ${TEST_SETUP} test setup"

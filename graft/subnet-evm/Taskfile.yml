@@ -24,7 +24,7 @@ tasks:
 
   build-docker-image:
     desc: Build multi-platform Docker image with avalanchego integration and optional publishing
-    cmd: ./scripts/build_docker_image.sh # publish_docker.yml
+    cmd: TARGET=subnet-evm ../../scripts/build_image.sh # publish_docker.yml
 
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
