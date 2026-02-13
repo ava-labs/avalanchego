@@ -335,9 +335,12 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			return
 		}
 
-		// If the failure message comes from a timeout, clear it. Otherwise, this indicates an early,
-		// internal failure and we should wait for either a successful response or a timeout to clear
-		// the request.
+		// Clear the request if it has definitively failed due to:
+		// 1. Timeout
+		// 2. Peer sent message failure (app-error is the only peer sent, non-internal message type indicating failure)
+		//
+		// For an early internal failure message due to benching, disconnect, or a request to self, we do not clear
+		// the timeout and instead wait for the actual response or timeout.
 		if timeout || !internal {
 			cr.timedRequests.Delete(uniqueRequestID)
 			cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
