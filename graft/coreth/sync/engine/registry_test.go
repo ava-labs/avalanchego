@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 )
 
@@ -458,7 +458,7 @@ func newTestContext(t *testing.T, wantErr error, timeout time.Duration) (context
 
 func newTestClientSummary(t *testing.T) message.Syncable {
 	t.Helper()
-	summary, err := message.NewBlockSyncSummary(common.HexToHash("0xdeadbeef"), 1000, common.HexToHash("0xdeadbeef"))
+	summary, err := message.NewBlockSyncSummary(message.CorethCodec, common.HexToHash("0xdeadbeef"), 1000, common.HexToHash("0xdeadbeef"))
 	require.NoError(t, err)
 
 	return summary

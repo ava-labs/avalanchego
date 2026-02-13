@@ -39,11 +39,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -89,8 +89,7 @@ var (
 
 func defaultExtensions() *extension.Config {
 	return &extension.Config{
-		SyncSummaryProvider: &message.BlockSyncSummaryProvider{},
-		SyncableParser:      &message.BlockSyncSummaryParser{},
+		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.CorethCodec),
 		Clock:               &mockable.Clock{},
 	}
 }
@@ -2217,6 +2216,7 @@ func TestArchivalQueries(t *testing.T) {
 
 				require.NoError(blk.Accept(ctx))
 			}
+			vm.blockChain.DrainAcceptorQueue()
 
 			handlers, err := vm.CreateHandlers(ctx)
 			require.NoError(err)

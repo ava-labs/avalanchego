@@ -1647,7 +1647,7 @@ platform.getUTXOs(
     },
 ) ->
 {
-    numFetched: int,
+    numFetched: string,
     utxos: []string,
     endIndex: {
         address: string,

@@ -94,13 +94,13 @@ runs:
       id: go-mod-cache
       with:
         path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum') }}
         restore-keys: ${{ runner.os }}-go-mod-
     # Cache Go build cache (architecture-specific)
     - uses: actions/cache@v4
       with:
         path: ~/.cache/go-build
-        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.sum') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum') }}
         restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
     # Download modules only on cache miss
     - run: go mod download

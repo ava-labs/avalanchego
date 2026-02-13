@@ -9,6 +9,10 @@
 
 version: '3'
 
+includes:
+  packaging:
+    taskfile: .github/packaging/Taskfile.yml
+
 tasks:
   default: ./scripts/run_task.sh --list
 
@@ -95,13 +99,14 @@ tasks:
       - task: check-clean-branch
 
   check-go-mod-tidy:
-    desc: Checks that go.mod and go.sum are up-to-date (requires a clean git working tree)
+    desc: Checks that go module configuration is consistent (requires a clean git working tree)
     cmds:
-      - cmd: go mod tidy
+      - task: go-mod-tidy
       - task: check-clean-branch
-      - cmd: go mod tidy
-        dir: tools/external
-      - task: check-clean-branch
+
+  check-go-version:
+    desc: Checks that go version directives are consistent across all modules
+    cmd: ./scripts/check_go_version.sh
 
   create-kind-cluster:
     desc: Creates the default kind cluster
@@ -140,6 +145,28 @@ tasks:
     desc: Runs ginkgo against the current working directory
     cmd: ./bin/ginkgo build {{.USER_WORKING_DIR}}
 
+  go-mod-tidy:
+    desc: Ensures that go module configuration is consistent
+    cmds:
+      # GOWORK=off is required because lint tooling runs with GOWORK=off
+      # (see scripts/run_tool.sh) and dependency resolution differs when
+      # the workspace is enabled vs disabled.
+      #
+      # NOTE: Using explicit 'cd' instead of Task's 'dir:' directive because
+      # 'dir:' doesn't properly isolate the go.work context, causing go mod tidy
+      # to miss some indirect dependency go.mod hashes in go.sum.
+      - cmd: GOWORK=off go mod tidy
+      # GOWORK=off is required because tools/external is not part of the workspace
+      # and go will otherwise find go.work by walking up the tree
+      - cmd: cd tools/external && GOWORK=off go mod tidy
+      # GOWORK=off is required for graft modules because lint tooling runs
+      # with GOWORK=off (see scripts/run_tool.sh) and dependency resolution
+      # differs when the workspace is enabled vs disabled.
+      - cmd: cd graft/evm && GOWORK=off go mod tidy
+      - cmd: cd graft/coreth && GOWORK=off go mod tidy
+      - cmd: cd graft/subnet-evm && GOWORK=off go mod tidy
+      - task: sync-go-work
+
   install-nix:
     desc: Installs nix with an OS-appropriate installer
     cmd: ./scripts/install_nix.sh
@@ -158,6 +185,8 @@ tasks:
       - lint
       - lint-action
       - lint-shell
+      - check-go-mod-tidy
+      - check-go-version
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -165,6 +194,8 @@ tasks:
       - task: lint
       - task: lint-action
       - task: lint-shell
+      - task: check-go-mod-tidy
+      - task: check-go-version
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
@@ -181,6 +212,13 @@ tasks:
   setup-chain-data:
     desc: Sets up C-Chain test data (blocks from S3, state from S3 or empty for genesis).
     cmd: ./scripts/setup_cchain_data.sh
+
+  sync-go-work:
+    desc: Downloads module dependencies and syncs go.work.sum
+    cmds:
+      - cmd: go mod download
+      # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
+      - cmd: GOWORK="" go work sync
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
@@ -320,3 +358,9 @@ tasks:
     cmds:
       - task: build
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
+
+  update-go-version:
+    desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"
+    cmds:
+      - cmd: ./scripts/set_go_version.sh {{.CLI_ARGS}}
+      - task: go-mod-tidy

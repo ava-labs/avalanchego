@@ -450,7 +450,8 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 			return vm.ChainVM.WaitForEvent(ctx)
 		}
 
-		duration := time.Until(timeToBuild)
+		now := vm.Clock.Time()
+		duration := timeToBuild.Sub(now)
 		if duration <= 0 {
 			vm.ctx.Log.Debug("Can build a block without waiting")
 			return vm.ChainVM.WaitForEvent(ctx)
