@@ -75,7 +75,7 @@ func TestBatchedParseBlockCaching(t *testing.T) {
 	testKey := batchedParseBlockCachingTestKey
 
 	// Create and start the plugin
-	vm := buildClientHelper(require, testKey)
+	vm := buildClientHelper(t.Context(), require, testKey)
 	defer vm.runtime.Stop(t.Context())
 
 	ctx := snowtest.Context(t, snowtest.CChainID)

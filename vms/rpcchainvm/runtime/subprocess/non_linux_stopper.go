@@ -15,7 +15,7 @@ import (
 )
 
 func NewCmd(path string, args ...string) *exec.Cmd {
-	return exec.Command(path, args...)
+	return exec.CommandContext(context.Background(), path, args...)
 }
 
 func stop(_ context.Context, log logging.Logger, cmd *exec.Cmd) {
