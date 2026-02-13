@@ -608,6 +608,13 @@ func (n *network) Peers(
 func (n *network) Dispatch(ctx context.Context) error {
 	go n.runTimers() // Periodically perform operations
 	go n.inboundConnUpgradeThrottler.Dispatch()
+	go func() {
+		select {
+		case <-ctx.Done():
+			n.StartClose()
+		case <-n.onCloseCtx.Done():
+		}
+	}()
 	for n.onCloseCtx.Err() == nil { // Continuously accept new connections
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {

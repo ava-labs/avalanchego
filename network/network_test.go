@@ -313,6 +313,45 @@ func TestNewNetwork(t *testing.T) {
 	require.NoError(eg.Wait())
 }
 
+func TestDispatchStopsOnContextCancel(t *testing.T) {
+	require := require.New(t)
+
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 1, defaultConfig)
+	config := configs[0]
+
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
+	config.Beacons = vdrs
+	config.Validators = vdrs
+
+	netIntf, err := NewNetwork(
+		config,
+		upgrade.InitiallyActiveTime,
+		newMessageCreator(t),
+		prometheus.NewRegistry(),
+		logging.NoLog{},
+		listeners[0],
+		dialer,
+		&testHandler{},
+	)
+	require.NoError(err)
+
+	dispatchCtx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() {
+		done <- netIntf.Dispatch(dispatchCtx)
+	}()
+
+	cancel()
+
+	select {
+	case err := <-done:
+		require.NoError(err)
+	case <-time.After(5 * time.Second):
+		require.Fail("dispatch did not return after context cancellation")
+	}
+}
+
 func TestIngressConnCount(t *testing.T) {
 	require := require.New(t)
 
