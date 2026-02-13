@@ -291,14 +291,8 @@ tasks:
     cmds:
       - cmd: bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}
 
-  # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
+  # To use a different fuzz time, run `task test-fuzz-long FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
-
-  test-fuzz:
-    desc: Runs each fuzz test for 10 seconds
-    vars:
-      FUZZTIME: '{{.FUZZTIME| default "10"}}'
-    cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}}
 
   test-fuzz-long:
     desc: Runs each fuzz test for 180 seconds
