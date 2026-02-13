@@ -42,12 +42,12 @@ tasks:
   build-builder-docker-image:
     desc: Builds the RPM builder Docker image
     internal: true
+    env:
+      GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
+      DOCKER_IMAGE: '{{.PACKAGING_DOCKER_IMAGE}}'
+      CONTEXT_DIR: '{{.ROOT_DIR}}/.github/packaging'
     cmds:
-      - cmd: >-
-          docker build
-          --build-arg GO_VERSION={{.PACKAGING_GO_VERSION}}
-          -t {{.PACKAGING_DOCKER_IMAGE}}
-          {{.ROOT_DIR}}/.github/packaging/
+      - cmd: '{{.ROOT_DIR}}/.github/packaging/scripts/build-builder-image.sh'
 
   build-avalanchego-rpm:
     desc: Builds RPM for avalanchego
