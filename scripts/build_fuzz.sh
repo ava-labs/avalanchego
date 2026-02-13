@@ -18,8 +18,13 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 fuzzTime=${1:-1}
 fuzzDir=${2:-.}
 
-# Set go test timeout to fuzz time + 20 minutes to allow for compilation and setup
-timeout=$((fuzzTime + 1200))
+# Set go test timeout to fuzz time + 20 minutes to allow for compilation and setup.
+# A negative fuzz time (e.g. -1) means run until failure, so disable the timeout.
+if (( fuzzTime < 0 )); then
+    timeout=0
+else
+    timeout=$((fuzzTime + 1200))
+fi
 
 EXCLUDE_DIR="graft"
 
