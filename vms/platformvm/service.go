@@ -82,6 +82,9 @@ type stakerAttributes struct {
 	validationRewardsOwner fx.Owner
 	delegationRewardsOwner fx.Owner
 	proofOfPossession      *signer.ProofOfPossession
+
+	// ACP-236
+	configOwner fx.Owner
 }
 
 // GetHeight returns the height of the last accepted block
@@ -682,11 +685,17 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 			}
 		}
 
+		var configOwner fx.Owner
+		if continuousStaker, ok := tx.Unsigned.(txs.ContinuousStaker); ok {
+			configOwner = continuousStaker.Owner()
+		}
+
 		attr = &stakerAttributes{
 			shares:                 stakerTx.Shares(),
 			validationRewardsOwner: stakerTx.ValidationRewardsOwner(),
 			delegationRewardsOwner: stakerTx.DelegationRewardsOwner(),
 			proofOfPossession:      pop,
+			configOwner:            configOwner,
 		}
 
 	case txs.DelegatorTx:
@@ -872,6 +881,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 			var (
 				validationRewardOwner *platformapi.Owner
 				delegationRewardOwner *platformapi.Owner
+				configOwner           *platformapi.Owner
 			)
 			validationOwner, ok := attr.validationRewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
@@ -887,6 +897,13 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 					return nil, err
 				}
 			}
+			owner, ok := attr.configOwner.(*secp256k1fx.OutputOwners)
+			if ok {
+				configOwner, err = s.getAPIOwner(owner)
+				if err != nil {
+					return nil, err
+				}
+			}
 
 			vdr := platformapi.PermissionlessValidator{
 				Staker:                 apiStaker,
@@ -898,6 +915,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				DelegationRewardOwner:  delegationRewardOwner,
 				DelegationFee:          delegationFee,
 				Signer:                 attr.proofOfPossession,
+				ConfigOwner:            configOwner,
 			}
 			validators = append(validators, vdr)
 

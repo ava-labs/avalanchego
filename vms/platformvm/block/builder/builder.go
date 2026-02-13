@@ -323,7 +323,12 @@ func buildBlock(
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
 	if shouldReward {
-		rewardValidatorTx, err := NewRewardValidatorTx(builder.txExecutorBackend.Ctx, stakerTxID)
+		stakerTx, _, err := parentState.GetTx(stakerTxID)
+		if err != nil {
+			return nil, err
+		}
+
+		rewardValidatorTx, err := NewRewardTxForStaker(builder.txExecutorBackend.Ctx, stakerTx, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
@@ -633,8 +638,26 @@ func getNextStakerToReward(
 	return ids.Empty, false, nil
 }
 
+func NewRewardTxForStaker(ctx *snow.Context, stakerTx *txs.Tx, timestamp time.Time) (*txs.Tx, error) {
+	txID := stakerTx.ID()
+	if _, ok := stakerTx.Unsigned.(txs.ContinuousStaker); ok {
+		return NewRewardContinuousValidatorTx(ctx, txID, uint64(timestamp.Unix()))
+	}
+
+	return NewRewardValidatorTx(ctx, txID)
+}
+
 func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
 	utx := &txs.RewardValidatorTx{TxID: txID}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(ctx)
+}
+
+func NewRewardContinuousValidatorTx(ctx *snow.Context, txID ids.ID, timestamp uint64) (*txs.Tx, error) {
+	utx := &txs.RewardContinuousValidatorTx{TxID: txID, Timestamp: timestamp}
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)
 	if err != nil {
 		return nil, err

@@ -319,6 +319,27 @@ type Builder interface {
 		rewardsOwner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (*txs.AddPermissionlessDelegatorTx, error)
+
+	NewAddContinuousValidatorTx(
+		validatorNodeID ids.NodeID,
+		weight uint64,
+		signer signer.Signer,
+		assetID ids.ID,
+		validationRewardsOwner *secp256k1fx.OutputOwners,
+		delegationRewardsOwner *secp256k1fx.OutputOwners,
+		configOwner *secp256k1fx.OutputOwners,
+		delegationShares uint32,
+		autoRestakeShares uint32,
+		period time.Duration,
+		options ...common.Option,
+	) (*txs.AddContinuousValidatorTx, error)
+
+	NewSetAutoRestakeConfigTx(
+		txID ids.ID,
+		autoRestakeShares uint32,
+		period time.Duration,
+		options ...common.Option,
+	) (*txs.SetAutoRestakeConfigTx, error)
 }
 
 type Backend interface {
@@ -1489,6 +1510,155 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		Subnet:                 vdr.Subnet,
 		StakeOuts:              stakeOutputs,
 		DelegationRewardsOwner: rewardsOwner,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewAddContinuousValidatorTx(
+	validatorNodeID ids.NodeID,
+	weight uint64,
+	signer signer.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	configOwner *secp256k1fx.OutputOwners,
+	delegationShares uint32,
+	autoRestakeShares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.AddContinuousValidatorTx, error) {
+	toBurn := map[ids.ID]uint64{}
+	toStake := map[ids.ID]uint64{
+		assetID: weight,
+	}
+
+	ops := common.NewOptions(options)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	signerComplexity, err := fee.SignerComplexity(signer)
+	if err != nil {
+		return nil, err
+	}
+	validatorOwnerComplexity, err := fee.OwnerComplexity(validationRewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	delegatorOwnerComplexity, err := fee.OwnerComplexity(delegationRewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	configOwnerComplexity, err := fee.OwnerComplexity(configOwner)
+	if err != nil {
+		return nil, err
+	}
+
+	complexity, err := fee.IntrinsicAddContinuousValidatorTxComplexities.Add(
+		&memoComplexity,
+		&signerComplexity,
+		&validatorOwnerComplexity,
+		&delegatorOwnerComplexity,
+		&configOwnerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.Sort(validationRewardsOwner.Addrs)
+	utils.Sort(delegationRewardsOwner.Addrs)
+	tx := &txs.AddContinuousValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         baseOutputs,
+			Memo:         memo,
+		}},
+		ValidatorNodeID:       validatorNodeID,
+		Signer:                signer,
+		StakeOuts:             stakeOutputs,
+		ValidatorRewardsOwner: validationRewardsOwner,
+		DelegatorRewardsOwner: delegationRewardsOwner,
+		ConfigOwner:           configOwner,
+		DelegationShares:      delegationShares,
+		Wght:                  weight,
+		AutoRestakeShares:     autoRestakeShares,
+		Period:                uint64(period.Seconds()),
+	}
+
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewSetAutoRestakeConfigTx(
+	txID ids.ID,
+	autoRestakeShares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.SetAutoRestakeConfigTx, error) {
+	toBurn := map[ids.ID]uint64{}
+	toStake := map[ids.ID]uint64{}
+	ops := common.NewOptions(options)
+
+	auth, err := b.authorize(txID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	authComplexity, err := fee.AuthComplexity(auth)
+	if err != nil {
+		return nil, err
+	}
+
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+
+	complexity, err := fee.IntrinsicSetAutoRestakeConfigTx.Add(
+		&memoComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &txs.SetAutoRestakeConfigTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		TxID:              txID,
+		Auth:              auth,
+		AutoRestakeShares: autoRestakeShares,
+		Period:            uint64(period.Seconds()),
 	}
 	return tx, b.initCtx(tx)
 }

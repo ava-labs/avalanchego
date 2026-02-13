@@ -308,6 +308,27 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
+	IssueAddContinuousValidatorTx(
+		validatorNodeID ids.NodeID,
+		weight uint64,
+		signer vmsigner.Signer,
+		assetID ids.ID,
+		validationRewardsOwner *secp256k1fx.OutputOwners,
+		delegationRewardsOwner *secp256k1fx.OutputOwners,
+		configOwner *secp256k1fx.OutputOwners,
+		delegationShares uint32,
+		autoRestakeShares uint32,
+		period time.Duration,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
+	IssueSetAutoRestakeConfigTx(
+		txID ids.ID,
+		autoRestakeShares uint32,
+		period time.Duration,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
 		utx txs.UnsignedTx,
@@ -597,6 +618,56 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 		vdr,
 		assetID,
 		rewardsOwner,
+		options...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueAddContinuousValidatorTx(
+	validatorNodeID ids.NodeID,
+	weight uint64,
+	signer vmsigner.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	configOwner *secp256k1fx.OutputOwners,
+	delegationShares uint32,
+	autoRestakeShares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewAddContinuousValidatorTx(
+		validatorNodeID,
+		weight,
+		signer,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		configOwner,
+		delegationShares,
+		autoRestakeShares,
+		period,
+		options...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueSetAutoRestakeConfigTx(
+	txID ids.ID,
+	autoRestakeShares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewSetAutoRestakeConfigTx(
+		txID,
+		autoRestakeShares,
+		period,
 		options...,
 	)
 	if err != nil {

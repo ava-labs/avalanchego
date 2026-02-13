@@ -42,6 +42,10 @@ var (
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
+	ErrMissingStakerTx                 = errors.New("missing staker tx")
+	ErrInvalidStakerTxType             = errors.New("invalid staker tx type")
+	ErrInvalidStakerTx                 = errors.New("invalid staker tx")
+	ErrMissingValidator                = errors.New("missing validator")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -866,6 +870,232 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	return nil
+}
+
+// verifyAddContinuousValidatorTx carries out the validation for an AddContinuousValidatorTx.
+func verifyAddContinuousValidatorTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.AddContinuousValidatorTx,
+) error {
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		upgrades         = backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsHeliconActivated(currentTimestamp) {
+		return errHeliconUpgradeNotActive
+	}
+
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return nil
+	}
+
+	validatorRules, err := getValidatorRules(backend, chainState, tx.SubnetID())
+	if err != nil {
+		return err
+	}
+
+	duration := tx.PeriodDuration()
+
+	stakedAssetID := tx.StakeOuts[0].AssetID()
+	switch {
+	case tx.Weight() < validatorRules.minValidatorStake:
+		// Ensure validator is staking at least the minimum amount
+		return ErrWeightTooSmall
+
+	case tx.Weight() > validatorRules.maxValidatorStake:
+		// Ensure validator isn't staking too much
+		return ErrWeightTooLarge
+
+	case tx.DelegationShares < validatorRules.minDelegationFee:
+		// Ensure the validator fee is at least the minimum amount
+		return ErrInsufficientDelegationFee
+
+	case duration < validatorRules.minStakeDuration:
+		// Ensure staking length is not too short
+		return ErrStakeTooShort
+
+	case duration > validatorRules.maxStakeDuration:
+		// Ensure staking length is not too long
+		return ErrStakeTooLong
+
+	case stakedAssetID != validatorRules.assetID:
+		// Wrong assetID used
+		return fmt.Errorf(
+			"%w: %s != %s",
+			ErrWrongStakedAssetID,
+			validatorRules.assetID,
+			stakedAssetID,
+		)
+	}
+
+	_, err = GetValidator(chainState, tx.SubnetID(), tx.NodeID())
+	switch {
+	case err == nil:
+		return fmt.Errorf(
+			"%w: %s on %s",
+			ErrDuplicateValidator,
+			tx.NodeID(),
+			tx.SubnetID(),
+		)
+	case errors.Is(err, database.ErrNotFound):
+		// OK: validator not found
+
+	default:
+		return fmt.Errorf(
+			"failed to check if validator %s is on subnet %s: %w",
+			tx.NodeID(),
+			tx.SubnetID(),
+			err,
+		)
+	}
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("getting utxos %w", err)
+	}
+
+	// Verify the flowcheck
+	fee, err := feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return fmt.Errorf("adding fee: %w", err)
+	}
+
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		ins,
+		outs,
+		sTx.Creds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: producedAVAX,
+		},
+	); err != nil {
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	}
+
+	return nil
+}
+
+// verifySetAutoRestakeConfigTx carries out the validation for an AutoRestakeConfigTx.
+func verifySetAutoRestakeConfigTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.SetAutoRestakeConfigTx,
+) (*state.Staker, error) {
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		upgrades         = backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsHeliconActivated(currentTimestamp) {
+		return nil, errHeliconUpgradeNotActive
+	}
+
+	if err := tx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return nil, err
+	}
+
+	stakerTx, _, err := chainState.GetTx(tx.TxID)
+	if err != nil {
+		return nil, ErrMissingStakerTx
+	}
+
+	continuousStakerTx, ok := stakerTx.Unsigned.(txs.ContinuousStaker)
+	if !ok {
+		return nil, fmt.Errorf("%w: %T", ErrInvalidStakerTxType, stakerTx.Unsigned)
+	}
+
+	validator, err := chainState.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrMissingValidator
+		}
+
+		return nil, fmt.Errorf("failed to get validator %s from state: %w", continuousStakerTx.NodeID(), err)
+	}
+
+	if tx.TxID != validator.TxID {
+		// This can happen if a validator restaked with the same node id.
+		// In this case, TxID should be the latest transaction of the continuous validator.
+		return nil, fmt.Errorf("%w: wrong tx id", ErrInvalidStakerTx)
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return validator, nil
+	}
+
+	validatorRules, err := getValidatorRules(backend, chainState, continuousStakerTx.SubnetID())
+	if err != nil {
+		return nil, err
+	}
+
+	duration := time.Duration(tx.Period) * time.Second
+	switch {
+	case duration > 0 && duration < validatorRules.minStakeDuration:
+		return nil, ErrStakeTooShort
+
+	case duration > validatorRules.maxStakeDuration:
+		return nil, ErrStakeTooLong
+	}
+
+	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, continuousStakerTx.Owner(), tx.Auth)
+	if err != nil {
+		return nil, err
+	}
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return nil, fmt.Errorf("getting utxos %w", err)
+	}
+
+	fee, err := feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return nil, fmt.Errorf("adding fee: %w", err)
+	}
+
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		ins,
+		outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: producedAVAX,
+		},
+	); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	}
+
+	return validator, nil
 }
 
 // Ensure the proposed validator starts after the current time

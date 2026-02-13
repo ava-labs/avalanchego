@@ -223,6 +223,33 @@ var (
 		gas.DBWrite: 6, // write remaining balance utxo + weight diff + deactivated weight diff + public key diff + delete staker + write staker
 	}
 
+	IntrinsicAddContinuousValidatorTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.NodeIDLen + // nodeID
+			wrappers.IntLen + // signer typeID
+			wrappers.IntLen + // num stake outs
+			wrappers.IntLen + // validator rewards typeID
+			wrappers.IntLen + // delegator rewards typeID
+			wrappers.IntLen + // config owner typeID
+			wrappers.IntLen + // delegation shares
+			wrappers.LongLen + // weight
+			wrappers.IntLen + // auto-restake shares
+			wrappers.LongLen, // period
+		gas.DBRead:  2, // check current validator + check pending validator (duplicate check)
+		gas.DBWrite: 3, // put staker + write weight diff + write pk diff
+	}
+
+	IntrinsicSetAutoRestakeConfigTx = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // txID
+			wrappers.IntLen + // auth typeID
+			wrappers.IntLen + // authCredential typeID
+			wrappers.IntLen + // auto-restake shares
+			wrappers.LongLen, // period
+		gas.DBRead:  2, // read tx + read staker
+		gas.DBWrite: 1, // update staker
+	}
+
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
 	errUnsupportedOwner  = errors.New("unsupported owner type")
@@ -513,6 +540,10 @@ func (*complexityVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTx
 }
 
+func (*complexityVisitor) RewardContinuousValidatorTx(*txs.RewardContinuousValidatorTx) error {
+	return ErrUnsupportedTx
+}
+
 func (*complexityVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	return ErrUnsupportedTx
 }
@@ -792,6 +823,51 @@ func (c *complexityVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) e
 		&baseTxComplexity,
 		&authComplexity,
 	)
+	return err
+}
+
+func (c *complexityVisitor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	signerComplexity, err := SignerComplexity(tx.Signer)
+	if err != nil {
+		return err
+	}
+	outputsComplexity, err := OutputComplexity(tx.StakeOuts...)
+	if err != nil {
+		return err
+	}
+	validatorOwnerComplexity, err := OwnerComplexity(tx.ValidatorRewardsOwner)
+	if err != nil {
+		return err
+	}
+	delegatorOwnerComplexity, err := OwnerComplexity(tx.DelegatorRewardsOwner)
+	if err != nil {
+		return err
+	}
+	configOwnerComplexity, err := OwnerComplexity(tx.ConfigOwner)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicAddContinuousValidatorTxComplexities.Add(
+		&baseTxComplexity,
+		&signerComplexity,
+		&outputsComplexity,
+		&validatorOwnerComplexity,
+		&delegatorOwnerComplexity,
+		&configOwnerComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) SetAutoRestakeConfigTx(tx *txs.SetAutoRestakeConfigTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicSetAutoRestakeConfigTx.Add(&baseTxComplexity)
 	return err
 }
 

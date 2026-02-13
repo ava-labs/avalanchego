@@ -207,7 +207,6 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	return nil
 }
 
-func (*AddContinuousValidatorTx) Visit(_ Visitor) error {
-	// TODO ACP-236: implement properly
-	return nil
+func (tx *AddContinuousValidatorTx) Visit(visitor Visitor) error {
+	return visitor.AddContinuousValidatorTx(tx)
 }

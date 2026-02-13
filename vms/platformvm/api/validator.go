@@ -86,6 +86,9 @@ type PermissionlessValidator struct {
 	Staked                 []UTXO                    `json:"staked,omitempty"`
 	Signer                 *signer.ProofOfPossession `json:"signer,omitempty"`
 
+	// ACP-236 fields
+	ConfigOwner *Owner `json:"configOwner,omitempty"`
+
 	// The delegators delegating to this validator
 	DelegatorCount  *json.Uint64        `json:"delegatorCount,omitempty"`
 	DelegatorWeight *json.Uint64        `json:"delegatorWeight,omitempty"`
