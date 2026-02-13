@@ -11,6 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime/uptimemock"
@@ -23,6 +24,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
+
+var zeroRequiredUptimeConfig = genesis.UptimeRequirementConfig{
+	DefaultRequiredUptimePercentage: 0,
+}
 
 func TestBlockOptions(t *testing.T) {
 	type test struct {
@@ -46,7 +51,7 @@ func TestBlockOptions(t *testing.T) {
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Internal{
-							UptimePercentage: 0,
+							UptimeRequirementConfig: zeroRequiredUptimeConfig,
 						},
 						Uptimes: uptimes,
 					},
@@ -73,7 +78,7 @@ func TestBlockOptions(t *testing.T) {
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Internal{
-							UptimePercentage: 0,
+							UptimeRequirementConfig: zeroRequiredUptimeConfig,
 						},
 						Uptimes: uptimes,
 					},
@@ -109,7 +114,7 @@ func TestBlockOptions(t *testing.T) {
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Internal{
-							UptimePercentage: 0,
+							UptimeRequirementConfig: zeroRequiredUptimeConfig,
 						},
 						Uptimes: uptimes,
 					},
@@ -147,7 +152,7 @@ func TestBlockOptions(t *testing.T) {
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Internal{
-							UptimePercentage: 0,
+							UptimeRequirementConfig: zeroRequiredUptimeConfig,
 						},
 						Uptimes: uptimes,
 					},
@@ -188,7 +193,7 @@ func TestBlockOptions(t *testing.T) {
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Internal{
-							UptimePercentage: 0,
+							UptimeRequirementConfig: zeroRequiredUptimeConfig,
 						},
 						Uptimes: uptimes,
 					},
@@ -239,7 +244,7 @@ func TestBlockOptions(t *testing.T) {
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Internal{
-							UptimePercentage: 0,
+							UptimeRequirementConfig: zeroRequiredUptimeConfig,
 						},
 						Uptimes: uptimes,
 					},
@@ -295,7 +300,7 @@ func TestBlockOptions(t *testing.T) {
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Internal{
-							UptimePercentage: 0,
+							UptimeRequirementConfig: zeroRequiredUptimeConfig,
 						},
 						Uptimes: uptimes,
 					},
@@ -351,7 +356,7 @@ func TestBlockOptions(t *testing.T) {
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Internal{
-							UptimePercentage: 0,
+							UptimeRequirementConfig: zeroRequiredUptimeConfig,
 						},
 						Uptimes: uptimes,
 					},
@@ -413,7 +418,9 @@ func TestBlockOptions(t *testing.T) {
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Internal{
-							UptimePercentage: .8,
+							UptimeRequirementConfig: genesis.UptimeRequirementConfig{
+								DefaultRequiredUptimePercentage: .8,
+							},
 						},
 						Uptimes: uptimes,
 					},
@@ -475,7 +482,9 @@ func TestBlockOptions(t *testing.T) {
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Internal{
-							UptimePercentage: .8,
+							UptimeRequirementConfig: genesis.UptimeRequirementConfig{
+								DefaultRequiredUptimePercentage: .8,
+							},
 						},
 						Uptimes: uptimes,
 					},

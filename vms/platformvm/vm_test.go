@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -244,6 +245,117 @@ func newWallet(t testing.TB, vm *VM, c walletConfig) wallet.Wallet {
 		nil, // validationIDs
 		[]ids.ID{vm.ctx.CChainID, vm.ctx.XChainID},
 	)
+}
+
+// setupUptimeTest creates and initializes a VM configured for uptime testing.
+// baseDB is used for atomic shared memory setup; if nil, db is used.
+// Returns the VM, context, and cleanup function.
+func setupUptimeTest(t *testing.T, db database.Database, baseDB database.Database, uptimeConfig genesis.UptimeRequirementConfig) (*VM, func()) {
+	if baseDB == nil {
+		baseDB = db
+	}
+
+	vm := &VM{Internal: config.Internal{
+		Chains:                  chains.TestManager,
+		UptimeRequirementConfig: uptimeConfig,
+		RewardConfig:            defaultRewardConfig,
+		Validators:              validators.NewManager(),
+		UptimeLockedCalculator:  uptime.NewLockedCalculator(),
+		UpgradeConfig:           upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
+	}}
+
+	ctx := snowtest.Context(t, snowtest.PChainID)
+	ctx.Lock.Lock()
+
+	// Set up atomic shared memory (required for proper state persistence)
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
+	m := atomic.NewMemory(atomicDB)
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+
+	appSender := &enginetest.Sender{T: t}
+	require.NoError(t, vm.Initialize(
+		t.Context(),
+		ctx,
+		db,
+		genesistest.NewBytes(t, genesistest.Config{}),
+		nil, nil, nil, appSender,
+	))
+
+	initialClkTime := latestForkTime.Add(time.Second)
+	vm.clock.Set(initialClkTime)
+
+	// Set VM state to NormalOp to start tracking validators' uptime
+	require.NoError(t, vm.SetState(t.Context(), snow.Bootstrapping))
+	require.NoError(t, vm.SetState(t.Context(), snow.NormalOp))
+
+	cleanup := func() {
+		require.NoError(t, vm.Shutdown(t.Context()))
+		ctx.Lock.Unlock()
+	}
+
+	return vm, cleanup
+}
+
+// verifyAbortPreferred builds a reward block and verifies that the abort option
+// is preferred (options[0]). Returns the proposal block, abort/commit options, and txID.
+func verifyAbortPreferred(t *testing.T, vm *VM) (smcon.OracleBlock, *blockexecutor.Block, *blockexecutor.Block, ids.ID) {
+	require := require.New(t)
+
+	// Build and verify the reward proposal block
+	blk, err := vm.Builder.BuildBlock(t.Context())
+	require.NoError(err)
+	require.NoError(blk.Verify(t.Context()))
+
+	// Get options and verify abort is preferred
+	oracleBlk := blk.(smcon.OracleBlock)
+	options, err := oracleBlk.Options(t.Context())
+	require.NoError(err)
+
+	abort := options[0].(*blockexecutor.Block)
+	require.IsType(&block.BanffAbortBlock{}, abort.Block)
+
+	commit := options[1].(*blockexecutor.Block)
+	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+
+	// Verify the block contains a RewardValidatorTx and capture its ID
+	rewardTx := oracleBlk.(block.Block).Txs()[0].Unsigned
+	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
+	txID := blk.(block.Block).Txs()[0].ID()
+
+	return oracleBlk, abort, commit, txID
+}
+
+// acceptAbortBlock verifies and accepts the abort option for a reward proposal.
+func acceptAbortBlock(t *testing.T, vm *VM, proposal smcon.OracleBlock, abort, commit *blockexecutor.Block) {
+	require := require.New(t)
+
+	require.NoError(commit.Verify(t.Context()))
+	require.NoError(abort.Verify(t.Context()))
+	require.NoError(proposal.(smcon.Block).Accept(t.Context()))
+	require.NoError(abort.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
+}
+
+// verifyValidatorRemoved checks that the validator was removed from the current
+// validator set after being aborted.
+func verifyValidatorRemoved(t *testing.T, vm *VM, proposalBlk smcon.OracleBlock, txID ids.ID) {
+	require := require.New(t)
+
+	rewardTx := proposalBlk.(block.Block).Txs()[0].Unsigned
+
+	// Verify transaction was aborted
+	_, txStatus, err := vm.state.GetTx(txID)
+	require.NoError(err)
+	require.Equal(status.Aborted, txStatus)
+
+	// Verify validator was removed from current set
+	tx, _, err := vm.state.GetTx(rewardTx.(*txs.RewardValidatorTx).TxID)
+	require.NoError(err)
+	require.IsType(&txs.AddValidatorTx{}, tx.Unsigned)
+
+	valTx := tx.Unsigned.(*txs.AddValidatorTx)
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 // Ensure genesis state is parsed from bytes and stored correctly
@@ -1664,43 +1776,17 @@ func TestMaxStakeAmount(t *testing.T) {
 }
 
 func TestUptimeDisallowedWithRestart(t *testing.T) {
-	require := require.New(t)
 	latestForkTime = genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
 	db := memdb.New()
 
-	firstDB := prefixdb.New([]byte{}, db)
+	// First VM: 20% uptime requirement
 	const firstUptimePercentage = 20 // 20%
-	firstVM := &VM{Internal: config.Internal{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       firstUptimePercentage / 100.,
-		RewardConfig:           defaultRewardConfig,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
-	}}
+	firstUptimeConfig := genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: firstUptimePercentage / 100.,
+	}
 
-	firstCtx := snowtest.Context(t, snowtest.PChainID)
-	firstCtx.Lock.Lock()
-
-	genesisBytes := genesistest.NewBytes(t, genesistest.Config{})
-
-	require.NoError(firstVM.Initialize(
-		t.Context(),
-		firstCtx,
-		firstDB,
-		genesisBytes,
-		nil,
-		nil,
-		nil,
-		nil,
-	))
-
-	initialClkTime := latestForkTime.Add(time.Second)
-	firstVM.clock.Set(initialClkTime)
-
-	// Set VM state to NormalOp, to start tracking validators' uptime
-	require.NoError(firstVM.SetState(t.Context(), snow.Bootstrapping))
-	require.NoError(firstVM.SetState(t.Context(), snow.NormalOp))
+	firstDB := prefixdb.New([]byte{}, db)
+	firstVM, firstCleanup := setupUptimeTest(t, firstDB, db, firstUptimeConfig)
 
 	// Fast forward clock so that validators meet 20% uptime required for reward
 	durationForReward := genesistest.DefaultValidatorEndTime.Sub(genesistest.DefaultValidatorStartTime) * firstUptimePercentage / 100
@@ -1709,196 +1795,92 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Shutdown VM to stop all genesis validator uptime.
 	// At this point they have been validating for the 20% uptime needed to be rewarded
-	require.NoError(firstVM.Shutdown(t.Context()))
-	firstCtx.Lock.Unlock()
+	firstCleanup()
 
 	// Restart the VM with a larger uptime requirement
-	secondDB := prefixdb.New([]byte{}, db)
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
-	secondVM := &VM{Internal: config.Internal{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       secondUptimePercentage / 100.,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
-	}}
+	secondUptimeConfig := genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: secondUptimePercentage / 100.,
+	}
 
-	secondCtx := snowtest.Context(t, snowtest.PChainID)
-	secondCtx.Lock.Lock()
-	defer func() {
-		require.NoError(secondVM.Shutdown(t.Context()))
-		secondCtx.Lock.Unlock()
-	}()
-
-	atomicDB := prefixdb.New([]byte{1}, db)
-	m := atomic.NewMemory(atomicDB)
-	secondCtx.SharedMemory = m.NewSharedMemory(secondCtx.ChainID)
-
-	require.NoError(secondVM.Initialize(
-		t.Context(),
-		secondCtx,
-		secondDB,
-		genesisBytes,
-		nil,
-		nil,
-		nil,
-		nil,
-	))
+	secondDB := prefixdb.New([]byte{}, db)
+	secondVM, secondCleanup := setupUptimeTest(t, secondDB, db, secondUptimeConfig)
+	defer secondCleanup()
 
 	secondVM.clock.Set(vmStopTime)
 
-	// Set VM state to NormalOp, to start tracking validators' uptime
-	require.NoError(secondVM.SetState(t.Context(), snow.Bootstrapping))
-	require.NoError(secondVM.SetState(t.Context(), snow.NormalOp))
-
-	// after restart and change of uptime required for reward, push validators to their end of life
+	// After restart and change of uptime required for reward, push validators to their end of life
 	secondVM.clock.Set(genesistest.DefaultValidatorEndTime)
 
-	// evaluate a genesis validator for reward
-	blk, err := secondVM.Builder.BuildBlock(t.Context())
-	require.NoError(err)
-	require.NoError(blk.Verify(t.Context()))
+	// Verify abort is preferred since uptime (20%) is below new requirement (21%)
+	proposal, abort, commit, txID := verifyAbortPreferred(t, secondVM)
 
-	// Assert preferences are correct.
-	// secondVM should prefer abort since uptime requirements are not met anymore
-	oracleBlk := blk.(smcon.OracleBlock)
-	options, err := oracleBlk.Options(t.Context())
-	require.NoError(err)
+	// Accept the abort block
+	acceptAbortBlock(t, secondVM, proposal, abort, commit)
 
-	abort := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
-
-	commit := options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
-
-	// Assert block tries to reward a genesis validator
-	rewardTx := oracleBlk.(block.Block).Txs()[0].Unsigned
-	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
-	txID := blk.(block.Block).Txs()[0].ID()
-
-	// Verify options and accept abort block
-	require.NoError(commit.Verify(t.Context()))
-	require.NoError(abort.Verify(t.Context()))
-	require.NoError(blk.Accept(t.Context()))
-	require.NoError(abort.Accept(t.Context()))
-	require.NoError(secondVM.SetPreference(t.Context(), secondVM.manager.LastAccepted()))
-
-	// Verify that rewarded validator has been removed.
-	// Note that test genesis has multiple validators
-	// terminating at the same time. The rewarded validator
-	// will the first by txID. To make the test more stable
-	// (txID changes every time we change any parameter
-	// of the tx creating the validator), we explicitly
-	//  check that rewarded validator is removed from staker set.
-	_, txStatus, err := secondVM.state.GetTx(txID)
-	require.NoError(err)
-	require.Equal(status.Aborted, txStatus)
-
-	tx, _, err := secondVM.state.GetTx(rewardTx.(*txs.RewardValidatorTx).TxID)
-	require.NoError(err)
-	require.IsType(&txs.AddValidatorTx{}, tx.Unsigned)
-
-	valTx, _ := tx.Unsigned.(*txs.AddValidatorTx)
-	_, err = secondVM.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
-	require.ErrorIs(err, database.ErrNotFound)
+	// Verify validator was removed from current set
+	verifyValidatorRemoved(t, secondVM, proposal, txID)
 }
 
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
-	require := require.New(t)
 	latestForkTime = genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
 
-	db := memdb.New()
+	uptimeConfig := genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: .2, // 20%
+	}
 
-	vm := &VM{Internal: config.Internal{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       .2,
-		RewardConfig:           defaultRewardConfig,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
-	}}
-
-	ctx := snowtest.Context(t, snowtest.PChainID)
-	ctx.Lock.Lock()
-
-	atomicDB := prefixdb.New([]byte{1}, db)
-	m := atomic.NewMemory(atomicDB)
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
-
-	appSender := &enginetest.Sender{T: t}
-	require.NoError(vm.Initialize(
-		t.Context(),
-		ctx,
-		db,
-		genesistest.NewBytes(t, genesistest.Config{}),
-		nil,
-		nil,
-		nil,
-		appSender,
-	))
-
-	defer func() {
-		require.NoError(vm.Shutdown(t.Context()))
-		ctx.Lock.Unlock()
-	}()
-
-	initialClkTime := latestForkTime.Add(time.Second)
-	vm.clock.Set(initialClkTime)
-
-	// Set VM state to NormalOp, to start tracking validators' uptime
-	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
-	require.NoError(vm.SetState(t.Context(), snow.NormalOp))
+	vm, cleanup := setupUptimeTest(t, memdb.New(), nil, uptimeConfig)
+	defer cleanup()
 
 	// Fast forward clock to time for genesis validators to leave
+	// Validator has 0% uptime since they never connected
 	vm.clock.Set(genesistest.DefaultValidatorEndTime)
 
-	// evaluate a genesis validator for reward
-	blk, err := vm.Builder.BuildBlock(t.Context())
-	require.NoError(err)
-	require.NoError(blk.Verify(t.Context()))
+	// Verify abort is preferred since uptime (0%) is below requirement (20%)
+	proposal, abort, commit, txID := verifyAbortPreferred(t, vm)
 
-	// Assert preferences are correct.
-	// vm should prefer abort since uptime requirements are not met.
-	oracleBlk := blk.(smcon.OracleBlock)
-	options, err := oracleBlk.Options(t.Context())
-	require.NoError(err)
+	// Accept the abort block
+	acceptAbortBlock(t, vm, proposal, abort, commit)
 
-	abort := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
+	// Verify validator was removed from current set
+	verifyValidatorRemoved(t, vm, proposal, txID)
+}
 
-	commit := options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+func TestUptimeDisallowedWithScheduledIncrease(t *testing.T) {
+	latestForkTime = genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
 
-	// Assert block tries to reward a genesis validator
-	rewardTx := oracleBlk.(block.Block).Txs()[0].Unsigned
-	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
-	txID := blk.(block.Block).Txs()[0].ID()
+	// Set up schedule: 80% default, 90% after genesis validator start time
+	// Genesis validators start at DefaultValidatorStartTime, so they need 90%
+	uptimeConfig := genesis.UptimeRequirementConfig{
+		DefaultRequiredUptimePercentage: .8, // 80%
+		RequiredUptimePercentageSchedule: []genesis.UptimeRequirementUpdate{
+			{
+				Time:        genesistest.DefaultValidatorStartTime.Add(-time.Second), // Before validator starts
+				Requirement: .9,                                                      // 90%
+			},
+		},
+	}
 
-	// Verify options and accept abort block
-	require.NoError(commit.Verify(t.Context()))
-	require.NoError(abort.Verify(t.Context()))
-	require.NoError(blk.Accept(t.Context()))
-	require.NoError(abort.Accept(t.Context()))
-	require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
+	vm, cleanup := setupUptimeTest(t, memdb.New(), nil, uptimeConfig)
+	defer cleanup()
 
-	// Verify that rewarded validator has been removed.
-	// Note that test genesis has multiple validators
-	// terminating at the same time. The rewarded validator
-	// will the first by txID. To make the test more stable
-	// (txID changes every time we change any parameter
-	// of the tx creating the validator), we explicitly
-	//  check that rewarded validator is removed from staker set.
-	_, txStatus, err := vm.state.GetTx(txID)
-	require.NoError(err)
-	require.Equal(status.Aborted, txStatus)
+	// Validator accumulates 85% uptime (above 80% default, below 90% scheduled requirement)
+	validatorDuration := genesistest.DefaultValidatorEndTime.Sub(genesistest.DefaultValidatorStartTime)
+	uptimeForReward := validatorDuration * 85 / 100 // 85%
+	vmStopTime := genesistest.DefaultValidatorStartTime.Add(uptimeForReward)
+	vm.clock.Set(vmStopTime)
 
-	tx, _, err := vm.state.GetTx(rewardTx.(*txs.RewardValidatorTx).TxID)
-	require.NoError(err)
-	require.IsType(&txs.AddValidatorTx{}, tx.Unsigned)
+	// Fast forward to validator end time
+	vm.clock.Set(genesistest.DefaultValidatorEndTime)
 
-	valTx, _ := tx.Unsigned.(*txs.AddValidatorTx)
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
-	require.ErrorIs(err, database.ErrNotFound)
+	// Verify abort is preferred since uptime (85%) is below scheduled requirement (90%)
+	proposal, abort, commit, txID := verifyAbortPreferred(t, vm)
+
+	// Accept the abort block
+	acceptAbortBlock(t, vm, proposal, abort, commit)
+
+	// Verify validator was removed from current set
+	verifyValidatorRemoved(t, vm, proposal, txID)
 }
 
 func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {

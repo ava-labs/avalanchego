@@ -630,7 +630,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Config.NetworkConfig.BLSKey = n.StakingSigner
 	n.Config.NetworkConfig.TrackedSubnets = n.Config.TrackedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
-	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement
+	n.Config.NetworkConfig.UptimeRequirementConfig = n.Config.UptimeRequirementConfig
 	n.Config.NetworkConfig.ResourceTracker = n.resourceTracker
 	n.Config.NetworkConfig.CPUTargeter = n.cpuTargeter
 	n.Config.NetworkConfig.DiskTargeter = n.diskTargeter
@@ -1213,7 +1213,7 @@ func (n *Node) initVMs() error {
 				TrackedSubnets:            n.Config.TrackedSubnets,
 				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
 				ValidatorFeeConfig:        n.Config.ValidatorFeeConfig,
-				UptimePercentage:          n.Config.UptimeRequirement,
+				UptimeRequirementConfig:   n.Config.UptimeRequirementConfig,
 				MinValidatorStake:         n.Config.MinValidatorStake,
 				MaxValidatorStake:         n.Config.MaxValidatorStake,
 				MinDelegatorStake:         n.Config.MinDelegatorStake,

@@ -52,7 +52,15 @@ var (
 			},
 		},
 		StakingConfig: StakingConfig{
-			UptimeRequirement: .8, // 80%
+			UptimeRequirementConfig: UptimeRequirementConfig{
+				DefaultRequiredUptimePercentage: .8, // 80%
+				RequiredUptimePercentageSchedule: []UptimeRequirementUpdate{
+					{
+						Time:        time.Date(2026, time.February, 15, 0, 0, 0, 0, time.UTC),
+						Requirement: .9, // 90%
+					},
+				},
+			},
 			MinValidatorStake: 1 * units.Avax,
 			MaxValidatorStake: 3 * units.MegaAvax,
 			MinDelegatorStake: 1 * units.Avax,
