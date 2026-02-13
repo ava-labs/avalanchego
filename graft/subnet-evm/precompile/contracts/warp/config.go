@@ -50,6 +50,7 @@ var (
 // adds specific configuration for Warp.
 type Config struct {
 	precompileconfig.Upgrade
+
 	QuorumNumerator              uint64 `json:"quorumNumerator"`
 	RequirePrimaryNetworkSigners bool   `json:"requirePrimaryNetworkSigners"`
 }

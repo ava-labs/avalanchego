@@ -34,6 +34,7 @@ func NewVertexVM(
 type vertexVM struct {
 	vertex.LinearizableVMWithEngine
 	vertexMetrics
+
 	registry prometheus.Registerer
 }
 

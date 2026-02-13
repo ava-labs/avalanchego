@@ -38,7 +38,8 @@ var (
 // UTXO adds messages to UTXOs
 type UTXO struct {
 	avax.UTXO `serialize:"true"`
-	Message   []byte `serialize:"true" json:"message"`
+
+	Message []byte `serialize:"true" json:"message"`
 }
 
 // Genesis represents a genesis state of the platform chain
@@ -118,6 +119,7 @@ type Owner struct {
 // GenesisPermissionlessValidator represents a permissionless validator at genesis
 type PermissionlessValidator struct {
 	Validator
+
 	RewardOwner        *Owner
 	DelegationFee      float32
 	ExactDelegationFee uint32

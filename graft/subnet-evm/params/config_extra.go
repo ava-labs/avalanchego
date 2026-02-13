@@ -105,6 +105,7 @@ func WithExtra(c *ChainConfig, extra *extras.ChainConfig) *ChainConfig {
 
 type ChainConfigWithUpgradesJSON struct {
 	ChainConfig
+
 	UpgradeConfig extras.UpgradeConfig `json:"upgrades,omitempty"`
 }
 

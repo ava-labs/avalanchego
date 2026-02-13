@@ -37,6 +37,7 @@ type AddPermissionlessValidatorTx struct {
 	BaseTx `serialize:"true"`
 	// Describes the validator
 	Validator `serialize:"true" json:"validator"`
+
 	// ID of the subnet this validator is validating
 	Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// If the [Subnet] is the primary network, [Signer] is the BLS key for this

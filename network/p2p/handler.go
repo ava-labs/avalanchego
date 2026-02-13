@@ -218,6 +218,7 @@ func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, dea
 // responder automatically sends the response for a given request
 type responder struct {
 	Handler
+
 	handlerID uint64
 	log       logging.Logger
 	sender    common.AppSender

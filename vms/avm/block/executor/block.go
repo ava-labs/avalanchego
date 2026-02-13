@@ -36,6 +36,7 @@ var (
 // Exported for testing in avm package.
 type Block struct {
 	block.Block
+
 	manager *manager
 }
 

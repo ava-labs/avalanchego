@@ -303,9 +303,9 @@ func (b *batch) Inner() database.Batch {
 // iterator walks over both the in memory database and the underlying database
 // at the same time.
 type iterator struct {
-	db *Database
 	database.Iterator
 
+	db         *Database
 	key, value []byte
 	err        error
 

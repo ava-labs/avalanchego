@@ -271,6 +271,7 @@ func deriveSender(tx *types.Transaction) (common.Address, error) {
 
 type testChain struct {
 	*testBlockChain
+
 	address common.Address
 	trigger *bool
 }

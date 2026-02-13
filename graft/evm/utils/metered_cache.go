@@ -14,6 +14,7 @@ import (
 // MeteredCache wraps *fastcache.Cache and periodically pulls stats from it.
 type MeteredCache struct {
 	*fastcache.Cache
+
 	namespace string
 
 	// stats to be surfaced

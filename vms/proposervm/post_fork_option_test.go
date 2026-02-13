@@ -27,6 +27,7 @@ var _ snowman.OracleBlock = (*TestOptionsBlock)(nil)
 
 type TestOptionsBlock struct {
 	snowmantest.Block
+
 	opts    [2]*snowmantest.Block
 	optsErr error
 }

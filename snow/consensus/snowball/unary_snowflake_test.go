@@ -64,9 +64,9 @@ func TestUnarySnowflake(t *testing.T) {
 }
 
 type unarySnowflakeTest struct {
-	require *require.Assertions
-
 	unarySnowflake
+
+	require *require.Assertions
 }
 
 func newUnarySnowflakeTest(t *testing.T, alphaPreference int, terminationConditions []terminationCondition) snowflakeTest[struct{}] {

@@ -47,6 +47,7 @@ var (
 
 type SyntacticVerifier struct {
 	*Backend
+
 	Tx *txs.Tx
 }
 

@@ -532,6 +532,7 @@ func TestClientCloseUnsubscribeRace(t *testing.T) {
 // unsubscribeRecorder collects the subscription IDs of *_unsubscribe calls.
 type unsubscribeRecorder struct {
 	ServerCodec
+
 	unsubscribes map[string]bool
 }
 
@@ -873,6 +874,7 @@ func httpTestClient(srv *Server, transport string, fl *flakeyListener) (*Client,
 // flakeyListener kills accepted connections after a random timeout.
 type flakeyListener struct {
 	net.Listener
+
 	maxKillTimeout time.Duration
 	maxAcceptDelay time.Duration
 }

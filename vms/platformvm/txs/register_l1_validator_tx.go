@@ -14,6 +14,7 @@ var _ UnsignedTx = (*RegisterL1ValidatorTx)(nil)
 type RegisterL1ValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
+
 	// Balance <= sum($AVAX inputs) - sum($AVAX outputs) - TxFee.
 	Balance uint64 `serialize:"true" json:"balance"`
 	// ProofOfPossession of the BLS key that is included in the Message.

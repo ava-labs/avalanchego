@@ -105,7 +105,8 @@ type Config struct {
 	PeerListGossipConfig `json:"peerListGossipConfig"`
 	TimeoutConfig        `json:"timeoutConfigs"`
 	DelayConfig          `json:"delayConfig"`
-	ThrottlerConfig      ThrottlerConfig `json:"throttlerConfig"`
+
+	ThrottlerConfig ThrottlerConfig `json:"throttlerConfig"`
 
 	ProxyEnabled           bool          `json:"proxyEnabled"`
 	ProxyReadHeaderTimeout time.Duration `json:"proxyReadHeaderTimeout"`

@@ -30,11 +30,11 @@ func NewUnboundedBlockingDeque[T any](initSize int) BlockingDeque[T] {
 }
 
 type unboundedBlockingDeque[T any] struct {
+	Deque[T]
+
 	lock   sync.RWMutex
 	cond   *sync.Cond
 	closed bool
-
-	Deque[T]
 }
 
 // If the deque is closed returns false.

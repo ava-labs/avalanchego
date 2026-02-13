@@ -36,6 +36,7 @@ import (
 
 type testPeer struct {
 	Peer
+
 	inboundMsgChan <-chan *message.InboundMessage
 }
 

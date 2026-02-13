@@ -40,6 +40,7 @@ var (
 // Mempool is a simple mempool for atomic transactions
 type Mempool struct {
 	*Txs
+
 	// bloom is a bloom filter containing the txs in the mempool
 	bloom  *gossip.BloomFilter
 	verify func(tx *atomic.Tx) error

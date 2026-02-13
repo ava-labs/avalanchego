@@ -15,8 +15,8 @@ var (
 )
 
 type LockOut struct {
-	Locktime             uint64 `serialize:"true" json:"locktime"`
-	avax.TransferableOut `serialize:"true" json:"output"`
+	Locktime             uint64                           `serialize:"true" json:"locktime"`
+	avax.TransferableOut `serialize:"true" json:"output"` //nolint:embeddedstructfieldcheck
 }
 
 func (s *LockOut) Addresses() [][]byte {
@@ -37,8 +37,8 @@ func (s *LockOut) Verify() error {
 }
 
 type LockIn struct {
-	Locktime            uint64 `serialize:"true" json:"locktime"`
-	avax.TransferableIn `serialize:"true" json:"input"`
+	Locktime            uint64                          `serialize:"true" json:"locktime"`
+	avax.TransferableIn `serialize:"true" json:"input"` //nolint:embeddedstructfieldcheck
 }
 
 func (s *LockIn) Verify() error {

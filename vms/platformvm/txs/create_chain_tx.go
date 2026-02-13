@@ -36,6 +36,7 @@ var (
 type CreateChainTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
+
 	// ID of the Subnet that validates this blockchain
 	SubnetID ids.ID `serialize:"true" json:"subnetID"`
 	// A human readable name for the chain; need not be unique

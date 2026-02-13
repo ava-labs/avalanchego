@@ -29,6 +29,7 @@ var (
 
 type blockVM struct {
 	block.ChainVM
+
 	buildBlockVM    block.BuildBlockWithContextChainVM
 	setPreferenceVM block.SetPreferenceWithContextChainVM
 	batchedVM       block.BatchedChainVM
