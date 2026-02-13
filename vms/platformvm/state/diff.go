@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -48,9 +49,7 @@ type diff struct {
 	l1ValidatorsDiff *l1ValidatorsDiff
 
 	currentStakerDiffs diffStakers
-	// map of subnetID -> nodeID -> total accrued delegatee rewards
-	modifiedDelegateeRewards map[ids.ID]map[ids.NodeID]uint64
-	pendingStakerDiffs       diffStakers
+	pendingStakerDiffs diffStakers
 
 	addedSubnetIDs []ids.ID
 	// Subnet ID --> Owner of the subnet
@@ -68,6 +67,9 @@ type diff struct {
 
 	// map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
 	modifiedUTXOs map[ids.ID]*avax.UTXO
+
+	// map of NodeID -> StartTime for continuous validators that need uptime reset after cycle restart
+	uptimeResets map[ids.NodeID]time.Time
 }
 
 func NewDiff(
@@ -282,31 +284,6 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	}
 }
 
-func (d *diff) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
-	if d.modifiedDelegateeRewards == nil {
-		d.modifiedDelegateeRewards = make(map[ids.ID]map[ids.NodeID]uint64)
-	}
-	nodes, ok := d.modifiedDelegateeRewards[subnetID]
-	if !ok {
-		nodes = make(map[ids.NodeID]uint64)
-		d.modifiedDelegateeRewards[subnetID] = nodes
-	}
-	nodes[nodeID] = amount
-	return nil
-}
-
-func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
-	amount, modified := d.modifiedDelegateeRewards[subnetID][nodeID]
-	if modified {
-		return amount, nil
-	}
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	return parentState.GetDelegateeReward(subnetID, nodeID)
-}
-
 func (d *diff) PutCurrentValidator(staker *Staker) error {
 	return d.currentStakerDiffs.PutValidator(staker)
 }
@@ -322,6 +299,30 @@ func (d *diff) UpdateCurrentValidator(mutatedValidator *Staker) error {
 	}
 
 	d.currentStakerDiffs.UpdateValidator(oldValidator, mutatedValidator)
+	return nil
+}
+
+func (d *diff) ResetContinuousValidatorCycle(
+	validator *Staker,
+	weight uint64,
+	potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
+) error {
+	mutatedValidator := *validator
+	if err := (&mutatedValidator).resetContinuousStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards); err != nil {
+		return err
+	}
+
+	if err := validator.ValidateMutation(&mutatedValidator); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidStakerMutation, err)
+	}
+
+	d.currentStakerDiffs.UpdateValidator(validator, &mutatedValidator)
+
+	if d.uptimeResets == nil {
+		d.uptimeResets = map[ids.NodeID]time.Time{}
+	}
+	d.uptimeResets[validator.NodeID] = mutatedValidator.StartTime
+
 	return nil
 }
 
@@ -633,9 +634,17 @@ func (d *diff) Apply(baseState Chain) error {
 			}
 		}
 	}
-	for subnetID, nodes := range d.modifiedDelegateeRewards {
-		for nodeID, amount := range nodes {
-			if err := baseState.SetDelegateeReward(subnetID, nodeID, amount); err != nil {
+	// Apply uptime resets for continuous validators that restarted their cycle
+	for nodeID, startTime := range d.uptimeResets {
+		// If baseState is another diff, propagate the resets to it
+		if baseDiff, ok := baseState.(*diff); ok {
+			if baseDiff.uptimeResets == nil {
+				baseDiff.uptimeResets = make(map[ids.NodeID]time.Time)
+			}
+			baseDiff.uptimeResets[nodeID] = startTime
+		} else if s, ok := baseState.(uptime.State); ok {
+			// If it's the actual state, apply the reset
+			if err := s.SetUptime(nodeID, 0, startTime); err != nil {
 				return err
 			}
 		}

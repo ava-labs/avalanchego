@@ -470,21 +470,6 @@ func (mr *MockStateMockRecorder) GetCurrentValidators(ctx, subnetID any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidators", reflect.TypeOf((*MockState)(nil).GetCurrentValidators), ctx, subnetID)
 }
 
-// GetDelegateeReward mocks base method.
-func (m *MockState) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDelegateeReward", subnetID, nodeID)
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDelegateeReward indicates an expected call of GetDelegateeReward.
-func (mr *MockStateMockRecorder) GetDelegateeReward(subnetID, nodeID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), subnetID, nodeID)
-}
-
 // GetExpiryIterator mocks base method.
 func (m *MockState) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	m.ctrl.T.Helper()
@@ -904,6 +889,20 @@ func (mr *MockStateMockRecorder) ReindexBlocks(lock, log any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReindexBlocks", reflect.TypeOf((*MockState)(nil).ReindexBlocks), lock, log)
 }
 
+// ResetContinuousValidatorCycle mocks base method.
+func (m *MockState) ResetContinuousValidatorCycle(validator *Staker, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResetContinuousValidatorCycle", validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResetContinuousValidatorCycle indicates an expected call of ResetContinuousValidatorCycle.
+func (mr *MockStateMockRecorder) ResetContinuousValidatorCycle(validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetContinuousValidatorCycle", reflect.TypeOf((*MockState)(nil).ResetContinuousValidatorCycle), validator, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
+}
+
 // SetAccruedFees mocks base method.
 func (m *MockState) SetAccruedFees(f uint64) {
 	m.ctrl.T.Helper()
@@ -926,20 +925,6 @@ func (m *MockState) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 func (mr *MockStateMockRecorder) SetCurrentSupply(subnetID, cs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockState)(nil).SetCurrentSupply), subnetID, cs)
-}
-
-// SetDelegateeReward mocks base method.
-func (m *MockState) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetDelegateeReward", subnetID, nodeID, amount)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetDelegateeReward indicates an expected call of SetDelegateeReward.
-func (mr *MockStateMockRecorder) SetDelegateeReward(subnetID, nodeID, amount any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), subnetID, nodeID, amount)
 }
 
 // SetFeeState mocks base method.

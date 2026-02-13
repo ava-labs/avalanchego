@@ -1206,3 +1206,234 @@ func TestDiffUpdateValidator(t *testing.T) {
 		actualStakers,
 	)
 }
+
+func TestDiffResetContinuousValidatorCycle(t *testing.T) {
+	require := require.New(t)
+
+	subnetID := ids.GenerateTestID()
+
+	state := newTestState(t, memdb.New())
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+
+	blsKey, err := localsigner.New()
+	require.NoError(err)
+
+	continuousValidator := &Staker{
+		ContinuousValidator: ContinuousValidator{
+			AccruedRewards:          10,
+			AccruedDelegateeRewards: 5,
+			AutoRestakeShares:       100_000,
+			ContinuationPeriod:      14 * 24 * time.Hour,
+		},
+		TxID:            ids.GenerateTestID(),
+		NodeID:          ids.GenerateTestNodeID(),
+		PublicKey:       blsKey.PublicKey(),
+		SubnetID:        subnetID,
+		Weight:          10,
+		StartTime:       time.Unix(1, 0),
+		EndTime:         time.Unix(2, 0),
+		PotentialReward: 100,
+		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
+	}
+	require.NoError(d.PutCurrentValidator(continuousValidator))
+
+	err = d.ResetContinuousValidatorCycle(
+		continuousValidator,
+		continuousValidator.Weight-1,
+		continuousValidator.PotentialReward,
+		continuousValidator.AccruedRewards,
+		continuousValidator.AccruedDelegateeRewards,
+	)
+	require.ErrorIs(err, ErrInvalidStakerMutation)
+
+	newWeight := continuousValidator.Weight + 10
+	newPotentialReward := continuousValidator.PotentialReward + 15
+	newAccruedRewards := continuousValidator.AccruedRewards + 20
+	newAccruedDelegateeRewards := continuousValidator.AccruedDelegateeRewards + 25
+
+	expectedStartTime := continuousValidator.EndTime
+	expectedEndTime := continuousValidator.EndTime.Add(continuousValidator.ContinuationPeriod)
+	require.NoError(
+		d.ResetContinuousValidatorCycle(
+			continuousValidator,
+			newWeight,
+			newPotentialReward,
+			newAccruedRewards,
+			newAccruedDelegateeRewards,
+		),
+	)
+
+	continuousValidator, err = d.GetCurrentValidator(subnetID, continuousValidator.NodeID)
+	require.NoError(err)
+
+	require.Equal(newWeight, continuousValidator.Weight)
+	require.Equal(newPotentialReward, continuousValidator.PotentialReward)
+	require.Equal(newAccruedRewards, continuousValidator.AccruedRewards)
+	require.Equal(newAccruedDelegateeRewards, continuousValidator.AccruedDelegateeRewards)
+	require.Equal(expectedStartTime, continuousValidator.StartTime)
+	require.Equal(expectedEndTime, continuousValidator.EndTime)
+	require.Equal(expectedEndTime, continuousValidator.NextTime)
+
+	updatedValidator := *continuousValidator
+	updatedValidator.ContinuationPeriod = 0
+
+	require.NoError(d.UpdateCurrentValidator(&updatedValidator))
+
+	err = d.ResetContinuousValidatorCycle(
+		&updatedValidator,
+		newWeight,
+		newPotentialReward,
+		newAccruedRewards,
+		newAccruedDelegateeRewards,
+	)
+	require.ErrorIs(err, errContinuationPeriodIsZero, err)
+}
+
+func TestDiffResetContinuousValidatorCycleResetsUptime(t *testing.T) {
+	require := require.New(t)
+
+	state := newTestState(t, memdb.New())
+
+	blsKey, err := localsigner.New()
+	require.NoError(err)
+
+	continuousValidator := &Staker{
+		ContinuousValidator: ContinuousValidator{
+			AccruedRewards:          10,
+			AccruedDelegateeRewards: 5,
+			AutoRestakeShares:       100_000,
+			ContinuationPeriod:      14 * 24 * time.Hour,
+		},
+		TxID:            ids.GenerateTestID(),
+		NodeID:          ids.GenerateTestNodeID(),
+		PublicKey:       blsKey.PublicKey(),
+		SubnetID:        constants.PrimaryNetworkID,
+		Weight:          10,
+		StartTime:       time.Unix(1000, 0),
+		EndTime:         time.Unix(2000, 0),
+		PotentialReward: 100,
+		NextTime:        time.Unix(2000, 0),
+		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
+	}
+
+	// Add validator to state
+	require.NoError(state.PutCurrentValidator(continuousValidator))
+	require.NoError(state.Commit())
+
+	// Simulate some uptime accumulation
+	accumulatedUptime := 500 * time.Second
+	require.NoError(state.SetUptime(continuousValidator.NodeID, accumulatedUptime, continuousValidator.StartTime))
+	require.NoError(state.Commit())
+
+	// Verify uptime was set
+	upDuration, _, err := state.GetUptime(continuousValidator.NodeID)
+	require.NoError(err)
+	require.Equal(accumulatedUptime, upDuration)
+
+	// Create a diff and reset the continuous validator cycle
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+
+	newWeight := continuousValidator.Weight + 10
+	newPotentialReward := continuousValidator.PotentialReward + 15
+	newAccruedRewards := continuousValidator.AccruedRewards + 20
+	newAccruedDelegateeRewards := continuousValidator.AccruedDelegateeRewards + 25
+
+	require.NoError(
+		d.ResetContinuousValidatorCycle(
+			continuousValidator,
+			newWeight,
+			newPotentialReward,
+			newAccruedRewards,
+			newAccruedDelegateeRewards,
+		),
+	)
+
+	// Apply the diff to the state
+	require.NoError(d.Apply(state))
+
+	// Verify uptime was reset to 0 with the new start time (which is the old end time)
+	upDuration, lastUpdated, err := state.GetUptime(continuousValidator.NodeID)
+	require.NoError(err)
+	require.Equal(time.Duration(0), upDuration, "uptime should be reset to 0 after cycle restart")
+	require.Equal(continuousValidator.EndTime, lastUpdated, "lastUpdated should be set to new cycle start time")
+}
+
+func TestDiffUptimeResetPropagatesThroughDiffChain(t *testing.T) {
+	require := require.New(t)
+
+	state := newTestState(t, memdb.New())
+
+	blsKey, err := localsigner.New()
+	require.NoError(err)
+
+	continuousValidator := &Staker{
+		ContinuousValidator: ContinuousValidator{
+			AccruedRewards:          10,
+			AccruedDelegateeRewards: 5,
+			AutoRestakeShares:       100_000,
+			ContinuationPeriod:      14 * 24 * time.Hour,
+		},
+		TxID:            ids.GenerateTestID(),
+		NodeID:          ids.GenerateTestNodeID(),
+		PublicKey:       blsKey.PublicKey(),
+		SubnetID:        constants.PrimaryNetworkID,
+		Weight:          10,
+		StartTime:       time.Unix(1000, 0),
+		EndTime:         time.Unix(2000, 0),
+		PotentialReward: 100,
+		NextTime:        time.Unix(2000, 0),
+		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
+	}
+
+	// Add validator to state
+	require.NoError(state.PutCurrentValidator(continuousValidator))
+	require.NoError(state.Commit())
+
+	// Simulate some uptime accumulation
+	accumulatedUptime := 500 * time.Second
+	require.NoError(state.SetUptime(continuousValidator.NodeID, accumulatedUptime, continuousValidator.StartTime))
+	require.NoError(state.Commit())
+
+	// Verify uptime was set
+	upDuration, _, err := state.GetUptime(continuousValidator.NodeID)
+	require.NoError(err)
+	require.Equal(accumulatedUptime, upDuration)
+
+	// Create diff1 on top of state
+	diff1, err := NewDiffOn(state)
+	require.NoError(err)
+
+	// Create diff2 on top of diff1
+	diff2, err := NewDiffOn(diff1)
+	require.NoError(err)
+
+	// Reset the continuous validator cycle on diff2
+	newWeight := continuousValidator.Weight + 10
+	newPotentialReward := continuousValidator.PotentialReward + 15
+	newAccruedRewards := continuousValidator.AccruedRewards + 20
+	newAccruedDelegateeRewards := continuousValidator.AccruedDelegateeRewards + 25
+
+	require.NoError(
+		diff2.ResetContinuousValidatorCycle(
+			continuousValidator,
+			newWeight,
+			newPotentialReward,
+			newAccruedRewards,
+			newAccruedDelegateeRewards,
+		),
+	)
+
+	// Apply diff2 to diff1 - uptime reset should propagate to diff1
+	require.NoError(diff2.Apply(diff1))
+
+	// Apply diff1 to state - uptime reset should be applied
+	require.NoError(diff1.Apply(state))
+
+	// Verify uptime was reset to 0 with the new start time
+	upDuration, lastUpdated, err := state.GetUptime(continuousValidator.NodeID)
+	require.NoError(err)
+	require.Equal(time.Duration(0), upDuration, "uptime should be reset to 0 after cycle restart through diff chain")
+	require.Equal(continuousValidator.EndTime, lastUpdated, "lastUpdated should be set to new cycle start time")
+}
