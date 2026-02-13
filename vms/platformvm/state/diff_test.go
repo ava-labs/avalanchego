@@ -1045,34 +1045,34 @@ func TestDiffStacking(t *testing.T) {
 func TestDiffUpdateValidatorErrors(t *testing.T) {
 	tests := []struct {
 		name            string
-		updateValidator func(*Staker)
+		mutateValidator func(*Staker)
 		updateState     func(*require.Assertions, Diff)
 		expectedErr     error
 	}{
 		{
 			name: "invalid mutation",
-			updateValidator: func(validator *Staker) {
+			mutateValidator: func(validator *Staker) {
 				validator.Weight = 5
 			},
 			expectedErr: ErrInvalidStakerMutation,
 		},
 		{
 			name: "invalid staker mutation",
-			updateValidator: func(staker *Staker) {
+			mutateValidator: func(staker *Staker) {
 				staker.Weight -= 1
 			},
 			expectedErr: ErrInvalidStakerMutation,
 		},
 		{
 			name: "staker not found",
-			updateValidator: func(staker *Staker) {
+			mutateValidator: func(staker *Staker) {
 				staker.NodeID = ids.GenerateTestNodeID()
 			},
 			expectedErr: database.ErrNotFound,
 		},
 		{
 			name: "missing validator",
-			updateValidator: func(validator *Staker) {
+			mutateValidator: func(validator *Staker) {
 				validator.NodeID = ids.GenerateTestNodeID()
 			},
 			expectedErr: database.ErrNotFound,
@@ -1093,7 +1093,7 @@ func TestDiffUpdateValidatorErrors(t *testing.T) {
 		},
 		{
 			name: "valid mutation",
-			updateValidator: func(validator *Staker) {
+			mutateValidator: func(validator *Staker) {
 				validator.Weight = 15
 			},
 		},
@@ -1129,8 +1129,8 @@ func TestDiffUpdateValidatorErrors(t *testing.T) {
 			}
 
 			validator := *currentValidator
-			if test.updateValidator != nil {
-				test.updateValidator(&validator)
+			if test.mutateValidator != nil {
+				test.mutateValidator(&validator)
 			}
 
 			err = d.UpdateCurrentValidator(&validator)
