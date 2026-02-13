@@ -200,6 +200,105 @@ func TestNewPendingStaker(t *testing.T) {
 	require.ErrorIs(err, errCustom)
 }
 
+func TestValidateMutation(t *testing.T) {
+	staker := &Staker{
+		TxID:            ids.GenerateTestID(),
+		NodeID:          ids.GenerateTestNodeID(),
+		PublicKey:       nil,
+		SubnetID:        ids.GenerateTestID(),
+		Weight:          100,
+		StartTime:       time.Unix(10, 0),
+		EndTime:         time.Unix(20, 0),
+		PotentialReward: 50,
+		NextTime:        time.Unix(20, 0),
+		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
+	}
+
+	tests := []struct {
+		name        string
+		mutateFn    func(Staker) *Staker
+		expectedErr error
+	}{
+		{
+			name: "mutated tx id",
+			mutateFn: func(staker Staker) *Staker {
+				staker.TxID = ids.GenerateTestID()
+
+				return &staker
+			},
+			expectedErr: errImmutableFieldsModified,
+		},
+		{
+			name: "mutated node id",
+			mutateFn: func(staker Staker) *Staker {
+				staker.NodeID = ids.GenerateTestNodeID()
+
+				return &staker
+			},
+			expectedErr: errImmutableFieldsModified,
+		},
+		{
+			name: "mutated public key",
+			mutateFn: func(staker Staker) *Staker {
+				newSig, err := localsigner.New()
+				require.NoError(t, err)
+
+				staker.PublicKey = newSig.PublicKey()
+				return &staker
+			},
+			expectedErr: errImmutableFieldsModified,
+		},
+		{
+			name: "mutated subnet id",
+			mutateFn: func(staker Staker) *Staker {
+				staker.SubnetID = ids.GenerateTestID()
+				return &staker
+			},
+			expectedErr: errImmutableFieldsModified,
+		},
+		{
+			name: "mutated priority",
+			mutateFn: func(staker Staker) *Staker {
+				staker.Priority = txs.Priority(255)
+				return &staker
+			},
+			expectedErr: errImmutableFieldsModified,
+		},
+		{
+			name: "decreased weight",
+			mutateFn: func(staker Staker) *Staker {
+				staker.Weight -= 1
+				return &staker
+			},
+			expectedErr: errDecreasedWeight,
+		},
+		{
+			name: "valid mutation",
+			mutateFn: func(staker Staker) *Staker {
+				staker.Weight = 200
+				staker.StartTime = time.Unix(30, 0)
+				staker.EndTime = time.Unix(40, 0)
+				staker.NextTime = time.Unix(50, 0)
+				staker.PotentialReward = 20
+				return &staker
+			},
+			expectedErr: nil,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			require.ErrorIs(
+				test.expectedErr,
+				staker.ValidateMutation(
+					test.mutateFn(*staker),
+				),
+			)
+		})
+	}
+}
+
 func generateStakerTx(require *require.Assertions) *txs.AddPermissionlessValidatorTx {
 	nodeID := ids.GenerateTestNodeID()
 	sk, err := localsigner.New()

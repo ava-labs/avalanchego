@@ -5,6 +5,7 @@ package state
 
 import (
 	"bytes"
+	"errors"
 	"time"
 
 	"github.com/google/btree"
@@ -14,7 +15,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ btree.LessFunc[*Staker] = (*Staker).Less
+var (
+	_ btree.LessFunc[*Staker] = (*Staker).Less
+
+	errDecreasedWeight         = errors.New("weight decreased")
+	errImmutableFieldsModified = errors.New("immutable fields modified")
+)
 
 // Staker contains all information required to represent a validator or
 // delegator in the current and pending validator sets.
@@ -99,6 +105,7 @@ func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) 
 		return nil, err
 	}
 	startTime := staker.StartTime()
+
 	return &Staker{
 		TxID:      txID,
 		NodeID:    staker.NodeID(),
@@ -110,4 +117,29 @@ func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) 
 		NextTime:  startTime,
 		Priority:  staker.PendingPriority(),
 	}, nil
+}
+
+func (s *Staker) ValidateMutation(ms *Staker) error {
+	if !s.immutableFieldsAreUnmodified(ms) {
+		return errImmutableFieldsModified
+	}
+
+	if s.Weight > ms.Weight {
+		// Weight can only increase (by accruing rewards from continuous staking).
+		return errDecreasedWeight
+	}
+
+	return nil
+}
+
+func (s *Staker) immutableFieldsAreUnmodified(ms *Staker) bool {
+	bothPKNil := s.PublicKey == nil && ms.PublicKey == nil
+	bothPKNotNil := s.PublicKey != nil && ms.PublicKey != nil
+	publicKeysEqual := bothPKNil || (bothPKNotNil && s.PublicKey.Equals(ms.PublicKey))
+
+	return s.TxID == ms.TxID &&
+		s.NodeID == ms.NodeID &&
+		publicKeysEqual &&
+		s.SubnetID == ms.SubnetID &&
+		s.Priority == ms.Priority
 }
