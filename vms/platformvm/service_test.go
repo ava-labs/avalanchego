@@ -63,7 +63,8 @@ var encodings = []formatting.Encoding{
 }
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
+	vm, _, mutableSharedMemory := setupVM(t, nil, upgradetest.Latest, 0)
+	initializeTestSubnet(t, vm)
 	return &Service{
 		vm:                    vm,
 		addrManager:           avax.NewAddressManager(vm.ctx),
