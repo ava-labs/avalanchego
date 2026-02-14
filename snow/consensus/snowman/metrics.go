@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+const unusuallyLongConsensusThreshold = 5 * time.Second
+
 type processingStart struct {
 	time       time.Time
 	pollNumber uint64
@@ -48,6 +50,10 @@ type metrics struct {
 	latAccepted          metric.Averager
 	consensusLatencies   prometheus.Histogram
 	buildLatencyAccepted prometheus.Gauge
+
+	consensusLatencyUnusual prometheus.Counter
+
+	buildLatencyUnusual prometheus.Counter
 
 	blockSizeRejectedSum prometheus.Gauge
 	// pollsRejected tracks the number of polls that a block was in processing
@@ -123,7 +129,14 @@ func newMetrics(
 			Name: "blks_build_accept_latency",
 			Help: "time (in ns) from the timestamp of a block to the time it was accepted",
 		}),
-
+		buildLatencyUnusual: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "blks_build_accept_unusual_latency",
+			Help: "unusually long times from the block build to accept",
+		}),
+		consensusLatencyUnusual: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "blks_accept_unusual_latency",
+			Help: "unusually long times from the block issuance to accept",
+		}),
 		blockSizeRejectedSum: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "blks_rejected_container_size_sum",
 			Help: "cumulative size of all rejected blocks",
@@ -167,6 +180,8 @@ func newMetrics(
 		reg.Register(m.numProcessing),
 		reg.Register(m.blockSizeAcceptedSum),
 		reg.Register(m.buildLatencyAccepted),
+		reg.Register(m.buildLatencyUnusual),
+		reg.Register(m.consensusLatencyUnusual),
 		reg.Register(m.consensusLatencies),
 		reg.Register(m.blockSizeRejectedSum),
 		reg.Register(m.numSuccessfulPolls),
@@ -218,6 +233,13 @@ func (m *metrics) Accepted(
 
 	builtDuration := now.Sub(timestamp)
 	m.buildLatencyAccepted.Add(float64(builtDuration))
+	if builtDuration > unusuallyLongConsensusThreshold {
+		m.buildLatencyUnusual.Inc()
+	}
+
+	if processingDuration > unusuallyLongConsensusThreshold {
+		m.consensusLatencyUnusual.Inc()
+	}
 	m.avgAcceptanceLatency.Observe(float64(builtDuration), now)
 	m.consensusLatencies.Observe(float64(processingDuration))
 }
