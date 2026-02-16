@@ -34,6 +34,14 @@ jobs:
         run: ./scripts/run_task.sh test-unit
         env:
           TIMEOUT: ${{ env.TIMEOUT }}
+  Fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: test-fuzz
+        shell: bash
+        run: ./scripts/run_task.sh test-fuzz
   e2e:
     runs-on: ${{ matrix.os }}
     strategy:
