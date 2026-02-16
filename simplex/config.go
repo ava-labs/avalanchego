@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
-	pSimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	psimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 // Config wraps all the parameters needed for a simplex engine
@@ -30,7 +30,7 @@ type Config struct {
 	SignBLS SignFunc
 
 	// Parameters passed in by the subnet configuration
-	Params *pSimplex.Parameters
+	Params *psimplex.Parameters
 }
 
 // Context is information about the current execution.
