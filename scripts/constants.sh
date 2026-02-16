@@ -31,9 +31,3 @@ export CGO_ENABLED=1 # Required for cross-compilation
 
 # Disable version control fallbacks
 export GOPROXY="${GOPROXY:-https://proxy.golang.org}"
-
-# The Dockerfiles don't specify the golang version to minimize the changes required to
-# bump the version. Instead, the golang version is provided as a build argument. Use
-# head -1 because go workspaces list multiple modules; CI validates all modules use the
-# same Go version.
-GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"

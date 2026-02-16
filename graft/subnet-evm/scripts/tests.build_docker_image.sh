@@ -13,8 +13,6 @@ AVALANCHE_PATH=$(cd "$SUBNET_EVM_PATH" && cd ../.. && pwd)
 
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
-# shellcheck disable=SC1091
-source "$AVALANCHE_PATH"/scripts/lib_test_docker_image.sh
 
 build_and_test() {
   local imagename="${1}"
@@ -77,7 +75,22 @@ VM_ID="${VM_ID:-${DEFAULT_VM_ID}}"
 echo "checking build of single-arch image"
 build_and_test "subnet-evm_avalanchego" "${VM_ID}" false "avalanchego"
 
-start_test_registry
+echo "starting local docker registry to allow verification of multi-arch image builds"
+REGISTRY_CONTAINER_ID="$(docker run --rm -d -P registry:2)"
+REGISTRY_PORT="$(docker port "$REGISTRY_CONTAINER_ID" 5000/tcp | grep -v "::" | awk -F: '{print $NF}')"
+
+echo "starting docker builder that supports multiplatform builds"
+# - '--driver-opt network=host' enables the builder to use the local registry
+docker buildx create --use --name ci-builder --driver-opt network=host
+
+# Ensure registry and builder cleanup on teardown
+function cleanup {
+  echo "stopping local docker registry"
+  docker stop "${REGISTRY_CONTAINER_ID}"
+  echo "removing multiplatform builder"
+  docker buildx rm ci-builder
+}
+trap cleanup EXIT
 
 echo "checking build of multi-arch images"
 build_and_test "localhost:${REGISTRY_PORT}/subnet-evm_avalanchego" "${VM_ID}" true "localhost:${REGISTRY_PORT}/avalanchego"

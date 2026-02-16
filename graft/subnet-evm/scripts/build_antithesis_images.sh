@@ -14,8 +14,7 @@ SUBNET_EVM_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 source "${SUBNET_EVM_PATH}"/scripts/constants.sh
 
 # Use the current repo's commit hash for the avalanchego image tag
-# shellcheck disable=SC2154
-AVALANCHEGO_IMAGE_TAG="${commit_hash}"
+AVALANCHEGO_IMAGE_TAG="$(git rev-parse HEAD | cut -c1-8)"
 
 # Build avalanchego node image from the parent repo
 pushd "${AVALANCHE_PATH}" > /dev/null
@@ -28,9 +27,15 @@ IMAGE_PREFIX="${IMAGE_PREFIX:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
 if [[ -z "${IMAGE_TAG}" ]]; then
   # Default to tagging with the commit hash
+  source "${SUBNET_EVM_PATH}"/scripts/constants.sh
   # shellcheck disable=SC2154
-  IMAGE_TAG="${commit_hash}"
+  IMAGE_TAG="${git_commit::8}"
 fi
+
+# The dockerfiles don't specify the golang version to minimize the changes required to bump
+# the version. Instead, the golang version is provided as an argument. Use head -1 because
+# go workspaces list multiple modules; CI validates all modules use the same Go version.
+GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 
 # Import common functions used to build images for antithesis test setups
 # shellcheck source=/dev/null

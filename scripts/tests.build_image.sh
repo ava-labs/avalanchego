@@ -14,7 +14,6 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 source "$AVALANCHE_PATH"/scripts/constants.sh
 source "$AVALANCHE_PATH"/scripts/git_commit.sh
 source "$AVALANCHE_PATH"/scripts/image_tag.sh
-source "$AVALANCHE_PATH"/scripts/lib_test_docker_image.sh
 
 build_and_test() {
   local image_name=$1
@@ -65,7 +64,23 @@ build_and_test() {
 echo "checking build of single-arch images"
 build_and_test avalanchego
 
-start_test_registry
+echo "starting local docker registry to allow verification of multi-arch image builds"
+REGISTRY_CONTAINER_ID="$(docker run --rm -d -P registry:2)"
+REGISTRY_PORT="$(docker port "$REGISTRY_CONTAINER_ID" 5000/tcp | grep -v "::" | awk -F: '{print $NF}')"
+
+echo "starting docker builder that supports multiplatform builds"
+# - creating a new builder enables multiplatform builds
+# - '--driver-opt network=host' enables the builder to use the local registry
+docker buildx create --use --name ci-builder --driver-opt network=host
+
+# Ensure registry and builder cleanup on teardown
+function cleanup {
+  echo "stopping local docker registry"
+  docker stop "${REGISTRY_CONTAINER_ID}"
+  echo "removing multiplatform builder"
+  docker buildx rm ci-builder
+}
+trap cleanup EXIT
 
 echo "checking build of multi-arch images"
 build_and_test "localhost:${REGISTRY_PORT}/avalanchego"
