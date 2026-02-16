@@ -956,7 +956,7 @@ func TestGetPrimaryNetworkConfig(t *testing.T) {
 	require.False(config.ValidatorOnly, "ValidatorOnly should be false for primary network")
 
 	// Verify SnowParameters have the default values from snowball.DefaultParameters
-	require.NotNil(config.SnowParameters, "SnowParameters should not be nil")
+	require.Equal(snowball.DefaultParameters, *config.SnowParameters)
 	require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
 	require.Equal(snowball.DefaultParameters.AlphaPreference, config.SnowParameters.AlphaPreference)
 	require.Equal(snowball.DefaultParameters.AlphaConfidence, config.SnowParameters.AlphaConfidence)
