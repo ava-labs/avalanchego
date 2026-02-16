@@ -1,0 +1,116 @@
+# RPM packaging tasks for avalanchego and subnet-evm.
+#
+# Builds RPMs inside a Rocky Linux 9 container (glibc 2.34) with GPG signing.
+# PACKAGING_TAG defaults to v0.0.0 for local testing; set for release builds.
+
+version: '3'
+
+vars:
+  # Repo root, computed from this Taskfile's location so that the
+  # packaging Taskfile works both as an include and standalone.
+  REPO_ROOT:
+    sh: cd "{{.TASKFILE_DIR}}/../.." && pwd
+  # Go version from the project's go.mod.
+  PACKAGING_GO_VERSION:
+    sh: go list -m -f '{{ "{{.GoVersion}}" }}' | head -1
+  # Map uname -m to RPM arch names (arm64 -> aarch64).
+  PACKAGING_HOST_ARCH:
+    sh: |
+      arch=$(uname -m)
+      case "${arch}" in
+        x86_64) echo "x86_64" ;;
+        arm64)  echo "aarch64" ;;
+        *)      echo "${arch}" ;;
+      esac
+  # Git commit hash, resolved on host (container may not have .git for worktrees).
+  PACKAGING_GIT_COMMIT:
+    sh: git rev-parse HEAD
+  # Default tag for local testing; overridden by CI for release builds.
+  PACKAGING_TAG:
+    sh: echo "${PACKAGING_TAG:-v0.0.0}"
+  PACKAGING_DOCKER_IMAGE: avalanchego-rpm-builder
+  PACKAGING_OUTPUT_DIR: '{{.REPO_ROOT}}/build/rpm'
+
+tasks:
+  default:
+    desc: Lists available packaging tasks
+    silent: true
+    cmd: task --list | grep packaging
+
+  build-rpms:
+    desc: Builds RPMs for both avalanchego and subnet-evm
+    cmds:
+      - task: build-avalanchego-rpm
+      - task: build-subnet-evm-rpm
+
+  build-builder-docker-image:
+    desc: Builds the RPM builder Docker image
+    internal: true
+    env:
+      GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
+      DOCKER_IMAGE: '{{.PACKAGING_DOCKER_IMAGE}}'
+      CONTEXT_DIR: '{{.REPO_ROOT}}/.github/packaging'
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/build-builder-image.sh'
+
+  build-avalanchego-rpm:
+    desc: Builds RPM for avalanchego
+    vars:
+      RPM_ARCH: '{{.RPM_ARCH | default .PACKAGING_HOST_ARCH}}'
+      RPM_TAG: '{{.PACKAGING_TAG}}'
+    deps: [build-builder-docker-image]
+    cmds:
+      - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
+      - cmd: >-
+          docker run --rm
+          -v {{.REPO_ROOT}}:/build
+          -v {{.PACKAGING_OUTPUT_DIR}}:/output
+          {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
+          -e PACKAGE=avalanchego
+          -e VERSION={{trimPrefix "v" .RPM_TAG}}
+          -e TAG={{.RPM_TAG}}
+          -e RPM_ARCH={{.RPM_ARCH}}
+          -e OUTPUT_DIR=/output
+          -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
+          {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
+          {{.PACKAGING_DOCKER_IMAGE}}
+          .github/packaging/scripts/build-rpm.sh
+
+  build-subnet-evm-rpm:
+    desc: Builds RPM for subnet-evm
+    vars:
+      RPM_ARCH: '{{.RPM_ARCH | default .PACKAGING_HOST_ARCH}}'
+      RPM_TAG: '{{.PACKAGING_TAG}}'
+    deps: [build-builder-docker-image]
+    cmds:
+      - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
+      - cmd: >-
+          docker run --rm
+          -v {{.REPO_ROOT}}:/build
+          -v {{.PACKAGING_OUTPUT_DIR}}:/output
+          {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
+          -e PACKAGE=subnet-evm
+          -e VERSION={{trimPrefix "v" .RPM_TAG}}
+          -e TAG={{.RPM_TAG}}
+          -e RPM_ARCH={{.RPM_ARCH}}
+          -e OUTPUT_DIR=/output
+          -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
+          {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
+          {{.PACKAGING_DOCKER_IMAGE}}
+          .github/packaging/scripts/build-rpm.sh
+
+  test-build-rpms:
+    desc: Builds and validates RPMs end-to-end
+    cmds:
+      - task: build-rpms
+      - task: validate-rpms
+
+  validate-rpms:
+    desc: Validates built RPMs by installing and smoke testing in a fresh container
+    env:
+      TAG: '{{.PACKAGING_TAG}}'
+      GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-rpm.sh'
