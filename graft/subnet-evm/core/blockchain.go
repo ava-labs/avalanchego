@@ -248,7 +248,7 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 			CacheSizeBytes:       uint(c.TrieCleanLimit * 1024 * 1024),
 			FreeListCacheEntries: 40_000,               // Firewood default
 			RevisionsInMemory:    uint(c.StateHistory), // must be at least 2
-			CacheStrategy:        ffi.CacheAllReads,
+			CacheStrategy:        ffi.OnlyCacheWrites,
 			Archive:              !c.Pruning,
 		}.BackendConstructor
 	}
