@@ -11,7 +11,7 @@ This document lists all available configuration options for AvalancheGo nodes. Y
 .config-tables table {
   min-width: 1400px;
 }
-.config-tables td:nth-child(5) {
+.config-tables td:nth-child(5) { 
   width: 50%;
 }
 .config-tables td:nth-child(-n+4) {
@@ -125,7 +125,7 @@ Some blockchains allow the node operator to provide custom configurations for in
 
 ### Config File
 
-| Flag | Env Var | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description | 
 |--------|--------|------|----|--------------------|
 |`--config-file` | `AVAGO_CONFIG_FILE` | string | - | Path to a JSON file that specifies this node's configuration. Command line arguments will override arguments set in the config file. This flag is ignored if `--config-file-content` is specified. Example JSON config file: `{"log-level": "debug"}`. [Install Script](https://build.avax.network/docs/tooling/avalanche-go-installer) creates the node config file at `~/.avalanchego/configs/node.json`. No default file is created if [AvalancheGo is built from source](https://build.avax.network/docs/nodes/run-a-node/from-source), you would need to create it manually if needed. |
 | `--config-file-content` | `AVAGO_CONFIG_FILE_CONTENT` | string | - | As an alternative to `--config-file`, it allows specifying base64 encoded config content. |
