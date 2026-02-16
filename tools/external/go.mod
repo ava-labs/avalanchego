@@ -14,7 +14,7 @@ module github.com/ava-labs/avalanchego/tools/external
 //   - ./scripts/run_tool.sh [tool] [args]
 //
 // See ../../go.mod for guidelines on updating the Go version.
-go 1.25.7
+go 1.26
 
 tool (
 	github.com/fjl/gencodec
