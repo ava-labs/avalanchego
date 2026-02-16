@@ -1926,12 +1926,14 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := validatorIt.Value()
-		metadata := &validatorMetadata{}
+		metadata := &validatorMetadata{
+			txID: txID,
+		}
 		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
 			// Populate [StakerStartTime] using the tx as a default in the event
 			// it was added pre-durango and is not stored in the database.
 			//
-			// Note: We do not populate [LastUpdated] since it is expected to
+			// Note: We do not populate [LastUpdatedUnix] since it is expected to
 			// always be present on disk.
 			metadata.StakerStartTime = uint64(scheduledStakerTx.StartTime().Unix())
 		}
@@ -1984,7 +1986,7 @@ func (s *state) loadCurrentValidators() error {
 			txID: txID,
 		}
 		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
-			// Populate [StakerStartTime] and [LastUpdated] using the tx as a
+			// Populate [StakerStartTime] and [LastUpdatedUnix] using the tx as a
 			// default in the event they are not stored in the database.
 			startTime := uint64(scheduledStakerTx.StartTime().Unix())
 			metadata.StakerStartTime = startTime

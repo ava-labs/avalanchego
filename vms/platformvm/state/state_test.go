@@ -2404,3 +2404,102 @@ func TestGetCurrentValidators(t *testing.T) {
 		})
 	}
 }
+
+func TestDelegateeRewardCommitAndLoad(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	s := newTestState(t, db)
+
+	const expectedDelegateeReward = uint64(12345)
+	require.NoError(s.SetDelegateeReward(
+		constants.PrimaryNetworkID,
+		defaultValidatorNodeID,
+		expectedDelegateeReward,
+	))
+	require.NoError(s.Commit())
+
+	actualDelegateeReward, err := s.GetDelegateeReward(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(err)
+	require.Equal(expectedDelegateeReward, actualDelegateeReward)
+
+	// Reload state.
+	s = newTestState(t, db)
+	actualDelegateeReward, err = s.GetDelegateeReward(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(err)
+	require.Equal(expectedDelegateeReward, actualDelegateeReward)
+}
+
+func TestUptimeMigrationFromLegacyMetadata(t *testing.T) {
+	require := require.New(t)
+	db := memdb.New()
+
+	// Preset values to write to legacy metadata
+	presetUpDuration := 10 * time.Hour
+	presetLastUpdated := time.Unix(12345, 0)
+
+	// 1. Setup initial state and create a new validator
+	s := newTestState(t, db)
+
+	nodeID := ids.GenerateTestNodeID()
+	startTime := time.Now().Truncate(time.Second)
+	validatorTx := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(startTime.Add(28 * 24 * time.Hour).Unix()),
+		Wght:   10,
+	})
+	addValidatorTx := &txs.Tx{Unsigned: validatorTx}
+	require.NoError(addValidatorTx.Initialize(txs.Codec))
+
+	staker, err := NewCurrentStaker(addValidatorTx.ID(), validatorTx, startTime, 0)
+	require.NoError(err)
+	require.NoError(s.PutCurrentValidator(staker))
+	s.AddTx(addValidatorTx, status.Committed)
+	require.NoError(s.Commit())
+
+	// 2. Write preset uptime values to legacy metadata
+	metadata := &validatorMetadata{
+		txID:                     staker.TxID,
+		UpDuration:               presetUpDuration,
+		LastUpdated:              uint64(presetLastUpdated.Unix()),
+		StakerStartTime:          uint64(staker.StartTime.Unix()),
+		PotentialReward:          staker.PotentialReward,
+		PotentialDelegateeReward: 0,
+	}
+	metadataBytes, err := MetadataCodec.Marshal(CodecVersion1, metadata)
+	require.NoError(err)
+	require.NoError(s.currentValidatorList.Put(staker.TxID[:], metadataBytes))
+
+	// 3. Delete from new uptime db to simulate pre-migration state
+	require.NoError(s.currentValidatorUptimeDB.Delete(nodeID[:]))
+
+	require.NoError(s.baseDB.Commit())
+
+	// 4. Reload state, should fallback to legacy metadata.
+	s = newTestState(t, db)
+	gotDuration, gotLastUpdated, err := s.GetUptime(nodeID)
+	require.NoError(err)
+	require.Equal(presetUpDuration, gotDuration)
+	require.Equal(presetLastUpdated.Unix(), gotLastUpdated.Unix())
+
+	// 5. Commit to trigger migration to new uptime db
+	require.NoError(s.Commit())
+
+	// 6. Reload and verify migration completed - now loads from new uptime db
+	s = newTestState(t, db)
+	gotDuration, gotLastUpdated, err = s.GetUptime(nodeID)
+	require.NoError(err)
+	require.Equal(presetUpDuration, gotDuration)
+	require.Equal(presetLastUpdated.Unix(), gotLastUpdated.Unix())
+
+	// 7. Verify data is persisted in new uptime db by reading directly
+	uptimeBytes, err := s.currentValidatorUptimeDB.Get(nodeID[:])
+	require.NoError(err)
+
+	var persistedUptime uptimeData
+	_, err = UptimeCodec.Unmarshal(uptimeBytes, &persistedUptime)
+	require.NoError(err)
+	require.Equal(presetUpDuration, persistedUptime.UpDuration)
+	require.Equal(uint64(presetLastUpdated.Unix()), persistedUptime.LastUpdatedUnix)
+}

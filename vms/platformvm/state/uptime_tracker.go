@@ -11,8 +11,8 @@ import (
 )
 
 type uptimeData struct {
-	UpDuration  time.Duration `v0:"true"`
-	LastUpdated uint64        `v0:"true"` // Unix time in seconds
+	UpDuration      time.Duration `v0:"true"`
+	LastUpdatedUnix uint64        `v0:"true"` // Unix time in seconds
 
 	lastUpdated time.Time // in-memory convenience form
 }
@@ -79,7 +79,7 @@ func (u *UptimeTrackerState) LoadUptime(nodeID ids.NodeID) error {
 	if _, err := UptimeCodec.Unmarshal(bytes, uptime); err != nil {
 		return err
 	}
-	uptime.lastUpdated = time.Unix(int64(uptime.LastUpdated), 0)
+	uptime.lastUpdated = time.Unix(int64(uptime.LastUpdatedUnix), 0)
 
 	u.validatorsUptime[nodeID] = uptime
 	return nil
@@ -96,7 +96,7 @@ func (u *UptimeTrackerState) WriteUptime(codecVersion uint16) error {
 			continue
 		}
 
-		uptime.LastUpdated = uint64(uptime.lastUpdated.Unix())
+		uptime.LastUpdatedUnix = uint64(uptime.lastUpdated.Unix())
 
 		bytes, err := UptimeCodec.Marshal(codecVersion, uptime)
 		if err != nil {

@@ -29,14 +29,15 @@ type preDelegateeRewardMetadata struct {
 }
 
 type validatorMetadata struct {
-	UpDuration               time.Duration `v0:"true"`
-	LastUpdated              uint64        `v0:"true"` // Unix time in seconds
-	PotentialReward          uint64        `v0:"true"`
-	PotentialDelegateeReward uint64        `v0:"true"`
-	StakerStartTime          uint64        `          v1:"true"`
+	UpDuration  time.Duration `v0:"true"` // Deprecated: It is now tracked in the uptime state.
+	LastUpdated uint64        `v0:"true"` // Unix time in seconds. Deprecated: It is now tracked in the uptime state.
+
+	PotentialReward          uint64 `v0:"true"`
+	PotentialDelegateeReward uint64 `v0:"true"`
+	StakerStartTime          uint64 `          v1:"true"`
 
 	txID        ids.ID
-	lastUpdated time.Time
+	lastUpdated time.Time // Deprecated: It is now tracked in the uptime state.
 }
 
 // Permissioned validators originally wrote their values as nil.
