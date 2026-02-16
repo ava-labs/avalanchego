@@ -33,8 +33,6 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 # Target image to build (avalanchego or subnet-evm)
 TARGET="${TARGET:-avalanchego}"
-SKIP_BUILD_RACE="${SKIP_BUILD_RACE:-}"
-FORCE_TAG_MASTER="${FORCE_TAG_MASTER:-}"
 
 # Skip building the race image
 SKIP_BUILD_RACE="${SKIP_BUILD_RACE:-}"

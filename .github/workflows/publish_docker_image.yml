@@ -41,6 +41,5 @@ jobs:
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
           DOCKER_IMAGE: avaplatform/subnet-evm
           BUILD_MULTI_ARCH: 1
-          ALLOW_TAG_LATEST: ${{ github.event_name != 'workflow_dispatch' }}
           AVALANCHEGO_NODE_IMAGE_REPO: ${{ secrets.DOCKER_REPO }}
         run: scripts/run_task.sh build-subnet-evm-image
