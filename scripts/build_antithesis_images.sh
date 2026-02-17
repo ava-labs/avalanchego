@@ -79,28 +79,20 @@ else
   NODE_ONLY=1
   build_antithesis_images_for_avalanchego avalanchego "" "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY}"
 
-  # Build required binaries for the VM test setup
+  # Set VM-specific paths and build the VM binary
   echo "Building binaries required for configuring the ${TEST_SETUP} test setup"
   "${AVALANCHE_PATH}"/scripts/build.sh
   if [[ "${TEST_SETUP}" == "xsvm" ]]; then
     "${AVALANCHE_PATH}"/scripts/build_xsvm.sh
+    vm_dockerfile="${AVALANCHE_PATH}/vms/example/xsvm/Dockerfile"
+    gencomposeconfig_path="${AVALANCHE_PATH}/tests/antithesis/xsvm/gencomposeconfig"
   elif [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
     "${AVALANCHE_PATH}"/graft/subnet-evm/scripts/build.sh
-  fi
-
-  # Set VM-specific paths
-  if [[ "${TEST_SETUP}" == "xsvm" ]]; then
-    vm_dockerfile="${AVALANCHE_PATH}/vms/example/xsvm/Dockerfile"
-  elif [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
     vm_dockerfile="${AVALANCHE_PATH}/graft/subnet-evm/Dockerfile"
+    gencomposeconfig_path="${AVALANCHE_PATH}/graft/subnet-evm/tests/antithesis/gencomposeconfig"
   fi
 
   echo "Generating compose configuration for ${TEST_SETUP}"
-  if [[ "${TEST_SETUP}" == "xsvm" ]]; then
-    gencomposeconfig_path="${AVALANCHE_PATH}/tests/antithesis/xsvm/gencomposeconfig"
-  elif [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
-    gencomposeconfig_path="${AVALANCHE_PATH}/graft/subnet-evm/tests/antithesis/gencomposeconfig"
-  fi
   gen_antithesis_compose_config "${IMAGE_TAG}" \
     "${gencomposeconfig_path}" \
     "${AVALANCHE_PATH}/build/antithesis/${TEST_SETUP}" \
