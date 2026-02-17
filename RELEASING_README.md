@@ -10,12 +10,14 @@ AvalancheGo is a monorepo which contains:
 - **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain EVM implementation, compiled into AvalancheGo
 - **Subnet-EVM** (in [graft/subnet-evm/](graft/subnet-evm/)) - Subnet-EVM plugin, released as a separate binary
 
+For the rationale behind the multi-module tagging process, see [Multi-Module Release Strategy](docs/design/multi_module_release.md).
+
 ### Versioning Strategy
 
 All components follow aligned versioning:
 
 - Same version number - When AvalancheGo releases v1.14.0, Subnet-EVM is also v1.14.0
-- Single tag - One git tag (e.g., `v1.14.0`) releases everything together
+- Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.14.0`, `graft/coreth/v1.14.0`, `graft/subnet-evm/v1.14.0`)
 
 ### Component Release Notes
 
@@ -44,7 +46,9 @@ git checkout master
 git checkout -b "releases/$VERSION_RC"
 ```
 
-### 3. Update Version Files
+### 3. Prepare Release Changes
+
+These changes prepare the merge commit that will be tagged.
 
 1. Update [`version/constants.go`](version/constants.go):
 
@@ -68,6 +72,12 @@ git checkout -b "releases/$VERSION_RC"
    And update [`version/compatibility.json`](version/compatibility.json) to add the new version.
 
 **Note:** Coreth and Subnet-EVM versions are automatically derived from `version/constants.go` and do not require manual updates.
+
+1. Update submodule require directives to reference the future tag:
+
+   ```bash
+   ./scripts/run_task.sh tags-set-require-directives -- "$VERSION_RC"
+   ```
 
 ### 4. Commit and Create PR
 
@@ -95,17 +105,30 @@ Merge:
 gh pr merge "releases/$VERSION_RC" --squash --subject "chore: release $VERSION_RC"
 ```
 
-### 5. Create Release Candidate Tag
+### 5. Create Release Candidate Tags
+
+Tag the merge commit from step 4:
 
 ```bash
 git fetch origin master
 git checkout master
 # Double check the tip of the master branch is the expected commit
-# of the squared release branch
+# of the squashed release branch
 git log -1
-git tag -s "$VERSION_RC"
-git push origin "$VERSION_RC"
+./scripts/run_task.sh tags-create -- "$VERSION_RC"
+./scripts/run_task.sh tags-push -- "$VERSION_RC"
 ```
+
+Verify from a fresh directory (to avoid local replace directives):
+
+```bash
+cd $(mktemp -d)
+go mod init test
+go get github.com/ava-labs/avalanchego@"$VERSION_RC"
+go list -m all | grep avalanchego
+```
+
+All submodules should resolve to matching versions.
 
 ### 6. Test the Release Candidate
 
@@ -192,7 +215,7 @@ As of this writing:
 1. Build and run AvalancheGo:
 
    ```bash
-   cd ../..  
+   cd ../..
    ./scripts/build.sh
    ./build/avalanchego --network-id=fuji --partial-sync-primary-network --public-ip=127.0.0.1 \
      --track-subnets=7WtoAMPhrmh5KosDUsFL9yTcvw7YSxiKHPpdfs4JsgW47oZT5,i9gFpZQHPLcGfZaQLiwFAStddQD7iTKBpFfurPFJsXm1CkTZK
@@ -265,16 +288,32 @@ As of this writing:
    Apr 03 10:34:55.510 gke-subnets-testnet subnets Submitted transaction
    ```
 
-### 7. Create Final Release
+### 7. Create Final Release Tags
 
-After successful testing:
+After successful testing, update the require directives from the RC version
+to the final version, merge, then tag the resulting commit:
+
+```bash
+git fetch origin master
+git checkout master
+git checkout -b "tags/$VERSION"
+./scripts/run_task.sh tags-set-require-directives -- "$VERSION"
+git add .
+git commit -S -m "chore: set require directives for $VERSION"
+git push -u origin "tags/$VERSION"
+gh pr create --repo github.com/ava-labs/avalanchego --base master --title "chore: set require directives for $VERSION"
+gh pr checks --watch
+gh pr merge "tags/$VERSION" --squash --subject "chore: set require directives for $VERSION"
+```
+
+Tag the merge commit:
 
 ```bash
 git checkout master
 git pull origin
 git log -1  # Verify expected commit
-git tag -s "$VERSION"
-git push origin "$VERSION"
+./scripts/run_task.sh tags-create -- "$VERSION"
+./scripts/run_task.sh tags-push -- "$VERSION"
 ```
 
 ### 8. Create GitHub Release
@@ -329,7 +368,7 @@ Artifacts produced:
 - `subnet-evm-linux-amd64-$VERSION.tar.gz`
 - `subnet-evm-linux-arm64-$VERSION.tar.gz`
 - `subnet-evm-macos-$VERSION.zip`
-  
+
 **Docker Images:**
 
 - `avaplatform/avalanchego:$VERSION` (multi-arch: linux/amd64, linux/arm64)
@@ -380,6 +419,33 @@ export NEXT_VERSION=v1.14.2
    ```
 
 1. Pat yourself on the back for a job well done
+
+## Development Tags
+
+To share work-in-progress without merging to master:
+
+1. On your branch, run `./scripts/run_task.sh tags-set-require-directives -- v0.0.0-mybranch`
+2. Commit and push to your branch
+3. Run `./scripts/run_task.sh tags-create -- v0.0.0-mybranch`
+4. Run `./scripts/run_task.sh tags-push -- v0.0.0-mybranch`
+
+External consumers can then `go get github.com/ava-labs/avalanchego@v0.0.0-mybranch`.
+
+## Tagging Task Reference
+
+### `tags-set-require-directives`
+
+Updates `require` directives in all go.mod files to reference the
+specified version. Version must match `vX.Y.Z` or `vX.Y.Z-suffix`.
+
+### `tags-create`
+
+Creates tags for the main module and all submodules at the current commit.
+
+### `tags-push`
+
+Pushes tags for the main module and all submodules. Set `GIT_REMOTE` to
+override the default remote (`origin`).
 
 ## RPC Chain VM Protocol Version
 
