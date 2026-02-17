@@ -119,7 +119,7 @@ git log -1
 ./scripts/run_task.sh tags-push -- "$VERSION_RC"
 ```
 
-Verify from a fresh directory (to avoid local replace directives):
+Optionally verify from a fresh directory (to avoid local replace directives):
 
 ```bash
 cd $(mktemp -d)
@@ -420,6 +420,28 @@ export NEXT_VERSION=v1.14.2
 
 1. Pat yourself on the back for a job well done
 
+## RPC Chain VM Protocol Version
+
+When the protocol version changes:
+
+1. Update [`version/constants.go`](version/constants.go):
+
+   ```go
+   RPCChainVMProtocol uint = 45
+   ```
+
+2. Update [`version/compatibility.json`](version/compatibility.json):
+
+   ```json
+   "45": ["v1.14.1"]
+   ```
+
+To verify compatibility:
+
+```bash
+go test -run ^TestCompatibility$ github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm
+```
+
 ## Development Tags
 
 To share work-in-progress without merging to master:
@@ -446,25 +468,3 @@ Creates tags for the main module and all submodules at the current commit.
 
 Pushes tags for the main module and all submodules. Set `GIT_REMOTE` to
 override the default remote (`origin`).
-
-## RPC Chain VM Protocol Version
-
-When the protocol version changes:
-
-1. Update [`version/constants.go`](version/constants.go):
-
-   ```go
-   RPCChainVMProtocol uint = 45
-   ```
-
-2. Update [`version/compatibility.json`](version/compatibility.json):
-
-   ```json
-   "45": ["v1.14.1"]
-   ```
-
-To verify compatibility:
-
-```bash
-go test -run ^TestCompatibility$ github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm
-```
