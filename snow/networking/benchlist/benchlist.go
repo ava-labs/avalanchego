@@ -112,7 +112,7 @@ func newBenchlist(
 		return nil, err
 	}
 
-	b.run()
+	go b.run()
 	return b, nil
 }
 
@@ -183,66 +183,64 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 
 // TODO: Close goroutine within run during shutdown.
 func (b *benchlist) run() {
-	go func() {
-		var (
-			benched     set.Set[ids.NodeID]
-			timeoutHeap = heap.NewMap[ids.NodeID, time.Time](time.Time.Before)
-			timer       = time.NewTimer(0)
-		)
-		defer timer.Stop()
+	var (
+		benched     set.Set[ids.NodeID]
+		timeoutHeap = heap.NewMap[ids.NodeID, time.Time](time.Time.Before)
+		timer       = time.NewTimer(0)
+	)
+	defer timer.Stop()
 
-		// Drain the initial timer fire since nothing is benched yet.
-		<-timer.C
+	// Drain the initial timer fire since nothing is benched yet.
+	<-timer.C
 
-		for {
-			select {
-			case j := <-b.jobs:
-				b.ctx.Log.Debug("updating benchlist",
-					zap.Stringer("nodeID", j.nodeID),
-					zap.Bool("benching", j.bench),
-				)
+	for {
+		select {
+		case j := <-b.jobs:
+			b.ctx.Log.Debug("updating benchlist",
+				zap.Stringer("nodeID", j.nodeID),
+				zap.Bool("benching", j.bench),
+			)
 
-				if j.bench {
-					// Always update the timeout deadline. If the node is
-					// already benched from the consumer's perspective
-					// (e.g., observe detected expiration and immediately
-					// re-benched before the timer fired), this extends
-					// the deadline without a duplicate Benched notification.
-					timeoutHeap.Push(j.nodeID, b.clock.Time().Add(b.benchDuration))
-					if !benched.Contains(j.nodeID) {
-						benched.Add(j.nodeID)
-						b.benchable.Benched(b.ctx.ChainID, j.nodeID)
-					}
-				} else if benched.Contains(j.nodeID) {
-					// Guard: only unbench if the consumer still considers
-					// the node benched, avoiding duplicate Unbenched calls
-					// when both EWMA and timeout race to unbench.
-					benched.Remove(j.nodeID)
-					timeoutHeap.Remove(j.nodeID)
-					b.benchable.Unbenched(b.ctx.ChainID, j.nodeID)
+			if j.bench {
+				// Always update the timeout deadline. If the node is
+				// already benched from the consumer's perspective
+				// (e.g., observe detected expiration and immediately
+				// re-benched before the timer fired), this extends
+				// the deadline without a duplicate Benched notification.
+				timeoutHeap.Push(j.nodeID, time.Now().Add(b.benchDuration))
+				if !benched.Contains(j.nodeID) {
+					benched.Add(j.nodeID)
+					b.benchable.Benched(b.ctx.ChainID, j.nodeID)
 				}
-
-			case <-timer.C:
-				now := b.clock.Time()
-				for {
-					nodeID, deadline, ok := timeoutHeap.Peek()
-					if !ok || deadline.After(now) {
-						break
-					}
-					timeoutHeap.Pop()
-					benched.Remove(nodeID)
-
-					b.ctx.Log.Debug("unbenching node due to timeout",
-						zap.Stringer("nodeID", nodeID),
-					)
-					b.benchable.Unbenched(b.ctx.ChainID, nodeID)
-				}
+			} else if benched.Contains(j.nodeID) {
+				// Guard: only unbench if the consumer still considers
+				// the node benched, avoiding duplicate Unbenched calls
+				// when both EWMA and timeout race to unbench.
+				benched.Remove(j.nodeID)
+				timeoutHeap.Remove(j.nodeID)
+				b.benchable.Unbenched(b.ctx.ChainID, j.nodeID)
 			}
 
-			b.updateMetrics(benched)
-			b.resetTimer(timer, &timeoutHeap)
+		case <-timer.C:
+			now := time.Now()
+			for {
+				nodeID, deadline, ok := timeoutHeap.Peek()
+				if !ok || deadline.After(now) {
+					break
+				}
+				timeoutHeap.Pop()
+				benched.Remove(nodeID)
+
+				b.ctx.Log.Debug("unbenching node due to timeout",
+					zap.Stringer("nodeID", nodeID),
+				)
+				b.benchable.Unbenched(b.ctx.ChainID, nodeID)
+			}
 		}
-	}()
+
+		b.updateMetrics(benched)
+		b.resetTimer(timer, &timeoutHeap)
+	}
 }
 
 // resetTimer stops the timer and resets it to fire at the earliest deadline in
@@ -257,7 +255,7 @@ func (b *benchlist) resetTimer(timer *time.Timer, timeoutHeap *heap.Map[ids.Node
 	}
 
 	if _, deadline, ok := timeoutHeap.Peek(); ok {
-		remaining := deadline.Sub(b.clock.Time())
+		remaining := deadline.Sub(time.Now())
 		if remaining <= 0 {
 			remaining = 0
 		}
