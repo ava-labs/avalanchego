@@ -383,16 +383,26 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		}
 
 		// Handle staker lifecycle.
-		e.onCommitState.DeleteCurrentValidator(stakerToReward)
-		e.onAbortState.DeleteCurrentValidator(stakerToReward)
+		if err := e.onCommitState.DeleteCurrentValidator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current validator from commit state: %w", err)
+		}
+
+		if err := e.onAbortState.DeleteCurrentValidator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current validator from abort state: %w", err)
+		}
 	case txs.DelegatorTx:
 		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
 		}
 
 		// Handle staker lifecycle.
-		e.onCommitState.DeleteCurrentDelegator(stakerToReward)
-		e.onAbortState.DeleteCurrentDelegator(stakerToReward)
+		if err := e.onCommitState.DeleteCurrentDelegator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current delegator from commit state: %w", err)
+		}
+
+		if err := e.onAbortState.DeleteCurrentDelegator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current delegator from abort state: %w", err)
+		}
 	default:
 		// Invariant: Permissioned stakers are removed by the advancement of
 		//            time and the current chain timestamp is == this staker's
