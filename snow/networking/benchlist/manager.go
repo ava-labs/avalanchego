@@ -42,6 +42,7 @@ type manager struct {
 	benchable Benchable
 	vdrs      validators.Manager
 	reg       metrics.MultiGatherer
+	config    Config
 
 	lock   sync.RWMutex
 	chains map[ids.ID]*benchlist
@@ -52,11 +53,13 @@ func NewManager(
 	benchable Benchable,
 	vdrs validators.Manager,
 	reg metrics.MultiGatherer,
+	config Config,
 ) Manager {
 	return &manager{
 		benchable: benchable,
 		vdrs:      vdrs,
 		reg:       reg,
+		config:    config,
 		chains:    make(map[ids.ID]*benchlist),
 	}
 }
@@ -99,7 +102,7 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		return err
 	}
 
-	benchlist, err := newBenchlist(ctx, m.benchable, m.vdrs, reg)
+	benchlist, err := newBenchlist(ctx, m.benchable, m.vdrs, m.config, reg)
 	if err != nil {
 		return err
 	}

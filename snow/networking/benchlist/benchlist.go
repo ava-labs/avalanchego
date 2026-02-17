@@ -21,11 +21,10 @@ import (
 )
 
 const (
-	halflife           = time.Minute
-	unbenchProbability = .2
-	benchProbability   = .5
-
-	defaultBenchDuration = 5 * time.Second
+	DefaultHalflife           = time.Minute
+	DefaultUnbenchProbability = .2
+	DefaultBenchProbability   = .5
+	DefaultBenchDuration      = 5 * time.Minute
 
 	success float64 = 0
 	failure float64 = 1
@@ -37,6 +36,14 @@ const (
 	// a message.
 	jobsBufferSize = 128
 )
+
+// Config defines the configuration for a benchlist
+type Config struct {
+	Halflife           time.Duration `json:"halflife"`
+	UnbenchProbability float64       `json:"unbenchProbability"`
+	BenchProbability   float64       `json:"benchProbability"`
+	BenchDuration      time.Duration `json:"benchDuration"`
+}
 
 // If a node does not respond to a request, the node waits for a timeout. This
 // can cause elevated latencies if a peer is frequently sent requests.
@@ -56,8 +63,11 @@ type benchlist struct {
 	numBenched    prometheus.Gauge
 	weightBenched prometheus.Gauge
 
-	clock         mockable.Clock
-	benchDuration time.Duration
+	clock              mockable.Clock
+	halflife           time.Duration
+	unbenchProbability float64
+	benchProbability   float64
+	benchDuration      time.Duration
 
 	// Notifications to the benchable are processed in a separate goroutine to
 	// avoid any potential reentrant locking between the benchlist and the
@@ -83,6 +93,7 @@ func newBenchlist(
 	ctx *snow.ConsensusContext,
 	benchable Benchable,
 	validators validators.Manager,
+	config Config,
 	reg prometheus.Registerer,
 ) (*benchlist, error) {
 	b := &benchlist{
@@ -99,9 +110,12 @@ func newBenchlist(
 			Help: "Weight of currently benched validators",
 		}),
 
-		benchDuration: defaultBenchDuration,
-		jobs:          make(chan job, jobsBufferSize),
-		nodes:         make(map[ids.NodeID]*node),
+		halflife:           config.Halflife,
+		unbenchProbability: config.UnbenchProbability,
+		benchProbability:   config.BenchProbability,
+		benchDuration:      config.BenchDuration,
+		jobs:               make(chan job, jobsBufferSize),
+		nodes:              make(map[ids.NodeID]*node),
 	}
 
 	err := errors.Join(
@@ -139,7 +153,7 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 	}
 	if !ok {
 		n = &node{
-			failureProbability: math.NewUninitializedAverager(halflife),
+			failureProbability: math.NewUninitializedAverager(b.halflife),
 		}
 		b.nodes[nodeID] = n
 	}
@@ -153,8 +167,8 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 	n.failureProbability.Observe(v, b.clock.Time())
 
 	p := n.failureProbability.Read()
-	shouldBench := !n.isBenched && p > benchProbability
-	shouldUnbench := n.isBenched && p < unbenchProbability
+	shouldBench := !n.isBenched && p > b.benchProbability
+	shouldUnbench := n.isBenched && p < b.unbenchProbability
 	if shouldBench || shouldUnbench {
 		n.isBenched = !n.isBenched
 		if n.isBenched {
