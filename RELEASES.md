@@ -14,6 +14,7 @@
 ### Fixes
 
 - Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space.
+- Updated minimum go version to `v1.25.7`.
 
 ## [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1)
 

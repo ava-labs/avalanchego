@@ -54,7 +54,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
@@ -63,6 +62,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/coreth/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -421,7 +421,7 @@ func (vm *VM) Initialize(
 
 	vm.chainConfig = g.Config
 
-	vm.networkCodec = message.Codec
+	vm.networkCodec = message.CorethCodec
 	vm.Network, err = network.NewNetwork(vm.ctx, appSender, vm.networkCodec, vm.config.MaxOutboundActiveRequests, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
@@ -658,17 +658,17 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				BlockParser:      vm,
 			},
 		),
-		Enabled:            stateSyncEnabled,
-		SkipResume:         vm.config.StateSyncSkipResume,
-		MinBlocks:          vm.config.StateSyncMinBlocks,
-		RequestSize:        vm.config.StateSyncRequestSize,
-		LastAcceptedHeight: lastAcceptedHeight, // TODO clean up how this is passed around
-		ChainDB:            vm.chaindb,
-		VerDB:              vm.versiondb,
-		MetadataDB:         vm.metadataDB,
-		Acceptor:           vm,
-		Parser:             vm.extensionConfig.SyncableParser,
-		Extender:           vm.extensionConfig.SyncExtender,
+		Enabled:             stateSyncEnabled,
+		SkipResume:          vm.config.StateSyncSkipResume,
+		MinBlocks:           vm.config.StateSyncMinBlocks,
+		RequestSize:         vm.config.StateSyncRequestSize,
+		LastAcceptedHeight:  lastAcceptedHeight, // TODO clean up how this is passed around
+		ChainDB:             vm.chaindb,
+		VerDB:               vm.versiondb,
+		MetadataDB:          vm.metadataDB,
+		Acceptor:            vm,
+		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
+		Extender:            vm.extensionConfig.SyncExtender,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume

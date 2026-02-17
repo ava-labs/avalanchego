@@ -52,7 +52,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run Warp E2E Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@70148edc6ecabb2836b89d890718011b892b7063
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-e2e-warp-ci
           working_directory: ./graft/subnet-evm
@@ -75,7 +75,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run E2E Load Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@70148edc6ecabb2836b89d890718011b892b7063
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-e2e-load-ci
           working_directory: ./graft/subnet-evm
@@ -111,6 +111,10 @@ jobs:
       run:
         working-directory: ./graft/subnet-evm
     steps:
+      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be #v1.3.1
+        with:
+          tool-cache: true
+          docker-images: true
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
