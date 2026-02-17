@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -26,10 +25,17 @@ const (
 	unbenchProbability = .2
 	benchProbability   = .5
 
-	duration time.Duration = 5 * time.Second
+	defaultBenchDuration = 5 * time.Second
 
 	success float64 = 0
 	failure float64 = 1
+
+	// jobsBufferSize is the buffer size of the jobs channel. This must be
+	// large enough that [observe] does not block while holding [lock].
+	// The consumer goroutine never acquires [lock], so any blocking is
+	// temporary backpressure that resolves as soon as the consumer processes
+	// a message.
+	jobsBufferSize = 128
 )
 
 // If a node does not respond to a request, the node waits for a timeout. This
@@ -39,6 +45,9 @@ const (
 // to a query. If a node is projected to fail, it is "benched". While it is
 // benched, queries to that node fail immediately to avoid waiting up to the
 // full network timeout.
+//
+// If a node remains benched for longer than [benchDuration], it is
+// automatically unbenched to give it another chance.
 type benchlist struct {
 	ctx       *snow.ConsensusContext
 	benchable Benchable
@@ -47,12 +56,13 @@ type benchlist struct {
 	numBenched    prometheus.Gauge
 	weightBenched prometheus.Gauge
 
-	clock mockable.Clock
+	clock         mockable.Clock
+	benchDuration time.Duration
 
 	// Notifications to the benchable are processed in a separate goroutine to
 	// avoid any potential reentrant locking between the benchlist and the
 	// benchable.
-	jobs buffer.BlockingDeque[job]
+	jobs chan job
 
 	lock  sync.RWMutex
 	nodes map[ids.NodeID]*node
@@ -61,6 +71,7 @@ type benchlist struct {
 type node struct {
 	failureProbability math.Averager
 	isBenched          bool
+	benchedAt          time.Time
 }
 
 type job struct {
@@ -88,8 +99,9 @@ func newBenchlist(
 			Help: "Weight of currently benched validators",
 		}),
 
-		jobs:  buffer.NewUnboundedBlockingDeque[job](1),
-		nodes: make(map[ids.NodeID]*node),
+		benchDuration: defaultBenchDuration,
+		jobs:          make(chan job, jobsBufferSize),
+		nodes:         make(map[ids.NodeID]*node),
 	}
 
 	err := errors.Join(
@@ -132,6 +144,12 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 		b.nodes[nodeID] = n
 	}
 
+	// If the bench duration has expired, clear the benched state so that the
+	// EWMA logic below can re-evaluate from a clean slate.
+	if n.isBenched && b.benchExpired(n) {
+		n.isBenched = false
+	}
+
 	n.failureProbability.Observe(v, b.clock.Time())
 
 	p := n.failureProbability.Read()
@@ -139,11 +157,19 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 	shouldUnbench := n.isBenched && p < unbenchProbability
 	if shouldBench || shouldUnbench {
 		n.isBenched = !n.isBenched
-		b.jobs.PushRight(job{
+		if n.isBenched {
+			n.benchedAt = b.clock.Time()
+		}
+		b.jobs <- job{
 			nodeID: nodeID,
 			bench:  n.isBenched,
-		})
+		}
 	}
+}
+
+// benchExpired reports whether n's bench duration has elapsed.
+func (b *benchlist) benchExpired(n *node) bool {
+	return !n.benchedAt.IsZero() && b.clock.Time().After(n.benchedAt.Add(b.benchDuration))
 }
 
 // IsBenched returns true if messages to nodeID should immediately fail.
@@ -152,84 +178,102 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 	defer b.lock.RUnlock()
 
 	n, ok := b.nodes[nodeID]
-	return ok && n.isBenched
+	return ok && n.isBenched && !b.benchExpired(n)
 }
 
-// TODO: Close goroutines within run during shutdown.
+// TODO: Close goroutine within run during shutdown.
 func (b *benchlist) run() {
-	var (
-		benched            set.Set[ids.NodeID]
-		benchedTimeoutHeap heap.Map[ids.NodeID, time.Time] = heap.NewMap[ids.NodeID, time.Time](time.Time.Before)
-		benchedLock        sync.Mutex
-	)
-
 	go func() {
+		var (
+			benched     set.Set[ids.NodeID]
+			timeoutHeap = heap.NewMap[ids.NodeID, time.Time](time.Time.Before)
+			timer       = time.NewTimer(0)
+		)
+		defer timer.Stop()
+
+		// Drain the initial timer fire since nothing is benched yet.
+		<-timer.C
+
 		for {
-			benchedLock.Lock()
-			// Unbench all nodes whose deadlines have passed.
-			for {
-				nodeID, deadline, ok := benchedTimeoutHeap.Peek()
-				if !ok || deadline.After(b.clock.Time()) {
-					break
+			select {
+			case j := <-b.jobs:
+				b.ctx.Log.Debug("updating benchlist",
+					zap.Stringer("nodeID", j.nodeID),
+					zap.Bool("benching", j.bench),
+				)
+
+				if j.bench {
+					// Always update the timeout deadline. If the node is
+					// already benched from the consumer's perspective
+					// (e.g., observe detected expiration and immediately
+					// re-benched before the timer fired), this extends
+					// the deadline without a duplicate Benched notification.
+					timeoutHeap.Push(j.nodeID, b.clock.Time().Add(b.benchDuration))
+					if !benched.Contains(j.nodeID) {
+						benched.Add(j.nodeID)
+						b.benchable.Benched(b.ctx.ChainID, j.nodeID)
+					}
+				} else if benched.Contains(j.nodeID) {
+					// Guard: only unbench if the consumer still considers
+					// the node benched, avoiding duplicate Unbenched calls
+					// when both EWMA and timeout race to unbench.
+					benched.Remove(j.nodeID)
+					timeoutHeap.Remove(j.nodeID)
+					b.benchable.Unbenched(b.ctx.ChainID, j.nodeID)
 				}
 
-				b.ctx.Log.Debug("unbenching node due to timeout",
-					zap.Stringer("nodeID", nodeID),
-				)
+			case <-timer.C:
+				now := b.clock.Time()
+				for {
+					nodeID, deadline, ok := timeoutHeap.Peek()
+					if !ok || deadline.After(now) {
+						break
+					}
+					timeoutHeap.Pop()
+					benched.Remove(nodeID)
 
-				benchedTimeoutHeap.Pop()
-				b.jobs.PushRight(job{
-					nodeID: nodeID,
-					bench:  false,
-				})
+					b.ctx.Log.Debug("unbenching node due to timeout",
+						zap.Stringer("nodeID", nodeID),
+					)
+					b.benchable.Unbenched(b.ctx.ChainID, nodeID)
+				}
 			}
-			benchedLock.Unlock()
-			time.Sleep(2 * time.Second)
+
+			b.updateMetrics(benched)
+			b.resetTimer(timer, &timeoutHeap)
 		}
 	}()
+}
 
-	go func() {
-		for {
-			job, ok := b.jobs.PopLeft()
-			if !ok {
-				return
-			}
-
-			b.ctx.Log.Debug("updating benchlist",
-				zap.Stringer("nodeID", job.nodeID),
-				zap.Bool("benching", job.bench),
-			)
-
-			benchedLock.Lock()
-			if job.bench {
-				benched.Add(job.nodeID)
-				benchedTimeoutHeap.Push(job.nodeID, b.clock.Time().Add(duration))
-			} else {
-				benched.Remove(job.nodeID)
-				benchedTimeoutHeap.Remove(job.nodeID)
-			}
-
-			b.numBenched.Set(float64(benched.Len()))
-			benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benched)
-			if err != nil {
-				b.ctx.Log.Error("error calculating benched stake",
-					zap.Stringer("subnetID", b.ctx.SubnetID),
-					zap.Error(err),
-				)
-				benchedLock.Unlock()
-				continue
-			}
-			b.weightBenched.Set(float64(benchedStake))
-
-			// Notify the benchable of the change last so that all internal state is
-			// updated before the notification is sent.
-			if job.bench {
-				b.benchable.Benched(b.ctx.ChainID, job.nodeID)
-			} else {
-				b.benchable.Unbenched(b.ctx.ChainID, job.nodeID)
-			}
-			benchedLock.Unlock()
+// resetTimer stops the timer and resets it to fire at the earliest deadline in
+// the timeout heap. If the heap is empty, the timer remains stopped and will be
+// reset when the next bench job arrives.
+func (b *benchlist) resetTimer(timer *time.Timer, timeoutHeap *heap.Map[ids.NodeID, time.Time]) {
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
 		}
-	}()
+	}
 
+	if _, deadline, ok := timeoutHeap.Peek(); ok {
+		remaining := deadline.Sub(b.clock.Time())
+		if remaining <= 0 {
+			remaining = 0
+		}
+		timer.Reset(remaining)
+	}
+}
+
+func (b *benchlist) updateMetrics(benched set.Set[ids.NodeID]) {
+	b.numBenched.Set(float64(benched.Len()))
+	benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benched)
+	if err != nil {
+		b.ctx.Log.Error("error calculating benched stake",
+			zap.Stringer("subnetID", b.ctx.SubnetID),
+			zap.Error(err),
+		)
+		return
+	}
+	b.weightBenched.Set(float64(benchedStake))
 }
