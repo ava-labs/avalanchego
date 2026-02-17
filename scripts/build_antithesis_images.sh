@@ -102,24 +102,15 @@ else
   fi
 
   echo "Generating compose configuration for ${TEST_SETUP}"
-  if [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
-    # subnet-evm gencomposeconfig is in a different module, so cd there first
-    (cd "${AVALANCHE_PATH}/graft/subnet-evm" && \
-     env TARGET_PATH="${AVALANCHE_PATH}/build/antithesis/${TEST_SETUP}" \
-         IMAGE_TAG="${IMAGE_TAG}" \
-         AVALANCHEGO_PATH="${AVALANCHE_PATH}/build/avalanchego" \
-         AVAGO_PLUGIN_DIR="${AVALANCHE_PATH}/build/plugins" \
-         go run ./tests/antithesis/gencomposeconfig)
-  else
-    # xsvm and others are in the root module
-    if [[ "${TEST_SETUP}" == "xsvm" ]]; then
-      gencomposeconfig_path="${AVALANCHE_PATH}/tests/antithesis/xsvm/gencomposeconfig"
-    fi
-    gen_antithesis_compose_config "${IMAGE_TAG}" \
-      "${gencomposeconfig_path}" \
-      "${AVALANCHE_PATH}/build/antithesis/${TEST_SETUP}" \
-      "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVAGO_PLUGIN_DIR=${AVALANCHE_PATH}/build/plugins"
+  if [[ "${TEST_SETUP}" == "xsvm" ]]; then
+    gencomposeconfig_path="${AVALANCHE_PATH}/tests/antithesis/xsvm/gencomposeconfig"
+  elif [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
+    gencomposeconfig_path="${AVALANCHE_PATH}/graft/subnet-evm/tests/antithesis/gencomposeconfig"
   fi
+  gen_antithesis_compose_config "${IMAGE_TAG}" \
+    "${gencomposeconfig_path}" \
+    "${AVALANCHE_PATH}/build/antithesis/${TEST_SETUP}" \
+    "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVAGO_PLUGIN_DIR=${AVALANCHE_PATH}/build/plugins"
 
   build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${vm_dockerfile}"
 fi
