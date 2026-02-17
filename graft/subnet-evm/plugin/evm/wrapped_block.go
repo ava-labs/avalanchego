@@ -130,7 +130,7 @@ func (b *wrappedBlock) handlePrecompileAccept(rules extras.Rules) error {
 	}
 	acceptCtx := &precompileconfig.AcceptContext{
 		SnowCtx: b.vm.ctx,
-		Warp:    b.vm.warpBackend,
+		Warp:    b.vm.warpMsgDB,
 	}
 	for _, receipt := range receipts {
 		for logIdx, log := range receipt.Logs {
