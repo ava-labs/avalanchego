@@ -260,7 +260,7 @@ func (b *benchlist) run() {
 // resetTimer stops the timer and resets it to fire at the earliest deadline in
 // the timeout heap. If the heap is empty, the timer remains stopped and will be
 // reset when the next bench job arrives.
-func (b *benchlist) resetTimer(timer *time.Timer, timeoutHeap *heap.Map[ids.NodeID, time.Time]) {
+func (*benchlist) resetTimer(timer *time.Timer, timeoutHeap *heap.Map[ids.NodeID, time.Time]) {
 	if !timer.Stop() {
 		select {
 		case <-timer.C:
@@ -269,7 +269,7 @@ func (b *benchlist) resetTimer(timer *time.Timer, timeoutHeap *heap.Map[ids.Node
 	}
 
 	if _, deadline, ok := timeoutHeap.Peek(); ok {
-		remaining := deadline.Sub(time.Now())
+		remaining := time.Until(deadline)
 		if remaining <= 0 {
 			remaining = 0
 		}
