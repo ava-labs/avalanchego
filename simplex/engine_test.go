@@ -482,7 +482,6 @@ func NewReplicationResponseMessage(qcBytes []byte) *p2p.Simplex {
 }
 
 func FuzzSimplexVotes(f *testing.F) {
-	f.Add(digest[:], signer, uint64(1), uint64(1), uint64(1), uint32(1))
 	f.Fuzz(func(t *testing.T, blockDigest []byte, signer []byte, epoch, round, seq uint64, version uint32) {
 		ctx := t.Context()
 		engine, configs := setupEngine(t)
@@ -510,7 +509,6 @@ func FuzzSimplexVotes(f *testing.F) {
 }
 
 func FuzzSimplexEmptyVotes(f *testing.F) {
-	f.Add(signer, uint64(1), uint64(1), []byte("emptyvote-sig"))
 	f.Fuzz(func(t *testing.T, signer []byte, epoch, round uint64, signerValue []byte) {
 		ctx := t.Context()
 		engine, configs := setupEngine(t)
@@ -529,7 +527,6 @@ func FuzzSimplexEmptyVotes(f *testing.F) {
 }
 
 func FuzzSimplexFinalizeVotes(f *testing.F) {
-	f.Add(digest[:], signer, []byte("signervalue"), uint64(2), uint64(5), uint64(50), uint32(1))
 	f.Fuzz(func(t *testing.T, signer []byte, signerValue []byte, blockDigest []byte, epoch, round, seq uint64, version uint32) {
 		ctx := t.Context()
 		engine, configs := setupEngine(t)
@@ -557,7 +554,6 @@ func FuzzSimplexFinalizeVotes(f *testing.F) {
 }
 
 func FuzzSimplexNotarizations(f *testing.F) {
-	f.Add([]byte("qc-data"), digest[:], uint64(3), uint64(8), uint64(75), uint32(1))
 	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
 		ctx := t.Context()
 		engine, configs := setupEngine(t)
@@ -586,7 +582,6 @@ func FuzzSimplexNotarizations(f *testing.F) {
 }
 
 func FuzzSimplexFinalizations(f *testing.F) {
-	f.Add([]byte("qc-data"), digest[:], uint64(5), uint64(11), uint64(120), uint32(1))
 	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
 		ctx := t.Context()
 		engine, configs := setupEngine(t)
@@ -615,7 +610,6 @@ func FuzzSimplexFinalizations(f *testing.F) {
 }
 
 func FuzzSimplexReplicationRequests(f *testing.F) {
-	f.Add(uint64(1), uint64(2), uint64(3), uint64(42))
 	f.Fuzz(func(t *testing.T, seq1, seq2, seq3, latestRound uint64) {
 		ctx := t.Context()
 		engine, configs := setupEngine(t)
@@ -634,8 +628,6 @@ func FuzzSimplexReplicationRequests(f *testing.F) {
 }
 
 func FuzzSimplexReplicationResponses(f *testing.F) {
-	f.Log("hello!!!!")
-	f.Add([]byte("qc-data"), digest[:], uint64(6), uint64(13), uint64(150), uint32(1))
 	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
 		t.Log("!!FuzzSimplexReplicationResponses called with:", qcData, blockDigest, epoch, round, seq, version)
 		ctx := t.Context()
@@ -673,7 +665,6 @@ func FuzzSimplexReplicationResponses(f *testing.F) {
 }
 
 func FuzzSimplexBlockProposals(f *testing.F) {
-	f.Add(blockBytes, digest[:], uint64(112), uint64(18), uint64(7), uint32(1))
 	f.Fuzz(func(t *testing.T, blockBytes []byte, blockDigest []byte, round, epoch, seq uint64, version uint32) {
 		ctx := t.Context()
 		engine, configs := setupEngine(t)
@@ -704,7 +695,6 @@ func FuzzSimplexBlockProposals(f *testing.F) {
 }
 
 func FuzzSimplexEmptyNotarizations(f *testing.F) {
-	f.Add([]byte("random msg data i am passing into QC"), uint64(112), uint64(18))
 	f.Fuzz(func(t *testing.T, data []byte, round uint64, epoch uint64) {
 		ctx := t.Context()
 		engine, configs := setupEngine(t)
