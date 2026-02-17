@@ -594,13 +594,15 @@ func (d *diff) Apply(baseState Chain) error {
 	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
-			switch validatorDiff.validatorStatus {
-			case added:
-				if err := baseState.PutCurrentValidator(validatorDiff.validator); err != nil {
+			// We might have removed the validator and then added it in the same diff.
+			// We therefore first delete and then only after add it.
+			if validatorDiff.removed != nil {
+				baseState.DeleteCurrentValidator(validatorDiff.removed)
+			}
+			if validatorDiff.added != nil {
+				if err := baseState.PutCurrentValidator(validatorDiff.added); err != nil {
 					return err
 				}
-			case deleted:
-				baseState.DeleteCurrentValidator(validatorDiff.validator)
 			}
 
 			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
@@ -623,13 +625,15 @@ func (d *diff) Apply(baseState Chain) error {
 	}
 	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
-			switch validatorDiff.validatorStatus {
-			case added:
-				if err := baseState.PutPendingValidator(validatorDiff.validator); err != nil {
+			// We might have removed the validator and then added it in the same diff.
+			// We therefore first delete and then only after add it.
+			if validatorDiff.removed != nil {
+				baseState.DeletePendingValidator(validatorDiff.removed)
+			}
+			if validatorDiff.added != nil {
+				if err := baseState.PutPendingValidator(validatorDiff.added); err != nil {
 					return err
 				}
-			case deleted:
-				baseState.DeletePendingValidator(validatorDiff.validator)
 			}
 
 			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)

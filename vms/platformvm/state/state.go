@@ -2509,9 +2509,14 @@ func (s *state) getInheritedPublicKey(nodeID ids.NodeID) (*bls.PublicKey, error)
 		// The primary network validator is present.
 		return vdr.validator.PublicKey, nil
 	}
-	if vdr, ok := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID][nodeID]; ok && vdr.validator != nil {
+	if vdr, ok := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID][nodeID]; ok {
 		// The primary network validator is being modified.
-		return vdr.validator.PublicKey, nil
+		if vdr.added != nil {
+			return vdr.added.PublicKey, nil
+		}
+		if vdr.removed != nil {
+			return vdr.removed.PublicKey, nil
+		}
 	}
 	return nil, fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
 }
@@ -2547,7 +2552,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 				continue
 			}
 
-			if diff.validatorStatus != added {
+			if diff.validatorStatus() != added {
 				if err := s.validators.AddWeight(subnetID, nodeID, weightDiff.Amount); err != nil {
 					return fmt.Errorf("failed to increase validator weight: %w", err)
 				}
@@ -2561,11 +2566,40 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 				return err
 			}
 
+			if diff.removed != nil {
+				// The validator was removed and re-added. We need to remove the
+				// old entry entirely (including any delegator weight) and
+				// re-add with the correct total weight.
+				currentWeight := s.validators.GetWeight(subnetID, nodeID)
+				if err := s.validators.RemoveWeight(subnetID, nodeID, currentWeight); err != nil {
+					return fmt.Errorf("failed to remove weight of deleted validator: %w", err)
+				}
+
+				newWeight, err := computeNewStakerWeight(weightDiff, currentWeight)
+				if err != nil {
+					return err
+				}
+
+				if newWeight > 0 {
+					err = s.validators.AddStaker(
+						subnetID,
+						nodeID,
+						pk,
+						diff.added.TxID,
+						newWeight,
+					)
+					if err != nil {
+						return fmt.Errorf("failed to add validator: %w", err)
+					}
+				}
+				continue
+			}
+
 			err = s.validators.AddStaker(
 				subnetID,
 				nodeID,
 				pk,
-				diff.validator.TxID,
+				diff.added.TxID,
 				weightDiff.Amount,
 			)
 			if err != nil {
@@ -2644,6 +2678,23 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 	return nil
 }
 
+// computeNewStakerWeight applies the net weight diff to the validator's
+// current weight in the manager (which includes delegator weight) to
+// obtain the correct total weight after a replacement.
+func computeNewStakerWeight(weightDiff ValidatorWeightDiff, currentWeight uint64) (uint64, error) {
+	var newWeight uint64
+	var err error
+	if weightDiff.Decrease {
+		newWeight, err = safemath.Sub(currentWeight, weightDiff.Amount)
+	} else {
+		newWeight, err = safemath.Add(currentWeight, weightDiff.Amount)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to calculate new validator weight: %w", err)
+	}
+	return newWeight, nil
+}
+
 type validatorDiff struct {
 	weightDiff    ValidatorWeightDiff
 	prevPublicKey []byte
@@ -2677,10 +2728,10 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 			}
 			if pk != nil {
 				pkBytes := bls.PublicKeyToUncompressedBytes(pk)
-				if diff.validatorStatus != added {
+				if diff.validatorStatus() != added {
 					change.prevPublicKey = pkBytes
 				}
-				if diff.validatorStatus != deleted {
+				if diff.validatorStatus() != deleted {
 					change.newPublicKey = pkBytes
 				}
 			}
@@ -2807,9 +2858,17 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 
 		// Record the change in weight and/or public key for each validator.
 		for nodeID, validatorDiff := range validatorDiffs {
-			switch validatorDiff.validatorStatus {
-			case added:
-				staker := validatorDiff.validator
+			// removed and added are handled with separate ifs (not
+			// if-else) because during a validator replacement both are set.
+			if validatorDiff.removed != nil {
+				if err := validatorDB.Delete(validatorDiff.removed.TxID[:]); err != nil {
+					return fmt.Errorf("failed to delete current staker: %w", err)
+				}
+
+				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
+			}
+			if validatorDiff.added != nil {
+				staker := validatorDiff.added
 
 				// The validator is being added.
 				//
@@ -2837,12 +2896,6 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 				}
 
 				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
-			case deleted:
-				if err := validatorDB.Delete(validatorDiff.validator.TxID[:]); err != nil {
-					return fmt.Errorf("failed to delete current staker: %w", err)
-				}
-
-				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 			}
 
 			err := writeCurrentDelegatorDiff(
@@ -2918,16 +2971,18 @@ func writePendingDiff(
 	pendingDelegatorList linkeddb.LinkedDB,
 	validatorDiff *diffValidator,
 ) error {
-	switch validatorDiff.validatorStatus {
-	case added:
-		err := pendingValidatorList.Put(validatorDiff.validator.TxID[:], nil)
-		if err != nil {
-			return fmt.Errorf("failed to add pending validator: %w", err)
-		}
-	case deleted:
-		err := pendingValidatorList.Delete(validatorDiff.validator.TxID[:])
+	// removed and added are handled with separate ifs (not if-else) because
+	// during a validator replacement both are set.
+	if validatorDiff.removed != nil {
+		err := pendingValidatorList.Delete(validatorDiff.removed.TxID[:])
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)
+		}
+	}
+	if validatorDiff.added != nil {
+		err := pendingValidatorList.Put(validatorDiff.added.TxID[:], nil)
+		if err != nil {
+			return fmt.Errorf("failed to add pending validator: %w", err)
 		}
 	}
 
