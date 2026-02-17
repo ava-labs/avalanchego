@@ -74,12 +74,6 @@ else
   # VM test setups (xsvm, subnet-evm) follow a common pattern
   build_builder_image_for_avalanchego
 
-  # Build VM-specific builder if needed
-  if [[ "${TEST_SETUP}" == "subnet-evm" ]]; then
-    echo "Building subnet-evm builder image"
-    build_antithesis_builder_image "${GO_VERSION}" "antithesis-subnet-evm-builder:${IMAGE_TAG}" "${AVALANCHE_PATH}" "${AVALANCHE_PATH}"
-  fi
-
   # Only build the avalanchego node image to use as the base for the VM image. Provide an empty
   # image prefix (the 1st argument) to prevent the image from being pushed
   NODE_ONLY=1
