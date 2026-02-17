@@ -2518,9 +2518,10 @@ func (s *state) getInheritedPublicKey(nodeID ids.NodeID) (*bls.PublicKey, error)
 		// The primary network validator is present.
 		return vdr.validator.PublicKey, nil
 	}
-	if vdr, ok := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID][nodeID]; ok && vdr.validator != nil {
-		// The primary network validator is being modified.
-		return vdr.validator.PublicKey, nil
+	if vdr, ok := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID][nodeID]; ok {
+		if vdr.removed != nil {
+			return vdr.removed.PublicKey, nil
+		}
 	}
 	return nil, fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
 }
@@ -2545,18 +2546,20 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 				return err
 			}
 
-			if weightDiff.Amount == 0 {
+			isReplacement := diff.added != nil && diff.removed != nil
+
+			if weightDiff.Amount == 0 && !isReplacement {
 				continue // No weight change; go to the next validator.
 			}
 
-			if weightDiff.Decrease {
+			if weightDiff.Decrease && !isReplacement {
 				if err := s.validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount); err != nil {
 					return fmt.Errorf("failed to reduce validator weight: %w", err)
 				}
 				continue
 			}
 
-			if diff.validatorStatus != added {
+			if diff.validatorStatus() != added {
 				if err := s.validators.AddWeight(subnetID, nodeID, weightDiff.Amount); err != nil {
 					return fmt.Errorf("failed to increase validator weight: %w", err)
 				}
@@ -2570,11 +2573,20 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 				return err
 			}
 
+			if diff.removed != nil {
+				// If we reached here, diff.validatorStatus() == added so diff.added != nil as well,
+				// meaning this is a replacement.
+				if err := s.removeAndReAddValidator(subnetID, nodeID, weightDiff, pk, diff); err != nil {
+					return err
+				}
+				continue
+			}
+
 			err = s.validators.AddStaker(
 				subnetID,
 				nodeID,
 				pk,
-				diff.validator.TxID,
+				diff.added.TxID,
 				weightDiff.Amount,
 			)
 			if err != nil {
@@ -2653,6 +2665,47 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 	return nil
 }
 
+func (s *state) removeAndReAddValidator(subnetID ids.ID, nodeID ids.NodeID, weightDiff ValidatorWeightDiff, pk *bls.PublicKey, diff *diffValidator) error {
+	currentWeight := s.validators.GetWeight(subnetID, nodeID)
+	if err := s.validators.RemoveWeight(subnetID, nodeID, currentWeight); err != nil {
+		return fmt.Errorf("failed to remove weight of deleted validator: %w", err)
+	}
+
+	newWeight, err := computeNewStakerWeight(weightDiff, currentWeight)
+	if err != nil {
+		return err
+	}
+
+	err = s.validators.AddStaker(
+		subnetID,
+		nodeID,
+		pk,
+		diff.added.TxID,
+		newWeight,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to add validator: %w", err)
+	}
+	return nil
+}
+
+// computeNewStakerWeight applies the net weight diff to the validator's
+// current weight in the manager (which includes delegator weight) to
+// obtain the correct total weight after a replacement.
+func computeNewStakerWeight(weightDiff ValidatorWeightDiff, currentWeight uint64) (uint64, error) {
+	var newWeight uint64
+	var err error
+	if weightDiff.Decrease {
+		newWeight, err = safemath.Sub(currentWeight, weightDiff.Amount)
+	} else {
+		newWeight, err = safemath.Add(currentWeight, weightDiff.Amount)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to calculate new validator weight: %w", err)
+	}
+	return newWeight, nil
+}
+
 type validatorDiff struct {
 	weightDiff    ValidatorWeightDiff
 	prevPublicKey []byte
@@ -2684,12 +2737,21 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 			change := &validatorDiff{
 				weightDiff: weightDiff,
 			}
-			if pk != nil {
+			if diff.added != nil && diff.removed != nil {
+				// This is a replacement of the public key.
+				if diff.removed.PublicKey != nil {
+					change.prevPublicKey = bls.PublicKeyToUncompressedBytes(diff.removed.PublicKey)
+				}
+				if diff.added.PublicKey != nil {
+					change.newPublicKey = bls.PublicKeyToUncompressedBytes(diff.added.PublicKey)
+				}
+			} else if pk != nil {
+				// This is not a replacement, and we anyway write the public key to the diff.
 				pkBytes := bls.PublicKeyToUncompressedBytes(pk)
-				if diff.validatorStatus != added {
+				if diff.validatorStatus() != added {
 					change.prevPublicKey = pkBytes
 				}
-				if diff.validatorStatus != deleted {
+				if diff.validatorStatus() != deleted {
 					change.newPublicKey = pkBytes
 				}
 			}
@@ -2812,9 +2874,13 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 		}
 
 		for nodeID, validatorDiff := range validatorDiffs {
-			switch validatorDiff.validatorStatus {
-			case added:
-				staker := validatorDiff.validator
+			// removed and added are handled with separate ifs (not
+			// if-else) because during a validator replacement both are set.
+			if validatorDiff.removed != nil {
+				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
+			}
+			if validatorDiff.added != nil {
+				staker := validatorDiff.added
 
 				// The validator is being added.
 				//
@@ -2833,8 +2899,6 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 				}
 
 				s.validatorState.AddValidatorMetadata(nodeID, subnetID, metadata)
-			case deleted:
-				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 			}
 
 			err := writeCurrentDelegatorDiff(
@@ -2919,16 +2983,18 @@ func writePendingDiff(
 	pendingDelegatorList linkeddb.LinkedDB,
 	validatorDiff *diffValidator,
 ) error {
-	switch validatorDiff.validatorStatus {
-	case added:
-		err := pendingValidatorList.Put(validatorDiff.validator.TxID[:], nil)
-		if err != nil {
-			return fmt.Errorf("failed to add pending validator: %w", err)
-		}
-	case deleted:
-		err := pendingValidatorList.Delete(validatorDiff.validator.TxID[:])
+	// removed and added are handled with separate ifs (not if-else) because
+	// during a validator replacement both are set.
+	if validatorDiff.removed != nil {
+		err := pendingValidatorList.Delete(validatorDiff.removed.TxID[:])
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)
+		}
+	}
+	if validatorDiff.added != nil {
+		err := pendingValidatorList.Put(validatorDiff.added.TxID[:], nil)
+		if err != nil {
+			return fmt.Errorf("failed to add pending validator: %w", err)
 		}
 	}
 

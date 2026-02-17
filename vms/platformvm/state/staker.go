@@ -43,6 +43,30 @@ type Staker struct {
 	Priority txs.Priority
 }
 
+func (s *Staker) Equals(other *Staker) bool {
+	if s == nil && other == nil {
+		return true
+	}
+
+	if other == nil || s == nil {
+		return false
+	}
+
+	equalPKs := (s.PublicKey == nil && other.PublicKey == nil) ||
+		(s.PublicKey != nil && other.PublicKey != nil && s.PublicKey.Equals(other.PublicKey))
+
+	return s.TxID == other.TxID &&
+		s.NodeID == other.NodeID &&
+		equalPKs &&
+		s.SubnetID == other.SubnetID &&
+		s.Weight == other.Weight &&
+		s.StartTime.Equal(other.StartTime) &&
+		s.EndTime.Equal(other.EndTime) &&
+		s.PotentialReward == other.PotentialReward &&
+		s.NextTime.Equal(other.NextTime) &&
+		s.Priority == other.Priority
+}
+
 // A *Staker is considered to be less than another *Staker when:
 //
 //  1. If its NextTime is before the other's.
