@@ -18,6 +18,14 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 fuzzTime=${1:-1}
 fuzzDir=${2:-.}
 
+# Set go test timeout to fuzz time + 20 minutes to allow for compilation and setup.
+# A negative fuzz time (e.g. -1) means run until failure, so disable the timeout.
+if (( fuzzTime < 0 )); then
+    timeout=0
+else
+    timeout=$((fuzzTime + 1200))
+fi
+
 EXCLUDE_DIR="graft"
 
 files=$(grep -r --exclude-dir="$EXCLUDE_DIR" --include='**_test.go' --files-with-matches 'func Fuzz' "$fuzzDir")
@@ -30,7 +38,7 @@ do
         echo "Fuzzing $func in $file"
         parentDir=$(dirname "$file")
         # If any of the fuzz tests fail, return exit code 1
-        if ! go test -tags test "$parentDir" -run="$func" -fuzz="$func" -fuzztime="${fuzzTime}"s; then
+        if ! go test -tags test -timeout="${timeout}s" "$parentDir" -run="$func" -fuzz="$func" -fuzztime="${fuzzTime}"s; then
             failed=true
         fi
     done
