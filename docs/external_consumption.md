@@ -11,7 +11,7 @@ together:
 | Subnet-EVM | `github.com/ava-labs/avalanchego/graft/subnet-evm` |
 
 For the rationale behind this document, see [Multi-Module Release
-Strategy](design/multi_module_release.md).
+Strategy](design/multi-module-release.md).
 
 ## Depending on a Released Version
 

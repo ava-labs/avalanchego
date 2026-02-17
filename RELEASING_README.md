@@ -10,7 +10,7 @@ AvalancheGo is a monorepo which contains:
 - **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain EVM implementation, compiled into AvalancheGo
 - **Subnet-EVM** (in [graft/subnet-evm/](graft/subnet-evm/)) - Subnet-EVM plugin, released as a separate binary
 
-For the rationale behind the multi-module tagging process, see [Multi-Module Release Strategy](docs/design/multi_module_release.md).
+For the rationale behind the multi-module tagging process, see [Multi-Module Release Strategy](docs/design/multi-module-release.md).
 
 ### Versioning Strategy
 
