@@ -50,7 +50,7 @@ ignored. Only require directives matter.
 
 ### Release Workflow
 
-See [Release Procedure](../releasing.md) for the step-by-step process.
+See [Release Procedure](../../RELEASING_README.md) for the step-by-step process.
 
 Between merge and tag, local builds continue to work because replace
 directives redirect inter-module references to local paths. Once
@@ -80,7 +80,7 @@ directives handle development builds.
 
 ### Phase 2: First Tagged Release
 
-Follow the [Release Procedure](../releasing.md) to create the first tagged release.
+Follow the [Release Procedure](../../RELEASING_README.md) to create the first tagged release.
 
 ## References
 

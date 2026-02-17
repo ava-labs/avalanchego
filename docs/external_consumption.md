@@ -43,7 +43,7 @@ go get github.com/ava-labs/avalanchego@v0.0.0-myfeature
 
 Development tags provide the same automatic submodule resolution as
 release tags. For instructions on creating development tags, see
-[Development Tags](releasing.md#development-tags).
+[Development Tags](../RELEASING_README.md#development-tags).
 
 ## Local Development with Replace Directives
 
@@ -88,6 +88,6 @@ the internal `require` directive rather than your pseudo-version.
 The result: mismatched module versions where some resolve to your
 target commit and others resolve to older tagged releases.
 
-Use [development tags](releasing.md#development-tags) instead - they
+Use [development tags](../RELEASING_README.md#development-tags) instead - they
 ensure all modules resolve to coordinated versions because the
 internal `require` directives are updated to match before tagging.
