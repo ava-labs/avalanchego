@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/buffer"
+	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -24,6 +25,8 @@ const (
 	halflife           = time.Minute
 	unbenchProbability = .2
 	benchProbability   = .5
+
+	duration time.Duration = 5 * time.Second
 
 	success float64 = 0
 	failure float64 = 1
@@ -47,7 +50,8 @@ type benchlist struct {
 	clock mockable.Clock
 
 	// Notifications to the benchable are processed in a separate goroutine to
-	// avoid any potential reentrant locking.
+	// avoid any potential reentrant locking between the benchlist and the
+	// benchable.
 	jobs buffer.BlockingDeque[job]
 
 	lock  sync.RWMutex
@@ -96,7 +100,7 @@ func newBenchlist(
 		return nil, err
 	}
 
-	go b.run()
+	b.run()
 	return b, nil
 }
 
@@ -151,42 +155,80 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 	return ok && n.isBenched
 }
 
-// TODO: Close this goroutine during node shutdown
+// TODO: Close goroutines within run during shutdown.
 func (b *benchlist) run() {
-	var benched set.Set[ids.NodeID]
-	for {
-		job, ok := b.jobs.PopLeft()
-		if !ok {
-			return
-		}
+	var (
+		benched            set.Set[ids.NodeID]
+		benchedTimeoutHeap heap.Map[ids.NodeID, time.Time] = heap.NewMap[ids.NodeID, time.Time](time.Time.Before)
+		benchedLock        sync.Mutex
+	)
 
-		b.ctx.Log.Debug("updating benchlist",
-			zap.Stringer("nodeID", job.nodeID),
-			zap.Bool("benching", job.bench),
-		)
-		if job.bench {
-			benched.Add(job.nodeID)
-		} else {
-			benched.Remove(job.nodeID)
-		}
+	go func() {
+		for {
+			benchedLock.Lock()
+			// Unbench all nodes whose deadlines have passed.
+			for {
+				nodeID, deadline, ok := benchedTimeoutHeap.Peek()
+				if !ok || deadline.After(b.clock.Time()) {
+					break
+				}
 
-		b.numBenched.Set(float64(benched.Len()))
-		benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benched)
-		if err != nil {
-			b.ctx.Log.Error("error calculating benched stake",
-				zap.Stringer("subnetID", b.ctx.SubnetID),
-				zap.Error(err),
+				b.ctx.Log.Debug("unbenching node due to timeout",
+					zap.Stringer("nodeID", nodeID),
+				)
+
+				b.jobs.PushRight(job{
+					nodeID: nodeID,
+					bench:  false,
+				})
+			}
+			benchedLock.Unlock()
+			time.Sleep(2 * time.Second)
+		}
+	}()
+
+	go func() {
+		for {
+			job, ok := b.jobs.PopLeft()
+			if !ok {
+				return
+			}
+
+			b.ctx.Log.Debug("updating benchlist",
+				zap.Stringer("nodeID", job.nodeID),
+				zap.Bool("benching", job.bench),
 			)
-			continue
-		}
-		b.weightBenched.Set(float64(benchedStake))
 
-		// Notify the benchable of the change last so that all internal state is
-		// updated before the notification is sent.
-		if job.bench {
-			b.benchable.Benched(b.ctx.ChainID, job.nodeID)
-		} else {
-			b.benchable.Unbenched(b.ctx.ChainID, job.nodeID)
+			benchedLock.Lock()
+			if job.bench {
+				benched.Add(job.nodeID)
+				benchedTimeoutHeap.Push(job.nodeID, b.clock.Time().Add(duration))
+			} else {
+				benched.Remove(job.nodeID)
+				benchedTimeoutHeap.Remove(job.nodeID)
+			}
+
+			b.numBenched.Set(float64(benched.Len()))
+			benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benched)
+			if err != nil {
+				b.ctx.Log.Error("error calculating benched stake",
+					zap.Stringer("subnetID", b.ctx.SubnetID),
+					zap.Error(err),
+				)
+				benchedLock.Unlock()
+				continue
+			}
+			b.weightBenched.Set(float64(benchedStake))
+
+			// Notify the benchable of the change last so that all internal state is
+			// updated before the notification is sent.
+			if job.bench {
+				b.benchable.Benched(b.ctx.ChainID, job.nodeID)
+			} else {
+				b.benchable.Unbenched(b.ctx.ChainID, job.nodeID)
+			}
+			benchedLock.Unlock()
 		}
-	}
+	}()
+
 }
