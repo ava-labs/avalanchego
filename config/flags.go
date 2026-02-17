@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -190,6 +191,12 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(NetworkTCPProxyReadTimeoutKey, constants.DefaultNetworkTCPProxyReadTimeout, "Maximum duration to wait for a TCP proxy header")
 
 	fs.String(NetworkTLSKeyLogFileKey, "", "TLS key log file path. Should only be specified for debugging")
+
+	// Benchlist
+	fs.Duration(BenchlistHalflifeKey, benchlist.DefaultHalflife, "Halflife of the EWMA averager used for benchlisting")
+	fs.Float64(BenchlistUnbenchProbabilityKey, benchlist.DefaultUnbenchProbability, "EWMA failure probability below which a node is unbenched")
+	fs.Float64(BenchlistBenchProbabilityKey, benchlist.DefaultBenchProbability, "EWMA failure probability above which a node is benched")
+	fs.Duration(BenchlistDurationKey, benchlist.DefaultBenchDuration, "Max amount of time a peer is benchlisted")
 
 	// Router
 	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")

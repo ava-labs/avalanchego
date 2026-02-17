@@ -565,7 +565,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	if err := n.MetricsGatherer.Register(benchlistNamespace, benchlistReg); err != nil {
 		return err
 	}
-	n.benchlistManager = benchlist.NewManager(n.chainRouter, n.vdrs, benchlistReg)
+	n.benchlistManager = benchlist.NewManager(n.chainRouter, n.vdrs, benchlistReg, n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
 

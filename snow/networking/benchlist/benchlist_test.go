@@ -61,6 +61,12 @@ func TestBenchlist(t *testing.T) {
 		ctx,
 		benchable,
 		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      DefaultBenchDuration,
+		},
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -106,7 +112,7 @@ func TestBenchlist(t *testing.T) {
 	requireNoBenchings()
 
 	// p = 1 / 5.5
-	now = now.Add(halflife)
+	now = now.Add(DefaultHalflife)
 	b.clock.Set(now)
 
 	for range 4 {
@@ -140,13 +146,15 @@ func TestBenchlistNoDuplicateBench(t *testing.T) {
 		ctx,
 		benchable,
 		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      10 * time.Second,
+		},
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
-
-	// Use a long bench duration so the real-time timer will not fire during
-	// this test. Only the mock clock advances past the deadline.
-	b.benchDuration = 10 * time.Second
 
 	now := time.Now()
 	b.clock.Set(now)
@@ -203,12 +211,15 @@ func TestBenchlistTimeout(t *testing.T) {
 		ctx,
 		benchable,
 		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      50 * time.Millisecond,
+		},
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
-
-	// Use a short bench duration so the real-time timer fires quickly.
-	b.benchDuration = 50 * time.Millisecond
 
 	now := time.Now()
 	b.clock.Set(now)

@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
@@ -418,6 +419,15 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
 	}
 	return config, nil
+}
+
+func getBenchlistConfig(v *viper.Viper) benchlist.Config {
+	return benchlist.Config{
+		Halflife:           v.GetDuration(BenchlistHalflifeKey),
+		UnbenchProbability: v.GetFloat64(BenchlistUnbenchProbabilityKey),
+		BenchProbability:   v.GetFloat64(BenchlistBenchProbabilityKey),
+		BenchDuration:      v.GetDuration(BenchlistDurationKey),
+	}
 }
 
 func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
@@ -1329,6 +1339,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ProposerMinBlockDelay = v.GetDuration(ProposerVMMinBlockDelayKey)
 	nodeConfig.SubnetConfigs = subnetConfigs
+
+	// Benchlist
+	nodeConfig.BenchlistConfig = getBenchlistConfig(v)
 
 	// File Descriptor Limit
 	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
