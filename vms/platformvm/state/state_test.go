@@ -2432,11 +2432,11 @@ func testCurrentStakers(t *testing.T, csF func() CurrentStakers) {
 		})
 
 		t.Run("exists", func(t *testing.T) {
-			s := csF()
+			cs := csF()
 			want := newTestCurrentStaker(t)
-			require.NoError(t, s.PutCurrentValidator(want))
+			require.NoError(t, cs.PutCurrentValidator(want))
 
-			got, err := s.GetCurrentValidator(want.SubnetID, want.NodeID)
+			got, err := cs.GetCurrentValidator(want.SubnetID, want.NodeID)
 			require.NoError(t, err)
 			require.Equal(t, want, got)
 		})
