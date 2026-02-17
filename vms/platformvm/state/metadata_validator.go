@@ -20,8 +20,6 @@ import (
 // CodecVersionLen + UpDurationLen + LastUpdatedLen + PotentialRewardLen
 const preDelegateeRewardSize = codec.VersionSize + 3*wrappers.LongLen
 
-var _ validatorState = (*metadata)(nil)
-
 type preDelegateeRewardMetadata struct {
 	UpDuration      time.Duration `v0:"true"`
 	LastUpdated     uint64        `v0:"true"` // Unix time in seconds
@@ -77,72 +75,13 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 	return nil
 }
 
-type validatorState interface {
-	// LoadValidatorMetadata sets the [metadata] of [vdrID] on [subnetID].
-	// GetUptime and SetUptime will return an error if the [vdrID] and
-	// [subnetID] hasn't been loaded. This call will not result in a write to
-	// disk.
-	LoadValidatorMetadata(
-		vdrID ids.NodeID,
-		subnetID ids.ID,
-		metadata *validatorMetadata,
-	)
-
-	// GetUptime returns the current uptime measurements of [vdrID] on
-	// [subnetID].
-	GetUptime(
-		vdrID ids.NodeID,
-		subnetID ids.ID,
-	) (upDuration time.Duration, lastUpdated time.Time, err error)
-
-	// SetUptime updates the uptime measurements of [vdrID] on [subnetID].
-	// Unless these measurements are deleted first, the next call to
-	// WriteUptimes will write this update to disk.
-	SetUptime(
-		vdrID ids.NodeID,
-		subnetID ids.ID,
-		upDuration time.Duration,
-		lastUpdated time.Time,
-	) error
-
-	// GetDelegateeReward returns the current rewards accrued to [vdrID] on
-	// [subnetID].
-	GetDelegateeReward(
-		subnetID ids.ID,
-		vdrID ids.NodeID,
-	) (amount uint64, err error)
-
-	// SetDelegateeReward updates the rewards accrued to [vdrID] on [subnetID].
-	// Unless these measurements are deleted first, the next call to
-	// WriteUptimes will write this update to disk.
-	SetDelegateeReward(
-		subnetID ids.ID,
-		vdrID ids.NodeID,
-		amount uint64,
-	) error
-
-	// DeleteValidatorMetadata removes in-memory references to the metadata of
-	// [vdrID] on [subnetID]. If there were staged updates from a prior call to
-	// SetUptime or SetDelegateeReward, the updates will be dropped. This call
-	// will not result in a write to disk.
-	DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID)
-
-	// WriteValidatorMetadata writes all staged updates from prior calls to
-	// SetUptime or SetDelegateeReward.
-	WriteValidatorMetadata(
-		dbPrimary database.KeyValueWriter,
-		dbSubnet database.KeyValueWriter,
-		codecVersion uint16,
-	) error
-}
-
 type metadata struct {
 	metadata map[ids.NodeID]map[ids.ID]*validatorMetadata // vdrID -> subnetID -> metadata
 	// updatedMetadata tracks the updates since WriteValidatorMetadata was last called
 	updatedMetadata map[ids.NodeID]set.Set[ids.ID] // vdrID -> subnetIDs
 }
 
-func newValidatorState() validatorState {
+func newValidatorState() *metadata {
 	return &metadata{
 		metadata:        make(map[ids.NodeID]map[ids.ID]*validatorMetadata),
 		updatedMetadata: make(map[ids.NodeID]set.Set[ids.ID]),
