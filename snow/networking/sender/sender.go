@@ -457,7 +457,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	sent := s.sendUnlessError(log, to, msg, err)
 
 	switch {
-	case s.timeouts.IsBenched(nodeID, s.ctx.ChainID):
+	case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
 		s.failedDueToBench.With(prometheus.Labels{
 			opLabel: message.GetAncestorsOp.String(),
 		}).Inc()
@@ -524,7 +524,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	)
 	sent := s.sendUnlessError(log, to, msg, err)
 	switch {
-	case s.timeouts.IsBenched(nodeID, s.ctx.ChainID):
+	case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
 		s.failedDueToBench.With(prometheus.Labels{
 			opLabel: message.GetOp.String(),
 		}).Inc()
@@ -610,7 +610,7 @@ func (s *sender) SendPushQuery(
 	sent := s.sendUnlessError(log, to, msg, err)
 	for nodeID := range nodeIDs {
 		switch {
-		case s.timeouts.IsBenched(nodeID, s.ctx.ChainID):
+		case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
 			s.failedDueToBench.With(prometheus.Labels{
 				opLabel: message.PushQueryOp.String(),
 			}).Inc()
@@ -691,7 +691,7 @@ func (s *sender) SendPullQuery(
 	sent := s.sendUnlessError(log, to, msg, err)
 	for nodeID := range nodeIDs {
 		switch {
-		case s.timeouts.IsBenched(nodeID, s.ctx.ChainID):
+		case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
 			s.failedDueToBench.With(prometheus.Labels{
 				opLabel: message.PullQueryOp.String(),
 			}).Inc()
@@ -812,7 +812,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	sent := s.sendUnlessError(log, to, msg, err)
 	for nodeID := range nodeIDs {
 		switch {
-		case s.timeouts.IsBenched(nodeID, s.ctx.ChainID):
+		case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
 			s.failedDueToBench.With(prometheus.Labels{
 				opLabel: message.AppRequestOp.String(),
 			}).Inc()
