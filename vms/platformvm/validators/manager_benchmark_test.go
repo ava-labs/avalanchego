@@ -4,6 +4,7 @@
 package validators
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -180,7 +181,7 @@ func addSubnetDelegator(
 ) error {
 	i := rand.Intn(len(nodeIDs)) //#nosec G404
 	nodeID := nodeIDs[i]
-	s.PutCurrentDelegator(&state.Staker{
+	if err := s.PutCurrentDelegator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
 		SubnetID:        subnetID,
@@ -190,7 +191,9 @@ func addSubnetDelegator(
 		PotentialReward: 0,
 		NextTime:        endTime,
 		Priority:        txs.SubnetPermissionlessDelegatorCurrentPriority,
-	})
+	}); err != nil {
+		return fmt.Errorf("putting current delegator: %w", err)
+	}
 
 	blk, err := block.NewBanffStandardBlock(startTime, ids.GenerateTestID(), height, nil)
 	if err != nil {
