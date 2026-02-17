@@ -373,7 +373,7 @@ type stateBlk struct {
  *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
  */
 type state struct {
-	validatorState *metadata
+	validatorState *validatorState
 	validators     validators.Manager
 	ctx            *snow.Context
 	upgrades       upgrade.Config

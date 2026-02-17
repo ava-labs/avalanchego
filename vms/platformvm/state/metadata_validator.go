@@ -75,20 +75,20 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 	return nil
 }
 
-type metadata struct {
+type validatorState struct {
 	metadata map[ids.NodeID]map[ids.ID]*validatorMetadata // vdrID -> subnetID -> metadata
 	// updatedMetadata tracks the updates since WriteValidatorMetadata was last called
 	updatedMetadata map[ids.NodeID]set.Set[ids.ID] // vdrID -> subnetIDs
 }
 
-func newValidatorState() *metadata {
-	return &metadata{
+func newValidatorState() *validatorState {
+	return &validatorState{
 		metadata:        make(map[ids.NodeID]map[ids.ID]*validatorMetadata),
 		updatedMetadata: make(map[ids.NodeID]set.Set[ids.ID]),
 	}
 }
 
-func (m *metadata) LoadValidatorMetadata(
+func (m *validatorState) LoadValidatorMetadata(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
 	uptime *validatorMetadata,
@@ -101,7 +101,7 @@ func (m *metadata) LoadValidatorMetadata(
 	subnetMetadata[subnetID] = uptime
 }
 
-func (m *metadata) GetUptime(
+func (m *validatorState) GetUptime(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
 ) (time.Duration, time.Time, error) {
@@ -112,7 +112,7 @@ func (m *metadata) GetUptime(
 	return metadata.UpDuration, metadata.lastUpdated, nil
 }
 
-func (m *metadata) SetUptime(
+func (m *validatorState) SetUptime(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
 	upDuration time.Duration,
@@ -129,7 +129,7 @@ func (m *metadata) SetUptime(
 	return nil
 }
 
-func (m *metadata) GetDelegateeReward(
+func (m *validatorState) GetDelegateeReward(
 	subnetID ids.ID,
 	vdrID ids.NodeID,
 ) (uint64, error) {
@@ -140,7 +140,7 @@ func (m *metadata) GetDelegateeReward(
 	return metadata.PotentialDelegateeReward, nil
 }
 
-func (m *metadata) SetDelegateeReward(
+func (m *validatorState) SetDelegateeReward(
 	subnetID ids.ID,
 	vdrID ids.NodeID,
 	amount uint64,
@@ -155,7 +155,7 @@ func (m *metadata) SetDelegateeReward(
 	return nil
 }
 
-func (m *metadata) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
+func (m *validatorState) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 	subnetMetadata := m.metadata[vdrID]
 	delete(subnetMetadata, subnetID)
 	if len(subnetMetadata) == 0 {
@@ -169,7 +169,7 @@ func (m *metadata) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 	}
 }
 
-func (m *metadata) WriteValidatorMetadata(
+func (m *validatorState) WriteValidatorMetadata(
 	dbPrimary database.KeyValueWriter,
 	dbSubnet database.KeyValueWriter,
 	codecVersion uint16,
@@ -196,7 +196,7 @@ func (m *metadata) WriteValidatorMetadata(
 	return nil
 }
 
-func (m *metadata) addUpdatedMetadata(vdrID ids.NodeID, subnetID ids.ID) {
+func (m *validatorState) addUpdatedMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 	updatedSubnetMetadata, ok := m.updatedMetadata[vdrID]
 	if !ok {
 		updatedSubnetMetadata = set.Set[ids.ID]{}
