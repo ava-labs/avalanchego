@@ -177,6 +177,7 @@ func (b *benchlist) run() {
 					zap.Stringer("nodeID", nodeID),
 				)
 
+				benchedTimeoutHeap.Pop()
 				b.jobs.PushRight(job{
 					nodeID: nodeID,
 					bench:  false,
