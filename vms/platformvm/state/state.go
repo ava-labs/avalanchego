@@ -1002,12 +1002,26 @@ func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 }
 
 func (s *state) PutCurrentValidator(staker *Staker) error {
+	_, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	if err == nil {
+		return errDuplicateValidator
+	}
+
+	if !errors.Is(err, database.ErrNotFound) {
+		return err
+	}
+
 	s.currentStakers.PutValidator(staker)
 	return nil
 }
 
-func (s *state) DeleteCurrentValidator(staker *Staker) {
+func (s *state) DeleteCurrentValidator(staker *Staker) error {
+	if _, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
+		return err
+	}
+
 	s.currentStakers.DeleteValidator(staker)
+	return nil
 }
 
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {

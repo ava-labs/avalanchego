@@ -14,7 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/iterator"
 )
 
-var ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
+var (
+	ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
+	errDuplicateValidator        = errors.New("duplicate validator")
+)
 
 type Stakers interface {
 	CurrentStakers
@@ -37,7 +40,7 @@ type CurrentStakers interface {
 	// the staker set.
 	//
 	// Invariant: [staker] is currently a CurrentValidator
-	DeleteCurrentValidator(staker *Staker)
+	DeleteCurrentValidator(staker *Staker) error
 
 	// SetDelegateeReward sets the accrued delegation rewards for [nodeID] on
 	// [subnetID] to [amount].

@@ -217,7 +217,9 @@ func advanceTimeTo(
 			break
 		}
 
-		changes.DeleteCurrentValidator(stakerToRemove)
+		if err := changes.DeleteCurrentValidator(stakerToRemove); err != nil {
+			return nil, false, fmt.Errorf("deleting current validator: %w", err)
+		}
 		changed = true
 	}
 

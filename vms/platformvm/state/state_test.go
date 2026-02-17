@@ -987,7 +987,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 			})
 		}
 		for _, removed := range diff.removedValidators {
-			d.DeleteCurrentValidator(&removed)
+			require.NoError(d.DeleteCurrentValidator(&removed))
 
 			expectedValidators.Remove(subnetIDNodeID{
 				subnetID: removed.SubnetID,
@@ -2402,5 +2402,94 @@ func TestGetCurrentValidators(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCurrentStakers(t *testing.T) {
+	t.Run("base", func(t *testing.T) {
+		testCurrentStakers(t, func() CurrentStakers {
+			return newTestState(t, memdb.New())
+		})
+	})
+
+	t.Run("diff", func(t *testing.T) {
+		testCurrentStakers(t, func() CurrentStakers {
+			diff, err := NewDiffOn(newTestState(t, memdb.New()))
+			require.NoError(t, err)
+
+			return diff
+		})
+	})
+}
+
+func testCurrentStakers(t *testing.T, csF func() CurrentStakers) {
+	t.Run("get current validator", func(t *testing.T) {
+		t.Run("does not exist", func(t *testing.T) {
+			cs := csF()
+
+			_, err := cs.GetCurrentValidator(ids.Empty, ids.EmptyNodeID)
+			require.ErrorIs(t, err, database.ErrNotFound)
+		})
+
+		t.Run("exists", func(t *testing.T) {
+			s := csF()
+			want := newTestCurrentStaker(t)
+			require.NoError(t, s.PutCurrentValidator(want))
+
+			got, err := s.GetCurrentValidator(want.SubnetID, want.NodeID)
+			require.NoError(t, err)
+			require.Equal(t, want, got)
+		})
+	})
+
+	t.Run("put current validator", func(t *testing.T) {
+		t.Run("does not exist", func(t *testing.T) {
+			cs := csF()
+
+			staker := newTestCurrentStaker(t)
+			require.NoError(t, cs.PutCurrentValidator(staker))
+		})
+
+		t.Run("exists", func(t *testing.T) {
+			cs := csF()
+
+			staker := newTestCurrentStaker(t)
+			require.NoError(t, cs.PutCurrentValidator(staker))
+			require.ErrorIs(t, cs.PutCurrentValidator(staker), errDuplicateValidator)
+		})
+	})
+
+	t.Run("delete current validator", func(t *testing.T) {
+		t.Run("does not exist", func(t *testing.T) {
+			cs := csF()
+
+			staker := newTestCurrentStaker(t)
+			require.ErrorIs(t, cs.DeleteCurrentValidator(staker), database.ErrNotFound)
+		})
+
+		t.Run("exists", func(t *testing.T) {
+			cs := csF()
+
+			staker := newTestCurrentStaker(t)
+			require.NoError(t, cs.PutCurrentValidator(staker))
+			require.NoError(t, cs.DeleteCurrentValidator(staker))
+		})
+	})
+}
+
+func newTestCurrentStaker(t *testing.T) *Staker {
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+
+	return &Staker{
+		TxID:            ids.GenerateTestID(),
+		NodeID:          ids.GenerateTestNodeID(),
+		PublicKey:       sk.PublicKey(),
+		SubnetID:        ids.GenerateTestID(),
+		Weight:          1,
+		StartTime:       time.Time{},
+		EndTime:         time.Time{}.Add(time.Second),
+		PotentialReward: 2,
+		NextTime:        time.Time{}.Add(time.Second),
 	}
 }

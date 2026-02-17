@@ -405,7 +405,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	require.Equal(currentValidator, gotCurrentValidator)
 
 	// Delete the current validator
-	d.DeleteCurrentValidator(currentValidator)
+	require.NoError(d.DeleteCurrentValidator(currentValidator))
 
 	// Make sure the deletion worked
 	state.EXPECT().GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID).Return(nil, database.ErrNotFound).Times(1)

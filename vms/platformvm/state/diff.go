@@ -307,11 +307,25 @@ func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, e
 }
 
 func (d *diff) PutCurrentValidator(staker *Staker) error {
+	_, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	if err == nil {
+		return errDuplicateValidator
+	}
+
+	if !errors.Is(err, database.ErrNotFound) {
+		return err
+	}
+
 	return d.currentStakerDiffs.PutValidator(staker)
 }
 
-func (d *diff) DeleteCurrentValidator(staker *Staker) {
+func (d *diff) DeleteCurrentValidator(staker *Staker) error {
+	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
+		return err
+	}
+
 	d.currentStakerDiffs.DeleteValidator(staker)
+	return nil
 }
 
 func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
@@ -600,7 +614,9 @@ func (d *diff) Apply(baseState Chain) error {
 					return err
 				}
 			case deleted:
-				baseState.DeleteCurrentValidator(validatorDiff.validator)
+				if err := baseState.DeleteCurrentValidator(validatorDiff.validator); err != nil {
+					return fmt.Errorf("deleting current validator: %w", err)
+				}
 			}
 
 			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)

@@ -146,9 +146,10 @@ func (mr *MockDiffMockRecorder) DeleteCurrentDelegator(staker any) *gomock.Call 
 }
 
 // DeleteCurrentValidator mocks base method.
-func (m *MockDiff) DeleteCurrentValidator(staker *Staker) {
+func (m *MockDiff) DeleteCurrentValidator(staker *Staker) error {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "DeleteCurrentValidator", staker)
+	return nil
 }
 
 // DeleteCurrentValidator indicates an expected call of DeleteCurrentValidator.
