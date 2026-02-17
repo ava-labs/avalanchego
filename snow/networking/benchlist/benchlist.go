@@ -36,16 +36,6 @@ const (
 // to a query. If a node is projected to fail, it is "benched". While it is
 // benched, queries to that node fail immediately to avoid waiting up to the
 // full network timeout.
-type Benchlist interface {
-	// RegisterResponse registers the response to a query message
-	RegisterResponse(nodeID ids.NodeID)
-	// RegisterFailure registers that we didn't receive a response within the timeout
-	RegisterFailure(nodeID ids.NodeID)
-	// IsBenched returns true if messages to [validatorID]
-	// should not be sent over the network and should immediately fail.
-	IsBenched(nodeID ids.NodeID) bool
-}
-
 type benchlist struct {
 	ctx       *snow.ConsensusContext
 	benchable Benchable
