@@ -49,7 +49,7 @@ done
 
 # Validate that the derived list matches actual go.mod files in the repo.
 # Excludes utility modules (tools/) that are not part of the release.
-mapfile -t actual < <(vcs_ls_files 'go.mod' '*/go.mod' | grep -v '^tools/' | sort)
+mapfile -t actual < <(vcs_ls_files 'go.mod' '**/go.mod' | grep -v '^tools/' | sort)
 expected="$(printf '%s\n' "${GO_MODS[@]}" | sort)"
 actual_str="$(printf '%s\n' "${actual[@]}")"
 

@@ -20,14 +20,19 @@
 
 set -euo pipefail
 
+# Wrapper that disables the pager so scripted jj commands never block on
+# interactive output. All jj invocations in this file MUST use _jj instead
+# of calling jj directly.
+_jj() { command jj --config 'ui.paginate="never"' "$@"; }
+
 # Returns true if running inside a jj repository. Falls back to git if jj
 # is not installed or the current directory is not inside a jj repo.
-_vcs_is_jj() { command -v jj >/dev/null 2>&1 && jj root --quiet >/dev/null 2>&1; }
+_vcs_is_jj() { command -v jj >/dev/null 2>&1 && _jj root --quiet >/dev/null 2>&1; }
 
 # Full commit hash of the current revision.
 vcs_commit_hash() {
   if _vcs_is_jj; then
-    jj log --no-graph -r @ -T 'commit_id' 2>/dev/null
+    _jj log --no-graph -r @ -T 'commit_id' 2>/dev/null
   else
     git rev-parse HEAD
   fi
@@ -47,7 +52,7 @@ vcs_branch_or_tag() {
   local name=""
   if _vcs_is_jj; then
     # Prefer the first bookmark pointing at the current revision
-    name="$(jj log --no-graph -r @ -T 'bookmarks.map(|b| b.name()).join(",")' 2>/dev/null)"
+    name="$(_jj log --no-graph -r @ -T 'bookmarks.map(|b| b.name()).join(",")' 2>/dev/null)"
     # Take the first bookmark if multiple exist
     name="${name%%,*}"
   else
@@ -65,7 +70,7 @@ vcs_branch_or_tag() {
 # Repository root directory.
 vcs_repo_root() {
   if _vcs_is_jj; then
-    jj root 2>/dev/null
+    _jj root 2>/dev/null
   else
     git rev-parse --show-toplevel
   fi
@@ -76,7 +81,7 @@ vcs_is_clean() {
   if _vcs_is_jj; then
     # jj considers a revision "empty" when there are no changes
     local empty
-    empty="$(jj log --no-graph -r @ -T 'empty' 2>/dev/null)"
+    empty="$(_jj log --no-graph -r @ -T 'empty' 2>/dev/null)"
     [[ "${empty}" == "true" ]]
   else
     test -z "$(git status --porcelain)"
@@ -86,7 +91,7 @@ vcs_is_clean() {
 # Show changed files (short summary).
 vcs_status_short() {
   if _vcs_is_jj; then
-    jj diff --summary 2>/dev/null
+    _jj diff --summary 2>/dev/null
   else
     git status --short
   fi
@@ -117,9 +122,9 @@ vcs_ls_files() {
       jj_args+=("glob:${pattern}")
     done
     if [[ "${nul_delimited}" == true ]]; then
-      jj file list "${jj_args[@]}" 2>/dev/null | tr '\n' '\0'
+      _jj file list "${jj_args[@]}" 2>/dev/null | tr '\n' '\0'
     else
-      jj file list "${jj_args[@]}" 2>/dev/null
+      _jj file list "${jj_args[@]}" 2>/dev/null
     fi
   else
     if [[ "${nul_delimited}" == true ]]; then

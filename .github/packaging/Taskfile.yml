@@ -6,10 +6,20 @@
 version: '3'
 
 vars:
-  # Repo root, computed from this Taskfile's location so that the
-  # packaging Taskfile works both as an include and standalone.
+  # Repo root. When included, ROOT_DIR is the entry Taskfile's
+  # directory (= repo root). When run standalone from .github/packaging,
+  # ROOT_DIR is .github/packaging, so we fall back to TASKFILE_DIR/../..
+  # We check for scripts/vcs.sh to detect which case we're in.
   REPO_ROOT:
-    sh: cd "{{.TASKFILE_DIR}}/../.." && pwd
+    sh: |
+      for candidate in "{{.ROOT_DIR}}" "$(cd "{{.TASKFILE_DIR}}/../.." && pwd)"; do
+        if [ -f "$candidate/scripts/vcs.sh" ]; then
+          echo "$candidate"
+          exit 0
+        fi
+      done
+      echo "Error: cannot locate repo root" >&2
+      exit 1
   # Go version from the project's go.mod.
   PACKAGING_GO_VERSION:
     sh: go list -m -f '{{ "{{.GoVersion}}" }}' | head -1
