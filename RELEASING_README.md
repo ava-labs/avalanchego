@@ -456,20 +456,78 @@ External consumers can then `go get github.com/ava-labs/avalanchego@v0.0.0-mybra
 
 ### `tags-update-require-directives`
 
-Updates `require` directives in all go.mod files to reference the
-specified version. Version must match `vX.Y.Z` or `vX.Y.Z-suffix`.
+Updates `require` directives in all go.mod files to reference the specified
+version. Version must match `vX.Y.Z` or `vX.Y.Z-suffix`.
 
 ### `tags-create`
 
-Creates signed tags for the main module and all submodules at the current
-commit. Pass `--no-sign` for unsigned tags (e.g., development tags).
+Creates signed tags for the main module and all submodules at the current commit. Pass
+`--no-sign` for unsigned tags (e.g., development tags).
 
 ### `tags-push`
 
-Pushes tags for the main module and all submodules. Set `GIT_REMOTE` to
-override the default remote (`origin`).
+Pushes tags for the main module and all submodules, then verifies all tags exist on
+the remote. Set `GIT_REMOTE` to override the default remote (`origin`).
+
+### `tags-verify-remote`
+
+Verifies that tags for the main module and all submodules exist on the
+remote. Automatically run at the end of `tags-push`, but can be run standalone to
+re-check.
 
 ### `check-require-directives`
 
-Verifies that all internal module `require` directives across go.mod files
-reference the same version.
+Verifies that all internal module `require` directives across go.mod files reference
+the same version.
+
+## Troubleshooting
+
+### Partial Tag Creation
+
+If `tags-create` fails after creating some tags (e.g. due to GPG signing error), the
+remaining tags won't exist. The script checks for existing tags before creating any,
+so re-running it will fail with details on which tags already exist.
+
+To recover, delete the partially created tags and re-run:
+
+```bash
+# The error output lists existing tags. Delete them:
+git tag -d v1.14.1 graft/evm/v1.14.1
+# Then re-run:
+./scripts/run_task.sh tags-create -- "$VERSION"
+```
+
+### Tag Push Failure
+
+If `tags-push` fails partway through (e.g., network error), some tags may have been
+pushed while others haven't. The script validates all tags exist locally before
+pushing, but cannot guarantee atomic remote delivery.
+
+To recover, simply re-run the push — git push is idempotent for tags that already
+exist at the correct commit:
+
+```bash
+./scripts/run_task.sh tags-push -- "$VERSION"
+```
+
+If a tag was pushed pointing to the wrong commit, delete the remote tag and re-push:
+
+```bash
+git push origin :refs/tags/graft/evm/v1.14.1
+./scripts/run_task.sh tags-push -- "$VERSION"
+```
+
+### Require Directive Update Failure
+
+If `tags-update-require-directives` fails partway through, some go.mod files may have
+been updated while others haven't. The consistency check will catch this:
+
+```bash
+./scripts/run_task.sh check-require-directives
+```
+
+To recover, re-run the update — it's idempotent:
+
+```bash
+./scripts/run_task.sh tags-update-require-directives -- "$VERSION"
+```

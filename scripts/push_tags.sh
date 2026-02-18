@@ -13,6 +13,11 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    sed -n '2,/^$/{ s/^# \?//; p }' "$0"
+    exit 0
+fi
+
 VERSION="${1:?Usage: push_tags.sh <version>}"
 REMOTE="${GIT_REMOTE:-origin}"
 

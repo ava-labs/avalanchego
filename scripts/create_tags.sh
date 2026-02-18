@@ -15,6 +15,11 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    sed -n '2,/^$/{ s/^# \?//; p }' "$0"
+    exit 0
+fi
+
 SIGN_FLAG="-s"
 if [[ "${1:-}" == "--no-sign" ]]; then
     SIGN_FLAG=""

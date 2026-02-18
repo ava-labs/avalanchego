@@ -10,6 +10,11 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    sed -n '2,/^$/{ s/^# \?//; p }' "$0"
+    exit 0
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/scripts/lib_go_modules.sh"
 
@@ -23,11 +28,10 @@ fi
 echo "Updating require directives to $VERSION"
 for go_mod in "${GO_MODS[@]}"; do
     echo "  $go_mod"
+    # Parse requires from go.mod and update any that reference internal modules
+    requires=$(go mod edit -json "$go_mod" | jq -r '.Require[]? | .Path')
     for module in "${MODULE_PATHS[@]}"; do
-        # Only update if the module is already required
-        # Escape dots for regex and match module followed by whitespace (space or tab)
-        module_pattern="${module//./\\.}"
-        if grep -qE "[[:space:]]${module_pattern}[[:space:]]" "$go_mod" 2>/dev/null; then
+        if echo "$requires" | grep -qxF "$module"; then
             go mod edit -require="${module}@${VERSION}" "$go_mod"
         fi
     done

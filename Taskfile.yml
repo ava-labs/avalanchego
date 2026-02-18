@@ -102,6 +102,12 @@ tasks:
     desc: Checks that internal module require directives reference the same version
     cmd: ./scripts/check_require_directives.sh
 
+  check-require-directives-round-trip:
+    desc: Validates that update_require_directives.sh is idempotent (requires a clean git working tree)
+    cmds:
+      - ./scripts/check_require_directives_round_trip.sh
+      - task: check-clean-branch
+
   check-go-mod-tidy:
     desc: Checks that go module configuration is consistent (requires a clean git working tree)
     cmds:
@@ -190,6 +196,7 @@ tasks:
       - lint-action
       - lint-shell
       - check-require-directives
+      - check-require-directives-round-trip
       - check-go-mod-tidy
       - check-go-version
 
@@ -200,6 +207,7 @@ tasks:
       - task: lint-action
       - task: lint-shell
       - task: check-require-directives
+      - task: check-require-directives-round-trip
       - task: check-go-mod-tidy
       - task: check-go-version
 
@@ -365,8 +373,10 @@ tasks:
     cmd: ./scripts/create_tags.sh {{.CLI_ARGS}}
 
   tags-push:
-    desc: Pushes tags for avalanchego and submodules
-    cmd: ./scripts/push_tags.sh {{.CLI_ARGS}}
+    desc: Pushes tags for avalanchego and submodules and verifies delivery
+    cmds:
+      - ./scripts/push_tags.sh {{.CLI_ARGS}}
+      - ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}
 
   tags-update-require-directives:
     desc: Updates require directives for avalanchego modules
@@ -374,6 +384,10 @@ tasks:
       - ./scripts/update_require_directives.sh {{.CLI_ARGS}}
       - task: go-mod-tidy
       - task: check-require-directives
+
+  tags-verify-remote:
+    desc: Verifies tags for avalanchego and submodules exist on the remote
+    cmd: ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}
 
   test-upgrade:
     desc: Runs upgrade tests
