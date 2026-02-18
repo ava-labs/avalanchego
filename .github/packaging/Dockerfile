@@ -20,7 +20,7 @@ ARG TARGETARCH
 RUN dnf install -y \
         gcc \
         gnupg2 \
-        git \
+        git \ # vcs-ok: package install, not a command invocation
     && dnf clean all
 
 # Install Go (with SHA256 verification)

@@ -30,7 +30,7 @@ mapfile -t scripts < <(
   } | sort -u
 )
 if [[ ${#scripts[@]} -eq 0 ]]; then
-  echo "Error: no .sh files found (are you in the repository root?)" >&2
+  echo "Error: no .sh files found" >&2
   exit 1
 fi
 
@@ -43,7 +43,7 @@ mapfile -t taskfiles < <(
   } | sort -u
 )
 if [[ ${#taskfiles[@]} -eq 0 ]]; then
-  echo "Error: no Taskfile.yml files found (are you in the repository root?)" >&2
+  echo "Error: no Taskfile.yml files found" >&2
   exit 1
 fi
 
@@ -97,6 +97,49 @@ for script in "${scripts[@]}"; do
     fi
     prev_line="$line"
   done < "$script"
+done
+
+# Also find Dockerfiles whose RUN blocks may contain git/jj usage.
+# shellcheck disable=SC2035
+mapfile -t dockerfiles < <(
+  {
+    find * -name 'Dockerfile*' -type f -print
+    find .github -name 'Dockerfile*' -type f 2>/dev/null || true
+  } | sort -u
+)
+if [[ ${#dockerfiles[@]} -eq 0 ]]; then
+  echo "Error: no Dockerfiles found" >&2
+  exit 1
+fi
+
+# Check Dockerfiles for direct git/jj usage. Scans lines the same way
+# as shell scripts; the vcs-ok whitelist handles any false positives
+# from non-command contexts (e.g., package installs).
+for dockerfile in "${dockerfiles[@]}"; do
+  line_num=0
+  prev_line=""
+  while IFS= read -r line; do
+    line_num=$((line_num + 1))
+
+    # Skip whitelisted lines (same line or preceding line)
+    if [[ "$line" == *"# vcs-ok:"* ]] || [[ "$prev_line" == *"# vcs-ok:"* ]]; then
+      prev_line="$line"
+      continue
+    fi
+
+    # Skip pure comment lines (no code before the #)
+    stripped="${line#"${line%%[![:space:]]*}"}"
+    if [[ "$stripped" == \#* ]]; then
+      prev_line="$line"
+      continue
+    fi
+
+    if echo "$line" | grep -qE '(^|[|;&`(! ])[ \t]*(git|jj)( |$)'; then
+      echo "${dockerfile}:${line_num}: ${line}"
+      violations=$((violations + 1))
+    fi
+    prev_line="$line"
+  done < "$dockerfile"
 done
 
 # Check Taskfile.yml sh: blocks for direct git/jj usage. Scans lines
