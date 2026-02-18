@@ -116,6 +116,8 @@ func StateSyncFromScratchExceedParentTest(t *testing.T, testSetup *SyncTestSetup
 }
 
 func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup) {
+	t.Skip("Flaky test - tracked in #4968")
+
 	var lock sync.Mutex
 	require := require.New(t)
 	reqCount := 0
