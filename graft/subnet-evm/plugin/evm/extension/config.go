@@ -8,19 +8,18 @@ import (
 	"errors"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -28,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 var (
@@ -75,7 +75,7 @@ type InnerVM interface {
 // ExtendedBlock is a block that can be used by the extension
 type ExtendedBlock interface {
 	snowman.Block
-	GetEthBlock() *types.Block
+	GetEthBlock() *ethtypes.Block
 	GetBlockExtension() BlockExtension
 }
 
@@ -135,7 +135,7 @@ type Config struct {
 	SyncSummaryProvider message.SyncSummaryProvider
 	// SyncExtender can extend the syncer to handle custom sync logic.
 	// It's optional and can be nil
-	SyncExtender sync.Extender
+	SyncExtender types.Extender
 	// BlockExtender allows the VM extension to create an extension to handle block processing events.
 	// It's optional and can be nil
 	BlockExtender BlockExtender

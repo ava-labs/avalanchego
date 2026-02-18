@@ -77,7 +77,7 @@ tasks:
   generate-bindings:
     desc: Generates Go bindings from Solidity contracts (searches for all compile.go files)
     cmds:
-      - cmd: find . -type f \( -name '*.abi' -o -name '*.bin' \) ! -path '*/artifacts/*' ! -path '*/setup-solc_downloads/*' ! -path '*/contracts/*' | xargs -r rm
+      - cmd: find . -type f \( -name '*.abi' -o -name '*.bin' \) ! -path '*/artifacts/*' ! -path '*/contracts/*' | xargs -r rm
       - cmd: find . -type f -name 'compile.go' -execdir go generate {} \;
 
   lint:
@@ -110,7 +110,7 @@ tasks:
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
-    cmd: ./scripts/shellcheck.sh 
+    cmd: ../../scripts/shellcheck.sh
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
