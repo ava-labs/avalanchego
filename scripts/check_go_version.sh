@@ -10,6 +10,9 @@ if ! [[ "$0" =~ scripts/check_go_version.sh ]]; then
   exit 255
 fi
 
+# shellcheck source=scripts/vcs.sh
+source "$(dirname "${BASH_SOURCE[0]}")/vcs.sh"
+
 # Reference version from go.work
 reference=$(go work edit -json go.work | jq -r .Go)
 
@@ -21,7 +24,7 @@ while IFS= read -r -d '' mod_file; do
   if [[ "$version" != "$reference" ]]; then
     mismatches+=("$mod_file: $version")
   fi
-done < <(git ls-files -z 'go.mod' '*/go.mod')
+done < <(vcs_ls_files -z 'go.mod' '*/go.mod')
 
 # Check nix version
 nix_file="nix/go/default.nix"
