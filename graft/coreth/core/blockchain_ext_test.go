@@ -6,8 +6,6 @@ package core
 import (
 	"fmt"
 	"math/big"
-	"os"
-	"path/filepath"
 	"slices"
 	"testing"
 
@@ -25,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap4"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -153,63 +152,6 @@ var reexecTests = []ReexecTest{
 	},
 }
 
-func copyMemDB(db ethdb.Database) (ethdb.Database, error) {
-	newDB := rawdb.NewMemoryDatabase()
-	iter := db.NewIterator(nil, nil)
-	defer iter.Release()
-	for iter.Next() {
-		if err := newDB.Put(iter.Key(), iter.Value()); err != nil {
-			return nil, err
-		}
-	}
-
-	return newDB, nil
-}
-
-// copyDir recursively copies all files and folders from a directory [src] to a
-// new temporary directory and returns the path to the new directory.
-func copyDir(t *testing.T, src string) string {
-	t.Helper()
-
-	if src == "" {
-		return ""
-	}
-
-	dst := t.TempDir()
-	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Calculate the relative path from src
-		relPath, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-
-		// Skip the root directory itself
-		if relPath == "." {
-			return nil
-		}
-
-		dstPath := filepath.Join(dst, relPath)
-
-		if info.IsDir() {
-			return os.MkdirAll(dstPath, info.Mode().Perm())
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		return os.WriteFile(dstPath, data, info.Mode().Perm())
-	})
-
-	require.NoError(t, err)
-	return dst
-}
-
 // checkBlockChainState creates a new BlockChain instance and checks that exporting each block from
 // genesis to last accepted from the original instance yields the same last accepted block and state
 // root.
@@ -255,9 +197,8 @@ func checkBlockChainState(
 	require.NoErrorf(checkState(acceptedState), "Check state failed for newly generated blockchain")
 
 	// Copy the database over to prevent any issues when re-using [originalDB] after this call.
-	originalDB, err = copyMemDB(originalDB)
-	require.NoError(err)
-	newChainDataDir := copyDir(t, oldChainDataDir)
+	originalDB = utilstest.CopyEthDB(t, originalDB)
+	newChainDataDir := utilstest.CopyDir(t, oldChainDataDir)
 	restartedChain, err := create(originalDB, gspec, lastAcceptedBlock.Hash(), newChainDataDir)
 	require.NoError(err)
 	defer restartedChain.Stop()
@@ -1702,7 +1643,7 @@ func ReexecCorruptedStateTest(t *testing.T, create ReexecTestFunc) {
 	blockchain.Stop()
 
 	// Restart blockchain with existing state
-	newDir := copyDir(t, tempDir) // avoid file lock
+	newDir := utilstest.CopyDir(t, tempDir) // avoid file lock
 	restartedBlockchain, err := create(chainDB, gspec, chain[1].Hash(), newDir, 4096)
 	require.NoError(t, err)
 	defer restartedBlockchain.Stop()
