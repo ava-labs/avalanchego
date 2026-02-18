@@ -108,6 +108,16 @@ tasks:
     desc: Checks that go version directives are consistent across all modules
     cmd: ./scripts/check_go_version.sh
 
+  check-require-directives:
+    desc: Checks that internal module require directives reference the same version
+    cmd: ./scripts/check_require_directives.sh
+
+  check-require-directives-round-trip:
+    desc: Validates that update_require_directives.sh is idempotent (requires a clean git working tree)
+    cmds:
+      - ./scripts/check_require_directives_round_trip.sh
+      - task: check-clean-branch
+
   create-kind-cluster:
     desc: Creates the default kind cluster
     cmd: bash -x ./scripts/start_kind_cluster.sh {{.CLI_ARGS}}
@@ -187,6 +197,8 @@ tasks:
       - lint-shell
       - check-go-mod-tidy
       - check-go-version
+      - check-require-directives
+      - check-require-directives-round-trip
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -196,6 +208,8 @@ tasks:
       - task: lint-shell
       - task: check-go-mod-tidy
       - task: check-go-version
+      - task: check-require-directives
+      - task: check-require-directives-round-trip
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
@@ -291,14 +305,15 @@ tasks:
     cmds:
       - cmd: bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}
 
-  # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
+  # test-fuzz targets a single package as a smoke test for fuzz infrastructure.
+  # For comprehensive fuzzing, use test-fuzz-long FUZZTIME=[value in seconds].
   # A value of `-1` will run until it encounters a failing output.
 
   test-fuzz:
-    desc: Runs each fuzz test for 10 seconds
+    desc: Smoke tests fuzz infrastructure with a quick package
     vars:
       FUZZTIME: '{{.FUZZTIME| default "10"}}'
-    cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}}
+    cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}} ./utils/cb58
 
   test-fuzz-long:
     desc: Runs each fuzz test for 180 seconds
@@ -352,6 +367,27 @@ tasks:
       NO_SHUFFLE: TRUE # Allows caching
       NO_RACE: TRUE    # Tests are much faster without race detection
     cmd: bash ./scripts/build_test.sh
+
+  tags-create:
+    desc: Creates tags for avalanchego and submodules
+    cmd: ./scripts/create_tags.sh {{.CLI_ARGS}}
+
+  tags-push:
+    desc: Pushes tags for avalanchego and submodules and verifies delivery
+    cmds:
+      - ./scripts/push_tags.sh {{.CLI_ARGS}}
+      - ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}
+
+  tags-update-require-directives:
+    desc: Updates require directives for avalanchego modules
+    cmds:
+      - ./scripts/update_require_directives.sh {{.CLI_ARGS}}
+      - task: go-mod-tidy
+      - task: check-require-directives
+
+  tags-verify-remote:
+    desc: Verifies tags for avalanchego and submodules exist on the remote
+    cmd: ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}
 
   test-upgrade:
     desc: Runs upgrade tests
