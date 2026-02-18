@@ -40,6 +40,7 @@ function build_antithesis_images {
   local target_path=$8
   local node_only=${9:-}
   local avalanchego_commit=${10:-}
+  local uninstrumented_node_target=${11:-}
 
   # Define image names
   if [[ -n "${image_prefix}" ]]; then
@@ -85,8 +86,15 @@ function build_antithesis_images {
   # Ensure the correct node image name is configured
   docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=${AVALANCHEGO_NODE_IMAGE}"
 
+  # When building uninstrumented (arm64) with the unified Dockerfile, specify the target stage.
+  local target_flag=""
+  if [[ "$(go env GOARCH)" == "arm64" && -n "${uninstrumented_node_target}" ]]; then
+    target_flag="--target=${uninstrumented_node_target}"
+  fi
+
   # Build node image first to allow the workload image to use it.
-  ${docker_cmd} -t "${node_image_name}" -f "${node_dockerfile}" "${target_path}"
+  # shellcheck disable=SC2086 # target_flag intentionally unquoted to expand to nothing when empty
+  ${docker_cmd} ${target_flag} -t "${node_image_name}" -f "${node_dockerfile}" "${target_path}"
 
   if [[ -n "${node_only}" ]]; then
     # Skip building the config and workload images. Supports building the avalanchego node image as the

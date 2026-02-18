@@ -9,6 +9,8 @@ SUBNET_EVM_PATH=$(
   cd "$(dirname "${BASH_SOURCE[0]}")"
   cd .. && pwd
 )
+AVALANCHE_PATH=$(cd "$SUBNET_EVM_PATH" && cd ../.. && pwd)
+
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
@@ -16,8 +18,7 @@ build_and_test() {
   local imagename="${1}"
   local vm_id="${2}"
   local multiarch_image="${3}"
-  # The local image name will be used to build a local image if the
-  # current avalanchego version lacks a published image.
+  # The local image name will be used to build a local avalanchego image.
   local avalanchego_local_image_name="${4}"
 
   if [[ "${multiarch_image}" == true ]]; then
@@ -29,14 +30,27 @@ build_and_test() {
     local arches="linux/$host_arch"
   fi
 
-  local imgtag="testtag"
+  local build_multi_arch=""
+  if [[ "$arches" == *,* ]]; then
+    build_multi_arch=1
+  fi
 
-  PLATFORMS="${arches}" \
-    BUILD_IMAGE_ID="${imgtag}" \
-    VM_ID=$"${vm_id}" \
-    IMAGE_NAME="${imagename}" \
-    AVALANCHEGO_LOCAL_IMAGE_NAME="${avalanchego_local_image_name}" \
-    ./scripts/build_docker_image.sh
+  # Build avalanchego base image first
+  SKIP_BUILD_RACE=1 \
+    DOCKER_IMAGE="${avalanchego_local_image_name}" \
+    BUILD_MULTI_ARCH="${build_multi_arch}" \
+    PLATFORMS="${arches}" \
+    "${AVALANCHE_PATH}"/scripts/build_image.sh
+
+  # Build subnet-evm image on top
+  # shellcheck disable=SC2154
+  TARGET=subnet-evm \
+    DOCKER_IMAGE="${imagename}" \
+    VM_ID="${vm_id}" \
+    AVALANCHEGO_NODE_IMAGE="${avalanchego_local_image_name}:${image_tag}" \
+    BUILD_MULTI_ARCH="${build_multi_arch}" \
+    PLATFORMS="${arches}" \
+    "${AVALANCHE_PATH}"/scripts/build_image.sh
 
   echo "listing images"
   docker images
@@ -44,14 +58,14 @@ build_and_test() {
   # Check all of the images expected to have been built
   # shellcheck disable=SC2154
   local target_images=(
-    "$imagename:$imgtag"
+    "$imagename:$image_tag"
     "$imagename:$commit_hash"
   )
   IFS=',' read -r -a archarray <<<"$arches"
   for arch in "${archarray[@]}"; do
     for target_image in "${target_images[@]}"; do
-      echo "checking sanity of image $target_image for $arch by running '${VM_ID} version'"
-      docker run -t --rm --platform "$arch" "$target_image" /avalanchego/build/plugins/"${VM_ID}" --version
+      echo "checking sanity of image $target_image for $arch by running '${vm_id} version'"
+      docker run -t --rm --platform "$arch" "$target_image" /avalanchego/build/plugins/"${vm_id}" --version
     done
   done
 }
