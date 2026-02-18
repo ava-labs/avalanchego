@@ -95,27 +95,24 @@ type proposalMeta struct {
 }
 
 type TrieDBConfig struct {
-	DatabaseDir          string
-	CacheSizeBytes       uint
-	FreeListCacheEntries uint
-	RevisionsInMemory    uint // must be >= 2
-	CacheStrategy        ffi.CacheStrategy
-	Archive              bool
+	DatabaseDir       string
+	CacheSizeBytes    uint
+	RevisionsInMemory uint // must be >= 2
+	CacheStrategy     ffi.CacheStrategy
+	Archive           bool
 }
 
 // DefaultConfig returns a sensible TrieDBConfig with the given directory.
 // The default config is:
 //   - CacheSizeBytes: 1MB
-//   - FreeListCacheEntries: 40,000
 //   - RevisionsInMemory: 100
 //   - CacheStrategy: [ffi.CacheAllReads]
 func DefaultConfig(dir string) TrieDBConfig {
 	return TrieDBConfig{
-		DatabaseDir:          dir,
-		CacheSizeBytes:       1024 * 1024, // 1MB
-		FreeListCacheEntries: 40_000,
-		RevisionsInMemory:    100,
-		CacheStrategy:        ffi.CacheAllReads,
+		DatabaseDir:       dir,
+		CacheSizeBytes:    1024 * 1024, // 1MB
+		RevisionsInMemory: 100,
+		CacheStrategy:     ffi.CacheAllReads,
 	}
 }
 
@@ -139,7 +136,6 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	path := filepath.Join(config.DatabaseDir, firewoodDir)
 	options := []ffi.Option{
 		ffi.WithNodeCacheEntries(config.CacheSizeBytes / 256), // TODO(#4750): is 256 bytes per node a good estimate?
-		ffi.WithFreeListCacheEntries(config.FreeListCacheEntries),
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithReadCacheStrategy(config.CacheStrategy),
 	}
