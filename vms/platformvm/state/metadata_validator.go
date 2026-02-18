@@ -29,20 +29,21 @@ type preDelegateeRewardMetadata struct {
 }
 
 type validatorMetadata struct {
-	UpDuration               time.Duration `v0:"true"`
-	LastUpdated              uint64        `v0:"true"` // Unix time in seconds
-	PotentialReward          uint64        `v0:"true"`
-	PotentialDelegateeReward uint64        `v0:"true"`
-	StakerStartTime          uint64        `          v1:"true"`
+	UpDuration  time.Duration `v0:"true"` // Deprecated: It is now tracked in the uptime state.
+	LastUpdated uint64        `v0:"true"` // Unix time in seconds. Deprecated: It is now tracked in the uptime state.
+
+	PotentialReward          uint64 `v0:"true"`
+	PotentialDelegateeReward uint64 `v0:"true"`
+	StakerStartTime          uint64 `          v1:"true"`
 
 	txID        ids.ID
-	lastUpdated time.Time
+	lastUpdated time.Time // Deprecated: It is now tracked in the uptime state.
 }
 
 // Permissioned validators originally wrote their values as nil.
 // With Banff we wrote the potential reward.
 // With Cortina we wrote the potential reward with the potential delegatee reward.
-// We now write the uptime, reward, and delegatee reward together.
+// We now write reward, and delegatee reward together.
 func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 	switch len(bytes) {
 	case 0:
@@ -79,31 +80,12 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 
 type validatorState interface {
 	// LoadValidatorMetadata sets the [metadata] of [vdrID] on [subnetID].
-	// GetUptime and SetUptime will return an error if the [vdrID] and
-	// [subnetID] hasn't been loaded. This call will not result in a write to
-	// disk.
+	// This call will not result in a write to disk.
 	LoadValidatorMetadata(
 		vdrID ids.NodeID,
 		subnetID ids.ID,
 		metadata *validatorMetadata,
 	)
-
-	// GetUptime returns the current uptime measurements of [vdrID] on
-	// [subnetID].
-	GetUptime(
-		vdrID ids.NodeID,
-		subnetID ids.ID,
-	) (upDuration time.Duration, lastUpdated time.Time, err error)
-
-	// SetUptime updates the uptime measurements of [vdrID] on [subnetID].
-	// Unless these measurements are deleted first, the next call to
-	// WriteUptimes will write this update to disk.
-	SetUptime(
-		vdrID ids.NodeID,
-		subnetID ids.ID,
-		upDuration time.Duration,
-		lastUpdated time.Time,
-	) error
 
 	// GetDelegateeReward returns the current rewards accrued to [vdrID] on
 	// [subnetID].
@@ -114,7 +96,7 @@ type validatorState interface {
 
 	// SetDelegateeReward updates the rewards accrued to [vdrID] on [subnetID].
 	// Unless these measurements are deleted first, the next call to
-	// WriteUptimes will write this update to disk.
+	// WriteValidatorMetadata will write this update to disk.
 	SetDelegateeReward(
 		subnetID ids.ID,
 		vdrID ids.NodeID,
@@ -123,12 +105,12 @@ type validatorState interface {
 
 	// DeleteValidatorMetadata removes in-memory references to the metadata of
 	// [vdrID] on [subnetID]. If there were staged updates from a prior call to
-	// SetUptime or SetDelegateeReward, the updates will be dropped. This call
-	// will not result in a write to disk.
+	// SetDelegateeReward, the updates will be dropped.
+	// This call will not result in a write to disk.
 	DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID)
 
 	// WriteValidatorMetadata writes all staged updates from prior calls to
-	// SetUptime or SetDelegateeReward.
+	// SetDelegateeReward.
 	WriteValidatorMetadata(
 		dbPrimary database.KeyValueWriter,
 		dbSubnet database.KeyValueWriter,
@@ -152,42 +134,14 @@ func newValidatorState() validatorState {
 func (m *metadata) LoadValidatorMetadata(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
-	uptime *validatorMetadata,
+	vdrMetadata *validatorMetadata,
 ) {
 	subnetMetadata, ok := m.metadata[vdrID]
 	if !ok {
 		subnetMetadata = make(map[ids.ID]*validatorMetadata)
 		m.metadata[vdrID] = subnetMetadata
 	}
-	subnetMetadata[subnetID] = uptime
-}
-
-func (m *metadata) GetUptime(
-	vdrID ids.NodeID,
-	subnetID ids.ID,
-) (time.Duration, time.Time, error) {
-	metadata, exists := m.metadata[vdrID][subnetID]
-	if !exists {
-		return 0, time.Time{}, database.ErrNotFound
-	}
-	return metadata.UpDuration, metadata.lastUpdated, nil
-}
-
-func (m *metadata) SetUptime(
-	vdrID ids.NodeID,
-	subnetID ids.ID,
-	upDuration time.Duration,
-	lastUpdated time.Time,
-) error {
-	metadata, exists := m.metadata[vdrID][subnetID]
-	if !exists {
-		return database.ErrNotFound
-	}
-	metadata.UpDuration = upDuration
-	metadata.lastUpdated = lastUpdated
-
-	m.addUpdatedMetadata(vdrID, subnetID)
-	return nil
+	subnetMetadata[subnetID] = vdrMetadata
 }
 
 func (m *metadata) GetDelegateeReward(
