@@ -29,9 +29,21 @@ mapfile -t scripts < <(
     find .github -name '*.sh' -type f 2>/dev/null || true
   } | sort -u
 )
-
 if [[ ${#scripts[@]} -eq 0 ]]; then
   echo "Error: no .sh files found (are you in the repository root?)" >&2
+  exit 1
+fi
+
+# Also find Taskfile.yml files whose sh: blocks may contain git/jj usage.
+# shellcheck disable=SC2035
+mapfile -t taskfiles < <(
+  {
+    find * -name 'Taskfile.yml' -type f -print
+    find .github -name 'Taskfile.yml' -type f 2>/dev/null || true
+  } | sort -u
+)
+if [[ ${#taskfiles[@]} -eq 0 ]]; then
+  echo "Error: no Taskfile.yml files found (are you in the repository root?)" >&2
   exit 1
 fi
 
@@ -87,11 +99,42 @@ for script in "${scripts[@]}"; do
   done < "$script"
 done
 
+# Check Taskfile.yml sh: blocks for direct git/jj usage. Scans lines
+# the same way as shell scripts; the vcs-ok whitelist handles any false
+# positives from non-shell YAML content.
+for taskfile in "${taskfiles[@]}"; do
+  line_num=0
+  prev_line=""
+  while IFS= read -r line; do
+    line_num=$((line_num + 1))
+
+    # Skip whitelisted lines (same line or preceding line)
+    if [[ "$line" == *"# vcs-ok:"* ]] || [[ "$prev_line" == *"# vcs-ok:"* ]]; then
+      prev_line="$line"
+      continue
+    fi
+
+    # Skip YAML comment lines
+    stripped="${line#"${line%%[![:space:]]*}"}"
+    if [[ "$stripped" == \#* ]]; then
+      prev_line="$line"
+      continue
+    fi
+
+    if echo "$line" | grep -qE '(^|[|;&`(! ])[ \t]*(git|jj)( |$)'; then
+      echo "${taskfile}:${line_num}: ${line}"
+      violations=$((violations + 1))
+    fi
+    prev_line="$line"
+  done < "$taskfile"
+done
+
 if [[ $violations -gt 0 ]]; then
   echo ""
   echo "${violations} violation(s) found."
   echo ""
   echo "Scripts should use scripts/vcs.sh functions instead of direct git/jj commands."
+  # vcs-ok: error message explaining the policy
   echo "This ensures that as much tooling as possible is compatible with jj workspaces, which lack a .git directory."
   echo "If direct usage is intentional, add a '# vcs-ok: <reason>' comment to the line."
   exit 1

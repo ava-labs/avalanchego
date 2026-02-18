@@ -19,7 +19,7 @@ tasks:
     cmd: ../../scripts/check_clean_branch.sh
 
   check-go-mod-tidy:
-    desc: Checks that all go.mod and go.sum files are up-to-date (requires a clean git working tree)
+    desc: Checks that all go.mod and go.sum files are up-to-date (requires a clean working tree)
     cmds:
       - cmd: go mod tidy
       - task: check-clean-branch
