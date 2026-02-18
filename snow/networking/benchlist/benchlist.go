@@ -158,10 +158,12 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 		b.nodes[nodeID] = n
 	}
 
-	// If the bench duration has expired, clear the benched state so that the
-	// EWMA logic below can re-evaluate from a clean slate.
+	// If the bench duration has expired, clear the benched state and reset
+	// the failure probability so that the node gets a clean slate rather
+	// than being immediately re-benched due to stale EWMA history.
 	if n.isBenched && b.benchExpired(n) {
 		n.isBenched = false
+		n.failureProbability = math.NewUninitializedAverager(b.halflife)
 	}
 
 	n.failureProbability.Observe(v, b.clock.Time())
