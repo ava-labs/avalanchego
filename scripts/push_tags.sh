@@ -36,7 +36,7 @@ done
 
 # Verify all tags exist locally before pushing
 for tag in "${TAGS[@]}"; do
-    if ! git rev-parse "$tag" >/dev/null 2>&1; then
+    if ! git rev-parse "$tag" >/dev/null 2>&1; then # vcs-ok: git tag resolution has no jj equivalent
         echo "Error: Tag '$tag' does not exist locally." >&2
         echo "Run './scripts/run_task.sh tags-create -- $VERSION' first." >&2
         exit 1
@@ -44,4 +44,4 @@ for tag in "${TAGS[@]}"; do
 done
 
 echo "Pushing tags for $VERSION to $REMOTE:"
-git push "$REMOTE" "${TAGS[@]}"
+git push "$REMOTE" "${TAGS[@]}" # vcs-ok: pushing git tags has no jj equivalent

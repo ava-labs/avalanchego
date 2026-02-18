@@ -47,9 +47,10 @@ rg "${ESCAPED_ORIGINAL}" -t go --files-with-matches --null | \
 echo "import rewrite completed successfully"
 
 echo "staging changes..."
-git add -u '*.go'
+git add -u '*.go' # vcs-ok: graft workflow uses git porcelain for staging/committing
 
 echo "committing changes..."
+# vcs-ok: graft workflow uses git porcelain for staging/committing
 git commit -S -m "Rewrite ${ORIGINAL_IMPORT} imports to ${TARGET_IMPORT}
 
 Rewrites all Go import statements from external package ${ORIGINAL_IMPORT}

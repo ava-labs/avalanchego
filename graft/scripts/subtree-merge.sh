@@ -78,12 +78,12 @@ fi
 REMOTE_NAME="${REPO_BASENAME}"
 
 echo "adding remote ${REMOTE_NAME} from ${REPO_URL}"
-git remote add -f "${REMOTE_NAME}" "${REPO_URL}"
+git remote add -f "${REMOTE_NAME}" "${REPO_URL}" # vcs-ok: git subtree operations have no jj equivalent
 
 echo "performing subtree merge of ${VERSION} into ${TARGET_PATH}"
-git subtree add --prefix="${TARGET_PATH}" "${REMOTE_NAME}" "${VERSION}"
+git subtree add --prefix="${TARGET_PATH}" "${REMOTE_NAME}" "${VERSION}" # vcs-ok: git subtree operations have no jj equivalent
 
 echo "removing ${REMOTE_NAME} remote"
-git remote remove "${REMOTE_NAME}"
+git remote remove "${REMOTE_NAME}" # vcs-ok: git subtree operations have no jj equivalent
 
 echo "subtree merge of ${REPO_BASENAME} completed successfully"

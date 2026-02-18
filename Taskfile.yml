@@ -118,6 +118,10 @@ tasks:
       - ./scripts/check_require_directives_round_trip.sh
       - task: check-clean-branch
 
+  check-vcs-usage:
+    desc: Checks that scripts use vcs.sh instead of direct git/jj commands
+    cmd: ./scripts/check_vcs_usage.sh
+
   create-kind-cluster:
     desc: Creates the default kind cluster
     cmd: bash -x ./scripts/start_kind_cluster.sh {{.CLI_ARGS}}
@@ -199,6 +203,7 @@ tasks:
       - check-go-version
       - check-require-directives
       - check-require-directives-round-trip
+      - check-vcs-usage
       - test-vcs
 
   lint-all-ci:
@@ -211,6 +216,7 @@ tasks:
       - task: check-go-version
       - task: check-require-directives
       - task: check-require-directives-round-trip
+      - task: check-vcs-usage
       - task: test-vcs-ci
 
   lint-fix:
