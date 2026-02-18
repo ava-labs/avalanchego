@@ -10,8 +10,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_ROOT/scripts/lib_go_modules.sh"
 
 VERSION="${1:?Usage: update_require_directives.sh <version>}"
 
@@ -20,27 +20,10 @@ if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
     exit 1
 fi
 
-cd "$REPO_ROOT"
-
-# Module paths to update
-declare -a MODULES=(
-    "github.com/ava-labs/avalanchego"
-    "github.com/ava-labs/avalanchego/graft/evm"
-    "github.com/ava-labs/avalanchego/graft/coreth"
-    "github.com/ava-labs/avalanchego/graft/subnet-evm"
-)
-
-GO_MODS=(
-    "go.mod"
-    "graft/evm/go.mod"
-    "graft/coreth/go.mod"
-    "graft/subnet-evm/go.mod"
-)
-
 echo "Updating require directives to $VERSION"
 for go_mod in "${GO_MODS[@]}"; do
     echo "  $go_mod"
-    for module in "${MODULES[@]}"; do
+    for module in "${MODULE_PATHS[@]}"; do
         # Only update if the module is already required
         # Escape dots for regex and match module followed by whitespace (space or tab)
         module_pattern="${module//./\\.}"

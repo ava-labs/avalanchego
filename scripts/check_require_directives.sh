@@ -8,18 +8,12 @@
 
 set -euo pipefail
 
-if ! [[ "$0" =~ scripts/check_require_directives.sh ]]; then
-  echo "must be run from repository root"
-  exit 255
-fi
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_ROOT/scripts/lib_go_modules.sh"
 
-# Discover all go.mod files tracked by git
-mapfile -t GO_MODS < <(git ls-files 'go.mod' '*/go.mod')
-
-# Build the set of internal module paths from the go.mod files themselves
+# Build the set of internal module paths from the discovered modules
 declare -A internal_modules
-for go_mod in "${GO_MODS[@]}"; do
-  mod_path=$(go mod edit -json "$go_mod" | jq -r '.Module.Path')
+for mod_path in "${MODULE_PATHS[@]}"; do
   internal_modules["$mod_path"]=1
 done
 

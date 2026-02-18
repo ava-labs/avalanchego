@@ -17,7 +17,7 @@ For the rationale behind the multi-module tagging process, see [Multi-Module Rel
 All components follow aligned versioning:
 
 - Same version number - When AvalancheGo releases v1.14.0, Subnet-EVM is also v1.14.0
-- Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.14.0`, `graft/coreth/v1.14.0`, `graft/evm/v1.14.0`, `graft/subnet-evm/v1.14.0`)
+- Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.14.0`, `graft/evm/v1.14.0`, `graft/coreth/v1.14.0`, `graft/subnet-evm/v1.14.0`)
 
 ### Component Release Notes
 
@@ -295,8 +295,7 @@ to the final version, merge, then tag the resulting commit:
 
 ```bash
 git fetch origin master
-git checkout master
-git checkout -b "tags/$VERSION"
+git checkout -b "tags/$VERSION" origin/master
 ./scripts/run_task.sh tags-set-require-directives -- "$VERSION"
 git add .
 git commit -S -m "chore: set require directives for $VERSION"

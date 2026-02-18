@@ -28,12 +28,13 @@ if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
     exit 1
 fi
 
-TAGS=(
-    "$VERSION"
-    "graft/evm/$VERSION"
-    "graft/coreth/$VERSION"
-    "graft/subnet-evm/$VERSION"
-)
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_ROOT/scripts/lib_go_modules.sh"
+
+TAGS=()
+for prefix in "${TAG_PREFIXES[@]}"; do
+    TAGS+=("${prefix}${VERSION}")
+done
 
 HEAD_COMMIT="$(git rev-parse HEAD)"
 HEAD_SHORT="$(git rev-parse --short HEAD)"
