@@ -1001,13 +1001,30 @@ func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 	return s.currentStakers.GetValidator(subnetID, nodeID)
 }
 
-func (s *state) PutCurrentValidator(staker *Staker) error {
-	_, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-	if err == nil {
-		return errDuplicateValidator
+func verifyHasCurrentValidator(
+	cs CurrentStakers,
+	subnetID ids.ID,
+	nodeID ids.NodeID,
+	expected bool,
+) error {
+	_, err := cs.GetCurrentValidator(subnetID, nodeID)
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
+		return err
 	}
 
-	if !errors.Is(err, database.ErrNotFound) {
+	if errors.Is(err, database.ErrNotFound) && expected {
+		return err
+	}
+
+	if !expected {
+		return errUnexpectedValidator
+	}
+
+	return nil
+}
+
+func (s *state) PutCurrentValidator(staker *Staker) error {
+	if err := verifyHasCurrentValidator(s, staker.SubnetID, staker.NodeID, false); err != nil {
 		return err
 	}
 
@@ -1016,7 +1033,7 @@ func (s *state) PutCurrentValidator(staker *Staker) error {
 }
 
 func (s *state) DeleteCurrentValidator(staker *Staker) error {
-	if _, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
+	if err := verifyHasCurrentValidator(s, staker.SubnetID, staker.NodeID, true); err != nil {
 		return err
 	}
 

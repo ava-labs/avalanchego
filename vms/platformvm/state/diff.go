@@ -307,12 +307,7 @@ func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, e
 }
 
 func (d *diff) PutCurrentValidator(staker *Staker) error {
-	_, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-	if err == nil {
-		return errDuplicateValidator
-	}
-
-	if !errors.Is(err, database.ErrNotFound) {
+	if err := verifyHasCurrentValidator(d, staker.SubnetID, staker.NodeID, false); err != nil {
 		return err
 	}
 
@@ -320,7 +315,7 @@ func (d *diff) PutCurrentValidator(staker *Staker) error {
 }
 
 func (d *diff) DeleteCurrentValidator(staker *Staker) error {
-	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
+	if err := verifyHasCurrentValidator(d, staker.SubnetID, staker.NodeID, true); err != nil {
 		return err
 	}
 

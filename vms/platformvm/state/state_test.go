@@ -2419,6 +2419,8 @@ func TestCurrentStakers(t *testing.T) {
 
 			return diff
 		})
+
+		// TODO weird tests for delete/add/delete
 	})
 }
 
@@ -2455,7 +2457,7 @@ func testCurrentStakers(t *testing.T, csF func() CurrentStakers) {
 
 			staker := newTestCurrentStaker(t)
 			require.NoError(t, cs.PutCurrentValidator(staker))
-			require.ErrorIs(t, cs.PutCurrentValidator(staker), errDuplicateValidator)
+			require.ErrorIs(t, cs.PutCurrentValidator(staker), errUnexpectedValidator)
 		})
 	})
 
@@ -2473,6 +2475,30 @@ func testCurrentStakers(t *testing.T, csF func() CurrentStakers) {
 			staker := newTestCurrentStaker(t)
 			require.NoError(t, cs.PutCurrentValidator(staker))
 			require.NoError(t, cs.DeleteCurrentValidator(staker))
+		})
+	})
+
+	t.Run("set delegatee reward", func(t *testing.T) {
+		t.Run("does not exist", func(t *testing.T) {
+			cs := csF()
+
+			require.ErrorIs(
+				t,
+				cs.SetDelegateeReward(ids.GenerateTestID(), ids.GenerateTestNodeID(), 123),
+				database.ErrNotFound,
+			)
+		})
+
+		t.Run("exists", func(t *testing.T) {
+			cs := csF()
+
+			staker := newTestCurrentStaker(t)
+			require.NoError(t, cs.PutCurrentValidator(staker))
+			require.NoError(t, cs.SetDelegateeReward(staker.SubnetID, staker.NodeID, uint64(123)))
+
+			got, err := cs.GetDelegateeReward(staker.SubnetID, staker.NodeID)
+			require.NoError(t, err)
+			require.Equal(t, uint64(123), got)
 		})
 	})
 }

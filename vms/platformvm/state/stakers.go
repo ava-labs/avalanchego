@@ -16,7 +16,7 @@ import (
 
 var (
 	ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
-	errDuplicateValidator        = errors.New("duplicate validator")
+	errUnexpectedValidator = errors.New("unexpected validator")
 )
 
 type Stakers interface {
