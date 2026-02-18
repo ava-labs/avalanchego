@@ -204,6 +204,8 @@ AvalancheGo is first and foremost a client for the Avalanche network. The versio
 
 Because AvalancheGo's version denotes the network version, it is expected that interfaces exported by AvalancheGo's packages may change in `Patch` version updates.
 
+AvalancheGo is organized as multiple Go modules that must be consumed together at matching versions. For guidance on depending on these modules in your Go projects, see [Depending on AvalancheGo Modules](docs/external_consumption.md).
+
 ### API Compatibility Guarantees
 
 APIs exposed when running AvalancheGo will maintain backwards compatibility, unless the functionality is explicitly deprecated and announced when removed.
