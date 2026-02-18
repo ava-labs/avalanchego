@@ -32,8 +32,7 @@ tagged versions.
 ## Non-Goals
 
 - Module consolidation (separate effort)
-- CI verification of coordinated go.mod state (to be tackled separately)
-- Release automation (to be tackled separately)
+- Release automation (separate effort)
 
 ## Design
 

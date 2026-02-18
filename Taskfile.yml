@@ -98,6 +98,10 @@ tasks:
       - task: generate-protobuf
       - task: check-clean-branch
 
+  check-require-directives:
+    desc: Checks that internal module require directives reference the same version
+    cmd: ./scripts/check_require_directives.sh
+
   check-go-mod-tidy:
     desc: Checks that go module configuration is consistent (requires a clean git working tree)
     cmds:
@@ -185,6 +189,7 @@ tasks:
       - lint
       - lint-action
       - lint-shell
+      - check-require-directives
       - check-go-mod-tidy
       - check-go-version
 
@@ -194,6 +199,7 @@ tasks:
       - task: lint
       - task: lint-action
       - task: lint-shell
+      - task: check-require-directives
       - task: check-go-mod-tidy
       - task: check-go-version
 

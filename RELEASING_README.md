@@ -469,3 +469,8 @@ commit. Pass `--no-sign` for unsigned tags (e.g., development tags).
 
 Pushes tags for the main module and all submodules. Set `GIT_REMOTE` to
 override the default remote (`origin`).
+
+### `check-require-directives`
+
+Verifies that all internal module `require` directives across go.mod files
+reference the same version.
