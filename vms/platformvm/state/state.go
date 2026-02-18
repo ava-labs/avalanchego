@@ -2869,6 +2869,20 @@ func getOrSetDefault[K comparable, V any](m map[K]*V, k K) *V {
 	return v
 }
 
+func newValidatorMetadata(staker *Staker) *validatorMetadata {
+	startTime := uint64(staker.StartTime.Unix())
+	return &validatorMetadata{
+		txID:        staker.TxID,
+		lastUpdated: staker.StartTime,
+
+		UpDuration:               0,
+		LastUpdated:              startTime,
+		StakerStartTime:          startTime,
+		PotentialReward:          staker.PotentialReward,
+		PotentialDelegateeReward: 0,
+	}
+}
+
 func (s *state) writeCurrentStakers(codecVersion uint16) error {
 	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
 		// Select db to write to

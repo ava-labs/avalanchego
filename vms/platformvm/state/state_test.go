@@ -2410,40 +2410,6 @@ func TestCurrentStakers(t *testing.T) {
 		testCurrentStakers(t, func() CurrentStakers {
 			return newTestState(t, memdb.New())
 		})
-
-		t.Run("set delegatee reward", func(t *testing.T) {
-			t.Run("validator does not exist", func(t *testing.T) {
-				state := newTestState(t, memdb.New())
-
-				require.ErrorIs(
-					t,
-					state.SetDelegateeReward(ids.GenerateTestID(), ids.GenerateTestNodeID(), 123),
-					database.ErrNotFound,
-				)
-			})
-
-			t.Run("validator added in the same batch", func(t *testing.T) {
-				state := newTestState(t, memdb.New())
-
-				staker := newTestStaker()
-				require.NoError(t, state.PutCurrentValidator(staker))
-				require.ErrorIs(t, state.SetDelegateeReward(staker.SubnetID, staker.NodeID, uint64(123)), database.ErrNotFound)
-			})
-
-			t.Run("validator added in the previous batch", func(t *testing.T) {
-				state := newTestState(t, memdb.New())
-
-				staker := newTestStaker()
-				require.NoError(t, state.PutCurrentValidator(staker))
-				require.NoError(t, state.Commit())
-
-				require.NoError(t, state.SetDelegateeReward(staker.SubnetID, staker.NodeID, uint64(123)))
-
-				got, err := state.GetDelegateeReward(staker.SubnetID, staker.NodeID)
-				require.NoError(t, err)
-				require.Equal(t, uint64(123), got)
-			})
-		})
 	})
 
 	// TODO test diff stacking (?)
@@ -2453,32 +2419,6 @@ func TestCurrentStakers(t *testing.T) {
 			require.NoError(t, err)
 
 			return diff
-		})
-
-		t.Run("set delegatee reward", func(t *testing.T) {
-			t.Run("validator does not exist", func(t *testing.T) {
-				diff, err := NewDiffOn(newTestState(t, memdb.New()))
-				require.NoError(t, err)
-
-				require.ErrorIs(
-					t,
-					diff.SetDelegateeReward(ids.GenerateTestID(), ids.GenerateTestNodeID(), 123),
-					database.ErrNotFound,
-				)
-			})
-
-			t.Run("validator exists", func(t *testing.T) {
-				diff, err := NewDiffOn(newTestState(t, memdb.New()))
-				require.NoError(t, err)
-
-				staker := newTestStaker()
-				require.NoError(t, diff.PutCurrentValidator(staker))
-				require.NoError(t, diff.SetDelegateeReward(staker.SubnetID, staker.NodeID, uint64(123)))
-
-				got, err := diff.GetDelegateeReward(staker.SubnetID, staker.NodeID)
-				require.NoError(t, err)
-				require.Equal(t, uint64(123), got)
-			})
 		})
 		// TODO weird tests for delete/add/delete
 	})
@@ -2538,66 +2478,91 @@ func testCurrentStakers(t *testing.T, csF func() CurrentStakers) {
 		})
 	})
 
-
-
-	t.Run("get current delegator iterator", func(t *testing.T) {
+	t.Run("set delegatee reward", func(t *testing.T) {
 		t.Run("validator does not exist", func(t *testing.T) {
 			cs := csF()
 
-			_, err := cs.GetCurrentDelegatorIterator(ids.GenerateTestID(), ids.GenerateTestNodeID())
-			require.ErrorIs(t, err, database.ErrNotFound)
+			require.ErrorIs(
+				t,
+				cs.SetDelegateeReward(ids.GenerateTestID(), ids.GenerateTestNodeID(), 123),
+				database.ErrNotFound,
+			)
 		})
 
-		t.Run("validator has delegators", func(t *testing.T) {
+		t.Run("validator exists", func(t *testing.T) {
 			cs := csF()
-			v := newTestStaker()
 
-			require.NoError(t, cs.PutCurrentValidator(v))
+			staker := newTestStaker()
+			require.NoError(t, cs.PutCurrentValidator(staker))
+			require.NoError(t, cs.SetDelegateeReward(staker.SubnetID, staker.NodeID, uint64(123)))
 
-			// We expect delegators to be ordered by their end times.
-			d1 := newTestStaker()
-			d1.NodeID = v.NodeID
-			d1.NextTime = time.Time{}.Add(1 * time.Second)
-
-			require.NoError(t, cs.PutCurrentDelegator(d1))
-
-			d2 := newTestStaker()
-			d2.NodeID = v.NodeID
-			d2.NextTime = time.Time{}.Add(2 * time.Second)
-
-			require.NoError(t, cs.PutCurrentDelegator(d2))
-
-			d3 := newTestStaker()
-			d3.NodeID = v.NodeID
-			d3.NextTime = time.Time{}.Add(3 * time.Second)
-
-			require.NoError(t, cs.PutCurrentDelegator(d3))
-
-			itr, err := cs.GetCurrentDelegatorIterator(v.SubnetID, v.NodeID)
+			got, err := cs.GetDelegateeReward(staker.SubnetID, staker.NodeID)
 			require.NoError(t, err)
-
-			wantDelegators := []*Staker{d1, d2, d3}
-			var gotDelegators []*Staker
-
-			for itr.Next() {
-				gotDelegators = append(gotDelegators, itr.Value())
-			}
-
-			require.Equal(t, wantDelegators, gotDelegators)
+			require.Equal(t, uint64(123), got)
 		})
 
-		t.Run("validator has no delegators", func(t *testing.T) {
-			cs := csF()
+		t.Run("get current delegator iterator", func(t *testing.T) {
+			t.Run("validator does not exist", func(t *testing.T) {
+				cs := csF()
 
-			var gotDelegators []*Staker
-			itr, err := cs.GetCurrentDelegatorIterator(ids.GenerateTestID(), ids.GenerateTestNodeID())
-			require.NoError(t, err)
+				_, err := cs.GetCurrentDelegatorIterator(ids.GenerateTestID(), ids.GenerateTestNodeID())
+				require.ErrorIs(t, err, database.ErrNotFound)
+			})
 
-			for itr.Next() {
-				gotDelegators = append(gotDelegators, itr.Value())
-			}
+			t.Run("validator has delegators", func(t *testing.T) {
+				cs := csF()
 
-			require.Len(t, gotDelegators, 0)
+				v := newTestStaker()
+				require.NoError(t, cs.PutCurrentValidator(v))
+
+				// We expect delegators to be ordered by their end times.
+				d1 := newTestStaker()
+				d1.NodeID = v.NodeID
+				d1.NextTime = time.Time{}.Add(1 * time.Second)
+
+				require.NoError(t, cs.PutCurrentDelegator(d1))
+
+				d2 := newTestStaker()
+				d2.NodeID = v.NodeID
+				d2.NextTime = time.Time{}.Add(2 * time.Second)
+
+				require.NoError(t, cs.PutCurrentDelegator(d2))
+
+				d3 := newTestStaker()
+				d3.NodeID = v.NodeID
+				d3.NextTime = time.Time{}.Add(3 * time.Second)
+
+				require.NoError(t, cs.PutCurrentDelegator(d3))
+
+				itr, err := cs.GetCurrentDelegatorIterator(v.SubnetID, v.NodeID)
+				require.NoError(t, err)
+
+				wantDelegators := []*Staker{d1, d2, d3}
+				var gotDelegators []*Staker
+
+				for itr.Next() {
+					gotDelegators = append(gotDelegators, itr.Value())
+				}
+
+				require.Equal(t, wantDelegators, gotDelegators)
+			})
+
+			t.Run("validator has no delegators", func(t *testing.T) {
+				cs := csF()
+
+				v := newTestStaker()
+				require.NoError(t, cs.PutCurrentValidator(v))
+
+				var gotDelegators []*Staker
+				itr, err := cs.GetCurrentDelegatorIterator(v.SubnetID, v.NodeID)
+				require.NoError(t, err)
+
+				for itr.Next() {
+					gotDelegators = append(gotDelegators, itr.Value())
+				}
+
+				require.Len(t, gotDelegators, 0)
+			})
 		})
 	})
 }

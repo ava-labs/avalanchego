@@ -338,8 +338,10 @@ func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (
 	}
 
 	parentIterator, err := parentState.GetCurrentDelegatorIterator(subnetID, nodeID)
-	if err != nil {
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return nil, err
+	} else if errors.Is(err, database.ErrNotFound) {
+		parentIterator = iterator.Empty[*Staker]{}
 	}
 
 	return d.currentStakerDiffs.GetDelegatorIterator(parentIterator, subnetID, nodeID), nil
