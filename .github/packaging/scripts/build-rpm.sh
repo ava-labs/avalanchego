@@ -36,17 +36,17 @@ echo "=== Building ${PACKAGE} RPM for ${RPM_ARCH} (tag: ${TAG}) ==="
 # In CI, the bind-mounted source tree is owned by the host user. Mark it
 # as safe so that git works inside the container (needed by older build
 # scripts that resolve the commit hash via git rather than AVALANCHEGO_COMMIT).
-if ! git -C "${REPO_ROOT}" rev-parse HEAD &>/dev/null; then
-    git config --global --add safe.directory "${REPO_ROOT}"
+if ! git -C "${REPO_ROOT}" rev-parse HEAD &>/dev/null; then # vcs-ok: safe.directory prerequisite for vcs.sh in containers
+    git config --global --add safe.directory "${REPO_ROOT}" # vcs-ok: safe.directory prerequisite for vcs.sh in containers
 fi
 
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/constants.sh"
 # shellcheck disable=SC1091
-source "${REPO_ROOT}/scripts/git_commit.sh"
+source "${REPO_ROOT}/scripts/vcs.sh"
 
 # shellcheck disable=SC2154
-echo "Git commit: ${git_commit}"
+echo "Git commit: ${vcs_commit}"
 
 # Disable Go's automatic VCS stamping — the commit hash is passed
 # explicitly via AVALANCHEGO_COMMIT and -ldflags instead.
