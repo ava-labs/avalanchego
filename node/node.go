@@ -126,6 +126,7 @@ var (
 
 // New returns an instance of Node
 func New(
+	ctx context.Context,
 	config *node.Config,
 	logFactory logging.Factory,
 	logger logging.Logger,
@@ -194,8 +195,8 @@ func New(
 		return nil, fmt.Errorf("couldn't initialize metrics: %w", err)
 	}
 
-	n.initNAT()
-	if err := n.initAPIServer(); err != nil { // Start the API Server
+	n.initNAT(ctx)
+	if err := n.initAPIServer(ctx); err != nil { // Start the API Server
 		return nil, fmt.Errorf("couldn't initialize API server: %w", err)
 	}
 
@@ -241,7 +242,11 @@ func New(
 	}
 	n.initCPUTargeter(&config.CPUTargeterConfig)
 	n.initDiskTargeter(&config.DiskTargeterConfig)
-	if err := n.initNetworking(networkRegisterer); err != nil { // Set up networking layer.
+	// Set up networking layer.
+	if err := n.initNetworking(
+		ctx,
+		networkRegisterer,
+	); err != nil {
 		return nil, fmt.Errorf("problem initializing networking: %w", err)
 	}
 
@@ -418,7 +423,10 @@ type Node struct {
 
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
-func (n *Node) initNetworking(reg prometheus.Registerer) error {
+func (n *Node) initNetworking(
+	ctx context.Context,
+	reg prometheus.Registerer,
+) error {
 	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
 	// host will avoid the need for a firewall exception on recent MacOS:
 	//
@@ -437,7 +445,11 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
 	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(n.Config.ListenPort), 10))
-	listener, err := net.Listen(constants.NetworkType, listenAddress)
+	listener, err := (&net.ListenConfig{}).Listen(
+		ctx,
+		constants.NetworkType,
+		listenAddress,
+	)
 	if err != nil {
 		return err
 	}
@@ -672,7 +684,7 @@ func (n *Node) writeProcessContext() error {
 
 // Dispatch starts the node's servers.
 // Returns when the node exits.
-func (n *Node) Dispatch() error {
+func (n *Node) Dispatch(ctx context.Context) error {
 	if err := n.writeProcessContext(); err != nil {
 		return err
 	}
@@ -718,16 +730,16 @@ func (n *Node) Dispatch() error {
 
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
-		n.Net.ManuallyTrack(n.Config.StateSyncIDs[i], peerIP)
+		n.Net.ManuallyTrack(ctx, n.Config.StateSyncIDs[i], peerIP)
 	}
 
 	// Add bootstrap nodes to the peer network
 	for _, bootstrapper := range n.Config.Bootstrappers {
-		n.Net.ManuallyTrack(bootstrapper.ID, bootstrapper.IP)
+		n.Net.ManuallyTrack(ctx, bootstrapper.ID, bootstrapper.IP)
 	}
 
 	// Start P2P connections
-	retErr := n.Net.Dispatch()
+	retErr := n.Net.Dispatch(ctx)
 
 	// If the P2P server isn't running, shut down the node.
 	// If node is already shutting down, this does not trigger shutdown again,
@@ -935,32 +947,32 @@ func (n *Node) initMetrics() error {
 	)
 }
 
-func (n *Node) initNAT() {
+func (n *Node) initNAT(ctx context.Context) {
 	n.Log.Info("initializing NAT")
 
 	if n.Config.PublicIP == "" && n.Config.PublicIPResolutionService == "" {
-		n.router = nat.GetRouter()
+		n.router = nat.GetRouter(ctx)
 		if !n.router.SupportsNAT() {
 			n.Log.Warn("UPnP and NAT-PMP router attach failed, " +
 				"you may not be listening publicly. " +
 				"Please confirm the settings in your router")
 		}
 	} else {
-		n.router = nat.NewNoRouter()
+		n.router = nat.NewNoRouter(ctx)
 	}
 
 	n.portMapper = nat.NewPortMapper(n.Log, n.router)
 }
 
 // initAPIServer initializes the server that handles HTTP calls
-func (n *Node) initAPIServer() error {
+func (n *Node) initAPIServer(ctx context.Context) error {
 	n.Log.Info("initializing API server")
 
 	// An empty host is treated as a wildcard to match all addresses, so it is
 	// considered public.
 	hostIsPublic := n.Config.HTTPHost == ""
 	if !hostIsPublic {
-		ip, err := ips.Lookup(n.Config.HTTPHost)
+		ip, err := ips.Lookup(ctx, n.Config.HTTPHost)
 		if err != nil {
 			n.Log.Fatal("failed to lookup HTTP host",
 				zap.String("host", n.Config.HTTPHost),
@@ -978,7 +990,7 @@ func (n *Node) initAPIServer() error {
 	}
 
 	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
-	listener, err := net.Listen("tcp", listenAddress)
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", listenAddress)
 	if err != nil {
 		return err
 	}

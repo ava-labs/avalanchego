@@ -211,6 +211,7 @@ type peer struct {
 // Invariant: There must only be one peer running at a time with a reference to
 // the same [config.InboundMsgThrottler].
 func Start(
+	ctx context.Context,
 	config *Config,
 	conn net.Conn,
 	cert *staking.Certificate,
@@ -238,9 +239,9 @@ func Start(
 		p.IngressConnectionCount.Add(1)
 	}
 
-	go p.readMessages()
-	go p.writeMessages()
-	go p.sendNetworkMessages()
+	go p.readMessages(ctx)
+	go p.writeMessages(ctx)
+	go p.sendNetworkMessages(ctx)
 
 	return p
 }
@@ -362,7 +363,7 @@ func (p *peer) AwaitClosed(ctx context.Context) error {
 
 // close should be called at the end of each goroutine that has been spun up.
 // When the last goroutine is exiting, the peer will be marked as closed.
-func (p *peer) close() {
+func (p *peer) close(ctx context.Context) {
 	if atomic.AddInt64(&p.numExecuting, -1) != 0 {
 		return
 	}
@@ -371,19 +372,19 @@ func (p *peer) close() {
 		p.IngressConnectionCount.Add(-1)
 	}
 
-	p.Network.Disconnected(p.id)
+	p.Network.Disconnected(ctx, p.id)
 	close(p.onClosed)
 }
 
 // Read and handle messages from this peer.
 // When this method returns, the connection is closed.
-func (p *peer) readMessages() {
+func (p *peer) readMessages(ctx context.Context) {
 	// Track this node with the inbound message throttler.
 	p.InboundMsgThrottler.AddNode(p.id)
 	defer func() {
 		p.InboundMsgThrottler.RemoveNode(p.id)
 		p.StartClose()
-		p.close()
+		p.close(ctx)
 	}()
 
 	// Continuously read and handle messages from this peer.
@@ -502,15 +503,15 @@ func (p *peer) readMessages() {
 
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
-		p.handle(msg)
+		p.handle(ctx, msg)
 		p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 	}
 }
 
-func (p *peer) writeMessages() {
+func (p *peer) writeMessages(ctx context.Context) {
 	defer func() {
 		p.StartClose()
-		p.close()
+		p.close(ctx)
 	}()
 
 	writer := bufio.NewWriterSize(p.conn, p.Config.WriteBufferSize)
@@ -640,13 +641,13 @@ func (p *peer) writeMessage(writer io.Writer, msg *message.OutboundMessage) {
 	p.Metrics.Sent(msg)
 }
 
-func (p *peer) sendNetworkMessages() {
+func (p *peer) sendNetworkMessages(ctx context.Context) {
 	sendPingsTicker := time.NewTicker(p.PingFrequency)
 	defer func() {
 		sendPingsTicker.Stop()
 
 		p.StartClose()
-		p.close()
+		p.close(ctx)
 	}()
 
 	for {
@@ -750,7 +751,7 @@ func (p *peer) shouldDisconnect() bool {
 	return false
 }
 
-func (p *peer) handle(msg *message.InboundMessage) {
+func (p *peer) handle(ctx context.Context, msg *message.InboundMessage) {
 	switch m := msg.Message.(type) { // Network-related message types
 	case *p2p.Ping:
 		p.handlePing(m)
@@ -769,7 +770,7 @@ func (p *peer) handle(msg *message.InboundMessage) {
 		msg.OnFinishedHandling()
 		return
 	case *p2p.PeerList:
-		p.handlePeerList(m)
+		p.handlePeerList(ctx, m)
 		msg.OnFinishedHandling()
 		return
 	}
@@ -784,7 +785,7 @@ func (p *peer) handle(msg *message.InboundMessage) {
 	}
 
 	// Consensus and app-level messages
-	p.Router.HandleInbound(context.Background(), msg)
+	p.Router.HandleInbound(ctx, msg)
 }
 
 func (p *peer) handlePing(msg *p2p.Ping) {
@@ -1161,7 +1162,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 	p.Send(p.onClosingCtx, peerListMsg)
 }
 
-func (p *peer) handlePeerList(msg *p2p.PeerList) {
+func (p *peer) handlePeerList(ctx context.Context, msg *p2p.PeerList) {
 	if !p.finishedHandshake.Get() {
 		if !p.gotHandshake.Get() {
 			return
@@ -1221,7 +1222,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		)
 	}
 
-	if err := p.Network.Track(discoveredIPs); err != nil {
+	if err := p.Network.Track(ctx, discoveredIPs); err != nil {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.PeerListOp),

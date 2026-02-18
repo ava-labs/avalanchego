@@ -31,19 +31,19 @@ type PrometheusServer struct {
 
 // NewPrometheusServer creates and starts a Prometheus server with the provided gatherer
 // listening on 127.0.0.1:0 and serving /ext/metrics.
-func NewPrometheusServer(gatherer prometheus.Gatherer) (*PrometheusServer, error) {
-	return NewPrometheusServerWithPort(gatherer, defaultMetricsPort)
+func NewPrometheusServer(ctx context.Context, gatherer prometheus.Gatherer) (*PrometheusServer, error) {
+	return NewPrometheusServerWithPort(ctx, gatherer, defaultMetricsPort)
 }
 
 // NewPrometheusServerWithPort creates and starts a Prometheus server with the provided gatherer
 // listening on 127.0.0.1:port and serving /ext/metrics.
-func NewPrometheusServerWithPort(gatherer prometheus.Gatherer, port uint64) (*PrometheusServer, error) {
+func NewPrometheusServerWithPort(ctx context.Context, gatherer prometheus.Gatherer, port uint64) (*PrometheusServer, error) {
 	server := &PrometheusServer{
 		gatherer: gatherer,
 	}
 
 	serverAddress := fmt.Sprintf("%s:%d", localhostAddr, port)
-	if err := server.start(serverAddress); err != nil {
+	if err := server.start(ctx, serverAddress); err != nil {
 		return nil, err
 	}
 
@@ -51,11 +51,15 @@ func NewPrometheusServerWithPort(gatherer prometheus.Gatherer, port uint64) (*Pr
 }
 
 // start the Prometheus server on address.
-func (s *PrometheusServer) start(address string) error {
+func (s *PrometheusServer) start(ctx context.Context, address string) error {
 	mux := http.NewServeMux()
 	mux.Handle("/ext/metrics", promhttp.HandlerFor(s.gatherer, promhttp.HandlerOpts{}))
 
-	listener, err := net.Listen("tcp", address)
+	listener, err := (&net.ListenConfig{}).Listen(
+		ctx,
+		"tcp",
+		address,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", address, err)
 	}

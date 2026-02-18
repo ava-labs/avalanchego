@@ -451,7 +451,7 @@ func startServer(
 ) string {
 	r := require.New(tc)
 
-	server, err := tests.NewPrometheusServerWithPort(gatherer, port)
+	server, err := tests.NewPrometheusServerWithPort(tc.DefaultContext(), gatherer, port)
 	r.NoError(err)
 
 	tc.Log().Info("metrics endpoint available",
