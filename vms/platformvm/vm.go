@@ -76,7 +76,7 @@ type VM struct {
 	ctx *snow.Context
 	db  database.Database
 
-	state state.State
+	state *state.State
 
 	fx            fx.Fx
 	codecRegistry codec.Registry

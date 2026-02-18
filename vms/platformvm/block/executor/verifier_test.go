@@ -42,12 +42,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
@@ -458,7 +458,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	mempool, err := mempool.New(
 		"",
 		gas.Dimensions{},
@@ -538,7 +538,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	mempool, err := mempool.New(
 		"",
 		gas.Dimensions{},
@@ -616,10 +616,9 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 // Assert that a block with an unverified parent fails verification.
 func TestVerifyUnverifiedParent(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	mempool, err := mempool.New(
 		"",
 		gas.Dimensions{},
@@ -650,10 +649,6 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 
 	blk, err := block.NewApricotAbortBlock(parentID /*not in memory or persisted state*/, 2 /*height*/)
 	require.NoError(err)
-
-	// Set expectations for dependencies.
-	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	s.EXPECT().GetStatelessBlock(parentID).Return(nil, database.ErrNotFound).Times(1)
 
 	// Verify the block.
 	err = blk.Visit(verifier)
@@ -696,7 +691,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			require := require.New(t)
 
 			// Create mocked dependencies.
-			s := state.NewMockState(ctrl)
+			s := statetest.New(t, statetest.Config{})
 			mempool, err := mempool.New(
 				"",
 				gas.Dimensions{},
@@ -733,13 +728,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// setup parent state
-			parentTime := genesistest.DefaultValidatorStartTime
-			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
-			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
-			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
-			s.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(3)
-			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
-			s.EXPECT().NumActiveL1Validators().Return(0).Times(3)
+			s.SetLastAccepted(parentID)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -803,7 +792,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			require := require.New(t)
 
 			// Create mocked dependencies.
-			s := state.NewMockState(ctrl)
+			s := statetest.New(t, statetest.Config{})
 			mempool, err := mempool.New(
 				"",
 				gas.Dimensions{},
@@ -840,13 +829,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// setup parent state
-			parentTime := genesistest.DefaultValidatorStartTime
-			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
-			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
-			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
-			s.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(3)
-			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
-			s.EXPECT().NumActiveL1Validators().Return(0).Times(3)
+			s.SetLastAccepted(parentID)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -878,7 +861,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	mempool, err := mempool.New(
 		"",
 		gas.Dimensions{},
@@ -941,7 +924,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	mempool, err := mempool.New(
 		"",
 		gas.Dimensions{},
@@ -1006,7 +989,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	verifier := &verifier{
@@ -1048,7 +1031,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	timestamp := time.Unix(12345, 0)
@@ -1093,7 +1076,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	verifier := &verifier{
@@ -1135,7 +1118,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	timestamp := time.Unix(12345, 0)
