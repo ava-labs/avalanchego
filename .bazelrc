@@ -1,0 +1,50 @@
+# Go settings - match scripts/build_test.sh defaults
+
+# Test settings (match scripts/build_test.sh)
+test --test_output=errors
+# Per-category timeouts: short,moderate,long,eternal
+# "long" covers graft modules (coreth, evm, subnet-evm) via graft_go_test macro
+test --test_timeout=60,120,900,3600
+# Set HOME for tests that need it (e.g., config tests that expand $HOME/.avalanchego)
+test --test_env=HOME
+
+# Race detection ON by default (matches scripts/build_test.sh)
+# Disable with: bazel build/test --config=norace //...
+build --@io_bazel_rules_go//go/config:race=true
+test --@io_bazel_rules_go//go/config:race=true
+
+# Explicit race config (kept for clarity/compat)
+build:race --@io_bazel_rules_go//go/config:race=true
+test:race --@io_bazel_rules_go//go/config:race=true
+
+# Config: disable race (for faster local builds)
+build:norace --@io_bazel_rules_go//go/config:race=false
+test:norace --@io_bazel_rules_go//go/config:race=false
+
+# Shuffle ON by default (matches build_test.sh -shuffle=on)
+# Disable with: bazel test --config=noshuffle //...
+test --test_arg=-test.shuffle=on
+
+# Coverage: use `bazel coverage //...` instead of `bazel test //...`
+# This matches build_test.sh's -coverprofile/-covermode flags
+
+# CGO settings
+# Using action_env rather than --@io_bazel_rules_go//go/config:pure because:
+# 1. CGO_CFLAGS has no native rules_go equivalent - action_env is the only option
+# 2. Using action_env for both CGO_ENABLED and CGO_CFLAGS keeps configuration consistent
+# The BLST library requires -D__BLST_PORTABLE__ for portable builds across CPU architectures.
+build --action_env=CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
+build --action_env=CGO_ENABLED=1
+
+# Cache for faster builds
+build --disk_cache=~/.cache/bazel-disk-cache
+
+# Config: disable shuffle (for deterministic test ordering)
+test:noshuffle --test_arg=-test.shuffle=off
+
+# Config: fast local development (no shuffle, no race)
+test:fast --config=noshuffle --config=norace
+
+# Stamp builds with git commit
+build:release --stamp
+build:release --workspace_status_command=scripts/bazel_workspace_status.sh

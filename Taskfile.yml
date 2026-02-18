@@ -16,6 +16,92 @@ includes:
 tasks:
   default: ./scripts/run_task.sh --list
 
+  bazel-build:
+    desc: Build avalanchego with Bazel
+    cmd: bazel build //main:avalanchego
+
+  bazel-build-race:
+    desc: Build avalanchego with Bazel (race detection)
+    cmd: bazel build --config=race //main:avalanchego
+
+  bazel-build-opt:
+    desc: Build avalanchego with Bazel (optimized)
+    cmd: bazel build --compilation_mode=opt //main:avalanchego
+
+  bazel-gazelle-delete:
+    desc: Delete all gazelle-generated BUILD.bazel files (except manually maintained ones)
+    cmd: |
+      find . -name 'BUILD.bazel' -type f | while read f; do
+        # Skip root and graft module roots (manually maintained)
+        case "$f" in
+          ./BUILD.bazel|./graft/coreth/BUILD.bazel|./graft/evm/BUILD.bazel|./graft/subnet-evm/BUILD.bazel|./.bazel/*)
+            continue
+            ;;
+        esac
+        # Skip files with '# keep' comments (have manual customizations)
+        if grep -q '# keep' "$f"; then
+          continue
+        fi
+        rm -f "$f"
+      done
+
+  bazel-gazelle-generate:
+    desc: Ensure BUILD files are up-to-date by deleting and generating with Gazelle (all modules)
+    cmds:
+      - task: bazel-gazelle-delete
+      - bazel run //:gazelle
+      - bazel run //graft/coreth:gazelle
+      - bazel run //graft/evm:gazelle
+      - bazel run //graft/subnet-evm:gazelle
+
+  bazel-test:
+    desc: Run unit tests with Bazel (shuffle on, race on)
+    cmd: bazel test //...
+
+  bazel-test-fast:
+    desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
+    cmd: bazel test --config=fast //...
+
+  bazel-clean:
+    desc: Clean Bazel cache
+    cmd: bazel clean
+
+  bazel-clean-all:
+    desc: Clean Bazel cache (full expunge)
+    cmd: bazel clean --expunge
+
+  bazel-query:
+    desc: Query Bazel targets
+    cmd: bazel query '//...' {{.CLI_ARGS}}
+
+  bazel-mod-tidy:
+    desc: Update use_repo() in MODULE.bazel from go.mod
+    cmd: bazel mod tidy
+
+  bazel-fmt:
+    desc: Format BUILD.bazel files with buildifier
+    cmd: buildifier -r .
+
+  bazel-test-e2e:
+    desc: Run E2E tests with bazel-built binary
+    cmds:
+      - task: bazel-build
+      - task: build-xsvm
+      - cmd: |
+          AVALANCHEGO_PATH=$(pwd)/bazel-bin/main/avalanchego_/avalanchego \
+          bash -x ./scripts/tests.e2e.existing.sh
+
+  bazel-test-e2e-ci:
+    desc: Run E2E tests with bazel-built binary [serially with race detection]
+    env:
+      E2E_SERIAL: 1
+    cmds:
+      - task: bazel-build-race
+      - task: build-xsvm
+      - cmd: |
+          AVALANCHEGO_PATH=$(pwd)/bazel-bin/main/avalanchego_/avalanchego \
+          bash -x ./scripts/tests.e2e.existing.sh
+
   build:
     desc: Builds avalanchego
     cmd: ./scripts/build.sh
@@ -69,6 +155,18 @@ tasks:
   build-xsvm-image:
     desc: Builds xsvm image
     cmd: ./scripts/build_xsvm_image.sh
+
+  check-bazel-fmt:
+    desc: Check that BUILD.bazel files are formatted with buildifier
+    cmds:
+      - task: bazel-fmt
+      - task: check-clean-branch
+
+  check-bazel-gazelle-generate:
+    desc: Check that generated BUILD files are up-to-date (requires clean git tree)
+    cmds:
+      - task: bazel-gazelle-generate
+      - task: check-clean-branch
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
@@ -166,6 +264,8 @@ tasks:
       - cmd: cd graft/coreth && GOWORK=off go mod tidy
       - cmd: cd graft/subnet-evm && GOWORK=off go mod tidy
       - task: sync-go-work
+      # Update use_repo() in MODULE.bazel to match go.mod dependencies
+      - cmd: bazel mod tidy
 
   install-nix:
     desc: Installs nix with an OS-appropriate installer
@@ -184,6 +284,7 @@ tasks:
     deps:
       - lint
       - lint-action
+      - lint-bazel
       - lint-shell
       - check-go-mod-tidy
       - check-go-version
@@ -193,9 +294,16 @@ tasks:
     cmds:
       - task: lint
       - task: lint-action
+      - task: lint-bazel
       - task: lint-shell
       - task: check-go-mod-tidy
       - task: check-go-version
+
+  lint-bazel:
+    desc: Checks Bazel BUILD files are formatted and up-to-date (requires clean git tree)
+    cmds:
+      - task: check-bazel-fmt
+      - task: check-bazel-gazelle-generate
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code

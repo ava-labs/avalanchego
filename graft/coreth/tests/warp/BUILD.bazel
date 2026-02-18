@@ -1,0 +1,36 @@
+load("//.bazel:defs.bzl", "graft_go_test")
+
+graft_go_test(
+    name = "warp_test",
+    srcs = ["warp_test.go"],
+    embedsrcs = ["genesis.json"],
+    tags = ["manual"],  # keep
+    deps = [
+        "//api/info",
+        "//graft/coreth/accounts/abi/bind",
+        "//graft/coreth/cmd/simulator/key",
+        "//graft/coreth/cmd/simulator/load",
+        "//graft/coreth/cmd/simulator/metrics",
+        "//graft/coreth/cmd/simulator/txs",
+        "//graft/coreth/ethclient",
+        "//graft/coreth/params",
+        "//graft/coreth/precompile/contracts/warp",
+        "//graft/coreth/tests/utils",
+        "//graft/coreth/warp",
+        "//ids",
+        "//snow/validators",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//utils/constants",
+        "//vms/evm/predicate",
+        "//vms/platformvm",
+        "//vms/platformvm/api",
+        "//vms/platformvm/warp",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+    ],
+)
