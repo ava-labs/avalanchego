@@ -88,6 +88,10 @@ func newValidatorState() *validatorState {
 	}
 }
 
+// LoadValidatorMetadata sets the [metadata] of [vdrID] on [subnetID].
+// GetUptime and SetUptime will return an error if the [vdrID] and
+// [subnetID] hasn't been loaded. This call will not result in a write to
+// disk.
 func (m *validatorState) LoadValidatorMetadata(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
@@ -101,6 +105,8 @@ func (m *validatorState) LoadValidatorMetadata(
 	subnetMetadata[subnetID] = uptime
 }
 
+// GetUptime returns the current uptime measurements of [vdrID] on
+// [subnetID].
 func (m *validatorState) GetUptime(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
@@ -112,6 +118,9 @@ func (m *validatorState) GetUptime(
 	return metadata.UpDuration, metadata.lastUpdated, nil
 }
 
+// SetUptime updates the uptime measurements of [vdrID] on [subnetID].
+// Unless these measurements are deleted first, the next call to
+// WriteUptimes will write this update to disk.
 func (m *validatorState) SetUptime(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
@@ -129,6 +138,8 @@ func (m *validatorState) SetUptime(
 	return nil
 }
 
+// GetDelegateeReward returns the current rewards accrued to [vdrID] on
+// [subnetID].
 func (m *validatorState) GetDelegateeReward(
 	subnetID ids.ID,
 	vdrID ids.NodeID,
@@ -140,6 +151,9 @@ func (m *validatorState) GetDelegateeReward(
 	return metadata.PotentialDelegateeReward, nil
 }
 
+// SetDelegateeReward updates the rewards accrued to [vdrID] on [subnetID].
+// Unless these measurements are deleted first, the next call to
+// WriteUptimes will write this update to disk.
 func (m *validatorState) SetDelegateeReward(
 	subnetID ids.ID,
 	vdrID ids.NodeID,
@@ -155,6 +169,10 @@ func (m *validatorState) SetDelegateeReward(
 	return nil
 }
 
+// DeleteValidatorMetadata removes in-memory references to the metadata of
+// [vdrID] on [subnetID]. If there were staged updates from a prior call to
+// SetUptime or SetDelegateeReward, the updates will be dropped. This call
+// will not result in a write to disk.
 func (m *validatorState) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 	subnetMetadata := m.metadata[vdrID]
 	delete(subnetMetadata, subnetID)
@@ -169,6 +187,8 @@ func (m *validatorState) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.
 	}
 }
 
+// WriteValidatorMetadata writes all staged updates from prior calls to
+// SetUptime or SetDelegateeReward.
 func (m *validatorState) WriteValidatorMetadata(
 	dbPrimary database.KeyValueWriter,
 	dbSubnet database.KeyValueWriter,
