@@ -17,7 +17,7 @@ For the rationale behind the multi-module tagging process, see [Multi-Module Rel
 All components follow aligned versioning:
 
 - Same version number - When AvalancheGo releases v1.14.0, Subnet-EVM is also v1.14.0
-- Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.14.0`, `graft/coreth/v1.14.0`, `graft/subnet-evm/v1.14.0`)
+- Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.14.0`, `graft/coreth/v1.14.0`, `graft/evm/v1.14.0`, `graft/subnet-evm/v1.14.0`)
 
 ### Component Release Notes
 
@@ -448,7 +448,7 @@ To share work-in-progress without merging to master:
 
 1. On your branch, run `./scripts/run_task.sh tags-set-require-directives -- v0.0.0-mybranch`
 2. Commit and push to your branch
-3. Run `./scripts/run_task.sh tags-create -- v0.0.0-mybranch`
+3. Run `./scripts/run_task.sh tags-create -- --no-sign v0.0.0-mybranch`
 4. Run `./scripts/run_task.sh tags-push -- v0.0.0-mybranch`
 
 External consumers can then `go get github.com/ava-labs/avalanchego@v0.0.0-mybranch`.
@@ -462,7 +462,8 @@ specified version. Version must match `vX.Y.Z` or `vX.Y.Z-suffix`.
 
 ### `tags-create`
 
-Creates tags for the main module and all submodules at the current commit.
+Creates signed tags for the main module and all submodules at the current
+commit. Pass `--no-sign` for unsigned tags (e.g., development tags).
 
 ### `tags-push`
 
