@@ -43,7 +43,7 @@ HEAD_SHORT="$(git rev-parse --short HEAD)"
 existing=()
 all_at_head=true
 for tag in "${TAGS[@]}"; do
-    if tag_commit="$(git rev-parse "$tag" 2>/dev/null)"; then
+    if tag_commit="$(git rev-parse "$tag^{commit}" 2>/dev/null)"; then
         existing+=("$tag")
         if [[ "$tag_commit" != "$HEAD_COMMIT" ]]; then
             all_at_head=false

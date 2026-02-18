@@ -76,7 +76,7 @@ These changes prepare the merge commit that will be tagged.
 1. Update submodule require directives to reference the future tag:
 
    ```bash
-   ./scripts/run_task.sh tags-set-require-directives -- "$VERSION_RC"
+   ./scripts/run_task.sh tags-update-require-directives -- "$VERSION_RC"
    ```
 
 ### 4. Commit and Create PR
@@ -296,7 +296,7 @@ to the final version, merge, then tag the resulting commit:
 ```bash
 git fetch origin master
 git checkout -b "tags/$VERSION" origin/master
-./scripts/run_task.sh tags-set-require-directives -- "$VERSION"
+./scripts/run_task.sh tags-update-require-directives -- "$VERSION"
 git add .
 git commit -S -m "chore: set require directives for $VERSION"
 git push -u origin "tags/$VERSION"
@@ -445,8 +445,8 @@ go test -run ^TestCompatibility$ github.com/ava-labs/avalanchego/graft/subnet-ev
 
 To share work-in-progress without merging to master:
 
-1. On your branch, run `./scripts/run_task.sh tags-set-require-directives -- v0.0.0-mybranch`
-2. Commit and push to your branch
+1. On your branch, run `./scripts/run_task.sh tags-update-require-directives -- v0.0.0-mybranch`
+2. Commit and push to your branch (tags must reference a commit reachable on the remote)
 3. Run `./scripts/run_task.sh tags-create -- --no-sign v0.0.0-mybranch`
 4. Run `./scripts/run_task.sh tags-push -- v0.0.0-mybranch`
 
@@ -454,7 +454,7 @@ External consumers can then `go get github.com/ava-labs/avalanchego@v0.0.0-mybra
 
 ## Tagging Task Reference
 
-### `tags-set-require-directives`
+### `tags-update-require-directives`
 
 Updates `require` directives in all go.mod files to reference the
 specified version. Version must match `vX.Y.Z` or `vX.Y.Z-suffix`.

@@ -368,9 +368,12 @@ tasks:
     desc: Pushes tags for avalanchego and submodules
     cmd: ./scripts/push_tags.sh {{.CLI_ARGS}}
 
-  tags-set-require-directives:
+  tags-update-require-directives:
     desc: Updates require directives for avalanchego modules
-    cmd: ./scripts/update_require_directives.sh {{.CLI_ARGS}}
+    cmds:
+      - ./scripts/update_require_directives.sh {{.CLI_ARGS}}
+      - task: go-mod-tidy
+      - task: check-require-directives
 
   test-upgrade:
     desc: Runs upgrade tests

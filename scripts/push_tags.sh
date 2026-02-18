@@ -29,5 +29,14 @@ for prefix in "${TAG_PREFIXES[@]}"; do
     TAGS+=("${prefix}${VERSION}")
 done
 
+# Verify all tags exist locally before pushing
+for tag in "${TAGS[@]}"; do
+    if ! git rev-parse "$tag" >/dev/null 2>&1; then
+        echo "Error: Tag '$tag' does not exist locally." >&2
+        echo "Run './scripts/run_task.sh tags-create -- $VERSION' first." >&2
+        exit 1
+    fi
+done
+
 echo "Pushing tags for $VERSION to $REMOTE:"
 git push "$REMOTE" "${TAGS[@]}"

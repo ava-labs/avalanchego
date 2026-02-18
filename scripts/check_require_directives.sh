@@ -33,7 +33,7 @@ for go_mod in "${GO_MODS[@]}"; do
 done
 
 if [[ ${#versions[@]} -eq 0 ]]; then
-  echo "error: no internal module require directives found"
+  echo "error: no internal module require directives found" >&2
   exit 1
 fi
 
@@ -48,13 +48,13 @@ for i in "${!versions[@]}"; do
 done
 
 if [[ ${#mismatches[@]} -gt 0 ]]; then
-  echo "Inconsistent internal module require versions (expected $reference):"
-  echo "  ${sources[0]}"
+  echo "Inconsistent internal module require versions (expected $reference):" >&2
+  echo "  ${sources[0]}" >&2
   for m in "${mismatches[@]}"; do
-    echo "  $m"
+    echo "  $m" >&2
   done
-  echo ""
-  echo "Run './scripts/run_task.sh tags-set-require-directives -- <version>' to fix."
+  echo "" >&2
+  echo "Run './scripts/run_task.sh tags-update-require-directives -- <version>' to fix." >&2
   exit 1
 fi
 
