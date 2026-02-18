@@ -11,7 +11,7 @@ tasks:
   default: ./scripts/run_task.sh --list
 
   build:
-    desc: Compile Subnet EVM binary with git commit and static linking flags
+    desc: Compile Subnet EVM binary with commit hash and static linking flags
     cmd: ./scripts/build.sh {{.CLI_ARGS}}
 
   build-antithesis-images:
@@ -35,31 +35,31 @@ tasks:
     cmd: ../../scripts/check_clean_branch.sh
 
   check-generate-codec:
-    desc: Checks that generated codec files are up-to-date (requires a clean git working tree)
+    desc: Checks that generated codec files are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-codec
       - task: check-clean-branch
 
   check-generate-mocks:
-    desc: Checks that generated mocks are up-to-date (requires a clean git working tree)
+    desc: Checks that generated mocks are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-mocks
       - task: check-clean-branch
 
   check-generate-rlp:
-    desc: Checks that generated rlp files are up-to-date (requires a clean git working tree)
+    desc: Checks that generated rlp files are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-rlp
       - task: check-clean-branch
 
   check-generate-bindings:
-    desc: Checks that generated Go bindings from all Solidity contracts are up-to-date (requires a clean git working tree)
+    desc: Checks that generated Go bindings from all Solidity contracts are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-bindings
       - task: check-clean-branch
 
   check-go-mod-tidy:
-    desc: Checks that all go.mod and go.sum files are up-to-date (requires a clean git working tree)
+    desc: Checks that all go.mod and go.sum files are up-to-date (requires a clean working tree)
     cmds:
       - cmd: go mod tidy
       - task: check-clean-branch

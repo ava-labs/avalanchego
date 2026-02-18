@@ -24,7 +24,7 @@ vars:
       esac
   # Git commit hash, resolved on host (container may not have .git for worktrees).
   PACKAGING_GIT_COMMIT:
-    sh: git rev-parse HEAD
+    sh: source "{{.REPO_ROOT}}/scripts/vcs.sh" && vcs_commit_hash
   # Default tag for local testing; overridden by CI for release builds.
   PACKAGING_TAG:
     sh: echo "${PACKAGING_TAG:-v0.0.0}"

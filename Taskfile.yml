@@ -75,31 +75,31 @@ tasks:
     cmd: ./scripts/check_clean_branch.sh
 
   check-generate-canoto:
-    desc: Checks that generated canoto is up-to-date (requires a clean git working tree)
+    desc: Checks that generated canoto is up-to-date (requires a clean working tree)
     cmds:
       - task: generate-canoto
       - task: check-clean-branch
 
   check-generate-load-contract-bindings:
-    desc: Checks that generated load contract bindings are up-to-date (requires a clean git working tree)
+    desc: Checks that generated load contract bindings are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-load-contract-bindings
       - task: check-clean-branch
 
   check-generate-mocks:
-    desc: Checks that generated mocks are up-to-date (requires a clean git working tree)
+    desc: Checks that generated mocks are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-mocks
       - task: check-clean-branch
 
   check-generate-protobuf:
-    desc: Checks that generated protobuf is up-to-date (requires a clean git working tree)
+    desc: Checks that generated protobuf is up-to-date (requires a clean working tree)
     cmds:
       - task: generate-protobuf
       - task: check-clean-branch
 
   check-go-mod-tidy:
-    desc: Checks that go module configuration is consistent (requires a clean git working tree)
+    desc: Checks that go module configuration is consistent (requires a clean working tree)
     cmds:
       - task: go-mod-tidy
       - task: check-clean-branch
@@ -113,7 +113,7 @@ tasks:
     cmd: ./scripts/check_require_directives.sh
 
   check-require-directives-round-trip:
-    desc: Validates that update_require_directives.sh is idempotent (requires a clean git working tree)
+    desc: Validates that update_require_directives.sh is idempotent (requires a clean working tree)
     cmds:
       - ./scripts/check_require_directives_round_trip.sh
       - task: check-clean-branch
@@ -404,10 +404,12 @@ tasks:
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
 
   test-vcs:
+    # vcs-ok: description of test that exercises both VCS backends
     desc: Tests vcs.sh in git context and, if already a jj repo, jj context (use test-vcs-ci to force jj init)
     cmd: ./scripts/tests.vcs.sh --all
 
   test-vcs-ci:
+    # vcs-ok: description of test that exercises both VCS backends
     desc: Tests vcs.sh in both git and jj contexts. WARNING - will run 'jj git init --colocate' if not already a jj repo.
     cmd: ./scripts/tests.vcs.sh --all --init
 
