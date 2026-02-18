@@ -173,7 +173,8 @@ func TestBenchlistNoDuplicateBench(t *testing.T) {
 	require.False(b.IsBenched(vdrID))
 
 	// Register a failure. observe() detects the bench expired, clears
-	// isBenched, updates EWMA (still > 0.5), and immediately re-benches.
+	// isBenched, resets the EWMA to a clean slate, then observes the
+	// failure (p = 1.0 > 0.5) and immediately re-benches.
 	// This sends a bench job for a node the consumer already considers
 	// benched. Without the duplicate-bench guard, the consumer would call
 	// benchable.Benched() again, failing the require.NotContains assertion.
@@ -241,4 +242,61 @@ func TestBenchlistTimeout(t *testing.T) {
 	// Unbenched on the benchable.
 	<-benchable.updated
 	require.Empty(benchable.benched)
+}
+
+// Test that when a node is unbenched via timeout, its EWMA history is wiped
+// so that it gets a clean slate. Without the reset, a single failure after
+// unbenching would re-bench the node because the old high failure probability
+// is still present.
+func TestBenchlistTimeoutCleansSlate(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	vdrs := validators.NewManager()
+	vdrID := ids.GenerateTestNodeID()
+
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID, nil, ids.Empty, 1))
+
+	benchable := &benchable{
+		t:           t,
+		wantChainID: ctx.ChainID,
+		updated:     make(chan struct{}, 1),
+	}
+	b, err := newBenchlist(
+		ctx,
+		benchable,
+		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      10 * time.Second,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	now := time.Now()
+	b.clock.Set(now)
+
+	// Bench the node: p = 2/3 > 0.5
+	b.RegisterResponse(vdrID)
+	b.RegisterFailure(vdrID)
+	b.RegisterFailure(vdrID)
+	<-benchable.updated
+	require.True(b.IsBenched(vdrID))
+
+	// Advance past the bench duration so the bench expires.
+	now = now.Add(11 * time.Second)
+	b.clock.Set(now)
+	require.False(b.IsBenched(vdrID))
+
+	// Register a response followed by a failure. With a clean slate, p = 1/2
+	// which is NOT > benchProbability (0.5), so the node should NOT be
+	// re-benched. Without the EWMA reset, the old high failure probability
+	// would cause the node to be immediately re-benched.
+	b.RegisterResponse(vdrID)
+	b.RegisterFailure(vdrID)
+	require.False(b.IsBenched(vdrID))
 }
