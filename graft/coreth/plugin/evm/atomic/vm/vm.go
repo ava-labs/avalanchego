@@ -264,7 +264,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 			return err
 		}
 	case snow.NormalOp:
-		if err := vm.onNormalOperationsStarted(); err != nil {
+		if err := vm.onNormalOperationsStarted(ctx); err != nil {
 			return err
 		}
 	}
@@ -277,7 +277,7 @@ func (vm *VM) onBootstrapStarted() error {
 	return vm.Fx.Bootstrapping()
 }
 
-func (vm *VM) onNormalOperationsStarted() error {
+func (vm *VM) onNormalOperationsStarted(ctx context.Context) error {
 	if vm.bootstrapped.Get() {
 		return nil
 	}
@@ -290,7 +290,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return fmt.Errorf("failed to add atomic tx gossip handler: %w", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(ctx)
 	vm.cancel = cancel
 
 	vm.shutdownWg.Add(1)
