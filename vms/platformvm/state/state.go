@@ -1079,6 +1079,10 @@ func (s *state) DeleteCurrentValidator(staker *Staker) error {
 }
 
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
+	if _, err := s.GetCurrentValidator(subnetID, nodeID); err != nil {
+		return nil, err
+	}
+
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 

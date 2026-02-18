@@ -328,6 +328,10 @@ func (d *diff) DeleteCurrentValidator(staker *Staker) error {
 }
 
 func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
+	if _, err := d.GetCurrentValidator(subnetID, nodeID); err != nil {
+		return nil, err
+	}
+
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)

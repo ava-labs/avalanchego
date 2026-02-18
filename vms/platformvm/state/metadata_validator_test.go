@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestValidatorUptimes(t *testing.T) {
@@ -22,7 +21,7 @@ func TestValidatorUptimes(t *testing.T) {
 	state := newTestState(t, memdb.New())
 
 	// get non-existent uptime
-	staker := newTestStaker(constants.PrimaryNetworkID)
+	staker := newTestStaker()
 
 	_, _, err := state.GetUptime(staker.NodeID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -68,7 +67,7 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	require := require.New(t)
 	state := newTestState(t, memdb.New())
 
-	staker := newTestStaker(constants.PrimaryNetworkID)
+	staker := newTestStaker()
 
 	require.NoError(state.PutCurrentValidator(staker))
 	require.NoError(state.Commit())
