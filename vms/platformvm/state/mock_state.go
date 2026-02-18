@@ -263,9 +263,11 @@ func (mr *MockStateMockRecorder) CommitBatch() *gomock.Call {
 }
 
 // DeleteCurrentDelegator mocks base method.
-func (m *MockState) DeleteCurrentDelegator(staker *Staker) {
+func (m *MockState) DeleteCurrentDelegator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeleteCurrentDelegator", staker)
+	ret := m.ctrl.Call(m, "DeleteCurrentDelegator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // DeleteCurrentDelegator indicates an expected call of DeleteCurrentDelegator.
@@ -277,8 +279,9 @@ func (mr *MockStateMockRecorder) DeleteCurrentDelegator(staker any) *gomock.Call
 // DeleteCurrentValidator mocks base method.
 func (m *MockState) DeleteCurrentValidator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeleteCurrentValidator", staker)
-	return nil
+	ret := m.ctrl.Call(m, "DeleteCurrentValidator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // DeleteCurrentValidator indicates an expected call of DeleteCurrentValidator.
@@ -472,18 +475,18 @@ func (mr *MockStateMockRecorder) GetCurrentValidators(ctx, subnetID any) *gomock
 }
 
 // GetDelegateeReward mocks base method.
-func (m *MockState) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
+func (m *MockState) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDelegateeReward", subnetID, nodeID)
+	ret := m.ctrl.Call(m, "GetDelegateeReward", subnetID, vdrID)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetDelegateeReward indicates an expected call of GetDelegateeReward.
-func (mr *MockStateMockRecorder) GetDelegateeReward(subnetID, nodeID any) *gomock.Call {
+func (mr *MockStateMockRecorder) GetDelegateeReward(subnetID, vdrID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), subnetID, nodeID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), subnetID, vdrID)
 }
 
 // GetExpiryIterator mocks base method.
@@ -814,9 +817,11 @@ func (mr *MockStateMockRecorder) NumActiveL1Validators() *gomock.Call {
 }
 
 // PutCurrentDelegator mocks base method.
-func (m *MockState) PutCurrentDelegator(staker *Staker) {
+func (m *MockState) PutCurrentDelegator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "PutCurrentDelegator", staker)
+	ret := m.ctrl.Call(m, "PutCurrentDelegator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // PutCurrentDelegator indicates an expected call of PutCurrentDelegator.
@@ -930,17 +935,17 @@ func (mr *MockStateMockRecorder) SetCurrentSupply(subnetID, cs any) *gomock.Call
 }
 
 // SetDelegateeReward mocks base method.
-func (m *MockState) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
+func (m *MockState) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uint64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetDelegateeReward", subnetID, nodeID, amount)
+	ret := m.ctrl.Call(m, "SetDelegateeReward", subnetID, vdrID, amount)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetDelegateeReward indicates an expected call of SetDelegateeReward.
-func (mr *MockStateMockRecorder) SetDelegateeReward(subnetID, nodeID, amount any) *gomock.Call {
+func (mr *MockStateMockRecorder) SetDelegateeReward(subnetID, vdrID, amount any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), subnetID, nodeID, amount)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), subnetID, vdrID, amount)
 }
 
 // SetFeeState mocks base method.
@@ -1069,4 +1074,30 @@ func (m *MockState) WeightOfL1Validators(subnetID ids.ID) (uint64, error) {
 func (mr *MockStateMockRecorder) WeightOfL1Validators(subnetID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WeightOfL1Validators", reflect.TypeOf((*MockState)(nil).WeightOfL1Validators), subnetID)
+}
+
+// deleteValidatorMetadata mocks base method.
+func (m *MockState) deleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "deleteValidatorMetadata", vdrID, subnetID)
+}
+
+// deleteValidatorMetadata indicates an expected call of deleteValidatorMetadata.
+func (mr *MockStateMockRecorder) deleteValidatorMetadata(vdrID, subnetID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "deleteValidatorMetadata", reflect.TypeOf((*MockState)(nil).deleteValidatorMetadata), vdrID, subnetID)
+}
+
+// writeValidatorMetadata mocks base method.
+func (m *MockState) writeValidatorMetadata(dbPrimary, dbSubnet database.KeyValueWriter, codecVersion uint16) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "writeValidatorMetadata", dbPrimary, dbSubnet, codecVersion)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// writeValidatorMetadata indicates an expected call of writeValidatorMetadata.
+func (mr *MockStateMockRecorder) writeValidatorMetadata(dbPrimary, dbSubnet, codecVersion any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "writeValidatorMetadata", reflect.TypeOf((*MockState)(nil).writeValidatorMetadata), dbPrimary, dbSubnet, codecVersion)
 }

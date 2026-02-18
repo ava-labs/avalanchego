@@ -2501,6 +2501,34 @@ func testCurrentStakers(t *testing.T, csF func() CurrentStakers) {
 			require.Equal(t, uint64(123), got)
 		})
 	})
+
+	t.Run("get current delegator iterator", func(t *testing.T) {
+		t.Run("has delegators", func(t *testing.T) {
+			cs := csF()
+			v := newTestCurrentStaker(t)
+
+			require.NoError(t, cs.PutCurrentValidator(v))
+
+			d1 := newTestCurrentStaker(t)
+			d1.EndTime = time.Time{}.Add(1 * time.Second)
+
+			require.NoError(t, cs.PutCurrentDelegator(d1))
+
+			d2 := newTestCurrentStaker(t)
+			d2.EndTime = time.Time{}.Add(2 * time.Second)
+
+			require.NoError(t, cs.PutCurrentDelegator(d2))
+
+			d3 := newTestCurrentStaker(t)
+			d3.EndTime = time.Time{}.Add(3 * time.Second)
+
+			require.NoError(t, cs.PutCurrentDelegator(d3))
+		})
+
+		t.Run("no delegators", func(t *testing.T) {
+
+		})
+	})
 }
 
 func newTestCurrentStaker(t *testing.T) *Staker {

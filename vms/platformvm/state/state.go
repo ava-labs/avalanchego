@@ -50,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const (
@@ -158,6 +159,36 @@ type State interface {
 	Chain
 	uptime.State
 	avax.UTXOReader
+
+	// GetDelegateeReward returns the current rewards accrued to [vdrID] on
+	// [subnetID].
+	GetDelegateeReward(
+		subnetID ids.ID,
+		vdrID ids.NodeID,
+	) (amount uint64, err error)
+
+	// SetDelegateeReward updates the rewards accrued to [vdrID] on [subnetID].
+	// Unless these measurements are deleted first, the next call to
+	// WriteUptimes will write this update to disk.
+	SetDelegateeReward(
+		subnetID ids.ID,
+		vdrID ids.NodeID,
+		amount uint64,
+	) error
+
+	// DeleteValidatorMetadata removes in-memory references to the state of
+	// [vdrID] on [subnetID]. If there were staged updates from a prior call to
+	// SetUptime or SetDelegateeReward, the updates will be dropped. This call
+	// will not result in a write to disk.
+	deleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID)
+
+	// WriteValidatorMetadata writes all staged updates from prior calls to
+	// SetUptime or SetDelegateeReward.
+	writeValidatorMetadata(
+		dbPrimary database.KeyValueWriter,
+		dbSubnet database.KeyValueWriter,
+		codecVersion uint16,
+	) error
 
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
@@ -373,8 +404,6 @@ type stateBlk struct {
  *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
  */
 type state struct {
-	validatorState
-
 	validators validators.Manager
 	ctx        *snow.Context
 	upgrades   upgrade.Config
@@ -485,6 +514,9 @@ type state struct {
 	// TODO: Remove indexedHeights once v1.11.3 has been released.
 	indexedHeights *heightRange
 	singletonDB    database.Database
+
+	metadata        map[ids.NodeID]map[ids.ID]*validatorMetadata
+	updatedMetadata map[ids.NodeID]set.Set[ids.ID]
 }
 
 // heightRange is used to track which heights are safe to use the native DB
@@ -754,8 +786,6 @@ func New(
 	}
 
 	s := &state{
-		validatorState: newValidatorState(),
-
 		validators: validators,
 		ctx:        ctx,
 		upgrades:   upgrades,
@@ -850,6 +880,9 @@ func New(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(SingletonPrefix, baseDB),
+
+		metadata:        make(map[ids.NodeID]map[ids.ID]*validatorMetadata),
+		updatedMetadata: make(map[ids.NodeID]set.Set[ids.ID]),
 	}
 
 	if err := s.sync(genesisBytes); err != nil {
@@ -1012,8 +1045,12 @@ func verifyHasCurrentValidator(
 		return err
 	}
 
-	if errors.Is(err, database.ErrNotFound) && expected {
-		return err
+	if errors.Is(err, database.ErrNotFound) {
+		if expected {
+			return err
+		}
+
+		return nil
 	}
 
 	if !expected {
@@ -1045,12 +1082,14 @@ func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) 
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
-func (s *state) PutCurrentDelegator(staker *Staker) {
+func (s *state) PutCurrentDelegator(staker *Staker) error {
 	s.currentStakers.PutDelegator(staker)
+	return nil
 }
 
-func (s *state) DeleteCurrentDelegator(staker *Staker) {
+func (s *state) DeleteCurrentDelegator(staker *Staker) error {
 	s.currentStakers.DeleteDelegator(staker)
+	return nil
 }
 
 func (s *state) GetCurrentStakerIterator() (iterator.Iterator[*Staker], error) {
@@ -1972,7 +2011,7 @@ func (s *state) loadCurrentValidators() error {
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
+		s.loadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 	}
 
 	subnetValidatorIt := s.currentSubnetValidatorList.NewIterator()
@@ -2022,7 +2061,7 @@ func (s *state) loadCurrentValidators() error {
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
+		s.loadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 	}
 
 	delegatorIt := s.currentDelegatorList.NewIterator()
@@ -2280,7 +2319,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeValidatorDiffs(height),
 		s.writeCurrentStakers(codecVersion),
 		s.writePendingStakers(),
-		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
+		s.writeValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
 		s.writeL1Validators(),
 		s.writeTXs(),
 		s.writeRewardUTXOs(),
@@ -2867,13 +2906,13 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 					return fmt.Errorf("failed to write current validator to list: %w", err)
 				}
 
-				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
+				s.loadValidatorMetadata(nodeID, subnetID, metadata)
 			case deleted:
 				if err := validatorDB.Delete(validatorDiff.validator.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
 				}
 
-				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
+				s.deleteValidatorMetadata(nodeID, subnetID)
 			}
 
 			err := writeCurrentDelegatorDiff(
@@ -3426,12 +3465,25 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 	return s.Commit()
 }
 
+// TODO document how this interacts with Commit
 func (s *state) GetUptime(vdrID ids.NodeID) (time.Duration, time.Time, error) {
-	return s.validatorState.GetUptime(vdrID, constants.PrimaryNetworkID)
+	metadata, exists := s.metadata[vdrID][constants.PrimaryNetworkID]
+	if !exists {
+		return 0, time.Time{}, database.ErrNotFound
+	}
+	return metadata.UpDuration, metadata.lastUpdated, nil
 }
 
 func (s *state) SetUptime(vdrID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
-	return s.validatorState.SetUptime(vdrID, constants.PrimaryNetworkID, upDuration, lastUpdated)
+	metadata, exists := s.metadata[vdrID][constants.PrimaryNetworkID]
+	if !exists {
+		return database.ErrNotFound
+	}
+	metadata.UpDuration = upDuration
+	metadata.lastUpdated = lastUpdated
+
+	s.addUpdatedMetadata(vdrID, constants.PrimaryNetworkID)
+	return nil
 }
 
 func markInitialized(db database.KeyValueWriter) error {

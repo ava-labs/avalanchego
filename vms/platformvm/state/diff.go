@@ -282,6 +282,10 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 }
 
 func (d *diff) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
+	if _, err := d.GetCurrentValidator(subnetID, nodeID); err != nil {
+		return err
+	}
+
 	if d.modifiedDelegateeRewards == nil {
 		d.modifiedDelegateeRewards = make(map[ids.ID]map[ids.NodeID]uint64)
 	}
@@ -337,12 +341,14 @@ func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (
 	return d.currentStakerDiffs.GetDelegatorIterator(parentIterator, subnetID, nodeID), nil
 }
 
-func (d *diff) PutCurrentDelegator(staker *Staker) {
+func (d *diff) PutCurrentDelegator(staker *Staker) error {
 	d.currentStakerDiffs.PutDelegator(staker)
+	return nil
 }
 
-func (d *diff) DeleteCurrentDelegator(staker *Staker) {
+func (d *diff) DeleteCurrentDelegator(staker *Staker) error {
 	d.currentStakerDiffs.DeleteDelegator(staker)
+	return nil
 }
 
 func (d *diff) GetCurrentStakerIterator() (iterator.Iterator[*Staker], error) {

@@ -378,17 +378,8 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 
 func TestDiffCurrentValidator(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	state := NewMockState(ctrl)
-	// Called in NewDiffOn
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
-	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
-
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(newTestState(t, memdb.New()))
 	require.NoError(err)
 
 	// Put a current validator
@@ -408,7 +399,6 @@ func TestDiffCurrentValidator(t *testing.T) {
 	require.NoError(d.DeleteCurrentValidator(currentValidator))
 
 	// Make sure the deletion worked
-	state.EXPECT().GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID).Return(nil, database.ErrNotFound).Times(1)
 	_, err = d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }

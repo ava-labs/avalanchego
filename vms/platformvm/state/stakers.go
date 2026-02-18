@@ -59,13 +59,13 @@ type CurrentStakers interface {
 	// staker set.
 	//
 	// Invariant: [staker] is not currently a CurrentDelegator
-	PutCurrentDelegator(staker *Staker)
+	PutCurrentDelegator(staker *Staker) error
 
 	// DeleteCurrentDelegator removes the [staker] describing a delegator from
 	// the staker set.
 	//
 	// Invariant: [staker] is currently a CurrentDelegator
-	DeleteCurrentDelegator(staker *Staker)
+	DeleteCurrentDelegator(staker *Staker) error
 
 	// GetCurrentStakerIterator returns stakers in order of their removal from
 	// the current staker set.

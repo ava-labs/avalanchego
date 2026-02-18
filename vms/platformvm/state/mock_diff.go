@@ -134,9 +134,11 @@ func (mr *MockDiffMockRecorder) Apply(arg0 any) *gomock.Call {
 }
 
 // DeleteCurrentDelegator mocks base method.
-func (m *MockDiff) DeleteCurrentDelegator(staker *Staker) {
+func (m *MockDiff) DeleteCurrentDelegator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeleteCurrentDelegator", staker)
+	ret := m.ctrl.Call(m, "DeleteCurrentDelegator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // DeleteCurrentDelegator indicates an expected call of DeleteCurrentDelegator.
@@ -148,8 +150,9 @@ func (mr *MockDiffMockRecorder) DeleteCurrentDelegator(staker any) *gomock.Call 
 // DeleteCurrentValidator mocks base method.
 func (m *MockDiff) DeleteCurrentValidator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeleteCurrentValidator", staker)
-	return nil
+	ret := m.ctrl.Call(m, "DeleteCurrentValidator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // DeleteCurrentValidator indicates an expected call of DeleteCurrentValidator.
@@ -548,9 +551,11 @@ func (mr *MockDiffMockRecorder) NumActiveL1Validators() *gomock.Call {
 }
 
 // PutCurrentDelegator mocks base method.
-func (m *MockDiff) PutCurrentDelegator(staker *Staker) {
+func (m *MockDiff) PutCurrentDelegator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "PutCurrentDelegator", staker)
+	ret := m.ctrl.Call(m, "PutCurrentDelegator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // PutCurrentDelegator indicates an expected call of PutCurrentDelegator.
