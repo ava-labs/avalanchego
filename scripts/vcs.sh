@@ -100,6 +100,36 @@ vcs_in_repo() {
   git rev-parse --is-inside-work-tree >/dev/null 2>&1
 }
 
+# List tracked files matching the given pathspec patterns.
+# Accepts an optional -z flag for NUL-delimited output.
+# Usage: vcs_ls_files [-z] [pattern ...]
+vcs_ls_files() {
+  local nul_delimited=false
+  if [[ "${1:-}" == "-z" ]]; then
+    nul_delimited=true
+    shift
+  fi
+
+  if _vcs_is_jj; then
+    # jj requires the glob: prefix for glob patterns
+    local jj_args=()
+    for pattern in "$@"; do
+      jj_args+=("glob:${pattern}")
+    done
+    if [[ "${nul_delimited}" == true ]]; then
+      jj file list "${jj_args[@]}" 2>/dev/null | tr '\n' '\0'
+    else
+      jj file list "${jj_args[@]}" 2>/dev/null
+    fi
+  else
+    if [[ "${nul_delimited}" == true ]]; then
+      git ls-files -z "$@"
+    else
+      git ls-files "$@"
+    fi
+  fi
+}
+
 # --- Convenience variables for use by callers ---
 # WARNING: these use the most recent commit even if there are un-committed changes present
 vcs_commit="${AVALANCHEGO_COMMIT:-$(vcs_commit_hash)}"

@@ -93,6 +93,26 @@ run_tests() {
     echo "  PASS: vcs_is_clean runs without error (dirty)"
   fi
 
+  # vcs_ls_files: returns tracked files matching patterns
+  local ls_output
+  ls_output="$(vcs_ls_files 'go.mod' '*/go.mod')"
+  assert "vcs_ls_files returns non-empty output for go.mod" test -n "${ls_output}"
+  assert "vcs_ls_files includes root go.mod" echo "${ls_output}" | grep -qx 'go.mod'
+
+  # vcs_ls_files -z: NUL-delimited output
+  local count_z=0
+  while IFS= read -r -d '' _file; do
+    count_z=$((count_z + 1))
+  done < <(vcs_ls_files -z 'go.mod' '*/go.mod')
+  assert "vcs_ls_files -z returns at least one file" test "${count_z}" -gt 0
+
+  # Counts should match between newline and NUL modes
+  local count_nl
+  count_nl="$(echo "${ls_output}" | wc -l)"
+  # Trim whitespace from wc output
+  count_nl="${count_nl// /}"
+  assert_eq "vcs_ls_files -z count matches newline count" "${count_nl}" "${count_z}"
+
   # Convenience variables
   assert "vcs_commit is set" test -n "${vcs_commit}"
   assert "vcs_commit_short is set" test -n "${vcs_commit_short}"
