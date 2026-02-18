@@ -98,16 +98,6 @@ tasks:
       - task: generate-protobuf
       - task: check-clean-branch
 
-  check-require-directives:
-    desc: Checks that internal module require directives reference the same version
-    cmd: ./scripts/check_require_directives.sh
-
-  check-require-directives-round-trip:
-    desc: Validates that update_require_directives.sh is idempotent (requires a clean git working tree)
-    cmds:
-      - ./scripts/check_require_directives_round_trip.sh
-      - task: check-clean-branch
-
   check-go-mod-tidy:
     desc: Checks that go module configuration is consistent (requires a clean git working tree)
     cmds:
@@ -117,6 +107,16 @@ tasks:
   check-go-version:
     desc: Checks that go version directives are consistent across all modules
     cmd: ./scripts/check_go_version.sh
+
+  check-require-directives:
+    desc: Checks that internal module require directives reference the same version
+    cmd: ./scripts/check_require_directives.sh
+
+  check-require-directives-round-trip:
+    desc: Validates that update_require_directives.sh is idempotent (requires a clean git working tree)
+    cmds:
+      - ./scripts/check_require_directives_round_trip.sh
+      - task: check-clean-branch
 
   create-kind-cluster:
     desc: Creates the default kind cluster
@@ -195,10 +195,10 @@ tasks:
       - lint
       - lint-action
       - lint-shell
-      - check-require-directives
-      - check-require-directives-round-trip
       - check-go-mod-tidy
       - check-go-version
+      - check-require-directives
+      - check-require-directives-round-trip
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -206,10 +206,10 @@ tasks:
       - task: lint
       - task: lint-action
       - task: lint-shell
-      - task: check-require-directives
-      - task: check-require-directives-round-trip
       - task: check-go-mod-tidy
       - task: check-go-version
+      - task: check-require-directives
+      - task: check-require-directives-round-trip
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
