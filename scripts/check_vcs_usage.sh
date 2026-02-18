@@ -19,158 +19,91 @@ EXCLUDED_FILES=(
   scripts/tests.vcs.sh
 )
 
-# Find all .sh files. Include .github/ scripts (dotfiles are missed by
-# `find *`, so we list .github explicitly).
-#
-# shellcheck disable=SC2035
-mapfile -t scripts < <(
+# find_files discovers files matching the given pattern, including under
+# .github/ which is missed by `find *`.
+find_files() {
+  local pattern="$1"
+  # shellcheck disable=SC2035
   {
-    find * -name '*.sh' -type f -print
-    find .github -name '*.sh' -type f 2>/dev/null || true
+    find * -name "$pattern" -type f -print
+    find .github -name "$pattern" -type f 2>/dev/null || true
   } | sort -u
-)
+}
+
+# check_files scans files for direct git/jj command invocations.
+# A "# vcs-ok:" comment on the same line OR on the immediately preceding
+# line whitelists a match (useful for multi-line strings like commit
+# messages).
+#
+# Returns the number of violations found via the global violations counter.
+violations=0
+
+check_files() {
+  local -n files=$1
+
+  for file in "${files[@]}"; do
+    # Skip excluded files
+    local skip=false
+    for excluded in "${EXCLUDED_FILES[@]}"; do
+      if [[ "$file" == "$excluded" ]]; then
+        skip=true
+        break
+      fi
+    done
+    if [[ "$skip" == true ]]; then
+      continue
+    fi
+
+    local line_num=0
+    local prev_line=""
+    while IFS= read -r line; do
+      line_num=$((line_num + 1))
+
+      # Skip whitelisted lines (same line or preceding line)
+      if [[ "$line" == *"# vcs-ok:"* ]] || [[ "$prev_line" == *"# vcs-ok:"* ]]; then
+        prev_line="$line"
+        continue
+      fi
+
+      # Skip pure comment lines (no code before the #)
+      local stripped="${line#"${line%%[![:space:]]*}"}"
+      if [[ "$stripped" == \#* ]]; then
+        prev_line="$line"
+        continue
+      fi
+
+      if echo "$line" | grep -qE '(^|[|;&`(! ])[ \t]*(git|jj)( |$)'; then
+        echo "${file}:${line_num}: ${line}"
+        violations=$((violations + 1))
+      fi
+      prev_line="$line"
+    done < "$file"
+  done
+}
+
+# Collect files to scan.
+mapfile -t scripts < <(find_files '*.sh')
 if [[ ${#scripts[@]} -eq 0 ]]; then
   echo "Error: no .sh files found" >&2
   exit 1
 fi
 
-# Also find Taskfile.yml files whose sh: blocks may contain git/jj usage.
-# shellcheck disable=SC2035
-mapfile -t taskfiles < <(
-  {
-    find * -name 'Taskfile.yml' -type f -print
-    find .github -name 'Taskfile.yml' -type f 2>/dev/null || true
-  } | sort -u
-)
+mapfile -t taskfiles < <(find_files 'Taskfile.yml')
 if [[ ${#taskfiles[@]} -eq 0 ]]; then
   echo "Error: no Taskfile.yml files found" >&2
   exit 1
 fi
 
-# Match lines that invoke git or jj as a command. The pattern matches:
-#   - Start of line or after shell operators (|, &&, ||, ;, $( , `, !)
-#   - Optional leading whitespace
-#   - The literal word "git" or "jj" followed by a space or end of line
-#
-# Lines containing "# vcs-ok:" are whitelisted.
-violations=0
-
-for script in "${scripts[@]}"; do
-  # Skip excluded files
-  skip=false
-  for excluded in "${EXCLUDED_FILES[@]}"; do
-    if [[ "$script" == "$excluded" ]]; then
-      skip=true
-      break
-    fi
-  done
-  if [[ "$skip" == true ]]; then
-    continue
-  fi
-
-  # Read the file and check each line. A "# vcs-ok:" comment on the
-  # same line OR on the immediately preceding line whitelists a match.
-  # The preceding-line form is useful when the git/jj invocation is in
-  # the middle of a multi-line string (e.g., a commit message).
-  line_num=0
-  prev_line=""
-  while IFS= read -r line; do
-    line_num=$((line_num + 1))
-
-    # Skip whitelisted lines (same line or preceding line)
-    if [[ "$line" == *"# vcs-ok:"* ]] || [[ "$prev_line" == *"# vcs-ok:"* ]]; then
-      prev_line="$line"
-      continue
-    fi
-
-    # Skip pure comment lines (no code before the #)
-    stripped="${line#"${line%%[![:space:]]*}"}"
-    if [[ "$stripped" == \#* ]]; then
-      prev_line="$line"
-      continue
-    fi
-
-    # Check for direct git or jj command invocations
-    if echo "$line" | grep -qE '(^|[|;&`(! ])[ \t]*(git|jj)( |$)'; then
-      echo "${script}:${line_num}: ${line}"
-      violations=$((violations + 1))
-    fi
-    prev_line="$line"
-  done < "$script"
-done
-
-# Also find Dockerfiles whose RUN blocks may contain git/jj usage.
-# shellcheck disable=SC2035
-mapfile -t dockerfiles < <(
-  {
-    find * -name 'Dockerfile*' -type f -print
-    find .github -name 'Dockerfile*' -type f 2>/dev/null || true
-  } | sort -u
-)
+mapfile -t dockerfiles < <(find_files 'Dockerfile*')
 if [[ ${#dockerfiles[@]} -eq 0 ]]; then
   echo "Error: no Dockerfiles found" >&2
   exit 1
 fi
 
-# Check Dockerfiles for direct git/jj usage. Scans lines the same way
-# as shell scripts; the vcs-ok whitelist handles any false positives
-# from non-command contexts (e.g., package installs).
-for dockerfile in "${dockerfiles[@]}"; do
-  line_num=0
-  prev_line=""
-  while IFS= read -r line; do
-    line_num=$((line_num + 1))
-
-    # Skip whitelisted lines (same line or preceding line)
-    if [[ "$line" == *"# vcs-ok:"* ]] || [[ "$prev_line" == *"# vcs-ok:"* ]]; then
-      prev_line="$line"
-      continue
-    fi
-
-    # Skip pure comment lines (no code before the #)
-    stripped="${line#"${line%%[![:space:]]*}"}"
-    if [[ "$stripped" == \#* ]]; then
-      prev_line="$line"
-      continue
-    fi
-
-    if echo "$line" | grep -qE '(^|[|;&`(! ])[ \t]*(git|jj)( |$)'; then
-      echo "${dockerfile}:${line_num}: ${line}"
-      violations=$((violations + 1))
-    fi
-    prev_line="$line"
-  done < "$dockerfile"
-done
-
-# Check Taskfile.yml sh: blocks for direct git/jj usage. Scans lines
-# the same way as shell scripts; the vcs-ok whitelist handles any false
-# positives from non-shell YAML content.
-for taskfile in "${taskfiles[@]}"; do
-  line_num=0
-  prev_line=""
-  while IFS= read -r line; do
-    line_num=$((line_num + 1))
-
-    # Skip whitelisted lines (same line or preceding line)
-    if [[ "$line" == *"# vcs-ok:"* ]] || [[ "$prev_line" == *"# vcs-ok:"* ]]; then
-      prev_line="$line"
-      continue
-    fi
-
-    # Skip YAML comment lines
-    stripped="${line#"${line%%[![:space:]]*}"}"
-    if [[ "$stripped" == \#* ]]; then
-      prev_line="$line"
-      continue
-    fi
-
-    if echo "$line" | grep -qE '(^|[|;&`(! ])[ \t]*(git|jj)( |$)'; then
-      echo "${taskfile}:${line_num}: ${line}"
-      violations=$((violations + 1))
-    fi
-    prev_line="$line"
-  done < "$taskfile"
-done
+# Scan all file types for violations.
+check_files scripts
+check_files taskfiles
+check_files dockerfiles
 
 if [[ $violations -gt 0 ]]; then
   echo ""
