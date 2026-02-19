@@ -14,7 +14,11 @@ import (
 const defaultCommitInterval = 4096
 
 func NewDefaultConfig() Config {
+	falsePtr := false
 	return Config{
+		StateSyncEnabled: &falsePtr,
+		Preimages:        true,
+		AnalyzeState:     true,
 		AllowUnprotectedTxHashes: []common.Hash{
 			common.HexToHash("0xfefb2da535e927b85fe68eb81cb2e4a5827c905f78381a01ef2322aa9b0aee8e"), // EIP-1820: https://eips.ethereum.org/EIPS/eip-1820
 		},

@@ -575,7 +575,20 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 	vm.txPool.SetMinFee(big.NewInt(acp176.MinGasPrice))
 
 	vm.eth.Start()
-	return vm.initChainState(vm.blockChain.LastAcceptedBlock())
+
+	if err := vm.initChainState(vm.blockChain.LastAcceptedBlock()); err != nil {
+		return err
+	}
+
+	// Run state analysis if enabled
+	if vm.config.AnalyzeState {
+		if err := vm.analyzeState(); err != nil {
+			log.Warn("State analysis failed", "err", err)
+			// Non-fatal - continue initialization
+		}
+	}
+
+	return nil
 }
 
 // initializeStateSync initializes the vm for performing state sync and responding to peer requests.
@@ -1191,4 +1204,37 @@ func (vm *VM) stateSyncEnabled(lastAcceptedHeight uint64) bool {
 
 func (vm *VM) PutLastAcceptedID(id ids.ID) error {
 	return vm.acceptedBlockDB.Put(lastAcceptedKey, id[:])
+}
+
+// analyzeState performs state analysis for debugging and metrics collection
+func (vm *VM) analyzeState() error {
+	// If hash lookup is requested, just do that and return
+	if len(vm.config.LookupAddressHashes) > 0 {
+		log.Info("Looking up address hashes", "count", len(vm.config.LookupAddressHashes))
+		LookupAddressHashes(vm.chaindb, vm.config.LookupAddressHashes)
+		return nil
+	}
+
+	cfg := StateAnalysisConfig{
+		OutputDir: vm.config.AnalyzeStateOutputDir,
+		Workers:   vm.config.AnalyzeStateWorkers,
+		Addresses: vm.config.AnalyzeStateAddresses,
+	}
+
+	// Fast counting with snapshot iterators and parallel workers
+	rawData, err := AnalyzeState(vm.blockChain, cfg)
+	if err != nil {
+		return err
+	}
+
+	// Post-process and log results
+	topN := vm.config.AnalyzeStateTopN
+	if topN <= 0 {
+		topN = 100
+	}
+	// Pass chaindb to resolve address hashes to actual addresses via preimage lookup
+	analyzed := AnalyzeRawData(rawData, topN, vm.chaindb)
+	LogAnalyzedResult(analyzed)
+
+	return nil
 }
