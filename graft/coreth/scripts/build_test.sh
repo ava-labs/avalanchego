@@ -16,4 +16,4 @@ fi
 
 cd "$REPO_ROOT/graft/coreth"
 # shellcheck disable=SC2046
-bisect -compile=variablemake -count 100 go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic "$@" -run ^TestCanonicalHashMarker$ github.com/ava-labs/avalanchego/graft/coreth/core
+bisect -compile=variablemake -count 10 go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic "$@" $(go list .//... | grep -v github.com/ava-labs/avalanchego/graft/coreth/tests)
