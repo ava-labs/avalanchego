@@ -122,11 +122,10 @@ func TestBenchlist(t *testing.T) {
 	requireBenched()
 }
 
-// Regression test: when observe() detects that a bench has expired via the
-// mock clock (before the consumer's real-time timer fires) and the EWMA
-// immediately re-benches the node, the consumer must not send a duplicate
-// Benched notification. The benchable.Benched() assertion
-// (require.NotContains) would fail if the guard were missing.
+// Regression test: Tests that when a node is unbenched by the timer and then
+// immediately re-benched by EWMA, the consumer doesn't send duplicate Benched
+// notifications. The benchable.Benched() assertion (require.NotContains) would
+// fail if the guard were missing.
 func TestBenchlistNoDuplicateBench(t *testing.T) {
 	require := require.New(t)
 
@@ -150,7 +149,7 @@ func TestBenchlistNoDuplicateBench(t *testing.T) {
 			Halflife:           DefaultHalflife,
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
-			BenchDuration:      10 * time.Second,
+			BenchDuration:      50 * time.Millisecond,
 		},
 		prometheus.NewRegistry(),
 	)
@@ -166,25 +165,20 @@ func TestBenchlistNoDuplicateBench(t *testing.T) {
 	<-benchable.updated
 	require.True(b.IsBenched(vdrID))
 
-	// Advance the mock clock past the bench duration. The real-time timer
-	// has NOT fired, so the consumer still considers the node benched.
-	now = now.Add(11 * time.Second)
-	b.clock.Set(now)
+	// Wait for the timer to fire and unbench the node. The timer resets the
+	// EWMA, giving the node a clean slate.
+	<-benchable.updated
 	require.False(b.IsBenched(vdrID))
 
-	// Register a failure. observe() detects the bench expired, clears
-	// isBenched, resets the EWMA to a clean slate, then observes the
-	// failure (p = 1.0 > 0.5) and immediately re-benches.
-	// This sends a bench job for a node the consumer already considers
-	// benched. Without the duplicate-bench guard, the consumer would call
-	// benchable.Benched() again, failing the require.NotContains assertion.
+	// Register a failure. With the clean slate, p = 1.0 > 0.5, so the node
+	// is re-benched. This is a legitimate unbench-then-bench sequence.
 	b.RegisterFailure(vdrID)
+	<-benchable.updated
 	require.True(b.IsBenched(vdrID))
 
 	// Drive the probability below unbenchProbability to trigger an EWMA
 	// unbench. Since jobs are FIFO, when we receive the unbench
-	// notification we know the re-bench job above was already processed
-	// (without a duplicate Benched call).
+	// notification we know all prior bench jobs were processed correctly.
 	for range 20 {
 		b.RegisterResponse(vdrID)
 	}
@@ -232,15 +226,10 @@ func TestBenchlistTimeout(t *testing.T) {
 	<-benchable.updated
 	require.True(b.IsBenched(vdrID))
 
-	// Advance the mock clock past the bench duration so IsBenched returns
-	// false immediately.
-	now = now.Add(100 * time.Millisecond)
-	b.clock.Set(now)
-	require.False(b.IsBenched(vdrID))
-
-	// The consumer goroutine's timer also fires (real time ≥ 50ms) and calls
-	// Unbenched on the benchable.
+	// The consumer goroutine's timer fires (real time ≥ 50ms) and calls
+	// Unbenched on the benchable. IsBenched now returns false.
 	<-benchable.updated
+	require.False(b.IsBenched(vdrID))
 	require.Empty(benchable.benched)
 }
 
@@ -271,7 +260,7 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 			Halflife:           DefaultHalflife,
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
-			BenchDuration:      10 * time.Second,
+			BenchDuration:      50 * time.Millisecond,
 		},
 		prometheus.NewRegistry(),
 	)
@@ -287,9 +276,9 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 	<-benchable.updated
 	require.True(b.IsBenched(vdrID))
 
-	// Advance past the bench duration so the bench expires.
-	now = now.Add(11 * time.Second)
-	b.clock.Set(now)
+	// Wait for the timer to fire and unbench the node. The timer also resets
+	// the EWMA to give the node a clean slate.
+	<-benchable.updated
 	require.False(b.IsBenched(vdrID))
 
 	// Register a response followed by a failure. With a clean slate, p = 1/2

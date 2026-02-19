@@ -158,14 +158,6 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 		b.nodes[nodeID] = n
 	}
 
-	// If the bench duration has expired, clear the benched state and reset
-	// the failure probability so that the node gets a clean slate rather
-	// than being immediately re-benched due to stale EWMA history.
-	if n.isBenched && b.benchExpired(n) {
-		n.isBenched = false
-		n.failureProbability = math.NewUninitializedAverager(b.halflife)
-	}
-
 	n.failureProbability.Observe(v, b.clock.Time())
 
 	p := n.failureProbability.Read()
@@ -183,18 +175,13 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 	}
 }
 
-// benchExpired reports whether n's bench duration has elapsed.
-func (b *benchlist) benchExpired(n *node) bool {
-	return !n.benchedAt.IsZero() && b.clock.Time().After(n.benchedAt.Add(b.benchDuration))
-}
-
 // IsBenched returns true if messages to nodeID should immediately fail.
 func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
 	n, ok := b.nodes[nodeID]
-	return ok && n.isBenched && !b.benchExpired(n)
+	return ok && n.isBenched
 }
 
 // TODO: Close goroutine within run during shutdown.
@@ -251,6 +238,15 @@ func (b *benchlist) run() {
 					zap.Stringer("nodeID", nodeID),
 				)
 				b.benchable.Unbenched(b.ctx.ChainID, nodeID)
+
+				// Update the node's state to reflect the unbench and reset
+				// the EWMA to give it a clean slate.
+				b.lock.Lock()
+				if n, ok := b.nodes[nodeID]; ok {
+					n.isBenched = false
+					n.failureProbability = math.NewUninitializedAverager(b.halflife)
+				}
+				b.lock.Unlock()
 			}
 		}
 
