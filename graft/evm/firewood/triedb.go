@@ -138,6 +138,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		ffi.WithNodeCacheEntries(config.CacheSizeBytes / 256), // TODO(#4750): is 256 bytes per node a good estimate?
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithReadCacheStrategy(config.CacheStrategy),
+		ffi.WithDeferredPersistenceCommitCount(4096),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())
