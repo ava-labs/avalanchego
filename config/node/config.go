@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/subnets"
@@ -152,8 +151,6 @@ type Config struct {
 	NetworkConfig network.Config `json:"networkConfig"`
 
 	AdaptiveTimeoutConfig timer.AdaptiveTimeoutConfig `json:"adaptiveTimeoutConfig"`
-
-	BenchlistConfig benchlist.Config `json:"benchlistConfig"`
 
 	ProfilerConfig profiler.Config `json:"profilerConfig"`
 

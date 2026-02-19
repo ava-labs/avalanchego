@@ -191,11 +191,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	fs.String(NetworkTLSKeyLogFileKey, "", "TLS key log file path. Should only be specified for debugging")
 
-	// Benchlist
-	fs.Int(BenchlistFailThresholdKey, constants.DefaultBenchlistFailThreshold, "Number of consecutive failed queries before benchlisting a node")
-	fs.Duration(BenchlistDurationKey, constants.DefaultBenchlistDuration, "Max amount of time a peer is benchlisted after surpassing the threshold")
-	fs.Duration(BenchlistMinFailingDurationKey, constants.DefaultBenchlistMinFailingDuration, "Minimum amount of time messages to a peer must be failing before the peer is benched")
-
 	// Router
 	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")
 	fs.Duration(ConsensusShutdownTimeoutKey, constants.DefaultConsensusShutdownTimeout, "Timeout before killing an unresponsive chain")
