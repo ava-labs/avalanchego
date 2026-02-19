@@ -416,6 +416,14 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 		parentPChainHeight,
 		currentSlot,
 	)
+
+	if p.vm.shouldFallbackToEmergencyProposer(parentTimestamp) && expectedProposerID != proposerID {
+		p.vm.ctx.Log.Warn("fallback to emergency proposer due to block built too long ago, setting expected proposer",
+			zap.String("expectedProposer", expectedProposerID.String()),
+			zap.String("currentProposer", proposerID.String()))
+		expectedProposerID = proposerID
+	}
+
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // block should be unsigned
@@ -448,6 +456,14 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 		parentPChainHeight,
 		currentSlot,
 	)
+
+	if p.vm.shouldFallbackToEmergencyProposer(parentTimestamp) {
+		p.vm.ctx.Log.Warn("falling back to emergency proposer due to block built too long ago, setting expected proposer",
+			zap.String("expectedProposer", expectedProposerID.String()),
+			zap.String("my ID", p.vm.ctx.NodeID.String()))
+		expectedProposerID = p.vm.ctx.NodeID
+	}
+
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // build an unsigned block
