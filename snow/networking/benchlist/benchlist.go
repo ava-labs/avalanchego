@@ -74,6 +74,11 @@ type benchlist struct {
 	// benchable.
 	jobs chan job
 
+	// notifications is a buffered channel for bench/unbench notifications
+	// that will be sent to the benchable. A dedicated worker goroutine
+	// consumes from this channel to prevent blocking the run() loop.
+	notifications chan job
+
 	lock  sync.RWMutex
 	nodes map[ids.NodeID]*node
 }
@@ -115,6 +120,7 @@ func newBenchlist(
 		benchProbability:   config.BenchProbability,
 		benchDuration:      config.BenchDuration,
 		jobs:               make(chan job, jobsBufferSize),
+		notifications:      make(chan job, jobsBufferSize),
 		nodes:              make(map[ids.NodeID]*node),
 	}
 
@@ -127,6 +133,7 @@ func newBenchlist(
 	}
 
 	go b.run()
+	go b.processNotifications()
 	return b, nil
 }
 
@@ -226,9 +233,10 @@ func (b *benchlist) run() {
 				timeoutHeap.Push(j.nodeID, time.Now().Add(b.benchDuration))
 				if !benched.Contains(j.nodeID) {
 					benched.Add(j.nodeID)
-					// Call Benched in a separate goroutine to avoid blocking
-					// the run loop if the Benchable implementation blocks.
-					go b.benchable.Benched(b.ctx.ChainID, j.nodeID)
+					b.notifications <- job{
+						nodeID: j.nodeID,
+						bench:  true,
+					}
 				}
 			} else if benched.Contains(j.nodeID) {
 				// Guard: only unbench if the consumer still considers
@@ -236,9 +244,10 @@ func (b *benchlist) run() {
 				// when both EWMA and timeout race to unbench.
 				benched.Remove(j.nodeID)
 				timeoutHeap.Remove(j.nodeID)
-				// Call Unbenched in a separate goroutine to avoid blocking
-				// the run loop if the Benchable implementation blocks.
-				go b.benchable.Unbenched(b.ctx.ChainID, j.nodeID)
+				b.notifications <- job{
+					nodeID: j.nodeID,
+					bench:  false,
+				}
 			}
 
 		case <-timer.C:
@@ -254,14 +263,29 @@ func (b *benchlist) run() {
 				b.ctx.Log.Debug("unbenching node due to timeout",
 					zap.Stringer("nodeID", nodeID),
 				)
-				// Call Unbenched in a separate goroutine to avoid blocking
-				// the run loop if the Benchable implementation blocks.
-				go b.benchable.Unbenched(b.ctx.ChainID, nodeID)
+				b.notifications <- job{
+					nodeID: nodeID,
+					bench:  false,
+				}
 			}
 		}
 
 		b.updateMetrics(benched)
 		b.resetTimer(timer, &timeoutHeap)
+	}
+}
+
+// processNotifications is a dedicated worker goroutine that consumes
+// bench/unbench notifications and makes the actual Benched/Unbenched calls
+// to the benchable. This prevents blocking the run() loop if the benchable
+// implementation blocks.
+func (b *benchlist) processNotifications() {
+	for notification := range b.notifications {
+		if notification.bench {
+			b.benchable.Benched(b.ctx.ChainID, notification.nodeID)
+		} else {
+			b.benchable.Unbenched(b.ctx.ChainID, notification.nodeID)
+		}
 	}
 }
 
