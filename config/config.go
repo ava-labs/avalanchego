@@ -421,12 +421,16 @@ func getNetworkConfig(
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper) benchlist.Config {
+func getBenchlistConfig(v *viper.Viper, consensusParameters snowball.Parameters) benchlist.Config {
+	alpha := consensusParameters.AlphaConfidence
+	k := consensusParameters.K
+
 	return benchlist.Config{
 		Halflife:           v.GetDuration(BenchlistHalflifeKey),
 		UnbenchProbability: v.GetFloat64(BenchlistUnbenchProbabilityKey),
 		BenchProbability:   v.GetFloat64(BenchlistBenchProbabilityKey),
 		BenchDuration:      v.GetDuration(BenchlistDurationKey),
+		MaxPortion:         (1.0 - (float64(alpha) / float64(k))) / 3.0,
 	}
 }
 
@@ -1341,7 +1345,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Benchlist
-	nodeConfig.BenchlistConfig = getBenchlistConfig(v)
+	nodeConfig.BenchlistConfig = getBenchlistConfig(v, primaryNetworkConfig.ConsensusParameters)
 
 	// File Descriptor Limit
 	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
