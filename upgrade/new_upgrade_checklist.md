@@ -2,7 +2,7 @@
 
 # New Upgrade Configuration Checklist
 
-This checklist ists all the required steps when when adding a new network upgrade/fork to AvalancheGo. Note that this list is not exhaustive nor future-proof.
+This checklist lists all the required steps when adding a new network upgrade/fork to AvalancheGo. Note that this list is not exhaustive nor future-proof.
 
 ---
 
