@@ -4,6 +4,7 @@
 package benchlist
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -33,6 +34,27 @@ func (b *benchable) Benched(chainID ids.ID, nodeID ids.NodeID) {
 	b.benched.Add(nodeID)
 	b.updated <- struct{}{}
 }
+
+type blockingBenchable struct {
+	t *testing.T
+
+	wantChainID ids.ID
+
+	benchedCalled chan struct{}
+	unblock       chan struct{}
+
+	once sync.Once
+}
+
+func (b *blockingBenchable) Benched(chainID ids.ID, _ ids.NodeID) {
+	require.Equal(b.t, b.wantChainID, chainID)
+	b.once.Do(func() {
+		close(b.benchedCalled)
+	})
+	<-b.unblock
+}
+
+func (*blockingBenchable) Unbenched(ids.ID, ids.NodeID) {}
 
 func (b *benchable) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 	require.Equal(b.t, b.wantChainID, chainID)
@@ -222,4 +244,115 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 	b.RegisterResponse(vdrID)
 	b.RegisterFailure(vdrID)
 	require.False(b.IsBenched(vdrID))
+}
+
+func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	vdrs := validators.NewManager()
+	vdrID := ids.GenerateTestNodeID()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID, nil, ids.Empty, 1))
+
+	benchable := &blockingBenchable{
+		t:             t,
+		wantChainID:   ctx.ChainID,
+		benchedCalled: make(chan struct{}),
+		unblock:       make(chan struct{}),
+	}
+	b, err := newBenchlist(
+		ctx,
+		benchable,
+		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      DefaultBenchDuration,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	// Bench the node and wait for the consumer to block in Benched.
+	b.RegisterResponse(vdrID)
+	b.RegisterFailure(vdrID)
+	b.RegisterFailure(vdrID)
+	select {
+	case <-benchable.benchedCalled:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for consumer to block in Benched")
+	}
+
+	done := make(chan struct{})
+	go func() {
+		// Trigger two transitions while the consumer is blocked:
+		// benched -> unbenched, then unbenched -> benched.
+		for range 8 {
+			b.RegisterResponse(vdrID)
+		}
+		for range 8 {
+			b.RegisterFailure(vdrID)
+		}
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("observe path blocked while consumer was blocked")
+	}
+
+	close(benchable.unblock)
+}
+
+func TestRunDrainsEntireJobQueuePerSignal(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	vdrs := validators.NewManager()
+	vdrID := ids.GenerateTestNodeID()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID, nil, ids.Empty, 1))
+
+	benchable := &benchable{
+		t:           t,
+		wantChainID: ctx.ChainID,
+		updated:     make(chan struct{}, 2),
+	}
+	b, err := newBenchlist(
+		ctx,
+		benchable,
+		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      DefaultBenchDuration,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	require.True(b.jobs.PushRight(job{
+		nodeID: vdrID,
+		bench:  true,
+	}))
+	require.True(b.jobs.PushRight(job{
+		nodeID: vdrID,
+		bench:  false,
+	}))
+	b.jobReady <- struct{}{}
+
+	select {
+	case <-benchable.updated:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for first drained job")
+	}
+	select {
+	case <-benchable.updated:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for second drained job")
+	}
 }

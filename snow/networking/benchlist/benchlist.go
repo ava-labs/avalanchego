@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -29,12 +30,7 @@ const (
 	success float64 = 0
 	failure float64 = 1
 
-	// jobsBufferSize is the buffer size of the jobs channel. This must be
-	// large enough that [observe] does not block while holding [lock].
-	// The consumer goroutine never acquires [lock], so any blocking is
-	// temporary backpressure that resolves as soon as the consumer processes
-	// a message.
-	jobsBufferSize = 128
+	jobQueueInitSize = 16
 )
 
 // Config defines the configuration for a benchlist
@@ -72,7 +68,8 @@ type benchlist struct {
 	// Notifications to the benchable are processed in a separate goroutine to
 	// avoid any potential reentrant locking between the benchlist and the
 	// benchable.
-	jobs chan job
+	jobs     *buffer.UnboundedBlockingDeque[job]
+	jobReady chan struct{}
 
 	lock  sync.RWMutex
 	nodes map[ids.NodeID]*node
@@ -114,7 +111,8 @@ func newBenchlist(
 		unbenchProbability: config.UnbenchProbability,
 		benchProbability:   config.BenchProbability,
 		benchDuration:      config.BenchDuration,
-		jobs:               make(chan job, jobsBufferSize),
+		jobs:               buffer.NewUnboundedBlockingDeque[job](jobQueueInitSize),
+		jobReady:           make(chan struct{}, 1),
 		nodes:              make(map[ids.NodeID]*node),
 	}
 
@@ -168,9 +166,13 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 		if n.isBenched {
 			n.benchedAt = b.clock.Time()
 		}
-		b.jobs <- job{
+		_ = b.jobs.PushRight(job{
 			nodeID: nodeID,
 			bench:  n.isBenched,
+		})
+		select {
+		case b.jobReady <- struct{}{}:
+		default:
 		}
 	}
 }
@@ -198,36 +200,39 @@ func (b *benchlist) run() {
 
 	for {
 		select {
-		case j := <-b.jobs:
-			b.ctx.Log.Debug("updating benchlist",
-				zap.Stringer("nodeID", j.nodeID),
-				zap.Bool("benching", j.bench),
-			)
+		case <-b.jobReady:
+			for b.jobs.Len() > 0 {
+				j, _ := b.jobs.PopLeft()
+				b.ctx.Log.Debug("updating benchlist",
+					zap.Stringer("nodeID", j.nodeID),
+					zap.Bool("benching", j.bench),
+				)
 
-			if j.bench {
-				// The producer path (observe) is the source of truth for
-				// b.nodes transitions triggered by EWMA. By the time a bench
-				// job is emitted, n.isBenched was already set under b.lock.
-				// This consumer branch only drives callbacks/metrics and tracks
-				// callback-visible deadlines.
-				// Always update the timeout deadline. If the node is
-				// already benched from the consumer's perspective, this
-				// extends the deadline without a duplicate Benched
-				// notification.
-				timeoutHeap.Push(j.nodeID, time.Now().Add(b.benchDuration))
-				if !benched.Contains(j.nodeID) {
-					benched.Add(j.nodeID)
-					b.benchable.Benched(b.ctx.ChainID, j.nodeID)
+				if j.bench {
+					// The producer path (observe) is the source of truth for
+					// b.nodes transitions triggered by EWMA. By the time a bench
+					// job is emitted, n.isBenched was already set under b.lock.
+					// This consumer branch only drives callbacks/metrics and tracks
+					// callback-visible deadlines.
+					// Always update the timeout deadline. If the node is
+					// already benched from the consumer's perspective, this
+					// extends the deadline without a duplicate Benched
+					// notification.
+					timeoutHeap.Push(j.nodeID, time.Now().Add(b.benchDuration))
+					if !benched.Contains(j.nodeID) {
+						benched.Add(j.nodeID)
+						b.benchable.Benched(b.ctx.ChainID, j.nodeID)
+					}
+				} else if benched.Contains(j.nodeID) {
+					// Same as above: EWMA unbench jobs don't update b.nodes here
+					// because observe already flipped n.isBenched before enqueuing.
+					// Guard: only unbench if the consumer still considers
+					// the node benched, avoiding duplicate Unbenched calls
+					// when both EWMA and timeout race to unbench.
+					benched.Remove(j.nodeID)
+					timeoutHeap.Remove(j.nodeID)
+					b.benchable.Unbenched(b.ctx.ChainID, j.nodeID)
 				}
-			} else if benched.Contains(j.nodeID) {
-				// Same as above: EWMA unbench jobs don't update b.nodes here
-				// because observe already flipped n.isBenched before enqueuing.
-				// Guard: only unbench if the consumer still considers
-				// the node benched, avoiding duplicate Unbenched calls
-				// when both EWMA and timeout race to unbench.
-				benched.Remove(j.nodeID)
-				timeoutHeap.Remove(j.nodeID)
-				b.benchable.Unbenched(b.ctx.ChainID, j.nodeID)
 			}
 
 		case <-timer.C:

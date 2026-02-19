@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ BlockingDeque[int] = (*unboundedBlockingDeque[int])(nil)
+var _ BlockingDeque[int] = (*UnboundedBlockingDeque[int])(nil)
 
 type BlockingDeque[T any] interface {
 	Deque[T]
@@ -21,15 +21,15 @@ type BlockingDeque[T any] interface {
 // Returns a new unbounded deque with the given initial size.
 // Note that the returned deque is always empty -- [initSize] is just
 // a hint to prevent unnecessary resizing.
-func NewUnboundedBlockingDeque[T any](initSize int) BlockingDeque[T] {
-	q := &unboundedBlockingDeque[T]{
+func NewUnboundedBlockingDeque[T any](initSize int) *UnboundedBlockingDeque[T] {
+	q := &UnboundedBlockingDeque[T]{
 		Deque: NewUnboundedDeque[T](initSize),
 	}
 	q.cond = sync.NewCond(&q.lock)
 	return q
 }
 
-type unboundedBlockingDeque[T any] struct {
+type UnboundedBlockingDeque[T any] struct {
 	lock   sync.RWMutex
 	cond   *sync.Cond
 	closed bool
@@ -38,7 +38,7 @@ type unboundedBlockingDeque[T any] struct {
 }
 
 // If the deque is closed returns false.
-func (q *unboundedBlockingDeque[T]) PushRight(elt T) bool {
+func (q *UnboundedBlockingDeque[T]) PushRight(elt T) bool {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
@@ -55,7 +55,7 @@ func (q *unboundedBlockingDeque[T]) PushRight(elt T) bool {
 }
 
 // If the deque is closed returns false.
-func (q *unboundedBlockingDeque[T]) PopRight() (T, bool) {
+func (q *UnboundedBlockingDeque[T]) PopRight() (T, bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
@@ -70,7 +70,7 @@ func (q *unboundedBlockingDeque[T]) PopRight() (T, bool) {
 	}
 }
 
-func (q *unboundedBlockingDeque[T]) PeekRight() (T, bool) {
+func (q *UnboundedBlockingDeque[T]) PeekRight() (T, bool) {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 
@@ -81,7 +81,7 @@ func (q *unboundedBlockingDeque[T]) PeekRight() (T, bool) {
 }
 
 // If the deque is closed returns false.
-func (q *unboundedBlockingDeque[T]) PushLeft(elt T) bool {
+func (q *UnboundedBlockingDeque[T]) PushLeft(elt T) bool {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
@@ -98,7 +98,7 @@ func (q *unboundedBlockingDeque[T]) PushLeft(elt T) bool {
 }
 
 // If the deque is closed returns false.
-func (q *unboundedBlockingDeque[T]) PopLeft() (T, bool) {
+func (q *UnboundedBlockingDeque[T]) PopLeft() (T, bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
@@ -113,7 +113,7 @@ func (q *unboundedBlockingDeque[T]) PopLeft() (T, bool) {
 	}
 }
 
-func (q *unboundedBlockingDeque[T]) PeekLeft() (T, bool) {
+func (q *UnboundedBlockingDeque[T]) PeekLeft() (T, bool) {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 
@@ -123,7 +123,7 @@ func (q *unboundedBlockingDeque[T]) PeekLeft() (T, bool) {
 	return q.Deque.PeekLeft()
 }
 
-func (q *unboundedBlockingDeque[T]) Index(i int) (T, bool) {
+func (q *UnboundedBlockingDeque[T]) Index(i int) (T, bool) {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 
@@ -133,7 +133,7 @@ func (q *unboundedBlockingDeque[T]) Index(i int) (T, bool) {
 	return q.Deque.Index(i)
 }
 
-func (q *unboundedBlockingDeque[T]) Len() int {
+func (q *UnboundedBlockingDeque[T]) Len() int {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 
@@ -143,7 +143,7 @@ func (q *unboundedBlockingDeque[T]) Len() int {
 	return q.Deque.Len()
 }
 
-func (q *unboundedBlockingDeque[T]) List() []T {
+func (q *UnboundedBlockingDeque[T]) List() []T {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 
@@ -153,7 +153,7 @@ func (q *unboundedBlockingDeque[T]) List() []T {
 	return q.Deque.List()
 }
 
-func (q *unboundedBlockingDeque[T]) Close() {
+func (q *UnboundedBlockingDeque[T]) Close() {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
