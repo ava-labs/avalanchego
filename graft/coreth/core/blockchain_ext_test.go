@@ -1701,6 +1701,10 @@ func ReexecCorruptedStateTest(t *testing.T, create ReexecTestFunc) {
 	require.NoError(t, blockchain.writeBlockAcceptedIndices(chain[1]))
 	blockchain.Stop()
 
+	// Write accepted block to disk as we are no longer writing it on verify
+	rawdb.WriteBlock(blockchain.db, chain[1])
+	blockchain.Stop()
+
 	// Restart blockchain with existing state
 	newDir := copyDir(t, tempDir) // avoid file lock
 	restartedBlockchain, err := create(chainDB, gspec, chain[1].Hash(), newDir, 4096)
