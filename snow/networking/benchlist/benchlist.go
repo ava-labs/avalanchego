@@ -233,10 +233,10 @@ func (b *benchlist) run() {
 				timeoutHeap.Push(j.nodeID, time.Now().Add(b.benchDuration))
 				if !benched.Contains(j.nodeID) {
 					benched.Add(j.nodeID)
-					b.notifications <- job{
+					b.sendNotification(job{
 						nodeID: j.nodeID,
 						bench:  true,
-					}
+					})
 				}
 			} else if benched.Contains(j.nodeID) {
 				// Guard: only unbench if the consumer still considers
@@ -244,10 +244,10 @@ func (b *benchlist) run() {
 				// when both EWMA and timeout race to unbench.
 				benched.Remove(j.nodeID)
 				timeoutHeap.Remove(j.nodeID)
-				b.notifications <- job{
+				b.sendNotification(job{
 					nodeID: j.nodeID,
 					bench:  false,
-				}
+				})
 			}
 
 		case <-timer.C:
@@ -263,15 +263,35 @@ func (b *benchlist) run() {
 				b.ctx.Log.Debug("unbenching node due to timeout",
 					zap.Stringer("nodeID", nodeID),
 				)
-				b.notifications <- job{
+				b.sendNotification(job{
 					nodeID: nodeID,
 					bench:  false,
-				}
+				})
 			}
 		}
 
 		b.updateMetrics(benched)
 		b.resetTimer(timer, &timeoutHeap)
+	}
+}
+
+// sendNotification attempts to send a notification to the processNotifications
+// worker goroutine. If the channel is full, it logs a warning and drops the
+// notification to avoid blocking the run() loop.
+func (b *benchlist) sendNotification(notification job) {
+	select {
+	case b.notifications <- notification:
+		// Notification sent successfully
+	default:
+		// Channel is full, log and drop the notification
+		action := "benching"
+		if !notification.bench {
+			action = "unbenching"
+		}
+		b.ctx.Log.Warn("dropped bench notification due to full buffer",
+			zap.Stringer("nodeID", notification.nodeID),
+			zap.String("action", action),
+		)
 	}
 }
 
