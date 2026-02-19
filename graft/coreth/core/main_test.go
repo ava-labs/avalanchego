@@ -25,7 +25,7 @@ func TestMain(m *testing.M) {
 	params.RegisterExtras()
 
 	// May of these tests are likely to fail due to `log.Crit` in goroutines.
-	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelCrit, true)))
+	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelInfo, true)))
 
 	opts := []goleak.Option{
 		// No good way to shut down these goroutines:
