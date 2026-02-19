@@ -17,6 +17,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+const (
+	// testBenchDuration is the bench duration used in tests that need to wait
+	// for actual timer fires. This is long enough to avoid flakiness on slower
+	// CI systems while still being short enough for fast test execution.
+	testBenchDuration = 100 * time.Millisecond
+)
+
 type benchable struct {
 	t *testing.T
 
@@ -149,7 +156,7 @@ func TestBenchlistNoDuplicateBench(t *testing.T) {
 			Halflife:           DefaultHalflife,
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
-			BenchDuration:      100 * time.Millisecond,
+			BenchDuration:      testBenchDuration,
 		},
 		prometheus.NewRegistry(),
 	)
@@ -210,7 +217,7 @@ func TestBenchlistTimeout(t *testing.T) {
 			Halflife:           DefaultHalflife,
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
-			BenchDuration:      50 * time.Millisecond,
+			BenchDuration:      testBenchDuration,
 		},
 		prometheus.NewRegistry(),
 	)
@@ -226,7 +233,7 @@ func TestBenchlistTimeout(t *testing.T) {
 	<-benchable.updated
 	require.True(b.IsBenched(vdrID))
 
-	// The consumer goroutine's timer fires (real time ≥ 50ms) and calls
+	// The consumer goroutine's timer fires and calls
 	// Unbenched on the benchable. IsBenched now returns false.
 	<-benchable.updated
 	require.False(b.IsBenched(vdrID))
@@ -260,7 +267,7 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 			Halflife:           DefaultHalflife,
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
-			BenchDuration:      100 * time.Millisecond,
+			BenchDuration:      testBenchDuration,
 		},
 		prometheus.NewRegistry(),
 	)
