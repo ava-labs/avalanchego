@@ -97,6 +97,11 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 		return nil, fmt.Errorf("failed to verify block: %w", err)
 	}
 
+	err := b.blockTracker.vm.SetPreference(ctx, b.vmBlock.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to set preference: %w", err)
+	}
+
 	return b, nil
 }
 
@@ -153,14 +158,18 @@ type blockTracker struct {
 
 	// handles block acceptance and rejection of inner blocks
 	tree tree.Tree
+
+	// the underlying VM
+	vm block.ChainVM
 }
 
-func newBlockTracker(latestBlock *Block) *blockTracker {
+func newBlockTracker(latestBlock *Block, vm block.ChainVM) *blockTracker {
 	return &blockTracker{
 		tree: tree.New(),
 		simplexDigestsToBlock: map[simplex.Digest]*Block{
 			latestBlock.digest: latestBlock,
 		},
+		vm: vm,
 	}
 }
 

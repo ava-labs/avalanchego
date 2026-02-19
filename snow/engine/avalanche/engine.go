@@ -31,6 +31,7 @@ type engine struct {
 	common.ChitsHandler
 	common.AppHandler
 	common.InternalHandler
+	common.SimplexHandler
 
 	ctx *snow.ConsensusContext
 }
@@ -51,6 +52,7 @@ func New(
 		ChitsHandler:                common.NewNoOpChitsHandler(ctx.Log),
 		AppHandler:                  common.NewNoOpAppHandler(ctx.Log),
 		InternalHandler:             common.NewNoOpInternalHandler(ctx.Log),
+		SimplexHandler:              common.NewNoOpSimplexHandler(ctx.Log),
 		ctx:                         ctx,
 	}
 }

@@ -52,7 +52,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 		digest := computeDigest(bytes)
 		block.digest = digest
 
-		block.blockTracker = newBlockTracker(block)
+		block.blockTracker = newBlockTracker(block, vm)
 		return block
 	}
 	if config.round == 0 {

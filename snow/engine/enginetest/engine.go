@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -43,6 +44,7 @@ var (
 	errPullQuery                     = errors.New("unexpectedly called PullQuery")
 	errQueryFailed                   = errors.New("unexpectedly called QueryFailed")
 	errChits                         = errors.New("unexpectedly called Chits")
+	errSimplex                       = errors.New("unexpectedly called SimplexMessage")
 	errStart                         = errors.New("unexpectedly called Start")
 
 	_ common.Engine = (*Engine)(nil)
@@ -91,6 +93,7 @@ type Engine struct {
 	CantPullQuery,
 	CantQueryFailed,
 	CantChits,
+	CantSimplex,
 
 	CantConnected,
 	CantDisconnected,
@@ -118,6 +121,7 @@ type Engine struct {
 	AcceptedFrontierF            func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
 	GetAcceptedF, AcceptedF      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs set.Set[ids.ID]) error
 	ChitsF                       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error
+	SimplexF                     func(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error
 	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
@@ -550,6 +554,19 @@ func (e *Engine) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) e
 		require.FailNow(e.T, errAppGossip.Error())
 	}
 	return errAppGossip
+}
+
+func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+	if e.SimplexF != nil {
+		return e.SimplexF(ctx, nodeID, msg)
+	}
+	if !e.CantSimplex {
+		return nil
+	}
+	if e.T != nil {
+		require.FailNow(e.T, errSimplex.Error())
+	}
+	return errSimplex
 }
 
 func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
