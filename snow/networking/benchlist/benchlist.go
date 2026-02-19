@@ -158,14 +158,6 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 		b.nodes[nodeID] = n
 	}
 
-	// If the bench duration has expired, clear the benched state and reset
-	// the failure probability so that the node gets a clean slate rather
-	// than being immediately re-benched due to stale EWMA history.
-	if n.isBenched && b.benchExpired(n) {
-		n.isBenched = false
-		n.failureProbability = math.NewUninitializedAverager(b.halflife)
-	}
-
 	n.failureProbability.Observe(v, b.clock.Time())
 
 	p := n.failureProbability.Read()
@@ -183,18 +175,13 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 	}
 }
 
-// benchExpired reports whether n's bench duration has elapsed.
-func (b *benchlist) benchExpired(n *node) bool {
-	return !n.benchedAt.IsZero() && b.clock.Time().After(n.benchedAt.Add(b.benchDuration))
-}
-
 // IsBenched returns true if messages to nodeID should immediately fail.
 func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
 	n, ok := b.nodes[nodeID]
-	return ok && n.isBenched && !b.benchExpired(n)
+	return ok && n.isBenched
 }
 
 // TODO: Close goroutine within run during shutdown.
@@ -218,17 +205,23 @@ func (b *benchlist) run() {
 			)
 
 			if j.bench {
+				// The producer path (observe) is the source of truth for
+				// b.nodes transitions triggered by EWMA. By the time a bench
+				// job is emitted, n.isBenched was already set under b.lock.
+				// This consumer branch only drives callbacks/metrics and tracks
+				// callback-visible deadlines.
 				// Always update the timeout deadline. If the node is
-				// already benched from the consumer's perspective
-				// (e.g., observe detected expiration and immediately
-				// re-benched before the timer fired), this extends
-				// the deadline without a duplicate Benched notification.
+				// already benched from the consumer's perspective, this
+				// extends the deadline without a duplicate Benched
+				// notification.
 				timeoutHeap.Push(j.nodeID, time.Now().Add(b.benchDuration))
 				if !benched.Contains(j.nodeID) {
 					benched.Add(j.nodeID)
 					b.benchable.Benched(b.ctx.ChainID, j.nodeID)
 				}
 			} else if benched.Contains(j.nodeID) {
+				// Same as above: EWMA unbench jobs don't update b.nodes here
+				// because observe already flipped n.isBenched before enqueuing.
 				// Guard: only unbench if the consumer still considers
 				// the node benched, avoiding duplicate Unbenched calls
 				// when both EWMA and timeout race to unbench.
@@ -246,6 +239,16 @@ func (b *benchlist) run() {
 				}
 				timeoutHeap.Pop()
 				benched.Remove(nodeID)
+				b.lock.Lock()
+				// Timeout unbenching originates in this consumer goroutine
+				// (not in observe), so we must synchronize b.nodes here to
+				// keep IsBenched consistent with callback-visible state.
+				// Timeout-based unbench gives the node a clean slate.
+				if n, exists := b.nodes[nodeID]; exists {
+					n.isBenched = false
+					n.failureProbability = math.NewUninitializedAverager(b.halflife)
+				}
+				b.lock.Unlock()
 
 				b.ctx.Log.Debug("unbenching node due to timeout",
 					zap.Stringer("nodeID", nodeID),
