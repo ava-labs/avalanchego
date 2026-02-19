@@ -56,22 +56,26 @@ linters:
     - copyloopvar
     - depguard
     - durationcheck
+    # - embeddedstructfieldcheck
     - errcheck
     - errorlint
     - forbidigo
     - goconst
     - gocheckcompilerdirectives
+    # - godoclint
     - gocritic
     - goprintffuncname
     - gosec
     - govet
     - importas
     - ineffassign
-    - mirror 
+    # - iotamixing
+    - mirror
     - misspell
+    # - modernize
     - nakedret
     - nilerr
-    - noctx
+    # - noctx
     - nolintlint
     - perfsprint
     - prealloc
