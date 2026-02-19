@@ -141,17 +141,19 @@ func TestGetValidatorSet(t *testing.T) {
 	// Happy path
 	sk0, err := localsigner.New()
 	require.NoError(err)
+	pk0 := sk0.PublicKey()
 	vdr0 := &validators.GetValidatorOutput{
 		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: sk0.PublicKey(),
+		PublicKey: pk0,
 		Weight:    1,
 	}
 
 	sk1, err := localsigner.New()
 	require.NoError(err)
+	pk1 := sk1.PublicKey()
 	vdr1 := &validators.GetValidatorOutput{
 		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: sk1.PublicKey(),
+		PublicKey: pk1,
 		Weight:    2,
 	}
 

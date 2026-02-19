@@ -2621,12 +2621,12 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 				// This validator's active status is changing.
 				err = errors.Join(
 					s.validators.RemoveWeight(l1Validator.SubnetID, priorL1Validator.effectiveNodeID(), priorL1Validator.Weight),
-					addL1ValidatorToValidatorManager(s.validators, l1Validator),
+					addL1ValidatorToValidatorManager(s.validators, &l1Validator),
 				)
 			}
 		case database.ErrNotFound:
 			// Adding a new validator
-			err = addL1ValidatorToValidatorManager(s.validators, l1Validator)
+			err = addL1ValidatorToValidatorManager(s.validators, &l1Validator)
 		}
 		if err != nil {
 			return err

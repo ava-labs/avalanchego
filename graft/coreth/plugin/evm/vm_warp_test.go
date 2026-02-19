@@ -350,13 +350,11 @@ func testWarpVMTransaction(t *testing.T, scheme string, unsignedMessage *avalanc
 			vdrs := validators.WarpSet{
 				Validators: []*validators.Warp{
 					{
-						PublicKey:      blsPublicKey1,
 						PublicKeyBytes: bls.PublicKeyToUncompressedBytes(blsPublicKey1),
 						Weight:         50,
 						NodeIDs:        []ids.NodeID{nodeID1},
 					},
 					{
-						PublicKey:      blsPublicKey2,
 						PublicKeyBytes: bls.PublicKeyToUncompressedBytes(blsPublicKey2),
 						Weight:         50,
 						NodeIDs:        []ids.NodeID{nodeID2},
@@ -664,7 +662,6 @@ func testReceiveWarpMessage(
 				for _, s := range signers {
 					pk := s.secret.PublicKey()
 					vdrs.Validators = append(vdrs.Validators, &validators.Warp{
-						PublicKey:      pk,
 						PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 						Weight:         s.weight,
 						NodeIDs:        []ids.NodeID{s.nodeID},

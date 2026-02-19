@@ -53,7 +53,6 @@ func newTestValidator() *testValidator {
 		nodeID: nodeID,
 		sk:     sk,
 		vdr: &validators.Warp{
-			PublicKey:      pk,
 			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 			Weight:         3,
 			NodeIDs:        []ids.NodeID{nodeID},
