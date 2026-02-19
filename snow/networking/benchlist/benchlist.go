@@ -78,7 +78,6 @@ type benchlist struct {
 type node struct {
 	failureProbability math.Averager
 	isBenched          bool
-	benchedAt          time.Time
 }
 
 type job struct {
@@ -163,9 +162,6 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 	shouldUnbench := n.isBenched && p < b.unbenchProbability
 	if shouldBench || shouldUnbench {
 		n.isBenched = !n.isBenched
-		if n.isBenched {
-			n.benchedAt = b.clock.Time()
-		}
 		_ = b.jobs.PushRight(job{
 			nodeID: nodeID,
 			bench:  n.isBenched,

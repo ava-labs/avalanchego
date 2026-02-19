@@ -282,7 +282,7 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 	select {
 	case <-benchable.benchedCalled:
 	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for consumer to block in Benched")
+		require.FailNow("timed out waiting for consumer to block in Benched")
 	}
 
 	done := make(chan struct{})
@@ -301,7 +301,7 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(time.Second):
-		t.Fatal("observe path blocked while consumer was blocked")
+		require.FailNow("observe path blocked while consumer was blocked")
 	}
 
 	close(benchable.unblock)
@@ -348,11 +348,11 @@ func TestRunDrainsEntireJobQueuePerSignal(t *testing.T) {
 	select {
 	case <-benchable.updated:
 	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for first drained job")
+		require.FailNow("timed out waiting for first drained job")
 	}
 	select {
 	case <-benchable.updated:
 	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for second drained job")
+		require.FailNow("timed out waiting for second drained job")
 	}
 }
