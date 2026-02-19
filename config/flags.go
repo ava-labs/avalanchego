@@ -361,6 +361,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint64(SystemTrackerRequiredAvailableDiskSpacePercentageKey, 3, "Minimum percentage (between 0 and 50) of available disk space, under which the node will shutdown.")
 	fs.Uint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey, 0, fmt.Sprintf("DEPRECATED: Warning threshold for the number of available bytes on disk, under which the node will be considered unhealthy.  Must be >= [%s]", SystemTrackerRequiredAvailableDiskSpaceKey))
 	fs.Uint64(SystemTrackerWarningAvailableDiskSpacePercentageKey, 10, fmt.Sprintf("Warning threshold for the percentage (between 0 and 50) of available disk space, under which the node will be considered unhealthy. Must be >= [%s]", SystemTrackerRequiredAvailableDiskSpacePercentageKey))
+	fs.Uint64(SystemTrackerWarningAvailableMemoryPercentageKey, 0, "Warning threshold percentage (between 0 and 50) for available system memory. When available memory drops below this, the node will report unhealthy. Set to 0 to disable, disabled by default.")
 
 	// CPU management
 	fs.Float64(CPUVdrAllocKey, float64(runtime.NumCPU()), "Maximum number of CPUs to allocate for use by validators. Value should be in range [0, total core count]")

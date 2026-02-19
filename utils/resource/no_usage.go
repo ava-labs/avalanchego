@@ -25,3 +25,11 @@ func (noUsage) DiskUsage() (float64, float64) {
 func (noUsage) AvailableDiskBytes() uint64 {
 	return math.MaxUint64
 }
+
+func (noUsage) AvailableMemoryBytes() uint64 {
+	return math.MaxUint64
+}
+
+func (noUsage) AvailableMemoryPercentage() uint64 {
+	return 100
+}

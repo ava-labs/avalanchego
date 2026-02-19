@@ -39,10 +39,16 @@ type DiskTracker interface {
 	AvailableDiskPercentage() uint64
 }
 
+type MemoryTracker interface {
+	AvailableMemoryBytes() uint64
+	AvailableMemoryPercentage() uint64
+}
+
 // ResourceTracker is an interface for tracking peers' usage of resources
 type ResourceTracker interface {
 	CPUTracker() Tracker
 	DiskTracker() DiskTracker
+	MemoryTracker() MemoryTracker
 	// Registers that the given node started processing at the given time.
 	StartProcessing(ids.NodeID, time.Time)
 	// Registers that the given node stopped processing at the given time.
@@ -198,6 +204,30 @@ func (t *diskResourceTracker) TimeUntilUsage(nodeID ids.NodeID, now time.Time, v
 	return m.TimeUntil(now, value/scale)
 }
 
+type memoryResourceTracker struct {
+	t *resourceTracker
+}
+
+func (t *memoryResourceTracker) AvailableMemoryBytes() uint64 {
+	rt := t.t
+	rt.lock.Lock()
+	defer rt.lock.Unlock()
+
+	bytesAvailable := rt.resources.AvailableMemoryBytes()
+	rt.metrics.memoryAvailable.Set(float64(bytesAvailable))
+	return bytesAvailable
+}
+
+func (t *memoryResourceTracker) AvailableMemoryPercentage() uint64 {
+	rt := t.t
+	rt.lock.Lock()
+	defer rt.lock.Unlock()
+
+	percentageAvailable := rt.resources.AvailableMemoryPercentage()
+	rt.metrics.memoryPercentageAvailable.Set(float64(percentageAvailable))
+	return percentageAvailable
+}
+
 type resourceTracker struct {
 	lock sync.RWMutex
 
@@ -242,6 +272,10 @@ func (rt *resourceTracker) CPUTracker() Tracker {
 
 func (rt *resourceTracker) DiskTracker() DiskTracker {
 	return &diskResourceTracker{t: rt}
+}
+
+func (rt *resourceTracker) MemoryTracker() MemoryTracker {
+	return &memoryResourceTracker{t: rt}
 }
 
 func (rt *resourceTracker) StartProcessing(nodeID ids.NodeID, now time.Time) {
@@ -297,12 +331,14 @@ func (rt *resourceTracker) prune(now time.Time) {
 }
 
 type trackerMetrics struct {
-	processingTimeMetric    prometheus.Gauge
-	cpuMetric               prometheus.Gauge
-	diskReadsMetric         prometheus.Gauge
-	diskWritesMetric        prometheus.Gauge
-	diskSpaceAvailable      prometheus.Gauge
-	diskPercentageAvailable prometheus.Gauge
+	processingTimeMetric      prometheus.Gauge
+	cpuMetric                 prometheus.Gauge
+	diskReadsMetric           prometheus.Gauge
+	diskWritesMetric          prometheus.Gauge
+	diskSpaceAvailable        prometheus.Gauge
+	diskPercentageAvailable   prometheus.Gauge
+	memoryAvailable           prometheus.Gauge
+	memoryPercentageAvailable prometheus.Gauge
 }
 
 func newCPUTrackerMetrics(reg prometheus.Registerer) (*trackerMetrics, error) {
@@ -324,12 +360,20 @@ func newCPUTrackerMetrics(reg prometheus.Registerer) (*trackerMetrics, error) {
 			Help: "Disk writes (bytes/sec) tracked by the resource manager",
 		}),
 		diskSpaceAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "disk_available_space",
+			Name: "disk_available",
 			Help: "Available space remaining (bytes) on the database volume",
 		}),
 		diskPercentageAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "disk_available_percentage",
+			Name: "disk_percentage_available",
 			Help: "Percentage of database volume available",
+		}),
+		memoryAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "memory_available",
+			Help: "Available memory remaining (bytes) on the system",
+		}),
+		memoryPercentageAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "memory_percentage_available",
+			Help: "Percentage of system memory available",
 		}),
 	}
 	err := errors.Join(
@@ -339,6 +383,8 @@ func newCPUTrackerMetrics(reg prometheus.Registerer) (*trackerMetrics, error) {
 		reg.Register(m.diskWritesMetric),
 		reg.Register(m.diskSpaceAvailable),
 		reg.Register(m.diskPercentageAvailable),
+		reg.Register(m.memoryAvailable),
+		reg.Register(m.memoryPercentageAvailable),
 	)
 	return m, err
 }
