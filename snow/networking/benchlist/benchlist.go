@@ -226,7 +226,9 @@ func (b *benchlist) run() {
 				timeoutHeap.Push(j.nodeID, time.Now().Add(b.benchDuration))
 				if !benched.Contains(j.nodeID) {
 					benched.Add(j.nodeID)
-					b.benchable.Benched(b.ctx.ChainID, j.nodeID)
+					// Call Benched in a separate goroutine to avoid blocking
+					// the run loop if the Benchable implementation blocks.
+					go b.benchable.Benched(b.ctx.ChainID, j.nodeID)
 				}
 			} else if benched.Contains(j.nodeID) {
 				// Guard: only unbench if the consumer still considers
@@ -234,7 +236,9 @@ func (b *benchlist) run() {
 				// when both EWMA and timeout race to unbench.
 				benched.Remove(j.nodeID)
 				timeoutHeap.Remove(j.nodeID)
-				b.benchable.Unbenched(b.ctx.ChainID, j.nodeID)
+				// Call Unbenched in a separate goroutine to avoid blocking
+				// the run loop if the Benchable implementation blocks.
+				go b.benchable.Unbenched(b.ctx.ChainID, j.nodeID)
 			}
 
 		case <-timer.C:
@@ -250,7 +254,9 @@ func (b *benchlist) run() {
 				b.ctx.Log.Debug("unbenching node due to timeout",
 					zap.Stringer("nodeID", nodeID),
 				)
-				b.benchable.Unbenched(b.ctx.ChainID, nodeID)
+				// Call Unbenched in a separate goroutine to avoid blocking
+				// the run loop if the Benchable implementation blocks.
+				go b.benchable.Unbenched(b.ctx.ChainID, nodeID)
 			}
 		}
 
