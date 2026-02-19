@@ -45,7 +45,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
@@ -70,14 +69,6 @@ var (
 	errConflictingImplicitACPOpinion          = errors.New("objecting to enabled ACP")
 	errSybilProtectionDisabledStakerWeights   = errors.New("sybil protection disabled weights must be positive")
 	errSybilProtectionDisabledOnPublicNetwork = errors.New("sybil protection disabled on public network")
-	errInvalidUptimeRequirement               = errors.New("uptime requirement must be in the range [0, 1]")
-	errMinValidatorStakeAboveMax              = errors.New("minimum validator stake can't be greater than maximum validator stake")
-	errInvalidDelegationFee                   = errors.New("delegation fee must be in the range [0, 1,000,000]")
-	errInvalidMinStakeDuration                = errors.New("min stake duration must be > 0")
-	errMinStakeDurationAboveMax               = errors.New("max stake duration can't be less than min stake duration")
-	errStakeMaxConsumptionTooLarge            = fmt.Errorf("max stake consumption must be less than or equal to %d", reward.PercentDenominator)
-	errStakeMaxConsumptionBelowMin            = errors.New("stake max consumption can't be less than min stake consumption")
-	errStakeMintingPeriodBelowMin             = errors.New("stake minting period can't be less than max stake duration")
 	errCannotTrackPrimaryNetwork              = errors.New("cannot track primary network")
 	errStakingKeyContentUnset                 = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
 	errStakingCertContentUnset                = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
@@ -684,27 +675,14 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		config.RewardConfig.MintingPeriod = v.GetDuration(StakeMintingPeriodKey)
 		config.RewardConfig.SupplyCap = v.GetUint64(StakeSupplyCapKey)
 		config.MinDelegationFee = v.GetUint32(MinDelegatorFeeKey)
-		switch {
-		case config.UptimeRequirement < 0 || config.UptimeRequirement > 1:
-			return node.StakingConfig{}, errInvalidUptimeRequirement
-		case config.MinValidatorStake > config.MaxValidatorStake:
-			return node.StakingConfig{}, errMinValidatorStakeAboveMax
-		case config.MinDelegationFee > 1_000_000:
-			return node.StakingConfig{}, errInvalidDelegationFee
-		case config.MinStakeDuration <= 0:
-			return node.StakingConfig{}, errInvalidMinStakeDuration
-		case config.MaxStakeDuration < config.MinStakeDuration:
-			return node.StakingConfig{}, errMinStakeDurationAboveMax
-		case config.RewardConfig.MaxConsumptionRate > reward.PercentDenominator:
-			return node.StakingConfig{}, errStakeMaxConsumptionTooLarge
-		case config.RewardConfig.MaxConsumptionRate < config.RewardConfig.MinConsumptionRate:
-			return node.StakingConfig{}, errStakeMaxConsumptionBelowMin
-		case config.RewardConfig.MintingPeriod < config.MaxStakeDuration:
-			return node.StakingConfig{}, errStakeMintingPeriodBelowMin
-		}
 	} else {
 		config.StakingConfig = genesis.GetStakingConfig(networkID)
 	}
+
+	if err = config.Verify(); err != nil {
+		return node.StakingConfig{}, err
+	}
+
 	return config, nil
 }
 
