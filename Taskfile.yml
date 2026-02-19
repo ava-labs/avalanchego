@@ -259,7 +259,7 @@ tasks:
     cmds:
       - task: build-race
       - task: build-subnet-evm
-      - cmd: cd graft/subnet-evm && go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --duration=120s
+      - cmd: cd graft/subnet-evm && go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --plugin-dir=../../build/plugins --duration=120s
       - cmd: bash -x ./scripts/tests.build_antithesis_images.sh
 
   test-build-antithesis-images-xsvm:
