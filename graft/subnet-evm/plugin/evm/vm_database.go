@@ -124,7 +124,7 @@ func (vm *VM) useStandaloneDatabase(acceptedDB avalanchedatabase.Database) (bool
 	// no config provided, use default
 	standaloneDBFlag := vm.config.UseStandaloneDatabase
 	if standaloneDBFlag != nil {
-		return standaloneDBFlag.Bool(), nil
+		return *standaloneDBFlag, nil
 	}
 
 	// check if the chain can use a standalone database
