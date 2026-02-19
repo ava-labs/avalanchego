@@ -22,6 +22,7 @@ var _ vertex.LinearizableVMWithEngine = (*vertexVM)(nil)
 
 type vertexVM struct {
 	vertex.LinearizableVMWithEngine
+
 	tracer trace.Tracer
 }
 

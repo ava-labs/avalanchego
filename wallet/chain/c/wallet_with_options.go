@@ -26,6 +26,7 @@ func NewWalletWithOptions(
 
 type walletWithOptions struct {
 	Wallet
+
 	options []common.Option
 }
 

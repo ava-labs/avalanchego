@@ -18,6 +18,7 @@ var _ Builder = (*builderWithOptions)(nil)
 
 type builderWithOptions struct {
 	Builder
+
 	options []common.Option
 }
 

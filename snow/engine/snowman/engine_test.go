@@ -3199,6 +3199,7 @@ func TestShouldIssueBlock(t *testing.T) {
 
 type mockConnVDR struct {
 	tracker.Peers
+
 	percent float64
 }
 

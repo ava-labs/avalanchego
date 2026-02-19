@@ -13,6 +13,7 @@ var _ StateSyncer = (*tracedStateSyncer)(nil)
 
 type tracedStateSyncer struct {
 	Engine
+
 	stateSyncer StateSyncer
 	tracer      trace.Tracer
 }

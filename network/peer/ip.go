@@ -70,6 +70,7 @@ func (ip *UnsignedIP) bytes() []byte {
 // SignedIP is a wrapper of an UnsignedIP with the signature from a signer.
 type SignedIP struct {
 	UnsignedIP
+
 	TLSSignature      []byte
 	BLSSignature      *bls.Signature
 	BLSSignatureBytes []byte

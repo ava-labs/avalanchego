@@ -294,6 +294,7 @@ func (snaptest *crashSnapshotTest) test(t *testing.T) {
 // - restart with enabling the snapshot again
 type gappedSnapshotTest struct {
 	snapshotTestBasic
+
 	gapped int // Number of blocks to insert without enabling snapshot
 }
 
@@ -341,6 +342,7 @@ func (snaptest *gappedSnapshotTest) test(t *testing.T) {
 // - crash
 type wipeCrashSnapshotTest struct {
 	snapshotTestBasic
+
 	newBlocks int
 }
 

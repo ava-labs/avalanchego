@@ -90,6 +90,7 @@ type bandwidthThrottlerMetrics struct {
 
 type bandwidthThrottlerImpl struct {
 	BandwidthThrottlerConfig
+
 	metrics bandwidthThrottlerMetrics
 	log     logging.Logger
 	lock    sync.RWMutex

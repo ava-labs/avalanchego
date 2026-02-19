@@ -15,7 +15,8 @@ var (
 
 // CreateAssetTx is a transaction that creates a new asset.
 type CreateAssetTx struct {
-	BaseTx       `serialize:"true"`
+	BaseTx `serialize:"true"`
+
 	Name         string          `serialize:"true" json:"name"`
 	Symbol       string          `serialize:"true" json:"symbol"`
 	Denomination byte            `serialize:"true" json:"denomination"`

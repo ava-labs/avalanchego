@@ -9,6 +9,7 @@ import "time"
 // been running for at least the half-life duration.
 type maturedAverager struct {
 	Averager
+
 	halfLife     time.Duration
 	startTime    time.Time
 	lastObserved time.Time

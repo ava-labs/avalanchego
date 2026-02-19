@@ -47,6 +47,7 @@ var (
 // UnsignedImportTx is an unsigned ImportTx
 type UnsignedImportTx struct {
 	Metadata
+
 	// ID of the network on which this tx was issued
 	NetworkID uint32 `serialize:"true" json:"networkID"`
 	// ID of this blockchain.

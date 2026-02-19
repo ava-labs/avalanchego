@@ -15,6 +15,8 @@ import (
 
 type Config struct {
 	common.AllGetsServer
+	// Haltable signals when the engine is stopped
+	common.Haltable
 
 	Ctx *snow.ConsensusContext
 
@@ -39,7 +41,4 @@ type Config struct {
 	// If StopVertexID is empty, the engine will generate the stop vertex based
 	// on the current state.
 	StopVertexID ids.ID
-
-	// Haltable signals when the engine is stopped
-	common.Haltable
 }

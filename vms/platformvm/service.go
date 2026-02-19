@@ -975,6 +975,7 @@ type GetL1ValidatorArgs struct {
 
 type GetL1ValidatorReply struct {
 	platformapi.APIL1Validator
+
 	SubnetID ids.ID `json:"subnetID"`
 	// Height is the height of the last accepted block
 	Height avajson.Uint64 `json:"height"`
@@ -1530,6 +1531,7 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 
 type GetStakeArgs struct {
 	api.JSONAddresses
+
 	ValidatorsOnly bool                `json:"validatorsOnly"`
 	Encoding       formatting.Encoding `json:"encoding"`
 }
@@ -2017,6 +2019,7 @@ func (s *Service) GetFeeConfig(_ *http.Request, _ *struct{}, reply *gas.Config) 
 
 type GetFeeStateReply struct {
 	gas.State
+
 	Price gas.Price `json:"price"`
 	Time  time.Time `json:"timestamp"`
 }

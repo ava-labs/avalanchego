@@ -61,6 +61,7 @@ type msgMetadata struct {
 // acquiring enough bytes to be read.
 type inboundMsgByteThrottler struct {
 	commonMsgThrottler
+
 	metrics   inboundMsgByteThrottlerMetrics
 	nextMsgID uint64
 	// Node ID --> Msg ID for a message this node is waiting to acquire

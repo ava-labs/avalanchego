@@ -27,13 +27,13 @@ var (
 
 type blockVM struct {
 	block.ChainVM
+	blockMetrics
+
 	buildBlockVM    block.BuildBlockWithContextChainVM
 	setPreferenceVM block.SetPreferenceWithContextChainVM
 	batchedVM       block.BatchedChainVM
 	ssVM            block.StateSyncableVM
-
-	blockMetrics
-	registry prometheus.Registerer
+	registry        prometheus.Registerer
 }
 
 func NewBlockVM(

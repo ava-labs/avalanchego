@@ -26,6 +26,7 @@ type AddSubnetValidatorTx struct {
 	BaseTx `serialize:"true"`
 	// The validator
 	SubnetValidator `serialize:"true" json:"validator"`
+
 	// Auth that will be allowing this validator into the network
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }

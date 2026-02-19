@@ -58,6 +58,7 @@ type Config struct {
 // Admin is the API service for node admin management
 type Admin struct {
 	Config
+
 	lock     sync.RWMutex
 	profiler profiler.Profiler
 }

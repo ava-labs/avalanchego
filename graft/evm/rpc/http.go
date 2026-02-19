@@ -273,6 +273,7 @@ func (hc *httpConn) doRequest(ctx context.Context, msg interface{}) (io.ReadClos
 type httpServerConn struct {
 	io.Reader
 	io.Writer
+
 	r *http.Request
 }
 

@@ -17,7 +17,8 @@ var _ Block = (*ApricotAtomicBlock)(nil)
 // in the block to be accepted and committed to the chain.
 type ApricotAtomicBlock struct {
 	CommonBlock `serialize:"true"`
-	Tx          *txs.Tx `serialize:"true" json:"tx"`
+
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (b *ApricotAtomicBlock) initialize(bytes []byte) error {

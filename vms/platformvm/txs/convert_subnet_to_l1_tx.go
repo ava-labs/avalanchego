@@ -34,6 +34,7 @@ var (
 type ConvertSubnetToL1Tx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
+
 	// ID of the Subnet to transform
 	Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// Chain where the Subnet manager lives

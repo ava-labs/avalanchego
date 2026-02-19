@@ -28,6 +28,7 @@ var (
 type Config struct {
 	allowlist.AllowListConfig
 	precompileconfig.Upgrade
+
 	InitialMint map[common.Address]*math.HexOrDecimal256 `json:"initialMint,omitempty"` // addresses to receive the initial mint mapped to the amount to mint
 }
 
