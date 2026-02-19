@@ -35,6 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
+      - run: go install golang.org/x/tools/cmd/bisect@latest
       - run: ./scripts/run_task.sh build-test
       - run: ./scripts/run_task.sh coverage
 
