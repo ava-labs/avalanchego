@@ -47,6 +47,9 @@ func DefaultTmpnetFlags() FlagsMap {
 		// resource-constrained environments that commonly have low disk space.
 		config.SystemTrackerRequiredAvailableDiskSpacePercentageKey: "0",
 		config.SystemTrackerWarningAvailableDiskSpacePercentageKey:  "0",
+		// Reduce benchlist duration from the 5m default to avoid
+		// benching nodes that are slow to start in test environments.
+		config.BenchlistDurationKey: "5s",
 	}
 }
 

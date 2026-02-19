@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -192,9 +193,10 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(NetworkTLSKeyLogFileKey, "", "TLS key log file path. Should only be specified for debugging")
 
 	// Benchlist
-	fs.Int(BenchlistFailThresholdKey, constants.DefaultBenchlistFailThreshold, "Number of consecutive failed queries before benchlisting a node")
-	fs.Duration(BenchlistDurationKey, constants.DefaultBenchlistDuration, "Max amount of time a peer is benchlisted after surpassing the threshold")
-	fs.Duration(BenchlistMinFailingDurationKey, constants.DefaultBenchlistMinFailingDuration, "Minimum amount of time messages to a peer must be failing before the peer is benched")
+	fs.Duration(BenchlistHalflifeKey, benchlist.DefaultHalflife, "Halflife of the EWMA averager used for benchlisting")
+	fs.Float64(BenchlistUnbenchProbabilityKey, benchlist.DefaultUnbenchProbability, "EWMA failure probability below which a node is unbenched")
+	fs.Float64(BenchlistBenchProbabilityKey, benchlist.DefaultBenchProbability, "EWMA failure probability above which a node is benched")
+	fs.Duration(BenchlistDurationKey, benchlist.DefaultBenchDuration, "Max amount of time a peer is benchlisted")
 
 	// Router
 	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")

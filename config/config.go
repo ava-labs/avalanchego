@@ -421,25 +421,13 @@ func getNetworkConfig(
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper, consensusParameters snowball.Parameters) (benchlist.Config, error) {
-	// AlphaConfidence is used here to ensure that benching can't cause a
-	// liveness failure. If AlphaPreference were used, the benchlist may grow to
-	// a point that committing would be extremely unlikely to happen.
-	alpha := consensusParameters.AlphaConfidence
-	k := consensusParameters.K
-	config := benchlist.Config{
-		Threshold:              v.GetInt(BenchlistFailThresholdKey),
-		Duration:               v.GetDuration(BenchlistDurationKey),
-		MinimumFailingDuration: v.GetDuration(BenchlistMinFailingDurationKey),
-		MaxPortion:             (1.0 - (float64(alpha) / float64(k))) / 3.0,
+func getBenchlistConfig(v *viper.Viper) benchlist.Config {
+	return benchlist.Config{
+		Halflife:           v.GetDuration(BenchlistHalflifeKey),
+		UnbenchProbability: v.GetFloat64(BenchlistUnbenchProbabilityKey),
+		BenchProbability:   v.GetFloat64(BenchlistBenchProbabilityKey),
+		BenchDuration:      v.GetDuration(BenchlistDurationKey),
 	}
-	switch {
-	case config.Duration < 0:
-		return benchlist.Config{}, fmt.Errorf("%q must be >= 0", BenchlistDurationKey)
-	case config.MinimumFailingDuration < 0:
-		return benchlist.Config{}, fmt.Errorf("%q must be >= 0", BenchlistMinFailingDurationKey)
-	}
-	return config, nil
 }
 
 func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
@@ -1353,10 +1341,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Benchlist
-	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.ConsensusParameters)
-	if err != nil {
-		return node.Config{}, err
-	}
+	nodeConfig.BenchlistConfig = getBenchlistConfig(v)
 
 	// File Descriptor Limit
 	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
