@@ -16,5 +16,4 @@ fi
 
 cd "$REPO_ROOT/graft/coreth"
 # shellcheck disable=SC2046
-# bisect -compile=variablemake -godebug checkfinalizers=1 go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic "$@" $(go list .//... | grep -v github.com/ava-labs/avalanchego/graft/coreth/tests)
-GODEBUG=checkfinalizers=1 go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic "$@" $(go list .//... | grep -v github.com/ava-labs/avalanchego/graft/coreth/tests)
+bisect -compile=variablemake -godebug checkfinalizers=1 go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic "$@" $(go list .//... | grep -v github.com/ava-labs/avalanchego/graft/coreth/tests)
