@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -404,26 +406,174 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"invalid consensus parameters": {
-			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"consensusParameters":{"k": 111, "alphaPreference":1234} }`,
+		"invalid snowball consensus parameters": {
+			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{
+				"validatorOnly": true,
+				"snowballParameters": {
+					"k": 111,
+					"alphaPreference": 1234
+				}
+			}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Nil(given)
 			},
 			expectedErr: snowball.ErrParametersInvalid,
 		},
-		"correct config": {
+		"invalid + deprecated consensus parameters": {
+			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{
+				"consensusParameters": {
+					"k": 111,
+					"alphaPreference": 1234
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Nil(given)
+			},
+			expectedErr: snowball.ErrParametersInvalid,
+		},
+		"correct but deprecated consensus config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "consensusParameters":{"alphaConfidence":16} }`,
+			givenJSON: `{"validatorOnly": true, "consensusParameters":{"alphaConfidence":16}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
 
 				require.True(config.ValidatorOnly)
-				require.Equal(16, config.ConsensusParameters.AlphaConfidence)
+				require.Equal(16, config.SnowParameters.AlphaConfidence)
 				// must still respect defaults
-				require.Equal(20, config.ConsensusParameters.K)
+				require.Equal(20, config.SnowParameters.K)
+			},
+			expectedErr: nil,
+		},
+		"correct snowball config": {
+			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{"validatorOnly": true, "snowballParameters":{"alphaConfidence":16}}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+
+				require.True(config.ValidatorOnly)
+				require.Equal(16, config.SnowParameters.AlphaConfidence)
+				// must still respect defaults
+				require.Equal(20, config.SnowParameters.K)
+			},
+			expectedErr: nil,
+		},
+		"multiple configs": {
+			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{
+				"consensusParameters": {
+					"alphaConfidence": 16
+				},
+				"simplexParameters": {}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Nil(given)
+			},
+			expectedErr: subnets.ErrTooManyConsensusParameters,
+		},
+		"default simplex params set": {
+			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `
+			{
+				"simplexParameters": {
+						"initialValidators": [
+								{
+										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								},
+								{
+										"nodeID": "NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								}
+						]
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+
+				require.False(config.ValidatorOnly)
+				require.Equal(simplex.DefaultParameters.MaxNetworkDelay, config.SimplexParameters.MaxNetworkDelay)
+				require.Equal(simplex.DefaultParameters.MaxRebroadcastWait, config.SimplexParameters.MaxRebroadcastWait)
+
+				pkBytes, err := base64.StdEncoding.DecodeString(
+					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",
+				)
+				require.NoError(err)
+
+				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
+				require.NoError(err)
+				validator := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator, config.SimplexParameters.InitialValidators[0])
+
+				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
+				require.NoError(err)
+				validator2 := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID2,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator2, config.SimplexParameters.InitialValidators[1])
+			},
+			expectedErr: nil,
+		},
+		"correct simplex config": {
+			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `
+			{
+				"validatorOnly": true,
+				"simplexParameters": {
+						"MaxNetworkDelay":1000,
+						"MaxRebroadcastWait":1000,
+						"initialValidators": [
+								{
+										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								},
+								{
+										"nodeID": "NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								}
+						]
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+
+				require.True(config.ValidatorOnly)
+				require.Equal(time.Duration(1000), config.SimplexParameters.MaxNetworkDelay)
+				require.Equal(time.Duration(1000), config.SimplexParameters.MaxRebroadcastWait)
+
+				pkBytes, err := base64.StdEncoding.DecodeString(
+					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",
+				)
+				require.NoError(err)
+
+				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
+				require.NoError(err)
+				validator := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator, config.SimplexParameters.InitialValidators[0])
+
+				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
+				require.NoError(err)
+				validator2 := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID2,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator2, config.SimplexParameters.InitialValidators[1])
 			},
 			expectedErr: nil,
 		},
@@ -480,7 +630,59 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				// should respect defaults
-				require.Equal(20, config.ConsensusParameters.K)
+				require.Equal(20, config.SnowParameters.K)
+			},
+			expectedErr: nil,
+		},
+		"simplex enabled": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"simplexParameters": {
+						"MaxNetworkDelay":1000,
+						"MaxRebroadcastWait":1000,
+						"initialValidators": [
+								{
+										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								},
+								{
+										"nodeID": "NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh",
+										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
+								}
+						]
+					},
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+
+				require.True(config.ValidatorOnly)
+				require.Equal(time.Duration(1000), config.SimplexParameters.MaxNetworkDelay)
+				require.Equal(time.Duration(1000), config.SimplexParameters.MaxRebroadcastWait)
+
+				pkBytes, err := base64.StdEncoding.DecodeString(
+					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",
+				)
+				require.NoError(err)
+
+				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
+				require.NoError(err)
+				validator := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator, config.SimplexParameters.InitialValidators[0])
+
+				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
+				require.NoError(err)
+				validator2 := simplex.SimplexValidatorInfo{
+					NodeID:    nodeID2,
+					PublicKey: pkBytes,
+				}
+				require.Equal(validator2, config.SimplexParameters.InitialValidators[1])
 			},
 			expectedErr: nil,
 		},
@@ -491,10 +693,10 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"invalid consensus parameters": {
+		"invalid snow consensus parameters": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusParameters": {
+					"snowballParameters": {
 						"k": 111,
 						"alphaPreference": 1234
 					}
@@ -505,13 +707,13 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			},
 			expectedErr: snowball.ErrParametersInvalid,
 		},
-		"correct config": {
+		"correct snow config": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusParameters": {
-						"k": 30,
-						"alphaPreference": 16,
-						"alphaConfidence": 20
+					"snowballParameters": {
+							"k": 30,
+							"alphaPreference": 16,
+							"alphaConfidence": 20
 					},
 					"validatorOnly": true
 				}
@@ -521,11 +723,49 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				require.True(config.ValidatorOnly)
-				require.Equal(16, config.ConsensusParameters.AlphaPreference)
-				require.Equal(20, config.ConsensusParameters.AlphaConfidence)
-				require.Equal(30, config.ConsensusParameters.K)
+				require.Equal(16, config.SnowParameters.AlphaPreference)
+				require.Equal(20, config.SnowParameters.AlphaConfidence)
+				require.Equal(30, config.SnowParameters.K)
 				// must still respect defaults
-				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
+				require.Equal(256, config.SnowParameters.MaxOutstandingItems)
+			},
+			expectedErr: nil,
+		},
+		"multiple configs": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"snowballParameters": {
+						"alphaConfidence": 16
+					},
+					"simplexParameters": {}
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Nil(given)
+			},
+			expectedErr: subnets.ErrTooManyConsensusParameters,
+		},
+		"correct but deprecated consensus config": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+						"consensusParameters": {
+							"k": 30,
+							"alphaPreference": 16,
+							"alphaConfidence": 20
+					},
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				require.True(config.ValidatorOnly)
+				require.Equal(16, config.SnowParameters.AlphaPreference)
+				require.Equal(20, config.SnowParameters.AlphaConfidence)
+				require.Equal(30, config.SnowParameters.K)
+				// must still respect defaults
+				require.Equal(256, config.SnowParameters.MaxOutstandingItems)
 			},
 			expectedErr: nil,
 		},
@@ -704,6 +944,27 @@ func setupFile(t *testing.T, path string, fileName string, value string) {
 	require.NoError(os.MkdirAll(path, 0o700))
 	filePath := filepath.Join(path, fileName)
 	require.NoError(os.WriteFile(filePath, []byte(value), 0o600))
+}
+
+func TestGetPrimaryNetworkConfig(t *testing.T) {
+	require := require.New(t)
+	v := setupViperFlags()
+
+	config := getPrimaryNetworkConfig(v)
+
+	// Verify basic config structure
+	require.False(config.ValidatorOnly, "ValidatorOnly should be false for primary network")
+
+	// Verify SnowParameters have the default values from snowball.DefaultParameters
+	require.Equal(snowball.DefaultParameters, *config.SnowParameters)
+	require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
+	require.Equal(snowball.DefaultParameters.AlphaPreference, config.SnowParameters.AlphaPreference)
+	require.Equal(snowball.DefaultParameters.AlphaConfidence, config.SnowParameters.AlphaConfidence)
+	require.Equal(snowball.DefaultParameters.Beta, config.SnowParameters.Beta)
+	require.Equal(snowball.DefaultParameters.ConcurrentRepolls, config.SnowParameters.ConcurrentRepolls)
+	require.Equal(snowball.DefaultParameters.OptimalProcessing, config.SnowParameters.OptimalProcessing)
+	require.Equal(snowball.DefaultParameters.MaxOutstandingItems, config.SnowParameters.MaxOutstandingItems)
+	require.Equal(snowball.DefaultParameters.MaxItemProcessingTime, config.SnowParameters.MaxItemProcessingTime)
 }
 
 func setupViperFlags() *viper.Viper {

@@ -21,10 +21,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	pSimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 type newBlockConfig struct {
@@ -81,22 +82,13 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 	return block
 }
 
-func newTestValidatorInfo(allNodes []*testNode) map[ids.NodeID]*validators.GetValidatorOutput {
-	vds := make(map[ids.NodeID]*validators.GetValidatorOutput, len(allNodes))
-	for _, node := range allNodes {
-		vds[node.validator.NodeID] = &node.validator
-	}
-
-	return vds
-}
-
 func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 	return newNetworkConfigs(t, numNodes)[0]
 }
 
 type testNode struct {
-	validator validators.GetValidatorOutput
-	signFunc  SignFunc
+	pSimplex.SimplexValidatorInfo
+	signFunc SignFunc
 }
 
 // newNetworkConfigs creates a slice of Configs for testing purposes.
@@ -107,7 +99,7 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 	chainID := ids.GenerateTestID()
 
 	testNodes := generateTestNodes(t, numNodes)
-
+	chainParameters := newSimplexChainParams(testNodes)
 	configs := make([]*Config, 0, numNodes)
 
 	for _, node := range testNodes {
@@ -121,7 +113,7 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 		require.NoError(t, err)
 		config := &Config{
 			Ctx: SimplexChainContext{
-				NodeID:    node.validator.NodeID,
+				NodeID:    node.NodeID,
 				ChainID:   chainID,
 				NetworkID: constants.UnitTestID,
 			},
@@ -131,12 +123,25 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 			VM:                 newTestVM(),
 			DB:                 memdb.New(),
 			SignBLS:            node.signFunc,
-			Validators:         newTestValidatorInfo(testNodes),
+			Params:             chainParameters,
 		}
 		configs = append(configs, config)
 	}
 
 	return configs
+}
+
+// newSimplexChainParams creates simplex chain parameters with the given nodes as initial validators.
+func newSimplexChainParams(nodes []*testNode) *pSimplex.Parameters {
+	params := &pSimplex.Parameters{
+		MaxNetworkDelay:    1 * time.Second,
+		MaxRebroadcastWait: 1 * time.Second,
+	}
+	params.InitialValidators = make([]pSimplex.SimplexValidatorInfo, len(nodes))
+	for i, node := range nodes {
+		params.InitialValidators[i] = node.SimplexValidatorInfo
+	}
+	return params
 }
 
 func generateTestNodes(t *testing.T, num uint64) []*testNode {
@@ -147,9 +152,9 @@ func generateTestNodes(t *testing.T, num uint64) []*testNode {
 
 		nodeID := ids.GenerateTestNodeID()
 		nodes[i] = &testNode{
-			validator: validators.GetValidatorOutput{
+			SimplexValidatorInfo: pSimplex.SimplexValidatorInfo{
 				NodeID:    nodeID,
-				PublicKey: ls.PublicKey(),
+				PublicKey: ls.PublicKey().Compress(),
 			},
 			signFunc: ls.Sign,
 		}
@@ -167,7 +172,8 @@ func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader
 		vote := simplex.ToBeSignedFinalization{
 			BlockHeader: bh,
 		}
-		signer, _ := NewBLSAuth(config)
+		signer, _, err := NewBLSAuth(config)
+		require.NoError(t, err)
 		sig, err := vote.Sign(&signer)
 		require.NoError(t, err)
 		finalizedVotes = append(finalizedVotes, &simplex.FinalizeVote{
@@ -179,7 +185,8 @@ func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader
 		})
 	}
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	sigAgg := &SignatureAggregator{verifier: &verifier}
 
 	finalization, err := simplex.NewFinalization(configs[0].Log, sigAgg, finalizedVotes)
