@@ -4,13 +4,18 @@
 package atomic
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ SharedMemory = (*sharedMemory)(nil)
+var (
+	_ SharedMemory = (*sharedMemory)(nil)
+	_ SharedMemory = (*ReadOnly)(nil)
+)
 
 type Requests struct {
 	RemoveRequests [][]byte   `serialize:"true"`
@@ -162,4 +167,53 @@ func (sm *sharedMemory) Apply(requests map[ids.ID]*Requests, batches ...database
 	}
 
 	return WriteAll(batch, batches...)
+}
+
+// ReadOnly drops writes to the underlying [SharedMemory] so that atomic
+// operations can be replayed without duplicating writes.
+type ReadOnly struct {
+	sm SharedMemory
+}
+
+func NewReadOnly(sharedMemory SharedMemory) ReadOnly {
+	return ReadOnly{sm: sharedMemory}
+}
+
+func (r ReadOnly) Get(
+	peerChainID ids.ID,
+	keys [][]byte,
+) (
+	[][]byte,
+	error,
+) {
+	return r.sm.Get(peerChainID, keys)
+}
+
+func (r ReadOnly) Indexed(
+	peerChainID ids.ID,
+	traits [][]byte,
+	startTrait,
+	startKey []byte,
+	limit int,
+) ([][]byte, []byte, []byte, error) {
+	return r.sm.Indexed(
+		peerChainID,
+		traits,
+		startTrait,
+		startKey,
+		limit,
+	)
+}
+
+// Apply drops atomic write requests.
+func (ReadOnly) Apply(
+	_ map[ids.ID]*Requests,
+	bs ...database.Batch,
+) error {
+	// TODO hacky
+	if len(bs) != 1 {
+		return errors.New("expected only one batch")
+	}
+
+	return bs[0].Write()
 }
