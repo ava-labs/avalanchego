@@ -149,7 +149,7 @@ func TestBenchlistNoDuplicateBench(t *testing.T) {
 			Halflife:           DefaultHalflife,
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
-			BenchDuration:      50 * time.Millisecond,
+			BenchDuration:      100 * time.Millisecond,
 		},
 		prometheus.NewRegistry(),
 	)
@@ -260,7 +260,7 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 			Halflife:           DefaultHalflife,
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
-			BenchDuration:      50 * time.Millisecond,
+			BenchDuration:      100 * time.Millisecond,
 		},
 		prometheus.NewRegistry(),
 	)
