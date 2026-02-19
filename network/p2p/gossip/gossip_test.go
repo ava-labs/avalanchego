@@ -666,6 +666,10 @@ func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
 	return t.validators.Contains(nodeID)
 }
 
+func (t testValidatorSet) HasValidator(_ context.Context, nodeID ids.NodeID) bool {
+	return t.validators.Contains(nodeID)
+}
+
 type testHistogram struct {
 	prometheus.Histogram
 	observedVal float64

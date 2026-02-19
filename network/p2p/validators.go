@@ -30,7 +30,11 @@ var (
 
 type ValidatorSet interface {
 	Len(ctx context.Context) int
+	// Has returns true if nodeID is a connected validator.
 	Has(ctx context.Context, nodeID ids.NodeID) bool // TODO return error
+	// HasValidator returns true if nodeID is in the validator set, regardless of
+	// connection status.
+	HasValidator(ctx context.Context, nodeID ids.NodeID) bool // TODO return error
 }
 
 type ValidatorSubset interface {
@@ -202,6 +206,16 @@ func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
 	defer v.lock.RUnlock()
 
 	return v.connectedValidators.Contains(nodeID)
+}
+
+// HasValidator returns if nodeID is a validator.
+func (v *Validators) HasValidator(ctx context.Context, nodeID ids.NodeID) bool {
+	v.refresh(ctx)
+
+	v.lock.RLock()
+	defer v.lock.RUnlock()
+
+	return v.validatorSet.Contains(nodeID)
 }
 
 // Len returns the number of connected validators.
