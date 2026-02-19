@@ -269,7 +269,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint64(SybilProtectionDisabledWeightKey, 100, "Weight to provide to each peer when sybil protection is disabled")
 	fs.Bool(PartialSyncPrimaryNetworkKey, false, "Only sync the P-chain on the Primary Network. If the node is a Primary Network validator, it will report unhealthy")
 	// Uptime Requirement
-	fs.Float64(UptimeRequirementKey, genesis.LocalParams.UptimeRequirement, "Fraction of time a validator must be online to receive rewards")
+	fs.Float64(UptimeRequirementKey, genesis.LocalParams.UptimeRequirementConfig.DefaultRequiredUptimePercentage, "Fraction of time a validator must be online to receive rewards")
 	// Minimum Stake required to validate the Primary Network
 	fs.Uint64(MinValidatorStakeKey, genesis.LocalParams.MinValidatorStake, "Minimum stake, in nAVAX, required to validate the primary network")
 	// Maximum Stake that can be staked and delegated to a validator on the Primary Network

@@ -664,7 +664,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	}
 
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		config.UptimeRequirement = v.GetFloat64(UptimeRequirementKey)
+		config.UptimeRequirementConfig.DefaultRequiredUptimePercentage = v.GetFloat64(UptimeRequirementKey)
 		config.MinValidatorStake = v.GetUint64(MinValidatorStakeKey)
 		config.MaxValidatorStake = v.GetUint64(MaxValidatorStakeKey)
 		config.MinDelegatorStake = v.GetUint64(MinDelegatorStakeKey)

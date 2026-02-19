@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -516,7 +517,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := setupVM(t, nil, upgradetest.Cortina, 0)
+	vm, baseDB, mutableSharedMemory := setupVM(t, nil, upgradetest.Cortina, genesis.UptimeRequirementConfig{})
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -709,7 +710,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := setupVM(t, nil, upgradetest.Cortina, 0)
+	vm, baseDB, mutableSharedMemory := setupVM(t, nil, upgradetest.Cortina, genesis.UptimeRequirementConfig{})
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 

@@ -1205,8 +1205,10 @@ func (n *network) NodeUptime() (UptimeResult, error) {
 		weightFloat := float64(weight)
 		totalWeightedPercent += percent * weightFloat
 
-		// if this peer thinks we're above requirement add the weight
-		if percent/100 >= n.config.UptimeRequirement {
+		// if this peer thinks we're above latest requirement, add the weight.
+		// the actual requirement may vary if our staking start time was before
+		// the latest required uptime update.
+		if percent/100 >= n.config.RequiredUptime(time.Now()) {
 			rewardingStake += weightFloat
 		}
 	}
