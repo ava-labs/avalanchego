@@ -107,7 +107,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-	onParentAccept.EXPECT().GetValidatorMutables(constants.PrimaryNetworkID, utx.NodeID()).Return(state.ValidatorMutables{}, nil).AnyTimes()
+	onParentAccept.EXPECT().GetValidatorMutables(utx.NodeID(), constants.PrimaryNetworkID).Return(state.ValidatorMutables{}, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any()).Return(
 		time.Microsecond, /*upDuration*/
@@ -221,7 +221,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetActiveL1ValidatorsIterator().Return(iterator.Empty[state.L1Validator]{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
-	onParentAccept.EXPECT().GetValidatorMutables(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(state.ValidatorMutables{}, nil).AnyTimes()
+	onParentAccept.EXPECT().GetValidatorMutables(unsignedNextStakerTx.NodeID(), constants.PrimaryNetworkID).Return(state.ValidatorMutables{}, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any).Return(
 		time.Microsecond, /*upDuration*/
