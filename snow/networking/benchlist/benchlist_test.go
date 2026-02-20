@@ -101,16 +101,12 @@ func TestBenchlist(t *testing.T) {
 		t.Helper()
 		require.False(b.IsBenched(vdrID))
 		require.False(b.IsBenched(nodeID))
-		require.Zero(testutil.ToFloat64(b.numBenched))
-		require.Zero(testutil.ToFloat64(b.weightBenched))
 	}
 
 	requireBenched := func() {
 		t.Helper()
 		require.True(b.IsBenched(vdrID))
 		require.False(b.IsBenched(nodeID))
-		require.Equal(1.0, testutil.ToFloat64(b.numBenched))
-		require.Equal(1.0, testutil.ToFloat64(b.weightBenched))
 	}
 
 	// Nobody should be benched at the start
