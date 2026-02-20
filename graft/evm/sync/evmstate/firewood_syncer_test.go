@@ -250,8 +250,10 @@ func assertFirewoodAllKeysConsistency(t *testing.T, clientState, serverState sta
 
 	clientRev, err := clientDB.Revision(clientRoot)
 	require.NoError(t, err, "client Revision()")
+	defer func() { require.NoError(t, clientRev.Drop()) }()
 	serverRev, err := serverDB.Revision(serverRoot)
 	require.NoError(t, err, "server Revision()")
+	defer func() { require.NoError(t, serverRev.Drop()) }()
 
 	clientIt, err := clientRev.Iter(nil)
 	require.NoError(t, err, "client Iter()")
