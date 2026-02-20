@@ -470,21 +470,6 @@ func (mr *MockStateMockRecorder) GetCurrentValidators(ctx, subnetID any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidators", reflect.TypeOf((*MockState)(nil).GetCurrentValidators), ctx, subnetID)
 }
 
-// GetDelegateeReward mocks base method.
-func (m *MockState) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDelegateeReward", subnetID, nodeID)
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDelegateeReward indicates an expected call of GetDelegateeReward.
-func (mr *MockStateMockRecorder) GetDelegateeReward(subnetID, nodeID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), subnetID, nodeID)
-}
-
 // GetExpiryIterator mocks base method.
 func (m *MockState) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	m.ctrl.T.Helper()
@@ -768,6 +753,21 @@ func (mr *MockStateMockRecorder) GetUptime(nodeID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUptime", reflect.TypeOf((*MockState)(nil).GetUptime), nodeID)
 }
 
+// GetValidatorMutables mocks base method.
+func (m *MockState) GetValidatorMutables(nodeID ids.NodeID, subnetID ids.ID) (ValidatorMutables, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetValidatorMutables", nodeID, subnetID)
+	ret0, _ := ret[0].(ValidatorMutables)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetValidatorMutables indicates an expected call of GetValidatorMutables.
+func (mr *MockStateMockRecorder) GetValidatorMutables(nodeID, subnetID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorMutables", reflect.TypeOf((*MockState)(nil).GetValidatorMutables), nodeID, subnetID)
+}
+
 // HasExpiry mocks base method.
 func (m *MockState) HasExpiry(arg0 ExpiryEntry) (bool, error) {
 	m.ctrl.T.Helper()
@@ -928,20 +928,6 @@ func (mr *MockStateMockRecorder) SetCurrentSupply(subnetID, cs any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockState)(nil).SetCurrentSupply), subnetID, cs)
 }
 
-// SetDelegateeReward mocks base method.
-func (m *MockState) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetDelegateeReward", subnetID, nodeID, amount)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetDelegateeReward indicates an expected call of SetDelegateeReward.
-func (mr *MockStateMockRecorder) SetDelegateeReward(subnetID, nodeID, amount any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), subnetID, nodeID, amount)
-}
-
 // SetFeeState mocks base method.
 func (m *MockState) SetFeeState(f gas.State) {
 	m.ctrl.T.Helper()
@@ -1038,6 +1024,20 @@ func (m *MockState) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastU
 func (mr *MockStateMockRecorder) SetUptime(nodeID, upDuration, lastUpdated any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockState)(nil).SetUptime), nodeID, upDuration, lastUpdated)
+}
+
+// SetValidatorMutables mocks base method.
+func (m *MockState) SetValidatorMutables(nodeID ids.NodeID, subnetID ids.ID, mutables ValidatorMutables) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetValidatorMutables", nodeID, subnetID, mutables)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetValidatorMutables indicates an expected call of SetValidatorMutables.
+func (mr *MockStateMockRecorder) SetValidatorMutables(nodeID, subnetID, mutables any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetValidatorMutables", reflect.TypeOf((*MockState)(nil).SetValidatorMutables), nodeID, subnetID, mutables)
 }
 
 // UTXOIDs mocks base method.

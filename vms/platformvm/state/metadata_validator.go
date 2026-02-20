@@ -4,23 +4,23 @@
 package state
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+var errUncommittedChanges = errors.New("uncommitted validator changes exist")
 
 // preDelegateeRewardSize is the size of codec marshalling
 // [preDelegateeRewardMetadata].
 //
 // CodecVersionLen + UpDurationLen + LastUpdatedLen + PotentialRewardLen
 const preDelegateeRewardSize = codec.VersionSize + 3*wrappers.LongLen
-
-var _ validatorState = (*metadata)(nil)
 
 type preDelegateeRewardMetadata struct {
 	UpDuration      time.Duration `v0:"true"`
@@ -77,191 +77,195 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 	return nil
 }
 
-type validatorState interface {
-	// LoadValidatorMetadata sets the [metadata] of [vdrID] on [subnetID].
-	// GetUptime and SetUptime will return an error if the [vdrID] and
-	// [subnetID] hasn't been loaded. This call will not result in a write to
-	// disk.
-	LoadValidatorMetadata(
-		vdrID ids.NodeID,
-		subnetID ids.ID,
-		metadata *validatorMetadata,
-	)
-
-	// GetUptime returns the current uptime measurements of [vdrID] on
-	// [subnetID].
-	GetUptime(
-		vdrID ids.NodeID,
-		subnetID ids.ID,
-	) (upDuration time.Duration, lastUpdated time.Time, err error)
-
-	// SetUptime updates the uptime measurements of [vdrID] on [subnetID].
-	// Unless these measurements are deleted first, the next call to
-	// WriteUptimes will write this update to disk.
-	SetUptime(
-		vdrID ids.NodeID,
-		subnetID ids.ID,
-		upDuration time.Duration,
-		lastUpdated time.Time,
-	) error
-
-	// GetDelegateeReward returns the current rewards accrued to [vdrID] on
-	// [subnetID].
-	GetDelegateeReward(
-		subnetID ids.ID,
-		vdrID ids.NodeID,
-	) (amount uint64, err error)
-
-	// SetDelegateeReward updates the rewards accrued to [vdrID] on [subnetID].
-	// Unless these measurements are deleted first, the next call to
-	// WriteUptimes will write this update to disk.
-	SetDelegateeReward(
-		subnetID ids.ID,
-		vdrID ids.NodeID,
-		amount uint64,
-	) error
-
-	// DeleteValidatorMetadata removes in-memory references to the metadata of
-	// [vdrID] on [subnetID]. If there were staged updates from a prior call to
-	// SetUptime or SetDelegateeReward, the updates will be dropped. This call
-	// will not result in a write to disk.
-	DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID)
-
-	// WriteValidatorMetadata writes all staged updates from prior calls to
-	// SetUptime or SetDelegateeReward.
-	WriteValidatorMetadata(
-		dbPrimary database.KeyValueWriter,
-		dbSubnet database.KeyValueWriter,
-		codecVersion uint16,
-	) error
+// ValidatorMutables holds mutable validator data that can be modified.
+type ValidatorMutables struct {
+	DelegateeReward uint64
 }
 
-type metadata struct {
-	metadata map[ids.NodeID]map[ids.ID]*validatorMetadata // vdrID -> subnetID -> metadata
-	// updatedMetadata tracks the updates since WriteValidatorMetadata was last called
-	updatedMetadata map[ids.NodeID]set.Set[ids.ID] // vdrID -> subnetIDs
-}
-
-func newValidatorState() validatorState {
-	return &metadata{
-		metadata:        make(map[ids.NodeID]map[ids.ID]*validatorMetadata),
-		updatedMetadata: make(map[ids.NodeID]set.Set[ids.ID]),
+func validatorMutablesFromMetadata(vdrMetadata *validatorMetadata) ValidatorMutables {
+	return ValidatorMutables{
+		DelegateeReward: vdrMetadata.PotentialDelegateeReward,
 	}
 }
 
-func (m *metadata) LoadValidatorMetadata(
-	vdrID ids.NodeID,
-	subnetID ids.ID,
-	uptime *validatorMetadata,
-) {
-	subnetMetadata, ok := m.metadata[vdrID]
-	if !ok {
-		subnetMetadata = make(map[ids.ID]*validatorMetadata)
-		m.metadata[vdrID] = subnetMetadata
-	}
-	subnetMetadata[subnetID] = uptime
+type validatorStateKey struct {
+	nodeID   ids.NodeID //nolint:unused // used as part of map key comparison
+	subnetID ids.ID
 }
 
-func (m *metadata) GetUptime(
-	vdrID ids.NodeID,
-	subnetID ids.ID,
-) (time.Duration, time.Time, error) {
-	metadata, exists := m.metadata[vdrID][subnetID]
-	if !exists {
-		return 0, time.Time{}, database.ErrNotFound
-	}
-	return metadata.UpDuration, metadata.lastUpdated, nil
+type validatorState struct {
+	primaryNetworkValidatorsDB database.KeyValueWriterDeleter
+	subnetValidatorsDB         database.KeyValueWriterDeleter
+
+	// metadata holds the validator data.
+	metadata map[validatorStateKey]*validatorMetadata // (vdrID, subnetID) -> metadata
+
+	// dirtyMetadata tracks which keys have been modified and need DB write on commit.
+	dirtyMetadata map[validatorStateKey]struct{}
+
+	// deleted tracks validators to be deleted from DB on commit, storing their txID.
+	deleted map[validatorStateKey]ids.ID // (vdrID, subnetID) -> txID
 }
 
-func (m *metadata) SetUptime(
-	vdrID ids.NodeID,
+// newValidatorState creates a new validatorState instance with the given database writers.
+func newValidatorState(
+	primaryNetworkValidatorsDB database.KeyValueWriterDeleter,
+	subnetValidatorsDB database.KeyValueWriterDeleter,
+) *validatorState {
+	return &validatorState{
+		metadata:                   make(map[validatorStateKey]*validatorMetadata),
+		dirtyMetadata:              make(map[validatorStateKey]struct{}),
+		deleted:                    make(map[validatorStateKey]ids.ID),
+		primaryNetworkValidatorsDB: primaryNetworkValidatorsDB,
+		subnetValidatorsDB:         subnetValidatorsDB,
+	}
+}
+
+// LoadValidatorMetadata loads validator metadata into the in-memory state.
+// Returns errUncommittedChanges if there are pending dirty changes for this validator.
+func (m *validatorState) LoadValidatorMetadata(
+	nodeID ids.NodeID,
 	subnetID ids.ID,
+	vdrMetadata *validatorMetadata,
+) error {
+	key := getValidatorStateKey(nodeID, subnetID)
+	if _, ok := m.dirtyMetadata[key]; ok {
+		return errUncommittedChanges
+	}
+	if _, ok := m.deleted[key]; ok {
+		return errUncommittedChanges
+	}
+
+	m.metadata[key] = vdrMetadata
+	return nil
+}
+
+// GetUptime returns the uptime for the Primary Network validator with [nodeID].
+func (m *validatorState) GetUptime(nodeID ids.NodeID) (time.Duration, time.Time, error) {
+	key := getValidatorStateKey(nodeID, constants.PrimaryNetworkID)
+	vdrMetadata, err := m.getValidatorMetadata(key)
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	return vdrMetadata.UpDuration, vdrMetadata.lastUpdated, nil
+}
+
+// SetUptime sets the uptime for the Primary Network validator with [nodeID].
+// The change is tracked as dirty and will be written on Commit.
+func (m *validatorState) SetUptime(
+	nodeID ids.NodeID,
 	upDuration time.Duration,
 	lastUpdated time.Time,
 ) error {
-	metadata, exists := m.metadata[vdrID][subnetID]
-	if !exists {
-		return database.ErrNotFound
+	key := getValidatorStateKey(nodeID, constants.PrimaryNetworkID)
+	vdrMetadata, err := m.getValidatorMetadata(key)
+	if err != nil {
+		return err
 	}
-	metadata.UpDuration = upDuration
-	metadata.lastUpdated = lastUpdated
 
-	m.addUpdatedMetadata(vdrID, subnetID)
+	vdrMetadata.UpDuration = upDuration
+	vdrMetadata.LastUpdated = uint64(lastUpdated.Unix())
+	vdrMetadata.lastUpdated = lastUpdated
+	m.dirtyMetadata[key] = struct{}{}
 	return nil
 }
 
-func (m *metadata) GetDelegateeReward(
-	subnetID ids.ID,
-	vdrID ids.NodeID,
-) (uint64, error) {
-	metadata, exists := m.metadata[vdrID][subnetID]
-	if !exists {
-		return 0, database.ErrNotFound
+// GetValidatorMutables returns the mutable data for the validator on [subnetID] with [nodeID].
+func (m *validatorState) GetValidatorMutables(nodeID ids.NodeID, subnetID ids.ID) (ValidatorMutables, error) {
+	key := getValidatorStateKey(nodeID, subnetID)
+	vdrMetadata, err := m.getValidatorMetadata(key)
+	if err != nil {
+		return ValidatorMutables{}, err
 	}
-	return metadata.PotentialDelegateeReward, nil
+	return validatorMutablesFromMetadata(vdrMetadata), nil
 }
 
-func (m *metadata) SetDelegateeReward(
+// SetValidatorMutables sets the mutable data for the validator on [subnetID] with [nodeID].
+// The change is tracked as dirty and will be written on Commit.
+func (m *validatorState) SetValidatorMutables(
+	nodeID ids.NodeID,
 	subnetID ids.ID,
-	vdrID ids.NodeID,
-	amount uint64,
+	mutables ValidatorMutables,
 ) error {
-	metadata, exists := m.metadata[vdrID][subnetID]
-	if !exists {
-		return database.ErrNotFound
+	key := getValidatorStateKey(nodeID, subnetID)
+	vdrMetadata, err := m.getValidatorMetadata(key)
+	if err != nil {
+		return err
 	}
-	metadata.PotentialDelegateeReward = amount
 
-	m.addUpdatedMetadata(vdrID, subnetID)
+	vdrMetadata.PotentialDelegateeReward = mutables.DelegateeReward
+	m.dirtyMetadata[key] = struct{}{}
 	return nil
 }
 
-func (m *metadata) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
-	subnetMetadata := m.metadata[vdrID]
-	delete(subnetMetadata, subnetID)
-	if len(subnetMetadata) == 0 {
-		delete(m.metadata, vdrID)
+// DeleteValidatorMetadata marks the validator for deletion on [subnetID] with [nodeID].
+// The deletion will be persisted to DB on Commit.
+func (m *validatorState) DeleteValidatorMetadata(nodeID ids.NodeID, subnetID ids.ID) error {
+	key := getValidatorStateKey(nodeID, subnetID)
+	vdrMetadata, err := m.getValidatorMetadata(key)
+	if err != nil {
+		return err
 	}
 
-	subnetUpdatedMetadata := m.updatedMetadata[vdrID]
-	subnetUpdatedMetadata.Remove(subnetID)
-	if subnetUpdatedMetadata.Len() == 0 {
-		delete(m.updatedMetadata, vdrID)
-	}
+	m.deleted[key] = vdrMetadata.txID
+	delete(m.metadata, key)
+	delete(m.dirtyMetadata, key)
+	return nil
 }
 
-func (m *metadata) WriteValidatorMetadata(
-	dbPrimary database.KeyValueWriter,
-	dbSubnet database.KeyValueWriter,
-	codecVersion uint16,
-) error {
-	for vdrID, updatedSubnets := range m.updatedMetadata {
-		for subnetID := range updatedSubnets {
-			metadata := m.metadata[vdrID][subnetID]
-			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
+// Commit writes all dirty validators to the database and deletes removed validators.
+// Clears dirty tracking after successful commit.
+func (m *validatorState) Commit(codecVersion uint16) error {
+	// Write dirty metadata
+	for key := range m.dirtyMetadata {
+		vdrMetadata := m.metadata[key]
 
-			metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
-			if err != nil {
-				return err
-			}
-			db := dbSubnet
-			if subnetID == constants.PrimaryNetworkID {
-				db = dbPrimary
-			}
-			if err := db.Put(metadata.txID[:], metadataBytes); err != nil {
-				return err
-			}
+		db := m.subnetValidatorsDB
+		if key.subnetID == constants.PrimaryNetworkID {
+			db = m.primaryNetworkValidatorsDB
 		}
-		delete(m.updatedMetadata, vdrID)
+
+		metadataBytes, err := MetadataCodec.Marshal(codecVersion, vdrMetadata)
+		if err != nil {
+			return err
+		}
+		if err := db.Put(vdrMetadata.txID[:], metadataBytes); err != nil {
+			return err
+		}
 	}
+
+	// Delete removed validators
+	for key, txID := range m.deleted {
+		db := m.subnetValidatorsDB
+		if key.subnetID == constants.PrimaryNetworkID {
+			db = m.primaryNetworkValidatorsDB
+		}
+
+		if err := db.Delete(txID[:]); err != nil {
+			return err
+		}
+	}
+
+	m.dirtyMetadata = make(map[validatorStateKey]struct{})
+	m.deleted = make(map[validatorStateKey]ids.ID)
 	return nil
 }
 
-func (m *metadata) addUpdatedMetadata(vdrID ids.NodeID, subnetID ids.ID) {
-	updatedSubnetMetadata, ok := m.updatedMetadata[vdrID]
-	if !ok {
-		updatedSubnetMetadata = set.Set[ids.ID]{}
-		m.updatedMetadata[vdrID] = updatedSubnetMetadata
+func (m *validatorState) getValidatorMetadata(key validatorStateKey) (*validatorMetadata, error) {
+	if _, ok := m.deleted[key]; ok {
+		return nil, database.ErrNotFound
 	}
-	updatedSubnetMetadata.Add(subnetID)
+	vdrMetadata, ok := m.metadata[key]
+	if !ok {
+		return nil, database.ErrNotFound
+	}
+	return vdrMetadata, nil
+}
+
+// getValidatorStateKey creates a composite key from nodeID and subnetID.
+func getValidatorStateKey(nodeID ids.NodeID, subnetID ids.ID) validatorStateKey {
+	return validatorStateKey{
+		nodeID:   nodeID,
+		subnetID: subnetID,
+	}
 }

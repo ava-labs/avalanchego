@@ -838,11 +838,11 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 		apiStaker := toPlatformStaker(currentStaker)
 		potentialReward := avajson.Uint64(currentStaker.PotentialReward)
 
-		delegateeReward, err := s.vm.state.GetDelegateeReward(currentStaker.SubnetID, currentStaker.NodeID)
+		mutables, err := s.vm.state.GetValidatorMutables(currentStaker.NodeID, currentStaker.SubnetID)
 		if err != nil {
 			return nil, err
 		}
-		jsonDelegateeReward := avajson.Uint64(delegateeReward)
+		jsonDelegateeReward := avajson.Uint64(mutables.DelegateeReward)
 
 		switch currentStaker.Priority {
 		case txs.PrimaryNetworkValidatorCurrentPriority, txs.SubnetPermissionlessValidatorCurrentPriority:

@@ -373,7 +373,7 @@ type stateBlk struct {
  *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
  */
 type state struct {
-	validatorState
+	validatorState *validatorState
 
 	validators validators.Manager
 	ctx        *snow.Context
@@ -753,8 +753,11 @@ func New(
 		return nil, err
 	}
 
+	currentValidatorList := linkeddb.NewDefault(currentValidatorBaseDB)
+	currentSubnetValidatorList := linkeddb.NewDefault(currentSubnetValidatorBaseDB)
+
 	s := &state{
-		validatorState: newValidatorState(),
+		validatorState: newValidatorState(currentValidatorList, currentSubnetValidatorList),
 
 		validators: validators,
 		ctx:        ctx,
@@ -792,13 +795,13 @@ func New(
 		validatorsDB:                        validatorsDB,
 		currentValidatorsDB:                 currentValidatorsDB,
 		currentValidatorBaseDB:              currentValidatorBaseDB,
-		currentValidatorList:                linkeddb.NewDefault(currentValidatorBaseDB),
+		currentValidatorList:                currentValidatorList,
 		currentDelegatorBaseDB:              currentDelegatorBaseDB,
 		currentDelegatorList:                linkeddb.NewDefault(currentDelegatorBaseDB),
 		currentSubnetValidatorBaseDB:        currentSubnetValidatorBaseDB,
 		currentSubnetValidatorList:          linkeddb.NewDefault(currentSubnetValidatorBaseDB),
 		currentSubnetDelegatorBaseDB:        currentSubnetDelegatorBaseDB,
-		currentSubnetDelegatorList:          linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
+		currentSubnetDelegatorList:          currentSubnetValidatorList,
 		pendingValidatorsDB:                 pendingValidatorsDB,
 		pendingValidatorBaseDB:              pendingValidatorBaseDB,
 		pendingValidatorList:                linkeddb.NewDefault(pendingValidatorBaseDB),
@@ -1941,7 +1944,9 @@ func (s *state) loadCurrentValidators() error {
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
+		if err := s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata); err != nil {
+			return err
+		}
 	}
 
 	subnetValidatorIt := s.currentSubnetValidatorList.NewIterator()
@@ -1991,7 +1996,9 @@ func (s *state) loadCurrentValidators() error {
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
+		if err := s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata); err != nil {
+			return err
+		}
 	}
 
 	delegatorIt := s.currentDelegatorList.NewIterator()
@@ -2249,7 +2256,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeValidatorDiffs(height),
 		s.writeCurrentStakers(codecVersion),
 		s.writePendingStakers(),
-		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
+		s.validatorState.Commit(codecVersion), // Must be called after writeCurrentStakers
 		s.writeL1Validators(),
 		s.writeTXs(),
 		s.writeRewardUTXOs(),
@@ -2836,13 +2843,17 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 					return fmt.Errorf("failed to write current validator to list: %w", err)
 				}
 
-				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
+				if err := s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata); err != nil {
+					return err
+				}
 			case deleted:
 				if err := validatorDB.Delete(validatorDiff.validator.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
 				}
 
-				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
+				if err := s.validatorState.DeleteValidatorMetadata(nodeID, subnetID); err != nil {
+					return err
+				}
 			}
 
 			err := writeCurrentDelegatorDiff(
@@ -3396,11 +3407,19 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 }
 
 func (s *state) GetUptime(vdrID ids.NodeID) (time.Duration, time.Time, error) {
-	return s.validatorState.GetUptime(vdrID, constants.PrimaryNetworkID)
+	return s.validatorState.GetUptime(vdrID)
 }
 
 func (s *state) SetUptime(vdrID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
-	return s.validatorState.SetUptime(vdrID, constants.PrimaryNetworkID, upDuration, lastUpdated)
+	return s.validatorState.SetUptime(vdrID, upDuration, lastUpdated)
+}
+
+func (s *state) GetValidatorMutables(nodeID ids.NodeID, subnetID ids.ID) (ValidatorMutables, error) {
+	return s.validatorState.GetValidatorMutables(nodeID, subnetID)
+}
+
+func (s *state) SetValidatorMutables(nodeID ids.NodeID, subnetID ids.ID, mutables ValidatorMutables) error {
+	return s.validatorState.SetValidatorMutables(nodeID, subnetID, mutables)
 }
 
 func markInitialized(db database.KeyValueWriter) error {

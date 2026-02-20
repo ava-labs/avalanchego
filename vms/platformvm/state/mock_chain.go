@@ -280,21 +280,6 @@ func (mr *MockChainMockRecorder) GetCurrentValidator(subnetID, nodeID any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidator", reflect.TypeOf((*MockChain)(nil).GetCurrentValidator), subnetID, nodeID)
 }
 
-// GetDelegateeReward mocks base method.
-func (m *MockChain) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDelegateeReward", subnetID, nodeID)
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDelegateeReward indicates an expected call of GetDelegateeReward.
-func (mr *MockChainMockRecorder) GetDelegateeReward(subnetID, nodeID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockChain)(nil).GetDelegateeReward), subnetID, nodeID)
-}
-
 // GetExpiryIterator mocks base method.
 func (m *MockChain) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	m.ctrl.T.Helper()
@@ -488,6 +473,21 @@ func (mr *MockChainMockRecorder) GetUTXO(utxoID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockChain)(nil).GetUTXO), utxoID)
 }
 
+// GetValidatorMutables mocks base method.
+func (m *MockChain) GetValidatorMutables(nodeID ids.NodeID, subnetID ids.ID) (ValidatorMutables, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetValidatorMutables", nodeID, subnetID)
+	ret0, _ := ret[0].(ValidatorMutables)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetValidatorMutables indicates an expected call of GetValidatorMutables.
+func (mr *MockChainMockRecorder) GetValidatorMutables(nodeID, subnetID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorMutables", reflect.TypeOf((*MockChain)(nil).GetValidatorMutables), nodeID, subnetID)
+}
+
 // HasExpiry mocks base method.
 func (m *MockChain) HasExpiry(arg0 ExpiryEntry) (bool, error) {
 	m.ctrl.T.Helper()
@@ -634,20 +634,6 @@ func (mr *MockChainMockRecorder) SetCurrentSupply(subnetID, cs any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockChain)(nil).SetCurrentSupply), subnetID, cs)
 }
 
-// SetDelegateeReward mocks base method.
-func (m *MockChain) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetDelegateeReward", subnetID, nodeID, amount)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetDelegateeReward indicates an expected call of SetDelegateeReward.
-func (mr *MockChainMockRecorder) SetDelegateeReward(subnetID, nodeID, amount any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockChain)(nil).SetDelegateeReward), subnetID, nodeID, amount)
-}
-
 // SetFeeState mocks base method.
 func (m *MockChain) SetFeeState(f gas.State) {
 	m.ctrl.T.Helper()
@@ -706,6 +692,20 @@ func (m *MockChain) SetTimestamp(tm time.Time) {
 func (mr *MockChainMockRecorder) SetTimestamp(tm any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockChain)(nil).SetTimestamp), tm)
+}
+
+// SetValidatorMutables mocks base method.
+func (m *MockChain) SetValidatorMutables(nodeID ids.NodeID, subnetID ids.ID, mutables ValidatorMutables) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetValidatorMutables", nodeID, subnetID, mutables)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetValidatorMutables indicates an expected call of SetValidatorMutables.
+func (mr *MockChainMockRecorder) SetValidatorMutables(nodeID, subnetID, mutables any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetValidatorMutables", reflect.TypeOf((*MockChain)(nil).SetValidatorMutables), nodeID, subnetID, mutables)
 }
 
 // WeightOfL1Validators mocks base method.
