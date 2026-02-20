@@ -8,10 +8,10 @@ module github.com/ava-labs/avalanchego/graft/coreth
 go 1.25.7
 
 require (
-	github.com/ava-labs/avalanchego v0.0.0-initial-consistent-tag
+	github.com/ava-labs/avalanchego v1.14.2-0.20260123184805-18c4dbe2714e
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-initial-consistent-tag
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
-	github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df
+	github.com/ava-labs/libevm v1.13.15-0.20260218120213-98a792673af1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3
 	github.com/google/go-cmp v0.7.0
@@ -24,7 +24,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.23.3
 	github.com/prometheus/client_golang v1.23.0
 	github.com/spf13/cast v1.9.2
-	github.com/spf13/pflag v1.0.6
+	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.11.1
 	github.com/tyler-smith/go-bip39 v1.1.0
@@ -33,7 +33,7 @@ require (
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.45.0
-	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
+	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	golang.org/x/sync v0.18.0
 	google.golang.org/protobuf v1.36.8
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
