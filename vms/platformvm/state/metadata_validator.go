@@ -88,6 +88,15 @@ type validatorState interface {
 		metadata *validatorMetadata,
 	)
 
+	// AddValidatorMetadata registers a new validator's [metadata] for vdrID
+	// on [subnetID] and marks it for writing to disk on the next call to
+	// WriteValidatorMetadata.
+	AddValidatorMetadata(
+		vdrID ids.NodeID,
+		subnetID ids.ID,
+		metadata *validatorMetadata,
+	)
+
 	// GetUptime returns the current uptime measurements of [vdrID] on
 	// [subnetID].
 	GetUptime(
@@ -130,16 +139,24 @@ type validatorState interface {
 	// WriteValidatorMetadata writes all staged updates from prior calls to
 	// SetUptime or SetDelegateeReward.
 	WriteValidatorMetadata(
-		dbPrimary database.KeyValueWriter,
-		dbSubnet database.KeyValueWriter,
+		dbPrimary database.KeyValueWriterDeleter,
+		dbSubnet database.KeyValueWriterDeleter,
 		codecVersion uint16,
 	) error
+}
+
+type pendingDelete struct {
+	subnetID ids.ID
+	txID     ids.ID
 }
 
 type metadata struct {
 	metadata map[ids.NodeID]map[ids.ID]*validatorMetadata // vdrID -> subnetID -> metadata
 	// updatedMetadata tracks the updates since WriteValidatorMetadata was last called
 	updatedMetadata map[ids.NodeID]set.Set[ids.ID] // vdrID -> subnetIDs
+	// pendingDeletes tracks entries to be deleted from DB on the next
+	// call to WriteValidatorMetadata
+	pendingDeletes []pendingDelete
 }
 
 func newValidatorState() validatorState {
@@ -160,6 +177,15 @@ func (m *metadata) LoadValidatorMetadata(
 		m.metadata[vdrID] = subnetMetadata
 	}
 	subnetMetadata[subnetID] = uptime
+}
+
+func (m *metadata) AddValidatorMetadata(
+	vdrID ids.NodeID,
+	subnetID ids.ID,
+	md *validatorMetadata,
+) {
+	m.LoadValidatorMetadata(vdrID, subnetID, md)
+	m.addUpdatedMetadata(vdrID, subnetID)
 }
 
 func (m *metadata) GetUptime(
@@ -217,6 +243,13 @@ func (m *metadata) SetDelegateeReward(
 }
 
 func (m *metadata) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
+	if md, exists := m.metadata[vdrID][subnetID]; exists {
+		m.pendingDeletes = append(m.pendingDeletes, pendingDelete{
+			subnetID: subnetID,
+			txID:     md.txID,
+		})
+	}
+
 	subnetMetadata := m.metadata[vdrID]
 	delete(subnetMetadata, subnetID)
 	if len(subnetMetadata) == 0 {
@@ -231,10 +264,21 @@ func (m *metadata) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 }
 
 func (m *metadata) WriteValidatorMetadata(
-	dbPrimary database.KeyValueWriter,
-	dbSubnet database.KeyValueWriter,
+	dbPrimary database.KeyValueWriterDeleter,
+	dbSubnet database.KeyValueWriterDeleter,
 	codecVersion uint16,
 ) error {
+	for _, del := range m.pendingDeletes {
+		db := dbSubnet
+		if del.subnetID == constants.PrimaryNetworkID {
+			db = dbPrimary
+		}
+		if err := db.Delete(del.txID[:]); err != nil {
+			return err
+		}
+	}
+	m.pendingDeletes = m.pendingDeletes[:0]
+
 	for vdrID, updatedSubnets := range m.updatedMetadata {
 		for subnetID := range updatedSubnets {
 			metadata := m.metadata[vdrID][subnetID]

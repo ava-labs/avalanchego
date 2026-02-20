@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -169,6 +170,122 @@ func TestValidatorDelegateeRewards(t *testing.T) {
 	// get deleted delegatee reward
 	_, _, err = state.GetUptime(nodeID, subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
+}
+
+func TestAddValidatorMetadataWrite(t *testing.T) {
+	tests := []struct {
+		name        string
+		subnetID    ids.ID
+		wantPrimary bool
+	}{
+		{
+			name:        "primary network",
+			subnetID:    constants.PrimaryNetworkID,
+			wantPrimary: true,
+		},
+		{
+			name:        "subnet",
+			subnetID:    ids.GenerateTestID(),
+			wantPrimary: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			state := newValidatorState()
+			primaryDB := memdb.New()
+			subnetDB := memdb.New()
+
+			txID := ids.GenerateTestID()
+			state.AddValidatorMetadata(ids.GenerateTestNodeID(), tt.subnetID, &validatorMetadata{
+				txID:            txID,
+				PotentialReward: 100,
+			})
+			require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
+
+			hasPrimary, err := primaryDB.Has(txID[:])
+			require.NoError(err)
+			hasSubnet, err := subnetDB.Has(txID[:])
+			require.NoError(err)
+
+			require.Equal(tt.wantPrimary, hasPrimary)
+			require.Equal(!tt.wantPrimary, hasSubnet)
+		})
+	}
+}
+
+func TestDeleteValidatorMetadataWrite(t *testing.T) {
+	require := require.New(t)
+	state := newValidatorState()
+	primaryDB := memdb.New()
+	subnetDB := memdb.New()
+
+	nodeID := ids.GenerateTestNodeID()
+	txID := ids.GenerateTestID()
+	state.AddValidatorMetadata(nodeID, constants.PrimaryNetworkID, &validatorMetadata{
+		txID:            txID,
+		PotentialReward: 100,
+	})
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
+
+	state.DeleteValidatorMetadata(nodeID, constants.PrimaryNetworkID)
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
+
+	has, err := primaryDB.Has(txID[:])
+	require.NoError(err)
+	require.False(has)
+}
+
+func TestAddThenDeleteValidatorMetadataWrite(t *testing.T) {
+	require := require.New(t)
+	state := newValidatorState()
+	primaryDB := memdb.New()
+	subnetDB := memdb.New()
+
+	nodeID := ids.GenerateTestNodeID()
+	txID := ids.GenerateTestID()
+	state.AddValidatorMetadata(nodeID, constants.PrimaryNetworkID, &validatorMetadata{
+		txID:            txID,
+		PotentialReward: 100,
+	})
+	state.DeleteValidatorMetadata(nodeID, constants.PrimaryNetworkID)
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
+
+	has, err := primaryDB.Has(txID[:])
+	require.NoError(err)
+	require.False(has)
+}
+
+func TestDeleteThenReAddValidatorMetadataWrite(t *testing.T) {
+	require := require.New(t)
+	state := newValidatorState()
+	primaryDB := memdb.New()
+	subnetDB := memdb.New()
+
+	nodeID := ids.GenerateTestNodeID()
+	oldTxID := ids.GenerateTestID()
+	state.AddValidatorMetadata(nodeID, constants.PrimaryNetworkID, &validatorMetadata{
+		txID:            oldTxID,
+		PotentialReward: 100,
+	})
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
+
+	state.DeleteValidatorMetadata(nodeID, constants.PrimaryNetworkID)
+	newTxID := ids.GenerateTestID()
+	state.AddValidatorMetadata(nodeID, constants.PrimaryNetworkID, &validatorMetadata{
+		txID:            newTxID,
+		PotentialReward: 200,
+	})
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
+
+	has, err := primaryDB.Has(oldTxID[:])
+	require.NoError(err)
+	require.False(has)
+
+	has, err = primaryDB.Has(newTxID[:])
+	require.NoError(err)
+	require.True(has)
 }
 
 func TestParseValidatorMetadata(t *testing.T) {
