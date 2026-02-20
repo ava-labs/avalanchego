@@ -308,3 +308,53 @@ func TestWorkHeapMergeInsertRandom(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkHeapStatus(t *testing.T) {
+	require := require.New(t)
+
+	h := newWorkHeap()
+	id := ids.GenerateTestID()
+
+	h.MergeInsert(&workItem{
+		start:       maybe.Nothing[[]byte](),
+		end:         maybe.Some([]byte{128}),
+		priority:    lowPriority,
+		localRootID: id,
+	})
+	pct := h.Status(id)
+	require.InDelta(50.0, pct, 0.0001)
+
+	h.MergeInsert(&workItem{
+		start:       maybe.Some([]byte{192}),
+		end:         maybe.Nothing[[]byte](),
+		priority:    lowPriority,
+		localRootID: id,
+	})
+	pct = h.Status(id)
+	require.InDelta(75.0, pct, 0.0001)
+
+	// insert other root with higher priority so it can be removed
+	otherID := ids.GenerateTestID()
+	h.MergeInsert(&workItem{
+		start:       maybe.Some([]byte{128}),
+		end:         maybe.Some([]byte{192}),
+		priority:    highPriority,
+		localRootID: otherID,
+	})
+	pct = h.Status(id)
+	require.InDelta(75.0, pct, 0.0001)
+	pct = h.Status(otherID)
+	require.InDelta(25.0, pct, 0.0001)
+	_ = h.GetWork() // remove to not corrupt next calculation
+	pct = h.Status(otherID)
+	require.InDelta(0, pct, 0.0001)
+
+	h.MergeInsert(&workItem{
+		start:       maybe.Some([]byte{128}),
+		end:         maybe.Some([]byte{192}),
+		priority:    lowPriority,
+		localRootID: id,
+	})
+	pct = h.Status(id)
+	require.InDelta(100.0, pct, 0.0001)
+}
