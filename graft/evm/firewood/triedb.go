@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -268,6 +269,7 @@ func (t *TrieDB) Close() error {
 	t.possible = nil
 
 	// We must provide a context to close since it may hang while waiting for the finalizers to complete.
+	runtime.GC()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return t.Firewood.Close(ctx)
