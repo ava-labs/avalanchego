@@ -4,7 +4,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/google/btree"
@@ -13,8 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 )
-
-var ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
 
 type Stakers interface {
 	CurrentStakers
@@ -142,8 +139,7 @@ func (v *baseStakers) PutValidator(staker *Staker) {
 	validator.validator = staker
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorStatus = added
-	validatorDiff.validator = staker
+	validatorDiff.added = staker
 
 	v.stakers.ReplaceOrInsert(staker)
 }
@@ -154,8 +150,8 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorStatus = deleted
-	validatorDiff.validator = staker
+	validatorDiff.added = nil
+	validatorDiff.removed = staker
 
 	v.stakers.Delete(staker)
 }
@@ -247,9 +243,7 @@ func (v *baseStakers) getOrCreateValidatorDiff(subnetID ids.ID, nodeID ids.NodeI
 	}
 	validatorDiff, ok := subnetValidatorDiffs[nodeID]
 	if !ok {
-		validatorDiff = &diffValidator{
-			validatorStatus: unmodified,
-		}
+		validatorDiff = &diffValidator{}
 		subnetValidatorDiffs[nodeID] = validatorDiff
 	}
 	return validatorDiff
@@ -263,23 +257,43 @@ type diffStakers struct {
 }
 
 type diffValidator struct {
-	// validatorStatus describes whether a validator has been added or removed.
-	//
-	// validatorStatus is not affected by delegators ops so unmodified does not
-	// mean that diffValidator hasn't change, since delegators may have changed.
-	validatorStatus diffValidatorStatus
-	validator       *Staker
-
+	// added represents a validator that was added in this diff, or nil if no
+	// validator was added. Can be non-nil at the same time as removed to represent a replacement.
+	added *Staker
+	// removed represents a validator that was removed in this diff, or nil if no
+	// validator was removed. Can be non-nil at the same time as added to represent a replacement.
+	removed           *Staker
 	addedDelegators   *btree.BTreeG[*Staker]
 	deletedDelegators map[ids.ID]*Staker
 }
 
-func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
-	weightDiff := ValidatorWeightDiff{
-		Decrease: d.validatorStatus == deleted,
+// validatorStatus returns the status of the validator in this diff.
+//
+// validatorStatus is not affected by delegator ops so unmodified does not
+// mean that diffValidator hasn't changed, since delegators may have changed.
+func (d *diffValidator) validatorStatus() diffValidatorStatus {
+	// If both added and removed are non-nil, this represents a replacement,
+	// so we just return the added validator's status, we don't need the removed validator's status.
+	if d.added != nil {
+		return added
 	}
-	if d.validatorStatus != unmodified {
-		weightDiff.Amount = d.validator.Weight
+	if d.removed != nil {
+		return deleted
+	}
+	return unmodified
+}
+
+func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
+	var weightDiff ValidatorWeightDiff
+	if d.added != nil {
+		if err := weightDiff.Add(d.added.Weight); err != nil {
+			return ValidatorWeightDiff{}, fmt.Errorf("failed to increase weight of added validator: %w", err)
+		}
+	}
+	if d.removed != nil {
+		if err := weightDiff.Sub(d.removed.Weight); err != nil {
+			return ValidatorWeightDiff{}, fmt.Errorf("failed to decrease weight of deleted validator: %w", err)
+		}
 	}
 
 	for _, staker := range d.deletedDelegators {
@@ -304,7 +318,6 @@ func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
 
 // GetValidator attempts to fetch the validator with the given subnetID and
 // nodeID.
-// Invariant: Assumes that the validator will never be removed and then added.
 func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, diffValidatorStatus) {
 	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
 	if !ok {
@@ -316,22 +329,40 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 		return nil, unmodified
 	}
 
-	if validatorDiff.validatorStatus == added {
-		return validatorDiff.validator, added
-	}
-	return nil, validatorDiff.validatorStatus
+	return validatorDiff.added, validatorDiff.validatorStatus()
 }
 
 func (s *diffStakers) PutValidator(staker *Staker) error {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.validatorStatus == deleted {
-		// Enforce the invariant that a validator cannot be added after being
-		// deleted.
-		return ErrAddingStakerAfterDeletion
+	if validatorDiff.removed != nil {
+		// TLDR: The validator was previously deleted, so we remove it from the
+		// deleted stakers set.
+
+		// We set the removed field when we delete the validator that was not added in this diff before.
+		// So if we reached here, it means we removed it first and now either re-adding it or updating it.
+		// Either way, we should remove it from the deleted stakers set.
+		delete(s.deletedStakers, validatorDiff.removed.TxID)
+		if len(s.deletedStakers) == 0 {
+			s.deletedStakers = nil
+		}
+
+		// If we're re-adding the exact same validator that was removed,
+		// the two operations cancel out.
+		if validatorDiff.removed.Equals(staker) {
+			validatorDiff.removed = nil
+			return nil
+		}
+
+		// Attention: We do not return here, but combine with the rest of the flow.
 	}
 
-	validatorDiff.validatorStatus = added
-	validatorDiff.validator = staker
+	validatorDiff.added = staker
+
+	// Ensure the newly added staker is not tracked as deleted.
+	delete(s.deletedStakers, staker.TxID)
+	if len(s.deletedStakers) == 0 {
+		s.deletedStakers = nil
+	}
 
 	if s.addedStakers == nil {
 		s.addedStakers = btree.NewG(defaultTreeDegree, (*Staker).Less)
@@ -342,15 +373,30 @@ func (s *diffStakers) PutValidator(staker *Staker) error {
 
 func (s *diffStakers) DeleteValidator(staker *Staker) {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.validatorStatus == added {
-		// This validator was added and immediately removed in this diff. We
-		// treat it as if it was never added.
-		validatorDiff.validatorStatus = unmodified
-		s.addedStakers.Delete(validatorDiff.validator)
-		validatorDiff.validator = nil
+	if validatorDiff.added != nil {
+		// This validator was added in this diff. Rollback the addition.
+		s.addedStakers.Delete(validatorDiff.added)
+		validatorDiff.added = nil
+
+		// TLDR: If there was a previously removed validator, re-add it to
+		// deletedStakers since the replacement is being undone.
+
+		// We set the removed field when we delete the validator that was not added in this diff before.
+		// Since we reached here, we have first deleted it, and then added it.
+		// When we deleted it, we set the removed field and add it to the deleted stakers set.
+		// When we added it, we removed it from the deleted stakers set.
+		// Since we're now deleting it again, we should add it back to the deleted stakers set.
+		// Why are we putting back the validator that was originally removed and not the new staker?
+		// Because the original staker, validatorDiff.removed was there at the beginning, and the second
+		// removal is just rolling back the addition of the new staker. We therefore put back original staker.
+		if validatorDiff.removed != nil {
+			if s.deletedStakers == nil {
+				s.deletedStakers = make(map[ids.ID]*Staker)
+			}
+			s.deletedStakers[validatorDiff.removed.TxID] = validatorDiff.removed
+		}
 	} else {
-		validatorDiff.validatorStatus = deleted
-		validatorDiff.validator = staker
+		validatorDiff.removed = staker
 		if s.deletedStakers == nil {
 			s.deletedStakers = make(map[ids.ID]*Staker)
 		}
@@ -438,9 +484,7 @@ func (s *diffStakers) getOrCreateDiff(subnetID ids.ID, nodeID ids.NodeID) *diffV
 	}
 	validatorDiff, ok := subnetValidatorDiffs[nodeID]
 	if !ok {
-		validatorDiff = &diffValidator{
-			validatorStatus: unmodified,
-		}
+		validatorDiff = &diffValidator{}
 		subnetValidatorDiffs[nodeID] = validatorDiff
 	}
 	return validatorDiff
