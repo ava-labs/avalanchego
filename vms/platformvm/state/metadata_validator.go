@@ -75,10 +75,18 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 	return nil
 }
 
+type pendingDelete struct {
+	subnetID ids.ID
+	txID     ids.ID
+}
+
 type validatorState struct {
 	metadata map[ids.NodeID]map[ids.ID]*validatorMetadata // vdrID -> subnetID -> metadata
 	// updatedMetadata tracks the updates since WriteValidatorMetadata was last called
 	updatedMetadata map[ids.NodeID]set.Set[ids.ID] // vdrID -> subnetIDs
+	// pendingDeletes tracks entries to be deleted from DB on the next
+	// call to WriteValidatorMetadata
+	pendingDeletes []pendingDelete
 }
 
 func newValidatorState() *validatorState {
@@ -103,6 +111,15 @@ func (vs *validatorState) LoadValidatorMetadata(
 		vs.metadata[vdrID] = subnetMetadata
 	}
 	subnetMetadata[subnetID] = uptime
+}
+
+func (vs *validatorState) AddValidatorMetadata(
+	vdrID ids.NodeID,
+	subnetID ids.ID,
+	vm *validatorMetadata,
+) {
+	vs.LoadValidatorMetadata(vdrID, subnetID, vm)
+	vs.addUpdatedMetadata(vdrID, subnetID)
 }
 
 // GetUptime returns the current uptime measurements of `vdrID` on
@@ -175,6 +192,13 @@ func (vs *validatorState) SetDelegateeReward(
 // will not result in a write to disk.
 func (vs *validatorState) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 	subnetMetadata := vs.metadata[vdrID]
+	if md, exists := subnetMetadata[subnetID]; exists {
+		vs.pendingDeletes = append(vs.pendingDeletes, pendingDelete{
+			subnetID: subnetID,
+			txID:     md.txID,
+		})
+	}
+
 	delete(subnetMetadata, subnetID)
 	if len(subnetMetadata) == 0 {
 		delete(vs.metadata, vdrID)
@@ -190,10 +214,21 @@ func (vs *validatorState) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids
 // WriteValidatorMetadata writes all staged updates from prior calls to
 // [SetUptime] or [SetDelegateeReward].
 func (vs *validatorState) WriteValidatorMetadata(
-	dbPrimary database.KeyValueWriter,
-	dbSubnet database.KeyValueWriter,
+	dbPrimary database.KeyValueWriterDeleter,
+	dbSubnet database.KeyValueWriterDeleter,
 	codecVersion uint16,
 ) error {
+	for _, del := range vs.pendingDeletes {
+		db := dbSubnet
+		if del.subnetID == constants.PrimaryNetworkID {
+			db = dbPrimary
+		}
+		if err := db.Delete(del.txID[:]); err != nil {
+			return err
+		}
+	}
+	vs.pendingDeletes = vs.pendingDeletes[:0]
+
 	for vdrID, updatedSubnets := range vs.updatedMetadata {
 		for subnetID := range updatedSubnets {
 			metadata := vs.metadata[vdrID][subnetID]
