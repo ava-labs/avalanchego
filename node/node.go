@@ -561,19 +561,11 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	}
 
 	// Configure benchlist
-	n.Config.BenchlistConfig.Validators = n.vdrs
-	n.Config.BenchlistConfig.Benchable = n.chainRouter
-	n.Config.BenchlistConfig.BenchlistRegisterer = metrics.NewLabelGatherer(chains.ChainLabel)
-
-	err = n.MetricsGatherer.Register(
-		benchlistNamespace,
-		n.Config.BenchlistConfig.BenchlistRegisterer,
-	)
-	if err != nil {
+	benchlistReg := metrics.NewLabelGatherer(chains.ChainLabel)
+	if err := n.MetricsGatherer.Register(benchlistNamespace, benchlistReg); err != nil {
 		return err
 	}
-
-	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
+	n.benchlistManager = benchlist.NewManager(n.chainRouter, n.vdrs, benchlistReg, n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
 

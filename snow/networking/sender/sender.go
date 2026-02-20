@@ -433,15 +433,6 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		return
 	}
 
-	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-		s.failedDueToBench.With(prometheus.Labels{
-			opLabel: message.GetAncestorsOp.String(),
-		}).Inc()
-		s.timeouts.RegisterRequestToUnreachableValidator()
-		s.router.HandleInternal(ctx, getFailed)
-		return
-	}
-
 	// The deadline is used as a best-effort communication to the peer for when
 	// we expect the message by. It's not guaranteed to exactly match our
 	// registered timeout.
@@ -464,8 +455,14 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		s.engineType,
 	)
 	sent := s.sendUnlessError(log, to, msg, err)
-	if sent.Len() == 0 {
-		s.timeouts.RegisterRequestToUnreachableValidator()
+
+	switch {
+	case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
+		s.failedDueToBench.With(prometheus.Labels{
+			opLabel: message.GetAncestorsOp.String(),
+		}).Inc()
+		fallthrough
+	case sent.Len() == 0:
 		s.router.HandleInternal(ctx, getFailed)
 	}
 }
@@ -506,15 +503,6 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		return
 	}
 
-	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-		s.failedDueToBench.With(prometheus.Labels{
-			opLabel: message.GetOp.String(),
-		}).Inc()
-		s.timeouts.RegisterRequestToUnreachableValidator()
-		s.router.HandleInternal(ctx, getFailed)
-		return
-	}
-
 	// The deadline is used as a best-effort communication to the peer for when
 	// we expect the message by. It's not guaranteed to exactly match our
 	// registered timeout.
@@ -535,8 +523,13 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		containerID,
 	)
 	sent := s.sendUnlessError(log, to, msg, err)
-	if sent.Len() == 0 {
-		s.timeouts.RegisterRequestToUnreachableValidator()
+	switch {
+	case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
+		s.failedDueToBench.With(prometheus.Labels{
+			opLabel: message.GetOp.String(),
+		}).Inc()
+		fallthrough
+	case sent.Len() == 0:
 		s.router.HandleInternal(ctx, getFailed)
 	}
 }
@@ -597,24 +590,6 @@ func (s *sender) SendPushQuery(
 		)
 	}
 
-	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-			s.failedDueToBench.With(prometheus.Labels{
-				opLabel: message.PushQueryOp.String(),
-			}).Inc()
-			nodeIDs.Remove(nodeID)
-			s.timeouts.RegisterRequestToUnreachableValidator()
-			s.router.HandleInternal(
-				ctx,
-				message.InternalQueryFailed(
-					nodeID,
-					s.ctx.ChainID,
-					requestID,
-				),
-			)
-		}
-	}
-
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.PushQueryOp),
 		zap.Uint32("requestID", requestID),
@@ -634,8 +609,13 @@ func (s *sender) SendPushQuery(
 	)
 	sent := s.sendUnlessError(log, to, msg, err)
 	for nodeID := range nodeIDs {
-		if !sent.Contains(nodeID) {
-			s.timeouts.RegisterRequestToUnreachableValidator()
+		switch {
+		case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
+			s.failedDueToBench.With(prometheus.Labels{
+				opLabel: message.PushQueryOp.String(),
+			}).Inc()
+			fallthrough
+		case !sent.Contains(nodeID):
 			s.router.HandleInternal(
 				ctx,
 				message.InternalQueryFailed(
@@ -691,24 +671,6 @@ func (s *sender) SendPullQuery(
 		)
 	}
 
-	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-			s.failedDueToBench.With(prometheus.Labels{
-				opLabel: message.PullQueryOp.String(),
-			}).Inc()
-			nodeIDs.Remove(nodeID)
-			s.timeouts.RegisterRequestToUnreachableValidator()
-			s.router.HandleInternal(
-				ctx,
-				message.InternalQueryFailed(
-					nodeID,
-					s.ctx.ChainID,
-					requestID,
-				),
-			)
-		}
-	}
-
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.PullQueryOp),
 		zap.Uint32("requestID", requestID),
@@ -728,8 +690,13 @@ func (s *sender) SendPullQuery(
 	)
 	sent := s.sendUnlessError(log, to, msg, err)
 	for nodeID := range nodeIDs {
-		if !sent.Contains(nodeID) {
-			s.timeouts.RegisterRequestToUnreachableValidator()
+		switch {
+		case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
+			s.failedDueToBench.With(prometheus.Labels{
+				opLabel: message.PullQueryOp.String(),
+			}).Inc()
+			fallthrough
+		case !sent.Contains(nodeID):
 			s.router.HandleInternal(
 				ctx,
 				message.InternalQueryFailed(
@@ -827,26 +794,6 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 		)
 	}
 
-	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-			s.failedDueToBench.With(prometheus.Labels{
-				opLabel: message.AppRequestOp.String(),
-			}).Inc()
-			nodeIDs.Remove(nodeID)
-			s.timeouts.RegisterRequestToUnreachableValidator()
-			s.router.HandleInternal(
-				ctx,
-				message.InboundAppError(
-					nodeID,
-					s.ctx.ChainID,
-					requestID,
-					common.ErrTimeout.Code,
-					common.ErrTimeout.Message,
-				),
-			)
-		}
-	}
-
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.AppRequestOp),
 		zap.Uint32("requestID", requestID),
@@ -864,8 +811,13 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	)
 	sent := s.sendUnlessError(log, to, msg, err)
 	for nodeID := range nodeIDs {
-		if !sent.Contains(nodeID) {
-			s.timeouts.RegisterRequestToUnreachableValidator()
+		switch {
+		case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
+			s.failedDueToBench.With(prometheus.Labels{
+				opLabel: message.AppRequestOp.String(),
+			}).Inc()
+			fallthrough
+		case !sent.Contains(nodeID):
 			s.router.HandleInternal(
 				ctx,
 				message.InboundAppError(
