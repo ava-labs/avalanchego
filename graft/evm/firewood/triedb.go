@@ -214,6 +214,7 @@ func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	root, err := t.Firewood.Root()
 	if err != nil {
 		log.Error("get root in SetHashAndHeight", "error", err)
+		return
 	}
 	t.tree.root = common.Hash(root)
 }

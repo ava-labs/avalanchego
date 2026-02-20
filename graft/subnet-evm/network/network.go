@@ -161,7 +161,10 @@ func NewNetwork(
 // The peer returned may not be a validator - to sample validators,
 // use [p2p.Validators.Sample] instead.
 func (n *network) Sample(_ context.Context, limit int) []ids.NodeID {
-	if limit != 1 {
+	if limit <= 0 {
+		return nil
+	}
+	if limit > 1 {
 		log.Warn("Sample called with limit > 1, but only 1 peer will be returned", "limit", limit)
 	}
 

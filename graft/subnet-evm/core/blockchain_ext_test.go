@@ -172,7 +172,6 @@ func checkBlockChainState(
 
 	// Copy the database over to prevent any issues when re-using [originalDB] after this call.
 	originalDB = utilstest.CopyEthDB(t, originalDB)
-	require.NoError(err)
 	newChainDataDir := utilstest.CopyDir(t, oldChainDataDir)
 	restartedChain, err := create(originalDB, gspec, lastAcceptedBlock.Hash(), newChainDataDir)
 	require.NoError(err)
