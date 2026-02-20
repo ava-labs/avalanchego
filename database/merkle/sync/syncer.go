@@ -260,7 +260,7 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 		s.workLock.Unlock()
 	}()
 
-	go s.logProgress()
+	go s.logProgress(ctx)
 
 	// Keep doing work until we're closed, done or [ctx] is canceled.
 	s.workLock.Lock()
@@ -292,12 +292,14 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 	}
 }
 
-func (s *Syncer[_, _]) logProgress() {
+func (s *Syncer[_, _]) logProgress(ctx context.Context) {
 	ticker := time.NewTicker(logInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-s.doneChan:
 			return
 		case <-ticker.C:

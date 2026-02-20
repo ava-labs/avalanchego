@@ -200,7 +200,7 @@ func (wh *workHeap) Status(root ids.ID) float64 {
 		return true
 	})
 
-	// Calculate total key space size (2^256 for 32-byte keys)
+	// Calculate total key space size (2^(statusBytes * 8) for statusBytes-size keys)
 
 	// Calculate percentage: (progress / totalSpace) * 100
 	progressFloat := new(big.Float).SetInt(progress)
