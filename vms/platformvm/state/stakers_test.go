@@ -4,6 +4,7 @@
 package state
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -403,6 +405,94 @@ func newTestStaker() *Staker {
 
 		NextTime: endTime,
 		Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
+	}
+}
+
+func TestStakerEquals(t *testing.T) {
+	// If this constant is wrong, a field was likely added to Staker without
+	// updating the Equals method. Update Equals to compare the new field,
+	// then fix this constant.
+	const expectedStakerFieldCount = 10
+
+	require.Equal(t,
+		expectedStakerFieldCount,
+		reflect.TypeOf(Staker{}).NumField(),
+		"Staker struct field count changed; update Staker.Equals and this test",
+	)
+
+	signer1, err := localsigner.New()
+	require.NoError(t, err)
+	signer2, err := localsigner.New()
+	require.NoError(t, err)
+
+	pk1 := signer1.PublicKey()
+	pk2 := signer2.PublicKey()
+
+	now := time.Now().Round(time.Second)
+	staker := &Staker{
+		TxID:            ids.GenerateTestID(),
+		NodeID:          ids.GenerateTestNodeID(),
+		PublicKey:       pk1,
+		SubnetID:        ids.GenerateTestID(),
+		Weight:          100,
+		StartTime:       now,
+		EndTime:         now.Add(time.Hour),
+		PotentialReward: 50,
+		NextTime:        now.Add(time.Hour),
+		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
+	}
+
+	// Test nil handling
+	var nilStaker *Staker
+	require.True(t, nilStaker.Equals(nil))
+	require.False(t, nilStaker.Equals(staker))
+	require.False(t, staker.Equals(nil))
+
+	// Test identical stakers
+	identical := *staker
+	require.True(t, staker.Equals(&identical))
+
+	// Test both public keys nil
+	noPK1 := *staker
+	noPK2 := *staker
+	noPK1.PublicKey = nil
+	noPK2.PublicKey = nil
+	require.True(t, noPK1.Equals(&noPK2))
+
+	// Test one public key nil
+	onePKNil := *staker
+	onePKNil.PublicKey = nil
+	require.False(t, staker.Equals(&onePKNil))
+	require.False(t, onePKNil.Equals(staker))
+
+	// Test that each field is actually compared by Equals.
+	type fieldMutation struct {
+		name   string
+		mutate func(s *Staker)
+	}
+	mutations := []fieldMutation{
+		{"TxID", func(s *Staker) { s.TxID = ids.GenerateTestID() }},
+		{"NodeID", func(s *Staker) { s.NodeID = ids.GenerateTestNodeID() }},
+		{"PublicKey", func(s *Staker) { s.PublicKey = pk2 }},
+		{"SubnetID", func(s *Staker) { s.SubnetID = ids.GenerateTestID() }},
+		{"Weight", func(s *Staker) { s.Weight++ }},
+		{"StartTime", func(s *Staker) { s.StartTime = s.StartTime.Add(time.Second) }},
+		{"EndTime", func(s *Staker) { s.EndTime = s.EndTime.Add(time.Second) }},
+		{"PotentialReward", func(s *Staker) { s.PotentialReward++ }},
+		{"NextTime", func(s *Staker) { s.NextTime = s.NextTime.Add(time.Second) }},
+		{"Priority", func(s *Staker) { s.Priority++ }},
+	}
+
+	require.Len(t, mutations, expectedStakerFieldCount,
+		"each Staker field must have a corresponding mutation entry in this test",
+	)
+
+	for _, m := range mutations {
+		t.Run("different "+m.name, func(t *testing.T) {
+			other := *staker
+			m.mutate(&other)
+			require.False(t, staker.Equals(&other))
+		})
 	}
 }
 
