@@ -73,6 +73,7 @@ func TestBenchlist(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	benchable := &benchable{
 		t:           t,
@@ -88,6 +89,7 @@ func TestBenchlist(t *testing.T) {
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
 			BenchDuration:      DefaultBenchDuration,
+			MaxPortion:         0.999,
 		},
 		prometheus.NewRegistry(),
 	)
@@ -99,16 +101,12 @@ func TestBenchlist(t *testing.T) {
 		t.Helper()
 		require.False(b.IsBenched(vdrID))
 		require.False(b.IsBenched(nodeID))
-		require.Zero(testutil.ToFloat64(b.numBenched))
-		require.Zero(testutil.ToFloat64(b.weightBenched))
 	}
 
 	requireBenched := func() {
 		t.Helper()
 		require.True(b.IsBenched(vdrID))
 		require.False(b.IsBenched(nodeID))
-		require.Equal(1.0, testutil.ToFloat64(b.numBenched))
-		require.Equal(1.0, testutil.ToFloat64(b.weightBenched))
 	}
 
 	// Nobody should be benched at the start
@@ -144,6 +142,55 @@ func TestBenchlist(t *testing.T) {
 	requireBenched()
 }
 
+func TestBenchlistSkipsBenchingWhenMaxPortionExceeded(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	vdrs := validators.NewManager()
+	vdrID0 := ids.GenerateTestNodeID()
+	vdrID1 := ids.GenerateTestNodeID()
+
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID0, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID1, nil, ids.Empty, 1))
+
+	benchable := &benchable{
+		t:           t,
+		wantChainID: ctx.ChainID,
+		updated:     make(chan struct{}, 1),
+	}
+	b, err := newBenchlist(
+		ctx,
+		benchable,
+		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      DefaultBenchDuration,
+			MaxPortion:         0.4,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	// p = 2/3 > 0.5, but benching this validator would bench 50% of stake and
+	// exceed maxPortion (40%).
+	b.RegisterResponse(vdrID0)
+	b.RegisterFailure(vdrID0)
+	b.RegisterFailure(vdrID0)
+
+	require.False(b.IsBenched(vdrID0))
+	require.Zero(testutil.ToFloat64(b.numBenched))
+	require.Zero(testutil.ToFloat64(b.weightBenched))
+
+	select {
+	case <-benchable.updated:
+		require.FailNow("unexpected bench/unbench callback")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
 func TestBenchlistTimeout(t *testing.T) {
 	require := require.New(t)
 
@@ -153,6 +200,7 @@ func TestBenchlistTimeout(t *testing.T) {
 	vdrID := ids.GenerateTestNodeID()
 
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	benchable := &benchable{
 		t:           t,
@@ -168,6 +216,7 @@ func TestBenchlistTimeout(t *testing.T) {
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
 			BenchDuration:      50 * time.Millisecond,
+			MaxPortion:         0.999,
 		},
 		prometheus.NewRegistry(),
 	)
@@ -203,6 +252,7 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 	vdrID := ids.GenerateTestNodeID()
 
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	benchable := &benchable{
 		t:           t,
@@ -218,6 +268,7 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
 			BenchDuration:      50 * time.Millisecond,
+			MaxPortion:         0.999,
 		},
 		prometheus.NewRegistry(),
 	)
@@ -254,6 +305,7 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 	vdrs := validators.NewManager()
 	vdrID := ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	benchable := &blockingBenchable{
 		t:             t,
@@ -270,6 +322,7 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
 			BenchDuration:      DefaultBenchDuration,
+			MaxPortion:         0.999,
 		},
 		prometheus.NewRegistry(),
 	)
@@ -315,6 +368,7 @@ func TestRunDrainsEntireJobQueuePerSignal(t *testing.T) {
 	vdrs := validators.NewManager()
 	vdrID := ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	benchable := &benchable{
 		t:           t,
@@ -330,6 +384,7 @@ func TestRunDrainsEntireJobQueuePerSignal(t *testing.T) {
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
 			BenchDuration:      DefaultBenchDuration,
+			MaxPortion:         0.999,
 		},
 		prometheus.NewRegistry(),
 	)

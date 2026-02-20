@@ -5,6 +5,7 @@ package benchlist
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -39,6 +40,7 @@ type Config struct {
 	UnbenchProbability float64       `json:"unbenchProbability"`
 	BenchProbability   float64       `json:"benchProbability"`
 	BenchDuration      time.Duration `json:"benchDuration"`
+	MaxPortion         float64       `json:"maxPortion"`
 }
 
 // If a node does not respond to a request, the node waits for a timeout. This
@@ -64,6 +66,7 @@ type benchlist struct {
 	unbenchProbability float64
 	benchProbability   float64
 	benchDuration      time.Duration
+	maxPortion         float64
 
 	// Notifications to the benchable are processed in a separate goroutine to
 	// avoid any potential reentrant locking between the benchlist and the
@@ -92,6 +95,10 @@ func newBenchlist(
 	config Config,
 	reg prometheus.Registerer,
 ) (*benchlist, error) {
+	if config.MaxPortion < 0 || config.MaxPortion >= 1 {
+		return nil, fmt.Errorf("max portion of benched stake must be in [0,1) but got %f", config.MaxPortion)
+	}
+
 	b := &benchlist{
 		ctx:       ctx,
 		benchable: benchable,
@@ -110,6 +117,7 @@ func newBenchlist(
 		unbenchProbability: config.UnbenchProbability,
 		benchProbability:   config.BenchProbability,
 		benchDuration:      config.BenchDuration,
+		maxPortion:         config.MaxPortion,
 		jobs:               buffer.NewUnboundedBlockingDeque[job](jobQueueInitSize),
 		jobReady:           make(chan struct{}, 1),
 		nodes:              make(map[ids.NodeID]*node),
@@ -160,6 +168,53 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 	p := n.failureProbability.Read()
 	shouldBench := !n.isBenched && p > b.benchProbability
 	shouldUnbench := n.isBenched && p < b.unbenchProbability
+	if shouldBench {
+		nodeStake := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID)
+		if nodeStake == 0 {
+			// Only bench validators.
+			return
+		}
+
+		var benchedStake uint64
+		for benchedNodeID, benchedNode := range b.nodes {
+			if !benchedNode.isBenched {
+				continue
+			}
+			var err error
+			benchedStake, err = math.Add(benchedStake, b.vdrs.GetWeight(b.ctx.SubnetID, benchedNodeID))
+			if err != nil {
+				b.ctx.Log.Error("overflow calculating benched stake")
+				return
+			}
+		}
+
+		totalStake, err := b.vdrs.TotalWeight(b.ctx.SubnetID)
+		if err != nil {
+			b.ctx.Log.Error("error calculating total stake",
+				zap.Stringer("subnetID", b.ctx.SubnetID),
+				zap.Error(err),
+			)
+			return
+		}
+
+		newBenchedStake, err := math.Add(benchedStake, nodeStake)
+		if err != nil {
+			b.ctx.Log.Error("overflow calculating new benched stake",
+				zap.Stringer("nodeID", nodeID),
+			)
+			return
+		}
+		maxBenchedStake := float64(totalStake) * b.maxPortion
+		if float64(newBenchedStake) > maxBenchedStake {
+			b.ctx.Log.Debug("not benching node",
+				zap.String("reason", "benched stake would exceed max"),
+				zap.Stringer("nodeID", nodeID),
+				zap.Float64("benchedStake", float64(newBenchedStake)),
+				zap.Float64("maxBenchedStake", maxBenchedStake),
+			)
+			return
+		}
+	}
 	if shouldBench || shouldUnbench {
 		n.isBenched = !n.isBenched
 		_ = b.jobs.PushRight(job{
