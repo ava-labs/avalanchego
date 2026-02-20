@@ -48,9 +48,9 @@ type diff struct {
 	l1ValidatorsDiff *l1ValidatorsDiff
 
 	currentStakerDiffs diffStakers
-	// map of subnetID -> nodeID -> total accrued delegatee rewards
-	modifiedDelegateeRewards map[ids.ID]map[ids.NodeID]uint64
-	pendingStakerDiffs       diffStakers
+	// map of subnetID -> nodeID -> mutable validator data
+	modifiedValidatorMutables map[ids.ID]map[ids.NodeID]*ValidatorMutables
+	pendingStakerDiffs        diffStakers
 
 	addedSubnetIDs []ids.ID
 	// Subnet ID --> Owner of the subnet
@@ -281,29 +281,28 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	}
 }
 
-func (d *diff) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
-	if d.modifiedDelegateeRewards == nil {
-		d.modifiedDelegateeRewards = make(map[ids.ID]map[ids.NodeID]uint64)
-	}
-	nodes, ok := d.modifiedDelegateeRewards[subnetID]
-	if !ok {
-		nodes = make(map[ids.NodeID]uint64)
-		d.modifiedDelegateeRewards[subnetID] = nodes
-	}
-	nodes[nodeID] = amount
-	return nil
-}
-
-func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
-	amount, modified := d.modifiedDelegateeRewards[subnetID][nodeID]
-	if modified {
-		return amount, nil
+func (d *diff) GetValidatorMutables(nodeID ids.NodeID, subnetID ids.ID) (ValidatorMutables, error) {
+	if mutables, ok := d.modifiedValidatorMutables[subnetID][nodeID]; ok {
+		return *mutables, nil
 	}
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		return ValidatorMutables{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
-	return parentState.GetDelegateeReward(subnetID, nodeID)
+	return parentState.GetValidatorMutables(nodeID, subnetID)
+}
+
+func (d *diff) SetValidatorMutables(nodeID ids.NodeID, subnetID ids.ID, mutables ValidatorMutables) error {
+	if d.modifiedValidatorMutables == nil {
+		d.modifiedValidatorMutables = make(map[ids.ID]map[ids.NodeID]*ValidatorMutables)
+	}
+	nodes, ok := d.modifiedValidatorMutables[subnetID]
+	if !ok {
+		nodes = make(map[ids.NodeID]*ValidatorMutables)
+		d.modifiedValidatorMutables[subnetID] = nodes
+	}
+	nodes[nodeID] = &mutables
+	return nil
 }
 
 func (d *diff) PutCurrentValidator(staker *Staker) error {
@@ -614,9 +613,9 @@ func (d *diff) Apply(baseState Chain) error {
 			}
 		}
 	}
-	for subnetID, nodes := range d.modifiedDelegateeRewards {
-		for nodeID, amount := range nodes {
-			if err := baseState.SetDelegateeReward(subnetID, nodeID, amount); err != nil {
+	for subnetID, nodes := range d.modifiedValidatorMutables {
+		for nodeID, mutables := range nodes {
+			if err := baseState.SetValidatorMutables(nodeID, subnetID, *mutables); err != nil {
 				return err
 			}
 		}

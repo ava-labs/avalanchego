@@ -468,13 +468,14 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	}
 
 	// Provide the accrued delegatee rewards from successful delegations here.
-	delegateeReward, err := e.onCommitState.GetDelegateeReward(
-		validator.SubnetID,
+	mutables, err := e.onCommitState.GetValidatorMutables(
 		validator.NodeID,
+		validator.SubnetID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
 	}
+	delegateeReward := mutables.DelegateeReward
 
 	if delegateeReward == 0 {
 		return nil
@@ -599,28 +600,28 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 
 	// Reward the delegatee here
 	if e.backend.Config.UpgradeConfig.IsCortinaActivated(validator.StartTime) {
-		previousDelegateeReward, err := e.onCommitState.GetDelegateeReward(
-			validator.SubnetID,
+		mutables, err := e.onCommitState.GetValidatorMutables(
 			validator.NodeID,
+			validator.SubnetID,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to get delegatee reward: %w", err)
+			return fmt.Errorf("failed to get validator mutables: %w", err)
 		}
 
 		// Invariant: The rewards calculator can never return a
 		//            [potentialReward] that would overflow the
 		//            accumulated rewards.
-		newDelegateeReward := previousDelegateeReward + delegateeReward
+		mutables.DelegateeReward += delegateeReward
 
 		// For any validators starting after [CortinaTime], we defer rewarding the
 		// [reward] until their staking period is over.
-		err = e.onCommitState.SetDelegateeReward(
-			validator.SubnetID,
+		err = e.onCommitState.SetValidatorMutables(
 			validator.NodeID,
-			newDelegateeReward,
+			validator.SubnetID,
+			mutables,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to update delegatee reward: %w", err)
+			return fmt.Errorf("failed to update validator mutables: %w", err)
 		}
 	} else {
 		// For any validators who started prior to [CortinaTime], we issue the
