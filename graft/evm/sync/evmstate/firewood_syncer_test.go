@@ -77,7 +77,7 @@ func TestFirewoodSync(t *testing.T) {
 			require.NoError(t, runFirewoodSync(t.Context(), codeSyncer, firewoodSyncer), "failure during sync")
 
 			// Finalization is not necessary, as no errors were encountered during sync.
-			assertFirewoodConsistency(t, root, clientState, accounts)
+			assertFirewoodConsistency(t, root, clientState, serverState, accounts)
 
 			// Code queue should be closed.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
@@ -198,7 +198,7 @@ func createDB(t *testing.T) state.Database {
 	return firewood.NewStateAccessor(internalState, tdb)
 }
 
-func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state.Database, accounts map[*utilstest.Key]*types.StateAccount) {
+func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState, serverState state.Database, accounts map[*utilstest.Key]*types.StateAccount) {
 	t.Helper()
 
 	db := dbFromState(t, clientState)
@@ -216,10 +216,61 @@ func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state
 		require.Equalf(t, codeHash, crypto.Keccak256Hash(codeBytes), "incorrect code for account %+x", k.Address)
 	}
 
+	// Verify all key-value pairs (accounts + storage) match between client
+	// and server using a raw FFI iterator, bypassing the 32-byte account
+	// filter that would otherwise hide storage entries.
+	assertFirewoodAllKeysConsistency(t, clientState, serverState)
+
 	it := customrawdb.NewCodeToFetchIterator(clientState.DiskDB())
 	defer it.Release()
 	require.False(t, it.Next(), "expected no remaining code-to-fetch markers after successful sync")
 	require.NoError(t, it.Error())
+}
+
+// assertFirewoodAllKeysConsistency uses the raw FFI iterator to verify that
+// every key-value pair in the client database matches the server database.
+// This covers both account entries (32-byte keys) and storage entries
+// (64-byte combined keys) in Firewood's flat key-value model.
+func assertFirewoodAllKeysConsistency(t *testing.T, clientState, serverState state.Database) {
+	t.Helper()
+
+	clientDB := dbFromState(t, clientState)
+	serverDB := dbFromState(t, serverState)
+
+	clientRoot, err := clientDB.Root()
+	require.NoError(t, err, "client Root()")
+	serverRoot, err := serverDB.Root()
+	require.NoError(t, err, "server Root()")
+	require.Equal(t, clientRoot, serverRoot, "client and server roots must match")
+
+	// Empty databases have EmptyRoot and cannot create revisions.
+	if clientRoot == ffi.EmptyRoot {
+		return
+	}
+
+	clientRev, err := clientDB.Revision(clientRoot)
+	require.NoError(t, err, "client Revision()")
+	serverRev, err := serverDB.Revision(serverRoot)
+	require.NoError(t, err, "server Revision()")
+
+	clientIt, err := clientRev.Iter(nil)
+	require.NoError(t, err, "client Iter()")
+	defer func() { require.NoError(t, clientIt.Drop()) }()
+
+	serverIt, err := serverRev.Iter(nil)
+	require.NoError(t, err, "server Iter()")
+	defer func() { require.NoError(t, serverIt.Drop()) }()
+
+	clientNext, serverNext := clientIt.Next(), serverIt.Next()
+	for clientNext && serverNext {
+		require.Equal(t, clientIt.Key(), serverIt.Key(), "key mismatch (key=%x)", serverIt.Key())
+		require.Equal(t, clientIt.Value(), serverIt.Value(), "value mismatch (key=%x)", clientIt.Key())
+		clientNext, serverNext = clientIt.Next(), serverIt.Next()
+	}
+	require.NoError(t, clientIt.Err(), "client iterator error")
+	require.NoError(t, serverIt.Err(), "server iterator error")
+	require.False(t, clientNext, "client has extra entries beyond server")
+	require.False(t, serverNext, "server has extra entries beyond client")
 }
 
 func dbFromState(t *testing.T, state state.Database) *ffi.Database {
