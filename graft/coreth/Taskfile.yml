@@ -15,39 +15,35 @@ tasks:
     cmd: ./scripts/build_test.sh
 
   check-clean-branch:
-    desc: Checks that the git working tree is clean
-    cmds:
-      - cmd: git add --all
-      - cmd: git update-index --really-refresh >> /dev/null
-      - cmd: git status --short # Show the status of the working tree.
-      - cmd: git diff-index --quiet HEAD # Exits if any uncommitted changes are found.
+    desc: Checks that the working tree is clean
+    cmd: ../../scripts/check_clean_branch.sh
 
   check-generate-codec:
-    desc: Checks that generated codec files are up-to-date (requires a clean git working tree)
+    desc: Checks that generated codec files are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-codec
       - task: check-clean-branch
 
   check-generate-mocks:
-    desc: Checks that generated mocks are up-to-date (requires a clean git working tree)
+    desc: Checks that generated mocks are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-mocks
       - task: check-clean-branch
 
   check-generate-rlp:
-    desc: Checks that generated rlp files are up-to-date (requires a clean git working tree)
+    desc: Checks that generated rlp files are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-rlp
       - task: check-clean-branch
 
   check-generate-bindings:
-    desc: Checks that generated Go bindings from all Solidity contracts are up-to-date (requires a clean git working tree)
+    desc: Checks that generated Go bindings from all Solidity contracts are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-bindings
       - task: check-clean-branch
 
   check-go-mod-tidy:
-    desc: Checks that all go.mod and go.sum files are up-to-date (requires a clean git working tree)
+    desc: Checks that all go.mod and go.sum files are up-to-date (requires a clean working tree)
     cmds:
       - cmd: go mod tidy
       - task: check-clean-branch

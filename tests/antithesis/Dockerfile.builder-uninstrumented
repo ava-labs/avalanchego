@@ -18,3 +18,8 @@ COPY . .
 
 # Ensure pre-existing builds are not available for inclusion in the final image
 RUN [ -d ./build ] && rm -rf ./build/* || true
+
+# Keep the commit hash to easily verify the exact version that is running.
+# Provided as a build arg so that VCS tooling is not required in the image.
+ARG COMMIT_HASH=""
+RUN echo "$COMMIT_HASH" > ./commit_hash.txt

@@ -7,6 +7,10 @@ FROM antithesis-avalanchego-builder:$BUILDER_IMAGE_TAG AS builder
 # The workdir is hard-coded since this Dockerfile is only intended for instrumented builds.
 WORKDIR /instrumented/customer
 
+# Pass the commit hash so build.sh does not need VCS tooling.
+ARG AVALANCHEGO_COMMIT=""
+ENV AVALANCHEGO_COMMIT=$AVALANCHEGO_COMMIT
+
 # Build avalanchego with race detection (-r) enabled.
 RUN ./scripts/build.sh -r
 

@@ -17,11 +17,8 @@ ARG TARGETARCH
 # - gcc: required for cgo (CGO_ENABLED=1 in scripts/constants.sh)
 # - gnupg2: GPG signing of RPM packages
 # - git: version detection in build scripts
-RUN dnf install -y \
-        gcc \
-        gnupg2 \
-        git \
-    && dnf clean all
+# vcs-ok: package install, not a command invocation
+RUN dnf install -y gcc gnupg2 git && dnf clean all
 
 # Install Go (with SHA256 verification)
 RUN curl -fsSL -o /tmp/go.tar.gz \

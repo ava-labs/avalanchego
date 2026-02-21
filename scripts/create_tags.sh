@@ -35,20 +35,22 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/scripts/lib_go_modules.sh"
+# shellcheck disable=SC1091
+source "$REPO_ROOT/scripts/vcs.sh"
 
 TAGS=()
 for prefix in "${TAG_PREFIXES[@]}"; do
     TAGS+=("${prefix}${VERSION}")
 done
 
-HEAD_COMMIT="$(git rev-parse HEAD)"
-HEAD_SHORT="$(git rev-parse --short HEAD)"
+HEAD_COMMIT="$(vcs_commit_hash)"
+HEAD_SHORT="$(vcs_commit_hash_short)"
 
 # Check for existing tags before creating any
 existing=()
 all_at_head=true
 for tag in "${TAGS[@]}"; do
-    if tag_commit="$(git rev-parse "$tag^{commit}" 2>/dev/null)"; then
+    if tag_commit="$(git rev-parse "$tag^{commit}" 2>/dev/null)"; then # vcs-ok: git tag resolution has no jj equivalent
         existing+=("$tag")
         if [[ "$tag_commit" != "$HEAD_COMMIT" ]]; then
             all_at_head=false
@@ -66,11 +68,11 @@ if [[ ${#existing[@]} -gt 0 ]]; then
 
     echo "Error: Some tags for $VERSION already exist (HEAD is $HEAD_SHORT):" >&2
     for tag in "${existing[@]}"; do
-        echo "  $tag -> $(git rev-parse --short "$tag")" >&2
+        echo "  $tag -> $(git rev-parse --short "$tag")" >&2 # vcs-ok: git tag resolution has no jj equivalent
     done
     echo "" >&2
     echo "To delete and re-create:" >&2
-    echo "  git tag -d ${existing[*]}" >&2
+    echo "  git tag -d ${existing[*]}" >&2 # vcs-ok: help text for user
     exit 1
 fi
 
@@ -78,7 +80,7 @@ fi
 echo "Creating tags for $VERSION at $HEAD_SHORT:"
 for tag in "${TAGS[@]}"; do
     echo "  $tag"
-    git tag $SIGN_FLAG "$tag"
+    git tag $SIGN_FLAG "$tag" # vcs-ok: signed git tags have no jj equivalent
 done
 
 echo ""

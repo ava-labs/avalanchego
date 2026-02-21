@@ -71,35 +71,35 @@ tasks:
     cmd: ./scripts/build_xsvm_image.sh
 
   check-clean-branch:
-    desc: Checks that the git working tree is clean
-    cmd: .github/workflows/check-clean-branch.sh
+    desc: Checks that the working tree is clean
+    cmd: ./scripts/check_clean_branch.sh
 
   check-generate-canoto:
-    desc: Checks that generated canoto is up-to-date (requires a clean git working tree)
+    desc: Checks that generated canoto is up-to-date (requires a clean working tree)
     cmds:
       - task: generate-canoto
       - task: check-clean-branch
 
   check-generate-load-contract-bindings:
-    desc: Checks that generated load contract bindings are up-to-date (requires a clean git working tree)
+    desc: Checks that generated load contract bindings are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-load-contract-bindings
       - task: check-clean-branch
 
   check-generate-mocks:
-    desc: Checks that generated mocks are up-to-date (requires a clean git working tree)
+    desc: Checks that generated mocks are up-to-date (requires a clean working tree)
     cmds:
       - task: generate-mocks
       - task: check-clean-branch
 
   check-generate-protobuf:
-    desc: Checks that generated protobuf is up-to-date (requires a clean git working tree)
+    desc: Checks that generated protobuf is up-to-date (requires a clean working tree)
     cmds:
       - task: generate-protobuf
       - task: check-clean-branch
 
   check-go-mod-tidy:
-    desc: Checks that go module configuration is consistent (requires a clean git working tree)
+    desc: Checks that go module configuration is consistent (requires a clean working tree)
     cmds:
       - task: go-mod-tidy
       - task: check-clean-branch
@@ -113,10 +113,14 @@ tasks:
     cmd: ./scripts/check_require_directives.sh
 
   check-require-directives-round-trip:
-    desc: Validates that update_require_directives.sh is idempotent (requires a clean git working tree)
+    desc: Validates that update_require_directives.sh is idempotent (requires a clean working tree)
     cmds:
       - ./scripts/check_require_directives_round_trip.sh
       - task: check-clean-branch
+
+  check-vcs-usage:
+    desc: Checks that scripts use vcs.sh instead of direct git/jj commands
+    cmd: ./scripts/check_vcs_usage.sh
 
   create-kind-cluster:
     desc: Creates the default kind cluster
@@ -199,6 +203,8 @@ tasks:
       - check-go-version
       - check-require-directives
       - check-require-directives-round-trip
+      - check-vcs-usage
+      - test-vcs
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -210,6 +216,8 @@ tasks:
       - task: check-go-version
       - task: check-require-directives
       - task: check-require-directives-round-trip
+      - task: check-vcs-usage
+      - task: test-vcs-ci
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
@@ -394,6 +402,16 @@ tasks:
     cmds:
       - task: build
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
+
+  test-vcs:
+    # vcs-ok: description of test that exercises both VCS backends
+    desc: Tests vcs.sh in git context and, if already a jj repo, jj context (use test-vcs-ci to force jj init)
+    cmd: ./scripts/tests.vcs.sh --all
+
+  test-vcs-ci:
+    # vcs-ok: description of test that exercises both VCS backends
+    desc: Tests vcs.sh in both git and jj contexts. WARNING - will run 'jj git init --colocate' if not already a jj repo.
+    cmd: ./scripts/tests.vcs.sh --all --init
 
   update-go-version:
     desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"

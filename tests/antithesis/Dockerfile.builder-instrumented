@@ -23,8 +23,10 @@ COPY . .
 # Ensure pre-existing builds are not available for inclusion in the final image
 RUN [ -d ./build ] && rm -rf ./build/* || true
 
-# Keep the commit hash to easily verify the exact version that is running
-RUN git rev-parse HEAD > ./commit_hash.txt
+# Keep the commit hash to easily verify the exact version that is running.
+# Provided as a build arg so that VCS tooling is not required in the image.
+ARG COMMIT_HASH=""
+RUN echo "$COMMIT_HASH" > ./commit_hash.txt
 
 # Copy the instrumentor and supporting files to their correct locations
 COPY --from=instrumentor /opt/antithesis /opt/antithesis
@@ -32,10 +34,6 @@ COPY --from=instrumentor /opt/antithesis/lib /lib
 
 # Create the destination output directory for the instrumented code
 RUN mkdir -p /instrumented
-
-# Park the .git file in a safe location
-RUN mkdir -p /opt/tmp/
-RUN cp -r .git /opt/tmp/
 
 # Instrument the code
 RUN /opt/antithesis/bin/goinstrumentor \
@@ -46,4 +44,3 @@ RUN /opt/antithesis/bin/goinstrumentor \
 
 WORKDIR /instrumented/customer
 RUN go mod download
-RUN ln -s /opt/tmp/.git .git
