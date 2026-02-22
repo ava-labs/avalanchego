@@ -88,7 +88,7 @@ tasks:
       - task: bazel-build
       - task: build-xsvm
       - cmd: |
-          AVALANCHEGO_PATH=$(pwd)/bazel-bin/main/avalanchego_/avalanchego \
+          AVALANCHEGO_PATH=$(bazel cquery --output=files //main:avalanchego 2>/dev/null) \
           bash -x ./scripts/tests.e2e.existing.sh
 
   bazel-test-e2e-ci:
@@ -99,7 +99,7 @@ tasks:
       - task: bazel-build-race
       - task: build-xsvm
       - cmd: |
-          AVALANCHEGO_PATH=$(pwd)/bazel-bin/main/avalanchego_/avalanchego \
+          AVALANCHEGO_PATH=$(bazel cquery --output=files //main:avalanchego 2>/dev/null) \
           bash -x ./scripts/tests.e2e.existing.sh
 
   build:
