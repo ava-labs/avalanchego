@@ -34,8 +34,9 @@
           # The Nix packages provided in the environment
           packages = with pkgs; [
             # Build requirements
-            git
             bazelisk
+            (runCommand "bazel" {} ''mkdir -p $out/bin && ln -s ${bazelisk}/bin/bazelisk $out/bin/bazel'')
+            git
 
             # Task runner
             go-task

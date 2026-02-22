@@ -16,17 +16,20 @@ includes:
 tasks:
   default: ./scripts/run_task.sh --list
 
+  # All bazel invocations are to ./scripts/run_bazel.sh which will invoke bazelisk without a
+  # dependency on being in a nix shell.
+
   bazel-build:
     desc: Build avalanchego with Bazel
-    cmd: bazel build //main:avalanchego
+    cmd: ./scripts/run_bazel.sh build //main:avalanchego
 
   bazel-build-race:
     desc: Build avalanchego with Bazel (race detection)
-    cmd: bazel build --config=race //main:avalanchego
+    cmd: ./scripts/run_bazel.sh build --config=race //main:avalanchego
 
   bazel-build-opt:
     desc: Build avalanchego with Bazel (optimized)
-    cmd: bazel build --compilation_mode=opt //main:avalanchego
+    cmd: ./scripts/run_bazel.sh build --compilation_mode=opt //main:avalanchego
 
   bazel-gazelle-delete:
     desc: Delete all gazelle-generated BUILD.bazel files (except manually maintained ones)
@@ -49,34 +52,34 @@ tasks:
     desc: Ensure BUILD files are up-to-date by deleting and generating with Gazelle (all modules)
     cmds:
       - task: bazel-gazelle-delete
-      - bazel run //:gazelle
-      - bazel run //graft/coreth:gazelle
-      - bazel run //graft/evm:gazelle
-      - bazel run //graft/subnet-evm:gazelle
+      - ./scripts/run_bazel.sh run //:gazelle
+      - ./scripts/run_bazel.sh run //graft/coreth:gazelle
+      - ./scripts/run_bazel.sh run //graft/evm:gazelle
+      - ./scripts/run_bazel.sh run //graft/subnet-evm:gazelle
 
   bazel-test:
     desc: Run unit tests with Bazel (shuffle on, race on)
-    cmd: bazel test //...
+    cmd: ./scripts/run_bazel.sh test //...
 
   bazel-test-fast:
     desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
-    cmd: bazel test --config=fast //...
+    cmd: ./scripts/run_bazel.sh test --config=fast //...
 
   bazel-clean:
     desc: Clean Bazel cache
-    cmd: bazel clean
+    cmd: ./scripts/run_bazel.sh clean
 
   bazel-clean-all:
     desc: Clean Bazel cache (full expunge)
-    cmd: bazel clean --expunge
+    cmd: ./scripts/run_bazel.sh clean --expunge
 
   bazel-query:
     desc: Query Bazel targets
-    cmd: bazel query '//...' {{.CLI_ARGS}}
+    cmd: ./scripts/run_bazel.sh query '//...' {{.CLI_ARGS}}
 
   bazel-mod-tidy:
     desc: Update use_repo() in MODULE.bazel from go.mod
-    cmd: bazel mod tidy
+    cmd: ./scripts/run_bazel.sh mod tidy
 
   bazel-fmt:
     desc: Format BUILD.bazel files with buildifier
@@ -88,7 +91,7 @@ tasks:
       - task: bazel-build
       - task: build-xsvm
       - cmd: |
-          AVALANCHEGO_PATH=$(bazel cquery --output=files //main:avalanchego 2>/dev/null) \
+          AVALANCHEGO_PATH=$(./scripts/run_bazel.sh cquery --output=files //main:avalanchego 2>/dev/null) \
           bash -x ./scripts/tests.e2e.existing.sh
 
   bazel-test-e2e-ci:
@@ -99,7 +102,7 @@ tasks:
       - task: bazel-build-race
       - task: build-xsvm
       - cmd: |
-          AVALANCHEGO_PATH=$(bazel cquery --output=files //main:avalanchego 2>/dev/null) \
+          AVALANCHEGO_PATH=$(./scripts/run_bazel.sh cquery --output=files //main:avalanchego 2>/dev/null) \
           bash -x ./scripts/tests.e2e.existing.sh
 
   build:
@@ -275,7 +278,7 @@ tasks:
       - cmd: cd graft/subnet-evm && GOWORK=off go mod tidy
       - task: sync-go-work
       # Update use_repo() in MODULE.bazel to match go.mod dependencies
-      - cmd: bazel mod tidy
+      - cmd: ./scripts/run_bazel.sh mod tidy
 
   install-nix:
     desc: Installs nix with an OS-appropriate installer
