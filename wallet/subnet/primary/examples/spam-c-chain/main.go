@@ -16,22 +16,18 @@ import (
 	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 
 	ethereum "github.com/ava-labs/libevm"
 )
 
 // maxFeePerGas is the fee that transactions issued by this test will pay.
-const maxFeePerGas = 1000 * params.GWei
+const maxFeePerGas = 100 * params.Wei
 
 var gasPrice = big.NewInt(maxFeePerGas)
 
 func main() {
 	ctx := context.Background()
-	const (
-		chainUUID = "C"
-		uri       = primary.LocalAPIURI + "/ext/bc/" + chainUUID + "/rpc"
-	)
+	const uri = "https://api.avax-dev.network/ext/bc/C/rpc"
 	c, err := ethclient.DialContext(ctx, uri)
 	if err != nil {
 		log.Fatal(err)
@@ -54,9 +50,9 @@ func main() {
 	for {
 		tx := types.NewTx(&types.DynamicFeeTx{
 			Nonce:     nonce,
-			GasTipCap: gasPrice,
+			GasTipCap: big.NewInt(params.Wei),
 			GasFeeCap: gasPrice,
-			Gas:       1_000_000, // params.TxGas,
+			Gas:       params.TxGas,
 			To:        &eoa,
 		})
 
