@@ -34,6 +34,7 @@
           # The Nix packages provided in the environment
           packages = with pkgs; [
             # Build requirements
+            (runCommand "bazel" {} ''mkdir -p $out/bin && ln -s ${bazelisk}/bin/bazelisk $out/bin/bazel'')
             bazelisk
             git
             jujutsu

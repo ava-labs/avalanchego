@@ -3,6 +3,14 @@
 This document explains how Bazel is configured and used in the
 avalanchego monorepo.
 
+## Prerequisites
+
+The `bazel` command is provided by [bazelisk](https://github.com/bazelbuild/bazelisk),
+which automatically downloads the correct Bazel version from `.bazelversion`. All
+Taskfile targets use `./scripts/run_bazel.sh`, which runs bazelisk directly if
+available or via `nix run` if not. In the nix dev shell (`nix develop`), `bazel`
+and `bazelisk` are both on PATH directly.
+
 ## Quick Start
 
 ```bash
