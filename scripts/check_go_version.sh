@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Checks that go version directives are consistent across all go.mod, go.work,
-# and nix/go/default.nix.
+# MODULE.bazel (Bazel Go SDK), and nix/go/default.nix.
 
 if ! [[ "$0" =~ scripts/check_go_version.sh ]]; then
   echo "must be run from repository root"
@@ -25,6 +25,16 @@ while IFS= read -r -d '' mod_file; do
     mismatches+=("$mod_file: $version")
   fi
 done < <(vcs_ls_files -z 'go.mod' '*/go.mod')
+
+# Check MODULE.bazel version (Bazel Go SDK)
+bazel_file="MODULE.bazel"
+bazel_version=$(sed -n 's/^go_sdk\.download(version = "\(.*\)")$/\1/p' "$bazel_file")
+if [[ -z "$bazel_version" ]]; then
+  echo "error: failed to parse go_sdk.download version from $bazel_file"
+  exit 1
+elif [[ "$bazel_version" != "$reference" ]]; then
+  mismatches+=("$bazel_file: $bazel_version")
+fi
 
 # Check nix version
 nix_file="nix/go/default.nix"

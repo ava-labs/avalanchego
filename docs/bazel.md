@@ -39,7 +39,7 @@ ensuring reproducible builds without requiring a Nix shell:
 
 ```python
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
-go_sdk.download(version = "1.24.12")
+go_sdk.download(version = "1.xx.x")
 ```
 
 **Approaches considered:**
@@ -48,11 +48,11 @@ go_sdk.download(version = "1.24.12")
 |----------|------|------|
 | `go_sdk.download()` (chosen) | Reproducible, no nix required for builds | Go version must be synced manually across go.mod files |
 | `go_sdk.host()` | Single source of truth via nix | Requires nix shell, not hermetic outside nix |
-| `rules_nixpkgs_go` | Bazel calls Nix directly, fully hermetic | **Incompatible with rules_go v0.56+** (toolchain API mismatch) |
+| `rules_nixpkgs_go` | Bazel calls Nix directly, fully hermetic | **Incompatible with rules_go v0.57+** (toolchain API mismatch) |
 
 > **Note:** rules_nixpkgs_go v0.13.0 proved incompatible with rules_go
-> v0.56.0+. The rules_go toolchain API changed to require a `pack`
-> attribute that rules_nixpkgs_go doesn't provide.  See:
+> v0.56.0+. The rules_go toolchain API changed in ways that
+> rules_nixpkgs_go doesn't support. See:
 > https://github.com/tweag/rules_nixpkgs/issues/667
 
 ### Version Pinning
@@ -60,14 +60,9 @@ go_sdk.download(version = "1.24.12")
 | Tool | Version | Pin Mechanism | Rationale |
 |------|---------|---------------|-----------|
 | Bazel | 8.0.1 | `.bazelversion` + bazelisk | Current LTS with native bzlmod support |
-| Go | 1.24.12 | `MODULE.bazel` go_sdk.download | Project requirement |
-| rules_go | 0.56.0 | `MODULE.bazel` | Requires `pack` tool (removed in Go 1.25; see upgrade note) |
-| gazelle | 0.45.0 | `MODULE.bazel` | Compatible with rules_go 0.56.0 |
-
-**Go 1.25 upgrade note:** Go 1.25 removed the `pack` tool from the Go
-distribution, which rules_go v0.56.x relies on. When upgrading to Go
-1.25+, also upgrade rules_go to v0.57.0+ (which no longer depends on
-external `pack`).
+| Go | 1.25.7 | `MODULE.bazel` go_sdk.download | Must match go.mod |
+| rules_go | 0.57.0 | `MODULE.bazel` | Go 1.25+ support (compiles `pack` from source) |
+| gazelle | 0.45.0 | `MODULE.bazel` | Compatible with rules_go 0.57.0 |
 
 ### Why Bazel 8?
 
@@ -310,8 +305,8 @@ bls12-381 `fp` and `fr` targets, allowing the Go assembler to resolve
 relative includes from the full source tree in the execroot. Only
 bls12-381 is patched since it's the only curve in the dependency graph.
 This is simpler than duplicating assembly files or providing custom
-BUILD files for the entire module
-(see [rules_go#3636](https://github.com/bazel-contrib/rules_go/issues/3636)).
+BUILD files for the entire module.
+See [rules_go#3636](https://github.com/bazel-contrib/rules_go/issues/3636)).
 ```python
 go_deps.module_override(
     patches = ["//.bazel/patches:com_github_consensys_gnark_crypto_asm_includes.patch"],
@@ -585,18 +580,16 @@ bazel build --config=release //main:avalanchego   # Release build (stamped)
 
 ## Known Limitations
 
-1. **Go/rules_go version coupling** - Upgrading to Go 1.25+ requires
-   also upgrading rules_go to v0.57.0+ (see Version Pinning section)
-
-2. **gnark-crypto sandbox relaxation** - The `no-sandbox` tags on bls12-381
+1. **gnark-crypto sandbox relaxation** - The `no-sandbox` tags on bls12-381
    targets (see "Sandbox relaxation" strategy above) mean those compilations
    are not hermetically sandboxed. This is acceptable for a pinned dependency
    but incompatible with remote execution.
 
-3. **Manual Go version sync** - Go version must be kept in sync across:
-   - `MODULE.bazel` (`go_sdk.download(version = "...")`)
-   - `go.work` and `go.mod` files
-   - `nix/go/default.nix` (if using nix shell)
+2. **Go version sync** - Go version must be kept in sync across
+   `MODULE.bazel`, `go.work`, `go.mod` files, and `nix/go/default.nix`.
+   Use `task update-go-version -- <version>` to update all files except
+   nix (which requires SHA changes). CI enforces consistency via
+   `task check-go-version`.
 
 ## Future Improvements
 

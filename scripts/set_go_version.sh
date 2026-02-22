@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# Updates go version directives across all go.mod and go.work files.
+# Updates go version directives across all go.mod, go.work, and MODULE.bazel files.
 # Does NOT update nix/go/default.nix (requires SHA changes).
 
 if ! [[ "$0" =~ scripts/set_go_version.sh ]]; then
@@ -23,6 +23,10 @@ version="$1"
 
 go work edit -go="$version" go.work
 echo "updated go.work"
+
+# Update MODULE.bazel go_sdk.download version
+sed -i "s/^go_sdk\.download(version = \".*\")$/go_sdk.download(version = \"$version\")/" MODULE.bazel
+echo "updated MODULE.bazel"
 
 while IFS= read -r -d '' mod_file; do
   go mod edit -go="$version" "$mod_file"
