@@ -50,6 +50,9 @@ jobs:
           tool-cache: true
           docker-images: true
       - uses: actions/checkout@v4
+      # Go is not used by Bazel (it downloads its own SDK via go_sdk.download),
+      # but run_task.sh falls back to `go tool` to run the `task` binary when
+      # it's not installed on the runner.
       - uses: ./.github/actions/setup-go-for-project
       - name: Run unit tests with Bazel
         shell: bash
