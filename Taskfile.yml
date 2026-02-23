@@ -54,11 +54,7 @@ tasks:
 
   bazel-gazelle-generate:
     desc: Regenerate BUILD files with Gazelle (all modules)
-    cmds:
-      - ./scripts/run_bazel.sh run //:gazelle
-      - ./scripts/run_bazel.sh run //graft/coreth:gazelle
-      - ./scripts/run_bazel.sh run //graft/evm:gazelle
-      - ./scripts/run_bazel.sh run //graft/subnet-evm:gazelle
+    cmd: ./scripts/run_bazel.sh run //:gazelle
 
   bazel-test:
     desc: Run unit tests with Bazel (shuffle on, race on)
