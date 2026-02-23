@@ -14,9 +14,9 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	atomicstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
@@ -89,7 +89,7 @@ type Syncer struct {
 }
 
 // NewSyncer returns a new syncer instance that will sync the atomic trie from the network.
-func NewSyncer(client leaf.Client, db *versiondb.Database, atomicTrie *atomicstate.AtomicTrie, targetRoot common.Hash, targetHeight uint64, opts ...SyncerOption) (*Syncer, error) {
+func NewSyncer(client types.LeafClient, db *versiondb.Database, atomicTrie *atomicstate.AtomicTrie, targetRoot common.Hash, targetHeight uint64, opts ...SyncerOption) (*Syncer, error) {
 	if targetHeight == 0 {
 		return nil, errTargetHeightRequired
 	}
