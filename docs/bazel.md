@@ -239,6 +239,16 @@ Ordered from least to most invasive:
    dependency has complex build requirements (CGO, assembly,
    non-standard layout) that gazelle can't handle.
 
+**Choosing between augmentation (3) and custom BUILD files (4):**
+Prefer augmentation when gazelle produces a correct BUILD file that
+only needs minor additions (e.g., an extra `copts` flag or a missing
+source file). Switch to custom BUILD files when gazelle gets less than
+~70% of the target right — at that point, patching the delta becomes
+harder to maintain than owning the whole file. Signs that custom BUILD
+files are warranted: `cc_library` targets with platform-specific
+`select()`, CGO with assembly, pre-built static libraries via
+`cc_import`, or unity-build compilation models.
+
 | Dependency | Issue | Solution |
 |------------|-------|----------|
 | `ava-labs/libevm` | Missing C sources for secp256k1 | Custom BUILD files + gazelle directive excludes secp256k1 dir |
