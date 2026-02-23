@@ -16,11 +16,17 @@ go_library(
 )
 
 go_binary(
-    name = "avalanchego",  # keep
+    name = "main",
     embed = [":main_lib"],
     visibility = ["//visibility:public"],
     x_defs = {
         # keep
         "github.com/ava-labs/avalanchego/version.GitCommit": "{STABLE_GIT_COMMIT}",
     },
+)
+
+alias(
+    name = "avalanchego",
+    actual = ":main",
+    visibility = ["//visibility:public"],
 )
