@@ -1,0 +1,16 @@
+# gazelle:ignore
+# Source library for blst - headers and C files for unity build
+
+cc_library(
+    name = "src",
+    hdrs = glob(
+        ["*.h"],
+        allow_empty = True,
+    ),
+    includes = ["."],
+    textual_hdrs = glob(
+        ["*.c"],
+        allow_empty = True,
+    ),
+    visibility = ["//:__subpackages__"],
+)

@@ -1,0 +1,65 @@
+# gazelle:ignore
+# Go bindings for blst library
+#
+# Compiler flags are derived from the CGO directives in blst.go:13-16.
+
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+COPTS = [
+    "-O2",
+    "-D__BLST_PORTABLE__",
+    "-D__BLST_CGO__",
+    "-fno-builtin-memcpy",
+    "-fno-builtin-memset",
+] + select({
+    "@io_bazel_rules_go//go/platform:amd64": [
+        "-D__ADX__",
+        "-mno-avx",
+    ],
+    "//conditions:default": [],
+})
+
+cc_library(
+    name = "cgo",
+    srcs = [
+        "cgo_assembly.S",
+        "cgo_server.c",
+    ],
+    copts = COPTS,
+    visibility = ["//visibility:private"],
+    deps = [
+        "//bindings",
+        "//build:build_cc",
+        "//src",
+    ],
+)
+
+go_library(
+    name = "go",
+    srcs = [
+        "blst.go",
+        "rb_tree.go",
+    ],
+    cdeps = [
+        ":cgo",
+        "//bindings",
+        "//build:build_cc",
+        "//src",
+    ],
+    cgo = True,
+    copts = COPTS,
+    importpath = "github.com/supranational/blst/bindings/go",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_test",
+    srcs = [
+        "blst_htoc_test.go",
+        "blst_miller_loop_test.go",
+        "blst_minpk_test.go",
+        "blst_minsig_test.go",
+    ],
+    data = ["//bindings/vectors"],
+    embed = [":go"],
+)

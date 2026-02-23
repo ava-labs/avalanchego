@@ -2,68 +2,24 @@ diff --git a/bindings/BUILD.bazel b/bindings/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/bindings/BUILD.bazel
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,12 @@
 +# gazelle:ignore
 +# Header library for blst C bindings
 +
 +cc_library(
 +    name = "bindings",
-+    hdrs = glob(["*.h"], allow_empty = True),
++    hdrs = glob(
++        ["*.h"],
++        allow_empty = True,
++    ),
 +    includes = ["."],
-+    visibility = ["//:__subpackages__"],
-+)
-diff --git a/src/BUILD.bazel b/src/BUILD.bazel
-new file mode 100644
---- /dev/null
-+++ b/src/BUILD.bazel
-@@ -0,0 +1,10 @@
-+# gazelle:ignore
-+# Source library for blst - headers and C files for unity build
-+
-+cc_library(
-+    name = "src",
-+    hdrs = glob(["*.h"], allow_empty = True),
-+    textual_hdrs = glob(["*.c"], allow_empty = True),
-+    includes = ["."],
-+    visibility = ["//:__subpackages__"],
-+)
-diff --git a/build/BUILD.bazel b/build/BUILD.bazel
-new file mode 100644
---- /dev/null
-+++ b/build/BUILD.bazel
-@@ -0,0 +1,14 @@
-+# gazelle:ignore
-+# Assembly and build file library for blst
-+
-+cc_library(
-+    name = "build_cc",
-+    hdrs = glob([
-+        "**/*.c",
-+        "**/*.h",
-+        "**/*.S",
-+        "**/*.s",
-+    ], allow_empty = True),
-+    includes = ["."],
-+    visibility = ["//:__subpackages__"],
-+)
-diff --git a/bindings/vectors/BUILD.bazel b/bindings/vectors/BUILD.bazel
-new file mode 100644
---- /dev/null
-+++ b/bindings/vectors/BUILD.bazel
-@@ -0,0 +1,8 @@
-+# gazelle:ignore
-+# Test vectors for blst
-+
-+filegroup(
-+    name = "vectors",
-+    srcs = glob(["hash_to_curve/*.json"], allow_empty = True),
 +    visibility = ["//:__subpackages__"],
 +)
 diff --git a/bindings/go/BUILD.bazel b/bindings/go/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/bindings/go/BUILD.bazel
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,65 @@
 +# gazelle:ignore
 +# Go bindings for blst library
 +#
@@ -82,24 +38,6 @@ new file mode 100644
 +        "-D__ADX__",
 +        "-mno-avx",
 +    ],
-+    "@io_bazel_rules_go//go/platform:mips64": [
-+        "-D__BLST_NO_ASM__",
-+    ],
-+    "@io_bazel_rules_go//go/platform:mips64le": [
-+        "-D__BLST_NO_ASM__",
-+    ],
-+    "@io_bazel_rules_go//go/platform:ppc64": [
-+        "-D__BLST_NO_ASM__",
-+    ],
-+    "@io_bazel_rules_go//go/platform:ppc64le": [
-+        "-D__BLST_NO_ASM__",
-+    ],
-+    "@io_bazel_rules_go//go/platform:riscv64": [
-+        "-D__BLST_NO_ASM__",
-+    ],
-+    "@io_bazel_rules_go//go/platform:s390x": [
-+        "-D__BLST_NO_ASM__",
-+    ],
 +    "//conditions:default": [],
 +})
 +
@@ -110,12 +48,12 @@ new file mode 100644
 +        "cgo_server.c",
 +    ],
 +    copts = COPTS,
++    visibility = ["//visibility:private"],
 +    deps = [
 +        "//bindings",
 +        "//build:build_cc",
 +        "//src",
 +    ],
-+    visibility = ["//visibility:private"],
 +)
 +
 +go_library(
@@ -124,13 +62,13 @@ new file mode 100644
 +        "blst.go",
 +        "rb_tree.go",
 +    ],
-+    cgo = True,
 +    cdeps = [
 +        ":cgo",
 +        "//bindings",
 +        "//build:build_cc",
 +        "//src",
 +    ],
++    cgo = True,
 +    copts = COPTS,
 +    importpath = "github.com/supranational/blst/bindings/go",
 +    visibility = ["//visibility:public"],
@@ -144,6 +82,65 @@ new file mode 100644
 +        "blst_minpk_test.go",
 +        "blst_minsig_test.go",
 +    ],
++    data = ["//bindings/vectors"],
 +    embed = [":go"],
-+    data = ["//bindings/vectors:vectors"],
++)
+diff --git a/bindings/vectors/BUILD.bazel b/bindings/vectors/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/bindings/vectors/BUILD.bazel
+@@ -0,0 +1,11 @@
++# gazelle:ignore
++# Test vectors for blst
++
++filegroup(
++    name = "vectors",
++    srcs = glob(
++        ["hash_to_curve/*.json"],
++        allow_empty = True,
++    ),
++    visibility = ["//:__subpackages__"],
++)
+diff --git a/build/BUILD.bazel b/build/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/build/BUILD.bazel
+@@ -0,0 +1,17 @@
++# gazelle:ignore
++# Assembly and build file library for blst
++
++cc_library(
++    name = "build_cc",
++    hdrs = glob(
++        [
++            "**/*.c",
++            "**/*.h",
++            "**/*.S",
++            "**/*.s",
++        ],
++        allow_empty = True,
++    ),
++    includes = ["."],
++    visibility = ["//:__subpackages__"],
++)
+diff --git a/src/BUILD.bazel b/src/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/src/BUILD.bazel
+@@ -0,0 +1,16 @@
++# gazelle:ignore
++# Source library for blst - headers and C files for unity build
++
++cc_library(
++    name = "src",
++    hdrs = glob(
++        ["*.h"],
++        allow_empty = True,
++    ),
++    includes = ["."],
++    textual_hdrs = glob(
++        ["*.c"],
++        allow_empty = True,
++    ),
++    visibility = ["//:__subpackages__"],
 +)

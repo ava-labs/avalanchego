@@ -1,0 +1,11 @@
+# gazelle:ignore
+# Test vectors for blst
+
+filegroup(
+    name = "vectors",
+    srcs = glob(
+        ["hash_to_curve/*.json"],
+        allow_empty = True,
+    ),
+    visibility = ["//:__subpackages__"],
+)

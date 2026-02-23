@@ -31,6 +31,10 @@ tasks:
     desc: Build avalanchego with Bazel (optimized)
     cmd: ./scripts/run_bazel.sh build --compilation_mode=opt //main:avalanchego
 
+  bazel-generate-patches:
+    desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
+    cmd: ./scripts/generate_bazel_patches.sh
+
   bazel-gazelle-delete:
     desc: Delete all gazelle-generated BUILD.bazel files (except manually maintained ones)
     cmd: |
@@ -162,6 +166,12 @@ tasks:
     desc: Check that BUILD.bazel files are formatted with buildifier
     cmds:
       - task: bazel-fmt
+      - task: check-clean-branch
+
+  check-bazel-generate-patches:
+    desc: Checks that generated patches are up-to-date (requires a clean working tree)
+    cmds:
+      - task: bazel-generate-patches
       - task: check-clean-branch
 
   check-bazel-gazelle-generate:
@@ -318,6 +328,10 @@ tasks:
     cmds:
       - task: check-bazel-fmt
       - task: check-bazel-gazelle-generate
+      # Must run after fmt and gazelle since either could modify source BUILD
+      # files in .bazel/patches/build_files/. In practice gazelle skips them
+      # (they have `# gazelle:ignore`) but buildifier will reformat them.
+      - task: check-bazel-generate-patches
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
