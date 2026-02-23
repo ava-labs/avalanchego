@@ -16,4 +16,4 @@ fi
 
 cd "$REPO_ROOT/graft/coreth"
 # shellcheck disable=SC2046
-GODEBUG=invalidptr=1 go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic "$@" github.com/ava-labs/avalanchego/graft/coreth/core 
+GOFLAGS=-gcflags=all=-d=variablemakehash=0 go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic "$@" github.com/ava-labs/avalanchego/graft/coreth/core 
