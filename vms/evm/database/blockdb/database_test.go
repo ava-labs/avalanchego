@@ -333,7 +333,7 @@ func TestDatabaseInitialization(t *testing.T) {
 			}
 
 			writeBlocks(evmDB, tc.evmDBBlocks, []types.Receipts{})
-			db, _, err := New(
+			db, err := New(
 				base,
 				evmDB,
 				dataDir,
@@ -374,7 +374,7 @@ func TestDatabaseInitBlockDBs(t *testing.T) {
 	require.NoError(t, err)
 	evmDB := rawdb.NewDatabase(evmdb.New(base))
 
-	db, initialized, err := New(
+	db, err := New(
 		base,
 		evmDB,
 		dataDir,
@@ -384,7 +384,7 @@ func TestDatabaseInitBlockDBs(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
-	require.False(t, initialized)
+	require.False(t, db.heightDBsReady)
 
 	require.NoError(t, db.InitBlockDBs(10))
 	require.Equal(t, uint64(10), db.minHeight)
@@ -398,7 +398,7 @@ func TestDatabaseMinHeightWrites(t *testing.T) {
 	require.NoError(t, err)
 	evmDB := rawdb.NewDatabase(evmdb.New(base))
 
-	db, _, err := New(
+	db, err := New(
 		base,
 		evmDB,
 		dataDir,
@@ -501,7 +501,7 @@ func TestIsEnabled(t *testing.T) {
 	require.False(t, enabled)
 
 	// create db but don't initialize
-	db, initialized, err := New(
+	db, err := New(
 		base,
 		evmDB,
 		dataDir,
@@ -511,7 +511,7 @@ func TestIsEnabled(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
-	require.False(t, initialized)
+	require.False(t, db.heightDBsReady)
 
 	// not enabled since InitBlockDBs was not called
 	enabled, err = IsEnabled(base)

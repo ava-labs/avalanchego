@@ -122,9 +122,6 @@ func (db *Database) newMeteredHeightDB(
 // If allowDeferredInit is true and no minimum block height is known,
 // New defers initializing the height-indexed block databases until
 // [Database.InitBlockDBs] is called.
-//
-// The bool result is true if the block databases were initialized immediately,
-// and false if initialization was deferred.
 func New(
 	metaDB database.Database,
 	evmDB ethdb.Database,
@@ -133,7 +130,7 @@ func New(
 	config heightindexdb.DatabaseConfig,
 	logger logging.Logger,
 	reg prometheus.Registerer,
-) (*Database, bool, error) {
+) (*Database, error) {
 	db := &Database{
 		metaDB:   metaDB,
 		Database: evmDB,
@@ -160,21 +157,27 @@ func New(
 	for _, fn := range minHeightFn {
 		h, ok, err := fn()
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		if !ok {
 			continue
 		}
 		if err := db.InitBlockDBs(h); err != nil {
-			return nil, false, err
+			return nil, err
 		}
-		return db, true, nil
+		return db, nil
 	}
 
 	db.logger.Info(
 		"Deferring block database initialization until minimum height is known",
 	)
-	return db, false, nil
+	return db, nil
+}
+
+// IsReady reports whether the height-indexed block databases have been
+// initialized and are ready for use.
+func (db *Database) IsReady() bool {
+	return db.heightDBsReady
 }
 
 // InitBlockDBs initializes [database.HeightIndex] databases with the specified

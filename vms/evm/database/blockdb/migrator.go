@@ -366,7 +366,7 @@ func compactRange(
 	startKey := keyFunc(startNum, common.Hash{})
 	endKey := keyFunc(endNum+1, common.Hash{})
 	if err := db.Compact(startKey, endKey); err != nil {
-		logger.Error("Failed to compact data in range",
+		logger.Warn("Failed to compact data in range",
 			zap.Uint64("startHeight", startNum),
 			zap.Uint64("endHeight", endNum),
 			zap.Error(err))
@@ -474,14 +474,14 @@ func (m *migrator) run(ctx context.Context) error {
 		}
 		endBlockNum = num
 
-		if err := m.migrateHeader(num, hash); err != nil {
-			return fmt.Errorf("failed to migrate header data: %w", err)
+		if err := m.migrateReceipts(num, hash); err != nil {
+			return fmt.Errorf("failed to migrate receipts data: %w", err)
 		}
 		if err := m.migrateBody(num, hash, iter.Value()); err != nil {
 			return fmt.Errorf("failed to migrate body data: %w", err)
 		}
-		if err := m.migrateReceipts(num, hash); err != nil {
-			return fmt.Errorf("failed to migrate receipts data: %w", err)
+		if err := m.migrateHeader(num, hash); err != nil {
+			return fmt.Errorf("failed to migrate header data: %w", err)
 		}
 		if err := deleteBlock(batch, num, hash); err != nil {
 			return fmt.Errorf("failed to add block deletes to batch: %w", err)

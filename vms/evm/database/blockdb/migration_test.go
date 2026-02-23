@@ -54,7 +54,7 @@ func TestMigrationCompletion(t *testing.T) {
 				writeBlocks(evmDB, blocks, receipts)
 			}
 
-			db, _, err := New(
+			db, err := New(
 				base,
 				evmDB,
 				dataDir,
@@ -238,7 +238,7 @@ func TestMigrationSkipsGenesis(t *testing.T) {
 	writeBlocks(evmDB, blocks[0:1], receipts[0:1])
 	writeBlocks(evmDB, blocks[5:10], receipts[5:10])
 
-	db, _, err := New(
+	db, err := New(
 		base,
 		evmDB,
 		dataDir,
@@ -274,7 +274,7 @@ func TestMigrationWithoutReceipts(t *testing.T) {
 		rawdb.WriteCanonicalHash(evmDB, block.Hash(), block.NumberU64())
 	}
 
-	db, initialized, err := New(
+	db, err := New(
 		base,
 		evmDB,
 		dataDir,
@@ -284,7 +284,7 @@ func TestMigrationWithoutReceipts(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
-	require.True(t, initialized)
+	require.True(t, db.heightDBsReady)
 	startMigration(t, db, true)
 	require.True(t, db.migrator.isCompleted())
 

@@ -50,7 +50,7 @@ func newDatabasesFromDir(t *testing.T, dataDir string) (*Database, ethdb.Databas
 	base, err := leveldb.New(dataDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
 	evmDB := rawdb.NewDatabase(evmdb.New(base))
-	db, _, err := New(
+	db, err := New(
 		base,
 		evmDB,
 		dataDir,
@@ -144,8 +144,8 @@ func startPartialMigration(t *testing.T, db *Database, blocksToMigrate uint64) {
 	t.Helper()
 
 	n := uint64(0)
-	db.migrator.headerDB = &blockingDatabase{
-		HeightIndex: db.headerDB,
+	db.migrator.receiptsDB = &blockingDatabase{
+		HeightIndex: db.receiptsDB,
 		shouldBlock: func() bool {
 			n++
 			return n > blocksToMigrate

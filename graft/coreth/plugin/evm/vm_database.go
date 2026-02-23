@@ -117,7 +117,7 @@ func (vm *VM) initBlockDB(db avalanchedatabase.Database) error {
 	}
 	stateSyncEnabled := vm.stateSyncEnabled(lastAcceptedHeight)
 	cfg := heightindexdb.DefaultConfig().WithSyncToDisk(vm.config.BlockDatabaseSync)
-	blockDB, initialized, err := blockdb.New(
+	blockDB, err := blockdb.New(
 		metaDB,
 		vm.chaindb,
 		path,
@@ -129,11 +129,18 @@ func (vm *VM) initBlockDB(db avalanchedatabase.Database) error {
 	if err != nil {
 		return err
 	}
-	if initialized && !vm.config.SkipBlockDatabaseAutoMigrate {
-		if err := blockDB.StartMigration(context.Background()); err != nil {
-			return err
-		}
-	}
 	vm.chaindb = blockDB
 	return nil
+}
+
+// startBlockDBMigration starts the block database migration if applicable.
+// Must be called after the chain is fully initialized to avoid racing with
+// initialization code that reads blocks from the database.
+func (vm *VM) startBlockDBMigration() {
+	if vm.config.SkipBlockDatabaseAutoMigrate {
+		return
+	}
+	if db, ok := vm.chaindb.(*blockdb.Database); ok && db.IsReady() {
+		db.StartMigration(context.Background())
+	}
 }

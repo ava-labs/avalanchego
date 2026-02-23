@@ -465,6 +465,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	vm.startBlockDBMigration()
+
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
 	// Add p2p warp message warpHandler
