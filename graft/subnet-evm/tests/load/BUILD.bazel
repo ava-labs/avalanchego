@@ -3,7 +3,7 @@ load("//.bazel:defs.bzl", "graft_go_test")
 graft_go_test(
     name = "load_test",
     srcs = ["load_test.go"],
-    tags = ["manual"],  # keep
+    tags = ["manual"],
     deps = [
         "//graft/subnet-evm/tests",
         "//graft/subnet-evm/tests/utils",

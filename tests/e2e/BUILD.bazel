@@ -11,7 +11,7 @@ go_library(
 go_test(
     name = "e2e_test",
     srcs = ["e2e_test.go"],
-    tags = ["manual"],  # keep
+    tags = ["manual"],
     deps = [
         "//config",
         "//graft/coreth/plugin/evm",

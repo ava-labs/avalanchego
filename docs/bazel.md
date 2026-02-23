@@ -427,7 +427,7 @@ automatically rewrite it to `graft_go_test`:
 go_test(
     name = "my_e2e_test",
     srcs = ["my_e2e_test.go"],
-    tags = ["manual"],  # keep -- not a unit test
+    tags = ["manual"],  # not a unit test
     deps = [...],
 )
 ```

@@ -3,7 +3,7 @@ load("//.bazel:defs.bzl", "go_test")
 go_test(
     name = "e2e_test",
     srcs = ["e2e_test.go"],
-    tags = ["manual"],  # keep
+    tags = ["manual"],
     deps = [
         "//config",
         "//ids",
