@@ -36,10 +36,10 @@ cc_library(
 
 go_library(
     name = "go",
-    srcs = [
-        "blst.go",
-        "rb_tree.go",
-    ],
+    srcs = glob(
+        ["*.go"],
+        exclude = ["*_test.go"],
+    ),
     cdeps = [
         ":cgo",
         "//bindings",
@@ -54,12 +54,7 @@ go_library(
 
 go_test(
     name = "go_test",
-    srcs = [
-        "blst_htoc_test.go",
-        "blst_miller_loop_test.go",
-        "blst_minpk_test.go",
-        "blst_minsig_test.go",
-    ],
+    srcs = glob(["*_test.go"]),
     data = ["//bindings/vectors"],
     embed = [":go"],
 )

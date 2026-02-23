@@ -2,7 +2,7 @@ diff --git a/BUILD.bazel b/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/BUILD.bazel
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,58 @@
 +load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 +
 +# Pre-built static library for firewood FFI
@@ -28,19 +28,13 @@ new file mode 100644
 +
 +go_library(
 +    name = "ffi",
-+    srcs = [
-+        "batch_op.go",
-+        "firewood.go",
-+        "firewood.h",
-+        "iterator.go",
-+        "keepalive.go",
-+        "maybe.go",
-+        "memory.go",
-+        "metrics.go",
-+        "proofs.go",
-+        "proposal.go",
-+        "revision.go",
-+    ],
++    srcs = glob(
++        [
++            "*.go",
++            "*.h",
++        ],
++        exclude = ["*_test.go"],
++    ),
 +    cdeps = [":firewood_ffi"],
 +    cgo = True,
 +    importpath = "github.com/ava-labs/firewood-go-ethhash/ffi",
@@ -60,11 +54,7 @@ new file mode 100644
 +
 +go_test(
 +    name = "ffi_test",
-+    srcs = [
-+        "firewood_test.go",
-+        "metrics_test.go",
-+        "proofs_test.go",
-+    ],
++    srcs = glob(["*_test.go"]),
 +    embed = [":ffi"],
 +    deps = [
 +        "@com_github_prometheus_client_model//go",
