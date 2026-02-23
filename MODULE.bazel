@@ -18,50 +18,37 @@ go_sdk.download(version = "1.25.7")
 go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_work = "//:go.work")
 
-# Patches for external dependencies that need custom BUILD files
-# blst: Disable gazelle and provide custom BUILD files for CGO
-go_deps.module_override(
-    patch_strip = 1,
-    patches = ["//.bazel/patches:com_github_supranational_blst.patch"],
-    path = "github.com/supranational/blst",
-)
-go_deps.gazelle_override(
-    build_file_generation = "off",
-    path = "github.com/supranational/blst",
-)
+# Patches for external dependencies that need custom BUILD files or fixes.
+# See docs/bazel.md "Patched Dependencies" for details on each override.
+GO_OVERRIDES = {
+    "github.com/supranational/blst": {
+        "build_gen": "off",
+        "patches": ["//.bazel/patches:com_github_supranational_blst.patch"],
+    },
+    "github.com/ava-labs/firewood-go-ethhash/ffi": {
+        "build_gen": "off",
+        "patches": ["//.bazel/patches:com_github_ava_labs_firewood_go_ethhash_ffi.patch"],
+    },
+    "github.com/consensys/gnark-crypto": {
+        "patches": ["//.bazel/patches:com_github_consensys_gnark_crypto_asm_includes.patch"],
+    },
+    "github.com/ava-labs/libevm": {
+        "patches": ["//.bazel/patches:com_github_ava_labs_libevm.patch"],
+        "gazelle_directives": ["gazelle:exclude crypto/secp256k1/**"],
+    },
+}
 
-# firewood: Disable gazelle and provide custom BUILD file for CGO FFI
-go_deps.module_override(
+[go_deps.module_override(
     patch_strip = 1,
-    patches = ["//.bazel/patches:com_github_ava_labs_firewood_go_ethhash_ffi.patch"],
-    path = "github.com/ava-labs/firewood-go-ethhash/ffi",
-)
-go_deps.gazelle_override(
-    build_file_generation = "off",
-    path = "github.com/ava-labs/firewood-go-ethhash/ffi",
-)
+    patches = o.get("patches", []),
+    path = path,
+) for path, o in GO_OVERRIDES.items()]
 
-# gnark-crypto: Patch assembly include paths to work in Bazel sandboxes
-go_deps.module_override(
-    patch_strip = 1,
-    patches = ["//.bazel/patches:com_github_consensys_gnark_crypto_asm_includes.patch"],
-    path = "github.com/consensys/gnark-crypto",
-)
-
-# libevm: patch secp256k1 CGO package and tell gazelle to skip it
-go_deps.module_override(
-    patch_strip = 1,
-    patches = [
-        "//.bazel/patches:com_github_ava_labs_libevm.patch",
-    ],
-    path = "github.com/ava-labs/libevm",
-)
-go_deps.gazelle_override(
-    directives = [
-        "gazelle:exclude crypto/secp256k1/**",
-    ],
-    path = "github.com/ava-labs/libevm",
-)
+[go_deps.gazelle_override(
+    build_file_generation = o.get("build_gen", "on"),
+    directives = o.get("gazelle_directives", []),
+    path = path,
+) for path, o in GO_OVERRIDES.items()]
 
 # NOTE: Workspace modules (avalanchego, graft/*) are included in use_repo
 # because `bazel mod tidy` requires them, even though they're built locally.
