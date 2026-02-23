@@ -46,6 +46,7 @@ tmp/
 
 bin/
 build/
+!.bazel/patches/build_files/**/build/
 
 keys/staker.*
 
