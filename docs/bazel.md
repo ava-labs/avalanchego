@@ -169,8 +169,20 @@ Run `task bazel-gazelle-generate` after:
 
 ### How Gazelle Handles Multiple Modules
 
+Dependency resolution and BUILD file generation handle multiple Go
+modules differently:
+
+- **Dependency resolution** (`go_deps.from_file(go_work = "//:go.work")`)
+  reads the workspace to build a single unified set of external
+  dependencies. One declaration covers all modules.
+
+- **BUILD file generation** (gazelle) must run separately per Go module
+  because each module has a different import path prefix. A single
+  gazelle run from the repo root would assign the root prefix to
+  graft module targets, producing wrong `importpath` values.
+
 Each Go module root needs a `BUILD.bazel` with a `gazelle:prefix`
-directive:
+directive and its own `gazelle()` target:
 
 ```python
 # graft/coreth/BUILD.bazel
