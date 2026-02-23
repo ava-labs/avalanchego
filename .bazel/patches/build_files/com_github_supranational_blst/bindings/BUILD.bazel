@@ -3,10 +3,7 @@
 
 cc_library(
     name = "bindings",
-    hdrs = glob(
-        ["*.h"],
-        allow_empty = True,
-    ),
+    hdrs = glob(["*.h"]),
     includes = ["."],
     visibility = ["//:__subpackages__"],
 )
