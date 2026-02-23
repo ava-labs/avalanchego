@@ -123,7 +123,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 	res.uptimes = uptime.NewManager(res.state, res.clk)
 	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
-
 	res.backend = &executor.Backend{
 		Config:       res.config,
 		Ctx:          res.ctx,

@@ -228,7 +228,6 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.SetHeight(blk.Height())
 	s.AddStatelessBlock(blk)
 
-
 	batch, err := s.CommitBatch()
 	require.NoError(err)
 
@@ -338,9 +337,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 		sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1),
 	)
-
-	// batch, err = s.CommitBatch()
-	// require.Error(err)
 
 	require.NoError(acceptor.ApricotCommitBlock(blk))
 	require.True(calledOnAcceptFunc)
