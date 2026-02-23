@@ -394,6 +394,197 @@ wscat -c ws://127.0.0.1:9650/ext/bc/C/ws -x '{"jsonrpc":"2.0", "id":1, "method":
 }
 ```
 
+## Warp APIs
+
+The Warp API enables interaction with Avalanche Warp Messaging (AWM), allowing cross-chain
+communication between Avalanche blockchains. It provides methods for retrieving warp messages
+and their BLS signatures, as well as aggregating signatures from validators.
+
+The Warp API is enabled when the `warp-api-enabled` flag is set to `true` in the node configuration.
+
+### Warp API Endpoint
+
+```sh
+/ext/bc/C/rpc
+```
+
+### Warp API Methods
+
+#### `warp_getMessage`
+
+Returns the raw bytes of a warp message by its ID.
+
+**Signature:**
+
+```sh
+warp_getMessage({messageID: string}) -> data
+```
+
+- `messageID` is the ID of the warp message.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"warp_getMessage",
+    "params" :["2PsAgvhGczsTNxCMgVJG39gKV4W9ETXWL1mMJk3xoSRHMBcyY"]
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x..."
+}
+```
+
+#### `warp_getMessageSignature`
+
+Returns BLS signature for the specified warp message.
+
+**Signature:**
+
+```sh
+warp_getMessageSignature({messageID: string}) -> data
+```
+
+- `messageID` is the ID of the warp message.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"warp_getMessageSignature",
+    "params" :["2PsAgvhGczsTNxCMgVJG39gKV4W9ETXWL1mMJk3xoSRHMBcyY"]
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x..."
+}
+```
+
+#### `warp_getBlockSignature`
+
+Returns the BLS signature associated with a blockID.
+
+**Signature:**
+
+```sh
+warp_getBlockSignature({blockID: string}) -> data
+```
+
+- `blockID` is the ID of the block in warp message.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"warp_getBlockSignature",
+    "params" :["2PsAgvhGczsTNxCMgVJG39gKV4W9ETXWL1mMJk3xoSRHMBcyY"]
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x..."
+}
+```
+
+#### `warp_getMessageAggregateSignature`
+
+Fetches BLS signatures from validators for the specified warp message and aggregates them into a
+single signed warp message. The caller specifies the quorum numerator (the denominator is 100).
+
+**Signature:**
+
+```sh
+warp_getMessageAggregateSignature({messageID: string, quorumNum: number, subnetID: string (optional)}) -> data
+```
+
+- `messageID` is the ID of the warp message.
+- `quorumNum` is the quorum numerator (e.g., `67` for 67% quorum). The denominator is 100.
+- `subnetID` (optional) is the subnet to aggregate signatures from. Defaults to the current subnet.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"warp_getMessageAggregateSignature",
+    "params" :["2PsAgvhGczsTNxCMgVJG39gKV4W9ETXWL1mMJk3xoSRHMBcyY", 67, ""]
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x..."
+}
+```
+
+The returned bytes are the serialized signed warp message.
+
+#### `warp_getBlockAggregateSignature`
+
+Fetches BLS signatures from validators for the specified block and aggregates them into a single
+signed warp message. The caller specifies the quorum numerator (the denominator is 100).
+
+**Signature:**
+
+```sh
+warp_getBlockAggregateSignature({blockID: string, quorumNum: number, subnetID: string (optional)}) -> data
+```
+
+- `blockID` is the ID of the block.
+- `quorumNum` is the quorum numerator (e.g., `67` for 67% quorum). The denominator is 100.
+- `subnetID` (optional) is the subnet to aggregate signatures from. Defaults to the current subnet.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"warp_getBlockAggregateSignature",
+    "params" :["2PsAgvhGczsTNxCMgVJG39gKV4W9ETXWL1mMJk3xoSRHMBcyY", 67, ""]
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x..."
+}
+```
+
+The returned bytes are the serialized signed warp message.
+
 ## Admin APIs
 
 The Admin API provides administrative functionality for the EVM.
