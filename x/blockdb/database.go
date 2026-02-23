@@ -538,28 +538,29 @@ func (s *Database) Sync(start, end uint64) error {
 	}
 
 	var synced set.Set[int]
-	for h := start; h <= end; h++ {
+	for h := start; ; h++ {
 		entry, err := s.readBlockIndex(h)
 		if err != nil {
-			if errors.Is(err, database.ErrNotFound) {
-				continue
+			if !errors.Is(err, database.ErrNotFound) {
+				return fmt.Errorf("failed to read block index for height %d: %w", h, err)
 			}
-			return fmt.Errorf("failed to read block index for height %d: %w", h, err)
+		} else {
+			f, _, idx, err := s.getDataFileAndOffset(entry.Offset)
+			if err != nil {
+				return fmt.Errorf("failed to get data file for height %d: %w", h, err)
+			}
+
+			if !synced.Contains(idx) {
+				if err := f.Sync(); err != nil {
+					return fmt.Errorf("failed to sync data file %d: %w", idx, err)
+				}
+				synced.Add(idx)
+			}
 		}
 
-		f, _, idx, err := s.getDataFileAndOffset(entry.Offset)
-		if err != nil {
-			return fmt.Errorf("failed to get data file for height %d: %w", h, err)
+		if h == end {
+			break
 		}
-
-		if synced.Contains(idx) {
-			continue
-		}
-
-		if err := f.Sync(); err != nil {
-			return fmt.Errorf("failed to sync data file %d: %w", idx, err)
-		}
-		synced.Add(idx)
 	}
 
 	return nil
