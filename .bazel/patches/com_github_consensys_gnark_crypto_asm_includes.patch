@@ -1,18 +1,28 @@
 diff --git a/ecc/bls12-381/fp/BUILD.bazel b/ecc/bls12-381/fp/BUILD.bazel
 --- a/ecc/bls12-381/fp/BUILD.bazel
 +++ b/ecc/bls12-381/fp/BUILD.bazel
-@@ -3,4 +3,5 @@
+@@ -3,4 +3,10 @@
  go_library(
      name = "fp",
++    # no-sandbox: Bazel execution tag that disables filesystem sandboxing,
++    # allowing the Go assembler to resolve relative cross-package #include
++    # directives in .s files.
++    # Workaround for https://github.com/bazel-contrib/rules_go/issues/3636
++    # See docs/bazel.md "gnark-crypto (BLS12-381 for KZG)".
 +    tags = ["no-sandbox"],
      srcs = [
          "arith.go",
 diff --git a/ecc/bls12-381/fr/BUILD.bazel b/ecc/bls12-381/fr/BUILD.bazel
 --- a/ecc/bls12-381/fr/BUILD.bazel
 +++ b/ecc/bls12-381/fr/BUILD.bazel
-@@ -3,4 +3,5 @@
+@@ -3,4 +3,10 @@
  go_library(
      name = "fr",
++    # no-sandbox: Bazel execution tag that disables filesystem sandboxing,
++    # allowing the Go assembler to resolve relative cross-package #include
++    # directives in .s files.
++    # Workaround for https://github.com/bazel-contrib/rules_go/issues/3636
++    # See docs/bazel.md "gnark-crypto (BLS12-381 for KZG)".
 +    tags = ["no-sandbox"],
      srcs = [
          "arith.go",
