@@ -1,0 +1,12 @@
+# gazelle:ignore
+# Header library for blst C bindings
+
+cc_library(
+    name = "bindings",
+    hdrs = glob(
+        ["*.h"],
+        allow_empty = True,
+    ),
+    includes = ["."],
+    visibility = ["//:__subpackages__"],
+)

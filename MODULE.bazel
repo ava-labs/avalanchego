@@ -50,9 +50,9 @@ go_deps.module_override(
 
 # libevm: patch secp256k1 CGO package and tell gazelle to skip it
 go_deps.module_override(
+    patch_strip = 1,
     patches = [
-        "//.bazel/patches:com_github_ava_labs_libevm_libsecp256k1.patch",
-        "//.bazel/patches:com_github_ava_labs_libevm_secp256k1.patch",
+        "//.bazel/patches:com_github_ava_labs_libevm.patch",
     ],
     path = "github.com/ava-labs/libevm",
 )

@@ -1,5 +1,7 @@
+diff --git a/crypto/secp256k1/BUILD.bazel b/crypto/secp256k1/BUILD.bazel
+new file mode 100644
 --- /dev/null
-+++ crypto/secp256k1/BUILD.bazel
++++ b/crypto/secp256k1/BUILD.bazel
 @@ -0,0 +1,28 @@
 +# gazelle:ignore
 +load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
@@ -28,4 +30,18 @@
 +    name = "secp256k1_test",
 +    srcs = ["secp256_test.go"],
 +    embed = [":secp256k1"],
++)
+diff --git a/crypto/secp256k1/libsecp256k1/BUILD.bazel b/crypto/secp256k1/libsecp256k1/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/crypto/secp256k1/libsecp256k1/BUILD.bazel
+@@ -0,0 +1,9 @@
++# gazelle:ignore
++cc_library(
++    name = "libsecp256k1",
++    hdrs = glob([
++        "**/*.c",
++        "**/*.h",
++    ]),
++    visibility = ["//crypto/secp256k1:__pkg__"],
 +)
