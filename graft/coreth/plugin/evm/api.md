@@ -80,7 +80,7 @@ Starting with release [`v0.12.2`](https://github.com/ava-labs/avalanchego/releas
 ### Avalanche - Ethereum APIs
 
 In addition to the standard Ethereum APIs, Avalanche offers `eth_baseFee`,
-`eth_maxPriorityFeePerGas`, `eth_getChainConfig`, `eth_callDetailed`,
+`eth_getChainConfig`, `eth_callDetailed`,
 `eth_getBadBlocks`, `eth_suggestPriceOptions`,
 and the `eth_newAcceptedTransactions` subscription.
 
@@ -122,42 +122,6 @@ curl -X POST --data '{
   "result": "0x34630b8a00"
 }
 ```
-
-#### `eth_maxPriorityFeePerGas`
-
-Get the priority fee needed to be included in a block.
-
-**Signature:**
-
-```sh
-eth_maxPriorityFeePerGas() -> {}
-```
-
-`result` is hex value of the estimated priority fee needed to be included in a block.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"eth_maxPriorityFeePerGas",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": "0x2540be400"
-}
-```
-
-For more information on dynamic fees see the [C-Chain section of the transaction fee
-documentation](https://build.avax.network/docs/rpcs/other/guides/txn-fees#c-chain-fees).
 
 #### `eth_getChainConfig`
 
