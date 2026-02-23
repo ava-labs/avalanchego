@@ -4,9 +4,9 @@
 package bindings
 
 // Step 1: Compile interface to generate ABI at top level
-//go:generate sh -c "solc-v0.8.30 -o ../.. --overwrite --abi --base-path ../../../../.. --pretty-json --evm-version cancun ../../IFeeManager.sol"
+//go:generate sh -c "solc -o ../.. --overwrite --abi --base-path ../../../../.. --pretty-json --evm-version cancun ../../IFeeManager.sol"
 // Step 2: Compile test contracts to generate ABI and bin files
-//go:generate solc-v0.8.30 -o artifacts --overwrite --abi --bin --base-path ../../../../.. --metadata-hash none  --evm-version cancun FeeManagerTest.sol
+//go:generate solc -o artifacts --overwrite --abi --bin --base-path ../../../../.. --metadata-hash none  --evm-version cancun FeeManagerTest.sol
 // Step 3: Generate Go bindings from the compiled artifacts
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type IFeeManager --abi ../../IFeeManager.abi --bin artifacts/IFeeManager.bin --out gen_ifeemanager_binding.go
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type FeeManagerTest --abi artifacts/FeeManagerTest.abi --bin artifacts/FeeManagerTest.bin --out gen_feemanagertest_binding.go
