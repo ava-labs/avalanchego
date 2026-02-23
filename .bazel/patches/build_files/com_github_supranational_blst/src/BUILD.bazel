@@ -3,14 +3,8 @@
 
 cc_library(
     name = "src",
-    hdrs = glob(
-        ["*.h"],
-        allow_empty = True,
-    ),
+    hdrs = glob(["*.h"]),
     includes = ["."],
-    textual_hdrs = glob(
-        ["*.c"],
-        allow_empty = True,
-    ),
+    textual_hdrs = glob(["*.c"]),
     visibility = ["//:__subpackages__"],
 )

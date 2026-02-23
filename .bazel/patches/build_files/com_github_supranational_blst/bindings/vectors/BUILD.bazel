@@ -3,9 +3,6 @@
 
 filegroup(
     name = "vectors",
-    srcs = glob(
-        ["hash_to_curve/*.json"],
-        allow_empty = True,
-    ),
+    srcs = glob(["hash_to_curve/*.json"]),
     visibility = ["//:__subpackages__"],
 )

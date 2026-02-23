@@ -2,16 +2,13 @@ diff --git a/bindings/BUILD.bazel b/bindings/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/bindings/BUILD.bazel
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,9 @@
 +# gazelle:ignore
 +# Header library for blst C bindings
 +
 +cc_library(
 +    name = "bindings",
-+    hdrs = glob(
-+        ["*.h"],
-+        allow_empty = True,
-+    ),
++    hdrs = glob(["*.h"]),
 +    includes = ["."],
 +    visibility = ["//:__subpackages__"],
 +)
@@ -84,58 +81,52 @@ diff --git a/bindings/vectors/BUILD.bazel b/bindings/vectors/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/bindings/vectors/BUILD.bazel
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,8 @@
 +# gazelle:ignore
 +# Test vectors for blst
 +
 +filegroup(
 +    name = "vectors",
-+    srcs = glob(
-+        ["hash_to_curve/*.json"],
-+        allow_empty = True,
-+    ),
++    srcs = glob(["hash_to_curve/*.json"]),
 +    visibility = ["//:__subpackages__"],
 +)
 diff --git a/build/BUILD.bazel b/build/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/build/BUILD.bazel
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,20 @@
 +# gazelle:ignore
 +# Assembly and build file library for blst
++#
++# assembly.S is #include'd by cgo_assembly.S and in turn
++# #include's platform-specific assembly from elf/, coff/, mach-o/.
 +
 +cc_library(
 +    name = "build_cc",
-+    hdrs = glob(
-+        [
-+            "**/*.c",
-+            "**/*.h",
-+            "**/*.S",
-+            "**/*.s",
-+        ],
-+        allow_empty = True,
-+    ),
++    hdrs = ["assembly.S"],
 +    includes = ["."],
++    textual_hdrs = glob([
++        "elf/*.s",
++        "elf/*.S",
++        "coff/*.s",
++        "coff/*.S",
++        "mach-o/*.s",
++        "mach-o/*.S",
++    ]),
 +    visibility = ["//:__subpackages__"],
 +)
 diff --git a/src/BUILD.bazel b/src/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/src/BUILD.bazel
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,10 @@
 +# gazelle:ignore
 +# Source library for blst - headers and C files for unity build
 +
 +cc_library(
 +    name = "src",
-+    hdrs = glob(
-+        ["*.h"],
-+        allow_empty = True,
-+    ),
++    hdrs = glob(["*.h"]),
 +    includes = ["."],
-+    textual_hdrs = glob(
-+        ["*.c"],
-+        allow_empty = True,
-+    ),
++    textual_hdrs = glob(["*.c"]),
 +    visibility = ["//:__subpackages__"],
 +)
