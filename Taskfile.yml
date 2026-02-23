@@ -49,9 +49,8 @@ tasks:
       done
 
   bazel-gazelle-generate:
-    desc: Ensure BUILD files are up-to-date by deleting and generating with Gazelle (all modules)
+    desc: Regenerate BUILD files with Gazelle (all modules)
     cmds:
-      - task: bazel-gazelle-delete
       - ./scripts/run_bazel.sh run //:gazelle
       - ./scripts/run_bazel.sh run //graft/coreth:gazelle
       - ./scripts/run_bazel.sh run //graft/evm:gazelle
@@ -166,10 +165,8 @@ tasks:
       - task: check-clean-branch
 
   check-bazel-gazelle-generate:
-    desc: Check that generated BUILD files are up-to-date (requires clean git tree)
-    cmds:
-      - task: bazel-gazelle-generate
-      - task: check-clean-branch
+    desc: Check that generated BUILD files are up-to-date
+    cmd: ./scripts/run_bazel.sh test //:gazelle_test //graft/coreth:gazelle_test //graft/evm:gazelle_test //graft/subnet-evm:gazelle_test
 
   check-clean-branch:
     desc: Checks that the git working tree is clean

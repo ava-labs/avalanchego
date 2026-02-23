@@ -22,8 +22,9 @@ build:norace --@io_bazel_rules_go//go/config:race=false
 test:norace --@io_bazel_rules_go//go/config:race=false
 
 # Shuffle ON by default (matches build_test.sh -shuffle=on)
+# Injected via go_test wrapper in .bazel/defs.bzl (not --test_arg, which
+# would break non-Go test rules like gazelle_test).
 # Disable with: bazel test --config=noshuffle //...
-test --test_arg=-test.shuffle=on
 
 # Coverage: use `bazel coverage //...` instead of `bazel test //...`
 # This matches build_test.sh's -coverprofile/-covermode flags
@@ -40,6 +41,7 @@ build --action_env=CGO_ENABLED=1
 build --disk_cache=~/.cache/bazel-disk-cache
 
 # Config: disable shuffle (for deterministic test ordering)
+# Overrides the shuffle=on injected by the go_test wrapper (last flag wins)
 test:noshuffle --test_arg=-test.shuffle=off
 
 # Config: fast local development (no shuffle, no race)
