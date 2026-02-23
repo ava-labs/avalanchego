@@ -4,7 +4,7 @@ graft_go_test(
     name = "warp_test",
     srcs = ["warp_test.go"],
     embedsrcs = ["genesis.json"],
-    tags = ["manual"],  # keep
+    tags = ["manual"],
     deps = [
         "//api/info",
         "//graft/subnet-evm/accounts/abi/bind",
