@@ -80,7 +80,9 @@ Starting with release [`v0.12.2`](https://github.com/ava-labs/avalanchego/releas
 ### Avalanche - Ethereum APIs
 
 In addition to the standard Ethereum APIs, Avalanche offers `eth_baseFee`,
-`eth_maxPriorityFeePerGas`, and `eth_getChainConfig`.
+`eth_maxPriorityFeePerGas`, `eth_getChainConfig`, `eth_callDetailed`,
+`eth_getBadBlocks`, `eth_suggestPriceOptions`,
+and the `eth_newAcceptedTransactions` subscription.
 
 They use the same endpoint as standard Ethereum APIs:
 
@@ -156,6 +158,241 @@ curl -X POST --data '{
 
 For more information on dynamic fees see the [C-Chain section of the transaction fee
 documentation](https://build.avax.network/docs/rpcs/other/guides/txn-fees#c-chain-fees).
+
+#### `eth_getChainConfig`
+
+Returns the chain configuration.
+
+**Signature:**
+
+```sh
+eth_getChainConfig() -> {}
+```
+
+`result` is the chain configuration object.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"eth_getChainConfig",
+    "params" :[]
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+        "apricotPhase1BlockTimestamp": 1607144400,
+        "apricotPhase2BlockTimestamp": 1607144400,
+        "apricotPhase3BlockTimestamp": 1607144400,
+        "apricotPhase4BlockTimestamp": 1607144400,
+        "apricotPhase5BlockTimestamp": 1607144400,
+        "apricotPhase6BlockTimestamp": 1607144400,
+        "apricotPhasePost6BlockTimestamp": 1607144400,
+        "apricotPhasePre6BlockTimestamp": 1607144400,
+        "banffBlockTimestamp": 1607144400,
+        "berlinBlock": 0,
+        "byzantiumBlock": 0,
+        "cancunTime": 1607144400,
+        "chainId": 43112,
+        "constantinopleBlock": 0,
+        "cortinaBlockTimestamp": 1607144400,
+        "daoForkBlock": 0,
+        "daoForkSupport": true,
+        "durangoBlockTimestamp": 1607144400,
+        "eip150Block": 0,
+        "eip155Block": 0,
+        "eip158Block": 0,
+        "etnaTimestamp": 1607144400,
+        "fortunaTimestamp": 1607144400,
+        "graniteTimestamp": 253399622400,
+        "homesteadBlock": 0,
+        "istanbulBlock": 0,
+        "londonBlock": 0,
+        "muirGlacierBlock": 0,
+        "petersburgBlock": 0,
+        "shanghaiTime": 1607144400
+    }
+}
+```
+
+#### `eth_callDetailed`
+
+Performs the same operation as `eth_call`, but returns additional execution details including gas
+used, any EVM error code, and return data.
+
+**Signature:**
+
+```sh
+eth_callDetailed({
+    from: address (optional),
+    to: address,
+    gas: quantity (optional),
+    gasPrice: quantity (optional),
+    maxFeePerGas: quantity (optional),
+    maxPriorityFeePerGas: quantity (optional),
+    value: quantity (optional),
+    data: data (optional)
+}, blockNumberOrHash, stateOverrides (optional)) -> {
+    gas: quantity,
+    errCode: number,
+    err: string,
+    returnData: data
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"eth_callDetailed",
+    "params" :[{
+        "to": "0x...",
+        "data": "0x..."
+    }, "latest"]
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "gas": 21000,
+    "errCode": 0,
+    "err": "",
+    "returnData": "0x"
+  }
+}
+```
+
+#### `eth_getBadBlocks`
+
+Returns a list of the last bad blocks that the client has seen on the network.
+
+**Signature:**
+
+```sh
+eth_getBadBlocks() -> []{
+    hash: hash,
+    block: object,
+    rlp: string,
+    reason: object
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"eth_getBadBlocks",
+    "params" :[]
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+```
+
+#### `eth_suggestPriceOptions`
+
+Returns suggested gas price options (slow, normal, fast) for the current network conditions. Each
+option includes a `maxPriorityFeePerGas` and a `maxFeePerGas` value.
+
+**Signature:**
+
+```sh
+eth_suggestPriceOptions() -> {
+    slow: {
+        maxPriorityFeePerGas: quantity,
+        maxFeePerGas: quantity
+    },
+    normal: {
+        maxPriorityFeePerGas: quantity,
+        maxFeePerGas: quantity
+    },
+    fast: {
+        maxPriorityFeePerGas: quantity,
+        maxFeePerGas: quantity
+    }
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"eth_suggestPriceOptions",
+    "params" :[]
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "slow": {
+      "maxPriorityFeePerGas": "0x5d21dba00",
+      "maxFeePerGas": "0x6fc23ac00"
+    },
+    "normal": {
+      "maxPriorityFeePerGas": "0x2540be400",
+      "maxFeePerGas": "0x4a817c800"
+    },
+    "fast": {
+      "maxPriorityFeePerGas": "0x12a05f200",
+      "maxFeePerGas": "0x37e11d600"
+    }
+  }
+}
+```
+
+#### `eth_newAcceptedTransactions` (Subscription)
+
+Creates a subscription that fires each time a transaction is accepted (finalized) on the chain.
+This is an Avalanche-specific subscription not available in standard Ethereum. If `fullTx` is
+`true`, the full transaction object is sent; otherwise only the transaction hash is sent.
+
+Available only via WebSocket.
+
+**Signature:**
+
+```sh
+{"jsonrpc":"2.0", "id":1, "method":"eth_subscribe", "params":["newAcceptedTransactions", {"fullTx": false}]}
+```
+
+**Example Call:**
+
+```sh
+wscat -c ws://127.0.0.1:9650/ext/bc/C/ws -x '{"jsonrpc":"2.0", "id":1, "method":"eth_subscribe", "params":["newAcceptedTransactions"]}'
+```
+
+**Example Notification:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "eth_subscription",
+  "params": {
+    "subscription": "0x...",
+    "result": "0xtransactionhash..."
+  }
+}
+```
 
 ## Admin APIs
 
