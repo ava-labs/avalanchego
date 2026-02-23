@@ -18,7 +18,7 @@ const (
 
 	// cchainBlockCount is the number of C-chain blocks to generate when
 	// seeding the bootstrap database for BlockDB migration testing.
-	cchainBlockCount = 500
+	cchainBlockCount = 1000
 )
 
 // Creates docker-compose.yml and its associated volumes in the target path.
