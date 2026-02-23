@@ -19,7 +19,7 @@ diff --git a/bindings/go/BUILD.bazel b/bindings/go/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/bindings/go/BUILD.bazel
-@@ -0,0 +1,65 @@
+@@ -0,0 +1,60 @@
 +# gazelle:ignore
 +# Go bindings for blst library
 +#
@@ -58,10 +58,10 @@ new file mode 100644
 +
 +go_library(
 +    name = "go",
-+    srcs = [
-+        "blst.go",
-+        "rb_tree.go",
-+    ],
++    srcs = glob(
++        ["*.go"],
++        exclude = ["*_test.go"],
++    ),
 +    cdeps = [
 +        ":cgo",
 +        "//bindings",
@@ -76,12 +76,7 @@ new file mode 100644
 +
 +go_test(
 +    name = "go_test",
-+    srcs = [
-+        "blst_htoc_test.go",
-+        "blst_miller_loop_test.go",
-+        "blst_minpk_test.go",
-+        "blst_minsig_test.go",
-+    ],
++    srcs = glob(["*_test.go"]),
 +    data = ["//bindings/vectors"],
 +    embed = [":go"],
 +)

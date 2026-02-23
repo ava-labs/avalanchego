@@ -3,14 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "secp256k1",
-    srcs = [
-        "curve.go",
-        "ext.h",
-        "panic_cb.go",
-        "scalar_mult_cgo.go",
-        "scalar_mult_nocgo.go",
-        "secp256.go",
-    ],
+    srcs = glob(
+        [
+            "*.go",
+            "*.h",
+        ],
+        exclude = ["*_test.go"],
+    ),
     cdeps = ["//crypto/secp256k1/libsecp256k1"],
     cgo = True,
     copts = [
@@ -23,6 +22,6 @@ go_library(
 
 go_test(
     name = "secp256k1_test",
-    srcs = ["secp256_test.go"],
+    srcs = glob(["*_test.go"]),
     embed = [":secp256k1"],
 )

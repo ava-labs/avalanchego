@@ -23,19 +23,13 @@ cc_library(
 
 go_library(
     name = "ffi",
-    srcs = [
-        "batch_op.go",
-        "firewood.go",
-        "firewood.h",
-        "iterator.go",
-        "keepalive.go",
-        "maybe.go",
-        "memory.go",
-        "metrics.go",
-        "proofs.go",
-        "proposal.go",
-        "revision.go",
-    ],
+    srcs = glob(
+        [
+            "*.go",
+            "*.h",
+        ],
+        exclude = ["*_test.go"],
+    ),
     cdeps = [":firewood_ffi"],
     cgo = True,
     importpath = "github.com/ava-labs/firewood-go-ethhash/ffi",
@@ -55,11 +49,7 @@ alias(
 
 go_test(
     name = "ffi_test",
-    srcs = [
-        "firewood_test.go",
-        "metrics_test.go",
-        "proofs_test.go",
-    ],
+    srcs = glob(["*_test.go"]),
     embed = [":ffi"],
     deps = [
         "@com_github_prometheus_client_model//go",
