@@ -22,7 +22,7 @@ go work edit -go="$version" go.work
 echo "updated go.work"
 
 # Update MODULE.bazel go_sdk.download version
-sed -i "s/^go_sdk\.download(version = \".*\")$/go_sdk.download(version = \"$version\")/" MODULE.bazel
+sed -i.bak "s/^go_sdk\.download(version = \".*\")$/go_sdk.download(version = \"$version\")/" MODULE.bazel && rm MODULE.bazel.bak
 echo "updated MODULE.bazel"
 
 while IFS= read -r -d '' mod_file; do
