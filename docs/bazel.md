@@ -435,14 +435,16 @@ grep -v tests/e2e | grep -v tests/upgrade | grep -v tests/fixture/bootstrapmonit
 | Subnet-EVM load tests | `graft/subnet-evm/tests/load/BUILD.bazel` |
 | Coreth warp tests | `graft/coreth/tests/warp/BUILD.bazel` |
 
-**When adding new non-unit tests**, add the manual tag. Use `go_test`
-in your BUILD.bazel -- in graft modules, `gazelle:map_kind` will
-automatically rewrite it to `graft_go_test`:
+**When adding new non-unit tests**, add the manual tag with a `# keep`
+comment. The `# keep` is required because gazelle does not manage the
+`manual` tag and will strip it when regenerating BUILD files from
+scratch. Use `go_test` in your BUILD.bazel -- in graft modules,
+`gazelle:map_kind` will automatically rewrite it to `graft_go_test`:
 ```python
 go_test(
     name = "my_e2e_test",
     srcs = ["my_e2e_test.go"],
-    tags = ["manual"],  # not a unit test
+    tags = ["manual"],  # keep -- not a unit test
     deps = [...],
 )
 ```
