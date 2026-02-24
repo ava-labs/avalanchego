@@ -173,51 +173,7 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 	shouldBench := !n.isBenched && p > b.benchProbability
 	shouldUnbench := n.isBenched && p < b.unbenchProbability
 	if shouldBench {
-		nodeStake := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID)
-		if nodeStake == 0 {
-			// Only bench validators.
-			return
-		}
-
-		benchedNodeIDs := set.NewSet[ids.NodeID](len(b.nodes))
-		for benchedNodeID, benchedNode := range b.nodes {
-			if benchedNode.isBenched {
-				benchedNodeIDs.Add(benchedNodeID)
-			}
-		}
-		benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benchedNodeIDs)
-		if err != nil {
-			b.ctx.Log.Error("error calculating benched stake",
-				zap.Stringer("subnetID", b.ctx.SubnetID),
-				zap.Error(err),
-			)
-			return
-		}
-
-		totalStake, err := b.vdrs.TotalWeight(b.ctx.SubnetID)
-		if err != nil {
-			b.ctx.Log.Error("error calculating total stake",
-				zap.Stringer("subnetID", b.ctx.SubnetID),
-				zap.Error(err),
-			)
-			return
-		}
-
-		newBenchedStake, err := math.Add(benchedStake, nodeStake)
-		if err != nil {
-			b.ctx.Log.Error("overflow calculating new benched stake",
-				zap.Stringer("nodeID", nodeID),
-			)
-			return
-		}
-		maxBenchedStake := float64(totalStake) * b.maxPortion
-		if float64(newBenchedStake) > maxBenchedStake {
-			b.ctx.Log.Debug("not benching node",
-				zap.String("reason", "benched stake would exceed max"),
-				zap.Stringer("nodeID", nodeID),
-				zap.Float64("benchedStake", float64(newBenchedStake)),
-				zap.Float64("maxBenchedStake", maxBenchedStake),
-			)
+		if !b.canBench(nodeID) {
 			return
 		}
 	}
@@ -232,6 +188,58 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 		default:
 		}
 	}
+}
+
+// canBench returns true if nodeID can be benched.
+func (b *benchlist) canBench(nodeID ids.NodeID) bool {
+	nodeStake := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID)
+	if nodeStake == 0 {
+		// Only bench validators.
+		return false
+	}
+
+	benchedNodeIDs := set.NewSet[ids.NodeID](len(b.nodes))
+	for benchedNodeID, benchedNode := range b.nodes {
+		if benchedNode.isBenched {
+			benchedNodeIDs.Add(benchedNodeID)
+		}
+	}
+	benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benchedNodeIDs)
+	if err != nil {
+		b.ctx.Log.Error("error calculating benched stake",
+			zap.Stringer("subnetID", b.ctx.SubnetID),
+			zap.Error(err),
+		)
+		return false
+	}
+
+	totalStake, err := b.vdrs.TotalWeight(b.ctx.SubnetID)
+	if err != nil {
+		b.ctx.Log.Error("error calculating total stake",
+			zap.Stringer("subnetID", b.ctx.SubnetID),
+			zap.Error(err),
+		)
+		return false
+	}
+
+	newBenchedStake, err := math.Add(benchedStake, nodeStake)
+	if err != nil {
+		b.ctx.Log.Error("overflow calculating new benched stake",
+			zap.Stringer("nodeID", nodeID),
+		)
+		return false
+	}
+	maxBenchedStake := float64(totalStake) * b.maxPortion
+	if float64(newBenchedStake) > maxBenchedStake {
+		b.ctx.Log.Debug("not benching node",
+			zap.String("reason", "benched stake would exceed max"),
+			zap.Stringer("nodeID", nodeID),
+			zap.Float64("benchedStake", float64(newBenchedStake)),
+			zap.Float64("maxBenchedStake", maxBenchedStake),
+		)
+		return false
+	}
+	return true
 }
 
 // IsBenched returns true if messages to nodeID should immediately fail.
