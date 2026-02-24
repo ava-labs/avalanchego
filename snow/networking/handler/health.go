@@ -49,7 +49,8 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 
 	subnetConfig := h.subnet.Config()
 
-	if subnetConfig.SimplexParameters != nil {
+	// SnowParameters can be nil if the subnet is ocnfigured for Simplex consensus
+	if subnetConfig.SnowParameters == nil {
 		return details, nil
 	}
 
