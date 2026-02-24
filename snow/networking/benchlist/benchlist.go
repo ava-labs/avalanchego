@@ -152,9 +152,12 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 	defer b.lock.Unlock()
 
 	n, ok := b.nodes[nodeID]
-	if weight := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID); weight == 0 && (!ok || !n.isBenched) {
-		// Don't track non-validators unless they're already benched to avoid
-		// excess memory pressure.
+	if weight := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID); weight == 0 {
+		// Don't track non-validators unless they're currently benched. If they
+		// aren't benched, prune any stale entry to avoid excess memory pressure.
+		if ok && !n.isBenched {
+			delete(b.nodes, nodeID)
+		}
 		return
 	}
 	if !ok {
