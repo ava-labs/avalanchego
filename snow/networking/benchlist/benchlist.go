@@ -179,17 +179,19 @@ func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
 			return
 		}
 
-		var benchedStake uint64
+		benchedNodeIDs := set.NewSet[ids.NodeID](len(b.nodes))
 		for benchedNodeID, benchedNode := range b.nodes {
-			if !benchedNode.isBenched {
-				continue
+			if benchedNode.isBenched {
+				benchedNodeIDs.Add(benchedNodeID)
 			}
-			var err error
-			benchedStake, err = math.Add(benchedStake, b.vdrs.GetWeight(b.ctx.SubnetID, benchedNodeID))
-			if err != nil {
-				b.ctx.Log.Error("overflow calculating benched stake")
-				return
-			}
+		}
+		benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benchedNodeIDs)
+		if err != nil {
+			b.ctx.Log.Error("error calculating benched stake",
+				zap.Stringer("subnetID", b.ctx.SubnetID),
+				zap.Error(err),
+			)
+			return
 		}
 
 		totalStake, err := b.vdrs.TotalWeight(b.ctx.SubnetID)
