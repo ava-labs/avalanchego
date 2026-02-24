@@ -56,7 +56,8 @@ use std::{
 };
 
 use firewood_storage::{
-    Committed, FileBacked, FileIoError, HashedNodeReader, NodeStore, NodeStoreHeader,
+    Committed, FileBacked, FileIoError, HashedNodeReader, LinearAddress, NodeStore,
+    NodeStoreHeader, TrieHash,
 };
 use parking_lot::{Condvar, Mutex, MutexGuard};
 
@@ -396,7 +397,7 @@ impl PersistLoop {
     ) -> Result<(), PersistError> {
         let result = self
             .persist_to_disk(revision)
-            .and_then(|()| self.save_to_root_store(revision));
+            .and_then(|()| self.maybe_save_to_root_store(revision));
         self.release_permits(commits_since_persist);
         result
     }
@@ -426,16 +427,25 @@ impl PersistLoop {
     }
 
     /// Saves the revision's root address to `RootStore` if configured.
-    fn save_to_root_store(&self, revision: &CommittedRevision) -> Result<(), PersistError> {
+    fn maybe_save_to_root_store(&self, revision: &CommittedRevision) -> Result<(), PersistError> {
         if let Some(ref store) = self.shared.root_store
             && let (Some(hash), Some(addr)) = (revision.root_hash(), revision.root_address())
         {
-            store.add_root(&hash, &addr).map_err(|e| {
-                error!("Failed to persist revision address to RootStore: {e}");
-                PersistError::RootStore(e.into())
-            })?;
+            save_to_root_store(store, &hash, &addr)?;
         }
 
         Ok(())
     }
+}
+
+#[crate::metrics("persist.root_store", "persist revision address to root store")]
+fn save_to_root_store(
+    store: &RootStore,
+    hash: &TrieHash,
+    addr: &LinearAddress,
+) -> Result<(), PersistError> {
+    store.add_root(hash, addr).map_err(|e| {
+        error!("Failed to persist revision address to RootStore: {e}");
+        PersistError::RootStore(e.into())
+    })
 }
