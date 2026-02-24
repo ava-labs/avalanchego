@@ -101,10 +101,18 @@ func setSnowDefaults(config *snowball.Parameters, v *viper.Viper) {
 		config.K = v.GetInt(SnowSampleSizeKey)
 	}
 	if config.AlphaPreference == 0 {
-		config.AlphaPreference = v.GetInt(SnowPreferenceQuorumSizeKey)
+		if v.IsSet(SnowQuorumSizeKey) {
+			config.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
+		} else {
+			config.AlphaPreference = v.GetInt(SnowPreferenceQuorumSizeKey)
+		}
 	}
 	if config.AlphaConfidence == 0 {
-		config.AlphaConfidence = v.GetInt(SnowConfidenceQuorumSizeKey)
+		if v.IsSet(SnowQuorumSizeKey) {
+			config.AlphaConfidence = v.GetInt(SnowPreferenceQuorumSizeKey)
+		} else {
+			config.AlphaConfidence = v.GetInt(SnowConfidenceQuorumSizeKey)
+		}
 	}
 	if config.Beta == 0 {
 		config.Beta = v.GetInt(SnowCommitThresholdKey)
@@ -120,11 +128,6 @@ func setSnowDefaults(config *snowball.Parameters, v *viper.Viper) {
 	}
 	if config.MaxItemProcessingTime == 0 {
 		config.MaxItemProcessingTime = v.GetDuration(SnowMaxTimeProcessingKey)
-	}
-
-	if v.IsSet(SnowQuorumSizeKey) {
-		config.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
-		config.AlphaConfidence = config.AlphaPreference
 	}
 	if config.Alpha != nil {
 		config.AlphaPreference = *config.Alpha
