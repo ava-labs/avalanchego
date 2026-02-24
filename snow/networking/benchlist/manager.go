@@ -55,6 +55,10 @@ func NewManager(
 	reg metrics.MultiGatherer,
 	config Config,
 ) Manager {
+	if config.MaxPortion <= 0 {
+		return NewNoBenchlist()
+	}
+
 	return &manager{
 		benchable: benchable,
 		vdrs:      vdrs,
