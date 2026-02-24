@@ -119,13 +119,13 @@ impl PersistWorker {
             commit_throttle: PersistSemaphore::new(commit_count),
             root_store,
             header: Mutex::new(header),
+            persist_on_shutdown: OnceLock::new(),
         });
 
         let persist_loop = PersistLoop {
             receiver,
             persist_interval,
             shared: shared.clone(),
-            persist_on_shutdown: None,
         };
 
         let handle = thread::spawn(move || persist_loop.run());
@@ -182,11 +182,16 @@ impl PersistWorker {
         }
     }
 
-    /// Close the persist worker.
-    ///
-    /// This method is idempotent for compatibility with `drop` (as `drop` is
-    /// called after this function).
-    pub(crate) fn close(mut self) -> Result<(), PersistError> {
+    /// Close the persist worker and persist `latest_committed_revision`.
+    pub(crate) fn close(
+        mut self,
+        latest_committed_revision: CommittedRevision,
+    ) -> Result<(), PersistError> {
+        self.shared
+            .persist_on_shutdown
+            .set(latest_committed_revision)
+            .expect("should be empty");
+
         // Drop the sender to close the channel, signaling the background
         // thread to exit.
         drop(self.sender.take());
@@ -317,6 +322,8 @@ struct SharedState {
     header: Mutex<NodeStoreHeader>,
     /// Optional persistent store for historical root addresses.
     root_store: Option<Arc<RootStore>>,
+    /// Unpersisted revision to persist on shutdown.
+    persist_on_shutdown: OnceLock<CommittedRevision>,
 }
 
 /// The background persistence loop that runs in a separate thread.
@@ -327,8 +334,6 @@ struct PersistLoop {
     persist_interval: NonZeroU64,
     /// Shared state for coordination with `PersistWorker`.
     shared: Arc<SharedState>,
-    /// Unpersisted revision to persist on shutdown.
-    persist_on_shutdown: Option<CommittedRevision>,
 }
 
 impl PersistLoop {
@@ -357,8 +362,10 @@ impl PersistLoop {
             }
         }
 
-        // Persist any unpersisted revision on shutdown
-        if let Some(revision) = self.persist_on_shutdown.take() {
+        // Persist the last unpersisted revision on shutdown
+        if let Some(revision) = self.shared.persist_on_shutdown.get().cloned()
+            && commits_since_persist > 0
+        {
             self.persist_and_release(&revision, &mut commits_since_persist)?;
         }
 
@@ -375,15 +382,10 @@ impl PersistLoop {
         *commits_since_persist = commits_since_persist.wrapping_add(1);
 
         if *commits_since_persist >= self.persist_interval.get() {
-            // Clear persist_on_shutdown before persisting to avoid holding
-            // an Arc reference during the persist operation.
-            self.persist_on_shutdown = None;
-            self.persist_and_release(&revision, commits_since_persist)
-        } else {
-            // Store the revision so we can persist it on shutdown if needed.
-            self.persist_on_shutdown = Some(revision);
-            Ok(())
+            self.persist_and_release(&revision, commits_since_persist)?;
         }
+
+        Ok(())
     }
 
     /// Performs the actual persistence and releases semaphore permits.

@@ -520,8 +520,9 @@ impl RevisionManager {
     /// This method shuts down the background persistence worker and persists
     /// the latest committed revision.
     pub fn close(self) -> Result<(), RevisionManagerError> {
+        let current_revision = self.current_revision();
         self.persist_worker
-            .close()
+            .close(current_revision)
             .map_err(RevisionManagerError::PersistError)
     }
 }
