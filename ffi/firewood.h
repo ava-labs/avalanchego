@@ -28,7 +28,9 @@ typedef enum NodeHashAlgorithm {
 } NodeHashAlgorithm;
 
 /**
- * FFI context for a parsed or generated change proof.
+ * FFI context for a parsed or generated change proof. This change proof has not
+ * been verified. Calling `verify` on it will generate a `VerifiedChangeProofContext`
+ * and consume the `proof` and replacing it with None.
  */
 typedef struct ChangeProofContext ChangeProofContext;
 
@@ -56,11 +58,26 @@ typedef struct IteratorHandle IteratorHandle;
 typedef struct ProposalHandle ProposalHandle;
 
 /**
+ * FFI context for a proposed change proof. It is created from calling `propose`
+ * on a `VerifiedChangeProofContext` and stores the database and proposal handle.
+ * Calling `commit` on it will consume the proof.
+ */
+typedef struct ProposedChangeProofContext ProposedChangeProofContext;
+
+/**
  * FFI context for for a parsed or generated range proof.
  */
 typedef struct RangeProofContext RangeProofContext;
 
 typedef struct RevisionHandle RevisionHandle;
+
+/**
+ * FFI context for a verified change proof. It is created from calling `verify`
+ * on a `ChangeProofContext` and stores the parameters of that call in `params`.
+ * Calling `propose` on it will consume the proof to create a
+ * `ProposedChangeProofContext`.
+ */
+typedef struct VerifiedChangeProofContext VerifiedChangeProofContext;
 
 /**
  * A database hash key, used in FFI functions that require hashes.
@@ -555,6 +572,47 @@ typedef struct CreateChangeProofArgs {
    */
   uint32_t max_length;
 } CreateChangeProofArgs;
+
+enum ProposedChangeProofResult_Tag {
+  /**
+   * The caller provided a null pointer to the input handle.
+   */
+  ProposedChangeProofResult_NullHandlePointer,
+  /**
+   * A proposal was successfully created for this proof.
+   */
+  ProposedChangeProofResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. If
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  ProposedChangeProofResult_Err,
+};
+typedef size_t ProposedChangeProofResult_Tag;
+
+typedef struct ProposedChangeProofResult {
+  ProposedChangeProofResult_Tag tag;
+  union {
+    struct {
+      struct ProposedChangeProofContext *ok;
+    };
+    struct {
+      OwnedBytes err;
+    };
+  };
+} ProposedChangeProofResult;
+
+typedef struct ProposedChangeProofArgs {
+  /**
+   * The verified change proof context that will be used to create a proposal.
+   */
+  struct VerifiedChangeProofContext *proof;
+} ProposedChangeProofArgs;
 
 /**
  * A result type returned from FFI functions that create or parse range proofs.
@@ -1168,6 +1226,37 @@ typedef struct LogArgs {
   BorrowedBytes filter_level;
 } LogArgs;
 
+enum VerifiedChangeProofResult_Tag {
+  /**
+   * The caller provided a null pointer to the input handle.
+   */
+  VerifiedChangeProofResult_NullHandlePointer,
+  VerifiedChangeProofResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. If
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  VerifiedChangeProofResult_Err,
+};
+typedef size_t VerifiedChangeProofResult_Tag;
+
+typedef struct VerifiedChangeProofResult {
+  VerifiedChangeProofResult_Tag tag;
+  union {
+    struct {
+      struct VerifiedChangeProofContext *ok;
+    };
+    struct {
+      OwnedBytes err;
+    };
+  };
+} VerifiedChangeProofResult;
+
 /**
  * Puts the given key-value pairs into the database.
  *
@@ -1427,6 +1516,31 @@ struct ChangeProofResult fwd_db_change_proof(const struct DatabaseHandle *db,
 struct ValueResult fwd_db_dump(const struct DatabaseHandle *db);
 
 /**
+ * Create a proposal from a change proof and return a `ProposedChangeProofResult`.
+ *
+ * # Arguments
+ *
+ * - `db` - The database to create the proposal.
+ * - `args` - The arguments for verifying the change proof.
+ *
+ * # Returns
+ *
+ * - [`ProposedChangeProofResult::NullHandlePointer`] if the caller provided a null pointer to either
+ *   the database or the proof.
+ * - [`ProposedChangeProofResult::Ok`] if a proposal was successfully created.
+ * - [`ProposedChangeProofResult::Err`] containing an error message if the proposal could not be created.
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct ProposedChangeProofResult fwd_db_propose_change_proof(const struct DatabaseHandle *db,
+                                                             struct ProposedChangeProofArgs args);
+
+/**
  * Generate a range proof for the given range of keys for the latest revision.
  *
  * # Arguments
@@ -1514,31 +1628,6 @@ struct HashResult fwd_db_verify_and_commit_change_proof(const struct DatabaseHan
  */
 struct HashResult fwd_db_verify_and_commit_range_proof(const struct DatabaseHandle *db,
                                                        struct VerifyRangeProofArgs args);
-
-/**
- * Verify a change proof and prepare a proposal to later commit or drop.
- *
- * # Arguments
- *
- * - `db` - The database to verify the proof against.
- * - `args` - The arguments for verifying the change proof.
- *
- * # Returns
- *
- * - [`VoidResult::NullHandlePointer`] if the caller provided a null pointer to either
- *   the database or the proof.
- * - [`VoidResult::Ok`] if the proof was successfully verified.
- * - [`VoidResult::Err`] containing an error message if the proof could not be verified
- *
- * # Thread Safety
- *
- * It is not safe to call this function concurrently with the same proof context
- * nor is it safe to call any other function that accesses the same proof context
- * concurrently. The caller must ensure exclusive access to the proof context
- * for the duration of the call.
- */
-struct VoidResult fwd_db_verify_change_proof(const struct DatabaseHandle *_db,
-                                             struct VerifyChangeProofArgs _args);
 
 /**
  * Verify a range proof and prepare a proposal to later commit or drop. If the
@@ -1689,6 +1778,20 @@ struct VoidResult fwd_free_owned_kv_pair(struct OwnedKeyValuePair kv);
 struct VoidResult fwd_free_proposal(struct ProposalHandle *proposal);
 
 /**
+ * Frees the memory associated with a `ProposedChangeProofContext`.
+ *
+ * # Arguments
+ *
+ * * `proof` - The `ProposedChangeProofContext` to free, previously returned from any Rust function.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::Ok`] if the memory was successfully freed.
+ * - [`VoidResult::Err`] if the process panics while freeing the memory.
+ */
+struct VoidResult fwd_free_proposed_change_proof(struct ProposedChangeProofContext *proof);
+
+/**
  * Frees the memory associated with a `RangeProofContext`.
  *
  * # Arguments
@@ -1722,6 +1825,20 @@ struct VoidResult fwd_free_range_proof(struct RangeProofContext *proof);
  * this function is called.
  */
 struct VoidResult fwd_free_revision(struct RevisionHandle *revision);
+
+/**
+ * Frees the memory associated with a `VerifiedChangeProofContext`.
+ *
+ * # Arguments
+ *
+ * * `proof` - The `VerifiedChangeProofContext` to free, previously returned from any Rust function.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::Ok`] if the memory was successfully freed.
+ * - [`VoidResult::Err`] if the process panics while freeing the memory.
+ */
+struct VoidResult fwd_free_verified_change_proof(struct VerifiedChangeProofContext *proof);
 
 /**
  * Gather latest metrics for this process.
@@ -2269,3 +2386,26 @@ struct VoidResult fwd_start_metrics(void);
  *   returned error (if any).
  */
 struct VoidResult fwd_start_metrics_with_exporter(uint16_t metrics_port);
+
+/**
+ * Verify a change proof and return a `VerifiedChangeProofResult`.
+ *
+ * # Arguments
+ *
+ * - `args` - The arguments for verifying the change proof.
+ *
+ * # Returns
+ *
+ * - [`VerifiedChangeProofResult::NullHandlePointer`] if the caller provided a null pointer to the
+ *   proof.
+ * - [`VerifiedChangeProofResult::Ok`] if the proof was successfully verified.
+ * - [`VerifiedChangeProofResult::Err`] containing an error message if the proof could not be verified
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct VerifiedChangeProofResult fwd_verify_change_proof(struct VerifyChangeProofArgs args);

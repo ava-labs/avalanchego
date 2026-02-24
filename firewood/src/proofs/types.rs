@@ -122,6 +122,24 @@ pub enum ProofError {
     /// Invalid value format
     #[error("invalid value format")]
     InvalidValueFormat,
+
+    #[error("larger than max length")]
+    ProofIsLargerThanMaxLength,
+
+    /// Change proof keys are not sorted
+    #[error("the change proof keys are not sorted")]
+    ChangeProofKeysNotSorted,
+
+    /// Start key is larger than first key
+    #[error("the start key of the change proof is larger than the first key in the proof array")]
+    StartKeyLargerThanFirstKey,
+
+    /// End key is smaller than last key
+    #[error("the end key of the change proof is larger than the end key in the proof array")]
+    EndKeyLessThanLastKey,
+
+    #[error("the proof is None as it has been consumed")]
+    ProofIsNone,
 }
 
 #[derive(Clone, PartialEq, Eq)]
