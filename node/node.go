@@ -1859,6 +1859,9 @@ func (n *Node) shutdown() {
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
 	}
+	if n.benchlistManager != nil {
+		n.benchlistManager.Shutdown()
+	}
 	if n.profiler != nil {
 		n.profiler.Shutdown()
 	}

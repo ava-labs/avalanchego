@@ -94,6 +94,7 @@ func TestBenchlist(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
+	defer b.shutdown()
 	now := time.Now()
 	b.clock.Set(now)
 
@@ -179,6 +180,7 @@ func TestBenchlistSkipsBenchingWhenMaxPortionExceeded(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
+	defer b.shutdown()
 	now := time.Now()
 	b.clock.Set(now)
 
@@ -235,6 +237,7 @@ func TestBenchlistTimeout(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
+	defer b.shutdown()
 
 	now := time.Now()
 	b.clock.Set(now)
@@ -292,6 +295,7 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
+	defer b.shutdown()
 
 	now := time.Now()
 	b.clock.Set(now)
@@ -350,6 +354,7 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
+	defer b.shutdown()
 
 	now := time.Now()
 	b.clock.Set(now)
@@ -423,6 +428,7 @@ func TestRunDrainsEntireEventQueuePerSignal(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
+	defer b.shutdown()
 
 	now := time.Now()
 	b.clock.Set(now)

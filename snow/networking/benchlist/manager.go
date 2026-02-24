@@ -36,6 +36,8 @@ type Manager interface {
 	// [nodeID] is benched. If called on an id.ShortID that does
 	// not map to a validator, it will return an empty array.
 	GetBenched(nodeID ids.NodeID) []ids.ID
+	// Shutdown stops all chain benchlists.
+	Shutdown()
 }
 
 type manager struct {
@@ -46,6 +48,9 @@ type manager struct {
 
 	lock   sync.RWMutex
 	chains map[ids.ID]*benchlist
+
+	shutdownOnce sync.Once
+	shutdown     bool
 }
 
 // NewManager returns a manager for chain-specific query benchlisting
@@ -97,6 +102,9 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	if m.shutdown {
+		return nil
+	}
 	if _, exists := m.chains[ctx.ChainID]; exists {
 		return nil
 	}
@@ -133,6 +141,23 @@ func (m *manager) RegisterFailure(chainID ids.ID, nodeID ids.NodeID) {
 	}
 }
 
+func (m *manager) Shutdown() {
+	m.shutdownOnce.Do(func() {
+		m.lock.Lock()
+		chainBenchlists := make([]*benchlist, 0, len(m.chains))
+		for _, chainBenchlist := range m.chains {
+			chainBenchlists = append(chainBenchlists, chainBenchlist)
+		}
+		clear(m.chains)
+		m.shutdown = true
+		m.lock.Unlock()
+
+		for _, chainBenchlist := range chainBenchlists {
+			chainBenchlist.shutdown()
+		}
+	})
+}
+
 type noBenchlist struct{}
 
 // NewNoBenchlist returns an empty benchlist that will never stop any queries
@@ -155,3 +180,5 @@ func (noBenchlist) IsBenched(ids.ID, ids.NodeID) bool {
 func (noBenchlist) GetBenched(ids.NodeID) []ids.ID {
 	return []ids.ID{}
 }
+
+func (noBenchlist) Shutdown() {}

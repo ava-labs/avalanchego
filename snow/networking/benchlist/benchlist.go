@@ -100,6 +100,9 @@ type benchlist struct {
 	// after each state transition; read by IsBenched on any goroutine.
 	lock    sync.RWMutex
 	benched set.Set[ids.NodeID]
+
+	shutdownOnce sync.Once
+	shutdownChan chan struct{}
 }
 
 func newBenchlist(
@@ -134,6 +137,7 @@ func newBenchlist(
 		maxPortion:         config.MaxPortion,
 		events:             buffer.NewUnboundedBlockingDeque[event](eventQueueInitSize),
 		eventReady:         make(chan struct{}, 1),
+		shutdownChan:       make(chan struct{}),
 	}
 
 	err := errors.Join(
@@ -183,8 +187,6 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 
 // run is the consumer goroutine. It owns the nodes map, timeout heap, and is
 // the only goroutine that calls Benched/Unbenched on the benchable.
-//
-// TODO: Close goroutine within run during shutdown.
 func (b *benchlist) run() {
 	var (
 		nodes       = make(map[ids.NodeID]*node)
@@ -198,6 +200,8 @@ func (b *benchlist) run() {
 
 	for {
 		select {
+		case <-b.shutdownChan:
+			return
 		case <-b.eventReady:
 		case <-timer.C:
 		}
@@ -207,6 +211,12 @@ func (b *benchlist) run() {
 		b.updateMetrics(nodes)
 		b.resetTimer(timer, &timeoutHeap)
 	}
+}
+
+func (b *benchlist) shutdown() {
+	b.shutdownOnce.Do(func() {
+		close(b.shutdownChan)
+	})
 }
 
 // processEvents drains all queued observations and applies them.
