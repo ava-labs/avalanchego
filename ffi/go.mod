@@ -1,6 +1,6 @@
 module github.com/ava-labs/firewood/ffi
 
-go 1.24
+go 1.25
 
 // Changes to the toolchain version should be replicated in:
 //   - ffi/go.mod (here)
@@ -8,7 +8,7 @@ go 1.24
 //   - ffi/tests/eth/go.mod
 //   - ffi/tests/firewood/go.mod
 // `just check-golang-version` validates that these versions are in sync and will run in CI as part of the ffi-nix job.
-toolchain go1.24.12
+toolchain go1.25.7
 
 require (
 	github.com/prometheus/client_golang v1.22.0

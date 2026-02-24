@@ -1,8 +1,8 @@
 module github.com/ava-labs/firewood/ffi/tests/eth
 
-go 1.24.0
+go 1.25
 
-toolchain go1.24.12
+toolchain go1.25.7
 
 require (
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0 // this is replaced to use the parent folder
