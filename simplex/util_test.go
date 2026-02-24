@@ -87,7 +87,7 @@ func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 }
 
 type testNode struct {
-	pSimplex.SimplexValidatorInfo
+	pSimplex.ValidatorInfo
 	signFunc SignFunc
 }
 
@@ -137,9 +137,9 @@ func newSimplexChainParams(nodes []*testNode) *pSimplex.Parameters {
 		MaxNetworkDelay:    1 * time.Second,
 		MaxRebroadcastWait: 1 * time.Second,
 	}
-	params.InitialValidators = make([]pSimplex.SimplexValidatorInfo, len(nodes))
+	params.InitialValidators = make([]pSimplex.ValidatorInfo, len(nodes))
 	for i, node := range nodes {
-		params.InitialValidators[i] = node.SimplexValidatorInfo
+		params.InitialValidators[i] = node.ValidatorInfo
 	}
 	return params
 }
@@ -152,7 +152,7 @@ func generateTestNodes(t *testing.T, num uint64) []*testNode {
 
 		nodeID := ids.GenerateTestNodeID()
 		nodes[i] = &testNode{
-			SimplexValidatorInfo: pSimplex.SimplexValidatorInfo{
+			ValidatorInfo: pSimplex.ValidatorInfo{
 				NodeID:    nodeID,
 				PublicKey: ls.PublicKey().Compress(),
 			},

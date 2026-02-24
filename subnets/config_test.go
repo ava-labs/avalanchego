@@ -75,7 +75,7 @@ func TestValid(t *testing.T) {
 				SimplexParameters: &simplex.Parameters{
 					MaxNetworkDelay:    1 * time.Second,
 					MaxRebroadcastWait: 1 * time.Second,
-					InitialValidators:  []simplex.SimplexValidatorInfo{{NodeID: ids.GenerateTestNodeID(), PublicKey: []byte{0x01}}},
+					InitialValidators:  []simplex.ValidatorInfo{{NodeID: ids.GenerateTestNodeID(), PublicKey: []byte{0x01}}},
 				},
 				ValidatorOnly: false,
 			},

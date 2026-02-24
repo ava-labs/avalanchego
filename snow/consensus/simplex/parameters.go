@@ -13,7 +13,7 @@ import (
 
 var ErrInvalidParameters = errors.New("simplex parameters must be valid")
 
-type SimplexValidatorInfo struct {
+type ValidatorInfo struct {
 	NodeID ids.NodeID `json:"nodeID" yaml:"nodeID"`
 
 	// PublicKey is the public key of the validator.
@@ -22,9 +22,9 @@ type SimplexValidatorInfo struct {
 }
 
 type Parameters struct {
-	MaxNetworkDelay    time.Duration          `json:"maxNetworkDelay"    yaml:"maxNetworkDelay"`
-	MaxRebroadcastWait time.Duration          `json:"maxRebroadcastWait" yaml:"maxRebroadcastWait"`
-	InitialValidators  []SimplexValidatorInfo `json:"initialValidators"  yaml:"initialValidators"`
+	MaxNetworkDelay    time.Duration   `json:"maxNetworkDelay"    yaml:"maxNetworkDelay"`
+	MaxRebroadcastWait time.Duration   `json:"maxRebroadcastWait" yaml:"maxRebroadcastWait"`
+	InitialValidators  []ValidatorInfo `json:"initialValidators"  yaml:"initialValidators"`
 }
 
 var DefaultParameters = Parameters{

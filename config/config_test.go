@@ -509,7 +509,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 
 				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
 				require.NoError(err)
-				validator := simplex.SimplexValidatorInfo{
+				validator := simplex.ValidatorInfo{
 					NodeID:    nodeID,
 					PublicKey: pkBytes,
 				}
@@ -517,7 +517,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 
 				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
 				require.NoError(err)
-				validator2 := simplex.SimplexValidatorInfo{
+				validator2 := simplex.ValidatorInfo{
 					NodeID:    nodeID2,
 					PublicKey: pkBytes,
 				}
@@ -561,7 +561,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 
 				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
 				require.NoError(err)
-				validator := simplex.SimplexValidatorInfo{
+				validator := simplex.ValidatorInfo{
 					NodeID:    nodeID,
 					PublicKey: pkBytes,
 				}
@@ -569,7 +569,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 
 				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
 				require.NoError(err)
-				validator2 := simplex.SimplexValidatorInfo{
+				validator2 := simplex.ValidatorInfo{
 					NodeID:    nodeID2,
 					PublicKey: pkBytes,
 				}
@@ -670,7 +670,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 
 				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
 				require.NoError(err)
-				validator := simplex.SimplexValidatorInfo{
+				validator := simplex.ValidatorInfo{
 					NodeID:    nodeID,
 					PublicKey: pkBytes,
 				}
@@ -678,7 +678,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 
 				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
 				require.NoError(err)
-				validator2 := simplex.SimplexValidatorInfo{
+				validator2 := simplex.ValidatorInfo{
 					NodeID:    nodeID2,
 					PublicKey: pkBytes,
 				}
