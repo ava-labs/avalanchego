@@ -8,18 +8,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"time"
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/strevm/sae"
+	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 
 	avadb "github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/txpool"
+	atomicvm "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
+	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
@@ -27,8 +36,12 @@ import (
 // method that treats the chain as being asynchronous since genesis.
 type SinceGenesis struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
+	config  sae.Config
 
-	config sae.Config
+	ctx          *snow.Context
+	mempool      *txpool.Mempool
+	pushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
+	acceptedTxs  *state.AtomicRepository
 
 	lastWaitForEvent utils.Atomic[time.Time]
 }
@@ -88,6 +101,51 @@ func (vm *SinceGenesis) Initialize(
 		return err
 	}
 	vm.VM = inner
+	vm.ctx = snowCtx
+
+	metrics := prometheus.NewRegistry()
+	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {
+		return fmt.Errorf("failed to register metrics: %w", err)
+	}
+
+	{
+		const mempoolSize = 4096
+		txs := txpool.NewTxs(snowCtx, mempoolSize)
+		mempool, err := txpool.NewMempool(txs, metrics, func(tx *atomic.Tx) error {
+			// TODO: Implement me
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to initialize mempool: %w", err)
+		}
+		vm.mempool = mempool
+	}
+
+	{
+
+		gossipHandler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
+			snowCtx.NodeID,
+			vm.Network,
+			nil, // TODO: Expose from SAE
+			vm.mempool,
+			&atomic.TxMarshaller{},
+			avalanchegossip.SystemConfig{
+				Log:       snowCtx.Log,
+				Registry:  metrics,
+				Namespace: "tx_gossip",
+				HandlerID: p2p.AtomicTxGossipHandlerID,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to initialize atomic gossip system: %w", err)
+		}
+
+		// TODO: Register these
+		_ = gossipHandler
+		_ = pullGossiper
+		_ = pushGossiper
+	}
+
 	return nil
 }
 
@@ -108,6 +166,28 @@ func (vm *SinceGenesis) WaitForEvent(ctx context.Context) (common.Message, error
 	case <-time.After(timeToWait):
 		return vm.VM.WaitForEvent(ctx)
 	}
+}
+
+const avaxHTTPExtensionPath = "/avax"
+
+func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	m, err := vm.VM.CreateHandlers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	avaxAPI, err := rpc.NewHandler("avax", &atomicvm.AvaxAPI{
+		Context:      vm.ctx,
+		Mempool:      vm.mempool,
+		PushGossiper: vm.pushGossiper,
+		AcceptedTxs:  vm.acceptedTxs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
+	}
+
+	m[avaxHTTPExtensionPath] = avaxAPI
+	return m, nil
 }
 
 // Shutdown gracefully closes the VM.

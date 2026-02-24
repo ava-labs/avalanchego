@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 
 	ethereum "github.com/ava-labs/libevm"
 )
@@ -27,7 +28,10 @@ var gasPrice = big.NewInt(maxFeePerGas)
 
 func main() {
 	ctx := context.Background()
-	const uri = "https://api.avax-dev.network/ext/bc/C/rpc"
+	const (
+		chainUUID = "C"
+		uri       = primary.LocalAPIURI + "/ext/bc/" + chainUUID + "/rpc"
+	)
 	c, err := ethclient.DialContext(ctx, uri)
 	if err != nil {
 		log.Fatal(err)
