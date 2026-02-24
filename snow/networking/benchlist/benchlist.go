@@ -31,7 +31,7 @@ const (
 	success float64 = 0
 	failure float64 = 1
 
-	jobQueueInitSize = 16
+	eventQueueInitSize = 16
 )
 
 // Config defines the configuration for a benchlist
@@ -41,6 +41,23 @@ type Config struct {
 	BenchProbability   float64       `json:"benchProbability"`
 	BenchDuration      time.Duration `json:"benchDuration"`
 	MaxPortion         float64       `json:"maxPortion"`
+}
+
+// event is a raw success/failure observation sent from any goroutine to the
+// single consumer goroutine that owns all mutable node state. The observation
+// time is captured at enqueue so the EWMA sees accurate timestamps even if the
+// consumer goroutine is temporarily blocked.
+type event struct {
+	nodeID ids.NodeID
+	value  float64   // success=0, failure=1
+	time   time.Time // wall-clock time of the observation
+}
+
+// node tracks failure probability and bench state for a single node.
+// Owned exclusively by the consumer goroutine — no external synchronization.
+type node struct {
+	failureProbability math.Averager
+	isBenched          bool
 }
 
 // If a remote node does not respond to a request, the local node waits for a
@@ -54,6 +71,11 @@ type Config struct {
 //
 // If a node remains benched for longer than [benchDuration], it is
 // automatically unbenched to give it another chance.
+//
+// All mutable state (nodes map, EWMA, timeout heap) is owned by a single
+// consumer goroutine. Producers (RegisterResponse/RegisterFailure) enqueue
+// events on an unbounded queue so they never block. IsBenched reads a
+// published snapshot of the benched set.
 type benchlist struct {
 	ctx       *snow.ConsensusContext
 	benchable Benchable
@@ -69,24 +91,15 @@ type benchlist struct {
 	benchDuration      time.Duration
 	maxPortion         float64
 
-	// Notifications to the benchable are processed in a separate goroutine to
-	// avoid any potential reentrant locking between the benchlist and the
-	// benchable.
-	jobs     *buffer.UnboundedBlockingDeque[job]
-	jobReady chan struct{}
+	// Event queue: producers push observations; the single consumer goroutine
+	// pops and processes them. The queue is unbounded so producers never block.
+	events     *buffer.UnboundedBlockingDeque[event]
+	eventReady chan struct{} // capacity 1
 
-	lock  sync.RWMutex
-	nodes map[ids.NodeID]*node
-}
-
-type node struct {
-	failureProbability math.Averager
-	isBenched          bool
-}
-
-type job struct {
-	nodeID ids.NodeID
-	bench  bool
+	// Protects only the benched set snapshot. Written by the consumer goroutine
+	// after each state transition; read by IsBenched on any goroutine.
+	lock    sync.RWMutex
+	benched set.Set[ids.NodeID]
 }
 
 func newBenchlist(
@@ -119,9 +132,8 @@ func newBenchlist(
 		benchProbability:   config.BenchProbability,
 		benchDuration:      config.BenchDuration,
 		maxPortion:         config.MaxPortion,
-		jobs:               buffer.NewUnboundedBlockingDeque[job](jobQueueInitSize),
-		jobReady:           make(chan struct{}, 1),
-		nodes:              make(map[ids.NodeID]*node),
+		events:             buffer.NewUnboundedBlockingDeque[event](eventQueueInitSize),
+		eventReady:         make(chan struct{}, 1),
 	}
 
 	err := errors.Join(
@@ -136,80 +148,210 @@ func newBenchlist(
 	return b, nil
 }
 
+// --- Public API (any goroutine) ---
+
 // RegisterResponse notes that we received a response from nodeID prior to the
 // timeout firing.
 func (b *benchlist) RegisterResponse(nodeID ids.NodeID) {
-	b.observe(nodeID, success)
+	b.enqueue(event{nodeID: nodeID, value: success})
 }
 
 // RegisterFailure notes that a request to nodeID timed out.
 func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
-	b.observe(nodeID, failure)
+	b.enqueue(event{nodeID: nodeID, value: failure})
 }
 
-func (b *benchlist) observe(nodeID ids.NodeID, v float64) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+// enqueue captures the observation time and adds the event to the unbounded
+// queue, then signals the consumer. Never blocks.
+func (b *benchlist) enqueue(ev event) {
+	ev.time = b.clock.Time()
+	_ = b.events.PushRight(ev)
+	select {
+	case b.eventReady <- struct{}{}:
+	default:
+	}
+}
 
-	n, ok := b.nodes[nodeID]
-	if weight := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID); weight == 0 {
+// IsBenched returns true if messages to nodeID should immediately fail.
+func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+	return b.benched.Contains(nodeID)
+}
+
+// --- Consumer goroutine (single owner of all mutable node state) ---
+
+// run is the consumer goroutine. It owns the nodes map, timeout heap, and is
+// the only goroutine that calls Benched/Unbenched on the benchable.
+//
+// TODO: Close goroutine within run during shutdown.
+func (b *benchlist) run() {
+	var (
+		nodes       = make(map[ids.NodeID]*node)
+		timeoutHeap = heap.NewMap[ids.NodeID, time.Time](time.Time.Before)
+		timer       = time.NewTimer(0)
+	)
+	defer timer.Stop()
+
+	// Drain the initial timer fire since nothing is benched yet.
+	<-timer.C
+
+	for {
+		select {
+		case <-b.eventReady:
+		case <-timer.C:
+		}
+
+		b.processEvents(nodes, &timeoutHeap)
+		b.processTimeouts(nodes, &timeoutHeap)
+		b.updateMetrics(nodes)
+		b.resetTimer(timer, &timeoutHeap)
+	}
+}
+
+// processEvents drains all queued observations and applies them.
+func (b *benchlist) processEvents(
+	nodes map[ids.NodeID]*node,
+	timeoutHeap *heap.Map[ids.NodeID, time.Time],
+) {
+	for b.events.Len() > 0 {
+		ev, _ := b.events.PopLeft()
+		b.processObservation(ev, nodes, timeoutHeap)
+	}
+}
+
+// processObservation updates a node's EWMA and transitions bench state if the
+// failure probability crosses a threshold.
+func (b *benchlist) processObservation(
+	ev event,
+	nodes map[ids.NodeID]*node,
+	timeoutHeap *heap.Map[ids.NodeID, time.Time],
+) {
+	nodeID := ev.nodeID
+
+	n, ok := nodes[nodeID]
+	if b.vdrs.GetWeight(b.ctx.SubnetID, nodeID) == 0 {
 		// Don't track non-validators unless they're currently benched. If they
 		// aren't benched, prune any stale entry to avoid excess memory pressure.
 		if ok && !n.isBenched {
-			delete(b.nodes, nodeID)
+			delete(nodes, nodeID)
 		}
 		return
 	}
 	if !ok {
 		n = &node{
-			failureProbability: math.NewUninitializedAverager(b.halflife),
+			failureProbability: b.newFailureProbability(),
 		}
-		b.nodes[nodeID] = n
+		nodes[nodeID] = n
 	}
 
-	n.failureProbability.Observe(v, b.clock.Time())
-
+	n.failureProbability.Observe(ev.value, ev.time)
 	p := n.failureProbability.Read()
-	shouldBench := !n.isBenched && p > b.benchProbability
-	shouldUnbench := n.isBenched && p < b.unbenchProbability
-	if shouldBench {
-		if !b.canBench(nodeID) {
-			return
-		}
-	}
-	if shouldBench || shouldUnbench {
-		n.isBenched = !n.isBenched
-		_ = b.jobs.PushRight(job{
-			nodeID: nodeID,
-			bench:  n.isBenched,
-		})
-		select {
-		case b.jobReady <- struct{}{}:
-		default:
-		}
+
+	switch {
+	case !n.isBenched && p > b.benchProbability:
+		b.tryBench(nodeID, n, nodes, timeoutHeap)
+	case n.isBenched && p < b.unbenchProbability:
+		b.unbench(nodeID, n, timeoutHeap)
 	}
 }
 
-// canBench returns true if nodeID can be benched.
-func (b *benchlist) canBench(nodeID ids.NodeID) bool {
+// tryBench benches a node if the max-portion constraint allows it.
+// Precondition: n.isBenched is false.
+func (b *benchlist) tryBench(
+	nodeID ids.NodeID,
+	n *node,
+	nodes map[ids.NodeID]*node,
+	timeoutHeap *heap.Map[ids.NodeID, time.Time],
+) {
+	if !b.canBench(nodeID, nodes) {
+		return
+	}
+
+	n.isBenched = true
+	timeoutHeap.Push(nodeID, time.Now().Add(b.benchDuration))
+
+	b.lock.Lock()
+	b.benched.Add(nodeID)
+	b.lock.Unlock()
+
+	b.ctx.Log.Debug("benching node", zap.Stringer("nodeID", nodeID))
+	b.benchable.Benched(b.ctx.ChainID, nodeID)
+}
+
+// unbench transitions a node from benched to unbenched.
+// Precondition: n.isBenched is true.
+func (b *benchlist) unbench(
+	nodeID ids.NodeID,
+	n *node,
+	timeoutHeap *heap.Map[ids.NodeID, time.Time],
+) {
+	n.isBenched = false
+	timeoutHeap.Remove(nodeID)
+
+	b.lock.Lock()
+	b.benched.Remove(nodeID)
+	b.lock.Unlock()
+
+	b.ctx.Log.Debug("unbenching node", zap.Stringer("nodeID", nodeID))
+	b.benchable.Unbenched(b.ctx.ChainID, nodeID)
+}
+
+// processTimeouts unbenches any nodes whose bench duration has expired.
+// Timeout-based unbench gives the node a clean EWMA slate so that a single
+// failure after unbenching doesn't immediately re-bench it.
+func (b *benchlist) processTimeouts(
+	nodes map[ids.NodeID]*node,
+	timeoutHeap *heap.Map[ids.NodeID, time.Time],
+) {
+	now := time.Now()
+	for {
+		nodeID, deadline, ok := timeoutHeap.Peek()
+		if !ok || deadline.After(now) {
+			break
+		}
+		timeoutHeap.Pop()
+
+		n, exists := nodes[nodeID]
+		if !exists || !n.isBenched {
+			continue
+		}
+
+		n.isBenched = false
+		n.failureProbability = b.newFailureProbability()
+
+		b.lock.Lock()
+		b.benched.Remove(nodeID)
+		b.lock.Unlock()
+
+		b.ctx.Log.Debug("unbenching node due to timeout",
+			zap.Stringer("nodeID", nodeID),
+		)
+		b.benchable.Unbenched(b.ctx.ChainID, nodeID)
+	}
+}
+
+// newFailureProbability creates a matured failure probability averager. The
+// matured wrapper ensures nodes are given at least [halflife] of observation
+// time to establish a failure probability before they are eligible to be
+// benched.
+func (b *benchlist) newFailureProbability() math.Averager {
+	return math.NewMaturedAverager(
+		b.halflife,
+		math.NewUninitializedAverager(b.halflife),
+	)
+}
+
+// canBench returns true if benching nodeID would not exceed the max portion
+// of total stake allowed to be benched.
+func (b *benchlist) canBench(nodeID ids.NodeID, nodes map[ids.NodeID]*node) bool {
 	nodeStake := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID)
 	if nodeStake == 0 {
-		// Only bench validators.
 		return false
 	}
 
-	benchedNodeIDs := set.NewSet[ids.NodeID](len(b.nodes))
-	for benchedNodeID, benchedNode := range b.nodes {
-		if benchedNode.isBenched {
-			benchedNodeIDs.Add(benchedNodeID)
-		}
-	}
-	benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benchedNodeIDs)
+	benchedStake, err := b.benchedStake(nodes)
 	if err != nil {
-		b.ctx.Log.Error("error calculating benched stake",
-			zap.Stringer("subnetID", b.ctx.SubnetID),
-			zap.Error(err),
-		)
 		return false
 	}
 
@@ -242,99 +384,27 @@ func (b *benchlist) canBench(nodeID ids.NodeID) bool {
 	return true
 }
 
-// IsBenched returns true if messages to nodeID should immediately fail.
-func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	n, ok := b.nodes[nodeID]
-	return ok && n.isBenched
-}
-
-// TODO: Close goroutine within run during shutdown.
-func (b *benchlist) run() {
-	var (
-		benched     set.Set[ids.NodeID]
-		timeoutHeap = heap.NewMap[ids.NodeID, time.Time](time.Time.Before)
-		timer       = time.NewTimer(0)
-	)
-	defer timer.Stop()
-
-	// Drain the initial timer fire since nothing is benched yet.
-	<-timer.C
-
-	for {
-		select {
-		case <-b.jobReady:
-			for b.jobs.Len() > 0 {
-				j, _ := b.jobs.PopLeft()
-				b.ctx.Log.Debug("updating benchlist",
-					zap.Stringer("nodeID", j.nodeID),
-					zap.Bool("benching", j.bench),
-				)
-
-				if j.bench {
-					// The producer path (observe) is the source of truth for
-					// b.nodes transitions triggered by EWMA. By the time a bench
-					// job is emitted, n.isBenched was already set under b.lock.
-					// This consumer branch only drives callbacks/metrics and tracks
-					// callback-visible deadlines.
-					// Always update the timeout deadline. If the node is
-					// already benched from the consumer's perspective, this
-					// extends the deadline without a duplicate Benched
-					// notification.
-					timeoutHeap.Push(j.nodeID, time.Now().Add(b.benchDuration))
-					if !benched.Contains(j.nodeID) {
-						benched.Add(j.nodeID)
-						b.benchable.Benched(b.ctx.ChainID, j.nodeID)
-					}
-				} else if benched.Contains(j.nodeID) {
-					// Same as above: EWMA unbench jobs don't update b.nodes here
-					// because observe already flipped n.isBenched before enqueuing.
-					// Guard: only unbench if the consumer still considers
-					// the node benched, avoiding duplicate Unbenched calls
-					// when both EWMA and timeout race to unbench.
-					benched.Remove(j.nodeID)
-					timeoutHeap.Remove(j.nodeID)
-					b.benchable.Unbenched(b.ctx.ChainID, j.nodeID)
-				}
-			}
-
-		case <-timer.C:
-			now := time.Now()
-			for {
-				nodeID, deadline, ok := timeoutHeap.Peek()
-				if !ok || deadline.After(now) {
-					break
-				}
-				timeoutHeap.Pop()
-				benched.Remove(nodeID)
-				b.lock.Lock()
-				// Timeout unbenching originates in this consumer goroutine
-				// (not in observe), so we must synchronize b.nodes here to
-				// keep IsBenched consistent with callback-visible state.
-				// Timeout-based unbench gives the node a clean slate.
-				if n, exists := b.nodes[nodeID]; exists {
-					n.isBenched = false
-					n.failureProbability = math.NewUninitializedAverager(b.halflife)
-				}
-				b.lock.Unlock()
-
-				b.ctx.Log.Debug("unbenching node due to timeout",
-					zap.Stringer("nodeID", nodeID),
-				)
-				b.benchable.Unbenched(b.ctx.ChainID, nodeID)
-			}
+// benchedStake returns the total stake weight of currently benched validators.
+func (b *benchlist) benchedStake(nodes map[ids.NodeID]*node) (uint64, error) {
+	benchedNodeIDs := set.NewSet[ids.NodeID](len(nodes))
+	for id, n := range nodes {
+		if n.isBenched {
+			benchedNodeIDs.Add(id)
 		}
-
-		b.updateMetrics(benched)
-		b.resetTimer(timer, &timeoutHeap)
 	}
+	weight, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benchedNodeIDs)
+	if err != nil {
+		b.ctx.Log.Error("error calculating benched stake",
+			zap.Stringer("subnetID", b.ctx.SubnetID),
+			zap.Error(err),
+		)
+	}
+	return weight, err
 }
 
 // resetTimer stops the timer and resets it to fire at the earliest deadline in
 // the timeout heap. If the heap is empty, the timer remains stopped and will be
-// reset when the next bench job arrives.
+// reset when the next event arrives.
 func (*benchlist) resetTimer(timer *time.Timer, timeoutHeap *heap.Map[ids.NodeID, time.Time]) {
 	if !timer.Stop() {
 		select {
@@ -352,15 +422,15 @@ func (*benchlist) resetTimer(timer *time.Timer, timeoutHeap *heap.Map[ids.NodeID
 	}
 }
 
-func (b *benchlist) updateMetrics(benched set.Set[ids.NodeID]) {
-	b.numBenched.Set(float64(benched.Len()))
-	benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benched)
+func (b *benchlist) updateMetrics(nodes map[ids.NodeID]*node) {
+	b.lock.RLock()
+	numBenched := float64(b.benched.Len())
+	b.lock.RUnlock()
+	b.numBenched.Set(numBenched)
+
+	weight, err := b.benchedStake(nodes)
 	if err != nil {
-		b.ctx.Log.Error("error calculating benched stake",
-			zap.Stringer("subnetID", b.ctx.SubnetID),
-			zap.Error(err),
-		)
 		return
 	}
-	b.weightBenched.Set(float64(benchedStake))
+	b.weightBenched.Set(float64(weight))
 }
