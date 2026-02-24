@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
+	// Import the simplex consensus package from avalanchego
+	// we use psimplex since we are using simplex.Parameters
 	psimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
