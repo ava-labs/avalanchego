@@ -15,8 +15,8 @@ import (
 var (
 	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
 	errNoParametersSet                  = errors.New("consensus config must have either snowball or simplex parameters set")
-	ErrUnsupportedConsensusParameters   = errors.New("consensusParameters is deprecated; use either snowballParameters or simplexParameters instead")
-	ErrTooManyConsensusParameters       = errors.New("only one of consensusParameters, snowballParameters, or simplexParameters can be set")
+	ErrUnsupportedConsensusParameters   = errors.New("consensusParameters is deprecated; use either snowParameters or simplexParameters instead")
+	ErrTooManyConsensusParameters       = errors.New("only one of consensusParameters, snowParameters, or simplexParameters can be set")
 )
 
 type Config struct {
@@ -32,8 +32,8 @@ type Config struct {
 	// Deprecated: Use either SnowParameters or SimplexParameters instead.
 	ConsensusParameters *snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
 
-	SnowParameters    *snowball.Parameters `json:"snowballParameters" yaml:"snowballParameters"`
-	SimplexParameters *simplex.Parameters  `json:"simplexParameters"  yaml:"simplexParameters"`
+	SnowParameters    *snowball.Parameters `json:"snowParameters"    yaml:"snowParameters"`
+	SimplexParameters *simplex.Parameters  `json:"simplexParameters" yaml:"simplexParameters"`
 
 	// ProposerNumHistoricalBlocks is the number of historical snowman++ blocks
 	// this node will index per chain. If set to 0, the node will index all

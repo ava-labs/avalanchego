@@ -12,7 +12,7 @@ Here is an example of Subnet config file:
 ```json
 {
   "validatorOnly": false,
-  "snowballParameters": {
+  "snowParameters": {
     "k": 25,
     "alpha": 18
   }

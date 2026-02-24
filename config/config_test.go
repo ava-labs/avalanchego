@@ -410,7 +410,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{
 				"validatorOnly": true,
-				"snowballParameters": {
+				"snowParameters": {
 					"k": 111,
 					"alphaPreference": 1234
 				}
@@ -450,7 +450,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		},
 		"correct snowball config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "snowballParameters":{"alphaConfidence":16}}`,
+			givenJSON: `{"validatorOnly": true, "snowParameters":{"alphaConfidence":16}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
@@ -696,7 +696,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"invalid snow consensus parameters": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"snowballParameters": {
+					"snowParameters": {
 						"k": 111,
 						"alphaPreference": 1234
 					}
@@ -710,7 +710,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"correct snow config": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"snowballParameters": {
+					"snowParameters": {
 							"k": 30,
 							"alphaPreference": 16,
 							"alphaConfidence": 20
@@ -734,7 +734,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"multiple configs": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"snowballParameters": {
+					"snowParameters": {
 						"alphaConfidence": 16
 					},
 					"simplexParameters": {}
@@ -965,6 +965,119 @@ func TestGetPrimaryNetworkConfig(t *testing.T) {
 	require.Equal(snowball.DefaultParameters.OptimalProcessing, config.SnowParameters.OptimalProcessing)
 	require.Equal(snowball.DefaultParameters.MaxOutstandingItems, config.SnowParameters.MaxOutstandingItems)
 	require.Equal(snowball.DefaultParameters.MaxItemProcessingTime, config.SnowParameters.MaxItemProcessingTime)
+}
+
+func TestSetConfigDefaults(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  subnets.Config
+		verify func(*require.Assertions, subnets.Config)
+	}{
+		{
+			name:  "no parameters set defaults to snow",
+			input: subnets.Config{},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.NotNil(cfg.SnowParameters)
+				require.Nil(cfg.SimplexParameters)
+				require.Nil(cfg.ConsensusParameters)
+				require.Equal(snowball.DefaultParameters, *cfg.SnowParameters)
+			},
+		},
+		{
+			name: "snow parameters set fills zero fields from viper",
+			input: subnets.Config{
+				SnowParameters: &snowball.Parameters{
+					K: 30,
+				},
+			},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.NotNil(cfg.SnowParameters)
+				require.Nil(cfg.SimplexParameters)
+				require.Nil(cfg.ConsensusParameters)
+				// explicitly set field preserved
+				require.Equal(30, cfg.SnowParameters.K)
+				// zero fields filled from viper defaults
+				require.Equal(snowball.DefaultParameters.AlphaPreference, cfg.SnowParameters.AlphaPreference)
+				require.Equal(snowball.DefaultParameters.AlphaConfidence, cfg.SnowParameters.AlphaConfidence)
+				require.Equal(snowball.DefaultParameters.Beta, cfg.SnowParameters.Beta)
+			},
+		},
+		{
+			name: "snow parameters set preserves all non-zero fields",
+			input: subnets.Config{
+				SnowParameters: &snowball.Parameters{
+					K:               30,
+					AlphaPreference: 16,
+					AlphaConfidence: 20,
+					Beta:            10,
+				},
+			},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.NotNil(cfg.SnowParameters)
+				require.Equal(30, cfg.SnowParameters.K)
+				require.Equal(16, cfg.SnowParameters.AlphaPreference)
+				require.Equal(20, cfg.SnowParameters.AlphaConfidence)
+				require.Equal(10, cfg.SnowParameters.Beta)
+			},
+		},
+		{
+			name: "deprecated consensus parameters migrated to snow parameters",
+			input: subnets.Config{
+				ConsensusParameters: &snowball.Parameters{
+					K:               25,
+					AlphaPreference: 14,
+					AlphaConfidence: 18,
+					Beta:            8,
+				},
+			},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.NotNil(cfg.SnowParameters)
+				require.Nil(cfg.ConsensusParameters)
+				require.Nil(cfg.SimplexParameters)
+				require.Equal(25, cfg.SnowParameters.K)
+				require.Equal(14, cfg.SnowParameters.AlphaPreference)
+				require.Equal(18, cfg.SnowParameters.AlphaConfidence)
+				require.Equal(8, cfg.SnowParameters.Beta)
+			},
+		},
+		{
+			name: "simplex parameters set fills zero fields from viper",
+			input: subnets.Config{
+				SimplexParameters: &simplex.Parameters{},
+			},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.NotNil(cfg.SimplexParameters)
+				require.Nil(cfg.SnowParameters)
+				require.Nil(cfg.ConsensusParameters)
+				require.Equal(simplex.DefaultParameters.MaxNetworkDelay, cfg.SimplexParameters.MaxNetworkDelay)
+				require.Equal(simplex.DefaultParameters.MaxRebroadcastWait, cfg.SimplexParameters.MaxRebroadcastWait)
+			},
+		},
+		{
+			name: "simplex parameters set preserves non-zero fields",
+			input: subnets.Config{
+				SimplexParameters: &simplex.Parameters{
+					MaxNetworkDelay:    1000,
+					MaxRebroadcastWait: 2000,
+				},
+			},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.NotNil(cfg.SimplexParameters)
+				require.Equal(time.Duration(1000), cfg.SimplexParameters.MaxNetworkDelay)
+				require.Equal(time.Duration(2000), cfg.SimplexParameters.MaxRebroadcastWait)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+			cfg := tt.input
+			setConfigDefaults(&cfg, v)
+			tt.verify(require, cfg)
+		})
+	}
 }
 
 func setupViperFlags() *viper.Viper {
