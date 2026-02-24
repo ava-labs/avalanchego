@@ -99,3 +99,13 @@ jobs:
           sudo apt -y install qemu-system qemu-user-static
       - name: Check image build
         run: ./scripts/run_task.sh test-build-image
+
+  test_build_antithesis_images:
+    name: Build Antithesis images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Check image build for subnet-evm test setup
+        shell: bash
+        run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm
