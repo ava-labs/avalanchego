@@ -43,10 +43,11 @@ type Config struct {
 	MaxPortion         float64       `json:"maxPortion"`
 }
 
-// If a node does not respond to a request, the node waits for a timeout. This
-// can cause elevated latencies if a peer is frequently sent requests.
+// If a remote node does not respond to a request, the local node waits for a
+// timeout. This can cause elevated latencies if the local node frequently sends
+// requests to the remote node.
 //
-// Therefore, we attempt to project whether or not a peer is likely to respond
+// Therefore, we attempt to project whether or not a node is likely to respond
 // to a query. If a node is projected to fail, it is "benched". While it is
 // benched, queries to that node fail immediately to avoid waiting up to the
 // full network timeout.
