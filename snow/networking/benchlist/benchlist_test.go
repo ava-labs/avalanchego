@@ -95,9 +95,6 @@ func TestBenchlist(t *testing.T) {
 	)
 	require.NoError(err)
 	defer b.shutdown()
-	now := time.Now()
-	b.clock.Set(now)
-
 	requireNoBenchings := func() {
 		t.Helper()
 		require.False(b.IsBenched(vdrID))
@@ -113,19 +110,12 @@ func TestBenchlist(t *testing.T) {
 	// Nobody should be benched at the start
 	requireNoBenchings()
 
-	// Observations before the matured averager's halflife elapses produce
-	// Read() = 0, so no benching occurs regardless of failure rate.
+	// p = 0.5, so no benching occurs.
 	b.RegisterResponse(vdrID)
-	b.RegisterFailure(vdrID)
 	b.RegisterFailure(vdrID)
 	requireNoBenchings()
 
-	// Advance past halflife so the averager matures. A failure now produces a
-	// non-zero probability that exceeds the bench threshold.
-	now = now.Add(DefaultHalflife)
-	b.clock.Set(now)
-
-	b.RegisterFailure(vdrID) // matured, p ≈ 0.8 > 0.5 → bench
+	b.RegisterFailure(vdrID) // p ≈ 0.67 > 0.5 → bench
 	<-benchable.updated
 	requireBenched()
 
@@ -138,8 +128,7 @@ func TestBenchlist(t *testing.T) {
 	<-benchable.updated
 	requireNoBenchings()
 
-	// After another halflife of decay, failures can re-bench.
-	now = now.Add(DefaultHalflife)
+	now := time.Now().Add(DefaultHalflife)
 	b.clock.Set(now)
 
 	for range 4 {
@@ -181,16 +170,6 @@ func TestBenchlistSkipsBenchingWhenMaxPortionExceeded(t *testing.T) {
 	)
 	require.NoError(err)
 	defer b.shutdown()
-	now := time.Now()
-	b.clock.Set(now)
-
-	// First observation starts the maturation timer.
-	b.RegisterResponse(vdrID0)
-
-	// Advance past halflife so the averager matures.
-	now = now.Add(DefaultHalflife)
-	b.clock.Set(now)
-
 	// p > 0.5, but benching this validator would bench 50% of stake and
 	// exceed maxPortion (40%).
 	b.RegisterFailure(vdrID0)
@@ -239,17 +218,7 @@ func TestBenchlistTimeout(t *testing.T) {
 	require.NoError(err)
 	defer b.shutdown()
 
-	now := time.Now()
-	b.clock.Set(now)
-
-	// First observation starts the maturation timer.
-	b.RegisterResponse(vdrID)
-
-	// Advance past halflife so the averager matures.
-	now = now.Add(DefaultHalflife)
-	b.clock.Set(now)
-
-	// Bench the node: matured, p > 0.5
+	// Bench the node: p > 0.5
 	b.RegisterFailure(vdrID)
 	<-benchable.updated
 	require.True(b.IsBenched(vdrID))
@@ -262,9 +231,7 @@ func TestBenchlistTimeout(t *testing.T) {
 }
 
 // Test that when a node is unbenched via timeout, its EWMA history is wiped
-// so that it gets a clean slate. The matured averager wrapper additionally
-// ensures the node must observe traffic for at least [halflife] before it can
-// be benched again.
+// so that it gets a clean slate.
 func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 	require := require.New(t)
 
@@ -297,17 +264,7 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 	require.NoError(err)
 	defer b.shutdown()
 
-	now := time.Now()
-	b.clock.Set(now)
-
-	// First observation starts the maturation timer.
-	b.RegisterResponse(vdrID)
-
-	// Advance past halflife so the averager matures.
-	now = now.Add(DefaultHalflife)
-	b.clock.Set(now)
-
-	// Bench the node: matured, p > 0.5
+	// Bench the node: p > 0.5
 	b.RegisterFailure(vdrID)
 	<-benchable.updated
 	require.True(b.IsBenched(vdrID))
@@ -316,9 +273,8 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 	<-benchable.updated
 	require.False(b.IsBenched(vdrID))
 
-	// After timeout, the EWMA is reset with a fresh matured averager. Even if
-	// every subsequent observation is a failure, the node cannot be re-benched
-	// until the new averager matures (i.e. halflife elapses).
+	// After timeout, the EWMA is reset. A response and a failure produce
+	// p = 0.5, which is not enough to re-bench.
 	b.RegisterResponse(vdrID)
 	b.RegisterFailure(vdrID)
 	require.False(b.IsBenched(vdrID))
@@ -355,16 +311,6 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 	)
 	require.NoError(err)
 	defer b.shutdown()
-
-	now := time.Now()
-	b.clock.Set(now)
-
-	// First observation starts the maturation timer.
-	b.RegisterResponse(vdrID)
-
-	// Advance past halflife so the averager matures.
-	now = now.Add(DefaultHalflife)
-	b.clock.Set(now)
 
 	// Bench the node and wait for the consumer to block in Benched.
 	b.RegisterFailure(vdrID)
@@ -430,16 +376,12 @@ func TestRunDrainsEntireEventQueuePerSignal(t *testing.T) {
 	require.NoError(err)
 	defer b.shutdown()
 
-	now := time.Now()
-	b.clock.Set(now)
-
 	// Register first observation via the normal API to initialize the node
 	// entry in the consumer goroutine.
 	b.RegisterResponse(vdrID)
 	require.Eventually(func() bool { return b.events.Len() == 0 }, time.Second, time.Millisecond)
 
-	// Advance past halflife so the averager matures.
-	now = now.Add(DefaultHalflife)
+	now := time.Now()
 	b.clock.Set(now)
 
 	// Push events directly to the queue without signaling.

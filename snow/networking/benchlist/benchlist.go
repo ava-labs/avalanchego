@@ -96,6 +96,13 @@ type benchlist struct {
 	events     *buffer.UnboundedBlockingDeque[event]
 	eventReady chan struct{} // capacity 1
 
+	// Owned by run goroutine only. All accesses are safe without additional
+	// synchronization because external goroutines communicate observations via
+	// [events], and these fields are only read/written while processing those
+	// queued events (or timer fires) in [run].
+	nodes       map[ids.NodeID]*node
+	timeoutHeap heap.Map[ids.NodeID, time.Time]
+
 	// Protects only the benched set snapshot. Written by the consumer goroutine
 	// after each state transition; read by IsBenched on any goroutine.
 	lock    sync.RWMutex
@@ -137,6 +144,8 @@ func newBenchlist(
 		maxPortion:         config.MaxPortion,
 		events:             buffer.NewUnboundedBlockingDeque[event](eventQueueInitSize),
 		eventReady:         make(chan struct{}, 1),
+		nodes:              make(map[ids.NodeID]*node),
+		timeoutHeap:        heap.NewMap[ids.NodeID, time.Time](time.Time.Before),
 		shutdownChan:       make(chan struct{}),
 	}
 
@@ -188,11 +197,7 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 // run is the consumer goroutine. It owns the nodes map, timeout heap, and is
 // the only goroutine that calls Benched/Unbenched on the benchable.
 func (b *benchlist) run() {
-	var (
-		nodes       = make(map[ids.NodeID]*node)
-		timeoutHeap = heap.NewMap[ids.NodeID, time.Time](time.Time.Before)
-		timer       = time.NewTimer(0)
-	)
+	timer := time.NewTimer(0)
 	defer timer.Stop()
 
 	// Drain the initial timer fire since nothing is benched yet.
@@ -206,10 +211,10 @@ func (b *benchlist) run() {
 		case <-timer.C:
 		}
 
-		b.processEvents(nodes, &timeoutHeap)
-		b.processTimeouts(nodes, &timeoutHeap)
-		b.updateMetrics(nodes)
-		b.resetTimer(timer, &timeoutHeap)
+		b.processEvents()
+		b.processTimeouts()
+		b.updateMetrics()
+		b.resetTimer(timer)
 	}
 }
 
@@ -220,31 +225,24 @@ func (b *benchlist) shutdown() {
 }
 
 // processEvents drains all queued observations and applies them.
-func (b *benchlist) processEvents(
-	nodes map[ids.NodeID]*node,
-	timeoutHeap *heap.Map[ids.NodeID, time.Time],
-) {
+func (b *benchlist) processEvents() {
 	for b.events.Len() > 0 {
 		ev, _ := b.events.PopLeft()
-		b.processObservation(ev, nodes, timeoutHeap)
+		b.processObservation(ev)
 	}
 }
 
 // processObservation updates a node's EWMA and transitions bench state if the
 // failure probability crosses a threshold.
-func (b *benchlist) processObservation(
-	ev event,
-	nodes map[ids.NodeID]*node,
-	timeoutHeap *heap.Map[ids.NodeID, time.Time],
-) {
+func (b *benchlist) processObservation(ev event) {
 	nodeID := ev.nodeID
 
-	n, ok := nodes[nodeID]
+	n, ok := b.nodes[nodeID]
 	if b.vdrs.GetWeight(b.ctx.SubnetID, nodeID) == 0 {
 		// Don't track non-validators unless they're currently benched. If they
 		// aren't benched, prune any stale entry to avoid excess memory pressure.
 		if ok && !n.isBenched {
-			delete(nodes, nodeID)
+			delete(b.nodes, nodeID)
 		}
 		return
 	}
@@ -252,7 +250,7 @@ func (b *benchlist) processObservation(
 		n = &node{
 			failureProbability: b.newFailureProbability(),
 		}
-		nodes[nodeID] = n
+		b.nodes[nodeID] = n
 	}
 
 	n.failureProbability.Observe(ev.value, ev.time)
@@ -260,69 +258,45 @@ func (b *benchlist) processObservation(
 
 	switch {
 	case !n.isBenched && p > b.benchProbability:
-		b.tryBench(nodeID, n, nodes, timeoutHeap)
+		if !b.canBench(nodeID) {
+			return
+		}
+
+		n.isBenched = true
+		b.timeoutHeap.Push(nodeID, time.Now().Add(b.benchDuration))
+
+		b.lock.Lock()
+		b.benched.Add(nodeID)
+		b.lock.Unlock()
+
+		b.ctx.Log.Debug("benching node", zap.Stringer("nodeID", nodeID))
+		b.benchable.Benched(b.ctx.ChainID, nodeID)
 	case n.isBenched && p < b.unbenchProbability:
-		b.unbench(nodeID, n, timeoutHeap)
+		n.isBenched = false
+		b.timeoutHeap.Remove(nodeID)
+
+		b.lock.Lock()
+		b.benched.Remove(nodeID)
+		b.lock.Unlock()
+
+		b.ctx.Log.Debug("unbenching node", zap.Stringer("nodeID", nodeID))
+		b.benchable.Unbenched(b.ctx.ChainID, nodeID)
 	}
-}
-
-// tryBench benches a node if the max-portion constraint allows it.
-// Precondition: n.isBenched is false.
-func (b *benchlist) tryBench(
-	nodeID ids.NodeID,
-	n *node,
-	nodes map[ids.NodeID]*node,
-	timeoutHeap *heap.Map[ids.NodeID, time.Time],
-) {
-	if !b.canBench(nodeID, nodes) {
-		return
-	}
-
-	n.isBenched = true
-	timeoutHeap.Push(nodeID, time.Now().Add(b.benchDuration))
-
-	b.lock.Lock()
-	b.benched.Add(nodeID)
-	b.lock.Unlock()
-
-	b.ctx.Log.Debug("benching node", zap.Stringer("nodeID", nodeID))
-	b.benchable.Benched(b.ctx.ChainID, nodeID)
-}
-
-// unbench transitions a node from benched to unbenched.
-// Precondition: n.isBenched is true.
-func (b *benchlist) unbench(
-	nodeID ids.NodeID,
-	n *node,
-	timeoutHeap *heap.Map[ids.NodeID, time.Time],
-) {
-	n.isBenched = false
-	timeoutHeap.Remove(nodeID)
-
-	b.lock.Lock()
-	b.benched.Remove(nodeID)
-	b.lock.Unlock()
-
-	b.ctx.Log.Debug("unbenching node", zap.Stringer("nodeID", nodeID))
-	b.benchable.Unbenched(b.ctx.ChainID, nodeID)
 }
 
 // processTimeouts unbenches any nodes whose bench duration has expired.
 // Timeout-based unbench gives the node a clean EWMA slate so that a single
 // failure after unbenching doesn't immediately re-bench it.
-func (b *benchlist) processTimeouts(
-	nodes map[ids.NodeID]*node,
-	timeoutHeap *heap.Map[ids.NodeID, time.Time],
-) {
+func (b *benchlist) processTimeouts() {
 	now := time.Now()
 	for {
-		nodeID, deadline, ok := timeoutHeap.Peek()
+		nodeID, deadline, ok := b.timeoutHeap.Peek()
 		if !ok || deadline.After(now) {
 			break
 		}
-		timeoutHeap.Pop()
+		b.timeoutHeap.Pop()
 
-		n, exists := nodes[nodeID]
+		n, exists := b.nodes[nodeID]
 		if !exists || !n.isBenched {
 			continue
 		}
@@ -341,26 +315,20 @@ func (b *benchlist) processTimeouts(
 	}
 }
 
-// newFailureProbability creates a matured failure probability averager. The
-// matured wrapper ensures nodes are given at least [halflife] of observation
-// time to establish a failure probability before they are eligible to be
-// benched.
+// newFailureProbability creates a failure probability averager.
 func (b *benchlist) newFailureProbability() math.Averager {
-	return math.NewMaturedAverager(
-		b.halflife,
-		math.NewUninitializedAverager(b.halflife),
-	)
+	return math.NewUninitializedAverager(b.halflife)
 }
 
 // canBench returns true if benching nodeID would not exceed the max portion
 // of total stake allowed to be benched.
-func (b *benchlist) canBench(nodeID ids.NodeID, nodes map[ids.NodeID]*node) bool {
+func (b *benchlist) canBench(nodeID ids.NodeID) bool {
 	nodeStake := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID)
 	if nodeStake == 0 {
 		return false
 	}
 
-	benchedStake, err := b.benchedStake(nodes)
+	benchedStake, err := b.benchedStake()
 	if err != nil {
 		return false
 	}
@@ -395,9 +363,9 @@ func (b *benchlist) canBench(nodeID ids.NodeID, nodes map[ids.NodeID]*node) bool
 }
 
 // benchedStake returns the total stake weight of currently benched validators.
-func (b *benchlist) benchedStake(nodes map[ids.NodeID]*node) (uint64, error) {
-	benchedNodeIDs := set.NewSet[ids.NodeID](len(nodes))
-	for id, n := range nodes {
+func (b *benchlist) benchedStake() (uint64, error) {
+	benchedNodeIDs := set.NewSet[ids.NodeID](len(b.nodes))
+	for id, n := range b.nodes {
 		if n.isBenched {
 			benchedNodeIDs.Add(id)
 		}
@@ -415,7 +383,7 @@ func (b *benchlist) benchedStake(nodes map[ids.NodeID]*node) (uint64, error) {
 // resetTimer stops the timer and resets it to fire at the earliest deadline in
 // the timeout heap. If the heap is empty, the timer remains stopped and will be
 // reset when the next event arrives.
-func (*benchlist) resetTimer(timer *time.Timer, timeoutHeap *heap.Map[ids.NodeID, time.Time]) {
+func (b *benchlist) resetTimer(timer *time.Timer) {
 	if !timer.Stop() {
 		select {
 		case <-timer.C:
@@ -423,7 +391,7 @@ func (*benchlist) resetTimer(timer *time.Timer, timeoutHeap *heap.Map[ids.NodeID
 		}
 	}
 
-	if _, deadline, ok := timeoutHeap.Peek(); ok {
+	if _, deadline, ok := b.timeoutHeap.Peek(); ok {
 		remaining := time.Until(deadline)
 		if remaining <= 0 {
 			remaining = 0
@@ -432,13 +400,13 @@ func (*benchlist) resetTimer(timer *time.Timer, timeoutHeap *heap.Map[ids.NodeID
 	}
 }
 
-func (b *benchlist) updateMetrics(nodes map[ids.NodeID]*node) {
+func (b *benchlist) updateMetrics() {
 	b.lock.RLock()
 	numBenched := float64(b.benched.Len())
 	b.lock.RUnlock()
 	b.numBenched.Set(numBenched)
 
-	weight, err := b.benchedStake(nodes)
+	weight, err := b.benchedStake()
 	if err != nil {
 		return
 	}
