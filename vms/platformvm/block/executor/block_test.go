@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime/uptimemock"
@@ -32,340 +33,340 @@ func TestBlockOptions(t *testing.T) {
 	}
 
 	tests := []test{
-		// {
-		// 	name: "apricot proposal block; commit preferred",
-		// 	blkF: func(ctrl *gomock.Controller) *Block {
-		// 		state := statetest.New(t, statetest.Config{})
+		{
+			name: "apricot proposal block; commit preferred",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				state := statetest.New(t, statetest.Config{})
 
-		// 		manager := &manager{
-		// 			backend: &backend{
-		// 				state: state,
-		// 				ctx:   snowtest.Context(t, snowtest.PChainID),
-		// 			},
-		// 			txExecutorBackend: &executor.Backend{
-		// 				Config: &config.Internal{
-		// 					UptimePercentage: 0,
-		// 				},
-		// 			},
-		// 		}
+				manager := &manager{
+					backend: &backend{
+						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: 0,
+						},
+					},
+				}
 
-		// 		return &Block{
-		// 			Block:   &block.ApricotProposalBlock{},
-		// 			manager: manager,
-		// 		}
-		// 	},
-		// 	expectedPreferenceType: &block.ApricotCommitBlock{},
-		// },
-		// {
-		// 	name: "banff proposal block; invalid proposal tx",
-		// 	blkF: func(ctrl *gomock.Controller) *Block {
-		// 		state := statetest.New(t, statetest.Config{})
-		// 		uptimes := uptimemock.NewCalculator(ctrl)
+				return &Block{
+					Block:   &block.ApricotProposalBlock{},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.ApricotCommitBlock{},
+		},
+		{
+			name: "banff proposal block; invalid proposal tx",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				state := statetest.New(t, statetest.Config{})
+				uptimes := uptimemock.NewCalculator(ctrl)
 
-		// 		manager := &manager{
-		// 			backend: &backend{
-		// 				state: state,
-		// 				ctx:   snowtest.Context(t, snowtest.PChainID),
-		// 			},
-		// 			txExecutorBackend: &executor.Backend{
-		// 				Config: &config.Internal{
-		// 					UptimePercentage: 0,
-		// 				},
-		// 				Uptimes: uptimes,
-		// 			},
-		// 		}
+				manager := &manager{
+					backend: &backend{
+						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: 0,
+						},
+						Uptimes: uptimes,
+					},
+				}
 
-		// 		return &Block{
-		// 			Block: &block.BanffProposalBlock{
-		// 				ApricotProposalBlock: block.ApricotProposalBlock{
-		// 					Tx: &txs.Tx{
-		// 						Unsigned: &txs.CreateChainTx{},
-		// 					},
-		// 				},
-		// 			},
-		// 			manager: manager,
-		// 		}
-		// 	},
-		// 	expectedPreferenceType: &block.BanffCommitBlock{},
-		// },
-		// {
-		// 	name: "banff proposal block; missing tx",
-		// 	blkF: func(ctrl *gomock.Controller) *Block {
-		// 		stakerTxID := ids.GenerateTestID()
-		// 		uptimes := uptimemock.NewCalculator(ctrl)
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.CreateChainTx{},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.BanffCommitBlock{},
+		},
+		{
+			name: "banff proposal block; missing tx",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				stakerTxID := ids.GenerateTestID()
+				uptimes := uptimemock.NewCalculator(ctrl)
 
-		// 		state := statetest.New(t, statetest.Config{})
+				state := statetest.New(t, statetest.Config{})
 
-		// 		manager := &manager{
-		// 			backend: &backend{
-		// 				state: state,
-		// 				ctx:   snowtest.Context(t, snowtest.PChainID),
-		// 			},
-		// 			txExecutorBackend: &executor.Backend{
-		// 				Config: &config.Internal{
-		// 					UptimePercentage: 0,
-		// 				},
-		// 				Uptimes: uptimes,
-		// 			},
-		// 		}
+				manager := &manager{
+					backend: &backend{
+						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: 0,
+						},
+						Uptimes: uptimes,
+					},
+				}
 
-		// 		return &Block{
-		// 			Block: &block.BanffProposalBlock{
-		// 				ApricotProposalBlock: block.ApricotProposalBlock{
-		// 					Tx: &txs.Tx{
-		// 						Unsigned: &txs.RewardValidatorTx{
-		// 							TxID: stakerTxID,
-		// 						},
-		// 					},
-		// 				},
-		// 			},
-		// 			manager: manager,
-		// 		}
-		// 	},
-		// 	expectedPreferenceType: &block.BanffCommitBlock{},
-		// },
-		// {
-		// 	name: "banff proposal block; error fetching staker tx",
-		// 	blkF: func(ctrl *gomock.Controller) *Block {
-		// 		stakerTxID := ids.GenerateTestID()
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.RewardValidatorTx{
+									TxID: stakerTxID,
+								},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.BanffCommitBlock{},
+		},
+		{
+			name: "banff proposal block; error fetching staker tx",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				stakerTxID := ids.GenerateTestID()
 
-		// 		state := statetest.New(t, statetest.Config{})
+				state := statetest.New(t, statetest.Config{})
 
-		// 		manager := &manager{
-		// 			backend: &backend{
-		// 				state: state,
-		// 				ctx:   snowtest.Context(t, snowtest.PChainID),
-		// 			},
-		// 			txExecutorBackend: &executor.Backend{
-		// 				Config: &config.Internal{
-		// 					UptimePercentage: 0,
-		// 				},
-		// 			},
-		// 		}
+				manager := &manager{
+					backend: &backend{
+						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: 0,
+						},
+					},
+				}
 
-		// 		return &Block{
-		// 			Block: &block.BanffProposalBlock{
-		// 				ApricotProposalBlock: block.ApricotProposalBlock{
-		// 					Tx: &txs.Tx{
-		// 						Unsigned: &txs.RewardValidatorTx{
-		// 							TxID: stakerTxID,
-		// 						},
-		// 					},
-		// 				},
-		// 			},
-		// 			manager: manager,
-		// 		}
-		// 	},
-		// 	expectedPreferenceType: &block.BanffCommitBlock{},
-		// },
-		// {
-		// 	name: "banff proposal block; unexpected staker tx type",
-		// 	blkF: func(ctrl *gomock.Controller) *Block {
-		// 		stakerTxID := ids.GenerateTestID()
-		// 		stakerTx := &txs.Tx{
-		// 			TxID: stakerTxID,
-		// 			Unsigned: &txs.CreateChainTx{},
-		// 		}
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.RewardValidatorTx{
+									TxID: stakerTxID,
+								},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.BanffCommitBlock{},
+		},
+		{
+			name: "banff proposal block; unexpected staker tx type",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				stakerTxID := ids.GenerateTestID()
+				stakerTx := &txs.Tx{
+					TxID: stakerTxID,
+					Unsigned: &txs.CreateChainTx{},
+				}
 
-		// 		state := statetest.New(t, statetest.Config{})
-		// 		state.AddTx(stakerTx, status.Committed)
+				state := statetest.New(t, statetest.Config{})
+				state.AddTx(stakerTx, status.Committed)
 
-		// 		manager := &manager{
-		// 			backend: &backend{
-		// 				state: state,
-		// 				ctx:   snowtest.Context(t, snowtest.PChainID),
-		// 			},
-		// 			txExecutorBackend: &executor.Backend{
-		// 				Config: &config.Internal{
-		// 					UptimePercentage: 0,
-		// 				},
-		// 			},
-		// 		}
+				manager := &manager{
+					backend: &backend{
+						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: 0,
+						},
+					},
+				}
 
-		// 		return &Block{
-		// 			Block: &block.BanffProposalBlock{
-		// 				ApricotProposalBlock: block.ApricotProposalBlock{
-		// 					Tx: &txs.Tx{
-		// 						Unsigned: &txs.RewardValidatorTx{
-		// 							TxID: stakerTxID,
-		// 						},
-		// 					},
-		// 				},
-		// 			},
-		// 			manager: manager,
-		// 		}
-		// 	},
-		// 	expectedPreferenceType: &block.BanffCommitBlock{},
-		// },
-		// {
-		// 	name: "banff proposal block; missing primary network validator",
-		// 	blkF: func(ctrl *gomock.Controller) *Block {
-		// 		var (
-		// 			stakerTxID = ids.GenerateTestID()
-		// 			nodeID     = ids.GenerateTestNodeID()
-		// 			subnetID   = ids.GenerateTestID()
-		// 			stakerTx   = &txs.Tx{
-		// 				Unsigned: &txs.AddPermissionlessValidatorTx{
-		// 					Validator: txs.Validator{
-		// 						NodeID: nodeID,
-		// 					},
-		// 					Subnet: subnetID,
-		// 				},
-		// 				TxID: stakerTxID,
-		// 			}
-		// 		)
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.RewardValidatorTx{
+									TxID: stakerTxID,
+								},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.BanffCommitBlock{},
+		},
+		{
+			name: "banff proposal block; missing primary network validator",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				var (
+					stakerTxID = ids.GenerateTestID()
+					nodeID     = ids.GenerateTestNodeID()
+					subnetID   = ids.GenerateTestID()
+					stakerTx   = &txs.Tx{
+						Unsigned: &txs.AddPermissionlessValidatorTx{
+							Validator: txs.Validator{
+								NodeID: nodeID,
+							},
+							Subnet: subnetID,
+						},
+						TxID: stakerTxID,
+					}
+				)
 
-		// 		state := statetest.New(t, statetest.Config{})
-		// 		state.AddTx(stakerTx, status.Committed)
+				state := statetest.New(t, statetest.Config{})
+				state.AddTx(stakerTx, status.Committed)
 
-		// 		manager := &manager{
-		// 			backend: &backend{
-		// 				state: state,
-		// 				ctx:   snowtest.Context(t, snowtest.PChainID),
-		// 			},
-		// 			txExecutorBackend: &executor.Backend{
-		// 				Config: &config.Internal{
-		// 					UptimePercentage: 0,
-		// 				},
-		// 			},
-		// 		}
+				manager := &manager{
+					backend: &backend{
+						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: 0,
+						},
+					},
+				}
 
-		// 		return &Block{
-		// 			Block: &block.BanffProposalBlock{
-		// 				ApricotProposalBlock: block.ApricotProposalBlock{
-		// 					Tx: &txs.Tx{
-		// 						Unsigned: &txs.RewardValidatorTx{
-		// 							TxID: stakerTxID,
-		// 						},
-		// 					},
-		// 				},
-		// 			},
-		// 			manager: manager,
-		// 		}
-		// 	},
-		// 	expectedPreferenceType: &block.BanffCommitBlock{},
-		// },
-		// {
-		// 	name: "banff proposal block; failed calculating primary network uptime",
-		// 	blkF: func(ctrl *gomock.Controller) *Block {
-		// 		var (
-		// 			nodeID     = ids.GenerateTestNodeID()
-		// 			subnetID   = constants.PrimaryNetworkID
-		// 			stakerTxID = ids.GenerateTestID()
-		// 			stakerTx   = &txs.Tx{
-		// 				Unsigned: &txs.AddPermissionlessValidatorTx{
-		// 					Validator: txs.Validator{
-		// 						NodeID: nodeID,
-		// 					},
-		// 					Subnet: subnetID,
-		// 				},
-		// 				TxID: stakerTxID,
-		// 			}
-		// 			primaryNetworkValidatorStartTime = time.Now()
-		// 			staker                           = &state.Staker{
-		// 				StartTime: primaryNetworkValidatorStartTime,
-		// 				NodeID: nodeID,
-		// 			}
-		// 		)
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.RewardValidatorTx{
+									TxID: stakerTxID,
+								},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.BanffCommitBlock{},
+		},
+		{
+			name: "banff proposal block; failed calculating primary network uptime",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				var (
+					nodeID     = ids.GenerateTestNodeID()
+					subnetID   = constants.PrimaryNetworkID
+					stakerTxID = ids.GenerateTestID()
+					stakerTx   = &txs.Tx{
+						Unsigned: &txs.AddPermissionlessValidatorTx{
+							Validator: txs.Validator{
+								NodeID: nodeID,
+							},
+							Subnet: subnetID,
+						},
+						TxID: stakerTxID,
+					}
+					primaryNetworkValidatorStartTime = time.Now()
+					staker                           = &state.Staker{
+						StartTime: primaryNetworkValidatorStartTime,
+						NodeID: nodeID,
+					}
+				)
 
-		// 		state := statetest.New(t, statetest.Config{})
-		// 		state.AddTx(stakerTx, status.Committed)
-		// 		err := state.PutCurrentValidator(staker)
-		// 		require.NoError(t, err)
+				state := statetest.New(t, statetest.Config{})
+				state.AddTx(stakerTx, status.Committed)
+				err := state.PutCurrentValidator(staker)
+				require.NoError(t, err)
 
-		// 		uptimes := uptimemock.NewCalculator(ctrl)
-		// 		uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(0.0, database.ErrNotFound)
+				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(0.0, database.ErrNotFound)
 
-		// 		manager := &manager{
-		// 			backend: &backend{
-		// 				state: state,
-		// 				ctx:   snowtest.Context(t, snowtest.PChainID),
-		// 			},
-		// 			txExecutorBackend: &executor.Backend{
-		// 				Config: &config.Internal{
-		// 					UptimePercentage: 0,
-		// 				},
-		// 				Uptimes: uptimes,
-		// 			},
-		// 		}
+				manager := &manager{
+					backend: &backend{
+						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: 0,
+						},
+						Uptimes: uptimes,
+					},
+				}
 
-		// 		return &Block{
-		// 			Block: &block.BanffProposalBlock{
-		// 				ApricotProposalBlock: block.ApricotProposalBlock{
-		// 					Tx: &txs.Tx{
-		// 						Unsigned: &txs.RewardValidatorTx{
-		// 							TxID: stakerTx.ID(),
-		// 						},
-		// 					},
-		// 				},
-		// 			},
-		// 			manager: manager,
-		// 		}
-		// 	},
-		// 	expectedPreferenceType: &block.BanffCommitBlock{},
-		// },
-		// {
-		// 	name: "banff proposal block; failed fetching subnet transformation",
-		// 	blkF: func(ctrl *gomock.Controller) *Block {
-		// 		var (
-		// 			stakerTxID = ids.GenerateTestID()
-		// 			nodeID     = ids.GenerateTestNodeID()
-		// 			subnetID   = ids.GenerateTestID()
-		// 			stakerTx   = &txs.Tx{
-		// 				Unsigned: &txs.AddPermissionlessValidatorTx{
-		// 					Validator: txs.Validator{
-		// 						NodeID: nodeID,
-		// 					},
-		// 					Subnet: subnetID,
-		// 				},
-		// 				TxID: stakerTxID,
-		// 			}
-		// 			primaryNetworkValidatorStartTime = time.Now()
-		// 			staker                           = &state.Staker{
-		// 				StartTime: primaryNetworkValidatorStartTime,
-		// 				NodeID: nodeID,
-		// 			}
-		// 			primaryNetworkValidator = &state.Staker{
-		// 				StartTime: primaryNetworkValidatorStartTime,
-		// 				NodeID: nodeID,
-		// 			}
-		// 		)
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.RewardValidatorTx{
+									TxID: stakerTx.ID(),
+								},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.BanffCommitBlock{},
+		},
+		{
+			name: "banff proposal block; failed fetching subnet transformation",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				var (
+					stakerTxID = ids.GenerateTestID()
+					nodeID     = ids.GenerateTestNodeID()
+					subnetID   = ids.GenerateTestID()
+					stakerTx   = &txs.Tx{
+						Unsigned: &txs.AddPermissionlessValidatorTx{
+							Validator: txs.Validator{
+								NodeID: nodeID,
+							},
+							Subnet: subnetID,
+						},
+						TxID: stakerTxID,
+					}
+					primaryNetworkValidatorStartTime = time.Now()
+					staker                           = &state.Staker{
+						StartTime: primaryNetworkValidatorStartTime,
+						NodeID: nodeID,
+					}
+					primaryNetworkValidator = &state.Staker{
+						StartTime: primaryNetworkValidatorStartTime,
+						NodeID: nodeID,
+					}
+				)
 
-		// 		state := statetest.New(t, statetest.Config{})
-		// 		state.AddTx(stakerTx, status.Committed)
+				state := statetest.New(t, statetest.Config{})
+				state.AddTx(stakerTx, status.Committed)
 
-		// 		err := state.PutCurrentValidator(primaryNetworkValidator)
-		// 		require.NoError(t, err)
-		// 		err = state.PutCurrentValidator(staker)
-		// 		require.NoError(t, err)
+				err := state.PutCurrentValidator(primaryNetworkValidator)
+				require.NoError(t, err)
+				err = state.PutCurrentValidator(staker)
+				require.NoError(t, err)
 
-		// 		manager := &manager{
-		// 			backend: &backend{
-		// 				state: state,
-		// 				ctx:   snowtest.Context(t, snowtest.PChainID),
-		// 			},
-		// 			txExecutorBackend: &executor.Backend{
-		// 				Config: &config.Internal{
-		// 					UptimePercentage: 0,
-		// 				},
-		// 			},
-		// 		}
+				manager := &manager{
+					backend: &backend{
+						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: 0,
+						},
+					},
+				}
 
-		// 		return &Block{
-		// 			Block: &block.BanffProposalBlock{
-		// 				ApricotProposalBlock: block.ApricotProposalBlock{
-		// 					Tx: &txs.Tx{
-		// 						Unsigned: &txs.RewardValidatorTx{
-		// 							TxID: stakerTxID,
-		// 						},
-		// 					},
-		// 				},
-		// 			},
-		// 			manager: manager,
-		// 		}
-		// 	},
-		// 	expectedPreferenceType: &block.BanffCommitBlock{},
-		// },
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.RewardValidatorTx{
+									TxID: stakerTxID,
+								},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.BanffCommitBlock{},
+		},
 		{
 			name: "banff proposal block; prefers commit",
 			blkF: func(ctrl *gomock.Controller) *Block {
