@@ -6,6 +6,8 @@ mod ec2_util;
 mod ssm_monitor;
 pub mod stage_config;
 
+use std::collections::HashMap;
+
 use clap::{Args, Subcommand, ValueEnum};
 use log::{debug, info};
 use thiserror::Error;
@@ -195,6 +197,45 @@ impl DryRunMode {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VariableOverride {
+    key: String,
+    value: String,
+}
+
+impl VariableOverride {
+    #[must_use]
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
+fn parse_variable_override(raw: &str) -> Result<VariableOverride, String> {
+    let (raw_key, raw_value) = raw
+        .split_once('=')
+        .ok_or_else(|| "expected KEY=VALUE format".to_owned())?;
+
+    let key = raw_key.strip_prefix("variables.").unwrap_or(raw_key).trim();
+    if key.is_empty() {
+        return Err("variable key must be non-empty".to_owned());
+    }
+    if key.chars().any(char::is_whitespace) {
+        return Err(format!(
+            "invalid variable key '{key}': whitespace is not allowed"
+        ));
+    }
+
+    Ok(VariableOverride {
+        key: key.to_owned(),
+        value: raw_value.to_owned(),
+    })
+}
+
 #[derive(Debug, Args)]
 pub struct DeployOptions {
     /// EC2 instance type
@@ -232,6 +273,14 @@ pub struct DeployOptions {
     /// VM reexecution config (firewood, hashdb, pathdb, etc.)
     #[arg(long = "config", value_name = "CONFIG", default_value = "firewood")]
     pub config: String,
+
+    /// Override template variables (`KEY=VALUE`). Repeat the flag to set multiple values.
+    #[arg(
+        long = "variable",
+        value_name = "KEY=VALUE",
+        value_parser = parse_variable_override
+    )]
+    pub variable_overrides: Vec<VariableOverride>,
 
     /// Enable metrics server during execution (`--metrics-server=false` disables)
     #[arg(
@@ -313,6 +362,18 @@ impl DeployOptions {
     #[must_use]
     pub fn scenario_name(&self) -> &str {
         &self.scenario
+    }
+
+    #[must_use]
+    pub fn variable_overrides_map(&self) -> HashMap<String, String> {
+        let mut merged = HashMap::new();
+        for override_pair in &self.variable_overrides {
+            merged.insert(
+                override_pair.key().to_owned(),
+                override_pair.value().to_owned(),
+            );
+        }
+        merged
     }
 
     #[must_use]
@@ -668,6 +729,19 @@ fn log_launch_config(opts: &DeployOptions) {
     info!("\t{:24}{}", "Scenario:", opts.scenario_name());
     info!("\t{:24}{}", "Blocks:", opts.nblocks.as_str());
     info!("\t{:24}{}", "Config:", opts.config);
+    info!(
+        "\t{:24}{}",
+        "Variable overrides:",
+        if opts.variable_overrides.is_empty() {
+            "none".to_owned()
+        } else {
+            opts.variable_overrides
+                .iter()
+                .map(VariableOverride::key)
+                .collect::<Vec<_>>()
+                .join(", ")
+        }
+    );
     info!("\t{:24}{}", "Metrics Server:", opts.metrics_server);
     info!("\t{:24}{}", "Region:", opts.region);
     info!(

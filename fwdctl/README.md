@@ -22,6 +22,25 @@ To use
 * `fwdctl delete`: Delete a key/value pair from the database.
 * `fwdctl root`: Get the root hash of the key/value trie.
 * `fwdctl dump`: Dump the contents of the key/value store.
+* `fwdctl launch` (requires `--features launch`): Launch and manage AWS benchmark runs.
+
+## Launch command
+
+`fwdctl launch` provisions and manages EC2 instances for benchmark workflows.
+
+Build with launch support:
+
+```sh
+cargo build --release --bin fwdctl --features launch
+```
+
+Then inspect command help:
+
+```sh
+./target/release/fwdctl launch -h
+```
+
+For full launch usage, defaults, and scenario configuration, see [README.launch.md](./README.launch.md).
 
 ## Examples
 
