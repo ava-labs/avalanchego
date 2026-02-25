@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -144,12 +145,12 @@ func getDefaultSnowParams(v *viper.Viper) *snowball.Parameters {
 
 // setSimplexDefaults sets the default values for any unset fields in the
 // simplex.Parameters.
-func setSimplexDefaults(config *subnets.Config, v *viper.Viper) {
-	if config.SimplexParameters.MaxNetworkDelay == 0 {
-		config.SimplexParameters.MaxNetworkDelay = v.GetDuration(SimplexMaxNetworkDelayKey)
+func setSimplexDefaults(config *simplex.Parameters, v *viper.Viper) {
+	if config.MaxNetworkDelay == 0 {
+		config.MaxNetworkDelay = v.GetDuration(SimplexMaxNetworkDelayKey)
 	}
-	if config.SimplexParameters.MaxRebroadcastWait == 0 {
-		config.SimplexParameters.MaxRebroadcastWait = v.GetDuration(SimplexMaxRebroadcastWaitKey)
+	if config.MaxRebroadcastWait == 0 {
+		config.MaxRebroadcastWait = v.GetDuration(SimplexMaxRebroadcastWaitKey)
 	}
 }
 
@@ -157,7 +158,7 @@ func setSimplexDefaults(config *subnets.Config, v *viper.Viper) {
 func setConfigDefaults(config *subnets.Config, v *viper.Viper) {
 	switch {
 	case config.SimplexParameters != nil:
-		setSimplexDefaults(config, v)
+		setSimplexDefaults(config.SimplexParameters, v)
 	case config.SnowParameters != nil:
 		setSnowDefaults(config.SnowParameters, v)
 	case config.ConsensusParameters != nil:
