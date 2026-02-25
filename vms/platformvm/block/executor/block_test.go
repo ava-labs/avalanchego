@@ -168,7 +168,7 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				stakerTxID := ids.GenerateTestID()
 				stakerTx := &txs.Tx{
-					TxID: stakerTxID,
+					TxID:     stakerTxID,
 					Unsigned: &txs.CreateChainTx{},
 				}
 
@@ -273,7 +273,7 @@ func TestBlockOptions(t *testing.T) {
 					primaryNetworkValidatorStartTime = time.Now()
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
-						NodeID: nodeID,
+						NodeID:    nodeID,
 					}
 				)
 
@@ -332,11 +332,11 @@ func TestBlockOptions(t *testing.T) {
 					primaryNetworkValidatorStartTime = time.Now()
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
-						NodeID: nodeID,
+						NodeID:    nodeID,
 					}
 					primaryStaker = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
-						NodeID: nodeID,
+						NodeID:    nodeID,
 					}
 				)
 				uptimes := uptimemock.NewCalculator(ctrl)
@@ -455,9 +455,9 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
-					nodeID   = ids.GenerateTestNodeID()
-					subnetID = constants.PrimaryNetworkID
-					stakerTx = &txs.Tx{
+					nodeID     = ids.GenerateTestNodeID()
+					subnetID   = constants.PrimaryNetworkID
+					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddPermissionlessValidatorTx{
 							Validator: txs.Validator{
 								NodeID: nodeID,
