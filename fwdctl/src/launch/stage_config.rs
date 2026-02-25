@@ -34,6 +34,9 @@ pub enum ConfigError {
     #[error("Unknown variable: {0}")]
     UnknownVariable(String),
 
+    #[error("Unresolved template remains in variable: {0}")]
+    UnresolvedTemplate(String),
+
     #[error("Malformed template: {0}")]
     MalformedTemplate(String),
 }
@@ -250,6 +253,7 @@ impl StageConfig {
             // Reset to base vars + stage vars
             stage_ctx.variables.clone_from(&base_vars);
             stage_ctx.variables.extend(stage.variables);
+            resolve_stage_variables(&mut stage_ctx)?;
 
             let commands = stage
                 .commands
@@ -296,6 +300,48 @@ fn process_template(template: &str, ctx: &TemplateContext) -> Result<String, Con
     Ok(out)
 }
 
+fn resolve_stage_variables(ctx: &mut TemplateContext) -> Result<(), ConfigError> {
+    let max_passes = ctx.variables.len().saturating_add(1).max(2);
+    let mut render_ctx = TemplateContext {
+        variables: HashMap::new(),
+        args: ctx.args.clone(),
+        branches: ctx.branches.clone(),
+    };
+
+    for _ in 0..max_passes {
+        render_ctx.variables.clone_from(&ctx.variables);
+        let mut changed = false;
+
+        for value in ctx.variables.values_mut() {
+            let rendered = process_template(value, &render_ctx)?;
+            if rendered != *value {
+                *value = rendered;
+                changed = true;
+            }
+        }
+
+        if !changed {
+            break;
+        }
+    }
+
+    if let Some((key, value)) = ctx
+        .variables
+        .iter()
+        .find(|(_, value)| contains_template_marker(value))
+    {
+        return Err(ConfigError::UnresolvedTemplate(format!(
+            "variables.{key}={value}"
+        )));
+    }
+
+    Ok(())
+}
+
+fn contains_template_marker(value: &str) -> bool {
+    value.contains("{{") && value.contains("}}")
+}
+
 fn resolve_var(path: &str, ctx: &TemplateContext) -> Result<String, ConfigError> {
     let err = || ConfigError::UnknownVariable(path.into());
     let (ns, key) = path.split_once('.').ok_or_else(err)?;
@@ -323,8 +369,12 @@ mod tests {
             .validate()
             .expect("embedded config should include required scenario");
         assert!(
-            config.scenarios.contains_key("reexecute"),
-            "should contain 'reexecute' scenario"
+            config.scenarios.contains_key(DEFAULT_SCENARIO),
+            "should contain default scenario"
+        );
+        assert!(
+            config.scenarios.contains_key("snapshotter"),
+            "should contain 'snapshotter' scenario"
         );
         assert!(
             !config.stages.is_empty(),
@@ -348,5 +398,42 @@ mod tests {
         assert!(result.is_err());
         let result = process_template("{{ variables.name", &ctx);
         assert!(matches!(result, Err(ConfigError::MalformedTemplate(_))));
+    }
+
+    #[test]
+    fn nested_stage_variable_interpolation() {
+        let yaml = r#"
+variables:
+  nvme_base: "/mnt/nvme"
+
+stages:
+  copy-to-s3:
+    name: "Copy"
+    variables:
+      src: "{{ variables.nvme_base }}/ubuntu/exec-data/current-state/replay_50k_log_db"
+    commands:
+      - "echo {{ variables.src }}"
+
+scenarios:
+  test:
+    stages:
+      - copy-to-s3
+"#;
+
+        let config: StageConfig =
+            serde_yaml::from_str(yaml).expect("nested variable config should parse");
+        let stages = config
+            .process(&TemplateContext::default(), "test")
+            .expect("nested variable interpolation should succeed");
+
+        assert_eq!(
+            stages
+                .first()
+                .expect("expected stage")
+                .commands
+                .first()
+                .expect("expected command"),
+            "echo /mnt/nvme/ubuntu/exec-data/current-state/replay_50k_log_db"
+        );
     }
 }

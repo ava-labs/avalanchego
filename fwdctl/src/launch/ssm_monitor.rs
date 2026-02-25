@@ -3,7 +3,9 @@
 
 use std::time::{Duration, Instant};
 
-use aws_config::BehaviorVersion;
+use super::LaunchError;
+use super::cloud_init::STATE_FILE;
+use crate::launch::ec2_util::aws_config;
 use aws_sdk_ssm::Client as SsmClient;
 use aws_sdk_ssm::error::ProvideErrorMetadata;
 use aws_sdk_ssm::types::{InstanceInformationFilter, InstanceInformationFilterKey, PingStatus};
@@ -12,25 +14,22 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use tokio::time::sleep;
 
-use super::LaunchError;
-use super::cloud_init::STATE_FILE;
-
+/// Maximum attempts while waiting for an instance to register as SSM `Online`.
 const SSM_MAX_RETRIES: u32 = 30;
+/// Delay between SSM registration retry attempts.
 const SSM_RETRY_DELAY: Duration = Duration::from_secs(5);
+/// Poll interval while waiting for an SSM command invocation status update.
 const SSM_COMMAND_POLL_INTERVAL: Duration = Duration::from_millis(500);
+/// Timeout for a single SSM command invocation.
 const SSM_COMMAND_TIMEOUT: Duration = Duration::from_secs(120);
+/// Poll interval for cloud-init state and bootstrap log streaming loops.
 const LOG_POLL_INTERVAL: Duration = Duration::from_secs(3);
+/// Number of log lines fetched per SSM read when tailing bootstrap output.
 const LOG_CHUNK_SIZE: u64 = 500;
+/// Log file containing benchmark re-execution output on the remote host.
 const BOOTSTRAP_LOG: &str = "/var/log/bootstrap.log";
+/// Maximum time to wait for cloud-init to publish its JSON state file.
 const STATE_FILE_TIMEOUT: Duration = Duration::from_secs(600);
-
-async fn aws_config(region: Option<&str>) -> aws_config::SdkConfig {
-    let mut loader = aws_config::defaults(BehaviorVersion::latest());
-    if let Some(r) = region {
-        loader = loader.region(aws_config::Region::new(r.to_owned()));
-    }
-    loader.load().await
-}
 
 pub async fn ssm_client(region: &str) -> SsmClient {
     SsmClient::new(&aws_config(Some(region)).await)

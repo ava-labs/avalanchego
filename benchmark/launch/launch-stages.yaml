@@ -68,23 +68,31 @@ variables:
   libevm_repo: "https://github.com/ava-labs/libevm.git"
   s3_bucket: "avalanchego-bootstrap-testing"
 
+# Reviewability note:
+# The `stages` list below intentionally mirrors the cloud-init `runcmd` flow in
+# `benchmark/bootstrap/aws-launch.sh` (around lines 410-485). Keep stage order
+# aligned with that script so reviewers can compare stage-by-stage.
 stages:
+  # aws-launch.sh: install rust (runcmd lines 410-417)
   rust-install:
     name: "Installing Rust"
     commands:
       - "install -d -m 0755 -o ubuntu -g ubuntu /usr/local/rust"
       - "sudo -u ubuntu --login env RUSTUP_HOME=/usr/local/rust CARGO_HOME=/usr/local/rust sh -c 'curl https://sh.rustup.rs -sSf | sh -s -- -y --no-modify-path'"
       - "sudo -u ubuntu --login env RUSTUP_HOME=/usr/local/rust CARGO_HOME=/usr/local/rust /usr/local/rust/bin/rustup default stable"
+  # aws-launch.sh: install SSM agent (new, not in legacy script)
   ssm-agent:
     name: "Installing SSM Agent"
     commands:
       - "snap install amazon-ssm-agent --classic"
       - "systemctl start snap.amazon-ssm-agent.amazon-ssm-agent"
       - "systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent"
+  # aws-launch.sh: clone firewood + build environment (runcmd lines 418-420)
   clone-firewood:
     name: "Cloning firewood"
     commands:
       - "git clone --depth 1 {{ branches.firewood }} {{ variables.firewood_repo }} /tmp/firewood"
+  # aws-launch.sh: permission fixes + symlink setup (runcmd lines 421-427)
   setup-environment:
     name: "Setting up environment"
     commands:
@@ -95,17 +103,20 @@ stages:
       - "find {{ variables.nvme_base }}/ubuntu -type d -print0 | xargs -0 chmod g+s"
       - "sudo -u ubuntu ln -s {{ variables.nvme_base }}/ubuntu/data /home/ubuntu/data"
       - "sudo -u ubuntu ln -s {{ variables.nvme_base }}/ubuntu/avalanchego /home/ubuntu/avalanchego"
+  # aws-launch.sh: install go + grafana (runcmd lines 428-430)
   install-go-grafana:
     name: "Installing Go and Grafana"
     commands:
       - "bash {{ variables.nvme_base }}/ubuntu/firewood/benchmark/setup-scripts/install-golang.sh"
       - "bash {{ variables.nvme_base }}/ubuntu/firewood/benchmark/setup-scripts/install-grafana.sh"
+  # aws-launch.sh: install task + clone avalanchego/libevm (runcmd lines 432-441)
   clone-repos:
     name: "Cloning repositories"
     commands:
       - "snap install task --classic"
       - "sudo -u ubuntu -D {{ variables.nvme_base }}/ubuntu git clone --depth 100 {{ branches.avalanchego }} {{ variables.avalanchego_repo }}"
       - "sudo -u ubuntu -D {{ variables.nvme_base }}/ubuntu git clone --depth 100 {{ branches.libevm }} {{ variables.libevm_repo }}"
+  # aws-launch.sh: go mod replace/tidy wiring (runcmd lines 443-468)
   configure-go-modules:
     name: "Configuring Go modules"
     commands:
@@ -117,15 +128,20 @@ stages:
       - "sudo -u ubuntu -D {{ variables.nvme_base }}/ubuntu/avalanchego /usr/local/go/bin/go mod edit -replace github.com/ava-labs/libevm=../libevm"
       # Run go mod tidy for coreth and avalanchego
       - "sudo -u ubuntu --login -D {{ variables.nvme_base }}/ubuntu/avalanchego/graft/coreth go mod tidy"
+  # aws-launch.sh: build firewood ffi (runcmd lines 460-465)
   build-firewood-ffi:
     name: "Building firewood FFI"
+    variables:
+      features: "ethhash,logger"
     commands:
-      - "sudo -u ubuntu -D {{ variables.nvme_base }}/ubuntu/firewood/ffi --login time cargo build --profile maxperf --features ethhash,logger > {{ variables.nvme_base }}/ubuntu/firewood/build.log 2>&1"
+      - "sudo -u ubuntu -D {{ variables.nvme_base }}/ubuntu/firewood/ffi --login time cargo build --profile maxperf --features {{ variables.features }} > {{ variables.nvme_base }}/ubuntu/firewood/build.log 2>&1"
+  # aws-launch.sh: build avalanchego (runcmd lines 467-472)
   build-avalanchego:
     name: "Building avalanchego"
     commands:
       - "sudo -u ubuntu --login -D {{ variables.nvme_base }}/ubuntu/avalanchego go mod tidy"
       - "sudo -u ubuntu --login -D {{ variables.nvme_base }}/ubuntu/avalanchego time scripts/build.sh > {{ variables.nvme_base }}/ubuntu/avalanchego/build.log 2>&1"
+  # aws-launch.sh: install s5cmd (runcmd line 474)
   install-s5cmd:
     name: "Installing s5cmd"
     commands:
@@ -136,6 +152,7 @@ stages:
           | cut -d '"' -f 4)
         curl -L -o /tmp/s5cmd.deb "$S5CMD_URL"
         dpkg -i /tmp/s5cmd.deb
+  # aws-launch.sh: download blocks (runcmd lines 476-480)
   download-blocks:
     name: "Downloading blocks"
     commands:
@@ -143,10 +160,29 @@ stages:
       - "s5cmd cp 's3://{{ variables.s3_bucket }}/cchain-mainnet-blocks-{{ args.nblocks }}-ldb/*' {{ variables.nvme_base }}/ubuntu/exec-data/blocks/ >/dev/null"
       - "chown -R ubuntu {{ variables.nvme_base }}/ubuntu/exec-data"
       - "chmod -R g=u {{ variables.nvme_base }}/ubuntu/exec-data"
+  # aws-launch.sh: create current state dir before execution
   init-state-dir:
     name: "Initializing state directory"
     commands:
       - "sudo -u ubuntu mkdir -p {{ variables.nvme_base }}/ubuntu/exec-data/current-state"
+  # aws-launch.sh: execute benchmark (runcmd lines 482-485)
+  execute-range:
+    name: "Executing blocks {{ variables.start_block }} to {{ variables.end_block }}"
+    variables:
+      start_block: "1"
+      end_block: "{{ args.end_block }}"
+      background: ""
+      replay_path: ""
+    commands:
+      - "sudo -u ubuntu -D {{ variables.nvme_base }}/ubuntu/avalanchego --login {{ variables.replay_path }} METRICS_SERVER_ENABLED={{ args.metrics_server }} CURRENT_STATE_DIR={{ variables.nvme_base }}/ubuntu/exec-data/current-state BLOCK_DIR={{ variables.nvme_base }}/ubuntu/exec-data/blocks START_BLOCK={{ variables.start_block }} END_BLOCK={{ variables.end_block }} CONFIG={{ args.config }} time task test-cchain-reexecution > /var/log/bootstrap.log 2>&1 {{ variables.background }}"
+  snapshot-to-s3:
+    name: "Snapshotting state at block {{ variables.snapshot_block }}"
+    commands:
+        - "s5cmd cp '{{ variables.nvme_base }}/ubuntu/exec-data/current-state/*' 's3://{{ variables.s3_bucket }}/snapshots/{{ variables.snapshot_block }}/'"
+  copy-to-s3:
+    name: "Copy file(s) from {{ variables.src }} to s3://{{ variables.s3_bucket }}/{{ variables.dst }}"
+    commands:
+      - "s5cmd cp '{{ variables.src }}' 's3://{{ variables.s3_bucket }}/{{ variables.dst }}'"
 
 scenarios:
   reexecute:
@@ -165,6 +201,73 @@ scenarios:
       - download-blocks
       - init-state-dir
       - id: execute-range
-        name: "Executing blocks"
-        commands:
-          - "sudo -u ubuntu -D {{ variables.nvme_base }}/ubuntu/avalanchego --login METRICS_SERVER_ENABLED={{ args.metrics_server }} CURRENT_STATE_DIR={{ variables.nvme_base }}/ubuntu/exec-data/current-state BLOCK_DIR={{ variables.nvme_base }}/ubuntu/exec-data/blocks START_BLOCK=1 END_BLOCK={{ variables.end_block }} CONFIG={{ args.config }} time task test-cchain-reexecution > /var/log/bootstrap.log 2>&1 &"
+        variables:
+          background: "&"
+  replay-log-gen:
+    description: "Re-execute up to 50k blocks, and save replay log to S3"
+    stages:
+      - rust-install
+      - ssm-agent
+      - clone-firewood
+      - setup-environment
+      - install-go-grafana
+      - clone-repos
+      - configure-go-modules
+      - id: build-firewood-ffi
+        variables:
+          features: "ethhash,logger,block-replay"
+      - build-avalanchego
+      - install-s5cmd
+      - download-blocks
+      - init-state-dir
+      - id: execute-range
+        variables:
+          end_block: "50000"
+          replay_path: "FIREWOOD_BLOCK_REPLAY_PATH='{{ variables.nvme_base }}/ubuntu/exec-data/current-state/replay_50k_log_db'"
+      - id: copy-to-s3
+        variables:
+          src: "{{ variables.nvme_base }}/ubuntu/exec-data/current-state/replay_50k_log_db"
+          dst: "amin-replay-logs/replay_50k_log_db"
+  snapshotter:
+    description: "Execute and snapshot state at 1m, 10m, 20m, and 30m blocks"
+    stages:
+      - rust-install
+      - ssm-agent
+      - clone-firewood
+      - setup-environment
+      - install-go-grafana
+      - clone-repos
+      - configure-go-modules
+      - build-firewood-ffi
+      - build-avalanchego
+      - install-s5cmd
+      - download-blocks
+      - init-state-dir
+      - id: execute-range
+        variables:
+          start_block: "1"
+          end_block: "1000000"
+      - id: snapshot-to-s3
+        variables:
+          snapshot_block: "1000000"
+      - id: execute-range
+        variables:
+          start_block: "1000000"
+          end_block: "10000000"
+      - id: snapshot-to-s3
+        variables:
+          snapshot_block: "10000000"
+      - id: execute-range
+        variables:
+          start_block: "10000000"
+          end_block: "20000000"
+      - id: snapshot-to-s3
+        variables:
+          snapshot_block: "20000000"
+      - id: execute-range
+        variables:
+          start_block: "20000000"
+          end_block: "30000000"
+      - id: snapshot-to-s3
+        variables:
+          snapshot_block: "30000000"
