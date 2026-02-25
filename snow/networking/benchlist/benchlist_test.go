@@ -65,6 +65,7 @@ func (*blockingBenchable) Unbenched(ids.ID, ids.NodeID) {}
 
 func TestBenchlist(t *testing.T) {
 	require := require.New(t)
+	const halflife = 25 * time.Millisecond
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
@@ -85,7 +86,7 @@ func TestBenchlist(t *testing.T) {
 		benchable,
 		vdrs,
 		Config{
-			Halflife:           DefaultHalflife,
+			Halflife:           halflife,
 			UnbenchProbability: DefaultUnbenchProbability,
 			BenchProbability:   DefaultBenchProbability,
 			BenchDuration:      DefaultBenchDuration,
@@ -128,8 +129,8 @@ func TestBenchlist(t *testing.T) {
 	<-benchable.updated
 	requireNoBenchings()
 
-	now := time.Now().Add(DefaultHalflife)
-	b.clock.Set(now)
+	// Let prior observations decay by one halflife before recording failures.
+	time.Sleep(halflife)
 
 	for range 4 {
 		b.RegisterFailure(vdrID)
