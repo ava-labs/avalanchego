@@ -59,10 +59,11 @@ pub struct DatabaseHandleArgs<'a> {
     /// enable `root_store`.
     pub root_store: bool,
 
-    /// The size of the node cache.
+    /// The optional memory limit for the node cache in bytes.
     ///
-    /// Opening returns an error if this is zero.
-    pub cache_size: usize,
+    /// Set to `0` to leave this unset and rely on the default configured in
+    /// `RevisionManagerConfig`.
+    pub node_cache_memory_limit: usize,
 
     /// The size of the free list cache.
     ///
@@ -112,21 +113,24 @@ impl DatabaseHandleArgs<'_> {
             2 => firewood::manager::CacheReadStrategy::All,
             _ => return Err(invalid_data("invalid cache strategy")),
         };
-        #[expect(deprecated)]
-        let config = RevisionManagerConfig::builder()
-            .node_cache_size(
-                self.cache_size
-                    .try_into()
-                    .map_err(|_| invalid_data("cache size should be non-zero"))?,
-            )
-            .max_revisions(self.revisions)
-            .cache_read_strategy(cache_read_strategy)
-            .free_list_cache_size(
-                self.free_list_cache_size
-                    .try_into()
-                    .map_err(|_| invalid_data("free list cache size should be non-zero"))?,
-            )
-            .build();
+        let free_list_cache_size = NonZeroUsize::new(self.free_list_cache_size)
+            .ok_or_else(|| invalid_data("free list cache size should be non-zero"))?;
+
+        let memory_limit = NonZeroUsize::new(self.node_cache_memory_limit);
+
+        let config = {
+            let builder = RevisionManagerConfig::builder()
+                .max_revisions(self.revisions)
+                .cache_read_strategy(cache_read_strategy)
+                .free_list_cache_size(free_list_cache_size);
+
+            if let Some(memory_limit) = memory_limit {
+                builder.node_cache_memory_limit(memory_limit).build()
+            } else {
+                builder.build()
+            }
+        };
+
         Ok(config)
     }
 }

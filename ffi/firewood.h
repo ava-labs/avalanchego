@@ -1054,11 +1054,12 @@ typedef struct DatabaseHandleArgs {
    */
   bool root_store;
   /**
-   * The size of the node cache.
+   * The optional memory limit for the node cache in bytes.
    *
-   * Opening returns an error if this is zero.
+   * Set to `0` to leave this unset and rely on the default configured in
+   * `RevisionManagerConfig`.
    */
-  size_t cache_size;
+  size_t node_cache_memory_limit;
   /**
    * The size of the free list cache.
    *

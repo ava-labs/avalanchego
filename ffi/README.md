@@ -31,7 +31,7 @@ Firewood uses the functional options pattern for configuration. You can customiz
 ```go
 db, err := ffi.New("/path/to/database_dir",
     ffi.WithTruncate(true),                    // Clear the database if it exists
-    ffi.WithNodeCacheEntries(2_000_000),       // Set node cache size
+    ffi.WithNodeCacheSizeInBytes(256_000_000), // Set node cache memory limit
     ffi.WithFreeListCacheEntries(50_000),      // Set freelist cache size
     ffi.WithRevisions(200),                    // Keep 200 historical revisions
     ffi.WithReadCacheStrategy(ffi.CacheAllReads), // Cache all reads
