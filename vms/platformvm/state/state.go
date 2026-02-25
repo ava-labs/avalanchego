@@ -858,15 +858,15 @@ func New(
 	return s, nil
 }
 
-func (s *State) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
+func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
 	return s.validatorState.GetDelegateeReward(subnetID, vdrID)
 }
 
-func (s *State) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, reward uint64) error {
+func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, reward uint64) error {
 	return s.validatorState.SetDelegateeReward(subnetID, vdrID, reward)
 }
 
-func (s *State) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
+func (s *state) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	return s.expiryDiff.getExpiryIterator(
 		iterator.FromTree(s.expiry),
 	), nil
