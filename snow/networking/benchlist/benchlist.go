@@ -248,7 +248,7 @@ func (b *benchlist) processObservation(ev event) {
 	}
 	if !ok {
 		n = &node{
-			failureProbability: b.newFailureProbability(),
+			failureProbability: b.newFailureProbabilityAverager(ev.time),
 		}
 		b.nodes[nodeID] = n
 	}
@@ -289,6 +289,7 @@ func (b *benchlist) processObservation(ev event) {
 // failure after unbenching doesn't immediately re-bench it.
 func (b *benchlist) processTimeouts() {
 	now := time.Now()
+	resetTime := b.clock.Time()
 	for {
 		nodeID, deadline, ok := b.timeoutHeap.Peek()
 		if !ok || deadline.After(now) {
@@ -302,7 +303,7 @@ func (b *benchlist) processTimeouts() {
 		}
 
 		n.isBenched = false
-		n.failureProbability = b.newFailureProbability()
+		n.failureProbability = b.newFailureProbabilityAverager(resetTime)
 
 		b.lock.Lock()
 		b.benched.Remove(nodeID)
@@ -315,9 +316,10 @@ func (b *benchlist) processTimeouts() {
 	}
 }
 
-// newFailureProbability creates a failure probability averager.
-func (b *benchlist) newFailureProbability() math.Averager {
-	return math.NewUninitializedAverager(b.halflife)
+// newFailureProbabilityAverager creates a failure probability averager with an
+// optimistic prior to slightly favor newly tracked nodes.
+func (b *benchlist) newFailureProbabilityAverager(now time.Time) math.Averager {
+	return math.NewAverager(0, b.halflife, now)
 }
 
 // canBench returns true if benching nodeID would not exceed the max portion

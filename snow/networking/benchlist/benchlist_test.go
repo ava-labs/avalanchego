@@ -110,8 +110,8 @@ func TestBenchlist(t *testing.T) {
 	// Nobody should be benched at the start
 	requireNoBenchings()
 
-	// p = 0.5, so no benching occurs.
-	b.RegisterResponse(vdrID)
+	// First failure on a new node starts from an optimistic prior, so p = 0.5
+	// and no benching occurs.
 	b.RegisterFailure(vdrID)
 	requireNoBenchings()
 
@@ -220,6 +220,7 @@ func TestBenchlistTimeout(t *testing.T) {
 
 	// Bench the node: p > 0.5
 	b.RegisterFailure(vdrID)
+	b.RegisterFailure(vdrID)
 	<-benchable.updated
 	require.True(b.IsBenched(vdrID))
 
@@ -266,6 +267,7 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 
 	// Bench the node: p > 0.5
 	b.RegisterFailure(vdrID)
+	b.RegisterFailure(vdrID)
 	<-benchable.updated
 	require.True(b.IsBenched(vdrID))
 
@@ -273,8 +275,8 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 	<-benchable.updated
 	require.False(b.IsBenched(vdrID))
 
-	// After timeout, the EWMA is reset. A response and a failure produce
-	// p = 0.5, which is not enough to re-bench.
+	// After timeout, the EWMA is reset. A response then a failure still keeps
+	// p < 0.5, which is not enough to re-bench.
 	b.RegisterResponse(vdrID)
 	b.RegisterFailure(vdrID)
 	require.False(b.IsBenched(vdrID))
@@ -313,6 +315,7 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 	defer b.shutdown()
 
 	// Bench the node and wait for the consumer to block in Benched.
+	b.RegisterFailure(vdrID)
 	b.RegisterFailure(vdrID)
 	select {
 	case <-benchable.benchedCalled:
