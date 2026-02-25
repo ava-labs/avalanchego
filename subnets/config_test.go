@@ -33,16 +33,6 @@ func TestValid(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name: "deprecated consensus parameters set",
-			s: Config{
-				ConsensusParameters: &snowball.Parameters{
-					K:               2,
-					AlphaPreference: 1,
-				},
-			},
-			expectedErr: ErrUnsupportedConsensusParameters,
-		},
-		{
 			name: "invalid snow consensus parameters",
 			s: Config{
 				SnowParameters: &snowball.Parameters{
