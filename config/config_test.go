@@ -531,8 +531,8 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			{
 				"validatorOnly": true,
 				"simplexParameters": {
-						"MaxNetworkDelay":1000,
-						"MaxRebroadcastWait":1000,
+						"maxNetworkDelay":1000,
+						"maxRebroadcastWait":1000,
 						"initialValidators": [
 								{
 										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
@@ -638,8 +638,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"simplexParameters": {
-						"MaxNetworkDelay":1000,
-						"MaxRebroadcastWait":1000,
+						"maxNetworkDelay":1000,
+						"maxRebroadcastWait":1000,
 						"initialValidators": [
 								{
 										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
