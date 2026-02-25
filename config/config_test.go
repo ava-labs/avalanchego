@@ -968,6 +968,18 @@ func TestGetPrimaryNetworkConfig(t *testing.T) {
 }
 
 func TestSetConfigDefaults(t *testing.T) {
+	// Custom values used across test inputs and verify functions — declared once
+	// to avoid duplication between the two.
+	var (
+		customSnowK           = snowball.DefaultParameters.K + 10
+		customAlphaPreference = snowball.DefaultParameters.AlphaPreference + 2
+		customAlphaConfidence = snowball.DefaultParameters.AlphaConfidence + 2
+		customBeta            = snowball.DefaultParameters.Beta + 2
+
+		customMaxNetworkDelay    = simplex.DefaultParameters.MaxNetworkDelay + time.Second
+		customMaxRebroadcastWait = simplex.DefaultParameters.MaxRebroadcastWait + time.Second
+	)
+
 	tests := []struct {
 		name   string
 		input  subnets.Config
@@ -987,7 +999,7 @@ func TestSetConfigDefaults(t *testing.T) {
 			name: "snow parameters set fills zero fields from viper",
 			input: subnets.Config{
 				SnowParameters: &snowball.Parameters{
-					K: 30,
+					K: customSnowK,
 				},
 			},
 			verify: func(require *require.Assertions, cfg subnets.Config) {
@@ -995,7 +1007,7 @@ func TestSetConfigDefaults(t *testing.T) {
 				require.Nil(cfg.SimplexParameters)
 				require.Nil(cfg.ConsensusParameters)
 				// explicitly set field preserved
-				require.Equal(30, cfg.SnowParameters.K)
+				require.Equal(customSnowK, cfg.SnowParameters.K)
 				// zero fields filled from viper defaults
 				require.Equal(snowball.DefaultParameters.AlphaPreference, cfg.SnowParameters.AlphaPreference)
 				require.Equal(snowball.DefaultParameters.AlphaConfidence, cfg.SnowParameters.AlphaConfidence)
@@ -1006,38 +1018,38 @@ func TestSetConfigDefaults(t *testing.T) {
 			name: "snow parameters set preserves all non-zero fields",
 			input: subnets.Config{
 				SnowParameters: &snowball.Parameters{
-					K:               30,
-					AlphaPreference: 16,
-					AlphaConfidence: 20,
-					Beta:            10,
+					K:               customSnowK,
+					AlphaPreference: customAlphaPreference,
+					AlphaConfidence: customAlphaConfidence,
+					Beta:            customBeta,
 				},
 			},
 			verify: func(require *require.Assertions, cfg subnets.Config) {
 				require.NotNil(cfg.SnowParameters)
-				require.Equal(30, cfg.SnowParameters.K)
-				require.Equal(16, cfg.SnowParameters.AlphaPreference)
-				require.Equal(20, cfg.SnowParameters.AlphaConfidence)
-				require.Equal(10, cfg.SnowParameters.Beta)
+				require.Equal(customSnowK, cfg.SnowParameters.K)
+				require.Equal(customAlphaPreference, cfg.SnowParameters.AlphaPreference)
+				require.Equal(customAlphaConfidence, cfg.SnowParameters.AlphaConfidence)
+				require.Equal(customBeta, cfg.SnowParameters.Beta)
 			},
 		},
 		{
 			name: "deprecated consensus parameters migrated to snow parameters",
 			input: subnets.Config{
 				ConsensusParameters: &snowball.Parameters{
-					K:               25,
-					AlphaPreference: 14,
-					AlphaConfidence: 18,
-					Beta:            8,
+					K:               customSnowK,
+					AlphaPreference: customAlphaPreference,
+					AlphaConfidence: customAlphaConfidence,
+					Beta:            customBeta,
 				},
 			},
 			verify: func(require *require.Assertions, cfg subnets.Config) {
 				require.NotNil(cfg.SnowParameters)
 				require.Nil(cfg.ConsensusParameters)
 				require.Nil(cfg.SimplexParameters)
-				require.Equal(25, cfg.SnowParameters.K)
-				require.Equal(14, cfg.SnowParameters.AlphaPreference)
-				require.Equal(18, cfg.SnowParameters.AlphaConfidence)
-				require.Equal(8, cfg.SnowParameters.Beta)
+				require.Equal(customSnowK, cfg.SnowParameters.K)
+				require.Equal(customAlphaPreference, cfg.SnowParameters.AlphaPreference)
+				require.Equal(customAlphaConfidence, cfg.SnowParameters.AlphaConfidence)
+				require.Equal(customBeta, cfg.SnowParameters.Beta)
 			},
 		},
 		{
@@ -1057,14 +1069,14 @@ func TestSetConfigDefaults(t *testing.T) {
 			name: "simplex parameters set preserves non-zero fields",
 			input: subnets.Config{
 				SimplexParameters: &simplex.Parameters{
-					MaxNetworkDelay:    1000,
-					MaxRebroadcastWait: 2000,
+					MaxNetworkDelay:    customMaxNetworkDelay,
+					MaxRebroadcastWait: customMaxRebroadcastWait,
 				},
 			},
 			verify: func(require *require.Assertions, cfg subnets.Config) {
 				require.NotNil(cfg.SimplexParameters)
-				require.Equal(time.Duration(1000), cfg.SimplexParameters.MaxNetworkDelay)
-				require.Equal(time.Duration(2000), cfg.SimplexParameters.MaxRebroadcastWait)
+				require.Equal(customMaxNetworkDelay, cfg.SimplexParameters.MaxNetworkDelay)
+				require.Equal(customMaxRebroadcastWait, cfg.SimplexParameters.MaxRebroadcastWait)
 			},
 		},
 	}

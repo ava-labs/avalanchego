@@ -63,19 +63,19 @@ JSON keys are different from their matching `CLI` keys. These parameters must be
 `snowParameters` key. The snow parameters of a Subnet default to the
 same values used for the Primary Network, which are given [CLI Snow Parameters](https://build.avax.network/docs/nodes/configure/configs-flags#snow-parameters).
 
-| CLI Key                           | JSON Key                    |
-| :-------------------------------- | :-------------------------- |
-| --snow-sample-size                | k                           |
-| --snow-quorum-size                | alpha                       |
-| --snow-commit-threshold           | `beta`                      |
-| --snow-concurrent-repolls         | concurrentRepolls           |
-| --snow-optimal-processing         | `optimalProcessing`         |
-| --snow-max-processing             | maxOutstandingItems         |
-| --snow-max-time-processing        | maxItemProcessingTime       |
-| --snow-avalanche-batch-size       | `batchSize`                 |
-| --snow-avalanche-num-parents      | `parentSize`                |
-| --simplex-max-network-delay       | `simplexMaxNetworkDelay`    |
-| --simplex-max-rebroadcast-wait    | `simplexMaxRebroadcastWait` |
+| CLI Key                           | JSON Key                               |
+| :-------------------------------- | :------------------------------------- |
+| --snow-sample-size                | k                                      |
+| --snow-quorum-size                | alpha                                  |
+| --snow-commit-threshold           | `beta`                                 |
+| --snow-concurrent-repolls         | concurrentRepolls                      |
+| --snow-optimal-processing         | `optimalProcessing`                    |
+| --snow-max-processing             | maxOutstandingItems                    |
+| --snow-max-time-processing        | maxItemProcessingTime                  |
+| --snow-avalanche-batch-size       | `batchSize`                            |
+| --snow-avalanche-num-parents      | `parentSize`                           |
+| --simplex-max-network-delay       | `simplexParameters.maxNetworkDelay`    |
+| --simplex-max-rebroadcast-wait    | `simplexParameters.maxRebroadcastWait` |
 
 ### Gossip Configs
 
