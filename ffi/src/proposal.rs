@@ -21,7 +21,7 @@ impl<'db> DbView for ProposalHandle<'db> {
     where
         Self: 'view;
 
-    fn root_hash(&self) -> Result<Option<HashKey>, api::Error> {
+    fn root_hash(&self) -> Option<HashKey> {
         self.proposal.root_hash()
     }
 
@@ -138,7 +138,7 @@ impl<'db> CreateProposalResult<'db> {
             expensive
         );
 
-        let hash_key = proposal.root_hash()?;
+        let hash_key = proposal.root_hash();
 
         Ok(CreateProposalResult {
             handle: ProposalHandle {

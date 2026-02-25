@@ -124,8 +124,7 @@ func TestReplayLogExecution(t *testing.T) {
 	r.NoError(err, "replay logs against database")
 	elapsed := time.Since(start)
 
-	root, err := db.Root()
-	r.NoError(err, "get root after replay")
+	root := db.Root()
 	r.NotEqual(EmptyRoot, root, "root should not be EmptyRoot after replay")
 
 	t.Logf("Replay completed in %v (%d commits), final root: %x", elapsed, commits, root)
@@ -193,8 +192,7 @@ func TestBlockReplayRoundTrip(t *testing.T) {
 	r.NoError(err)
 	r.NoError(p2.Commit())
 
-	originalRoot, err := db1.Root()
-	r.NoError(err)
+	originalRoot := db1.Root()
 
 	r.NoError(FlushBlockReplay())
 	r.NoError(db1.Close(oneSecCtx(t)))
@@ -218,9 +216,7 @@ func TestBlockReplayRoundTrip(t *testing.T) {
 	_, err = applyReplayLogs(db2, logs, replayConfig{VerifyHashes: true})
 	r.NoError(err)
 
-	replayedRoot, err := db2.Root()
-	r.NoError(err)
-
+	replayedRoot := db2.Root()
 	r.Equal(originalRoot, replayedRoot, "replayed database should have same root hash")
 }
 
@@ -342,10 +338,7 @@ func applyReplayLogs(db *Database, logs []replayLog, cfg replayConfig) (int, err
 				}
 
 				if cfg.VerifyHashes && op.Commit.ReturnedHash != nil {
-					root, err := db.Root()
-					if err != nil {
-						return totalCommits, fmt.Errorf("Root after Commit: %w", err)
-					}
+					root := db.Root()
 					if !bytes.Equal(op.Commit.ReturnedHash, root[:]) {
 						return totalCommits, fmt.Errorf("root hash mismatch: expected %x, got %x", op.Commit.ReturnedHash, root[:])
 					}

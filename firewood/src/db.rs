@@ -63,8 +63,8 @@ where
     where
         Self: 'view;
 
-    fn root_hash(&self) -> Result<Option<HashKey>, api::Error> {
-        Ok(HashedNodeReader::root_hash(self).or_default_root_hash())
+    fn root_hash(&self) -> Option<HashKey> {
+        HashedNodeReader::root_hash(self).or_default_root_hash()
     }
 
     fn val<K: api::KeyType>(&self, key: K) -> Result<Option<Value>, api::Error> {
@@ -166,8 +166,8 @@ impl api::Db for Db {
         Ok(nodestore)
     }
 
-    fn root_hash(&self) -> Result<Option<HashKey>, api::Error> {
-        Ok(self.manager.root_hash()?.or_default_root_hash())
+    fn root_hash(&self) -> Option<HashKey> {
+        self.manager.root_hash().or_default_root_hash()
     }
 
     fn propose(&self, batch: impl IntoBatchIter) -> Result<Self::Proposal<'_>, api::Error> {
@@ -380,7 +380,7 @@ impl api::DbView for Proposal<'_> {
     where
         Self: 'view;
 
-    fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
+    fn root_hash(&self) -> Option<api::HashKey> {
         api::DbView::root_hash(&*self.nodestore)
     }
 
@@ -524,7 +524,7 @@ mod test {
         let proposal = db.propose(batch).unwrap();
         assert_eq!(&*proposal.val(b"k").unwrap().unwrap(), b"v2");
 
-        let committed = db.root_hash().unwrap().unwrap();
+        let committed = db.root_hash().unwrap();
         let historical = db.revision(committed).unwrap();
         assert_eq!(&*historical.val(b"k").unwrap().unwrap(), b"v");
     }
@@ -532,7 +532,7 @@ mod test {
     #[test]
     fn reopen_test() {
         let db = TestDb::new();
-        let initial_root = db.root_hash().unwrap();
+        let initial_root = db.root_hash();
         let batch = vec![
             BatchOp::Put {
                 key: b"a",
@@ -545,18 +545,19 @@ mod test {
         ];
         let proposal = db.propose(batch).unwrap();
         proposal.commit().unwrap();
-        println!("{:?}", db.root_hash().unwrap().unwrap());
+        println!("{:?}", db.root_hash().unwrap());
 
         let db = db.reopen();
-        println!("{:?}", db.root_hash().unwrap().unwrap());
-        let committed = db.root_hash().unwrap().unwrap();
+        println!("{:?}", db.root_hash().unwrap());
+        let committed = db.root_hash().unwrap();
         let historical = db.revision(committed).unwrap();
         assert_eq!(&*historical.val(b"a").unwrap().unwrap(), b"1");
         drop(historical);
 
         let db = db.replace();
-        println!("{:?}", db.root_hash().unwrap());
-        assert!(db.root_hash().unwrap() == initial_root);
+        let final_root = db.root_hash();
+        println!("{final_root:?}");
+        assert!(final_root == initial_root);
     }
 
     #[test]
@@ -590,14 +591,14 @@ mod test {
         // the proposal is dropped here, but the underlying
         // nodestore is still accessible because it's referenced by the revision manager
         // The third proposal remains referenced
-        let p2hash = proposal2.root_hash().unwrap().unwrap();
+        let p2hash = proposal2.root_hash().unwrap();
         assert!(db.manager.proposal_hashes().contains(&p2hash));
         drop(proposal2);
 
         // commit the first proposal
         proposal1.commit().unwrap();
         // Ensure we committed the first proposal's data
-        let committed = db.root_hash().unwrap().unwrap();
+        let committed = db.root_hash().unwrap();
         let historical = db.revision(committed).unwrap();
         assert_eq!(&*historical.val(b"k1").unwrap().unwrap(), b"v1");
 
@@ -606,7 +607,7 @@ mod test {
 
         // the third proposal should still be contained within the all_hashes list
         // would be deleted if another proposal was committed and proposal3 was dropped here
-        let hash3 = proposal3.root_hash().unwrap().unwrap();
+        let hash3 = proposal3.root_hash().unwrap();
         assert!(db.manager.proposal_hashes().contains(&hash3));
     }
 
@@ -642,14 +643,14 @@ mod test {
         // the proposal is dropped here, but the underlying
         // nodestore is still accessible because it's referenced by the revision manager
         // The third proposal remains referenced
-        let p2hash = proposal2.root_hash().unwrap().unwrap();
+        let p2hash = proposal2.root_hash().unwrap();
         assert!(db.manager.proposal_hashes().contains(&p2hash));
         drop(proposal2);
 
         // commit the first proposal
         proposal1.commit().unwrap();
         // Ensure we committed the first proposal's data
-        let committed = db.root_hash().unwrap().unwrap();
+        let committed = db.root_hash().unwrap();
         let historical = db.revision(committed).unwrap();
         assert_eq!(&*historical.val(b"k1").unwrap().unwrap(), b"v1");
 
@@ -657,7 +658,7 @@ mod test {
         assert!(!db.manager.proposal_hashes().contains(&p2hash));
 
         // the third proposal should still be contained within the all_hashes list
-        let hash3 = proposal3.root_hash().unwrap().unwrap();
+        let hash3 = proposal3.root_hash().unwrap();
         assert!(db.manager.proposal_hashes().contains(&hash3));
 
         // moreover, the data from the second and third proposals should still be available
@@ -676,7 +677,7 @@ mod test {
             value: b"historical_value",
         }];
         let proposal = db.propose(batch).unwrap();
-        let historical_hash = proposal.root_hash().unwrap().unwrap();
+        let historical_hash = proposal.root_hash().unwrap();
         proposal.commit().unwrap();
 
         // Create a new proposal (uncommitted)
@@ -685,7 +686,7 @@ mod test {
             value: b"proposal_value",
         }];
         let proposal = db.propose(batch).unwrap();
-        let proposal_hash = proposal.root_hash().unwrap().unwrap();
+        let proposal_hash = proposal.root_hash().unwrap();
 
         // Test that view_sync can find the historical revision
         let historical_view = db.view(historical_hash).unwrap();
@@ -718,7 +719,7 @@ mod test {
         let db = db.reopen();
         insert_commit(&db, 2);
         // Check that the keys are still there after the commits
-        let committed = db.revision(db.root_hash().unwrap().unwrap()).unwrap();
+        let committed = db.revision(db.root_hash().unwrap()).unwrap();
         let keys: Vec<[u8; 1]> = vec![[1; 1], [2; 1]];
         let vals: Vec<Box<[u8]>> = vec![Box::new([1; 1]), Box::new([2; 1])];
         let kviter = keys.iter().zip(vals.iter());
@@ -740,8 +741,8 @@ mod test {
                 .build(),
         );
         insert_commit(&db2, 2);
-        let committed1 = db1.revision(db1.root_hash().unwrap().unwrap()).unwrap();
-        let committed2 = db2.revision(db2.root_hash().unwrap().unwrap()).unwrap();
+        let committed1 = db1.revision(db1.root_hash().unwrap()).unwrap();
+        let committed2 = db2.revision(db2.root_hash().unwrap()).unwrap();
         let keys: Vec<[u8; 1]> = vec![[1; 1], [2; 1]];
         let vals: Vec<Box<[u8]>> = vec![Box::new([1; 1]), Box::new([2; 1])];
         let mut kviter = keys.iter().zip(vals.iter());
@@ -785,7 +786,7 @@ mod test {
         proposal.commit().unwrap();
 
         // Check that the key is still there after the commit
-        let committed = db.revision(db.root_hash().unwrap().unwrap()).unwrap();
+        let committed = db.revision(db.root_hash().unwrap()).unwrap();
         let kviter = keys.iter().zip(vals.iter());
         for (k, v) in kviter {
             assert_eq!(&committed.val(k).unwrap().unwrap(), v);
@@ -991,7 +992,7 @@ mod test {
         proposal2.commit().unwrap();
 
         // all keys are in the database
-        let committed = db.root_hash().unwrap().unwrap();
+        let committed = db.root_hash().unwrap();
         let revision = db.revision(committed).unwrap();
 
         for (k, v) in keys.into_iter().zip(vals.into_iter()) {
@@ -1074,7 +1075,7 @@ mod test {
             },
         );
 
-        let last_proposal_root_hash = proposals.last().unwrap().root_hash().unwrap().unwrap();
+        let last_proposal_root_hash = proposals.last().unwrap().root_hash().unwrap();
 
         // commit the proposals
         for proposal in proposals {
@@ -1082,7 +1083,7 @@ mod test {
         }
 
         // get the last committed revision
-        let last_root_hash = db.root_hash().unwrap().unwrap();
+        let last_root_hash = db.root_hash().unwrap();
         let committed = db.revision(last_root_hash.clone()).unwrap();
 
         // the last root hash should be the same as the last proposal root hash
@@ -1133,7 +1134,7 @@ mod test {
                         value: [id as u8; 8],
                     }];
                     let proposal = db.propose(batch).unwrap();
-                    let last_hash = proposal.root_hash().unwrap().unwrap();
+                    let last_hash = proposal.root_hash().unwrap();
                     let view = db.view(last_hash).unwrap();
 
                     tx.send(proposal).unwrap();
@@ -1159,7 +1160,7 @@ mod test {
         let batch = vec![BatchOp::Put { key, value }];
 
         let proposal = db.propose(batch).unwrap();
-        let root_hash = proposal.root_hash().unwrap().unwrap();
+        let root_hash = proposal.root_hash().unwrap();
         proposal.commit().unwrap();
 
         // Wait for background persistence to complete
@@ -1184,7 +1185,7 @@ mod test {
         // Finally, reopen the database and make sure that we can retrieve the first revision
         let db = db.reopen();
 
-        let latest_root_hash = db.root_hash().unwrap().unwrap();
+        let latest_root_hash = db.root_hash().unwrap();
         let latest_revision = db.revision(latest_root_hash).unwrap();
 
         let latest_value = latest_revision.val(key).unwrap().unwrap();
@@ -1211,7 +1212,7 @@ mod test {
         let batch = vec![BatchOp::Put { key, value }];
 
         let proposal = db.propose(batch).unwrap();
-        let root_hash = proposal.root_hash().unwrap().unwrap();
+        let root_hash = proposal.root_hash().unwrap();
         proposal.commit().unwrap();
 
         // Next, overwrite the kv-pair with a new revision
@@ -1257,7 +1258,7 @@ mod test {
                 let value = i.to_be_bytes();
                 let batch = vec![BatchOp::Put { key, value }];
                 let proposal = db.propose(batch).unwrap();
-                let root_hash = proposal.root_hash().unwrap().unwrap();
+                let root_hash = proposal.root_hash().unwrap();
                 proposal.commit().unwrap();
 
                 (root_hash, value)
@@ -1294,7 +1295,7 @@ mod test {
             value: b"bar",
         }];
         let proposal = db.propose(batch).unwrap();
-        let root_hash = proposal.root_hash().unwrap().unwrap();
+        let root_hash = proposal.root_hash().unwrap();
         proposal.commit().unwrap();
 
         let db = db.reopen();
@@ -1324,7 +1325,7 @@ mod test {
         // Wait for background persistence to complete before reading the file
         testdb.wait_persisted();
 
-        let rh = testdb.root_hash().unwrap().unwrap();
+        let rh = testdb.root_hash().unwrap();
 
         let file = std::fs::OpenOptions::new()
             .read(true)
@@ -1344,7 +1345,7 @@ mod test {
 
         let testdb = testdb.reopen();
 
-        assert_eq!(rh, testdb.root_hash().unwrap().unwrap());
+        assert_eq!(rh, testdb.root_hash().unwrap());
     }
 
     #[test]
@@ -1369,7 +1370,7 @@ mod test {
                     value: format!("value{i}").as_bytes().to_vec(),
                 }];
                 let proposal = db.propose(batch).unwrap();
-                let root_hash = proposal.root_hash().unwrap().unwrap();
+                let root_hash = proposal.root_hash().unwrap();
                 proposal.commit().unwrap();
                 root_hash
             })
@@ -1403,7 +1404,7 @@ mod test {
         let value = b"bar";
         let batch = vec![BatchOp::Put { key, value }];
         let proposal = db.propose(batch).unwrap();
-        let root_hash = proposal.root_hash().unwrap().unwrap();
+        let root_hash = proposal.root_hash().unwrap();
 
         proposal.commit().unwrap();
         let db = db.reopen();
@@ -1431,7 +1432,7 @@ mod test {
         let value = b"bar";
         let batch = vec![BatchOp::Put { key, value }];
         let proposal = db.propose(batch).unwrap();
-        let root_hash = proposal.root_hash().unwrap().unwrap();
+        let root_hash = proposal.root_hash().unwrap();
 
         proposal.commit().unwrap();
         let db = db.reopen();
@@ -1461,7 +1462,7 @@ mod test {
                 value: format!("value{i}").as_bytes().to_vec(),
             }];
             let proposal = db.propose(batch).unwrap();
-            root_hashes.push(proposal.root_hash().unwrap().unwrap());
+            root_hashes.push(proposal.root_hash().unwrap());
             proposal.commit().unwrap();
         }
 
@@ -1509,7 +1510,7 @@ mod test {
         let db = db.reopen();
 
         // Verify that the latest committed revision is empty.
-        let last_committed_hash = db.root_hash().unwrap();
+        let last_committed_hash = db.root_hash();
         assert_eq!(last_committed_hash, TrieHash::default_root_hash());
     }
 
@@ -1540,7 +1541,7 @@ mod test {
                 value: format!("{i}").as_bytes().to_vec(),
             }];
             let proposal = db.propose(batch).unwrap();
-            root_hashes.push(proposal.root_hash().unwrap().unwrap());
+            root_hashes.push(proposal.root_hash().unwrap());
             proposal.commit().unwrap();
         }
 
@@ -1597,7 +1598,7 @@ mod test {
                 value: format!("{i}").as_bytes().to_vec(),
             }];
             let proposal = db.propose(batch).unwrap();
-            root_hashes.push(proposal.root_hash().unwrap().unwrap());
+            root_hashes.push(proposal.root_hash().unwrap());
             proposal.commit().unwrap();
         }
 

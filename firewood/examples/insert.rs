@@ -133,7 +133,7 @@ fn verify_keys(
     verify: HashMap<&[u8], &[u8]>,
 ) -> Result<(), firewood::v2::api::Error> {
     if !verify.is_empty() {
-        let hash = db.root_hash()?.expect("root hash should exist");
+        let hash = db.root_hash().expect("root hash should exist");
         let revision = db.revision(hash)?;
         for (key, value) in verify {
             assert_eq!(Some(value), revision.val(key)?.as_deref());

@@ -259,10 +259,8 @@ func (tr *tree) checkDBHash() {
 	merkleRoot, err := tr.merkleDB.GetMerkleRoot(context.Background())
 	tr.require.NoError(err)
 
-	fwdRoot, err := tr.fwdDB.Root()
-	tr.require.NoError(err)
-
 	// Compare the root hashes.
+	fwdRoot := tr.fwdDB.Root()
 	tr.require.Equal(merkleRoot, ids.ID(fwdRoot))
 }
 
@@ -296,10 +294,9 @@ func (tr *tree) createProposalOnProposal() {
 	merkleChildView, err := merkleView.NewView(context.Background(), merkleViewChange)
 	tr.require.NoError(err)
 
-	fwdRoot, err := fwdChildPr.Root()
-	tr.require.NoError(err)
 	merkleRoot, err := merkleChildView.GetMerkleRoot(context.Background())
 	tr.require.NoError(err)
+	fwdRoot := fwdChildPr.Root()
 	tr.require.Equal(merkleRoot, ids.ID(fwdRoot))
 
 	tr.nextID++
@@ -333,10 +330,9 @@ func (tr *tree) createProposalOnDB() {
 	merkleChildView, err := tr.merkleDB.NewView(context.Background(), merkleViewChange)
 	tr.require.NoError(err)
 
-	fwdRoot, err := fwdPr.Root()
-	tr.require.NoError(err)
 	merkleRoot, err := merkleChildView.GetMerkleRoot(context.Background())
 	tr.require.NoError(err)
+	fwdRoot := fwdPr.Root()
 	tr.require.Equal(merkleRoot, ids.ID(fwdRoot))
 
 	tr.nextID++

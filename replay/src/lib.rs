@@ -222,7 +222,7 @@ fn apply_operation<'db>(
 ) -> Result<Option<Box<[u8]>>, ReplayError> {
     match operation {
         DbOperation::GetLatest(GetLatest { key }) => {
-            if let Some(root) = DbApi::root_hash(db)? {
+            if let Some(root) = DbApi::root_hash(db) {
                 let view = DbApi::revision(db, root)?;
                 let _ = DbViewApi::val(&*view, key)?;
             }
@@ -416,9 +416,7 @@ mod tests {
 
         replay_from_reader(Cursor::new(buf), &db, None).expect("replay");
 
-        let root = DbApi::root_hash(&db)
-            .expect("root_hash")
-            .expect("non-empty");
+        let root = DbApi::root_hash(&db).expect("non-empty");
         let view = DbApi::revision(&db, root).expect("revision");
 
         for i in 0u8..5 {
@@ -456,9 +454,7 @@ mod tests {
 
         replay_from_reader(Cursor::new(buf), &db, None).expect("replay");
 
-        let root = DbApi::root_hash(&db)
-            .expect("root_hash")
-            .expect("non-empty");
+        let root = DbApi::root_hash(&db).expect("non-empty");
         let view = DbApi::revision(&db, root).expect("revision");
 
         for i in 0u8..3 {
@@ -504,9 +500,7 @@ mod tests {
 
         replay_from_reader(Cursor::new(buf), &db, None).expect("replay");
 
-        let root = DbApi::root_hash(&db)
-            .expect("root_hash")
-            .expect("non-empty");
+        let root = DbApi::root_hash(&db).expect("non-empty");
         let view = DbApi::revision(&db, root).expect("revision");
 
         let v1 = DbViewApi::val(&*view, [1]).expect("val").expect("exists");

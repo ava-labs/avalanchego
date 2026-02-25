@@ -570,7 +570,6 @@ pub extern "C" fn fwd_free_proposal(proposal: Option<Box<ProposalHandle<'_>>>) -
 /// - [`HashResult::NullHandlePointer`] if the provided database handle is null.
 /// - [`HashResult::None`] if the database is empty.
 /// - [`HashResult::Some`] with the root hash of the database.
-/// - [`HashResult::Err`] if an error occurred while looking up the root hash.
 ///
 /// # Safety
 ///

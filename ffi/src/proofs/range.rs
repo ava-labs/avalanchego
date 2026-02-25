@@ -275,7 +275,7 @@ impl<'db> RangeProofContext<'db> {
 
         let root_hash = match self.proposal_state {
             Some(ProposalState::Committed(ref hash)) => Ok(hash.clone()),
-            Some(ProposalState::Proposed(ref proposal)) => proposal.root_hash(),
+            Some(ProposalState::Proposed(ref proposal)) => Ok(proposal.root_hash()),
             None => Err(api::Error::ProofError(ProofError::Unverified)),
         }?;
         if root_hash.as_ref() == Some(&verification.root) {

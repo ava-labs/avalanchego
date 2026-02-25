@@ -80,7 +80,7 @@ pub(super) fn run(opts: &Options) -> Result<(), api::Error> {
     }
 
     // Print the root hash from the database for verification
-    if let Some(root) = DbApi::root_hash(&db)? {
+    if let Some(root) = DbApi::root_hash(&db) {
         println!("Database root: {}", hex::encode(root));
     }
 

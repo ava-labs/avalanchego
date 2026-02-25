@@ -173,7 +173,7 @@ fn test_merge_key_value_range(
         }
     }
 
-    let merge_root_hash = proposal.root_hash().unwrap();
+    let merge_root_hash = proposal.root_hash();
 
     // Create a fresh database with the same initial state
     let db2 = TestDb::new();
@@ -183,7 +183,7 @@ fn test_merge_key_value_range(
 
     // Apply the expected operations manually
     let mut batch = Vec::new();
-    if let Some(root) = db2.root_hash().unwrap() {
+    if let Some(root) = db2.root_hash() {
         batch.extend(
             db2.revision(root)
                 .unwrap()
@@ -210,7 +210,7 @@ fn test_merge_key_value_range(
     }));
 
     let manual_proposal = db2.propose(batch).unwrap();
-    let manual_root_hash = manual_proposal.root_hash().unwrap();
+    let manual_root_hash = manual_proposal.root_hash();
 
     assert_eq!(
         merge_root_hash, manual_root_hash,
@@ -221,7 +221,7 @@ fn test_merge_key_value_range(
     proposal.commit().unwrap();
 
     // Verify the committed state
-    if let Some(root) = db.root_hash().unwrap() {
+    if let Some(root) = db.root_hash() {
         let committed = db.revision(root).unwrap();
         for (key, expected_value) in expected_kvs {
             let actual_value = committed.val(key).unwrap();

@@ -474,8 +474,8 @@ impl RevisionManager {
         Ok(revision)
     }
 
-    pub fn root_hash(&self) -> Result<Option<HashKey>, RevisionManagerError> {
-        Ok(self.current_revision().root_hash())
+    pub fn root_hash(&self) -> Option<HashKey> {
+        self.current_revision().root_hash()
     }
 
     pub fn current_revision(&self) -> CommittedRevision {

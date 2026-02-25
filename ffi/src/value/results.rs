@@ -3,6 +3,7 @@
 
 use firewood::merkle;
 use firewood::v2::api;
+use firewood_storage::TrieHash;
 use std::fmt;
 
 use crate::revision::{GetRevisionResult, RevisionHandle};
@@ -174,9 +175,17 @@ pub enum HashResult {
 impl<E: fmt::Display> From<Result<Option<api::HashKey>, E>> for HashResult {
     fn from(value: Result<Option<api::HashKey>, E>) -> Self {
         match value {
-            Ok(None) => HashResult::None,
-            Ok(Some(hash)) => HashResult::Some(HashKey::from(hash)),
+            Ok(hash) => hash.into(),
             Err(err) => HashResult::Err(err.to_string().into_bytes().into()),
+        }
+    }
+}
+
+impl From<Option<TrieHash>> for HashResult {
+    fn from(value: Option<TrieHash>) -> Self {
+        match value {
+            Some(hash) => HashResult::Some(hash.into()),
+            None => HashResult::None,
         }
     }
 }

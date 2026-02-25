@@ -44,7 +44,7 @@ impl DbView for RevisionHandle {
     where
         Self: 'view;
 
-    fn root_hash(&self) -> Result<Option<HashKey>, api::Error> {
+    fn root_hash(&self) -> Option<HashKey> {
         self.view.root_hash()
     }
 

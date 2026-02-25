@@ -187,8 +187,8 @@ impl DatabaseHandle {
     ///
     /// # Errors
     ///
-    /// An error is returned if there was an i/o error while reading the root hash.
-    pub fn current_root_hash(&self) -> Result<Option<HashKey>, api::Error> {
+    /// Never errors.
+    pub fn current_root_hash(&self) -> Option<HashKey> {
         self.db.root_hash()
     }
 
@@ -198,7 +198,7 @@ impl DatabaseHandle {
     ///
     /// An error is returned if there was an i/o error while reading the value.
     pub fn get_latest(&self, key: impl KeyType) -> Result<Option<Box<[u8]>>, api::Error> {
-        let Some(root) = self.current_root_hash()? else {
+        let Some(root) = self.current_root_hash() else {
             return Err(api::Error::RevisionNotFound {
                 provided: HashKey::default_root_hash(),
             });

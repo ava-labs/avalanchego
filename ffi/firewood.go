@@ -361,14 +361,15 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 
 // Root returns the current root hash of the trie.
 // With Firewood hashing, the empty trie must return [EmptyRoot].
+// If the database is already closed, it returns [EmptyRoot].
 //
 // This function conflicts with all other calls that access the latest state of the database,
 // and will lock for the duration of this function.
-func (db *Database) Root() (Hash, error) {
+func (db *Database) Root() Hash {
 	db.handleLock.RLock()
 	defer db.handleLock.RUnlock()
 	if db.handle == nil {
-		return EmptyRoot, errDBClosed
+		return EmptyRoot
 	}
 
 	db.commitLock.Lock()
@@ -377,8 +378,10 @@ func (db *Database) Root() (Hash, error) {
 }
 
 // root assumes db.stateLock is held and the database is open.
-func (db *Database) root() (Hash, error) {
-	return getHashKeyFromHashResult(C.fwd_root_hash(db.handle))
+func (db *Database) root() Hash {
+	// Since we already guaranteed the database is open, we can ignore the error since the only error is that the handle is nil.
+	hash, _ := getHashKeyFromHashResult(C.fwd_root_hash(db.handle))
+	return hash
 }
 
 // LatestRevision returns a [Revision] representing the latest state of the database.
@@ -396,10 +399,7 @@ func (db *Database) LatestRevision() (*Revision, error) {
 
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
-	root, err := db.root()
-	if err != nil {
-		return nil, err
-	}
+	root := db.root()
 	if root == EmptyRoot {
 		return nil, errRevisionNotFound
 	}

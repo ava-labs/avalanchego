@@ -22,7 +22,7 @@ pub(super) fn run(opts: &Options) -> Result<(), api::Error> {
 
     let db = Db::new(opts.database.dbpath.clone(), cfg.build())?;
 
-    let hash = db.root_hash()?;
+    let hash = db.root_hash();
 
     println!("{hash:?}");
     db.close()
