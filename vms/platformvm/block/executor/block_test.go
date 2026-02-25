@@ -37,6 +37,7 @@ func TestBlockOptions(t *testing.T) {
 			name: "apricot proposal block; commit preferred",
 			blkF: func(ctrl *gomock.Controller) *Block {
 				state := statetest.New(t, statetest.Config{})
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -47,6 +48,7 @@ func TestBlockOptions(t *testing.T) {
 						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
+						Uptimes: uptimes,
 					},
 				}
 
@@ -131,6 +133,7 @@ func TestBlockOptions(t *testing.T) {
 				stakerTxID := ids.GenerateTestID()
 
 				state := statetest.New(t, statetest.Config{})
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -141,6 +144,7 @@ func TestBlockOptions(t *testing.T) {
 						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
+						Uptimes: uptimes,
 					},
 				}
 
@@ -170,6 +174,7 @@ func TestBlockOptions(t *testing.T) {
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -180,6 +185,7 @@ func TestBlockOptions(t *testing.T) {
 						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
+						Uptimes: uptimes,
 					},
 				}
 
@@ -218,6 +224,7 @@ func TestBlockOptions(t *testing.T) {
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -228,6 +235,7 @@ func TestBlockOptions(t *testing.T) {
 						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
+						Uptimes: uptimes,
 					},
 				}
 
@@ -250,9 +258,9 @@ func TestBlockOptions(t *testing.T) {
 			name: "banff proposal block; failed calculating primary network uptime",
 			blkF: func(ctrl *gomock.Controller) *Block {
 				var (
+					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
 					subnetID   = constants.PrimaryNetworkID
-					stakerTxID = ids.GenerateTestID()
 					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddPermissionlessValidatorTx{
 							Validator: txs.Validator{
@@ -295,7 +303,7 @@ func TestBlockOptions(t *testing.T) {
 						ApricotProposalBlock: block.ApricotProposalBlock{
 							Tx: &txs.Tx{
 								Unsigned: &txs.RewardValidatorTx{
-									TxID: stakerTx.ID(),
+									TxID: stakerTxID,
 								},
 							},
 						},
@@ -326,16 +334,17 @@ func TestBlockOptions(t *testing.T) {
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID: nodeID,
 					}
-					primaryNetworkValidator = &state.Staker{
+					primaryStaker = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID: nodeID,
 					}
 				)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
 
-				err := state.PutCurrentValidator(primaryNetworkValidator)
+				err := state.PutCurrentValidator(primaryStaker)
 				require.NoError(t, err)
 				err = state.PutCurrentValidator(staker)
 				require.NoError(t, err)
@@ -349,6 +358,7 @@ func TestBlockOptions(t *testing.T) {
 						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
+						Uptimes: uptimes,
 					},
 				}
 
@@ -444,6 +454,7 @@ func TestBlockOptions(t *testing.T) {
 			name: "banff proposal block; prefers abort",
 			blkF: func(ctrl *gomock.Controller) *Block {
 				var (
+					stakerTxID = ids.GenerateTestID()
 					nodeID   = ids.GenerateTestNodeID()
 					subnetID = constants.PrimaryNetworkID
 					stakerTx = &txs.Tx{
@@ -453,6 +464,7 @@ func TestBlockOptions(t *testing.T) {
 							},
 							Subnet: subnetID,
 						},
+						TxID: stakerTxID,
 					}
 					primaryNetworkValidatorStartTime = time.Now()
 					staker                           = &state.Staker{
@@ -493,7 +505,7 @@ func TestBlockOptions(t *testing.T) {
 						ApricotProposalBlock: block.ApricotProposalBlock{
 							Tx: &txs.Tx{
 								Unsigned: &txs.RewardValidatorTx{
-									TxID: stakerTx.ID(),
+									TxID: stakerTxID,
 								},
 							},
 						},

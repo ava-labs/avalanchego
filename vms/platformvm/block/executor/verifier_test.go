@@ -728,6 +728,8 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// setup parent state
+			parentTime := genesistest.DefaultValidatorStartTime
+			s.SetTimestamp(parentTime)
 			s.SetLastAccepted(parentID)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
@@ -829,6 +831,8 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// setup parent state
+			parentTime := genesistest.DefaultValidatorStartTime
+			s.SetTimestamp(parentTime)
 			s.SetLastAccepted(parentID)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)

@@ -142,11 +142,8 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s.SetHeight(blk.Height())
 	s.AddStatelessBlock(blk)
 
-	batch, err := s.CommitBatch()
-	require.NoError(err)
-
 	onAcceptState.EXPECT().Apply(s).Times(1)
-	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
+	sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1)
 
 	require.NoError(acceptor.ApricotAtomicBlock(blk))
 }
@@ -228,11 +225,8 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.SetHeight(blk.Height())
 	s.AddStatelessBlock(blk)
 
-	batch, err := s.CommitBatch()
-	require.NoError(err)
-
 	onAcceptState.EXPECT().Apply(s).Times(1)
-	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
+	sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1)
 
 	require.NoError(acceptor.BanffStandardBlock(blk))
 	require.True(calledOnAcceptFunc)
@@ -401,7 +395,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 
-		// these are called when we add the parent's stateless block to the state
+		// These are called when we add the parent's stateless block to the state
 		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 	)
