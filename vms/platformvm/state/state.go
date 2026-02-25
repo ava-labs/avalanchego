@@ -151,132 +151,6 @@ type Chain interface {
 	AddTx(tx *txs.Tx, status status.Status)
 }
 
-// type State interface {
-// 	Chain
-// 	uptime.State
-// 	avax.UTXOReader
-
-// 	GetLastAccepted() ids.ID
-// 	SetLastAccepted(blkID ids.ID)
-
-// 	GetStatelessBlock(blockID ids.ID) (block.Block, error)
-
-// 	// Invariant: [block] is an accepted block.
-// 	AddStatelessBlock(block block.Block)
-
-// 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
-
-// 	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
-// 	GetSubnetIDs() ([]ids.ID, error)
-// 	GetChains(subnetID ids.ID) ([]*txs.Tx, error)
-
-// 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
-// 	// block until it has applied all of the diffs up to and including
-// 	// [endHeight]. Applying the diffs modifies [validators].
-// 	//
-// 	// Invariant: If attempting to generate the validator set for
-// 	// [endHeight - 1], [validators] must initially contain the validator
-// 	// weights for [startHeight].
-// 	//
-// 	// Note: Because this function iterates towards the genesis, [startHeight]
-// 	// will typically be greater than or equal to [endHeight]. If [startHeight]
-// 	// is less than [endHeight], no diffs will be applied.
-// 	ApplyValidatorWeightDiffs(
-// 		ctx context.Context,
-// 		validators map[ids.NodeID]*validators.GetValidatorOutput,
-// 		startHeight uint64,
-// 		endHeight uint64,
-// 		subnetID ids.ID,
-// 	) error
-
-// 	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
-// 	// genesis block until it has applied all of the diffs up to and including
-// 	// [endHeight]. Applying the diffs modifies [validators].
-// 	//
-// 	// Invariant: If attempting to generate the validator set for
-// 	// [endHeight - 1], [validators] must initially contain the validator
-// 	// weights for [startHeight].
-// 	//
-// 	// Note: Because this function iterates towards the genesis, [startHeight]
-// 	// will typically be greater than or equal to [endHeight]. If [startHeight]
-// 	// is less than [endHeight], no diffs will be applied.
-// 	ApplyValidatorPublicKeyDiffs(
-// 		ctx context.Context,
-// 		validators map[ids.NodeID]*validators.GetValidatorOutput,
-// 		startHeight uint64,
-// 		endHeight uint64,
-// 		subnetID ids.ID,
-// 	) error
-
-// 	// ApplyAllValidatorWeightDiffs iterates from [startHeight] towards the genesis
-// 	// block until it has applied all of the diffs up to and including
-// 	// [endHeight]. Applying the diffs modifies [validators].
-// 	//
-// 	// Invariant: If attempting to generate the validator set for
-// 	// [endHeight - 1], [validators] must initially contain the validator
-// 	// weights for [startHeight].
-// 	//
-// 	// Note: Because this function iterates towards the genesis, [startHeight]
-// 	// will typically be greater than or equal to [endHeight]. If [startHeight]
-// 	// is less than [endHeight], no diffs will be applied.
-// 	ApplyAllValidatorWeightDiffs(
-// 		ctx context.Context,
-// 		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
-// 		startHeight uint64,
-// 		endHeight uint64,
-// 	) error
-
-// 	// ApplyAllValidatorPublicKeyDiffs iterates from [startHeight] towards the
-// 	// genesis block until it has applied all of the diffs up to and including
-// 	// [endHeight]. Applying the diffs modifies [validators].
-// 	//
-// 	// Invariant: If attempting to generate the validator set for
-// 	// [endHeight - 1], [validators] must initially contain the validator
-// 	// weights for [startHeight].
-// 	//
-// 	// Note: Because this function iterates towards the genesis, [startHeight]
-// 	// will typically be greater than or equal to [endHeight]. If [startHeight]
-// 	// is less than [endHeight], no diffs will be applied.
-// 	ApplyAllValidatorPublicKeyDiffs(
-// 		ctx context.Context,
-// 		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
-// 		startHeight uint64,
-// 		endHeight uint64,
-// 	) error
-
-// 	SetHeight(height uint64)
-
-// 	// GetCurrentValidators returns subnet and L1 validators for the given
-// 	// subnetID along with the current P-chain height.
-// 	// This method works for both subnets and L1s. Depending of the requested
-// 	// subnet/L1 validator schema, the return values can include only subnet
-// 	// validator, only L1 validators or both if there are initial stakers in the
-// 	// L1 conversion.
-// 	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error)
-
-// 	// Discard uncommitted changes to the database.
-// 	Abort()
-
-// 	// ReindexBlocks converts any block indices using the legacy storage format
-// 	// to the new format. If this database has already updated the indices,
-// 	// this function will return immediately, without iterating over the
-// 	// database.
-// 	//
-// 	// TODO: Remove after v1.14.x is activated
-// 	ReindexBlocks(lock sync.Locker, log logging.Logger) error
-
-// 	// Commit changes to the base database.
-// 	Commit() error
-
-// 	// Returns a batch of unwritten changes that, when written, will commit all
-// 	// pending changes to the base database.
-// 	CommitBatch() (database.Batch, error)
-
-// 	Checksum() ids.ID
-
-// 	Close() error
-// }
-
 // Prior to https://github.com/ava-labs/avalanchego/pull/1719, blocks were
 // stored as a map from blkID to stateBlk. Nodes synced prior to this PR may
 // still have blocks partially stored using this legacy format.
@@ -858,15 +732,15 @@ func New(
 	return s, nil
 }
 
-func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
+func (s *State) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
 	return s.validatorState.GetDelegateeReward(subnetID, vdrID)
 }
 
-func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, reward uint64) error {
+func (s *State) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, reward uint64) error {
 	return s.validatorState.SetDelegateeReward(subnetID, vdrID, reward)
 }
 
-func (s *state) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
+func (s *State) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	return s.expiryDiff.getExpiryIterator(
 		iterator.FromTree(s.expiry),
 	), nil
@@ -888,6 +762,12 @@ func (s *State) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
 }
 
+// GetCurrentValidators returns subnet and L1 validators for the given
+// subnetID along with the current P-chain height.
+// This method works for both subnets and L1s. Depending of the requested
+// subnet/L1 validator schema, the return values can include only subnet
+// validator, only L1 validators or both if there are initial stakers in the
+// L1 conversion.
 func (s *State) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
 	// First add the current validators (non-L1)
 	legacyBaseStakers := s.currentStakers.validators[subnetID]
@@ -1437,6 +1317,17 @@ func (s *State) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	}
 }
 
+// ApplyAllValidatorWeightDiffs iterates from [startHeight] towards the genesis
+// block until it has applied all of the diffs up to and including
+// [endHeight]. Applying the diffs modifies [validators].
+//
+// Invariant: If attempting to generate the validator set for
+// [endHeight - 1], [validators] must initially contain the validator
+// weights for [startHeight].
+//
+// Note: Because this function iterates towards the genesis, [startHeight]
+// will typically be greater than or equal to [endHeight]. If [startHeight]
+// is less than [endHeight], no diffs will be applied.
 func (s *State) ApplyAllValidatorWeightDiffs(
 	ctx context.Context,
 	allValidators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
@@ -1502,6 +1393,17 @@ func (s *State) ApplyAllValidatorWeightDiffs(
 	return diffIter.Error()
 }
 
+// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
+// block until it has applied all of the diffs up to and including
+// [endHeight]. Applying the diffs modifies [validators].
+//
+// Invariant: If attempting to generate the validator set for
+// [endHeight - 1], [validators] must initially contain the validator
+// weights for [startHeight].
+//
+// Note: Because this function iterates towards the genesis, [startHeight]
+// will typically be greater than or equal to [endHeight]. If [startHeight]
+// is less than [endHeight], no diffs will be applied.
 func (s *State) ApplyValidatorWeightDiffs(
 	ctx context.Context,
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -1594,6 +1496,17 @@ func applyWeightDiff(
 	return nil
 }
 
+// ApplyAllValidatorPublicKeyDiffs iterates from [startHeight] towards the
+// genesis block until it has applied all of the diffs up to and including
+// [endHeight]. Applying the diffs modifies [validators].
+//
+// Invariant: If attempting to generate the validator set for
+// [endHeight - 1], [validators] must initially contain the validator
+// weights for [startHeight].
+//
+// Note: Because this function iterates towards the genesis, [startHeight]
+// will typically be greater than or equal to [endHeight]. If [startHeight]
+// is less than [endHeight], no diffs will be applied.
 func (s *State) ApplyAllValidatorPublicKeyDiffs(
 	ctx context.Context,
 	allValidators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
@@ -1639,6 +1552,17 @@ func (s *State) ApplyAllValidatorPublicKeyDiffs(
 	return diffIter.Error()
 }
 
+// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
+// genesis block until it has applied all of the diffs up to and including
+// [endHeight]. Applying the diffs modifies [validators].
+//
+// Invariant: If attempting to generate the validator set for
+// [endHeight - 1], [validators] must initially contain the validator
+// weights for [startHeight].
+//
+// Note: Because this function iterates towards the genesis, [startHeight]
+// will typically be greater than or equal to [endHeight]. If [startHeight]
+// is less than [endHeight], no diffs will be applied.
 func (s *State) ApplyValidatorPublicKeyDiffs(
 	ctx context.Context,
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -2355,6 +2279,8 @@ func (s *State) init(genesisBytes []byte) error {
 	return s.Commit()
 }
 
+// AddStatelessBlock stores block as an accepted block.
+// Invariant: [block] is an accepted block.
 func (s *State) AddStatelessBlock(block block.Block) {
 	blkID := block.ID()
 	s.addedBlockIDs[block.Height()] = blkID
@@ -2375,6 +2301,7 @@ func (s *State) SetHeight(height uint64) {
 	s.currentHeight = height
 }
 
+// Commit commits changes to the base database.
 func (s *State) Commit() error {
 	defer s.Abort()
 	batch, err := s.CommitBatch()
@@ -2384,6 +2311,7 @@ func (s *State) Commit() error {
 	return batch.Write()
 }
 
+// Abort discards uncommitted changes to the database.
 func (s *State) Abort() {
 	s.baseDB.Abort()
 }
@@ -2392,6 +2320,8 @@ func (s *State) Checksum() ids.ID {
 	return s.utxoState.Checksum()
 }
 
+// CommitBatch returns a batch of unwritten changes that, when written, will
+// commit all pending changes to the base database.
 func (s *State) CommitBatch() (database.Batch, error) {
 	// updateValidators is set to true here so that the validator manager is
 	// kept up to date with the last accepted state.
@@ -3264,6 +3194,11 @@ func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
 	return blk, true, err
 }
 
+// ReindexBlocks converts any block indices using the legacy storage format to
+// the new format. If this database has already updated the indices, this
+// function will return immediately, without iterating over the database.
+//
+// TODO: Remove after v1.14.x is activated
 func (s *State) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 	has, err := s.singletonDB.Has(BlocksReindexedKey)
 	if err != nil {
