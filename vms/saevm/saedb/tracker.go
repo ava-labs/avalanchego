@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path/filepath"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/ethdb"
@@ -16,7 +18,12 @@ import (
 	"github.com/ava-labs/libevm/triedb/hashdb"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
+
+	graftfw "github.com/ava-labs/avalanchego/graft/evm/firewood"
 )
 
 const (
@@ -50,6 +57,7 @@ const (
 
 // Config allows parameterization of the TrieDB and when state is committed.
 type Config struct {
+	Scheme           string // trie database scheme to use; "" = default (rawdb.HashScheme)
 	TrieCacheMiB     uint64 // size of the TrieDB cache
 	SnapshotCacheMiB uint64 // size of the snapshot cache - if 0, snapshots are disabled
 	Archival         bool   // if true, will store every state on disk
@@ -59,6 +67,12 @@ type Config struct {
 	maxCapBytes       common.StorageSize
 	targetCommitBytes common.StorageSize
 }
+
+var (
+	errZeroCommitInterval = errors.New("commit interval must be non-zero")
+	errCacheTooLarge      = fmt.Errorf("cache size exceeds maximum of %d MiB", maxCacheMiB)
+	errUnknownScheme      = errors.New("unknown trie database scheme")
+)
 
 func (c Config) Verify() error {
 	if c.CommitInterval == 0 {
@@ -70,14 +84,53 @@ func (c Config) Verify() error {
 	if c.SnapshotCacheMiB > maxCacheMiB {
 		return fmt.Errorf("%w: SnapshotCacheMiB (%d)", errCacheTooLarge, c.SnapshotCacheMiB)
 	}
+	switch c.Scheme {
+	case "", customrawdb.FirewoodScheme, rawdb.HashScheme:
+	default:
+		return fmt.Errorf("%w: %q", errUnknownScheme, c.Scheme)
+	}
+
 	return nil
 }
 
-func (c Config) TrieDBConfig() *triedb.Config {
-	return &triedb.Config{
-		HashDB: &hashdb.Config{
-			CleanCacheSize: int(c.TrieCacheMiB) * mibToBytes, //#nosec G115 // checked in [Config.Verify]
-		},
+// TrieDBConfig returns a config that can be used to create a [triedb.Database] based on
+// the [Config] parameters provided.
+//
+// All [triedb.Database] must be closed, unless the TrieDB cache is disabled, as
+// this will result in a memory leak.
+func (c Config) TrieDBConfig(snowCtx *snow.Context) *triedb.Config {
+	switch c.Scheme {
+	case customrawdb.FirewoodScheme:
+		if c.TrieCacheMiB == 0 {
+			// Firewood doesn't allow memory-only operation
+			c.TrieCacheMiB = DefaultTrieCacheSizeMiB
+		}
+		if c.Archival {
+			// TODO(alarso16): Allow arbitrary values when re-execution is enabled
+			c.CommitInterval = 1
+		}
+		return &triedb.Config{
+			DBOverride: firewood.Config{
+				Path:                   filepath.Join(snowCtx.ChainDataDir, graftfw.Directory),
+				CacheSizeBytes:         uint(c.TrieCacheMiB) * mibToBytes, // #nosec G115 -- checked in [Config.Verify]
+				RevisionsInMemory:      uint(2 * c.CommitInterval),
+				DeferredCommitInterval: c.CommitInterval,
+				Archive:                c.Archival,
+				Log:                    snowCtx.Log,
+			}.BackendConstructor,
+		}
+	case rawdb.HashScheme, "":
+		return &triedb.Config{
+			HashDB: &hashdb.Config{
+				CleanCacheSize: int(c.TrieCacheMiB) * mibToBytes, // #nosec G115 -- checked in [Config.Verify]
+			},
+		}
+	default:
+		snowCtx.Log.Error("Defaulting to hashdb",
+			zap.Error(errUnknownScheme),
+			zap.String("scheme", c.Scheme),
+		)
+		return nil
 	}
 }
 
@@ -85,8 +138,12 @@ func (c Config) snapConfig() *snapshot.Config {
 	if c.SnapshotCacheMiB <= 0 {
 		return nil
 	}
+	if c.Scheme == customrawdb.FirewoodScheme {
+		// Firewood doesn't support snapshots
+		return nil
+	}
 	return &snapshot.Config{
-		CacheSize:  int(c.SnapshotCacheMiB), //#nosec G115 // checked in [Config.Verify]
+		CacheSize:  int(c.SnapshotCacheMiB), //#nosec G115 -- checked in [Config.Verify]
 		AsyncBuild: true,
 	}
 }
@@ -120,17 +177,12 @@ type Tracker struct {
 	log    logging.Logger
 }
 
-var (
-	errZeroCommitInterval = errors.New("commit interval must be non-zero")
-	errCacheTooLarge      = fmt.Errorf("cache size exceeds maximum of %d MiB", maxCacheMiB)
-)
-
 // NewTracker provides a new [Tracker] on the underlying database.
-func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log logging.Logger) (*Tracker, error) {
+func NewTracker(db ethdb.Database, c Config, snowCtx *snow.Context, lastExecuted common.Hash) (*Tracker, error) {
 	if err := c.Verify(); err != nil {
 		return nil, err
 	}
-	cache := state.NewDatabaseWithConfig(db, c.TrieDBConfig())
+	cache := state.NewDatabaseWithConfig(db, c.TrieDBConfig(snowCtx))
 	var snaps *snapshot.Tree
 	if snapConf := c.snapConfig(); snapConf != nil {
 		var err error
@@ -145,7 +197,7 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log loggi
 		snaps:  snaps,
 		cache:  cache,
 		config: c,
-		log:    log,
+		log:    snowCtx.Log,
 	}, nil
 }
 
@@ -177,6 +229,11 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 		because string
 	)
 	switch {
+	case t.config.Scheme == customrawdb.FirewoodScheme:
+		// Since Firewood doesn't guarantee that the state will be persisted to
+		// disk immediately, it can enter a crash loop missing a settled state.
+		commit = settledRoot
+		because = "settled "
 	case t.config.Archival:
 		commit = executionRoot
 		because = "post-execution archive"

@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"time"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -159,8 +158,6 @@ func New(config Config) (*TrieDB, error) {
 // underlying Firewood database.  If a reference to a [state.Trie] obtained
 // from this parent [state.Database] is still accessible during this call, an
 // error will be returned.
-//
-// TODO(alarso16): Force drop all pending revisions on close once supported.
 func (t *TrieDB) Close() error {
 	errs := make([]error, 0, t.committable.Len()+2)
 	for it := t.committable.NewIterator(); it.Next(); {
@@ -172,12 +169,11 @@ func (t *TrieDB) Close() error {
 		t.pending = nil
 	}
 
-	// Allow some time for garbage collection and disk persistence of the
-	// last committed revision.
-	go runtime.GC()
+	// Firewood will iterate through all open handles and close them, but this
+	// isn't guaranteed to finish.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	errs = append(errs, t.Firewood.Close(ctx))
+	errs = append(errs, t.Firewood.Close(ctx, ffi.WithForceCloseHandles()))
 
 	return errors.Join(errs...)
 }

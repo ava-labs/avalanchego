@@ -19,8 +19,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
@@ -35,6 +38,10 @@ func TestNewTracker(t *testing.T) {
 	}{
 		{
 			name: "defaults",
+		},
+		{
+			name: "firewood",
+			with: func(c *Config) { c.Scheme = customrawdb.FirewoodScheme },
 		},
 		{
 			name:    "zero_commit_interval",
@@ -57,18 +64,24 @@ func TestNewTracker(t *testing.T) {
 			with:    func(c *Config) { c.SnapshotCacheMiB = math.MaxInt },
 			wantErr: errCacheTooLarge,
 		},
+		{
+			name:    "unknown_scheme",
+			with:    func(c *Config) { c.Scheme = rawdb.PathScheme },
+			wantErr: errUnknownScheme,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log := loggingtest.New(t, logging.Debug)
+			snowCtx := snowtest.Context(t, ids.Empty)
+			snowCtx.Log = loggingtest.New(t, logging.Debug)
 			cfg := defaults
 			if tt.with != nil {
 				tt.with(&cfg)
 			}
 			db := rawdb.NewMemoryDatabase()
 
-			tr, err := NewTracker(db, cfg, types.EmptyRootHash, log)
+			tr, err := NewTracker(db, cfg, snowCtx, types.EmptyRootHash)
 			require.ErrorIs(t, err, tt.wantErr, "NewTracker()")
 			if err != nil {
 				return
@@ -139,9 +152,11 @@ func TestTrackerMaybeCap(t *testing.T) {
 		maxCapBytes:       maxCapBytes,
 		targetCommitBytes: targetCommitBytes,
 	}
-	log := loggingtest.New(t, logging.Debug)
 
-	tr, err := NewTracker(rawdb.NewMemoryDatabase(), cfg, types.EmptyRootHash, log)
+	snowCtx := snowtest.Context(t, ids.Empty)
+	snowCtx.Log = loggingtest.New(t, logging.Debug)
+
+	tr, err := NewTracker(rawdb.NewMemoryDatabase(), cfg, snowCtx, types.EmptyRootHash)
 	require.NoError(t, err, "NewTracker()")
 
 	prevRoot := types.EmptyRootHash
@@ -254,7 +269,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 				for b.Loop() {
 					b.StopTimer()
 					db := tt.open(b)
-					tr, err := NewTracker(db, cfg, types.EmptyRootHash, logging.NoLog{})
+					tr, err := NewTracker(db, cfg, snowtest.Context(b, ids.Empty), types.EmptyRootHash)
 					require.NoError(b, err, "NewTracker()")
 					b.StartTimer()
 

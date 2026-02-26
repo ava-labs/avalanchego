@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
@@ -140,6 +141,11 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.SnapshotCache = 128 }),
 		},
 		{
+			name: "state_scheme",
+			json: `{"state-scheme":"firewood"}`,
+			want: with(func(c *config) { c.StateScheme = customrawdb.FirewoodScheme }),
+		},
+		{
 			name: "all_active_fields",
 			json: `{
 				"min-price-target":500,
@@ -154,7 +160,8 @@ func TestParseConfig(t *testing.T) {
 				"warp-off-chain-messages":["0x1234"],
 				"trie-clean-cache":256,
 				"snapshot-cache":128,
-				"commit-interval":256
+				"commit-interval":256,
+				"state-scheme":"firewood"
 			}`,
 			want: config{
 				PriceTarget:          utils.PointerTo(gas.Price(500)),
@@ -170,6 +177,7 @@ func TestParseConfig(t *testing.T) {
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 				TrieCleanCache:       256,
 				SnapshotCache:        128,
+				StateScheme:          customrawdb.FirewoodScheme,
 			},
 		},
 	}

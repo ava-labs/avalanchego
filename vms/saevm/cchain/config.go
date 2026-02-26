@@ -45,7 +45,7 @@ type config struct {
 	// AllowMissingTries    bool    `json:"allow-missing-tries"`
 	// PopulateMissingTries *uint64 `json:"populate-missing-tries,omitempty"`
 	// OfflinePruning       bool    `json:"offline-pruning-enabled"`
-	// StateScheme          string  `json:"state-scheme"`
+	StateScheme string `json:"state-scheme"`
 
 	// Transaction pool
 	LocalTxsEnabled    bool   `json:"local-txs-enabled"`
@@ -128,6 +128,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 		MempoolConfig: mempoolConfig,
 		DBConfig: saedb.Config{
 			Archival:         !c.Pruning,
+			Scheme:           c.StateScheme,
 			TrieCacheMiB:     c.TrieCleanCache,
 			CommitInterval:   c.CommitInterval,
 			SnapshotCacheMiB: c.SnapshotCache,

@@ -6,10 +6,13 @@ package sae
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -55,21 +58,9 @@ func (vm *SinceGenesis[_]) Initialize(
 	appSender snowcommon.AppSender,
 ) error {
 	db := newEthDB(avaDB)
-	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig())
-
-	genesis := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
-		return fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
-	}
-	config, hash, err := core.SetupGenesisBlock(db, tdb, genesis)
+	config, err := createGenesisBlock(db, vm.config.DBConfig.TrieDBConfig(snowCtx), genesisBytes)
 	if err != nil {
-		return fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
-	}
-
-	// [NewVM] assumes that the genesis block is "finalized", which does not
-	// happen in [core.SetupGenesisBlock]. This MUST only happen once.
-	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
-		rawdb.WriteFinalizedBlockHash(db, hash)
+		return err
 	}
 
 	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, appSender)
@@ -78,6 +69,30 @@ func (vm *SinceGenesis[_]) Initialize(
 	}
 	vm.VM = inner
 	return nil
+}
+
+func createGenesisBlock(db ethdb.Database, tdbConfig *triedb.Config, genesisBytes []byte) (_ *params.ChainConfig, err error) {
+	tdb := triedb.NewDatabase(db, tdbConfig)
+	defer func() {
+		err = errors.Join(err, tdb.Close())
+	}()
+
+	genesis := new(core.Genesis)
+	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
+		return nil, fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
+	}
+	config, hash, err := core.SetupGenesisBlock(db, tdb, genesis)
+	if err != nil {
+		return nil, fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
+	}
+
+	// [NewVM] assumes that the genesis block is "finalized", which does not
+	// happen in [core.SetupGenesisBlock]. This MUST only happen once.
+	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
+		rawdb.WriteFinalizedBlockHash(db, hash)
+	}
+
+	return config, nil
 }
 
 // Shutdown gracefully closes the VM.

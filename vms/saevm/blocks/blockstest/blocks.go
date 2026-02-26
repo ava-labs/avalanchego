@@ -133,6 +133,11 @@ func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, al
 	}
 
 	tdb := triedb.NewDatabase(db, conf.tdbConfig)
+	defer func() {
+		if err := tdb.Close(); err != nil {
+			tb.Errorf("triedb.Database.Close(): %v", err)
+		}
+	}()
 	_, _, err := core.SetupGenesisBlock(db, tdb, gen)
 	require.NoError(tb, err, "core.SetupGenesisBlock()")
 
