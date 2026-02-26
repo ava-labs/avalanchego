@@ -1068,6 +1068,43 @@ func TestGetPrimaryNetworkConfig(t *testing.T) {
 	require.Equal(snowball.DefaultParameters.MaxItemProcessingTime, config.SnowParameters.MaxItemProcessingTime)
 }
 
+func TestGetPrimaryNetworkConfigWithSnowQuorumSizeKey(t *testing.T) {
+	snowQuorumSize := 8
+	tests := map[string]struct {
+		setFlag bool
+		testF   func(*require.Assertions, subnets.Config)
+	}{
+		"SnowQuorumSizeKey not set": {
+			setFlag: false,
+			testF: func(require *require.Assertions, config subnets.Config) {
+				require.Equal(snowball.DefaultParameters.AlphaPreference, config.SnowParameters.AlphaPreference)
+				require.Equal(snowball.DefaultParameters.AlphaConfidence, config.SnowParameters.AlphaConfidence)
+			},
+		},
+		"SnowQuorumSizeKey set": {
+			setFlag: true,
+			testF: func(require *require.Assertions, config subnets.Config) {
+				require.Equal(snowQuorumSize, config.SnowParameters.AlphaPreference)
+				require.Equal(snowQuorumSize, config.SnowParameters.AlphaConfidence)
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			v := setupViperFlags()
+			if test.setFlag {
+				v.Set(SnowQuorumSizeKey, snowQuorumSize)
+			}
+
+			config := getPrimaryNetworkConfig(v)
+			test.testF(require, config)
+		})
+	}
+}
+
 func TestSetConfigDefaults(t *testing.T) {
 	// Custom values used across test inputs and verify functions — declared once
 	// to avoid duplication between the two.
