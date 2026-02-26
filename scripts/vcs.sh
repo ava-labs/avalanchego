@@ -79,7 +79,8 @@ vcs_repo_root() {
 # Exits 0 if the working copy is clean, 1 otherwise.
 vcs_is_clean() {
   if _vcs_is_jj; then
-    # jj considers a revision "empty" when there are no changes
+    # jj considers a revision "empty" when its diff from parent is empty.
+    # Note: after `jj new`, @ is empty even if the parent has pending work.
     local empty
     empty="$(_jj log --no-graph -r @ -T 'empty' 2>/dev/null)"
     [[ "${empty}" == "true" ]]
