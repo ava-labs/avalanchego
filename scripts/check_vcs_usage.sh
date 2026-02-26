@@ -20,13 +20,14 @@ EXCLUDED_FILES=(
 )
 
 # find_files discovers files matching the given pattern, including under
-# .github/ which is missed by `find *`.
+# dotdirs like .github/ which are missed by `find *`.
 find_files() {
   local pattern="$1"
   # shellcheck disable=SC2035
   {
     find * -name "$pattern" -type f -print
-    find .github -name "$pattern" -type f 2>/dev/null || true
+    find .* -maxdepth 0 -type d ! -name '.' ! -name '..' -exec \
+      find {} -name "$pattern" -type f \; 2>/dev/null || true
   } | sort -u
 }
 
