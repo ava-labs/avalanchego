@@ -469,7 +469,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.AddSubnetTransformation(&transformTx)
 
 				primaryNetworkVdr := &state.Staker{
-					EndTime: mockable.MaxTime,
+					EndTime:  mockable.MaxTime,
+					SubnetID: constants.PrimaryNetworkID,
+					NodeID:   verifiedTx.NodeID(),
 				}
 				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
 				return s
@@ -512,7 +514,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.SetTimestamp(now)
 				s.AddSubnetTransformation(&transformTx)
 				primaryNetworkVdr := &state.Staker{
-					EndTime: mockable.MaxTime,
+					EndTime:  mockable.MaxTime,
+					SubnetID: constants.PrimaryNetworkID,
+					NodeID:   verifiedTx.NodeID(),
 				}
 				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
 				return s
