@@ -9,6 +9,7 @@ fi
 
 # Root-level directories to exclude from linting
 EXCLUDE_DIRS=(
+  firewood # Firewood subtree has its own lint config
   graft    # Grafted modules have their own lint config
   .direnv  # direnv cache
   .idea    # GoLand

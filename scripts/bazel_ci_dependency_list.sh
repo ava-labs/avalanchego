@@ -26,6 +26,7 @@ bazel_ci_target_patterns() {
 //main:avalanchego
 //:avalanchego_unit_tests
 //:coreth_unit_tests
+//firewood/ffi:ffi_test //firewood/ffi/tests/eth:eth_test //firewood/ffi/tests/firewood:firewood_test
 //:subnet_evm_unit_tests
 EOF
 }
