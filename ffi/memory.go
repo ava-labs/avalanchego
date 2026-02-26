@@ -11,15 +11,11 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"unsafe"
 )
 
 var errFreeingValue = errors.New("unexpected error while freeing value")
-
-type Pinner interface {
-	Pin(ptr any)
-	Unpin()
-}
 
 // Borrower is an interface for types that can borrow or copy bytes returned
 // from FFI methods.
@@ -56,7 +52,7 @@ var _ Borrower = (*ownedBytes)(nil)
 // newBorrowedBytes creates a new BorrowedBytes from a Go byte slice.
 //
 // Provide a Pinner to ensure the memory is pinned while the BorrowedBytes is in use.
-func newBorrowedBytes(slice []byte, pinner Pinner) C.BorrowedBytes {
+func newBorrowedBytes(slice []byte, pinner *runtime.Pinner) C.BorrowedBytes {
 	// Get the pointer first to distinguish between nil slice and empty slice
 	ptr := unsafe.SliceData(slice)
 	sliceLen := len(slice)
@@ -81,7 +77,7 @@ func newBorrowedBytes(slice []byte, pinner Pinner) C.BorrowedBytes {
 // newCBatchOp creates a new C.BatchOp from a Go BatchOp.
 //
 // Provide a Pinner to ensure the memory is pinned while the C.BatchOp is in use.
-func newCBatchOp(op BatchOp, pinner Pinner) C.BatchOp {
+func newCBatchOp(op BatchOp, pinner *runtime.Pinner) C.BatchOp {
 	var cOp C.BatchOp
 	cOp.tag = op.tag
 	switch op.tag {
@@ -106,7 +102,7 @@ func newCBatchOp(op BatchOp, pinner Pinner) C.BatchOp {
 //
 // Provide a Pinner to ensure the memory is pinned while the BorrowedBatchOps is
 // in use.
-func newBorrowedBatchOps(ops []C.BatchOp, pinner Pinner) C.BorrowedBatchOps {
+func newBorrowedBatchOps(ops []C.BatchOp, pinner *runtime.Pinner) C.BorrowedBatchOps {
 	sliceLen := len(ops)
 	if sliceLen == 0 {
 		return C.BorrowedBatchOps{ptr: nil, len: 0}
@@ -129,7 +125,7 @@ func newBorrowedBatchOps(ops []C.BatchOp, pinner Pinner) C.BorrowedBatchOps {
 //
 // Provide a Pinner to ensure the memory is pinned while the BorrowedBatchOps is
 // in use.
-func newKeyValuePairsFromBatch(batch []BatchOp, pinner Pinner) C.BorrowedBatchOps {
+func newKeyValuePairsFromBatch(batch []BatchOp, pinner *runtime.Pinner) C.BorrowedBatchOps {
 	if len(batch) == 0 {
 		return C.BorrowedBatchOps{ptr: nil, len: 0}
 	}

@@ -8,6 +8,7 @@ package ffi
 import "C"
 
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -30,7 +31,7 @@ type Maybe[T any] interface {
 	Value() T
 }
 
-func newMaybeBorrowedBytes(maybe Maybe[[]byte], pinner Pinner) C.Maybe_BorrowedBytes {
+func newMaybeBorrowedBytes(maybe Maybe[[]byte], pinner *runtime.Pinner) C.Maybe_BorrowedBytes {
 	var cMaybe C.Maybe_BorrowedBytes
 
 	if maybe != nil && maybe.HasValue() {
