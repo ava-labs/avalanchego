@@ -285,6 +285,276 @@ func TestBenchlistTimeoutCleansSlate(t *testing.T) {
 	require.False(b.IsBenched(vdrID))
 }
 
+// TestBenchlistEvictsLowestProbabilityNode verifies that when a new node
+// crosses the bench threshold but capacity is full, the benched node with
+// the lowest failure probability is evicted to make room.
+func TestBenchlistEvictsLowestProbabilityNode(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	vdrs := validators.NewManager()
+
+	// 3 validators with stake=1 each. Total stake = 3.
+	// maxPortion = 0.4 → maxBenchedStake = 1.2, so only 1 node (stake=1) fits.
+	vdrA := ids.GenerateTestNodeID()
+	vdrB := ids.GenerateTestNodeID()
+	vdrC := ids.GenerateTestNodeID()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrA, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrB, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrC, nil, ids.Empty, 1))
+
+	benchable := &benchable{
+		t:           t,
+		wantChainID: ctx.ChainID,
+		// Capacity 2: eviction produces Unbenched(victim) + Benched(incoming).
+		updated: make(chan struct{}, 2),
+	}
+	b, err := newBenchlist(
+		ctx,
+		benchable,
+		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      DefaultBenchDuration,
+			MaxPortion:         0.4,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+	defer b.shutdown()
+
+	// Bench A: 2 failures → p ≈ 0.67 > 0.5 → benched.
+	b.RegisterFailure(vdrA)
+	b.RegisterFailure(vdrA)
+	<-benchable.updated
+	require.True(b.IsBenched(vdrA))
+
+	// Now push B to a higher failure probability than A.
+	// 3 failures → p ≈ 0.75 > A's 0.67. B wants to bench but capacity is
+	// full. Eviction: A (lower p) is evicted, B is benched.
+	b.RegisterFailure(vdrB)
+	b.RegisterFailure(vdrB)
+	b.RegisterFailure(vdrB)
+	// Expect Unbenched(A) + Benched(B) = 2 signals.
+	<-benchable.updated
+	<-benchable.updated
+
+	require.False(b.IsBenched(vdrA), "A should be evicted")
+	require.True(b.IsBenched(vdrB), "B should be benched")
+}
+
+// TestBenchlistEvictionRefusedWhenNoBetterCandidate verifies that eviction
+// does not occur when the incoming node has a lower failure probability than
+// all currently benched nodes.
+func TestBenchlistEvictionRefusedWhenNoBetterCandidate(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	vdrs := validators.NewManager()
+
+	// 3 validators with stake=1. maxPortion=0.4 → room for 1.
+	vdrA := ids.GenerateTestNodeID()
+	vdrB := ids.GenerateTestNodeID()
+	vdrC := ids.GenerateTestNodeID()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrA, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrB, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrC, nil, ids.Empty, 1))
+
+	benchable := &benchable{
+		t:           t,
+		wantChainID: ctx.ChainID,
+		updated:     make(chan struct{}, 2),
+	}
+	b, err := newBenchlist(
+		ctx,
+		benchable,
+		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      DefaultBenchDuration,
+			MaxPortion:         0.4,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+	defer b.shutdown()
+
+	// Bench A with high failure probability: many failures → p close to 1.
+	for range 10 {
+		b.RegisterFailure(vdrA)
+	}
+	<-benchable.updated
+	require.True(b.IsBenched(vdrA))
+
+	// B crosses bench threshold with lower p than A.
+	// 2 failures → p ≈ 0.67, which is well below A's ~0.999.
+	// Eviction should NOT happen because A is worse than B.
+	b.RegisterFailure(vdrB)
+	b.RegisterFailure(vdrB)
+
+	select {
+	case <-benchable.updated:
+		require.FailNow("unexpected bench/unbench — eviction should not occur")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	require.True(b.IsBenched(vdrA), "A should remain benched")
+	require.False(b.IsBenched(vdrB), "B should not be benched")
+}
+
+// TestBenchlistEvictionRespectsStakeConstraints verifies that eviction does
+// not occur when evicting the candidate would not free enough stake for the
+// incoming node.
+func TestBenchlistEvictionRespectsStakeConstraints(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	vdrs := validators.NewManager()
+
+	// A has stake=1, B has stake=3, C has stake=6. Total = 10.
+	// maxPortion = 0.15 → maxBenchedStake = 1.5.
+	// A (stake=1) can be benched. B (stake=3) cannot fit even if A is evicted
+	// because 3 > 1.5.
+	vdrA := ids.GenerateTestNodeID()
+	vdrB := ids.GenerateTestNodeID()
+	vdrC := ids.GenerateTestNodeID()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrA, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrB, nil, ids.Empty, 3))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrC, nil, ids.Empty, 6))
+
+	benchable := &benchable{
+		t:           t,
+		wantChainID: ctx.ChainID,
+		updated:     make(chan struct{}, 2),
+	}
+	b, err := newBenchlist(
+		ctx,
+		benchable,
+		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      DefaultBenchDuration,
+			MaxPortion:         0.15,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+	defer b.shutdown()
+
+	// Bench A (stake=1): fits within maxBenchedStake = 1.5.
+	b.RegisterFailure(vdrA)
+	b.RegisterFailure(vdrA)
+	<-benchable.updated
+	require.True(b.IsBenched(vdrA))
+
+	// B (stake=3) crosses bench threshold with higher p than A.
+	// Even though B has higher p, evicting A frees stake=1, and
+	// B needs stake=3, which exceeds maxBenchedStake=1.5.
+	for range 5 {
+		b.RegisterFailure(vdrB)
+	}
+
+	select {
+	case <-benchable.updated:
+		require.FailNow("unexpected bench/unbench — stake constraint should prevent eviction")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	require.True(b.IsBenched(vdrA), "A should remain benched")
+	require.False(b.IsBenched(vdrB), "B should not be benched — too much stake")
+}
+
+// TestBenchlistEvictedNodePreservesEWMA verifies that an evicted node retains
+// its failure probability (EWMA is not reset), allowing organic recovery via
+// the unbench threshold path.
+func TestBenchlistEvictedNodePreservesEWMA(t *testing.T) {
+	require := require.New(t)
+	const halflife = 25 * time.Millisecond
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	vdrs := validators.NewManager()
+
+	vdrA := ids.GenerateTestNodeID()
+	vdrB := ids.GenerateTestNodeID()
+	vdrC := ids.GenerateTestNodeID()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrA, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrB, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrC, nil, ids.Empty, 1))
+
+	benchable := &benchable{
+		t:           t,
+		wantChainID: ctx.ChainID,
+		updated:     make(chan struct{}, 2),
+	}
+	b, err := newBenchlist(
+		ctx,
+		benchable,
+		vdrs,
+		Config{
+			Halflife:           halflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      DefaultBenchDuration,
+			MaxPortion:         0.4,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+	defer b.shutdown()
+
+	// Bench A: 2 failures → p ≈ 0.67.
+	b.RegisterFailure(vdrA)
+	b.RegisterFailure(vdrA)
+	<-benchable.updated
+	require.True(b.IsBenched(vdrA))
+
+	// Evict A by benching B with higher p.
+	b.RegisterFailure(vdrB)
+	b.RegisterFailure(vdrB)
+	b.RegisterFailure(vdrB)
+	<-benchable.updated // Unbenched(A)
+	<-benchable.updated // Benched(B)
+	require.False(b.IsBenched(vdrA))
+
+	// A's EWMA was NOT reset — it preserves the p ≈ 0.67 from before eviction.
+	// Verify this by sending a single success and checking that A doesn't get
+	// re-benched. With preserved EWMA, one success on p ≈ 0.67 yields
+	// p ≈ 0.5 which is right at the threshold but not above it.
+	//
+	// If the EWMA had been reset (like timeout-based unbench does), A would
+	// start from a clean slate at p = 0, and one success would keep p ≈ 0.
+	// Both cases result in "not benched", so to distinguish them we need a
+	// failure after recovery to prove the prior history is still there.
+	//
+	// First, unbench B organically so A has room to re-bench if it crosses
+	// the threshold. This isolates the EWMA test from capacity constraints.
+	time.Sleep(halflife) // decay B's failure history
+	for range 8 {
+		b.RegisterResponse(vdrB)
+	}
+	<-benchable.updated // Unbenched(B)
+	require.False(b.IsBenched(vdrB))
+
+	// Now A is unbenched with preserved EWMA (p ≈ 0.67). With B unbenched,
+	// there's capacity to bench. A single failure on preserved EWMA should
+	// push p above bench threshold and re-bench A (p goes from ~0.67 higher).
+	// If EWMA were reset, a single failure from clean slate yields p = 0.5,
+	// which does NOT cross the bench threshold (needs p > 0.5).
+	b.RegisterFailure(vdrA)
+	<-benchable.updated // Benched(A) — proves EWMA was preserved
+	require.True(b.IsBenched(vdrA), "A should re-bench from one failure because EWMA was preserved")
+}
+
 func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 	require := require.New(t)
 
