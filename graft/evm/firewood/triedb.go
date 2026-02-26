@@ -108,8 +108,6 @@ type TrieDBConfig struct {
 //   - CacheSizeBytes: 1MB
 //   - RevisionsInMemory: 100
 //   - CacheStrategy: [ffi.CacheAllReads]
-//   - CommitInterval: 128
-//   - Archive: false
 func DefaultConfig(dir string) TrieDBConfig {
 	return TrieDBConfig{
 		DatabaseDir:       dir,
