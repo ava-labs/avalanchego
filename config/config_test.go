@@ -791,6 +791,107 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	}
 }
 
+func TestConfigWithSnowQuorumSizeKey(t *testing.T) {
+	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+	require.NoError(t, err)
+	snowQuorumSize := 8
+	tests := map[string]struct {
+		givenJSON string
+		testF     func(*require.Assertions, map[ids.ID]subnets.Config)
+	}{
+		"no alpha params set": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"consensusParameters": {
+						"k": 15
+					},
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				config, ok := given[subnetID]
+				require.True(ok)
+				require.True(config.ValidatorOnly)
+				require.Equal(snowQuorumSize, config.SnowParameters.AlphaPreference)
+				require.Equal(snowQuorumSize, config.SnowParameters.AlphaConfidence)
+				require.Equal(15, config.SnowParameters.K)
+			},
+		},
+		"alpha preference set": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"consensusParameters": {
+						"k": 13,
+						"alphaPreference": 7
+					},
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				config, ok := given[subnetID]
+				require.True(ok)
+				require.True(config.ValidatorOnly)
+				require.Equal(7, config.SnowParameters.AlphaPreference)
+				require.Equal(snowQuorumSize, config.SnowParameters.AlphaConfidence)
+			},
+		},
+		"alpha confidence set": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"consensusParameters": {
+						"k": 13,
+						"alphaConfidence": 9
+					},
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				config, ok := given[subnetID]
+				require.True(ok)
+				require.True(config.ValidatorOnly)
+				require.Equal(snowQuorumSize, config.SnowParameters.AlphaPreference)
+				require.Equal(9, config.SnowParameters.AlphaConfidence)
+			},
+		},
+		"both alpha params set": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"consensusParameters": {
+						"k": 13,
+						"alphaConfidence": 9,
+						"alphaPreference": 7
+					},
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				config, ok := given[subnetID]
+				require.True(ok)
+				require.True(config.ValidatorOnly)
+				require.Equal(7, config.SnowParameters.AlphaPreference)
+				require.Equal(9, config.SnowParameters.AlphaConfidence)
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			encodedFileContent := base64.StdEncoding.EncodeToString([]byte(test.givenJSON))
+
+			v := setupViperFlags()
+			v.Set(SubnetConfigContentKey, encodedFileContent)
+			v.Set(SnowQuorumSizeKey, snowQuorumSize)
+
+			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
+			require.NoError(err)
+
+			test.testF(require, subnetConfigs)
+		})
+	}
+}
+
 func TestGetStakingSigner(t *testing.T) {
 	testKey := "HLimS3vRibTMk9lZD4b+Z+GLuSBShvgbsu0WTLt2Kd4="
 	dataDir := t.TempDir()

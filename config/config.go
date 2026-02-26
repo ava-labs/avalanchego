@@ -110,7 +110,7 @@ func setSnowDefaults(config *snowball.Parameters, v *viper.Viper) {
 	}
 	if config.AlphaConfidence == 0 {
 		if v.IsSet(SnowQuorumSizeKey) {
-			config.AlphaConfidence = v.GetInt(SnowPreferenceQuorumSizeKey)
+			config.AlphaConfidence = v.GetInt(SnowQuorumSizeKey)
 		} else {
 			config.AlphaConfidence = v.GetInt(SnowConfidenceQuorumSizeKey)
 		}
