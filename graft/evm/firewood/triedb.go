@@ -96,11 +96,12 @@ type proposalMeta struct {
 }
 
 type TrieDBConfig struct {
-	DatabaseDir       string
-	CacheSizeBytes    uint
-	RevisionsInMemory uint // must be >= 2
-	CacheStrategy     ffi.CacheStrategy
-	Archive           bool
+	DatabaseDir                    string
+	CacheSizeBytes                 uint
+	RevisionsInMemory              uint // must be >= 2
+	CacheStrategy                  ffi.CacheStrategy
+	Archive                        bool
+	DeferredPersistenceCommitCount uint64
 }
 
 // DefaultConfig returns a sensible TrieDBConfig with the given directory.
@@ -108,12 +109,14 @@ type TrieDBConfig struct {
 //   - CacheSizeBytes: 1MB
 //   - RevisionsInMemory: 100
 //   - CacheStrategy: [ffi.CacheAllReads]
+//   - DeferredPersistenceCommitCount: 4096
 func DefaultConfig(dir string) TrieDBConfig {
 	return TrieDBConfig{
-		DatabaseDir:       dir,
-		CacheSizeBytes:    1024 * 1024, // 1MB
-		RevisionsInMemory: 100,
-		CacheStrategy:     ffi.CacheAllReads,
+		DatabaseDir:                    dir,
+		CacheSizeBytes:                 1024 * 1024, // 1MB
+		RevisionsInMemory:              100,
+		CacheStrategy:                  ffi.CacheAllReads,
+		DeferredPersistenceCommitCount: 4096,
 	}
 }
 
@@ -135,11 +138,17 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		return nil, err
 	}
 	path := filepath.Join(config.DatabaseDir, firewoodDir)
+	commitCount := config.DeferredPersistenceCommitCount
+	if config.Archive {
+		// Archive nodes persist every commit so that all roots are recorded
+		// in RootStore and remain queryable after eviction from memory.
+		commitCount = 1
+	}
 	options := []ffi.Option{
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithReadCacheStrategy(config.CacheStrategy),
-		ffi.WithDeferredPersistenceCommitCount(1),
+		ffi.WithDeferredPersistenceCommitCount(commitCount),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())

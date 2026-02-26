@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap4"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -133,6 +134,7 @@ type ReexecTest struct {
 	testFunc func(
 		t *testing.T,
 		create ReexecTestFunc,
+		scheme string,
 	)
 }
 
@@ -1371,7 +1373,7 @@ func InsertChainValidBlockFeeTest(t *testing.T, create createFunc) {
 	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
-func ReexecBlocksTest(t *testing.T, create ReexecTestFunc) {
+func ReexecBlocksTest(t *testing.T, create ReexecTestFunc, _ string) {
 	var (
 		require = require.New(t)
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -1489,7 +1491,7 @@ func ReexecBlocksTest(t *testing.T, create ReexecTestFunc) {
 	}
 }
 
-func ReexecMaxBlocksTest(t *testing.T, create ReexecTestFunc) {
+func ReexecMaxBlocksTest(t *testing.T, create ReexecTestFunc, scheme string) {
 	var (
 		require = require.New(t)
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -1514,6 +1516,12 @@ func ReexecMaxBlocksTest(t *testing.T, create ReexecTestFunc) {
 	genNumBlocks := 20
 	newCommitInterval := 6
 	numAcceptedBlocks := 2*newCommitInterval - 1
+	// For Firewood, the commit interval must be large enough to walk back to a
+	// persisted state. With deferred persistence, recent revisions may not be
+	// on disk, so we set the interval to cover all generated blocks.
+	if scheme == customrawdb.FirewoodScheme {
+		newCommitInterval = genNumBlocks
+	}
 
 	signer := types.HomesteadSigner{}
 	_, chain, _, err := GenerateChainWithGenesis(gspec, blockchain.engine, genNumBlocks, 10, func(_ int, gen *BlockGen) {
@@ -1609,7 +1617,7 @@ func ReexecMaxBlocksTest(t *testing.T, create ReexecTestFunc) {
 	}
 }
 
-func ReexecCorruptedStateTest(t *testing.T, create ReexecTestFunc) {
+func ReexecCorruptedStateTest(t *testing.T, create ReexecTestFunc, _ string) {
 	var (
 		key1, _        = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _        = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
