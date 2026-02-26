@@ -59,8 +59,9 @@ typedef struct ProposalHandle ProposalHandle;
 
 /**
  * FFI context for a proposed change proof. It is created from calling `propose`
- * on a `VerifiedChangeProofContext` and stores the database and proposal handle.
- * Calling `commit` on it will consume the proof.
+ * on a `VerifiedChangeProofContext` and stores the database, proposal handle,
+ * and other parameters need to implement `find_next_key`. Calling `commit` on it
+ * will consume the proof, but `find_next_key` can still be called on it.
  */
 typedef struct ProposedChangeProofContext ProposedChangeProofContext;
 
@@ -573,6 +574,10 @@ typedef struct CreateChangeProofArgs {
   uint32_t max_length;
 } CreateChangeProofArgs;
 
+typedef struct CommittedChangeProofArgs {
+  struct ProposedChangeProofContext *proof;
+} CommittedChangeProofArgs;
+
 enum ProposedChangeProofResult_Tag {
   /**
    * The caller provided a null pointer to the input handle.
@@ -703,44 +708,6 @@ typedef struct CreateRangeProofArgs {
    */
   uint32_t max_length;
 } CreateRangeProofArgs;
-
-/**
- * Arguments for verifying a change proof.
- */
-typedef struct VerifyChangeProofArgs {
-  /**
-   * The change proof to verify. If null, the function will return
-   * [`VoidResult::NullHandlePointer`]. We need a mutable reference to
-   * update the validation context.
-   */
-  struct ChangeProofContext *proof;
-  /**
-   * The root hash of the starting revision. This must match the starting
-   * root of the proof.
-   */
-  struct HashKey start_root;
-  /**
-   * The root hash of the ending revision. This must match the ending root of
-   * the proof.
-   */
-  struct HashKey end_root;
-  /**
-   * The lower bound of the key range that the proof is expected to cover. If
-   * `None`, the proof is expected to cover from the start of the keyspace.
-   */
-  struct Maybe_BorrowedBytes start_key;
-  /**
-   * The upper bound of the key range that the proof is expected to cover. If
-   * `None`, the proof is expected to cover to the end of the keyspace.
-   */
-  struct Maybe_BorrowedBytes end_key;
-  /**
-   * The maximum number of key/value pairs that the proof is expected to cover.
-   * If the proof contains more items than this, it is considered invalid. If
-   * `0`, there is no limit.
-   */
-  uint32_t max_length;
-} VerifyChangeProofArgs;
 
 /**
  * Arguments for verifying a range proof.
@@ -1259,6 +1226,44 @@ typedef struct VerifiedChangeProofResult {
 } VerifiedChangeProofResult;
 
 /**
+ * Arguments for verifying a change proof.
+ */
+typedef struct VerifyChangeProofArgs {
+  /**
+   * The change proof to verify. If null, the function will return
+   * [`VoidResult::NullHandlePointer`]. We need a mutable reference to
+   * update the validation context.
+   */
+  struct ChangeProofContext *proof;
+  /**
+   * The root hash of the starting revision. This must match the starting
+   * root of the proof.
+   */
+  struct HashKey start_root;
+  /**
+   * The root hash of the ending revision. This must match the ending root of
+   * the proof.
+   */
+  struct HashKey end_root;
+  /**
+   * The lower bound of the key range that the proof is expected to cover. If
+   * `None`, the proof is expected to cover from the start of the keyspace.
+   */
+  struct Maybe_BorrowedBytes start_key;
+  /**
+   * The upper bound of the key range that the proof is expected to cover. If
+   * `None`, the proof is expected to cover to the end of the keyspace.
+   */
+  struct Maybe_BorrowedBytes end_key;
+  /**
+   * The maximum number of key/value pairs that the proof is expected to cover.
+   * If the proof contains more items than this, it is considered invalid. If
+   * `0`, there is no limit.
+   */
+  uint32_t max_length;
+} VerifyChangeProofArgs;
+
+/**
  * Puts the given key-value pairs into the database.
  *
  * # Arguments
@@ -1302,10 +1307,6 @@ struct VoidResult fwd_block_replay_flush(void);
  * Returns the next key range that should be fetched after processing the
  * current set of operations in a change proof that was truncated.
  *
- * Can be called multiple times to get subsequent disjoint key ranges until
- * it returns [`NextKeyRangeResult::None`], indicating there are no more keys to
- * fetch and the proof is complete.
- *
  * # Arguments
  *
  * - `proof` - A [`ChangeProofContext`] previously returned from the create
@@ -1315,7 +1316,8 @@ struct VoidResult fwd_block_replay_flush(void);
  *
  * - [`NextKeyRangeResult::NullHandlePointer`] if the caller provided a null pointer.
  * - [`NextKeyRangeResult::NotPrepared`] if the proof has not been prepared into
- *   a proposal nor committed to the database.
+ *   a proposal nor committed to the database. Should not be possible for a change
+ *   proof due to its different interface compared to range proofs.
  * - [`NextKeyRangeResult::None`] if there are no more keys to fetch.
  * - [`NextKeyRangeResult::Some`] containing the next key range to fetch.
  * - [`NextKeyRangeResult::Err`] containing an error message if the next key range
@@ -1328,7 +1330,7 @@ struct VoidResult fwd_block_replay_flush(void);
  * concurrently. The caller must ensure exclusive access to the proof context
  * for the duration of the call.
  */
-struct NextKeyRangeResult fwd_change_proof_find_next_key(struct ChangeProofContext *_proof);
+struct NextKeyRangeResult fwd_change_proof_find_next_key_proposed(struct ProposedChangeProofContext *proof);
 
 /**
  * Deserialize a `ChangeProof` from bytes.
@@ -1493,6 +1495,29 @@ struct ChangeProofResult fwd_db_change_proof(const struct DatabaseHandle *db,
                                              struct CreateChangeProofArgs args);
 
 /**
+ * Commit a change proof to the database.
+ *
+ * # Arguments
+ *
+ * - `args` - The arguments for verifying the change proof, which is just a `ProposedChangeProofContext`.
+ *
+ * # Returns
+ *
+ * - [`HashResult::NullHandlePointer`] if the caller provided a null pointer to the proof.
+ * - [`HashResult::None`] if the proof resulted in an empty database (i.e., all keys were deleted).
+ * - [`HashResult::Some`] containing the new root hash
+ * - [`HashResult::Err`] containing an error message if the proof could not be committed.
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct HashResult fwd_db_commit_change_proof(struct CommittedChangeProofArgs args);
+
+/**
  * Dumps the Trie structure of the latest revision of the database to a DOT
  * (Graphviz) format string for debugging.
  *
@@ -1560,40 +1585,6 @@ struct ProposedChangeProofResult fwd_db_propose_change_proof(const struct Databa
  */
 struct RangeProofResult fwd_db_range_proof(const struct DatabaseHandle *db,
                                            struct CreateRangeProofArgs args);
-
-/**
- * Verify and commit a change proof to the database.
- *
- * If the proof has already been verified, the previously prepared proposal will be
- * committed instead of re-verifying. If the proof has not been verified, it will be
- * verified now. If the prepared proposal is no longer valid (e.g., the database has
- * changed since it was prepared), a new proposal will be created and committed.
- *
- * The proof context will be updated with additional information about the committed
- * proof to allow for optimized introspection of the committed changes.
- *
- * # Arguments
- *
- * - `db` - The database to commit the changes to.
- * - `args` - The arguments for verifying the change proof.
- *
- * # Returns
- *
- * - [`HashResult::NullHandlePointer`] if the caller provided a null pointer to either
- *   the database or the proof.
- * - [`HashResult::None`] if the proof resulted in an empty database (i.e., all keys were deleted).
- * - [`HashResult::Some`] containing the new root hash if the proof was successfully verified
- * - [`HashResult::Err`] containing an error message if the proof could not be verified or committed.
- *
- * # Thread Safety
- *
- * It is not safe to call this function concurrently with the same proof context
- * nor is it safe to call any other function that accesses the same proof context
- * concurrently. The caller must ensure exclusive access to the proof context
- * for the duration of the call.
- */
-struct HashResult fwd_db_verify_and_commit_change_proof(const struct DatabaseHandle *_db,
-                                                        struct VerifyChangeProofArgs _args);
 
 /**
  * Verify and commit a range proof to the database.

@@ -140,6 +140,9 @@ pub enum ProofError {
 
     #[error("the proof is None as it has been consumed")]
     ProofIsNone,
+
+    #[error("the proposal for a change proof is None as it has been consumed")]
+    ProposalIsNone,
 }
 
 #[derive(Clone, PartialEq, Eq)]

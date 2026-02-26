@@ -74,6 +74,7 @@ type VerifiedChangeProof struct {
 // ProposedChangeProof contains a proposal for the ChangeProof.
 type ProposedChangeProof struct {
 	handle *C.ProposedChangeProofContext
+	db     *Database
 }
 
 // NextKeyRange represents a range of keys to fetch from the database. The start
@@ -390,9 +391,31 @@ func (db *Database) ProposeChangeProof(
 	args := C.ProposedChangeProofArgs{
 		proof: proof.handle,
 	}
-	return getProposedChangeProofFromProposedChangeProofResult(C.fwd_db_propose_change_proof(db.handle, args))
+	return getProposedChangeProofFromProposedChangeProofResult(db, C.fwd_db_propose_change_proof(db.handle, args))
 }
 
+func (proof *ProposedChangeProof) CommitChangeProof() (Hash, error) {
+	proof.db.handleLock.RLock()
+	defer proof.db.handleLock.RUnlock()
+	if proof.db.handle == nil {
+		return EmptyRoot, errDBClosed
+	}
+
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+
+	args := C.CommittedChangeProofArgs{
+		proof: proof.handle,
+	}
+
+	return getHashKeyFromHashResult(C.fwd_db_commit_change_proof(args))
+}
+
+func (proof *ProposedChangeProof) FindNextKey() (*NextKeyRange, error) {
+	return getNextKeyRangeFromNextKeyRangeResult(C.fwd_change_proof_find_next_key_proposed(proof.handle))
+}
+
+/*
 // VerifyAndCommitChangeProof verifies the provided change [proof] proves the changes
 // between [startRoot] and [endRoot] for keys in the range [startKey, endKey]. If
 // the proof is valid, it is committed to the database and the new root hash is
@@ -425,6 +448,7 @@ func (db *Database) VerifyAndCommitChangeProof(
 	return getHashKeyFromHashResult(C.fwd_db_verify_and_commit_change_proof(db.handle, args))
 }
 
+
 // FindNextKey returns the next key range to fetch for this proof, if any. If the
 // proof has been fully processed, nil is returned. If an error occurs while
 // determining the next key range, that error is returned.
@@ -434,6 +458,7 @@ func (db *Database) VerifyAndCommitChangeProof(
 func (p *ChangeProof) FindNextKey() (*NextKeyRange, error) {
 	return getNextKeyRangeFromNextKeyRangeResult(C.fwd_change_proof_find_next_key(p.handle))
 }
+*/
 
 // CodeHashes returns an iterator for the code hashes contained in the account nodes
 // of this proof. This list may contain duplicates and is not guaranteed to be in any particular order.
@@ -664,13 +689,13 @@ func getVerifiedChangeProofFromVerifiedChangeProofResult(result C.VerifiedChange
 	}
 }
 
-func getProposedChangeProofFromProposedChangeProofResult(result C.ProposedChangeProofResult) (*ProposedChangeProof, error) {
+func getProposedChangeProofFromProposedChangeProofResult(db *Database, result C.ProposedChangeProofResult) (*ProposedChangeProof, error) {
 	switch result.tag {
 	case C.ProposedChangeProofResult_NullHandlePointer:
 		return nil, errDBClosed
 	case C.ProposedChangeProofResult_Ok:
 		ptr := *(**C.ProposedChangeProofContext)(unsafe.Pointer(&result.anon0))
-		return &ProposedChangeProof{handle: ptr}, nil
+		return &ProposedChangeProof{handle: ptr, db: db}, nil
 	case C.ProposedChangeProofResult_Err:
 		err := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
 		return nil, err
