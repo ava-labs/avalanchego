@@ -279,8 +279,7 @@ func TestBlockOptions(t *testing.T) {
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
-				err := state.PutCurrentValidator(staker)
-				require.NoError(t, err)
+				require.NoError(t, state.PutCurrentValidator(staker))
 
 				uptimes := uptimemock.NewCalculator(ctrl)
 				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(0.0, database.ErrNotFound)
@@ -344,10 +343,8 @@ func TestBlockOptions(t *testing.T) {
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
 
-				err := state.PutCurrentValidator(primaryStaker)
-				require.NoError(t, err)
-				err = state.PutCurrentValidator(staker)
-				require.NoError(t, err)
+				require.NoError(t, state.PutCurrentValidator(primaryStaker))
+				require.NoError(t, state.PutCurrentValidator(staker))
 
 				manager := &manager{
 					backend: &backend{
@@ -415,10 +412,8 @@ func TestBlockOptions(t *testing.T) {
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
-				err := state.PutCurrentValidator(staker)
-				require.NoError(t, err)
-				err = state.PutCurrentValidator(primaryStaker)
-				require.NoError(t, err)
+				require.NoError(t, state.PutCurrentValidator(staker))
+				require.NoError(t, state.PutCurrentValidator(primaryStaker))
 
 				state.AddSubnetTransformation(transformSubnetTx)
 
@@ -481,8 +476,7 @@ func TestBlockOptions(t *testing.T) {
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
-				err := state.PutCurrentValidator(staker)
-				require.NoError(t, err)
+				require.NoError(t, state.PutCurrentValidator(staker))
 
 				state.AddSubnetTransformation(transformSubnetTx)
 				uptimes := uptimemock.NewCalculator(ctrl)

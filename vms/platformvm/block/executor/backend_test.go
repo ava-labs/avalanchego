@@ -118,7 +118,7 @@ func TestBackendGetBlock(t *testing.T) {
 func TestGetTimestamp(t *testing.T) {
 	type test struct {
 		name              string
-		backendF          func(*gomock.Controller) *backend
+		backendF          func() *backend
 		expectedTimestamp time.Time
 	}
 
@@ -126,7 +126,7 @@ func TestGetTimestamp(t *testing.T) {
 	tests := []test{
 		{
 			name: "block is in map",
-			backendF: func(*gomock.Controller) *backend {
+			backendF: func() *backend {
 				return &backend{
 					blkIDToState: map[ids.ID]*blockState{
 						blkID: {
@@ -139,7 +139,7 @@ func TestGetTimestamp(t *testing.T) {
 		},
 		{
 			name: "block isn't map",
-			backendF: func(ctrl *gomock.Controller) *backend {
+			backendF: func() *backend {
 				state := statetest.New(t, statetest.Config{})
 				state.SetTimestamp(time.Unix(1337, 0))
 				return &backend{
@@ -152,9 +152,7 @@ func TestGetTimestamp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-
-			backend := tt.backendF(ctrl)
+			backend := tt.backendF()
 			gotTimestamp := backend.getTimestamp(blkID)
 			require.Equal(t, tt.expectedTimestamp, gotTimestamp)
 		})
