@@ -258,7 +258,7 @@ func (t *TrieDB) Close() error {
 	t.possible = nil
 
 	// We must provide a context to close since it may hang while waiting for the finalizers to complete.
-	runtime.GC()
+	runtime.GC() // encourage finalizers to run beforew we wait, otherwise the database won't close properly.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return t.Firewood.Close(ctx)
