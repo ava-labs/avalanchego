@@ -91,7 +91,7 @@ var (
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
 )
 
-func getDefaultSnowConfig(v *viper.Viper) *snowball.Parameters {
+func getPrimaryNetworkSnowConfig(v *viper.Viper) *snowball.Parameters {
 	p := &snowball.Parameters{
 		K:                     v.GetInt(SnowSampleSizeKey),
 		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
@@ -185,7 +185,7 @@ func setSubnetConfigDefaults(config *subnets.Config, v *viper.Viper) {
 		config.ConsensusParameters = nil
 	default:
 		// If no consensus parameters are set, default to snowball parameters
-		config.SnowParameters = getDefaultSnowConfig(v)
+		config.SnowParameters = getPrimaryNetworkSnowConfig(v)
 	}
 }
 
@@ -1205,7 +1205,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
-		SnowParameters:              getDefaultSnowConfig(v),
+		SnowParameters:              getPrimaryNetworkSnowConfig(v),
 		ValidatorOnly:               false,
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}
