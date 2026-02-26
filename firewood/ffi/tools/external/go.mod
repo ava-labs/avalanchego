@@ -14,7 +14,7 @@ module github.com/ava-labs/firewood/ffi/tools/external
 //   - ./ffi/scripts/run_tool.sh [tool] [args]
 //
 // See ../../go.mod for guidelines on updating the Go version.
-go 1.25.8
+go 1.25.10
 
 tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 

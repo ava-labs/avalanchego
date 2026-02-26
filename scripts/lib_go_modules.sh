@@ -44,9 +44,11 @@ for prefix in "${TAG_PREFIXES[@]}"; do
     fi
 done
 
-# Validate that the derived list matches actual go.mod files in the repo.
-# Excludes utility modules (tools/) that are not part of the release.
-mapfile -t actual < <(git ls-files 'go.mod' '*/go.mod' | grep -v '^tools/' | sort)
+# Validate that the derived list matches actual go.mod files in the repo.  Excludes
+# utility modules (tools/) that are not released and the firewood subtree (firewood/)
+# so long as consumption of the ffi module requires publication to
+# github.com/ava-labs/firewood-go-ethhash.
+mapfile -t actual < <(git ls-files 'go.mod' '**/go.mod' | grep -v '^tools/' | grep -v '^firewood/' | sort)
 expected="$(printf '%s\n' "${GO_MODS[@]}" | sort)"
 actual_str="$(printf '%s\n' "${actual[@]}")"
 

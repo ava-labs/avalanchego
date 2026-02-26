@@ -28,6 +28,7 @@ jobs:
       - check-metadata
       - unit-main
       - unit-coreth
+      - unit-firewood-ffi
       - unit-subnet-evm
       - e2e
     runs-on: ${{ inputs.runner }}
@@ -84,6 +85,16 @@ jobs:
       - name: Run coreth unit tests with Bazel
         shell: bash
         run: ./scripts/run_task.sh bazel-test-coreth
+
+  unit-firewood-ffi:
+    needs: check-metadata
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Run firewood ffi unit tests with Bazel
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-firewood-ffi
 
   unit-subnet-evm:
     needs: check-metadata
