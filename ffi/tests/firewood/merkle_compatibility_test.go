@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -81,7 +82,7 @@ func newTestFirewoodDatabase(t *testing.T) *firewood.Database {
 			runtime.GC()
 			err = db.Close(oneSecCtx(t))
 		}
-		r.NoError(err, "%T.Close()", db)
+		assert.NoError(t, err, "%T.Close()", db)
 	})
 	return db
 }

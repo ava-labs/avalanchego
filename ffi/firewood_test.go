@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -162,7 +163,7 @@ func newTestDatabase(tb testing.TB, opts ...Option) *Database {
 			runtime.GC()
 			err = db.Close(oneSecCtx(tb))
 		}
-		r.NoError(err)
+		assert.NoError(tb, err) // don't mask any earlier error in the test
 	})
 	return db
 }

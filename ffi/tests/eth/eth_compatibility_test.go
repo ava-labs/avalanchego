@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,7 +93,7 @@ func newFirewoodDB(t *testing.T) *firewood.Database {
 			runtime.GC()
 			err = db.Close(oneSecCtx(t))
 		}
-		r.NoError(err, "%T.Close()", db)
+		assert.NoError(t, err, "%T.Close()", db)
 	})
 	return db
 }

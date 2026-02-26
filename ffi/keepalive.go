@@ -3,7 +3,66 @@
 
 package ffi
 
-import "sync"
+// #include <stdlib.h>
+// #include "firewood.h"
+import "C"
+
+import (
+	"fmt"
+	"sync"
+)
+
+type handle[T any] struct {
+	// handle is an opaque pointer to the underlying Rust object. It should be
+	// passed to the C FFI functions that operate on this type.
+	//
+	// It is not safe to call these methods with a nil handle.
+	//
+	// Calls to `C.fwd_free_X` will invalidate this handle, so it should not be
+	// used after those calls.
+	ptr     T
+	dropped bool
+
+	// keepAliveHandle is used to keep the database alive while this object is
+	// in use. It is initialized when the object is created and disowned after
+	// [X.Close] is called.
+	keepAliveHandle databaseKeepAliveHandle
+
+	free func(T) C.VoidResult
+}
+
+func createHandle[T any](ptr T, wg *sync.WaitGroup, free func(T) C.VoidResult) *handle[T] {
+	h := &handle[T]{
+		ptr:     ptr,
+		free:    free,
+		dropped: false,
+	}
+	h.keepAliveHandle.init(wg)
+	return h
+}
+
+func drop[T any](h *handle[T]) {
+	_ = h.Drop()
+}
+
+func (h *handle[T]) Drop() error {
+	return h.keepAliveHandle.disown(false /* evenOnError */, func() error {
+		if h.dropped {
+			return nil
+		}
+
+		if err := getErrorFromVoidResult(h.free(h.ptr)); err != nil {
+			return fmt.Errorf("%w: %w", errFreeingValue, err)
+		}
+
+		// Prevent double free
+		var zero T
+		h.ptr = zero
+		h.dropped = true
+
+		return nil
+	})
+}
 
 // databaseKeepAliveHandle is added to types that hold a lease on the database
 // to ensure it is not closed while those types are still in use.
@@ -13,7 +72,7 @@ import "sync"
 // free those objects after the database has been closed will lead to undefined
 // behavior, as a part of the underling Rust object will have already been freed.
 type databaseKeepAliveHandle struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 	// [Database.Close] blocks on this WaitGroup, which is set and incremented
 	// by [newKeepAliveHandle], and decremented by
 	// [databaseKeepAliveHandle.disown].
