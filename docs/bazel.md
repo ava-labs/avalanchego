@@ -69,8 +69,10 @@ go_sdk.from_file(go_mod = "//:go.mod")
 | Tool | Version | Pin Mechanism | Rationale |
 |------|---------|---------------|-----------|
 | Bazel | 8.0.1 | `.bazelversion` + bazelisk | Current LTS with native bzlmod support |
-| Go | 1.25.7 | `go.mod` via go_sdk.from_file | Single source of truth |
+| Go | 1.25.8 | `go.mod` via `MODULE.bazel` `go_sdk.from_file()` | Single source of truth for Bazel Go toolchain version |
+| Rust | 1.91.0 | `MODULE.bazel` rust.toolchain | Must match `firewood/Cargo.toml` rust-version |
 | rules_go | 0.57.0 | `MODULE.bazel` | Go 1.25+ support (compiles `pack` from source) |
+| rules_rust | 0.69.0 | `MODULE.bazel` | Rust toolchain + crate_universe for firewood |
 | gazelle | 0.45.0 | `MODULE.bazel` | Compatible with rules_go 0.57.0 |
 
 ### Why Bazel 8?
@@ -123,8 +125,9 @@ custom content that would be lost if deleted:
 
 | File | Custom Content |
 |------|---------------|
-| `BUILD.bazel` (root) | Gazelle directives (prefix, exclude, proto) + `gazelle()` rule |
+| `BUILD.bazel` (root) | Gazelle directives (prefix, exclude, proto, firewood resolve) + `gazelle()` rule |
 | `main/BUILD.bazel` | `x_defs` for Git commit stamping |
+| `firewood/**/*.bazel` | Hand-crafted `rules_rust` + CGO targets (`# gazelle:ignore`) |
 | `graft/coreth/BUILD.bazel` | `gazelle:prefix`, `gazelle:map_kind` for test timeouts |
 | `graft/evm/BUILD.bazel` | `gazelle:prefix`, `gazelle:map_kind` for test timeouts |
 | `graft/subnet-evm/BUILD.bazel` | `gazelle:prefix`, `gazelle:map_kind` for test timeouts |
@@ -258,7 +261,7 @@ files are warranted: `cc_library` targets with platform-specific
 | Dependency | Issue | Solution |
 |------------|-------|----------|
 | `ava-labs/libevm` | Missing C sources for secp256k1 | Custom BUILD files + gazelle directive excludes secp256k1 dir |
-| `firewood-go-ethhash/ffi` | Pre-built static libraries | Custom BUILD files with `cc_import` |
+| `firewood` (subtree) | Rust FFI built from source | `rules_rust` BUILD files under `firewood/` (see above) |
 | `supranational/blst` | Complex CGO with assembly | Custom BUILD files (gazelle disabled) |
 | `consensys/gnark-crypto` | Assembly cross-package includes | `no-sandbox` on bls12-381 `fp` and `fr` targets |
 
@@ -271,14 +274,84 @@ sources.
 secp256k1 directory from generation. See `Patch Maintenance` below
 for how to edit these.
 
-#### firewood-go-ethhash FFI
+#### Firewood FFI (built from source)
 
-**Problem:** Pre-built static libraries with `-L` paths that don't work
-in Bazel's sandbox.
+Firewood is an embedded key-value store written in Rust, included as a
+git subtree under `firewood/`. Bazel builds the Rust code from source
+using `rules_rust` and `crate_universe`, replacing the previous approach
+of patching in pre-built static libraries.
 
-**Solution:** Custom BUILD files with `cc_import` for proper static
-library linking. Gazelle can't generate these rules for pre-built
-libraries. See `Patch Maintenance` below for how to edit these.
+Go source imports continue to reference
+`github.com/ava-labs/firewood-go-ethhash/ffi` so that external consumers
+can `go get` without a Rust toolchain. Bazel overrides the resolution at
+build time via a gazelle resolve directive in the root `BUILD.bazel`.
+
+**FFI build targets** (`firewood/ffi/BUILD.bazel`):
+
+1. `rust_static_library` — Compiles Rust FFI source into a static `.a`
+   library. Uses the committed `firewood.h` header (no build-time
+   cbindgen). Includes `tikv-jemallocator` on Linux/macOS via `select()`,
+   matching the supported Bazel platforms in this repo.
+   `README.md` is declared as `compile_data` because `lib.rs` uses
+   `include_str!("../README.md")`.
+2. `cc_library` — Wraps the static lib with the C header and
+   platform-specific linkopts (`-lm -ldl -lpthread` on Linux, `-lm` on
+   macOS).
+3. `go_library` — CGO-enabled Go library with `importpath` matching the
+   published module path.
+4. `go_test` — FFI integration tests (`size = "small"`, ~25s runtime)
+   exercising the full Go→C→Rust boundary.
+
+**Rust crate BUILD files** (all hand-crafted with `# gazelle:ignore`):
+
+| File | Target |
+|------|--------|
+| `firewood/BUILD.bazel` | Exports `Cargo.toml` and `Cargo.lock` |
+| `firewood/ffi/BUILD.bazel` | FFI build targets (see above) |
+| `firewood/firewood/BUILD.bazel` | Core `rust_library` |
+| `firewood/storage/BUILD.bazel` | Storage `rust_library` |
+| `firewood/firewood-macros/BUILD.bazel` | `rust_proc_macro` |
+| `firewood/metrics/BUILD.bazel` | Metrics `rust_library` |
+
+Only 5 of the 9 Cargo workspace members need BUILD files — the FFI crate
+and its transitive runtime dependencies. The remaining members
+(`benchmark`, `fwdctl`, `replay`, `triehash`) are not needed for building
+avalanchego (`triehash` is only a dev dependency of the core crate).
+
+**FFI test BUILD files** (also hand-crafted with `# gazelle:ignore`):
+
+| File | Target |
+|------|--------|
+| `firewood/ffi/tests/eth/BUILD.bazel` | `eth_test` compatibility tests for `github.com/ava-labs/firewood-go-ethhash/ffi` |
+| `firewood/ffi/tests/firewood/BUILD.bazel` | `firewood_test` compatibility tests for `github.com/ava-labs/firewood-go/ffi` |
+
+**Why no build-time cbindgen:** `rules_rust` has no native cbindgen rule
+([bazelbuild/rules_rust#381](https://github.com/bazelbuild/rules_rust/issues/381)).
+The committed `firewood.h` header changes rarely (only when the
+`pub extern "C"` API surface changes) and staleness would be caught
+immediately at compile time.
+
+**Rust toolchain version sync:** `scripts/check_rust_version.sh` reads
+`rust-version` and `edition` from `firewood/Cargo.toml` and checks they
+match `MODULE.bazel`'s `rust.toolchain()` registration. Wired into
+`lint-all` via the `check-rust-version` task.
+
+**`crate.spec` entries in MODULE.bazel:** `crate_universe` doesn't
+auto-detect optional dependencies enabled via `crate_features` in BUILD
+files (the `ethhash` and `logger` features). The `bytes`, `log`, `rlp`,
+and `sha3` crates are declared as explicit `crate.spec` entries so they
+are available for the BUILD targets that enable these features.
+
+**Lint exclusions:** The `firewood/` subtree is managed upstream and
+excluded from avalanchego's lint checks: `scripts/shellcheck.sh` (shell
+linting), `scripts/lint.sh` (Go license headers, import checks), and
+`scripts/lib_go_modules.sh` (release module validation).
+
+**CI:** Bazel CI is split into separate jobs for metadata checks, main
+module unit tests, coreth/evm unit tests, subnet-evm unit tests,
+Firewood FFI tests, and E2E tests. The Firewood FFI coverage runs in the
+`unit-firewood-ffi` job via `task bazel-test-firewood-ffi`. Use the same
+task locally to run those tests in isolation.
 
 #### blst (BLS Signatures)
 
@@ -598,6 +671,10 @@ bazel build --config=release //main:avalanchego   # Release build (stamped)
    nix (which requires SHA changes). CI enforces consistency via
    `task check-go-version`.
 
+3. **Rust version sync** - Rust version and edition in `MODULE.bazel`
+   must match `firewood/Cargo.toml`. CI enforces consistency via
+   `task check-rust-version`.
+
 ## Future Improvements
 
 The following improvements are planned or under consideration:
@@ -609,8 +686,10 @@ Remote caching would enable:
 - Faster builds for new team members
 - Cross-machine cache reuse
 
-`go_sdk.download()` enables remote execution since the Go toolchain is
-hermetic and reproducible.
+The current `go_sdk.from_file()` approach keeps the Go toolchain version
+hermetic and sourced from `go.mod`. Remote caching should work with this
+setup; if remote execution is added later, confirm the chosen rules_go
+toolchain registration remains compatible with the remote executor.
 
 Implementation: Add BuildBuddy, Buildkite or similar remote cache service.
 
@@ -623,8 +702,8 @@ Implementation: Add BuildBuddy, Buildkite or similar remote cache service.
 
 ### Patch Maintenance
 
-Patches that create new BUILD files (blst, firewood, libevm) are
-generated from readable BUILD files in `.bazel/patches/build_files/`.
+Patches that create new BUILD files (blst, libevm) are generated from
+readable BUILD files in `.bazel/patches/build_files/`.
 This avoids hand-maintaining patch hunk line counts, which Bazel's
 internal patch parser is strict about (unlike `git apply`).
 

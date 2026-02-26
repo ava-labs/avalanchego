@@ -13,11 +13,11 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//database/merkle/sync",
+        "//firewood/ffi",
         "//ids",
         "//network/p2p",
         "//utils/logging",
         "//utils/maybe",
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_prometheus_client_golang//prometheus",
@@ -31,9 +31,9 @@ go_test(
     deps = [
         "//database/merkle/sync",
         "//database/merkle/sync/synctest",
+        "//firewood/ffi",
         "//ids",
         "//network/p2p/p2ptest",
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
