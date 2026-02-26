@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -37,12 +36,12 @@ type config struct {
 	// State & trie
 	Pruning        bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
 	CommitInterval uint64 `json:"commit-interval"` // Commit interval at which to persist the state trie; 0 uses the default (4096).
-	// TrieCleanCache       int     `json:"trie-clean-cache"`
-	// SnapshotCache        int     `json:"snapshot-cache"`
+	TrieCleanCache int    `json:"trie-clean-cache"`
+	SnapshotCache  int    `json:"snapshot-cache"`
 	// AllowMissingTries    bool    `json:"allow-missing-tries"`
 	// PopulateMissingTries *uint64 `json:"populate-missing-tries,omitempty"`
 	// OfflinePruning       bool    `json:"offline-pruning-enabled"`
-	// StateScheme          string  `json:"state-scheme"`
+	StateScheme string `json:"state-scheme"`
 
 	// Transaction pool
 	LocalTxsEnabled    bool   `json:"local-txs-enabled"`
@@ -105,9 +104,11 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	return sae.Config{
 		MempoolConfig: mempoolConfig,
 		DBConfig: saedb.Config{
-			TrieDBConfig:       triedb.HashDefaults,
-			Archival:           !c.Pruning,
-			TrieCommitInterval: c.CommitInterval,
+			Archival:             !c.Pruning,
+			Scheme:               c.StateScheme,
+			SnapshotCacheSizeMiB: c.SnapshotCache,
+			TrieCommitInterval:   c.CommitInterval,
+			TrieDBCacheSizeMiB:   c.TrieCleanCache,
 		},
 		Now: now,
 	}

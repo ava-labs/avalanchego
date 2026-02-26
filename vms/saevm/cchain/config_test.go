@@ -96,12 +96,24 @@ func TestParseConfig(t *testing.T) {
 			}),
 		},
 		{
+			name: "trie_clean_cache",
+			json: `{"trie-clean-cache":64}`,
+			want: with(func(c *config) { c.TrieCleanCache = 64 }),
+		},
+		{
+			name: "snapshot_cache",
+			json: `{"snapshot-cache":32}`,
+			want: with(func(c *config) { c.SnapshotCache = 32 }),
+		},
+		{
 			name: "all_active_fields",
 			json: `{
 				"min-price-target":500,
 				"gas-target":1500,
 				"pruning-enabled":false,
 				"commit-interval":256,
+				"trie-clean-cache":64,
+				"snapshot-cache":32,
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
@@ -112,6 +124,8 @@ func TestParseConfig(t *testing.T) {
 				GasTarget:            utils.PointerTo(gas.Gas(1500)),
 				Pruning:              false,
 				CommitInterval:       256,
+				TrieCleanCache:       64,
+				SnapshotCache:        32,
 				LocalTxsEnabled:      true,
 				TxPoolAccountSlots:   8,
 				TxPoolGlobalSlots:    2048,
