@@ -268,7 +268,7 @@ func (b *benchlist) processObservation(ev event) {
 		}
 
 		n.isBenched = true
-		b.timeoutHeap.Push(nodeID, time.Now().Add(b.benchDuration))
+		b.timeoutHeap.Push(nodeID, b.clock.Time().Add(b.benchDuration))
 
 		b.lock.Lock()
 		b.benched.Add(nodeID)
@@ -299,8 +299,7 @@ func (b *benchlist) processObservation(ev event) {
 // Timeout-based unbench gives the node a clean EWMA slate so that a single
 // failure after unbenching doesn't immediately re-bench it.
 func (b *benchlist) processTimeouts() {
-	now := time.Now()
-	resetTime := b.clock.Time()
+	now := b.clock.Time()
 	for {
 		nodeID, deadline, ok := b.timeoutHeap.Peek()
 		if !ok || deadline.After(now) {
@@ -315,7 +314,7 @@ func (b *benchlist) processTimeouts() {
 
 		n.isBenched = false
 		oldFailureProbability := n.failureProbability.Read()
-		n.failureProbability = b.newFailureProbabilityAverager(resetTime)
+		n.failureProbability = b.newFailureProbabilityAverager(now)
 		resetFailureProbability := n.failureProbability.Read()
 
 		b.lock.Lock()
