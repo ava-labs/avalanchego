@@ -5,7 +5,7 @@
 # in the update script itself and ensures the committed state is consistent
 # with what the tooling produces.
 #
-# Requires a clean git working tree.
+# Requires a clean working tree.
 
 set -euo pipefail
 

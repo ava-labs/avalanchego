@@ -32,8 +32,8 @@ vars:
         arm64)  echo "aarch64" ;;
         *)      echo "${arch}" ;;
       esac
-  # Git commit hash, resolved on host (container may not have .git for worktrees).
-  PACKAGING_GIT_COMMIT:
+  # VCS commit hash, resolved on host (container may not have .git/.jj for worktrees).
+  PACKAGING_VCS_COMMIT:
     sh: source "{{.REPO_ROOT}}/scripts/vcs.sh" && vcs_commit_hash
   # Default tag for local testing; overridden by CI for release builds.
   PACKAGING_TAG:
@@ -81,7 +81,7 @@ tasks:
           -e TAG={{.RPM_TAG}}
           -e RPM_ARCH={{.RPM_ARCH}}
           -e OUTPUT_DIR=/output
-          -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          -e AVALANCHEGO_COMMIT={{.PACKAGING_VCS_COMMIT}}
           {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
           {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
           {{.PACKAGING_DOCKER_IMAGE}}
@@ -105,7 +105,7 @@ tasks:
           -e TAG={{.RPM_TAG}}
           -e RPM_ARCH={{.RPM_ARCH}}
           -e OUTPUT_DIR=/output
-          -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          -e AVALANCHEGO_COMMIT={{.PACKAGING_VCS_COMMIT}}
           {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
           {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
           {{.PACKAGING_DOCKER_IMAGE}}
@@ -121,6 +121,6 @@ tasks:
     desc: Validates built RPMs by installing and smoke testing in a fresh container
     env:
       TAG: '{{.PACKAGING_TAG}}'
-      GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
+      GIT_COMMIT: '{{.PACKAGING_VCS_COMMIT}}'
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-rpm.sh'
