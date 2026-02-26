@@ -6,6 +6,7 @@ exports_files(["BUILD.bazel"])
 # gazelle:exclude tools
 # gazelle:exclude .direnv
 # gazelle:exclude .bazel/patches/build_files
+# gazelle:resolve go github.com/ava-labs/firewood-go-ethhash/ffi //firewood/ffi:ffi
 # gazelle:proto disable_global
 # gazelle:map_kind go_test go_test //.bazel:defs.bzl
 

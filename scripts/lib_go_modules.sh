@@ -48,8 +48,9 @@ for prefix in "${TAG_PREFIXES[@]}"; do
 done
 
 # Validate that the derived list matches actual go.mod files in the repo.
-# Excludes utility modules (tools/) that are not part of the release.
-mapfile -t actual < <(vcs_ls_files 'go.mod' '**/go.mod' | grep -v '^tools/' | sort)
+# Excludes utility modules (tools/) and the firewood subtree (firewood/)
+# which are not part of the release.
+mapfile -t actual < <(vcs_ls_files 'go.mod' '**/go.mod' | grep -v '^tools/' | grep -v '^firewood/' | sort)
 expected="$(printf '%s\n' "${GO_MODS[@]}" | sort)"
 actual_str="$(printf '%s\n' "${actual[@]}")"
 

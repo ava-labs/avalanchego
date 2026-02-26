@@ -8,7 +8,46 @@ bazel_dep(name = "gazelle", version = "0.45.0", repo_name = "bazel_gazelle")
 bazel_dep(name = "rules_proto", version = "7.0.2")
 bazel_dep(name = "protobuf", version = "29.3", repo_name = "com_google_protobuf")
 bazel_dep(name = "platforms", version = "1.0.0")
-bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "bazel_skylib", version = "1.8.2")
+bazel_dep(name = "rules_rust", version = "0.69.0")
+
+# Rust toolchain for firewood
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2024",
+    versions = ["1.91.0"],
+)
+use_repo(rust, "rust_toolchains")
+
+register_toolchains("@rust_toolchains//:all")
+
+# Crate universe for firewood Rust dependencies
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.from_cargo(
+    name = "firewood_crates",
+    cargo_lockfile = "//firewood:Cargo.lock",
+    manifests = ["//firewood:Cargo.toml"],
+)
+
+# Extra crate specs for optional dependencies enabled via BUILD file features
+# (ethhash, logger) that crate_universe doesn't auto-detect.
+crate.spec(
+    package = "bytes",
+    version = "1.11.1",
+)
+crate.spec(
+    package = "log",
+    version = "0.4.29",
+)
+crate.spec(
+    package = "rlp",
+    version = "0.6.1",
+)
+crate.spec(
+    package = "sha3",
+    version = "0.10.8",
+)
+use_repo(crate, "firewood_crates")
 
 # Go SDK - version should match go.mod and nix/go/default.nix
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
@@ -24,10 +63,6 @@ GO_OVERRIDES = {
     "github.com/supranational/blst": {
         "build_gen": "off",
         "patches": ["//.bazel/patches:com_github_supranational_blst.patch"],
-    },
-    "github.com/ava-labs/firewood-go-ethhash/ffi": {
-        "build_gen": "off",
-        "patches": ["//.bazel/patches:com_github_ava_labs_firewood_go_ethhash_ffi.patch"],
     },
     "github.com/consensys/gnark-crypto": {
         "patches": ["//.bazel/patches:com_github_consensys_gnark_crypto_asm_includes.patch"],

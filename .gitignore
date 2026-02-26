@@ -69,7 +69,3 @@ vendor
 
 # debug files
 __debug_*
-
-# polyrepo
-polyrepo.log
-/firewood
