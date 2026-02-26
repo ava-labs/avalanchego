@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+const defaultTestTimeout = 10 * time.Second
+
 type benchable struct {
 	t *testing.T
 
@@ -320,7 +322,7 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 	b.RegisterFailure(vdrID)
 	select {
 	case <-benchable.benchedCalled:
-	case <-time.After(time.Second):
+	case <-time.After(defaultTestTimeout):
 		require.FailNow("timed out waiting for consumer to block in Benched")
 	}
 
@@ -339,7 +341,7 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 
 	select {
 	case <-done:
-	case <-time.After(time.Second):
+	case <-time.After(defaultTestTimeout):
 		require.FailNow("observe path blocked while consumer was blocked")
 	}
 

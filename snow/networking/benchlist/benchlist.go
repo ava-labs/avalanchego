@@ -110,6 +110,7 @@ type benchlist struct {
 
 	shutdownOnce sync.Once
 	shutdownChan chan struct{}
+	shutdownDone chan struct{}
 }
 
 func newBenchlist(
@@ -147,6 +148,7 @@ func newBenchlist(
 		nodes:              make(map[ids.NodeID]*node),
 		timeoutHeap:        heap.NewMap[ids.NodeID, time.Time](time.Time.Before),
 		shutdownChan:       make(chan struct{}),
+		shutdownDone:       make(chan struct{}),
 	}
 
 	err := errors.Join(
@@ -197,6 +199,8 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 // run is the consumer goroutine. It owns the nodes map, timeout heap, and is
 // the only goroutine that calls Benched/Unbenched on the benchable.
 func (b *benchlist) run() {
+	defer close(b.shutdownDone)
+
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
@@ -221,6 +225,7 @@ func (b *benchlist) run() {
 func (b *benchlist) shutdown() {
 	b.shutdownOnce.Do(func() {
 		close(b.shutdownChan)
+		<-b.shutdownDone
 	})
 }
 
@@ -269,7 +274,10 @@ func (b *benchlist) processObservation(ev event) {
 		b.benched.Add(nodeID)
 		b.lock.Unlock()
 
-		b.ctx.Log.Debug("benching node", zap.Stringer("nodeID", nodeID))
+		b.ctx.Log.Debug("benching node",
+			zap.Stringer("nodeID", nodeID),
+			zap.Float64("failureProbability", p),
+		)
 		b.benchable.Benched(b.ctx.ChainID, nodeID)
 	case n.isBenched && p < b.unbenchProbability:
 		n.isBenched = false
@@ -279,7 +287,10 @@ func (b *benchlist) processObservation(ev event) {
 		b.benched.Remove(nodeID)
 		b.lock.Unlock()
 
-		b.ctx.Log.Debug("unbenching node", zap.Stringer("nodeID", nodeID))
+		b.ctx.Log.Debug("unbenching node",
+			zap.Stringer("nodeID", nodeID),
+			zap.Float64("failureProbability", p),
+		)
 		b.benchable.Unbenched(b.ctx.ChainID, nodeID)
 	}
 }
@@ -303,7 +314,9 @@ func (b *benchlist) processTimeouts() {
 		}
 
 		n.isBenched = false
+		oldFailureProbability := n.failureProbability.Read()
 		n.failureProbability = b.newFailureProbabilityAverager(resetTime)
+		resetFailureProbability := n.failureProbability.Read()
 
 		b.lock.Lock()
 		b.benched.Remove(nodeID)
@@ -311,6 +324,8 @@ func (b *benchlist) processTimeouts() {
 
 		b.ctx.Log.Debug("unbenching node due to timeout",
 			zap.Stringer("nodeID", nodeID),
+			zap.Float64("oldFailureProbability", oldFailureProbability),
+			zap.Float64("resetFailureProbability", resetFailureProbability),
 		)
 		b.benchable.Unbenched(b.ctx.ChainID, nodeID)
 	}
@@ -366,12 +381,10 @@ func (b *benchlist) canBench(nodeID ids.NodeID) bool {
 
 // benchedStake returns the total stake weight of currently benched validators.
 func (b *benchlist) benchedStake() (uint64, error) {
-	benchedNodeIDs := set.NewSet[ids.NodeID](len(b.nodes))
-	for id, n := range b.nodes {
-		if n.isBenched {
-			benchedNodeIDs.Add(id)
-		}
-	}
+	b.lock.RLock()
+	benchedNodeIDs := set.Of(b.benched.List()...)
+	b.lock.RUnlock()
+
 	weight, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benchedNodeIDs)
 	if err != nil {
 		b.ctx.Log.Error("error calculating benched stake",
