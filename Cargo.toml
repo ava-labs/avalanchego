@@ -55,12 +55,12 @@ cast_possible_truncation = "allow"
 
 [workspace.dependencies]
 # workspace local packages
-firewood = { path = "firewood", version = "0.1.0" }
+firewood = { path = "firewood", version = "0.2.0" }
 firewood-macros = { path = "firewood-macros", version = "0.1.0" }
-firewood-storage = { path = "storage", version = "0.1.0" }
-firewood-ffi = { path = "ffi", version = "0.1.0" }
-firewood-metrics = { path = "metrics", version = "0.1.0" }
-firewood-replay = { path = "replay", version = "0.1.0" }
+firewood-storage = { path = "storage", version = "0.2.0" }
+firewood-ffi = { path = "ffi", version = "0.2.0" }
+firewood-metrics = { path = "metrics", version = "0.2.0" }
+firewood-replay = { path = "replay", version = "0.2.0" }
 
 # no longer bumping with workspace
 firewood-triehash = { path = "triehash", version = "0.0.16" }
@@ -72,7 +72,7 @@ bytemuck_derive = "1.10.2"
 clap = { version = "4.5.60", features = ["derive"] }
 coarsetime = "0.1.37"
 env_logger = "0.11.9"
-fastrace = "0.7.16"
+fastrace = "0.7.17"
 hex = "0.4.3"
 integer-encoding = "4.1.0"
 log = "0.4.29"
@@ -92,4 +92,4 @@ ethereum-types = "0.16.0"
 hex-literal = "1.1.0"
 pprof = "0.15.0"
 rand = "0.10.0"
-tempfile = "3.25.0"
+tempfile = "3.26.0"

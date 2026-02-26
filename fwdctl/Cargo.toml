@@ -1,6 +1,6 @@
 [package]
 name = "firewood-fwdctl"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 authors = [
      "Dan Laine <daniel.laine@avalabs.org>",
@@ -38,8 +38,8 @@ indicatif = "0.18.4"
 askama = "0.15.4"
 num-format = "0.4.4"
 aws-config = { version = "1.8", optional = true }
-aws-sdk-ec2 = { version = "1.212", optional = true }
-aws-sdk-ssm = { version = "1.105", optional = true }
+aws-sdk-ec2 = { version = "1.214", optional = true }
+aws-sdk-ssm = { version = "1.106", optional = true }
 aws-sdk-sts = { version = "1.99.0", optional = true }
 aws-smithy-runtime-api = { version = "1.11", optional = true }
 base64 = { version = "0.22", optional = true }
