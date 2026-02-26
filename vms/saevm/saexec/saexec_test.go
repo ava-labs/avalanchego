@@ -36,9 +36,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -67,11 +70,12 @@ func TestMain(m *testing.M) {
 // SUT is the system under test, primarily the [Executor].
 type SUT struct {
 	*Executor
-	saedbConfig saedb.Config
-	chain       *blockstest.ChainBuilder
-	wallet      *saetest.Wallet
-	logger      *loggingtest.Logger
-	db          ethdb.Database
+	saedbConfig  saedb.Config
+	chain        *blockstest.ChainBuilder
+	wallet       *saetest.Wallet
+	logger       *loggingtest.Logger
+	db           ethdb.Database
+	chainDataDir string
 
 	// [closeOnce] ensures that [Executor.Close] is only called once, so tests can
 	// explicitly close the [Executor] without worrying about the cleanup calling it again.
@@ -83,6 +87,7 @@ type (
 		hooks          *saehookstest.Stub
 		archival       bool
 		commitInterval uint64
+		scheme         string
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -101,12 +106,18 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	}, opts...)
 	config := saetest.ChainConfig()
 	db := rawdb.NewMemoryDatabase()
-	tdbConfig := &triedb.Config{}
 	xdb := saetest.NewExecutionResultsDB()
+	saedbConfig := saedb.Config{
+		Archival:           sutCfg.archival,
+		Scheme:             sutCfg.scheme,
+		TrieCommitInterval: sutCfg.commitInterval,
+	}
+	snowCtx := snowtest.Context(tb, ids.Empty)
+	snowCtx.Log = logger
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
-	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, blockstest.WithTrieDBConfig(tdbConfig), blockstest.WithGasTarget(sutCfg.hooks.Target))
+	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, blockstest.WithTrieDBConfig(saedbConfig.TrieDBConfig(snowCtx)), blockstest.WithGasTarget(sutCfg.hooks.Target))
 
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),
@@ -114,12 +125,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
 
-	saedbConfig := saedb.Config{
-		TrieDBConfig:       tdbConfig,
-		Archival:           sutCfg.archival,
-		TrieCommitInterval: sutCfg.commitInterval,
-	}
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger, prometheus.NewRegistry())
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, snowCtx, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(e.Close)
@@ -127,13 +133,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		require.NoErrorf(tb, closeOnce(), "%T.Close()", e)
 	})
 	return ctx, &SUT{
-		Executor:    e,
-		saedbConfig: saedbConfig,
-		chain:       chain,
-		wallet:      wallet,
-		logger:      logger,
-		db:          db,
-		closeOnce:   closeOnce,
+		Executor:     e,
+		saedbConfig:  saedbConfig,
+		chain:        chain,
+		wallet:       wallet,
+		logger:       logger,
+		db:           db,
+		chainDataDir: snowCtx.ChainDataDir,
+		closeOnce:    closeOnce,
 	}
 }
 
@@ -920,7 +927,7 @@ func TestSnapshotPersistence(t *testing.T) {
 	// The crux of the test is whether we can recover the EOA nonce using only a
 	// new set of snapshots, recovered from the databases.
 	conf := snapshot.Config{
-		CacheSize: saedb.SnapshotCacheSizeMB,
+		CacheSize: saedb.DefaultSnapshotCacheSizeMB,
 		NoBuild:   true, // i.e. MUST be loaded from disk
 	}
 	snaps, err := snapshot.New(conf, sut.db, triedb.NewDatabase(e.db, nil), last.PostExecutionStateRoot())
@@ -937,7 +944,7 @@ func TestSnapshotPersistence(t *testing.T) {
 	})
 }
 
-func TestStateRootAvailability(t *testing.T) {
+func TestHashDBStateRootAvailability(t *testing.T) {
 	const commitInterval = 16
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
 		c.commitInterval = commitInterval
@@ -1004,15 +1011,13 @@ func TestStateRootAvailability(t *testing.T) {
 	})
 }
 
-func TestArchivalStoresAll(t *testing.T) {
-	const commitInterval = 16
+func TestFirewoodRecovery(t *testing.T) {
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.archival = true
-		c.commitInterval = commitInterval
+		c.scheme = customrawdb.FirewoodScheme
 	}))
 	e, chain := sut.Executor, sut.chain
 
-	const numBlocks = commitInterval + 10
+	const numBlocks = 10
 	for range numBlocks {
 		b := chain.NewBlock(t, types.Transactions{
 			sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
@@ -1020,31 +1025,87 @@ func TestArchivalStoresAll(t *testing.T) {
 				Gas:      params.TxGas,
 				GasPrice: big.NewInt(1),
 			}),
-		})
+		}, blockstest.WithEthBlockOptions(
+			blockstest.ModifyHeader(func(h *types.Header) {
+				h.Root = chain.Last().PostExecutionStateRoot() // settles previous block
+			}),
+		))
 		require.NoError(t, e.Enqueue(ctx, b), "%T.Enqueue()", e)
 	}
 
 	final := chain.Last()
 	require.NoErrorf(t, final.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted() on last-enqueued block", final)
-
-	// Dereferencing doesn't do anything
-	for _, b := range chain.AllBlocks() {
-		e.Untrack(b.PostExecutionStateRoot())
-	}
-	require.NoErrorf(t, sut.Close(), "%T.Close()", e)
+	require.NoError(t, sut.Close(), "%T.Close()", sut)
 
 	t.Run("recover", func(t *testing.T) {
-		// Restart the chain to remove the TrieDB cache.
 		src := blocks.Source(chain.GetBlock)
-		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log, prometheus.NewRegistry())
+		snowCtx := snowtest.Context(t, ids.Empty)
+		snowCtx.Log = loggingtest.New(t, logging.Debug)
+		snowCtx.ChainDataDir = sut.chainDataDir
+		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), snowCtx, prometheus.NewRegistry())
 		require.NoError(t, err, "New()")
 		t.Cleanup(func() {
 			require.NoErrorf(t, e.Close(), "%T.Close()", e)
 		})
 
-		for _, b := range chain.AllBlocks() {
-			_, err := e.StateDB(b.PostExecutionStateRoot())
-			assert.NoErrorf(t, err, "%T.StateDB()", e)
-		}
+		_, err = e.StateDB(final.SettledStateRoot())
+		assert.NoErrorf(t, err, "%T.StateDB()", e)
 	})
+}
+
+func TestArchivalStoresAll(t *testing.T) {
+	for _, scheme := range []string{rawdb.HashScheme, customrawdb.FirewoodScheme} {
+		t.Run(scheme, func(t *testing.T) {
+			const commitInterval = 16
+			ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+				c.archival = true
+				c.commitInterval = commitInterval
+				c.scheme = scheme
+			}))
+			e, chain := sut.Executor, sut.chain
+
+			const numBlocks = commitInterval + 10
+			for range numBlocks {
+				b := chain.NewBlock(t, types.Transactions{
+					sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+						To:       &common.Address{},
+						Gas:      params.TxGas,
+						GasPrice: big.NewInt(1),
+					}),
+				}, blockstest.WithEthBlockOptions(
+					blockstest.ModifyHeader(func(h *types.Header) {
+						h.Root = chain.Last().PostExecutionStateRoot() // settles previous block
+					}),
+				))
+				require.NoError(t, e.Enqueue(ctx, b), "%T.Enqueue()", e)
+			}
+
+			final := chain.Last()
+			require.NoErrorf(t, final.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted() on last-enqueued block", final)
+
+			// Dereferencing doesn't do anything
+			for _, b := range chain.AllBlocks() {
+				e.Untrack(b.PostExecutionStateRoot())
+			}
+			require.NoErrorf(t, sut.Close(), "%T.Close()", sut)
+
+			t.Run("recover", func(t *testing.T) {
+				// Restart the chain to remove the TrieDB cache.
+				src := blocks.Source(chain.GetBlock)
+				snowCtx := snowtest.Context(t, ids.Empty)
+				snowCtx.Log = loggingtest.New(t, logging.Debug)
+				snowCtx.ChainDataDir = sut.chainDataDir
+				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), snowCtx, prometheus.NewRegistry())
+				require.NoError(t, err, "New()")
+				t.Cleanup(func() {
+					require.NoErrorf(t, e.Close(), "%T.Close()", e)
+				})
+
+				for _, b := range chain.AllBlocks() {
+					_, err := e.StateDB(b.PostExecutionStateRoot())
+					assert.NoErrorf(t, err, "%T.StateDB()", e)
+				}
+			})
+		})
+	}
 }
