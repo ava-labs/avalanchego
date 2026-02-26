@@ -91,10 +91,35 @@ var (
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
 )
 
-// setSnowDefaults sets the default values for any unset fields in the
-// snowball.Parameters struct.
-// It also handles the deprecated Alpha field for backwards compatibility.
-func setSnowDefaults(config *snowball.Parameters, v *viper.Viper) {
+func getDefaultSnowConfig(v *viper.Viper) *snowball.Parameters {
+	p := &snowball.Parameters{
+		K:                     v.GetInt(SnowSampleSizeKey),
+		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
+		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
+		Beta:                  v.GetInt(SnowCommitThresholdKey),
+		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
+		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
+		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
+		MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
+	}
+	if v.IsSet(SnowQuorumSizeKey) {
+		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
+		p.AlphaConfidence = p.AlphaPreference
+	}
+	return p
+}
+
+// applySnowballParameterDefaults populates unset fields in a snowball.Parameters
+// struct with values from viper. It is intended for subnet configurations that
+// have been unmarshalled into a snowball.Parameters struct where some fields
+// may be omitted.
+//
+// If a field is zero-valued, it is treated as unset and defaulted from the
+// corresponding configuration key.
+//
+// This function also handles the deprecated Alpha field for backward
+// compatibility by mapping it to both AlphaPreference and AlphaConfidence.
+func applySnowballParameterDefaults(config *snowball.Parameters, v *viper.Viper) {
 	if config == nil {
 		return
 	}
@@ -136,13 +161,6 @@ func setSnowDefaults(config *snowball.Parameters, v *viper.Viper) {
 	}
 }
 
-func getDefaultSnowParams(v *viper.Viper) *snowball.Parameters {
-	p := snowball.DefaultParameters
-	setSnowDefaults(&p, v)
-
-	return &p
-}
-
 // setSimplexDefaults sets the default values for any unset fields in the
 // simplex.Parameters.
 func setSimplexDefaults(config *simplex.Parameters, v *viper.Viper) {
@@ -154,26 +172,26 @@ func setSimplexDefaults(config *simplex.Parameters, v *viper.Viper) {
 	}
 }
 
-// setConfigDefaults sets the default values for any unset fields in the subnets.Config.
-func setConfigDefaults(config *subnets.Config, v *viper.Viper) {
+// setSubnetConfigDefaults sets the default values for any unset fields in the subnets.Config.
+func setSubnetConfigDefaults(config *subnets.Config, v *viper.Viper) {
 	switch {
 	case config.SimplexParameters != nil:
 		setSimplexDefaults(config.SimplexParameters, v)
 	case config.SnowParameters != nil:
-		setSnowDefaults(config.SnowParameters, v)
+		applySnowballParameterDefaults(config.SnowParameters, v)
 	case config.ConsensusParameters != nil:
-		setSnowDefaults(config.ConsensusParameters, v)
+		applySnowballParameterDefaults(config.ConsensusParameters, v)
 		config.SnowParameters = config.ConsensusParameters
 		config.ConsensusParameters = nil
 	default:
 		// If no consensus parameters are set, default to snowball parameters
-		config.SnowParameters = getDefaultSnowParams(v)
+		config.SnowParameters = getDefaultSnowConfig(v)
 	}
 }
 
-// getConfigFromBytes unmarshals a subnet config from rawBytes and validates it.
+// getSubnetConfigFromBytes unmarshals a subnet config from rawBytes and validates it.
 // It also sets any unset fields to their default values for the provided subnet config.
-func getConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, error) {
+func getSubnetConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, error) {
 	config := getPrimaryNetworkConfig(v)
 	config.SnowParameters = nil
 	config.SimplexParameters = nil
@@ -188,7 +206,7 @@ func getConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, error)
 		return subnets.Config{}, err
 	}
 	// set unset fields
-	setConfigDefaults(&config, v)
+	setSubnetConfigDefaults(&config, v)
 
 	// validate parameters
 	if err := config.ValidParameters(); err != nil {
@@ -1128,7 +1146,7 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 			continue
 		}
 
-		config, err := getConfigFromBytes(rawSubnetConfigBytes, v)
+		config, err := getSubnetConfigFromBytes(rawSubnetConfigBytes, v)
 		if err != nil {
 			return nil, fmt.Errorf("could not read subnet config for %q: %w", subnetID, err)
 		}
@@ -1174,7 +1192,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, err
 		}
 
-		config, err := getConfigFromBytes(file, v)
+		config, err := getSubnetConfigFromBytes(file, v)
 		if err != nil {
 			return nil, fmt.Errorf("could not read subnet config file %q: %w", filePath, err)
 		}
@@ -1187,7 +1205,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
-		SnowParameters:              getDefaultSnowParams(v),
+		SnowParameters:              getDefaultSnowConfig(v),
 		ValidatorOnly:               false,
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}

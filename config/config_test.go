@@ -1187,7 +1187,7 @@ func TestSetConfigDefaults(t *testing.T) {
 			require := require.New(t)
 			v := setupViperFlags()
 			cfg := tt.input
-			setConfigDefaults(&cfg, v)
+			setSubnetConfigDefaults(&cfg, v)
 			tt.verify(require, cfg)
 		})
 	}
