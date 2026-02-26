@@ -8,9 +8,9 @@ module github.com/ava-labs/avalanchego/graft/coreth
 go 1.25.7
 
 require (
-	github.com/ava-labs/avalanchego v0.0.0-initial-consistent-tag
+	github.com/ava-labs/avalanchego v0.0.0-00010101000000-000000000000
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-initial-consistent-tag
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0-20260223203733-a2611cbe3e58
 	github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3

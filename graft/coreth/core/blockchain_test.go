@@ -736,11 +736,6 @@ func TestCanonicalHashMarker(t *testing.T) {
 }
 
 func testCanonicalHashMarker(t *testing.T, scheme string) {
-	// TODO: https://github.com/ava-labs/firewood/issues/1679
-	if scheme == customrawdb.FirewoodScheme {
-		t.Skip("firewood currently fails due to a stack corruption issue")
-	}
-
 	var cases = []struct {
 		forkA int
 		forkB int
@@ -775,7 +770,8 @@ func testCanonicalHashMarker(t *testing.T, scheme string) {
 		//      markers [1, 11] should be updated
 		{10, 11},
 	}
-	for _, c := range cases {
+	for i, c := range cases {
+		t.Log(i)
 		var (
 			gspec = &Genesis{
 				Config:  params.TestChainConfig,
