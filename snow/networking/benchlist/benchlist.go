@@ -6,6 +6,7 @@ package benchlist
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -56,6 +57,7 @@ type event struct {
 // node tracks failure probability and bench state for a single node.
 // Owned exclusively by the consumer goroutine — no external synchronization.
 type node struct {
+	nodeID             ids.NodeID
 	failureProbability math.Averager
 	isBenched          bool
 }
@@ -248,6 +250,7 @@ func (b *benchlist) processObservation(ev event) {
 	}
 	if !ok {
 		n = &node{
+			nodeID:             nodeID,
 			failureProbability: b.newFailureProbabilityAverager(ev.time),
 		}
 		b.nodes[nodeID] = n
@@ -258,7 +261,7 @@ func (b *benchlist) processObservation(ev event) {
 
 	switch {
 	case !n.isBenched && p > b.benchProbability:
-		if !b.canBench(nodeID) {
+		if !b.tryMakeRoom(nodeID, p) {
 			return
 		}
 
@@ -322,11 +325,14 @@ func (b *benchlist) newFailureProbabilityAverager(now time.Time) math.Averager {
 	return math.NewAverager(0, b.halflife, now)
 }
 
-// canBench returns true if benching nodeID would not exceed the max portion
-// of total stake allowed to be benched.
-func (b *benchlist) canBench(nodeID ids.NodeID) bool {
-	nodeStake := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID)
-	if nodeStake == 0 {
+// tryMakeRoom checks whether benching nodeID fits within maxPortion.
+// If it fits directly, returns true. If not, it attempts greedy eviction:
+// find the least-failing set of benched nodes whose probability is below
+// incomingFailureProbability, verify the stake swap fits, unbench the
+// victim, and return true. Returns false if benching is not possible.
+func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability float64) bool {
+	incomingStake := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID)
+	if incomingStake == 0 {
 		return false
 	}
 
@@ -344,23 +350,79 @@ func (b *benchlist) canBench(nodeID ids.NodeID) bool {
 		return false
 	}
 
-	newBenchedStake, err := math.Add(benchedStake, nodeStake)
-	if err != nil {
-		b.ctx.Log.Error("overflow calculating new benched stake",
-			zap.Stringer("nodeID", nodeID),
-		)
-		return false
-	}
 	maxBenchedStake := float64(totalStake) * b.maxPortion
-	if float64(newBenchedStake) > maxBenchedStake {
-		b.ctx.Log.Debug("not benching node",
-			zap.String("reason", "benched stake would exceed max"),
-			zap.Stringer("nodeID", nodeID),
-			zap.Float64("benchedStake", float64(newBenchedStake)),
-			zap.Float64("maxBenchedStake", maxBenchedStake),
-		)
+
+	// Fast path: benching fits directly without eviction.
+	newBenchedStake, err := math.Add(benchedStake, incomingStake)
+	if err != nil {
 		return false
 	}
+	if float64(newBenchedStake) <= maxBenchedStake {
+		return true
+	}
+
+	// If benching exceeds the max portion, we must evict >= targetEvictStake
+	// so that benching the incoming node does not exceed the max portion.
+	targetEvictStake := newBenchedStake - uint64(maxBenchedStake)
+
+	// Scan the currently benched nodes and find all potential eviction candidates.
+	candidates := make([]*node, 0)
+	for _, node := range b.nodes {
+		if !node.isBenched || node.failureProbability.Read() > incomingFailureProbability {
+			continue
+		}
+
+		candidates = append(candidates, node)
+	}
+	// If there are no candidates for eviction, skip benching the incoming node
+	// because the entire currently benched set has a higher failure probability.
+	if len(candidates) == 0 {
+		return false
+	}
+	// Sort the candidates in ascending order of failure probability.
+	// We want to select nodes in ascending order of failure probability, so that we
+	// evict nodes from the benchlist with the lowest failure probability => maximize
+	// probability of successful queries.
+	slices.SortFunc(candidates, func(a, b *node) int {
+		diff := a.failureProbability.Read() - b.failureProbability.Read()
+		switch {
+		case diff < 0:
+			return -1
+		case diff > 0:
+			return 1
+		default:
+			return 0
+		}
+	})
+
+	// Select a sufficient set of candidates to evict to make room for the incoming node.
+	evictedStake := uint64(0)
+	evictNodes := make([]*node, 0)
+	for _, candidate := range candidates {
+		candidateStake := b.vdrs.GetWeight(b.ctx.SubnetID, candidate.nodeID)
+		evictedStake += candidateStake
+		evictNodes = append(evictNodes, candidate)
+		if evictedStake >= targetEvictStake {
+			break
+		}
+	}
+
+	// If we couldn't evict enough stake to make room for the incoming node, skip
+	// benching it and return early.
+	if evictedStake < targetEvictStake {
+		return false
+	}
+
+	// Evict the selected candidates from the benchlist
+	for _, evictNode := range evictNodes {
+		evictNode.isBenched = false
+		b.timeoutHeap.Remove(evictNode.nodeID)
+		b.lock.Lock()
+		b.benched.Remove(evictNode.nodeID)
+		b.lock.Unlock()
+		b.benchable.Unbenched(b.ctx.ChainID, evictNode.nodeID)
+	}
+
 	return true
 }
 
