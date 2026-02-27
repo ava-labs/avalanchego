@@ -288,6 +288,51 @@ func TestDeleteThenReAddValidatorMetadataWrite(t *testing.T) {
 	require.True(has)
 }
 
+func TestDeleteAddDeleteAddValidatorMetadataWrite(t *testing.T) {
+	require := require.New(t)
+	state := newValidatorState()
+	primaryDB := memdb.New()
+	subnetDB := memdb.New()
+
+	nodeID := ids.GenerateTestNodeID()
+	txID1 := ids.GenerateTestID()
+	txID2 := ids.GenerateTestID()
+	txID3 := ids.GenerateTestID()
+
+	state.AddValidatorMetadata(nodeID, constants.PrimaryNetworkID, &validatorMetadata{
+		txID:            txID1,
+		PotentialReward: 100,
+	})
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
+	has, err := primaryDB.Has(txID1[:])
+	require.NoError(err)
+	require.True(has)
+
+	state.DeleteValidatorMetadata(nodeID, constants.PrimaryNetworkID)
+	state.AddValidatorMetadata(nodeID, constants.PrimaryNetworkID, &validatorMetadata{
+		txID:            txID2,
+		PotentialReward: 200,
+	})
+	state.DeleteValidatorMetadata(nodeID, constants.PrimaryNetworkID)
+	state.AddValidatorMetadata(nodeID, constants.PrimaryNetworkID, &validatorMetadata{
+		txID:            txID3,
+		PotentialReward: 300,
+	})
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
+
+	has, err = primaryDB.Has(txID1[:])
+	require.NoError(err)
+	require.False(has)
+
+	has, err = primaryDB.Has(txID2[:])
+	require.NoError(err)
+	require.False(has)
+
+	has, err = primaryDB.Has(txID3[:])
+	require.NoError(err)
+	require.True(has)
+}
+
 func TestParseValidatorMetadata(t *testing.T) {
 	type test struct {
 		name        string
