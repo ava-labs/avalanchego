@@ -163,7 +163,7 @@ func checkBlockChainState(
 	gspec *Genesis,
 	create createFunc,
 	checkState func(sdb *state.StateDB) error,
-) (new *BlockChain, restarted *BlockChain) {
+) (*BlockChain, *BlockChain) {
 	var (
 		require           = require.New(t)
 		lastAcceptedBlock = bc.LastConsensusAcceptedBlock()

@@ -152,7 +152,7 @@ func checkBlockChainState(
 	oldChainDataDir := bc.CacheConfig().ChainDataDir // cacheConfig uses same reference in most tests
 	newBlockChain, err := create(newDB, gspec, common.Hash{}, t.TempDir())
 	require.NoError(err, "Failed to create new blockchain instance")
-	defer newBlockChain.Stop()
+	t.Cleanup(newBlockChain.Stop)
 
 	for i := uint64(1); i <= lastAcceptedBlock.NumberU64(); i++ {
 		block := bc.GetBlockByNumber(i)
@@ -170,9 +170,10 @@ func checkBlockChainState(
 	require.NoError(err)
 	require.NoErrorf(checkState(acceptedState), "Check state failed for newly generated blockchain")
 
+	bc.Stop()
 	restartedChain, err := create(oldDB, gspec, lastAcceptedBlock.Hash(), oldChainDataDir)
 	require.NoError(err)
-	defer restartedChain.Stop()
+	t.Cleanup(restartedChain.Stop)
 
 	currentBlock := restartedChain.CurrentBlock()
 	require.Equal(lastAcceptedBlock.Hash(), currentBlock.Hash(), "Restarted chain's current block does not match last accepted block")
