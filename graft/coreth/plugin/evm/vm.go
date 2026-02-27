@@ -623,7 +623,6 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		}
 	default:
 		log.Warn("state sync is not supported for this scheme, no leaf handlers will be registered", "scheme", scheme)
-		return nil
 	}
 
 	extraLeafConfig := vm.extensionConfig.ExtraSyncLeafHandlerConfig
