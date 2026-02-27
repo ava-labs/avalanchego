@@ -72,6 +72,11 @@ func TestValidParameters(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name:        "no consensus parameters",
+			s:           Config{},
+			expectedErr: errNoParametersSet,
+		},
+		{
 			name: "invalid simplex parameters",
 			s: Config{
 				SimplexParameters: &simplex.Parameters{
@@ -90,72 +95,35 @@ func TestValidParameters(t *testing.T) {
 	}
 }
 
+// TestValidConsensusConfiguration tests the three meaningful states of
+// ValidConsensusConfiguration: zero, one, or more than one consensus parameter
+// set.
 func TestValidConsensusConfiguration(t *testing.T) {
 	tests := []struct {
-		name        string
-		cfg         Config
-		expectedErr error
+		name    string
+		config  Config
+		wantErr error
 	}{
 		{
-			name:        "none set",
-			cfg:         Config{},
-			expectedErr: nil,
+			name:   "none set",
+			config: Config{},
 		},
 		{
-			name: "only snow set",
-			cfg: Config{
-				SnowParameters: &snowball.Parameters{},
-			},
-			expectedErr: nil,
+			name:   "one set",
+			config: Config{SimplexParameters: &simplex.Parameters{}},
 		},
 		{
-			name: "only simplex set",
-			cfg: Config{
-				SimplexParameters: &simplex.Parameters{},
-			},
-			expectedErr: nil,
-		},
-		{
-			name: "only deprecated consensusParameters set",
-			cfg: Config{
-				ConsensusParameters: &snowball.Parameters{},
-			},
-			expectedErr: nil,
-		},
-		{
-			name: "snow + simplex set",
-			cfg: Config{
-				SnowParameters:    &snowball.Parameters{},
-				SimplexParameters: &simplex.Parameters{},
-			},
-			expectedErr: ErrTooManyConsensusParameters,
-		},
-		{
-			name: "consensusParameters + snow set",
-			cfg: Config{
-				ConsensusParameters: &snowball.Parameters{},
-				SnowParameters:      &snowball.Parameters{},
-			},
-			expectedErr: ErrTooManyConsensusParameters,
-		},
-		{
-			name: "all three set",
-			cfg: Config{
-				ConsensusParameters: &snowball.Parameters{},
-				SnowParameters:      &snowball.Parameters{},
-				SimplexParameters:   &simplex.Parameters{},
-			},
-			expectedErr: ErrTooManyConsensusParameters,
+			name:    "two set",
+			config:  Config{SimplexParameters: &simplex.Parameters{}, SnowParameters: &snowball.Parameters{}},
+			wantErr: ErrTooManyConsensusParameters,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.cfg.ValidConsensusConfiguration()
-			if tt.expectedErr == nil {
-				require.NoError(t, err)
-			} else {
-				require.ErrorIs(t, err, tt.expectedErr)
+			err := tt.config.ValidConsensusConfiguration()
+			if err != tt.wantErr {
+				t.Errorf("got %v, want %v", err, tt.wantErr)
 			}
 		})
 	}

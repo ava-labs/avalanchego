@@ -54,20 +54,19 @@ type Config struct {
 	ProposerNumHistoricalBlocks uint64 `json:"proposerNumHistoricalBlocks" yaml:"proposerNumHistoricalBlocks"`
 }
 
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 // ValidConsensusConfiguration ensures that at most one consensus parameter type is set.
 // If none are set, then the default snowball parameters will be used for SnowParameters.
 func (c *Config) ValidConsensusConfiguration() error {
-	numSet := 0
-	if c.SimplexParameters != nil {
-		numSet++
-	}
-	if c.SnowParameters != nil {
-		numSet++
-	}
-	if c.ConsensusParameters != nil {
-		numSet++
-	}
-
+	numSet := boolToInt(c.SimplexParameters != nil) +
+		boolToInt(c.SnowParameters != nil) +
+		boolToInt(c.ConsensusParameters != nil)
 	if numSet > 1 {
 		return ErrTooManyConsensusParameters
 	}
