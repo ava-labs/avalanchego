@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -95,27 +96,24 @@ type proposalMeta struct {
 }
 
 type TrieDBConfig struct {
-	DatabaseDir          string
-	CacheSizeBytes       uint
-	FreeListCacheEntries uint
-	RevisionsInMemory    uint // must be >= 2
-	CacheStrategy        ffi.CacheStrategy
-	Archive              bool
+	DatabaseDir       string
+	CacheSizeBytes    uint
+	RevisionsInMemory uint // must be >= 2
+	CacheStrategy     ffi.CacheStrategy
+	Archive           bool
 }
 
 // DefaultConfig returns a sensible TrieDBConfig with the given directory.
 // The default config is:
 //   - CacheSizeBytes: 1MB
-//   - FreeListCacheEntries: 40,000
 //   - RevisionsInMemory: 100
 //   - CacheStrategy: [ffi.CacheAllReads]
 func DefaultConfig(dir string) TrieDBConfig {
 	return TrieDBConfig{
-		DatabaseDir:          dir,
-		CacheSizeBytes:       1024 * 1024, // 1MB
-		FreeListCacheEntries: 40_000,
-		RevisionsInMemory:    100,
-		CacheStrategy:        ffi.CacheAllReads,
+		DatabaseDir:       dir,
+		CacheSizeBytes:    1024 * 1024, // 1MB
+		RevisionsInMemory: 100,
+		CacheStrategy:     ffi.CacheAllReads,
 	}
 }
 
@@ -138,10 +136,10 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	}
 	path := filepath.Join(config.DatabaseDir, firewoodDir)
 	options := []ffi.Option{
-		ffi.WithNodeCacheEntries(config.CacheSizeBytes / 256), // TODO(#4750): is 256 bytes per node a good estimate?
-		ffi.WithFreeListCacheEntries(config.FreeListCacheEntries),
+		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithReadCacheStrategy(config.CacheStrategy),
+		ffi.WithDeferredPersistenceCommitCount(1),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())
@@ -155,14 +153,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
-	initialRoot, err := fw.Root()
-	if err != nil {
-		if closeErr := fw.Close(context.Background()); closeErr != nil {
-			return nil, fmt.Errorf("%w: error while closing: %w", err, closeErr)
-		}
-		return nil, err
-	}
-
+	initialRoot := fw.Root()
 	blockHashes := make(map[common.Hash]struct{})
 	blockHashes[common.Hash{}] = struct{}{}
 	return &TrieDB{
@@ -211,12 +202,7 @@ func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	clear(t.tree.blockHashes)
 	t.tree.blockHashes[blockHash] = struct{}{}
 	t.tree.height = height
-	root, err := t.Firewood.Root()
-	if err != nil {
-		log.Error("get root in SetHashAndHeight", "error", err)
-		return
-	}
-	t.tree.root = common.Hash(root)
+	t.tree.root = common.Hash(t.Firewood.Root())
 }
 
 // Scheme returns the scheme of the database.
@@ -227,12 +213,7 @@ func (*TrieDB) Scheme() string {
 
 // Initialized checks whether a non-empty genesis block has been written.
 func (t *TrieDB) Initialized(common.Hash) bool {
-	root, err := t.Firewood.Root()
-	if err != nil {
-		log.Error("get current root", "error", err)
-		return false
-	}
-
+	root := t.Firewood.Root()
 	return common.Hash(root) != types.EmptyRootHash
 }
 
@@ -278,6 +259,7 @@ func (t *TrieDB) Close() error {
 	t.possible = nil
 
 	// We must provide a context to close since it may hang while waiting for the finalizers to complete.
+	runtime.GC() // encourage finalizers to run before we wait, otherwise the database won't close properly.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return t.Firewood.Close(ctx)
@@ -398,11 +380,7 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	}
 	p.handle = nil // The proposal has been committed.
 
-	newRoot, err := t.Firewood.Root()
-	if err != nil {
-		return fmt.Errorf("getting current root after commit: %w", err)
-	}
-	if common.Hash(newRoot) != root {
+	if newRoot := common.Hash(t.Firewood.Root()); newRoot != root {
 		return fmt.Errorf("root after commit (%x) does not match expected root %x", newRoot, root)
 	}
 
@@ -467,11 +445,7 @@ func (t *TrieDB) createProposal(parent *proposal, ops []ffi.BatchOp) (*proposal,
 		},
 	}
 
-	root, err := handle.Root()
-	if err != nil {
-		return nil, fmt.Errorf("getting root of proposal: %w", err)
-	}
-	p.root = common.Hash(root)
+	p.root = common.Hash(handle.Root())
 
 	return p, nil
 }
