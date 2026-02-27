@@ -31,7 +31,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"runtime"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -795,7 +794,6 @@ func testCanonicalHashMarker(t *testing.T, scheme string) {
 				}
 			}
 		}
-		go runtime.GC()
 		chain.Stop()
 	}
 }
