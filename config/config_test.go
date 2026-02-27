@@ -1186,6 +1186,47 @@ func TestSetSubnetConfigDefaults(t *testing.T) {
 	}
 }
 
+func TestResolveConsensusMode(t *testing.T) {
+	tests := []struct {
+		name  string
+		input subnets.Config
+		want  consensusMode
+	}{
+		{
+			name:  "empty config defaults to snow",
+			input: subnets.Config{},
+			want:  modeDefaultSnow,
+		},
+		{
+			name: "simplex parameters set",
+			input: subnets.Config{
+				SimplexParameters: &simplex.Parameters{},
+			},
+			want: modeSimplex,
+		},
+		{
+			name: "snow parameters set",
+			input: subnets.Config{
+				SnowParameters: &snowball.Parameters{},
+			},
+			want: modeSnow,
+		},
+		{
+			name: "deprecated consensus parameters set",
+			input: subnets.Config{
+				ConsensusParameters: &snowball.Parameters{},
+			},
+			want: modeSnowFromDeprecated,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, resolveConsensusMode(&tt.input))
+		})
+	}
+}
+
 func setupViperFlags() *viper.Viper {
 	v := viper.New()
 	fs := BuildFlagSet()

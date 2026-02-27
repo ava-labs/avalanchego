@@ -57,7 +57,14 @@ const (
 	subnetConfigFileExt  = ".json"
 
 	maxDiskSpaceThreshold = 50
+
+	modeSimplex = iota
+	modeSnow
+	modeSnowFromDeprecated
+	modeDefaultSnow
 )
+
+type consensusMode int
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
@@ -172,19 +179,31 @@ func setSimplexDefaults(config *simplex.Parameters, v *viper.Viper) {
 	}
 }
 
-// setSubnetConfigDefaults sets the default values for any unset fields in the subnets.Config.
-func setSubnetConfigDefaults(config *subnets.Config, v *viper.Viper) {
+func resolveConsensusMode(config *subnets.Config) consensusMode {
 	switch {
 	case config.SimplexParameters != nil:
-		setSimplexDefaults(config.SimplexParameters, v)
+		return modeSimplex
 	case config.SnowParameters != nil:
-		applySnowballParameterDefaults(config.SnowParameters, v)
+		return modeSnow
 	case config.ConsensusParameters != nil:
+		return modeSnowFromDeprecated
+	default:
+		return modeDefaultSnow
+	}
+}
+
+// setSubnetConfigDefaults sets the default values for any unset fields in the subnets.Config.
+func setSubnetConfigDefaults(config *subnets.Config, v *viper.Viper) {
+	switch resolveConsensusMode(config) {
+	case modeSimplex:
+		setSimplexDefaults(config.SimplexParameters, v)
+	case modeSnow:
+		applySnowballParameterDefaults(config.SnowParameters, v)
+	case modeSnowFromDeprecated:
 		applySnowballParameterDefaults(config.ConsensusParameters, v)
 		config.SnowParameters = config.ConsensusParameters
 		config.ConsensusParameters = nil
-	default:
-		// If no consensus parameters are set, default to snowball parameters
+	case modeDefaultSnow:
 		config.SnowParameters = getPrimaryNetworkSnowConfig(v)
 	}
 }
