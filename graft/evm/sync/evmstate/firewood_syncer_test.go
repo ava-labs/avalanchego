@@ -202,8 +202,7 @@ func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state
 	t.Helper()
 
 	db := dbFromState(t, clientState)
-	gotRoot, err := db.Root()
-	require.NoErrorf(t, err, "%T.Root()", db)
+	gotRoot := db.Root()
 	require.Equal(t, root, common.Hash(gotRoot), "client DB root does not match expected root")
 
 	for k, acc := range accounts {
