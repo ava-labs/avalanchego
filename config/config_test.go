@@ -1029,22 +1029,19 @@ func setupFile(t *testing.T, path string, fileName string, value string) {
 func TestGetPrimaryNetworkConfigWithSnowQuorumSizeKey(t *testing.T) {
 	snowQuorumSize := 8
 	tests := map[string]struct {
-		setFlag bool
-		testF   func(*require.Assertions, subnets.Config)
+		setFlag            bool
+		expectedPreference int
+		expectedConfidence int
 	}{
 		"SnowQuorumSizeKey not set": {
-			setFlag: false,
-			testF: func(require *require.Assertions, config subnets.Config) {
-				require.Equal(snowball.DefaultParameters.AlphaPreference, config.SnowParameters.AlphaPreference)
-				require.Equal(snowball.DefaultParameters.AlphaConfidence, config.SnowParameters.AlphaConfidence)
-			},
+			setFlag:            false,
+			expectedPreference: snowball.DefaultParameters.AlphaPreference,
+			expectedConfidence: snowball.DefaultParameters.AlphaConfidence,
 		},
 		"SnowQuorumSizeKey set": {
-			setFlag: true,
-			testF: func(require *require.Assertions, config subnets.Config) {
-				require.Equal(snowQuorumSize, config.SnowParameters.AlphaPreference)
-				require.Equal(snowQuorumSize, config.SnowParameters.AlphaConfidence)
-			},
+			setFlag:            true,
+			expectedPreference: snowQuorumSize,
+			expectedConfidence: snowQuorumSize,
 		},
 	}
 
@@ -1058,12 +1055,13 @@ func TestGetPrimaryNetworkConfigWithSnowQuorumSizeKey(t *testing.T) {
 			}
 
 			config := getPrimaryNetworkConfig(v)
-			test.testF(require, config)
+			require.Equal(test.expectedPreference, config.SnowParameters.AlphaPreference)
+			require.Equal(test.expectedConfidence, config.SnowParameters.AlphaConfidence)
 		})
 	}
 }
 
-func TestSetConfigDefaults(t *testing.T) {
+func TestSetSubnetConfigDefaults(t *testing.T) {
 	// Custom values used across test inputs and verify functions — declared once
 	// to avoid duplication between the two.
 	var (
