@@ -35,7 +35,7 @@ type Config struct {
 
 // Context is information about the current execution.
 type SimplexChainContext struct {
-	// Network is the ID of the network this context exists within.
+	// NodeID is the ID of this node
 	NodeID ids.NodeID
 
 	// ChainID is the ID of the chain this context exists within.
@@ -44,6 +44,6 @@ type SimplexChainContext struct {
 	// SubnetID is the ID of the subnet this context exists within.
 	SubnetID ids.ID
 
-	// NodeID is the ID of this node
+	// Network is the ID of the network this context exists within.
 	NetworkID uint32
 }

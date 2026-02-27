@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
-	pSimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 type newBlockConfig struct {
@@ -87,7 +87,7 @@ func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 }
 
 type testNode struct {
-	pSimplex.ValidatorInfo
+	simplexparams.ValidatorInfo
 	signFunc SignFunc
 }
 
@@ -132,12 +132,12 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 }
 
 // newSimplexChainParams creates simplex chain parameters with the given nodes as initial validators.
-func newSimplexChainParams(nodes []*testNode) *pSimplex.Parameters {
-	params := &pSimplex.Parameters{
+func newSimplexChainParams(nodes []*testNode) *simplexparams.Parameters {
+	params := &simplexparams.Parameters{
 		MaxNetworkDelay:    1 * time.Second,
 		MaxRebroadcastWait: 1 * time.Second,
 	}
-	params.InitialValidators = make([]pSimplex.ValidatorInfo, len(nodes))
+	params.InitialValidators = make([]simplexparams.ValidatorInfo, len(nodes))
 	for i, node := range nodes {
 		params.InitialValidators[i] = node.ValidatorInfo
 	}
@@ -152,7 +152,7 @@ func generateTestNodes(t *testing.T, num uint64) []*testNode {
 
 		nodeID := ids.GenerateTestNodeID()
 		nodes[i] = &testNode{
-			ValidatorInfo: pSimplex.ValidatorInfo{
+			ValidatorInfo: simplexparams.ValidatorInfo{
 				NodeID:    nodeID,
 				PublicKey: ls.PublicKey().Compress(),
 			},

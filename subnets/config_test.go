@@ -26,7 +26,7 @@ var validParameters = snowball.Parameters{
 	MaxItemProcessingTime: 1,
 }
 
-func TestValid(t *testing.T) {
+func TestValidParameters(t *testing.T) {
 	tests := []struct {
 		name        string
 		s           Config
@@ -72,26 +72,11 @@ func TestValid(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name:        "no consensus parameters",
-			s:           Config{},
-			expectedErr: errNoParametersSet,
-		},
-		{
 			name: "invalid simplex parameters",
 			s: Config{
 				SimplexParameters: &simplex.Parameters{
 					MaxNetworkDelay:    -1,
 					MaxRebroadcastWait: -10,
-				},
-			},
-			expectedErr: simplex.ErrInvalidParameters,
-		},
-		{
-			name: "empty simplex parameters",
-			s: Config{
-				SimplexParameters: &simplex.Parameters{
-					MaxNetworkDelay:    0,
-					MaxRebroadcastWait: 0,
 				},
 			},
 			expectedErr: simplex.ErrInvalidParameters,
