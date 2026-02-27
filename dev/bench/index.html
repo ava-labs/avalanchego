@@ -82,6 +82,44 @@
       .benchmark-chart {
         max-width: 1000px;
       }
+      .benchmark-chart-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        margin: 16px 0;
+        width: 100%;
+      }
+      .metric-selector {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 160px;
+        min-width: 160px;
+        padding: 8px;
+      }
+      .metric-option {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 16px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        text-align: left;
+        transition: background-color 0.15s, color 0.15s;
+        background-color: #e8e8e8;
+        color: #888;
+      }
+      .metric-option:hover:not(.active) {
+        background-color: #d0d0d0;
+        color: #555;
+      }
+      .metric-option.active {
+        background-color: #38ff38;
+        color: #000;
+      }
+      .chart-wrapper {
+        flex: 1;
+        min-width: 0;
+      }
     </style>
     <title>Benchmarks</title>
   </head>
@@ -127,18 +165,30 @@
         };
 
         function init() {
-          function collectBenchesPerTestCase(entries) {
+          function collectBenchesGrouped(entries) {
+            // Map<baseName, Map<metric, Array<{commit, date, tool, bench}>>>
             const map = new Map();
             for (const entry of entries) {
               const {commit, date, tool, benches} = entry;
               for (const bench of benches) {
                 const result = { commit, date, tool, bench };
-                const arr = map.get(bench.name);
-                if (arr === undefined) {
-                  map.set(bench.name, [result]);
+                const lastDash = bench.name.lastIndexOf(' - ');
+                let baseName, metric;
+                if (lastDash !== -1) {
+                  baseName = bench.name.slice(0, lastDash);
+                  metric = bench.name.slice(lastDash + 3);
                 } else {
-                  arr.push(result);
+                  baseName = bench.name;
+                  metric = bench.unit || 'value';
                 }
+                if (!map.has(baseName)) {
+                  map.set(baseName, new Map());
+                }
+                const metricsMap = map.get(baseName);
+                if (!metricsMap.has(metric)) {
+                  metricsMap.set(metric, []);
+                }
+                metricsMap.get(metric).push(result);
               }
             }
             return map;
@@ -164,26 +214,56 @@
           // Prepare data points for charts
           return Object.keys(data.entries).map(name => ({
             name,
-            dataSet: collectBenchesPerTestCase(data.entries[name]),
+            dataSet: collectBenchesGrouped(data.entries[name]),
           }));
         }
 
         function renderAllChars(dataSets) {
 
-          function renderGraph(parent, name, dataset) {
+          function renderGraph(parent, baseName, metricsMap) {
+            const container = document.createElement('div');
+            container.className = 'benchmark-chart-container';
+            parent.appendChild(container);
+
+            // Build metric sidebar
+            const sidebar = document.createElement('div');
+            sidebar.className = 'metric-selector';
+            container.appendChild(sidebar);
+
+            const metricKeys = Array.from(metricsMap.keys());
+            // Default to mgas/s if available, otherwise first metric
+            const defaultMetric = metricKeys.includes('mgas/s') ? 'mgas/s' : metricKeys[0];
+
+            const buttons = {};
+            for (const metric of metricKeys) {
+              const btn = document.createElement('button');
+              btn.className = 'metric-option' + (metric === defaultMetric ? ' active' : '');
+              btn.textContent = metric;
+              sidebar.appendChild(btn);
+              buttons[metric] = btn;
+            }
+
+            // Chart area
+            const chartWrapper = document.createElement('div');
+            chartWrapper.className = 'chart-wrapper';
+            container.appendChild(chartWrapper);
+
             const canvas = document.createElement('canvas');
             canvas.className = 'benchmark-chart';
-            parent.appendChild(canvas);
+            chartWrapper.appendChild(canvas);
 
-            const color = toolColors[dataset.length > 0 ? dataset[0].tool : '_'];
-            const data = {
-              labels: dataset.map(d => d.commit.id.slice(0, 7)),
+            // Mutable reference for tooltip callbacks
+            let currentDataset = metricsMap.get(defaultMetric);
+
+            const color = toolColors[currentDataset.length > 0 ? currentDataset[0].tool : '_'];
+            const chartData = {
+              labels: currentDataset.map(d => d.commit.id.slice(0, 7)),
               datasets: [
                 {
-                  label: name,
-                  data: dataset.map(d => d.bench.value),
+                  label: baseName + ' - ' + defaultMetric,
+                  data: currentDataset.map(d => d.bench.value),
                   borderColor: color,
-                  backgroundColor: color + '60', // Add alpha for #rrggbbaa
+                  backgroundColor: color + '60',
                 }
               ],
             };
@@ -201,7 +281,7 @@
                   {
                     scaleLabel: {
                       display: true,
-                      labelString: dataset.length > 0 ? dataset[0].bench.unit : '',
+                      labelString: defaultMetric,
                     },
                     ticks: {
                       beginAtZero: true,
@@ -213,12 +293,12 @@
                 callbacks: {
                   afterTitle: items => {
                     const {index} = items[0];
-                    const data = dataset[index];
+                    const data = currentDataset[index];
                     return '\n' + data.commit.message + '\n\n' + data.commit.timestamp + ' committed by @' + data.commit.committer.username + '\n';
                   },
                   label: item => {
                     let label = item.value;
-                    const { range, unit } = dataset[item.index].bench;
+                    const { range, unit } = currentDataset[item.index].bench;
                     label += ' ' + unit;
                     if (range) {
                       label += ' (' + range + ')';
@@ -226,7 +306,7 @@
                     return label;
                   },
                   afterLabel: item => {
-                    const { extra } = dataset[item.index].bench;
+                    const { extra } = currentDataset[item.index].bench;
                     return extra ? '\n' + extra : '';
                   }
                 }
@@ -235,18 +315,34 @@
                 if (activeElems.length === 0) {
                   return;
                 }
-                // XXX: Undocumented. How can we know the index?
                 const index = activeElems[0]._index;
-                const url = dataset[index].commit.url;
+                const url = currentDataset[index].commit.url;
                 window.open(url, '_blank');
               },
             };
 
-            new Chart(canvas, {
+            const chart = new Chart(canvas, {
               type: 'line',
-              data,
+              data: chartData,
               options,
             });
+
+            // Metric switching click handlers
+            for (const metric of metricKeys) {
+              buttons[metric].onclick = () => {
+                const newDataset = metricsMap.get(metric);
+                currentDataset = newDataset;
+                chart.data.labels = newDataset.map(d => d.commit.id.slice(0, 7));
+                chart.data.datasets[0].data = newDataset.map(d => d.bench.value);
+                chart.data.datasets[0].label = baseName + ' - ' + metric;
+                chart.options.scales.yAxes[0].scaleLabel.labelString = metric;
+                chart.update();
+                for (const key of metricKeys) {
+                  buttons[key].classList.remove('active');
+                }
+                buttons[metric].classList.add('active');
+              };
+            }
           }
 
           function renderBenchSet(name, benchSet, main) {
@@ -263,8 +359,8 @@
             graphsElem.className = 'benchmark-graphs';
             setElem.appendChild(graphsElem);
 
-            for (const [benchName, benches] of benchSet.entries()) {
-              renderGraph(graphsElem, benchName, benches)
+            for (const [baseName, metricsMap] of benchSet.entries()) {
+              renderGraph(graphsElem, baseName, metricsMap);
             }
           }
 
