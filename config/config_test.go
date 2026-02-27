@@ -792,25 +792,19 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 }
 
 func TestConfigWithSnowQuorumSizeKey(t *testing.T) {
-	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-	require.NoError(t, err)
 	snowQuorumSize := 8
 	tests := map[string]struct {
 		givenJSON string
-		testF     func(*require.Assertions, map[ids.ID]subnets.Config)
+		testF     func(*require.Assertions, subnets.Config)
 	}{
 		"no alpha params set": {
 			givenJSON: `{
-				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusParameters": {
-						"k": 15
-					},
-					"validatorOnly": true
-				}
+				"consensusParameters": {
+					"k": 15
+				},
+				"validatorOnly": true
 			}`,
-			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				config, ok := given[subnetID]
-				require.True(ok)
+			testF: func(require *require.Assertions, config subnets.Config) {
 				require.True(config.ValidatorOnly)
 				require.Equal(snowQuorumSize, config.SnowParameters.AlphaPreference)
 				require.Equal(snowQuorumSize, config.SnowParameters.AlphaConfidence)
@@ -819,17 +813,13 @@ func TestConfigWithSnowQuorumSizeKey(t *testing.T) {
 		},
 		"alpha preference set": {
 			givenJSON: `{
-				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusParameters": {
-						"k": 13,
-						"alphaPreference": 7
-					},
-					"validatorOnly": true
-				}
+				"consensusParameters": {
+					"k": 13,
+					"alphaPreference": 7
+				},
+				"validatorOnly": true
 			}`,
-			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				config, ok := given[subnetID]
-				require.True(ok)
+			testF: func(require *require.Assertions, config subnets.Config) {
 				require.True(config.ValidatorOnly)
 				require.Equal(7, config.SnowParameters.AlphaPreference)
 				require.Equal(snowQuorumSize, config.SnowParameters.AlphaConfidence)
@@ -837,17 +827,13 @@ func TestConfigWithSnowQuorumSizeKey(t *testing.T) {
 		},
 		"alpha confidence set": {
 			givenJSON: `{
-				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusParameters": {
-						"k": 13,
-						"alphaConfidence": 9
-					},
-					"validatorOnly": true
-				}
+				"consensusParameters": {
+					"k": 13,
+					"alphaConfidence": 9
+				},
+				"validatorOnly": true
 			}`,
-			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				config, ok := given[subnetID]
-				require.True(ok)
+			testF: func(require *require.Assertions, config subnets.Config) {
 				require.True(config.ValidatorOnly)
 				require.Equal(snowQuorumSize, config.SnowParameters.AlphaPreference)
 				require.Equal(9, config.SnowParameters.AlphaConfidence)
@@ -855,18 +841,14 @@ func TestConfigWithSnowQuorumSizeKey(t *testing.T) {
 		},
 		"both alpha params set": {
 			givenJSON: `{
-				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusParameters": {
-						"k": 13,
-						"alphaConfidence": 9,
-						"alphaPreference": 7
-					},
-					"validatorOnly": true
-				}
+				"consensusParameters": {
+					"k": 13,
+					"alphaConfidence": 9,
+					"alphaPreference": 7
+				},
+				"validatorOnly": true
 			}`,
-			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				config, ok := given[subnetID]
-				require.True(ok)
+			testF: func(require *require.Assertions, config subnets.Config) {
 				require.True(config.ValidatorOnly)
 				require.Equal(7, config.SnowParameters.AlphaPreference)
 				require.Equal(9, config.SnowParameters.AlphaConfidence)
@@ -878,13 +860,10 @@ func TestConfigWithSnowQuorumSizeKey(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 
-			encodedFileContent := base64.StdEncoding.EncodeToString([]byte(test.givenJSON))
-
 			v := setupViperFlags()
-			v.Set(SubnetConfigContentKey, encodedFileContent)
 			v.Set(SnowQuorumSizeKey, snowQuorumSize)
 
-			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
+			subnetConfigs, err := getSubnetConfigFromBytes([]byte(test.givenJSON), v)
 			require.NoError(err)
 
 			test.testF(require, subnetConfigs)
@@ -1045,27 +1024,6 @@ func setupFile(t *testing.T, path string, fileName string, value string) {
 	require.NoError(os.MkdirAll(path, 0o700))
 	filePath := filepath.Join(path, fileName)
 	require.NoError(os.WriteFile(filePath, []byte(value), 0o600))
-}
-
-func TestGetPrimaryNetworkConfig(t *testing.T) {
-	require := require.New(t)
-	v := setupViperFlags()
-
-	config := getPrimaryNetworkConfig(v)
-
-	// Verify basic config structure
-	require.False(config.ValidatorOnly, "ValidatorOnly should be false for primary network")
-
-	// Verify SnowParameters have the default values from snowball.DefaultParameters
-	require.Equal(snowball.DefaultParameters, *config.SnowParameters)
-	require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
-	require.Equal(snowball.DefaultParameters.AlphaPreference, config.SnowParameters.AlphaPreference)
-	require.Equal(snowball.DefaultParameters.AlphaConfidence, config.SnowParameters.AlphaConfidence)
-	require.Equal(snowball.DefaultParameters.Beta, config.SnowParameters.Beta)
-	require.Equal(snowball.DefaultParameters.ConcurrentRepolls, config.SnowParameters.ConcurrentRepolls)
-	require.Equal(snowball.DefaultParameters.OptimalProcessing, config.SnowParameters.OptimalProcessing)
-	require.Equal(snowball.DefaultParameters.MaxOutstandingItems, config.SnowParameters.MaxOutstandingItems)
-	require.Equal(snowball.DefaultParameters.MaxItemProcessingTime, config.SnowParameters.MaxItemProcessingTime)
 }
 
 func TestGetPrimaryNetworkConfigWithSnowQuorumSizeKey(t *testing.T) {
