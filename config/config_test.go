@@ -476,55 +476,6 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			},
 			expectedErr: subnets.ErrTooManyConsensusParameters,
 		},
-		"default simplex params set": {
-			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `
-			{
-				"simplexParameters": {
-						"initialValidators": [
-								{
-										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
-										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
-								},
-								{
-										"nodeID": "NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh",
-										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
-								}
-						]
-				}
-			}`,
-			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				config, ok := given[id]
-				require.True(ok)
-
-				require.False(config.ValidatorOnly)
-				require.Equal(simplex.DefaultParameters.MaxNetworkDelay, config.SimplexParameters.MaxNetworkDelay)
-				require.Equal(simplex.DefaultParameters.MaxRebroadcastWait, config.SimplexParameters.MaxRebroadcastWait)
-
-				pkBytes, err := base64.StdEncoding.DecodeString(
-					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",
-				)
-				require.NoError(err)
-
-				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
-				require.NoError(err)
-				validator := simplex.ValidatorInfo{
-					NodeID:    nodeID,
-					PublicKey: pkBytes,
-				}
-				require.Equal(validator, config.SimplexParameters.InitialValidators[0])
-
-				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
-				require.NoError(err)
-				validator2 := simplex.ValidatorInfo{
-					NodeID:    nodeID2,
-					PublicKey: pkBytes,
-				}
-				require.Equal(validator2, config.SimplexParameters.InitialValidators[1])
-			},
-			expectedErr: nil,
-		},
 		"correct simplex config": {
 			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `

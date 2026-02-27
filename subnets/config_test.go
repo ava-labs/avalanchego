@@ -122,9 +122,7 @@ func TestValidConsensusConfiguration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.ValidConsensusConfiguration()
-			if err != tt.wantErr {
-				t.Errorf("got %v, want %v", err, tt.wantErr)
-			}
+			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }
