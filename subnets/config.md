@@ -59,23 +59,22 @@ this configuration in order to properly allow a node in the private Subnet.
 ### Consensus Config
 
 Subnet configs supports loading new consensus parameters or even consensus engines(Snowman or Simplex).
-JSON keys are different from their matching `CLI` keys. These parameters must be grouped under
-`snowParameters` key. The snow parameters of a Subnet default to the
+JSON keys are different from their matching `CLI` keys. The snow parameters of a Subnet default to the
 same values used for the Primary Network, which are given [CLI Snow Parameters](https://build.avax.network/docs/nodes/configure/configs-flags#snow-parameters).
 
-| CLI Key                           | JSON Key                               |
-| :-------------------------------- | :------------------------------------- |
-| --snow-sample-size                | k                                      |
-| --snow-quorum-size                | alpha                                  |
-| --snow-commit-threshold           | `beta`                                 |
-| --snow-concurrent-repolls         | concurrentRepolls                      |
-| --snow-optimal-processing         | `optimalProcessing`                    |
-| --snow-max-processing             | maxOutstandingItems                    |
-| --snow-max-time-processing        | maxItemProcessingTime                  |
-| --snow-avalanche-batch-size       | `batchSize`                            |
-| --snow-avalanche-num-parents      | `parentSize`                           |
-| --simplex-max-network-delay       | `simplexParameters.maxNetworkDelay`    |
-| --simplex-max-rebroadcast-wait    | `simplexParameters.maxRebroadcastWait` |
+| CLI Key                           | JSON Key                                   |
+| :-------------------------------- | :----------------------------------------- |
+| --snow-sample-size                | `snowParameters.k`                         |
+| --snow-quorum-size                | `snowParameters.alpha`                     |
+| --snow-commit-threshold           | `snowParameters.beta`                      |
+| --snow-concurrent-repolls         | `snowParameters.concurrentRepolls`         |
+| --snow-optimal-processing         | `snowParameters.optimalProcessing`         |
+| --snow-max-processing             | `snowParameters.maxOutstandingItems`       |
+| --snow-max-time-processing        | `snowParameters.maxItemProcessingTime`     |
+| --snow-avalanche-batch-size       | `snowParameters.batchSize`                 |
+| --snow-avalanche-num-parents      | `snowParameters.parentSize`                |
+| --simplex-max-network-delay       | `simplexParameters.maxNetworkDelay`        |
+| --simplex-max-rebroadcast-wait    | `simplexParameters.maxRebroadcastWait`     |
 
 ### Gossip Configs
 
