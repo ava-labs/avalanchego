@@ -331,8 +331,8 @@ github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmV
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0 h1:Tt65C051dK7rE9VcJbi6zfit/ubsAqjC/H2vYMDmXfY=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0/go.mod h1:DkSDp/7LjADrNJ0Aj2dgFDPFTtn+9herXcABeZubmQk=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.2.0 h1:jUGQAvhs5q3jYmjYvnTYm+cxu2L4YU0FXoUaQtbQJLs=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.2.0/go.mod h1:HpT6N+ZGcxkhaHIU4YSorgwRgk94uDZEa/BR7yUdNw4=
 github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df h1:1I9OnStfoVelwi9OptthpNcucV3AVHO5o5QcPzeBuus=
 github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df/go.mod h1:oyJdZfpQTc9fVzAbDry+QRYeiCbw8s/kGaDUsEMpb4I=
 github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19 h1:S6oFasZsplNmw8B2S8cMJQMa62nT5ZKGzZRdCpd+5qQ=
