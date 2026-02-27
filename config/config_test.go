@@ -1054,9 +1054,9 @@ func TestGetPrimaryNetworkConfigWithSnowQuorumSizeKey(t *testing.T) {
 				v.Set(SnowQuorumSizeKey, snowQuorumSize)
 			}
 
-			config := getPrimaryNetworkConfig(v)
-			require.Equal(test.expectedPreference, config.SnowParameters.AlphaPreference)
-			require.Equal(test.expectedConfidence, config.SnowParameters.AlphaConfidence)
+			config := getPrimaryNetworkSnowConfig(v)
+			require.Equal(test.expectedPreference, config.AlphaPreference)
+			require.Equal(test.expectedConfidence, config.AlphaConfidence)
 		})
 	}
 }
