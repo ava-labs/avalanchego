@@ -503,25 +503,28 @@ type ValidatorWeightDiff struct {
 }
 
 func (v *ValidatorWeightDiff) Add(amount uint64) error {
-	return v.addOrSub(false, amount)
+	return v.add(false, amount)
 }
 
 func (v *ValidatorWeightDiff) Sub(amount uint64) error {
-	return v.addOrSub(true, amount)
+	return v.add(true, amount)
 }
 
-func (v *ValidatorWeightDiff) addOrSub(sub bool, amount uint64) error {
-	if v.Decrease == sub {
+func (v *ValidatorWeightDiff) add(isNegative bool, amount uint64) error {
+	if v.Decrease == isNegative {
+		// Adding to the same sign, so we can just add the amounts together.
 		var err error
 		v.Amount, err = safemath.Add(v.Amount, amount)
 		return err
 	}
 
+	// Adding to the opposite sign, so we need to subtract the smaller from the
+	// larger and keep the sign of the larger.
 	if v.Amount > amount {
 		v.Amount -= amount
 	} else {
-		v.Amount = safemath.AbsDiff(v.Amount, amount)
-		v.Decrease = sub
+		v.Amount = amount - v.Amount
+		v.Decrease = isNegative
 	}
 	return nil
 }
