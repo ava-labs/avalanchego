@@ -8,10 +8,14 @@ import "precompile/allowlist/IAllowList.sol";
 /// @dev Inherits from IAllowList for access control
 interface IACP224FeeManager is IAllowList {
     /// @notice Configuration parameters for the dynamic fee mechanism
+    /// @dev Fields are ordered so each mode flag precedes the parameter(s) it governs,
+    ///      reducing the risk of mis-ordering arguments.
     struct FeeConfig {
-        uint256 targetGas; // Target gas consumption per second
-        uint256 minGasPrice; // Minimum gas price in wei
-        uint256 timeToDouble; // Time in seconds for gas price to double at max capacity
+        bool validatorTargetGas; // When true, validators control targetGas via node preferences
+        uint256 targetGas; // Target gas consumption per second (T)
+        bool staticPricing; // When true, gas price is always minGasPrice
+        uint256 minGasPrice; // Minimum gas price in wei (M)
+        uint256 timeToDouble; // Seconds for gas price to double at max capacity
     }
 
     /// @notice Emitted when fee configuration is updated
@@ -25,7 +29,6 @@ interface IACP224FeeManager is IAllowList {
     );
 
     /// @notice Set the fee configuration
-    /// @dev Only callable by addresses with Admin or Manager role
     /// @param config New fee configuration parameters
     function setFeeConfig(FeeConfig calldata config) external;
 
