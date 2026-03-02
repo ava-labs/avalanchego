@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -263,6 +264,11 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 }
 
 func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string) {
+	// TODO: https://github.com/ava-labs/firewood/issues/1679
+	if scheme == customrawdb.FirewoodScheme {
+		t.Skip("firewood currently fails due to a stack corruption issue")
+	}
+
 	require := require.New(t)
 	importAmount := uint64(10000000)
 	vm := newAtomicTestVM()

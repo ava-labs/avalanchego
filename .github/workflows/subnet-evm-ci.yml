@@ -17,15 +17,11 @@ jobs:
         working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: Set up solc
-        uses: ARR4N/setup-solc@v0.2.0
-        with:
-          versions: "0.8.30"
+      - uses: ./.github/actions/install-nix
       - name: Run all lint checks
-        run: ./scripts/run_task.sh lint-all-ci
+        run: nix develop --command ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
-        run: ./scripts/run_task.sh check-go-mod-tidy
+        run: nix develop --command ./scripts/run_task.sh check-go-mod-tidy
 
   unit_test:
     name: Unit Tests (${{ matrix.os }})
@@ -107,13 +103,13 @@ jobs:
   test_build_antithesis_images:
     name: Build Antithesis images
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./graft/subnet-evm
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be #v1.3.1
         with:
-          go-version-file: "graft/subnet-evm/go.mod"
-      - name: Check antithesis image build
-        run: ./scripts/run_task.sh test-build-antithesis-images-ci
+          tool-cache: true
+          docker-images: true
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Check image build for subnet-evm test setup
+        shell: bash
+        run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm

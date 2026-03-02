@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
@@ -53,8 +54,7 @@ func Test_Creation(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NotNil(syncer)
-	require.NoError(syncer.Start(t.Context()))
-	require.NoError(syncer.Wait(t.Context()))
+	require.NoError(syncer.Sync(t.Context()))
 }
 
 // Tests that we are able to sync to the correct root while the server is
@@ -277,7 +277,10 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			require.NotNil(syncer)
 
 			// Start syncing from the server
-			require.NoError(syncer.Start(ctx))
+			var eg errgroup.Group
+			eg.Go(func() error {
+				return syncer.Sync(ctx)
+			})
 
 			// Simulate writes on the server
 			//
@@ -303,13 +306,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			}
 
 			// Block until all syncing is done
-			require.NoError(syncer.Wait(ctx))
+			require.NoErrorf(eg.Wait(), "%T.Sync()", syncer)
 
 			// We should have the same resulting root as the server
-			wantRoot, err := dbToSync.GetMerkleRoot(t.Context())
+			wantRoot, err := dbToSync.GetMerkleRoot(ctx)
 			require.NoError(err)
 
-			gotRoot, err := db.GetMerkleRoot(t.Context())
+			gotRoot, err := db.GetMerkleRoot(ctx)
 			require.NoError(err)
 			require.Equal(wantRoot, gotRoot)
 		})
@@ -334,7 +337,8 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	)
 	require.NoError(err)
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	syncer, err := sync.NewSyncer(
 		db,
 		sync.Config[*RangeProof, *ChangeProof]{
@@ -352,14 +356,19 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Start syncing from the server, will be cancelled by the range proof handler
-	require.NoError(syncer.Start(ctx))
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return syncer.Sync(ctx)
+	})
 
 	// Wait until we've processed some work before closing
 	require.Eventually(func() bool {
 		return db.NewIterator().Next()
 	}, 5*time.Second, 5*time.Millisecond)
-	syncer.Close()
+	cancel()
+	require.ErrorIsf(eg.Wait(), context.Canceled, "%T.Sync()", syncer)
 
+	ctx = t.Context()
 	newSyncer, err := sync.NewSyncer(
 		db,
 		sync.Config[*RangeProof, *ChangeProof]{
@@ -376,11 +385,9 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(newSyncer)
 
-	require.NoError(newSyncer.Start(t.Context()))
-	require.NoError(newSyncer.Error())
-	require.NoError(newSyncer.Wait(t.Context()))
+	require.NoError(newSyncer.Sync(ctx))
 
-	newRoot, err := db.GetMerkleRoot(t.Context())
+	newRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 	require.Equal(syncRoot, newRoot)
 }
@@ -461,9 +468,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(syncer)
 
-	require.NoError(syncer.Start(ctx))
-	require.NoError(syncer.Wait(ctx))
-	require.NoError(syncer.Error())
+	require.NoError(syncer.Sync(ctx))
 
 	newRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
@@ -519,8 +524,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(syncer.Start(ctx))
-	require.NoError(syncer.Wait(ctx))
+	require.NoError(syncer.Sync(ctx))
 }
 
 func generateTrie(t *testing.T, r *rand.Rand, count int) (MerkleDB, error) {

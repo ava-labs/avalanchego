@@ -48,7 +48,7 @@ func NewAtomicBackend(
 ) (*AtomicBackend, error) {
 	codec := repo.codec
 
-	atomicTrie, err := newAtomicTrie(repo.atomicTrieDB, repo.metadataDB, codec, lastAcceptedHeight, commitInterval)
+	atomicTrie, err := newAtomicTrie(repo.atomicTrieStorage, repo.metadataDB, codec, lastAcceptedHeight, commitInterval)
 	if err != nil {
 		return nil, err
 	}

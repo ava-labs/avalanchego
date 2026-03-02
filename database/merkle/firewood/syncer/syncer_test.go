@@ -89,8 +89,7 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, syncer.Start(ctx))
-	err = syncer.Wait(ctx)
+	err = syncer.Sync(ctx)
 	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
 		logDiff(t, serverDB, clientDB)
@@ -167,16 +166,14 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, syncer.Start(ctx))
-	err = syncer.Wait(ctx)
+	err = syncer.Sync(ctx)
 	if errors.Is(err, sync.ErrFinishedWithUnexpectedRoot) {
 		t.Log("syncer reported root mismatch; logging diff between DBs")
 		logDiff(t, serverDB, clientDB)
 	}
 	require.NoError(t, err)
 
-	gotRoot, err := clientDB.Root()
-	require.NoError(t, err)
+	gotRoot := clientDB.Root()
 	require.Equal(t, wantRoot, ids.ID(gotRoot))
 }
 
@@ -199,9 +196,7 @@ func generateDB(t *testing.T, r *rand.Rand, numKeys int) (*ffi.Database, ids.ID)
 // Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
 func fillDB(t *testing.T, r *rand.Rand, db *ffi.Database, numKeys int) ids.ID {
 	if numKeys == 0 {
-		root, err := db.Root()
-		require.NoError(t, err)
-		return ids.ID(root)
+		return ids.ID(db.Root())
 	}
 
 	var (

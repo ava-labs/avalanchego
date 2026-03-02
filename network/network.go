@@ -1096,7 +1096,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping connection",
-			zap.String("reason", "already connecting to peer"),
+			zap.String("reason", "already connected to peer"),
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil

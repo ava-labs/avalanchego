@@ -11,15 +11,21 @@ import (
 )
 
 // ForEachCodec runs fn as a subtest for each supported codec (coreth and subnet-evm).
-func ForEachCodec(t *testing.T, fn func(string, codec.Manager)) {
+// The callback receives the codec manager and the corresponding leafs request type.
+// The test case name is set automatically via t.Run.
+func ForEachCodec(t *testing.T, fn func(codec.Manager, message.LeafsRequestType)) {
 	t.Helper()
-	codecs := map[string]codec.Manager{
-		"coreth":     message.CorethCodec,
-		"subnet-evm": message.SubnetEVMCodec,
+	type codecEntry struct {
+		codec       codec.Manager
+		leafReqType message.LeafsRequestType
 	}
-	for name, c := range codecs {
+	codecs := map[string]codecEntry{
+		"coreth":     {message.CorethCodec, message.CorethLeafsRequestType},
+		"subnet-evm": {message.SubnetEVMCodec, message.SubnetEVMLeafsRequestType},
+	}
+	for name, entry := range codecs {
 		t.Run(name, func(*testing.T) {
-			fn(name, c)
+			fn(entry.codec, entry.leafReqType)
 		})
 	}
 }

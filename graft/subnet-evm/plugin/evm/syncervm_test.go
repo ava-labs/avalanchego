@@ -24,6 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
@@ -42,8 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
-	syncervm "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync"
-	statesyncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -55,7 +55,7 @@ func TestSkipStateSync(t *testing.T) {
 		stateSyncMinBlocks: 300, // must be greater than [syncableInterval] to skip sync
 		syncMode:           block.StateSyncSkipped,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 
 	testSyncerVM(t, vmSetup, test)
 }
@@ -67,14 +67,14 @@ func TestStateSyncFromScratch(t *testing.T) {
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		syncMode:           block.StateSyncStatic,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 
 	testSyncerVM(t, vmSetup, test)
 }
 
 func TestStateSyncFromScratchExceedParent(t *testing.T) {
 	rand.Seed(1)
-	numToGen := syncervm.ParentsToFetch + uint64(32)
+	numToGen := engine.BlocksToFetch + uint64(32)
 	test := syncTest{
 		syncableInterval:   numToGen,
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
@@ -112,7 +112,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		},
 		expectedErr: context.Canceled,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, vmSetup, test)
@@ -215,7 +215,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	require.NoError(t, syncReEnabledVM.Connected(
 		t.Context(),
 		vmSetup.serverVM.ctx.NodeID,
-		statesyncclient.StateSyncVersion,
+		client.StateSyncVersion,
 	))
 
 	enabled, err = syncReEnabledVM.StateSyncEnabled(t.Context())
@@ -252,7 +252,7 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 		},
 		expectedErr: context.Canceled,
 	}
-	vmSetup = createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup = createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, vmSetup, test)
 }
@@ -346,7 +346,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		syncerVM.vm.Connected(
 			t.Context(),
 			serverVM.vm.ctx.NodeID,
-			statesyncclient.StateSyncVersion,
+			client.StateSyncVersion,
 		),
 	)
 

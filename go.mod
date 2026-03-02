@@ -4,16 +4,10 @@ module github.com/ava-labs/avalanchego
 // tools/external/go.mod to avoid polluting the main module's dependencies. See
 // tools/external/go.mod for usage details.
 
-// - Changes to the minimum golang version must also be replicated in:
+// - To update the go version across all go.mod and go.work files:
+//     task update-go-version -- <version>
 //
-// The following go.mod files:
-//   - go.mod (here)
-//   - tools/external/go.mod
-//   - graft/evm/go.mod
-//   - graft/coreth/go.mod
-//   - graft/subnet-evm/go.mod
-//
-// and
+// - The following files must also be updated manually:
 //   - CONTRIBUTING.md
 //   - README.md
 //   - RELEASES.md
@@ -21,7 +15,7 @@ module github.com/ava-labs/avalanchego
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
 //   - Consider updating the version of golangci-lint (see tools/external/go.mod)
-go 1.24.12
+go 1.25.7
 
 require (
 	connectrpc.com/connect v1.18.1
@@ -29,8 +23,8 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.3
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-20251203215505-70148edc6eca
-	github.com/ava-labs/avalanchego/graft/subnet-evm v0.8.1-0.20251201175023-067762d6ce7d
+	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-initial-consistent-tag
+	github.com/ava-labs/avalanchego/graft/subnet-evm v0.0.0-initial-consistent-tag
 	github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
@@ -95,14 +89,14 @@ require (
 )
 
 require (
-	github.com/ava-labs/avalanchego/graft/evm v0.0.0-00010101000000-000000000000 // indirect
+	github.com/ava-labs/avalanchego/graft/evm v0.0.0-initial-consistent-tag // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 )
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.2.0
 	github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
