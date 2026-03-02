@@ -346,6 +346,82 @@ func TestBenchlistEvictsLowestProbabilityNode(t *testing.T) {
 	require.True(b.IsBenched(vdrB), "B should be benched")
 }
 
+// TestBenchlistEvictsMultipleNodes verifies that when a high-stake node
+// crosses the bench threshold, multiple lower-probability benched nodes
+// are evicted to make room within the maxPortion constraint.
+func TestBenchlistEvictsMultipleNodes(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	vdrs := validators.NewManager()
+
+	// 4 validators: A(2), B(2), C(1), D(5). Total = 10.
+	// maxPortion = 0.5 → maxBenchedStake = 5.
+	// A+B benched = 4 stake, fits within 5. D (stake=5) requires evicting
+	// both A and B: evicting only one frees 2 stake, leaving 2+5=7 > 5.
+	// Evicting both frees 4, leaving 0+5=5 ≤ 5.
+	vdrA := ids.GenerateTestNodeID()
+	vdrB := ids.GenerateTestNodeID()
+	vdrC := ids.GenerateTestNodeID()
+	vdrD := ids.GenerateTestNodeID()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrA, nil, ids.Empty, 2))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrB, nil, ids.Empty, 2))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrC, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrD, nil, ids.Empty, 5))
+
+	benchable := &benchable{
+		t:           t,
+		wantChainID: ctx.ChainID,
+		// Capacity 4: eviction of 2 nodes + bench of D + buffer.
+		updated: make(chan struct{}, 4),
+	}
+	b, err := newBenchlist(
+		ctx,
+		benchable,
+		vdrs,
+		Config{
+			Halflife:           DefaultHalflife,
+			UnbenchProbability: DefaultUnbenchProbability,
+			BenchProbability:   DefaultBenchProbability,
+			BenchDuration:      DefaultBenchDuration,
+			MaxPortion:         0.5,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+	defer b.shutdown()
+
+	// Bench A: 2 failures → p ≈ 0.67 > 0.5 → benched.
+	b.RegisterFailure(vdrA)
+	b.RegisterFailure(vdrA)
+	<-benchable.updated
+	require.True(b.IsBenched(vdrA))
+
+	// Bench B: 2 failures → p ≈ 0.67 > 0.5 → benched.
+	// Total benched stake = 4, within maxBenchedStake = 5.
+	b.RegisterFailure(vdrB)
+	b.RegisterFailure(vdrB)
+	<-benchable.updated
+	require.True(b.IsBenched(vdrB))
+
+	// D: 5 failures → p ≈ 0.83, well above A and B's ~0.67.
+	// D (stake=5) needs room: benchedStake = 4+5 = 9 > 5.
+	// targetEvictStake = 9 - 5 = 4. Evicting A (stake=2) alone frees 2 < 4.
+	// Must evict both A (2) and B (2) to free 4 ≥ 4.
+	for range 5 {
+		b.RegisterFailure(vdrD)
+	}
+	// Expect: Unbenched(A) + Unbenched(B) + Benched(D) = 3 signals.
+	<-benchable.updated
+	<-benchable.updated
+	<-benchable.updated
+
+	require.False(b.IsBenched(vdrA), "A should be evicted")
+	require.False(b.IsBenched(vdrB), "B should be evicted")
+	require.True(b.IsBenched(vdrD), "D should be benched")
+}
+
 // TestBenchlistEvictionRefusedWhenNoBetterCandidate verifies that eviction
 // does not occur when the incoming node has a lower failure probability than
 // all currently benched nodes.
