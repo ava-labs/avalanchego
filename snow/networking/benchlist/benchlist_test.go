@@ -604,7 +604,7 @@ func TestBenchlistEvictedNodePreservesEWMA(t *testing.T) {
 	require.True(b.IsBenched(vdrB))
 
 	// Bench A again with two failures → p ≈ 0.8.
-	// If A's EWMA does not reset, this yields 0.8 and evicts A.
+	// If A's EWMA does not reset, this yields 0.8 and evicts B.
 	// If A's EWMA does reset, this yields 0.67 and is insufficient to evict B.
 	for range 2 {
 		b.RegisterFailure(vdrA)
