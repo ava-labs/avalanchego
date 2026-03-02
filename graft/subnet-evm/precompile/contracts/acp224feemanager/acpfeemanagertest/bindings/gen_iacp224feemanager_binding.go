@@ -31,14 +31,16 @@ var (
 
 // IACP224FeeManagerFeeConfig is an auto generated low-level Go binding around an user-defined struct.
 type IACP224FeeManagerFeeConfig struct {
-	TargetGas    *big.Int
-	MinGasPrice  *big.Int
-	TimeToDouble *big.Int
+	ValidatorTargetGas bool
+	TargetGas          *big.Int
+	StaticPricing      bool
+	MinGasPrice        *big.Int
+	TimeToDouble       *big.Int
 }
 
 // IACP224FeeManagerMetaData contains all meta data concerning the IACP224FeeManager contract.
 var IACP224FeeManagerMetaData = &bind.MetaData{
-	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"targetGas\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"minGasPrice\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"timeToDouble\",\"type\":\"uint256\"}],\"indexed\":false,\"internalType\":\"structIACP224FeeManager.FeeConfig\",\"name\":\"oldFeeConfig\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"targetGas\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"minGasPrice\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"timeToDouble\",\"type\":\"uint256\"}],\"indexed\":false,\"internalType\":\"structIACP224FeeManager.FeeConfig\",\"name\":\"newFeeConfig\",\"type\":\"tuple\"}],\"name\":\"FeeConfigUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"role\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"oldRole\",\"type\":\"uint256\"}],\"name\":\"RoleSet\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"getFeeConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"targetGas\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"minGasPrice\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"timeToDouble\",\"type\":\"uint256\"}],\"internalType\":\"structIACP224FeeManager.FeeConfig\",\"name\":\"config\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getFeeConfigLastChangedAt\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"readAllowList\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"role\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setAdmin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setEnabled\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"targetGas\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"minGasPrice\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"timeToDouble\",\"type\":\"uint256\"}],\"internalType\":\"structIACP224FeeManager.FeeConfig\",\"name\":\"config\",\"type\":\"tuple\"}],\"name\":\"setFeeConfig\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setManager\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setNone\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"bool\",\"name\":\"validatorTargetGas\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"targetGas\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"staticPricing\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"minGasPrice\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"timeToDouble\",\"type\":\"uint256\"}],\"indexed\":false,\"internalType\":\"structIACP224FeeManager.FeeConfig\",\"name\":\"oldFeeConfig\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"bool\",\"name\":\"validatorTargetGas\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"targetGas\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"staticPricing\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"minGasPrice\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"timeToDouble\",\"type\":\"uint256\"}],\"indexed\":false,\"internalType\":\"structIACP224FeeManager.FeeConfig\",\"name\":\"newFeeConfig\",\"type\":\"tuple\"}],\"name\":\"FeeConfigUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"role\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"oldRole\",\"type\":\"uint256\"}],\"name\":\"RoleSet\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"getFeeConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"bool\",\"name\":\"validatorTargetGas\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"targetGas\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"staticPricing\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"minGasPrice\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"timeToDouble\",\"type\":\"uint256\"}],\"internalType\":\"structIACP224FeeManager.FeeConfig\",\"name\":\"config\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getFeeConfigLastChangedAt\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"readAllowList\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"role\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setAdmin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setEnabled\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bool\",\"name\":\"validatorTargetGas\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"targetGas\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"staticPricing\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"minGasPrice\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"timeToDouble\",\"type\":\"uint256\"}],\"internalType\":\"structIACP224FeeManager.FeeConfig\",\"name\":\"config\",\"type\":\"tuple\"}],\"name\":\"setFeeConfig\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setManager\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setNone\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
 }
 
 // IACP224FeeManagerABI is the input ABI used to generate the binding from.
@@ -189,7 +191,7 @@ func (_IACP224FeeManager *IACP224FeeManagerTransactorRaw) Transact(opts *bind.Tr
 
 // GetFeeConfig is a free data retrieval call binding the contract method 0x5fbbc0d2.
 //
-// Solidity: function getFeeConfig() view returns((uint256,uint256,uint256) config)
+// Solidity: function getFeeConfig() view returns((bool,uint256,bool,uint256,uint256) config)
 func (_IACP224FeeManager *IACP224FeeManagerCaller) GetFeeConfig(opts *bind.CallOpts) (IACP224FeeManagerFeeConfig, error) {
 	var out []interface{}
 	err := _IACP224FeeManager.contract.Call(opts, &out, "getFeeConfig")
@@ -206,14 +208,14 @@ func (_IACP224FeeManager *IACP224FeeManagerCaller) GetFeeConfig(opts *bind.CallO
 
 // GetFeeConfig is a free data retrieval call binding the contract method 0x5fbbc0d2.
 //
-// Solidity: function getFeeConfig() view returns((uint256,uint256,uint256) config)
+// Solidity: function getFeeConfig() view returns((bool,uint256,bool,uint256,uint256) config)
 func (_IACP224FeeManager *IACP224FeeManagerSession) GetFeeConfig() (IACP224FeeManagerFeeConfig, error) {
 	return _IACP224FeeManager.Contract.GetFeeConfig(&_IACP224FeeManager.CallOpts)
 }
 
 // GetFeeConfig is a free data retrieval call binding the contract method 0x5fbbc0d2.
 //
-// Solidity: function getFeeConfig() view returns((uint256,uint256,uint256) config)
+// Solidity: function getFeeConfig() view returns((bool,uint256,bool,uint256,uint256) config)
 func (_IACP224FeeManager *IACP224FeeManagerCallerSession) GetFeeConfig() (IACP224FeeManagerFeeConfig, error) {
 	return _IACP224FeeManager.Contract.GetFeeConfig(&_IACP224FeeManager.CallOpts)
 }
@@ -322,23 +324,23 @@ func (_IACP224FeeManager *IACP224FeeManagerTransactorSession) SetEnabled(addr co
 	return _IACP224FeeManager.Contract.SetEnabled(&_IACP224FeeManager.TransactOpts, addr)
 }
 
-// SetFeeConfig is a paid mutator transaction binding the contract method 0xc9b4816d.
+// SetFeeConfig is a paid mutator transaction binding the contract method 0x77954fb2.
 //
-// Solidity: function setFeeConfig((uint256,uint256,uint256) config) returns()
+// Solidity: function setFeeConfig((bool,uint256,bool,uint256,uint256) config) returns()
 func (_IACP224FeeManager *IACP224FeeManagerTransactor) SetFeeConfig(opts *bind.TransactOpts, config IACP224FeeManagerFeeConfig) (*types.Transaction, error) {
 	return _IACP224FeeManager.contract.Transact(opts, "setFeeConfig", config)
 }
 
-// SetFeeConfig is a paid mutator transaction binding the contract method 0xc9b4816d.
+// SetFeeConfig is a paid mutator transaction binding the contract method 0x77954fb2.
 //
-// Solidity: function setFeeConfig((uint256,uint256,uint256) config) returns()
+// Solidity: function setFeeConfig((bool,uint256,bool,uint256,uint256) config) returns()
 func (_IACP224FeeManager *IACP224FeeManagerSession) SetFeeConfig(config IACP224FeeManagerFeeConfig) (*types.Transaction, error) {
 	return _IACP224FeeManager.Contract.SetFeeConfig(&_IACP224FeeManager.TransactOpts, config)
 }
 
-// SetFeeConfig is a paid mutator transaction binding the contract method 0xc9b4816d.
+// SetFeeConfig is a paid mutator transaction binding the contract method 0x77954fb2.
 //
-// Solidity: function setFeeConfig((uint256,uint256,uint256) config) returns()
+// Solidity: function setFeeConfig((bool,uint256,bool,uint256,uint256) config) returns()
 func (_IACP224FeeManager *IACP224FeeManagerTransactorSession) SetFeeConfig(config IACP224FeeManagerFeeConfig) (*types.Transaction, error) {
 	return _IACP224FeeManager.Contract.SetFeeConfig(&_IACP224FeeManager.TransactOpts, config)
 }
@@ -460,9 +462,9 @@ type IACP224FeeManagerFeeConfigUpdated struct {
 	Raw          types.Log // Blockchain specific contextual infos
 }
 
-// FilterFeeConfigUpdated is a free log retrieval operation binding the contract event 0x18140cf9f64e10477794123f27ff2849b18ea81f12cbeb9a753b594e976b559a.
+// FilterFeeConfigUpdated is a free log retrieval operation binding the contract event 0x9efcd525309619a819a671641a5e57f40370865dbcdaacec4c3c9901a3574269.
 //
-// Solidity: event FeeConfigUpdated(address indexed sender, (uint256,uint256,uint256) oldFeeConfig, (uint256,uint256,uint256) newFeeConfig)
+// Solidity: event FeeConfigUpdated(address indexed sender, (bool,uint256,bool,uint256,uint256) oldFeeConfig, (bool,uint256,bool,uint256,uint256) newFeeConfig)
 func (_IACP224FeeManager *IACP224FeeManagerFilterer) FilterFeeConfigUpdated(opts *bind.FilterOpts, sender []common.Address) (*IACP224FeeManagerFeeConfigUpdatedIterator, error) {
 
 	var senderRule []interface{}
@@ -477,9 +479,9 @@ func (_IACP224FeeManager *IACP224FeeManagerFilterer) FilterFeeConfigUpdated(opts
 	return &IACP224FeeManagerFeeConfigUpdatedIterator{contract: _IACP224FeeManager.contract, event: "FeeConfigUpdated", logs: logs, sub: sub}, nil
 }
 
-// WatchFeeConfigUpdated is a free log subscription operation binding the contract event 0x18140cf9f64e10477794123f27ff2849b18ea81f12cbeb9a753b594e976b559a.
+// WatchFeeConfigUpdated is a free log subscription operation binding the contract event 0x9efcd525309619a819a671641a5e57f40370865dbcdaacec4c3c9901a3574269.
 //
-// Solidity: event FeeConfigUpdated(address indexed sender, (uint256,uint256,uint256) oldFeeConfig, (uint256,uint256,uint256) newFeeConfig)
+// Solidity: event FeeConfigUpdated(address indexed sender, (bool,uint256,bool,uint256,uint256) oldFeeConfig, (bool,uint256,bool,uint256,uint256) newFeeConfig)
 func (_IACP224FeeManager *IACP224FeeManagerFilterer) WatchFeeConfigUpdated(opts *bind.WatchOpts, sink chan<- *IACP224FeeManagerFeeConfigUpdated, sender []common.Address) (event.Subscription, error) {
 
 	var senderRule []interface{}
@@ -519,9 +521,9 @@ func (_IACP224FeeManager *IACP224FeeManagerFilterer) WatchFeeConfigUpdated(opts 
 	}), nil
 }
 
-// ParseFeeConfigUpdated is a log parse operation binding the contract event 0x18140cf9f64e10477794123f27ff2849b18ea81f12cbeb9a753b594e976b559a.
+// ParseFeeConfigUpdated is a log parse operation binding the contract event 0x9efcd525309619a819a671641a5e57f40370865dbcdaacec4c3c9901a3574269.
 //
-// Solidity: event FeeConfigUpdated(address indexed sender, (uint256,uint256,uint256) oldFeeConfig, (uint256,uint256,uint256) newFeeConfig)
+// Solidity: event FeeConfigUpdated(address indexed sender, (bool,uint256,bool,uint256,uint256) oldFeeConfig, (bool,uint256,bool,uint256,uint256) newFeeConfig)
 func (_IACP224FeeManager *IACP224FeeManagerFilterer) ParseFeeConfigUpdated(log types.Log) (*IACP224FeeManagerFeeConfigUpdated, error) {
 	event := new(IACP224FeeManagerFeeConfigUpdated)
 	if err := _IACP224FeeManager.contract.UnpackLog(event, "FeeConfigUpdated", log); err != nil {

@@ -11,9 +11,19 @@
       {
         "components": [
           {
+            "internalType": "bool",
+            "name": "validatorTargetGas",
+            "type": "bool"
+          },
+          {
             "internalType": "uint256",
             "name": "targetGas",
             "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "staticPricing",
+            "type": "bool"
           },
           {
             "internalType": "uint256",
@@ -34,9 +44,19 @@
       {
         "components": [
           {
+            "internalType": "bool",
+            "name": "validatorTargetGas",
+            "type": "bool"
+          },
+          {
             "internalType": "uint256",
             "name": "targetGas",
             "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "staticPricing",
+            "type": "bool"
           },
           {
             "internalType": "uint256",
@@ -96,9 +116,19 @@
       {
         "components": [
           {
+            "internalType": "bool",
+            "name": "validatorTargetGas",
+            "type": "bool"
+          },
+          {
             "internalType": "uint256",
             "name": "targetGas",
             "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "staticPricing",
+            "type": "bool"
           },
           {
             "internalType": "uint256",
@@ -182,9 +212,19 @@
       {
         "components": [
           {
+            "internalType": "bool",
+            "name": "validatorTargetGas",
+            "type": "bool"
+          },
+          {
             "internalType": "uint256",
             "name": "targetGas",
             "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "staticPricing",
+            "type": "bool"
           },
           {
             "internalType": "uint256",
