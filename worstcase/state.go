@@ -191,7 +191,10 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 			1<<types.LegacyTxType |
 			1<<types.AccessListTxType |
 			1<<types.DynamicFeeTxType,
-		MaxSize: math.MaxUint, // TODO(arr4n)
+		// No byte-size limit needed as gas validation (intrinsic gas ≤
+		// tx gas ≤ block gas limit) already enforces an implicit size
+		// limit (2MB) on transactions.
+		MaxSize: math.MaxUint,
 		MinTip:  big.NewInt(0),
 	}
 	if err := txpool.ValidateTransaction(tx, s.curr, s.signer, opts); err != nil {
