@@ -8,7 +8,7 @@ package bindings
 // Step 2: Compile test contracts to generate ABI and bin files
 //go:generate solc -o artifacts --overwrite --abi --bin --base-path ../../../../.. --metadata-hash none --evm-version cancun RewardManagerTest.sol
 // Step 3: Generate Go bindings from the compiled artifacts
-//go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type IRewardManager --abi ../../IRewardManager.abi --bin artifacts/IRewardManager.bin --out gen_irewardmanager_binding.go
+//go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type IRewardManager --abi ../../IRewardManager.abi --out gen_irewardmanager_binding.go
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type RewardManagerTest --abi artifacts/RewardManagerTest.abi --bin artifacts/RewardManagerTest.bin --out gen_rewardmanagertest_binding.go
 // Step 4: Replace import paths in generated binding to use subnet-evm instead of libevm
 // This is necessary because the libevm bindings package is not compatible with the subnet-evm simulated backend, which is used for testing.

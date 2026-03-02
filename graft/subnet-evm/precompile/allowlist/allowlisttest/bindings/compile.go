@@ -8,7 +8,7 @@ package bindings
 // Step 2: Compile test contracts to generate ABI and bin files
 //go:generate solc -o artifacts --overwrite --abi --bin --base-path . --metadata-hash none precompile/=../../../ --evm-version cancun AllowListTest.sol
 // Step 3: Generate Go bindings from the compiled artifacts
-//go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type IAllowList --abi ../../IAllowList.abi --bin artifacts/IAllowList.bin --out gen_allowlist_binding.go
+//go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type IAllowList --abi ../../IAllowList.abi --out gen_allowlist_binding.go
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type AllowListTest --abi artifacts/AllowListTest.abi --bin artifacts/AllowListTest.bin --out gen_allowlisttest_binding.go
 // Step 4: Replace import paths in generated binding to use subnet-evm instead of libevm
 // This is necessary because the libevm bindings package is not compatible with the subnet-evm simulated backend, which is used for testing.
