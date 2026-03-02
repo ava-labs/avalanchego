@@ -4,6 +4,7 @@
 package benchlist
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"slices"
@@ -398,15 +399,7 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 	// evict nodes from the benchlist with the lowest failure probability => maximize
 	// probability of successful queries.
 	slices.SortFunc(candidates, func(a, b *node) int {
-		diff := a.failureProbability.Read() - b.failureProbability.Read()
-		switch {
-		case diff < 0:
-			return -1
-		case diff > 0:
-			return 1
-		default:
-			return 0
-		}
+		return cmp.Compare(a.failureProbability.Read(), b.failureProbability.Read())
 	})
 
 	// Select a sufficient set of candidates to evict to make room for the incoming node.
