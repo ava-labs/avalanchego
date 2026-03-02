@@ -128,7 +128,7 @@ var reexecTests = []ReexecTest{
 // checkBlockChainState creates a new BlockChain instance and checks that exporting each block from
 // genesis to last accepted from the original instance yields the same last accepted block and state
 // root.
-// Additionally, create another BlockChain instance from [originalDB] to ensure that BlockChain is
+// Additionally, create another BlockChain instance from its databases to ensure that BlockChain is
 // persisted correctly through a restart.
 // checkBlockChainState consumes `bc` and all database references, and it cannot be used afterwards.
 func checkBlockChainState(
