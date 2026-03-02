@@ -405,7 +405,7 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 
 	// Select a sufficient set of candidates to evict to make room for the incoming node.
 	evictedStake := uint64(0)
-	evictNodes := make([]*node, 0)
+	evictNodes := make([]*node, 0, len(candidates)/2)
 	for _, candidate := range candidates {
 		candidateStake := b.vdrs.GetWeight(b.ctx.SubnetID, candidate.nodeID)
 		evictedStake += candidateStake
