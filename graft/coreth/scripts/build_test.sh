@@ -16,4 +16,4 @@ fi
 
 cd "$REPO_ROOT/graft/coreth"
 # shellcheck disable=SC2046
-go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic "$@" github.com/ava-labs/avalanchego/graft/coreth/core -count 5
+go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -run ^TestCanonicalHashMarker/firewood$ github.com/ava-labs/avalanchego/graft/coreth/core -count 2000

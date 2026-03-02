@@ -721,7 +721,8 @@ func testCanonicalHashMarker(t *testing.T, scheme string) {
 		//      markers [1, 11] should be updated
 		{10, 11},
 	}
-	for _, c := range cases {
+	for i, c := range cases {
+		fmt.Println(i)
 		var (
 			gspec = &Genesis{
 				Config:  params.TestChainConfig,
