@@ -4,7 +4,7 @@
 package warpbindings
 
 // Step 1: Compile interface to generate ABI at top level
-//go:generate sh -c "solc -o .. --overwrite --abi --pretty-json --evm-version cancun IWarpMessenger.sol"
+//go:generate solc -o .. --overwrite --abi --pretty-json --evm-version cancun IWarpMessenger.sol
 // Step 2: Generate Go bindings from the compiled artifacts
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg warpbindings --type IWarpMessenger --abi ../IWarpMessenger.abi --out gen_iwarpmessenger_binding.go
 // Step 3: Replace import paths in generated binding to use subnet-evm instead of libevm

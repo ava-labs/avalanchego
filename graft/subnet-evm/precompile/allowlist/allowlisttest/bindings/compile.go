@@ -4,7 +4,7 @@
 package bindings
 
 // Step 1: Compile interface to generate ABI at top level
-//go:generate sh -c "solc -o ../.. --overwrite --abi --pretty-json --evm-version cancun ../../IAllowList.sol"
+//go:generate solc -o ../.. --overwrite --abi --pretty-json --evm-version cancun ../../IAllowList.sol
 // Step 2: Compile test contracts to generate ABI and bin files
 //go:generate solc -o artifacts --overwrite --abi --bin --base-path . --metadata-hash none precompile/=../../../ --evm-version cancun AllowListTest.sol
 // Step 3: Generate Go bindings from the compiled artifacts

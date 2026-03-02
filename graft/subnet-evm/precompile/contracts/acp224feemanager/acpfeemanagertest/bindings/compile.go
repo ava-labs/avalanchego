@@ -4,7 +4,7 @@
 package bindings
 
 // Step 1: Compile interface to generate ABI at top level
-//go:generate sh -c "solc -o ../.. --overwrite --abi --base-path ../../../../.. --pretty-json --evm-version cancun ../../IACP224FeeManager.sol"
+//go:generate solc -o ../.. --overwrite --abi --base-path ../../../../.. --pretty-json --evm-version cancun ../../IACP224FeeManager.sol
 // Step 2: Generate Go bindings from the compiled artifacts
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type IACP224FeeManager --abi ../../IACP224FeeManager.abi --out gen_iacp224feemanager_binding.go
 // Step 3: Replace import paths in generated binding to use subnet-evm instead of libevm
