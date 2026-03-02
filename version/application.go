@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -34,6 +34,20 @@ func (a *Application) initString() {
 		a.Minor,
 		a.Patch,
 	)
+}
+
+// Semantic returns the semantic version string (e.g., "v1.14.1")
+func (a *Application) Semantic() string {
+	return fmt.Sprintf("v%d.%d.%d", a.Major, a.Minor, a.Patch)
+}
+
+// SemanticWithCommit returns the semantic version string with an optional git commit suffix
+func (a *Application) SemanticWithCommit(gitCommit string) string {
+	v := a.Semantic()
+	if len(gitCommit) != 0 {
+		return fmt.Sprintf("%s@%s", v, gitCommit)
+	}
+	return v
 }
 
 // Compare returns

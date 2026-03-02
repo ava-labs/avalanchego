@@ -69,8 +69,9 @@ DOCKER_CMD="docker buildx build ${*}"
 
 # The dockerfile doesn't specify the golang version to minimize the
 # changes required to bump the version. Instead, the golang version is
-# provided as an argument.
-GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
+# provided as an argument. Use head -1 because go workspaces list multiple
+# modules; CI validates all modules use the same Go version.
+GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 DOCKER_CMD="${DOCKER_CMD} --build-arg GO_VERSION=${GO_VERSION}"
 
 # Provide the git commit as a build argument to avoid requiring this
@@ -116,8 +117,8 @@ if [[ -z "${SKIP_BUILD_RACE}" ]]; then
                  "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 fi
 
-# Only tag the latest image for the master branch when images are pushed to a registry
-if [[ "${DOCKER_IMAGE}" == *"/"* && $image_tag == "master" ]]; then
+# Tag latest when pushing to a registry and the tag is a release (vMAJOR.MINOR.PATCH)
+if [[ "${DOCKER_IMAGE}" == *"/"* && $image_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Tagging current avalanchego images as $DOCKER_IMAGE:latest"
   docker buildx imagetools create -t "$DOCKER_IMAGE:latest" "$DOCKER_IMAGE:$commit_hash"
 fi

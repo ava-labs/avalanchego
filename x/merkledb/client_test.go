@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -18,23 +18,23 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/trace"
 
+	merklesync "github.com/ava-labs/avalanchego/database/merkle/sync"
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
-	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 var (
-	_ p2p.Handler = (*xsync.GetChangeProofHandler[*RangeProof, *ChangeProof])(nil)
-	_ p2p.Handler = (*xsync.GetRangeProofHandler[*RangeProof, *ChangeProof])(nil)
+	_ p2p.Handler = (*merklesync.GetChangeProofHandler[*RangeProof, *ChangeProof])(nil)
+	_ p2p.Handler = (*merklesync.GetRangeProofHandler[*RangeProof, *ChangeProof])(nil)
 	_ p2p.Handler = (*flakyHandler)(nil)
 )
 
 func newDefaultDBConfig() Config {
 	return Config{
 		IntermediateWriteBatchSize:  100,
-		HistoryLength:               xsync.DefaultRequestKeyLimit,
-		ValueNodeCacheSize:          xsync.DefaultRequestKeyLimit,
-		IntermediateWriteBufferSize: xsync.DefaultRequestKeyLimit,
-		IntermediateNodeCacheSize:   xsync.DefaultRequestKeyLimit,
+		HistoryLength:               merklesync.DefaultRequestKeyLimit,
+		ValueNodeCacheSize:          merklesync.DefaultRequestKeyLimit,
+		IntermediateWriteBufferSize: merklesync.DefaultRequestKeyLimit,
+		IntermediateNodeCacheSize:   merklesync.DefaultRequestKeyLimit,
 		Reg:                         prometheus.NewRegistry(),
 		Tracer:                      trace.Noop,
 		BranchFactor:                BranchFactor16,
@@ -49,7 +49,7 @@ func newFlakyRangeProofHandler(
 	var (
 		c                   = counter{m: 2}
 		rangeProofMarshaler = rangeProofMarshaler
-		handler             = xsync.NewGetRangeProofHandler(db, rangeProofMarshaler)
+		handler             = merklesync.NewGetRangeProofHandler(db, rangeProofMarshaler)
 	)
 
 	return &p2p.TestHandler{
@@ -86,7 +86,7 @@ func newFlakyChangeProofHandler(
 		c                    = counter{m: 2}
 		rangeProofMarshaler  = rangeProofMarshaler
 		changeProofMarshaler = changeProofMarshaler
-		handler              = xsync.NewGetChangeProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
+		handler              = merklesync.NewGetChangeProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
 	)
 
 	return &p2p.TestHandler{

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package stacktrace
@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 )
 
 // If the environment variable STACK_TRACE_ERRORS=1 is set, errors
@@ -40,11 +41,13 @@ func (e StackTraceError) Error() string {
 		return result
 	}
 
-	result += "\nStack trace:\n"
+	var b strings.Builder
+	b.WriteString(result)
+	b.WriteString("\nStack trace:\n")
 	for _, frame := range e.StackTrace {
-		result += fmt.Sprintf("%s:%d: %s\n", frame.File, frame.Line, frame.Function)
+		fmt.Fprintf(&b, "%s:%d: %s\n", frame.File, frame.Line, frame.Function)
 	}
-	return result
+	return b.String()
 }
 
 func (e StackTraceError) Unwrap() error {

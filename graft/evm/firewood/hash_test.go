@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package firewood
@@ -77,8 +77,7 @@ func newFuzzState(t *testing.T) *fuzzState {
 	})
 
 	firewoodMemdb := rawdb.NewMemoryDatabase()
-	fwCfg := Defaults                // copy the defaults
-	fwCfg.ChainDataDir = t.TempDir() // Use a temporary directory for the Firewood
+	fwCfg := DefaultConfig(t.TempDir())
 	firewoodState := state.NewDatabaseWithConfig(
 		firewoodMemdb,
 		&triedb.Config{

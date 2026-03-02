@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowtest
@@ -73,6 +73,9 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 
 	validatorState := &validatorstest.State{
 		GetMinimumHeightF: func(context.Context) (uint64, error) {
+			return 0, nil
+		},
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
 			return 0, nil
 		},
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {

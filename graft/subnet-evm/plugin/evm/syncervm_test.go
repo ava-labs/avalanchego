@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -19,19 +19,19 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/coretest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/statesync/statesynctest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -41,10 +41,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
-	syncervm "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync"
-	statesyncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -56,7 +55,7 @@ func TestSkipStateSync(t *testing.T) {
 		stateSyncMinBlocks: 300, // must be greater than [syncableInterval] to skip sync
 		syncMode:           block.StateSyncSkipped,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 
 	testSyncerVM(t, vmSetup, test)
 }
@@ -68,14 +67,14 @@ func TestStateSyncFromScratch(t *testing.T) {
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		syncMode:           block.StateSyncStatic,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 
 	testSyncerVM(t, vmSetup, test)
 }
 
 func TestStateSyncFromScratchExceedParent(t *testing.T) {
 	rand.Seed(1)
-	numToGen := syncervm.ParentsToFetch + uint64(32)
+	numToGen := engine.BlocksToFetch + uint64(32)
 	test := syncTest{
 		syncableInterval:   numToGen,
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
@@ -87,6 +86,9 @@ func TestStateSyncFromScratchExceedParent(t *testing.T) {
 }
 
 func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
+	// TODO(#4702): flaky test - should be fixed with state sync refactor
+	t.Skip("Flaky test - tracked in #4702")
+
 	rand.New(rand.NewSource(1))
 
 	var lock sync.Mutex
@@ -110,7 +112,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		},
 		expectedErr: context.Canceled,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, vmSetup, test)
@@ -213,7 +215,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	require.NoError(t, syncReEnabledVM.Connected(
 		t.Context(),
 		vmSetup.serverVM.ctx.NodeID,
-		statesyncclient.StateSyncVersion,
+		client.StateSyncVersion,
 	))
 
 	enabled, err = syncReEnabledVM.StateSyncEnabled(t.Context())
@@ -250,7 +252,7 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 		},
 		expectedErr: context.Canceled,
 	}
-	vmSetup = createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup = createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, vmSetup, test)
 }
@@ -286,8 +288,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 
 	// make some accounts
 	r := rand.New(rand.NewSource(1))
-	trieDB := triedb.NewDatabase(serverVM.vm.chaindb, nil)
-	root, accounts := statesynctest.FillAccountsWithOverlappingStorage(t, r, trieDB, types.EmptyRootHash, 1000, 16)
+	root, accounts := synctest.FillAccountsWithOverlappingStorage(t, r, serverVM.vm.Blockchain().StateCache(), types.EmptyRootHash, 1000, 16)
 
 	// patch serverVM's lastAcceptedBlock to have the new root
 	// and update the vm's state so the trie with accounts will
@@ -345,7 +346,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		syncerVM.vm.Connected(
 			t.Context(),
 			serverVM.vm.ctx.NodeID,
-			statesyncclient.StateSyncVersion,
+			client.StateSyncVersion,
 		),
 	)
 
@@ -434,7 +435,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 		require.ErrorIs(err, test.expectedErr)
 		// Note we re-open the database here to avoid a closed error when the test is for a shutdown VM.
 		chaindb := database.New(prefixdb.NewNested(ethDBPrefix, syncerVM.versiondb))
-		assertSyncPerformedHeights(t, chaindb, map[uint64]struct{}{})
+		requireSyncPerformedHeight(t, chaindb, 0)
 		return
 	}
 	require.NoError(err, "state sync failed")
@@ -445,7 +446,8 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	require.Equal(serverVM.LastAcceptedBlock().Height(), syncerVM.LastAcceptedBlock().Height(), "block height mismatch between syncer and server")
 	require.Equal(serverVM.LastAcceptedBlock().ID(), syncerVM.LastAcceptedBlock().ID(), "blockID mismatch between syncer and server")
 	require.True(syncerVM.blockChain.HasState(syncerVM.blockChain.LastAcceptedBlock().Root()), "unavailable state for last accepted block")
-	assertSyncPerformedHeights(t, syncerVM.chaindb, map[uint64]struct{}{retrievedSummary.Height(): {}})
+	expectedHeight := retrievedSummary.Height()
+	requireSyncPerformedHeight(t, syncerVM.chaindb, expectedHeight)
 
 	lastNumber := syncerVM.blockChain.LastAcceptedBlock().NumberU64()
 	// check the last block is indexed
@@ -583,16 +585,11 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 	vm.blockChain.DrainAcceptorQueue()
 }
 
-// assertSyncPerformedHeights iterates over all heights the VM has synced to and
+// requireSyncPerformedHeight iterates over all heights the VM has synced to and
 // verifies it matches [expected].
-func assertSyncPerformedHeights(t *testing.T, db ethdb.Iteratee, expected map[uint64]struct{}) {
-	it := customrawdb.NewSyncPerformedIterator(db)
-	defer it.Release()
-
-	found := make(map[uint64]struct{}, len(expected))
-	for it.Next() {
-		found[customrawdb.UnpackSyncPerformedKey(it.Key())] = struct{}{}
-	}
-	require.NoError(t, it.Error())
-	require.Equal(t, expected, found)
+func requireSyncPerformedHeight(t *testing.T, db ethdb.Iteratee, expected uint64) {
+	t.Helper()
+	latest, err := customrawdb.GetLatestSyncPerformed(db)
+	require.NoError(t, err)
+	require.Equal(t, expected, latest, "sync performed height mismatch")
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vm
@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -263,6 +264,11 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 }
 
 func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string) {
+	// TODO: https://github.com/ava-labs/firewood/issues/1679
+	if scheme == customrawdb.FirewoodScheme {
+		t.Skip("firewood currently fails due to a stack corruption issue")
+	}
+
 	require := require.New(t)
 	importAmount := uint64(10000000)
 	vm := newAtomicTestVM()

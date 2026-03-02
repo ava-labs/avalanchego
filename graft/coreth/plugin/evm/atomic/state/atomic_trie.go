@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -17,7 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/triedb/hashdb"
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -50,7 +50,7 @@ type AtomicTrie struct {
 // newAtomicTrie returns a new instance of a atomicTrie with a configurable commitHeightInterval, used in testing.
 // Initializes the trie before returning it.
 func newAtomicTrie(
-	atomicTrieDB avalanchedatabase.Database, metadataDB avalanchedatabase.Database,
+	atomicTrieStorage avalanchedatabase.Database, metadataDB avalanchedatabase.Database,
 	codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (*AtomicTrie, error) {
 	root, height, err := lastCommittedRootIfExists(metadataDB)
@@ -72,7 +72,7 @@ func newAtomicTrie(
 	}
 
 	trieDB := triedb.NewDatabase(
-		rawdb.NewDatabase(database.New(atomicTrieDB)),
+		rawdb.NewDatabase(database.New(atomicTrieStorage)),
 		&triedb.Config{
 			DBOverride: hashdb.Config{
 				CleanCacheSize: 64 * units.MiB, // Allocate 64MB of memory for clean cache

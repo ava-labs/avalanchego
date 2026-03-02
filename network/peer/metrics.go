@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -141,9 +141,9 @@ func (m *Metrics) SendFailed(msg *message.OutboundMessage) {
 	}).Inc()
 }
 
-func (m *Metrics) Received(msg message.InboundMessage, msgLen uint32) {
-	op := msg.Op().String()
-	saved := msg.BytesSavedCompression()
+func (m *Metrics) Received(msg *message.InboundMessage, msgLen uint32) {
+	op := msg.Op.String()
+	saved := msg.BytesSavedCompression
 	compressed := saved != 0 // assume that if [saved] == 0, [msg] wasn't compressed
 	compressedStr := strconv.FormatBool(compressed)
 

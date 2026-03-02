@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -165,6 +165,13 @@ func (p *Peers) Has(nodeID ids.NodeID) bool {
 	defer p.lock.RUnlock()
 
 	return p.set.Contains(nodeID)
+}
+
+func (p *Peers) Len() int {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.set.Len()
 }
 
 // Sample returns a pseudo-random sample of up to limit Peers

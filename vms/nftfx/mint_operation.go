@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nftfx
@@ -33,7 +33,7 @@ func (op *MintOperation) Cost() (uint64, error) {
 
 // Outs Returns []TransferOutput as []verify.State
 func (op *MintOperation) Outs() []verify.State {
-	outs := []verify.State{}
+	outs := make([]verify.State, 0, len(op.Outputs))
 	for _, out := range op.Outputs {
 		outs = append(outs, &TransferOutput{
 			GroupID:      op.GroupID,

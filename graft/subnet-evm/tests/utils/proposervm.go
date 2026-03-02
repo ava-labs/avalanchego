@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utils
@@ -7,19 +7,23 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-const numTriggerTxs = 2 // Number of txs needed to activate the proposer VM fork
+// expectedBlockHeight is the block height that activates the proposerVM fork.
+// We issue 2 txs (one per block) to reach block height 2.
+const expectedBlockHeight = 2
 
 // IssueTxsToActivateProposerVMFork issues transactions at the current
 // timestamp, which should be after the ProposerVM activation time (aka
@@ -37,16 +41,11 @@ func IssueTxsToActivateProposerVMFork(
 		return err
 	}
 
-	newHeads := make(chan *types.Header, 1)
-	sub, err := client.SubscribeNewHead(ctx, newHeads)
-	if err != nil {
-		return err
-	}
-	defer sub.Unsubscribe()
-
 	gasPrice := big.NewInt(legacy.BaseFee)
 	txSigner := types.LatestSignerForChainID(chainID)
-	for i := 0; i < numTriggerTxs; i++ {
+
+	// Send exactly 2 transactions, waiting for each to be included in a block
+	for i := 0; i < expectedBlockHeight; i++ {
 		tx := types.NewTransaction(
 			nonce, addr, common.Big1, ethparams.TxGas, gasPrice, nil)
 		triggerTx, err := types.SignTx(tx, txSigner, fundedKey)
@@ -56,12 +55,20 @@ func IssueTxsToActivateProposerVMFork(
 		if err := client.SendTransaction(ctx, triggerTx); err != nil {
 			return err
 		}
-		<-newHeads // wait for block to be accepted
+
+		// Wait for this transaction to be included in a block
+		receiptCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		if _, err := bind.WaitMined(receiptCtx, client, triggerTx); err != nil {
+			cancel()
+			return err
+		}
+		cancel()
 		nonce++
 	}
+
 	log.Info(
 		"Built sufficient blocks to activate proposerVM fork",
-		"txCount", numTriggerTxs,
+		"blockHeight", expectedBlockHeight,
 	)
 	return nil
 }

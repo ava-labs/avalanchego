@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package feemanager
@@ -8,11 +8,11 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 )

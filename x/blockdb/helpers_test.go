@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
@@ -75,9 +75,4 @@ func checkDatabaseState(t *testing.T, db *Database, maxHeight uint64) {
 
 	actualMaxHeight := db.maxBlockHeight.Load()
 	require.Equal(t, maxHeight, actualMaxHeight, "maxBlockHeight mismatch")
-}
-
-// Helper function to create a pointer to uint64
-func uint64Ptr(v uint64) *uint64 {
-	return &v
 }

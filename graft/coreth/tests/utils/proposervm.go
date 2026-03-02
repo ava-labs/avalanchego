@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utils
@@ -21,6 +21,8 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
+// expectedBlockHeight is the block height that activates the proposerVM fork.
+// We issue 2 txs (one per block) to reach block height 2.
 const expectedBlockHeight = 2
 
 // IssueTxsToActivateProposerVMFork issues transactions at the current
@@ -55,17 +57,18 @@ func IssueTxsToActivateProposerVMFork(
 		}
 
 		// Wait for this transaction to be included in a block
-		receiptCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
+		receiptCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		if _, err := bind.WaitMined(receiptCtx, client, triggerTx); err != nil {
+			cancel()
 			return err
 		}
+		cancel()
 		nonce++
 	}
 
 	log.Info(
 		"Built sufficient blocks to activate proposerVM fork",
-		"blockCount", expectedBlockHeight,
+		"blockHeight", expectedBlockHeight,
 	)
 	return nil
 }

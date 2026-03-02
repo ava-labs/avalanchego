@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -750,8 +750,8 @@ func (p *peer) shouldDisconnect() bool {
 	return false
 }
 
-func (p *peer) handle(msg message.InboundMessage) {
-	switch m := msg.Message().(type) { // Network-related message types
+func (p *peer) handle(msg *message.InboundMessage) {
+	switch m := msg.Message.(type) { // Network-related message types
 	case *p2p.Ping:
 		p.handlePing(m)
 		msg.OnFinishedHandling()
@@ -776,7 +776,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 	if !p.finishedHandshake.Get() {
 		p.Log.Debug("dropping message",
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("messageOp", msg.Op),
 			zap.String("reason", "handshake isn't finished"),
 		)
 		msg.OnFinishedHandling()
@@ -1011,7 +1011,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	}
 
 	port := uint16(msg.IpPort)
-	if msg.IpPort == 0 {
+	if port == 0 {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.HandshakeOp),

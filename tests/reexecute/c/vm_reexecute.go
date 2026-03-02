@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -29,8 +29,11 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/reexecute"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
@@ -43,6 +46,7 @@ var (
 	executionTimeout   time.Duration
 	labelsArg          string
 
+	pprofDirArg                string
 	metricsServerEnabledArg    bool
 	metricsServerPortArg       uint64
 	metricsCollectorEnabledArg bool
@@ -98,6 +102,7 @@ func init() {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
+	flag.StringVar(&pprofDirArg, "pprof-dir", "", "Directory to write cpu, mem, and lock profiles. Empty to disable.")
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
 	flag.Uint64Var(&metricsServerPortArg, "metrics-server-port", 0, "The port the metrics server will listen to.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
@@ -211,32 +216,51 @@ func benchmarkReexecuteRange(
 	)
 
 	log := tc.Log()
-	log.Info("re-executing block range with params",
+	logFields := []zap.Field{
 		zap.String("runner", runnerTypeArg),
 		zap.String("config", configNameArg),
 		zap.String("labels", labelsArg),
-		zap.String("metrics-server-enabled", strconv.FormatBool(metricsServerEnabled)),
+		zap.Bool("metrics-server-enabled", metricsServerEnabled),
 		zap.Uint64("metrics-server-port", metricsPort),
-		zap.String("metrics-collector-enabled", strconv.FormatBool(metricsCollectorEnabled)),
+		zap.Bool("metrics-collector-enabled", metricsCollectorEnabled),
 		zap.String("block-dir", blockDir),
 		zap.String("vm-db-dir", vmDBDir),
 		zap.String("chain-data-dir", chainDataDir),
 		zap.Uint64("start-block", startBlock),
 		zap.Uint64("end-block", endBlock),
 		zap.Int("chan-size", chanSize),
-	)
+	}
+
+	if pprofDirArg != "" {
+		p := profiler.New(pprofDirArg)
+		r.NoError(p.StartCPUProfiler())
+		defer func() {
+			r.NoError(p.StopCPUProfiler())
+			r.NoError(p.MemoryProfile())
+			r.NoError(p.LockProfile())
+		}()
+
+		logFields = append(logFields, zap.String("pprof-dir", pprofDirArg))
+	}
+	log.Info("re-executing block range with params", logFields...)
 
 	blockChan, err := reexecute.CreateBlockChanFromLevelDB(tc, blockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
-
-	dbReg, err := metrics.MakeAndRegister(
+	dbRegistry, err := metrics.MakeAndRegister(
 		prefixGatherer,
-		"avalanche_db",
+		metric.AppendNamespace(constants.PlatformName, "db"),
 	)
 	r.NoError(err)
-	db, err := leveldb.New(vmDBDir, nil, dbLogger, dbReg)
+	db, err := leveldb.New(vmDBDir, nil, dbLogger, dbRegistry)
+	r.NoError(err)
+	meterDBRegistry, err := metrics.MakeAndRegister(
+		prefixGatherer,
+		metric.AppendNamespace(constants.PlatformName, "meterdb"),
+	)
+	r.NoError(err)
+	db, err = meterdb.New(meterDBRegistry, db)
 	r.NoError(err)
 	defer func() {
 		log.Info("shutting down DB")

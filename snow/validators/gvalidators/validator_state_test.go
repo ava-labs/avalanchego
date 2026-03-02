@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gvalidators
@@ -271,37 +271,5 @@ func TestGetWarpValidatorSets(t *testing.T) {
 		vdrSets, err := c.GetWarpValidatorSets(t.Context(), height)
 		require.NoError(err)
 		require.Equal(expectedVdrSets, vdrSets)
-	})
-}
-
-func TestGetWarpValidatorSet(t *testing.T) {
-	const height uint64 = 1337
-	t.Run("error", func(t *testing.T) {
-		state := &validatorstest.State{
-			CantGetWarpValidatorSets: true,
-		}
-		c := newClient(t, state)
-
-		_, err := c.GetWarpValidatorSet(t.Context(), height, ids.GenerateTestID())
-		require.Error(t, err) //nolint:forbidigo // returns grpc error
-	})
-
-	t.Run("valid", func(t *testing.T) {
-		require := require.New(t)
-
-		subnetID := ids.GenerateTestID()
-		expectedVdrSet := validatorstest.NewWarpSet(t, 3)
-		state := &validatorstest.State{
-			GetWarpValidatorSetF: func(_ context.Context, h uint64, s ids.ID) (validators.WarpSet, error) {
-				require.Equal(height, h)
-				require.Equal(subnetID, s)
-				return expectedVdrSet, nil
-			},
-		}
-		c := newClient(t, state)
-
-		vdrSet, err := c.GetWarpValidatorSet(t.Context(), height, subnetID)
-		require.NoError(err)
-		require.Equal(expectedVdrSet, vdrSet)
 	})
 }

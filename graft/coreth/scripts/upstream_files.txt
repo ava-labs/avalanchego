@@ -5,23 +5,19 @@ core/*
 eth/*
 ethclient/*
 internal/*
-log/*
 miner/*
 node/*
 params/config_test.go
 params/config.go
 params/denomination.go
-params/network_params.go
 params/protocol_params.go
 params/version.go
 plugin/evm/customtypes/block_test.go
 plugin/evm/customtypes/hashing_test.go
 plugin/evm/customtypes/rlp_fuzzer_test.go
 plugin/evm/customtypes/types_test.go
-rpc/*
 signer/*
 tests/*
-triedb/*
 
 !accounts/abi/abi_extra_test.go
 !accounts/abi/bind/bind_extra_test.go
@@ -37,7 +33,6 @@ triedb/*
 !core/main_test.go
 !core/predicate_check.go
 !core/predicate_check_test.go
-!core/state/snapshot/snapshot_ext.go
 !core/state_manager_test.go
 !core/state_processor_ext.go
 !eth/chain_with_final_block.go
@@ -49,4 +44,3 @@ triedb/*
 !internal/ethapi/api_extra_test.go
 !tests/utils/*
 !tests/warp/*
-!triedb/firewood/*

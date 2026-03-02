@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -1096,7 +1096,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping connection",
-			zap.String("reason", "already connecting to peer"),
+			zap.String("reason", "already connected to peer"),
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil

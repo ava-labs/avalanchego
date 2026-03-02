@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -35,10 +35,10 @@ type testExternalHandler struct {
 // implementation does not implicitly register timeouts, so this handler is only
 // called by messages explicitly sent by the peer. If timeouts are required,
 // that must be handled by the user of this utility.
-func (t *testExternalHandler) HandleInbound(_ context.Context, message message.InboundMessage) {
+func (t *testExternalHandler) HandleInbound(_ context.Context, message *message.InboundMessage) {
 	t.log.Info(
 		"receiving message",
-		zap.Stringer("op", message.Op()),
+		zap.Stringer("op", message.Op),
 	)
 }
 

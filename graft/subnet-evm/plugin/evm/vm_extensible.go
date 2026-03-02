@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -10,14 +10,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-
-	vmsync "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync"
 )
 
 var _ extension.InnerVM = (*VM)(nil)
@@ -87,6 +86,6 @@ func (vm *VM) VersionDB() *versiondb.Database {
 	return vm.versiondb
 }
 
-func (vm *VM) SyncerClient() vmsync.Client {
+func (vm *VM) SyncerClient() engine.Client {
 	return vm.Client
 }
