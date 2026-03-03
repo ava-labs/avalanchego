@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"reflect"
 	"runtime/debug"
-	"sync"
 	"testing"
 	"time"
 
@@ -519,32 +518,12 @@ func TestChainID(t *testing.T) {
 	}
 }
 
-// registerBlockingPrecompile registers `addr` as a libevm precompile such that
-// any transactions sent to the precompile will block until the returned
-// function is called. It is safe to call the unblocker multiple times, which
-// will also be done during cleanup.
-func registerBlockingPrecompile(tb testing.TB, addr common.Address) func() {
-	tb.Helper()
-	unblock := make(chan struct{})
-	libevmHooks := &hookstest.Stub{
-		PrecompileOverrides: map[common.Address]libevm.PrecompiledContract{
-			addr: vm.NewStatefulPrecompile(func(vm.PrecompileEnvironment, []byte) ([]byte, error) {
-				<-unblock
-				return nil, nil
-			}),
-		},
-	}
-	libevmHooks.Register(tb)
-
-	fn := sync.OnceFunc(func() { close(unblock) })
-	tb.Cleanup(fn)
-	return fn
-}
-
 func TestEthGetters(t *testing.T) {
-	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-
-	ctx, sut := newSUT(t, 1, opt)
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
+	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
+	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt)
+	t.Cleanup(unblock)
 
 	t.Run("unknown_hashes", func(t *testing.T) {
 		sut.testGetByUnknownHash(ctx, t)
@@ -552,12 +531,6 @@ func TestEthGetters(t *testing.T) {
 	t.Run("unknown_numbers", func(t *testing.T) {
 		sut.testGetByUnknownNumber(ctx, t)
 	})
-
-	// The named block "pending" is the last to be enqueued but yet to be
-	// executed. Although unlikely to be useful in practice, it still needs to
-	// be tested.
-	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
-	registerBlockingPrecompile(t, blockingPrecompile)
 
 	genesis := sut.lastAcceptedBlock(t)
 
@@ -627,27 +600,22 @@ func TestEthGetters(t *testing.T) {
 func TestGetLogs(t *testing.T) {
 	// We shorten section size to reduce number of required blocks in the test.
 	const bloomSectionSize = 8
+
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-
-	ctx, sut := newSUT(t, 1, timeOpt, withBloomSectionSize(bloomSectionSize))
-	genesis := sut.lastAcceptedBlock(t)
-
-	emitter := common.Address{'l', 'o', 'g'}
 	rng := crypto.NewKeccakState()
-	stub := &hookstest.Stub{
-		PrecompileOverrides: map[common.Address]libevm.PrecompiledContract{
-			emitter: vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, _ []byte) ([]byte, error) {
-				data := make([]byte, 8)
-				rng.Read(data) //nolint:gosec,errcheck // Never returns an error; signature only to implement io.Reader
-				env.StateDB().AddLog(&types.Log{
-					Address: env.Addresses().EVMSemantic.Self,
-					Data:    data, // Guarantee uniqueness as this is the data under test
-				})
-				return nil, nil
-			}),
-		},
-	}
-	stub.Register(t)
+	emitter := common.Address{'l', 'o', 'g'}
+	precompile := vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, _ []byte) ([]byte, error) {
+		data := make([]byte, 8)
+		rng.Read(data) //nolint:gosec,errcheck // Never returns an error; signature only to implement io.Reader
+		env.StateDB().AddLog(&types.Log{
+			Address: env.Addresses().EVMSemantic.Self,
+			Data:    data, // Guarantee uniqueness as this is the data under test
+		})
+		return nil, nil
+	})
+
+	ctx, sut := newSUT(t, 1, timeOpt, withBloomSectionSize(bloomSectionSize), withPrecompile(emitter, precompile))
+	genesis := sut.lastAcceptedBlock(t)
 
 	txWithLog := func(t *testing.T) *types.Transaction {
 		t.Helper()
@@ -808,12 +776,13 @@ func TestEthPendingTransactions(t *testing.T) {
 }
 
 func TestGetReceipts(t *testing.T) {
-	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 1, timeOpt)
-
 	// Blocking precompile creates accepted-but-not-executed blocks
 	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
-	registerBlockingPrecompile(t, blockingPrecompile)
+
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
+	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt)
+	t.Cleanup(unblock)
 
 	var (
 		txs  []*types.Transaction

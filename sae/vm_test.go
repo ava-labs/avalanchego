@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,6 +37,7 @@ import (
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm"
@@ -99,11 +101,12 @@ type SUT struct {
 
 type (
 	sutConfig struct {
-		hooks    *hookstest.Stub
-		vmConfig Config
-		logLevel logging.Level
-		genesis  core.Genesis
-		db       database.Database
+		hooks       *hookstest.Stub
+		vmConfig    Config
+		logLevel    logging.Level
+		genesis     core.Genesis
+		db          database.Database
+		precompiles map[common.Address]libevm.PrecompiledContract
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -144,7 +147,6 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	snow := adaptor.Convert(vm)
 	tb.Cleanup(func() {
 		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
 	})
 
@@ -169,6 +171,19 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		nil, // Fxs
 		sender,
 	), "Initialize()")
+
+	if len(conf.precompiles) > 0 {
+		// All precompile registrations must occur after the VM is initialized,
+		// since [libevmhookstest.Stub] doesn't support JSON round-tripping,
+		// However, it must occur before the cleanup ensuring that all blocks
+		// are executed, since registering the precompile also adds a cleanup to
+		// remove the libevm registration.
+		registerPrecompiles(tb, conf.precompiles)
+	}
+	tb.Cleanup(func() {
+		ctx := context.WithoutCancel(tb.Context())
+		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+	})
 
 	rpcClient, ethClient := dialRPC(ctx, tb, snow)
 
@@ -282,6 +297,41 @@ func withBloomSectionSize(size uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.BlocksPerBloomSection = size
 	})
+}
+
+// withBlockingPrecompile adds a precompile that will block
+// all execution until the releasing function returned is called.
+// This should be called prior to closing the VM to prevent goroutine
+// leaks. The releaser can be called multiple times.
+func withBlockingPrecompile(addr common.Address) (sutOption, func()) {
+	unblock := make(chan struct{})
+	p := vm.NewStatefulPrecompile(func(vm.PrecompileEnvironment, []byte) ([]byte, error) {
+		<-unblock
+		return nil, nil
+	})
+	return withPrecompile(addr, p), sync.OnceFunc(func() { close(unblock) })
+}
+
+// withPrecompile adds any precompile at the specified address.
+func withPrecompile(addr common.Address, precompile libevm.PrecompiledContract) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		if c.precompiles == nil {
+			c.precompiles = make(map[common.Address]libevm.PrecompiledContract)
+		}
+		c.precompiles[addr] = precompile
+	})
+}
+
+// registerPrecompiles registers all `precompiles` as a libevm precompile.
+// As a side effect, a [testing.TB.Cleanup] will also be added, removing
+// the registration. This cleanup must run AFTER all transactions are
+// executed.
+func registerPrecompiles(tb testing.TB, precompiles map[common.Address]libevm.PrecompiledContract) {
+	tb.Helper()
+	h := &libevmhookstest.Stub{
+		PrecompileOverrides: precompiles,
+	}
+	h.Register(tb)
 }
 
 func (s *SUT) nodeID() ids.NodeID {
