@@ -266,6 +266,41 @@ func TestDiffStakersDeleteAddDeleteValidator(t *testing.T) {
 	_, status = diff.GetValidator(v1.SubnetID, v1.NodeID)
 	require.Equal(deleted, status, "original deletion of v1 was lost")
 	require.False(existsInDiff(&diff, v1))
+
+	// Verify that v1 is filtered out from a parent iterator that contains it.
+	// This ensures the deletion is tracked in deletedStakers, not just in the
+	// validator diff's removed field.
+	parentIterator := iterator.FromSlice(v1)
+	stakers := iterator.ToSlice(diff.GetStakerIterator(parentIterator))
+	require.Empty(stakers, "v1 should be filtered from parent after delete-add-delete")
+}
+
+func TestDiffStakersDeleteThenReAddSameValidator(t *testing.T) {
+	require := require.New(t)
+	v1 := newTestStaker()
+
+	diff := diffStakers{}
+
+	// Delete v1 (simulating removal of an existing validator from base state)
+	diff.DeleteValidator(v1)
+	_, status := diff.GetValidator(v1.SubnetID, v1.NodeID)
+	require.Equal(deleted, status)
+
+	// Re-add the exact same validator. The delete and add should cancel out.
+	require.NoError(diff.PutValidator(v1))
+
+	// The net effect should be: the validator is unmodified.
+	_, status = diff.GetValidator(v1.SubnetID, v1.NodeID)
+	require.Equal(unmodified, status, "delete then re-add of same validator should cancel out")
+
+	// The validator should not appear in addedStakers.
+	require.False(existsInDiff(&diff, v1), "validator should not be in addedStakers after cancellation")
+
+	// The validator should not be filtered from the parent iterator either,
+	// since the deletion was cancelled.
+	parentIterator := iterator.FromSlice(v1)
+	stakers := iterator.ToSlice(diff.GetStakerIterator(parentIterator))
+	require.Equal([]*Staker{v1}, stakers, "validator should still come through from parent")
 }
 
 func TestDiffValidatorWeightDiffAfterDeleteAndAdd(t *testing.T) {

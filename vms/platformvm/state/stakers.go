@@ -340,28 +340,21 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 
 func (s *diffStakers) PutValidator(staker *Staker) error {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.removed != nil {
-		// TLDR: The validator was previously deleted, so we remove it from the
-		// deleted stakers set.
 
+	if validatorDiff.removed != nil && validatorDiff.removed.Equals(staker) {
 		// We set the removed field when we delete the validator that was not added in this diff before.
-		// So if we reached here, it means we removed it first and now either re-adding it or updating it.
+		// So if we reached here, it means we removed it first and now either re-adding it.
 		// If we're re-adding the exact same validator, we should remove it from the deleted stakers set since it's no longer deleted.
-		// Otherwise, if we're updating the validator, then it stays in the deleted stakers set since the original validator is still deleted.
 
-		if validatorDiff.removed.Equals(staker) {
-			delete(s.deletedStakers, validatorDiff.removed.TxID)
-			if len(s.deletedStakers) == 0 {
-				s.deletedStakers = nil
-			}
-
-			// If we're re-adding the exact same validator that was removed,
-			// the two operations cancel out.
-			validatorDiff.removed = nil
-			return nil
+		delete(s.deletedStakers, validatorDiff.removed.TxID)
+		if len(s.deletedStakers) == 0 {
+			s.deletedStakers = nil
 		}
 
-		// Attention: We do not return here, but combine with the rest of the flow.
+		// If we're re-adding the exact same validator that was removed,
+		// the two operations cancel out.
+		validatorDiff.removed = nil
+		return nil
 	}
 
 	validatorDiff.added = staker
@@ -379,24 +372,6 @@ func (s *diffStakers) DeleteValidator(staker *Staker) {
 		// This validator was added in this diff. Rollback the addition.
 		s.addedStakers.Delete(validatorDiff.added)
 		validatorDiff.added = nil
-
-		// TLDR: If there was a previously removed validator, re-add it to
-		// deletedStakers since the replacement is being undone.
-
-		// We set the removed field when we delete the validator that was not added in this diff before.
-		// Since we reached here, we have first deleted it, and then added it.
-		// When we deleted it, we set the removed field and added it to the deleted stakers set.
-		// When we added it, we removed it from the deleted stakers set if the added validator was the same one removed.
-		// Since we're now deleting it again, we should add it back to the deleted stakers set.
-		// Why are we putting back the validator that was originally removed and not the new staker?
-		// Because the original staker, validatorDiff.removed was there at the beginning, and the second
-		// removal is just rolling back the addition of the new staker. We therefore put back the original staker.
-		if validatorDiff.removed != nil {
-			if s.deletedStakers == nil {
-				s.deletedStakers = make(map[ids.ID]*Staker)
-			}
-			s.deletedStakers[validatorDiff.removed.TxID] = validatorDiff.removed
-		}
 	} else {
 		validatorDiff.removed = staker
 		if s.deletedStakers == nil {
