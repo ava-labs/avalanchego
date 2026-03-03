@@ -55,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/bloombits"
@@ -64,6 +65,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/log"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // Config contains the configuration options of the ETH protocol.
@@ -74,6 +76,13 @@ var DefaultSettings Settings = Settings{MaxBlocksPerRequest: 2000}
 
 type Settings struct {
 	MaxBlocksPerRequest int64 // Maximum number of blocks to serve per getLogs request
+}
+
+// reconstructedCacheEntry holds a cached Reconstructed view for historical state queries.
+type reconstructedCacheEntry struct {
+	mu            sync.Mutex
+	reconstructed *ffi.Reconstructed
+	rev           *ffi.Revision // keep alive while Reconstructed exists
 }
 
 // PushGossiper sends pushes pending transactions to peers until they are
@@ -117,7 +126,8 @@ type Ethereum struct {
 
 	stackRPCs []rpc.API
 
-	settings Settings // Settings for Ethereum API
+	settings           Settings   // Settings for Ethereum API
+	reconstructedCache *lru.Cache // LRU cache for *reconstructedCacheEntry, keyed by common.Hash
 }
 
 // roundUpCacheSize returns [input] rounded up to the next multiple of [allocSize]
@@ -190,6 +200,19 @@ func New(
 		settings:          settings,
 		shutdownTracker:   shutdowncheck.NewShutdownTracker(chainDb),
 	}
+	eth.reconstructedCache, _ = lru.NewWithEvict(16, func(key, value interface{}) {
+		if entry, ok := value.(*reconstructedCacheEntry); ok {
+			entry.mu.Lock()
+			defer entry.mu.Unlock()
+			if entry.reconstructed != nil {
+				entry.reconstructed.Drop()
+			}
+			if entry.rev != nil {
+				entry.rev.Drop()
+			}
+		}
+	})
+
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
 	dbVer := "<nil>"
 	if bcVersion != nil {
@@ -405,6 +428,10 @@ func (s *Ethereum) Stop() error {
 	// Clean shutdown marker as the last thing before closing db
 	s.shutdownTracker.Stop()
 	log.Info("Stopped shutdownTracker")
+
+	if s.reconstructedCache != nil {
+		s.reconstructedCache.Purge()
+	}
 
 	s.chainDb.Close()
 	log.Info("Closed chaindb")
