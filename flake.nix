@@ -29,65 +29,85 @@
     in
     {
       # Development environment output
-      devShells = forAllSystems ({ pkgs }: {
-        default = pkgs.mkShell {
-          # The Nix packages provided in the environment
-          packages = with pkgs; [
-            # Build requirements
-            git
+      devShells = forAllSystems ({ pkgs }:
+        let
+          # Separate nixpkgs import with allowUnfree scoped to the ai shell
+          pkgsUnfree = import nixpkgs {
+            inherit (pkgs) system;
+            config.allowUnfree = true;
+          };
 
-            # Task runner
-            go-task
+          baseShell = pkgs.mkShell {
+            # The Nix packages provided in the environment
+            packages = with pkgs; [
+              # Build requirements
+              git
 
-            # Local Go package
-            (import ./nix/go { inherit pkgs; })
+              # Task runner
+              go-task
 
-            # Monitoring tools
-            promtail                                   # Loki log shipper
-            prometheus                                 # Metrics collector
+              # Local Go package
+              (import ./nix/go { inherit pkgs; })
 
-            # Kube tools
-            kubectl                                    # Kubernetes CLI
-            k9s                                        # Kubernetes TUI
-            kind                                       # Kubernetes-in-Docker
-            kubernetes-helm                            # Helm CLI (Kubernetes package manager)
+              # Monitoring tools
+              promtail                                   # Loki log shipper
+              prometheus                                 # Metrics collector
 
-            # JSON processing
-            jq
+              # Kube tools
+              kubectl                                    # Kubernetes CLI
+              k9s                                        # Kubernetes TUI
+              kind                                       # Kubernetes-in-Docker
+              kubernetes-helm                            # Helm CLI (Kubernetes package manager)
 
-            # Linters
-            shellcheck
+              # JSON processing
+              jq
 
-            # Protobuf
-            buf
-            protoc-gen-go
-            protoc-gen-go-grpc
-            protoc-gen-connect-go
+              # Linters
+              shellcheck
 
-            # Line-oriented search tool
-            ripgrep
+              # Protobuf
+              buf
+              protoc-gen-go
+              protoc-gen-go-grpc
+              protoc-gen-connect-go
 
-            # Solidity compiler
-            solc
+              # Line-oriented search tool
+              ripgrep
 
-            # s5cmd for rapid s3 interactions
-            s5cmd
+              # Solidity compiler
+              solc
 
-            # Dev container CLI
-            devcontainer
-          ];
+              # s5cmd for rapid s3 interactions
+              s5cmd
 
-          # Add scripts/ directory to PATH so kind-with-registry.sh is accessible
-          shellHook = ''
-            export PATH="$PWD/scripts:$PATH"
+              # Dev container CLI
+              devcontainer
+            ];
 
-            # Ensure golang bin is in the path
-            GOBIN="$(go env GOPATH)/bin"
-            if [[ ":$PATH:" != *":$GOBIN:"* ]]; then
-              export PATH="$GOBIN:$PATH"
-            fi
-          '';
-        };
-      });
+            # Add scripts/ directory to PATH so kind-with-registry.sh is accessible
+            shellHook = ''
+              export PATH="$PWD/scripts:$PATH"
+
+              # Ensure golang bin is in the path
+              GOBIN="$(go env GOPATH)/bin"
+              if [[ ":$PATH:" != *":$GOBIN:"* ]]; then
+                export PATH="$GOBIN:$PATH"
+              fi
+            '';
+          };
+        in
+        {
+          default = baseShell;
+
+          ai = pkgs.mkShell {
+            inputsFrom = [ baseShell ];
+            packages = [
+              pkgsUnfree.claude-code    # AI coding assistant (unfree)
+              pkgs.gh                   # GitHub CLI
+              pkgs.codex                # OpenAI Codex CLI
+            ];
+          };
+        }
+      );
     };
 }

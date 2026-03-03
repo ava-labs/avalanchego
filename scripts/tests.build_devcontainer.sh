@@ -51,8 +51,18 @@ for name in "${configs[@]}"; do
     sleep infinity)"
 
   echo "Smoke-testing devcontainer '${name}'..."
-  docker exec "${CONTAINER_ID}" nix develop --command sh -c \
+  NIX_SHELL="$(docker exec "${CONTAINER_ID}" printenv NIX_SHELL 2>/dev/null || echo "default")"
+  docker exec "${CONTAINER_ID}" nix develop ".#${NIX_SHELL}" --command sh -c \
     'go version && task --version && git rev-parse HEAD'
+
+  # Per-config extra tool checks
+  case "${name}" in
+    nix-develop-ai)
+      echo "Verifying AI tools in '${name}'..."
+      docker exec "${CONTAINER_ID}" nix develop ".#${NIX_SHELL}" --command sh -c \
+        'claude --version && gh --version && codex --version'
+      ;;
+  esac
 
   echo "=== devcontainer '${name}' OK ==="
 done

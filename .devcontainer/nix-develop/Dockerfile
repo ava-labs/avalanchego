@@ -1,5 +1,8 @@
 FROM nixos/nix:2.34.0
 
+# Which flake devShell to use (e.g. "default", "ai")
+ARG NIX_SHELL=default
+
 # Enable flakes
 RUN echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
 
@@ -7,7 +10,7 @@ RUN echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
 WORKDIR /tmp/nix-cache
 COPY flake.nix flake.lock ./
 COPY nix/ nix/
-RUN nix develop --profile /nix-dev-profile --command true
+RUN nix develop ".#${NIX_SHELL}" --profile /nix-dev-profile --command true
 
 # Create non-root dev user (nixos/nix has no adduser; edit files directly)
 RUN echo 'dev:x:1000:1000::/home/dev:/bin/sh' >> /etc/passwd \
@@ -41,7 +44,10 @@ RUN chown -R dev:dev /nix /workspace
 
 WORKDIR /workspace/avalanchego
 
+# Persist the shell selection for runtime (used by build_devcontainer.sh --run)
+ENV NIX_SHELL=${NIX_SHELL}
+
 USER dev
 
 # Set the default command to enter the dev shell
-CMD ["nix", "develop", "--command", "bash"]
+CMD nix develop ".#${NIX_SHELL}" --command bash
