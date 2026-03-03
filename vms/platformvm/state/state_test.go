@@ -2494,7 +2494,6 @@ func TestSetUptimeAndSetStakingInfoBothPersist(t *testing.T) {
 	require.Equal(t, wantDelegateeReward2, stakingInfo.DelegateeReward)
 }
 
-
 func TestCurrentValidatorRemoveAndReAddWithDifferentKey(t *testing.T) {
 	// Verifies that removing a current validator and re-adding it with a different BLS public key in the
 	// same block results in the new key being reflected in the state and the

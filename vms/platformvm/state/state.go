@@ -2522,7 +2522,7 @@ type inheritedPublicKeys struct {
 // network validator for [nodeID], both before and after the pending diff.
 //
 // primaryValidators is the base-state map of primary network validators.
-// PrimaryDiffs is the pending diff map for the primary network.
+// primaryDiffs is the pending diff map for the primary network.
 //
 // Note: Either key may be nil — prevPK is nil when the primary network
 // validator did not exist before this diff, and newPK is nil when the
@@ -2764,36 +2764,11 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 			change := &validatorDiff{
 				weightDiff: weightDiff,
 			}
-			if diff.added != nil && diff.removed != nil {
-				// This is a replacement. Primary network validators
-				// carry their own BLS key, but subnet validators
-				// inherit it from the corresponding primary network
-				// validator, so we fall back to the inherited key.
-				prevPK := inherited.prevPK
-				if removedPK := diff.removed.PublicKey; removedPK != nil {
-					prevPK = removedPK
-				}
-				newPK := inherited.newPK
-				if addedPK := diff.added.PublicKey; addedPK != nil {
-					newPK = addedPK
-				}
-				if prevPK != nil {
-					change.prevPublicKey = bls.PublicKeyToUncompressedBytes(prevPK)
-				}
-				if newPK != nil {
-					change.newPublicKey = bls.PublicKeyToUncompressedBytes(newPK)
-				}
-			} else {
-				// Not a replacement — use the inherited keys directly.
-				// prevPK is only set for validators that existed before
-				// (not newly added), and newPK is only set for
-				// validators that exist after (not deleted).
-				if inherited.prevPK != nil && diff.added == nil {
-					change.prevPublicKey = bls.PublicKeyToUncompressedBytes(inherited.prevPK)
-				}
-				if inherited.newPK != nil && diff.removed == nil {
-					change.newPublicKey = bls.PublicKeyToUncompressedBytes(inherited.newPK)
-				}
+			if inherited.prevPK != nil && (diff.removed != nil || diff.added == nil) {
+				change.prevPublicKey = bls.PublicKeyToUncompressedBytes(inherited.prevPK)
+			}
+			if inherited.newPK != nil && (diff.added != nil || diff.removed == nil) {
+				change.newPublicKey = bls.PublicKeyToUncompressedBytes(inherited.newPK)
 			}
 
 			subnetIDNodeID := subnetIDNodeID{
