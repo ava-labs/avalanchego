@@ -16,4 +16,4 @@ fi
 
 cd "$REPO_ROOT/graft/coreth"
 # shellcheck disable=SC2046
-go test -shuffle=on -timeout="${TIMEOUT:-900s}" github.com/ava-labs/avalanchego/graft/coreth/core -count 5
+GODEBUG=asyncpreemptoff=1 go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" github.com/ava-labs/avalanchego/graft/coreth/core -count 5
