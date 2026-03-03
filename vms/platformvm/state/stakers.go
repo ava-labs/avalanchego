@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/iterator"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 type Stakers interface {
@@ -282,36 +284,51 @@ func (d *diffValidator) validatorStatus() diffValidatorStatus {
 	return unmodified
 }
 
-func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
-	var weightDiff ValidatorWeightDiff
+// weightChanges returns the total weight added to and removed from this
+// validator by this diff. The added weight includes the added validator and all
+// added delegators. The removed weight includes the removed validator and all
+// deleted delegators.
+func (d *diffValidator) weightChanges() (addedWeight uint64, removedWeight uint64, err error) {
 	if d.added != nil {
-		if err := weightDiff.Add(d.added.Weight); err != nil {
-			return ValidatorWeightDiff{}, fmt.Errorf("failed to increase weight of added validator: %w", err)
-		}
-	}
-	if d.removed != nil {
-		if err := weightDiff.Sub(d.removed.Weight); err != nil {
-			return ValidatorWeightDiff{}, fmt.Errorf("failed to decrease weight of deleted validator: %w", err)
-		}
-	}
-
-	for _, staker := range d.deletedDelegators {
-		if err := weightDiff.Sub(staker.Weight); err != nil {
-			return ValidatorWeightDiff{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
-		}
+		addedWeight = d.added.Weight
 	}
 
 	addedDelegatorIterator := iterator.FromTree(d.addedDelegators)
 	defer addedDelegatorIterator.Release()
 
 	for addedDelegatorIterator.Next() {
-		staker := addedDelegatorIterator.Value()
-
-		if err := weightDiff.Add(staker.Weight); err != nil {
-			return ValidatorWeightDiff{}, fmt.Errorf("failed to increase node weight diff: %w", err)
+		addedWeight, err = safemath.Add(addedWeight, addedDelegatorIterator.Value().Weight)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to calculate added weight: %w", err)
 		}
 	}
 
+	if d.removed != nil {
+		removedWeight = d.removed.Weight
+	}
+	for _, staker := range d.deletedDelegators {
+		removedWeight, err = safemath.Add(removedWeight, staker.Weight)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to calculate removed weight: %w", err)
+		}
+	}
+
+	return addedWeight, removedWeight, nil
+}
+
+func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
+	addedWeight, removedWeight, err := d.weightChanges()
+	if err != nil {
+		return ValidatorWeightDiff{}, err
+	}
+
+	var weightDiff ValidatorWeightDiff
+	if err := weightDiff.Add(addedWeight); err != nil {
+		return ValidatorWeightDiff{}, fmt.Errorf("failed to increase node weight diff: %w", err)
+	}
+	if err := weightDiff.Sub(removedWeight); err != nil {
+		return ValidatorWeightDiff{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
+	}
 	return weightDiff, nil
 }
 

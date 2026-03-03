@@ -2619,9 +2619,29 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 
 			if diff.removed != nil {
 				// If we reached here, diff.validatorStatus() == added so diff.added != nil as well,
-				// meaning this is a replacement.
-				if err := s.removeAndReAddValidator(subnetID, nodeID, weightDiff, inherited.newPK, diff); err != nil {
+				// meaning this is a replacement. Use the individual added/removed weights
+				// instead of the net diff to compute the new weight directly.
+				addedWeight, removedWeight, err := diff.weightChanges()
+				if err != nil {
 					return err
+				}
+
+				currentWeight := s.validators.GetWeight(subnetID, nodeID)
+				if err := s.validators.RemoveWeight(subnetID, nodeID, currentWeight); err != nil {
+					return fmt.Errorf("failed to remove weight of replaced validator: %w", err)
+				}
+
+				remainingWeight, err := safemath.Sub(currentWeight, removedWeight)
+				if err != nil {
+					return fmt.Errorf("failed to calculate remaining validator weight: %w", err)
+				}
+				newWeight, err := safemath.Add(remainingWeight, addedWeight)
+				if err != nil {
+					return fmt.Errorf("failed to calculate new validator weight: %w", err)
+				}
+
+				if err := s.validators.AddStaker(subnetID, nodeID, inherited.newPK, diff.added.TxID, newWeight); err != nil {
+					return fmt.Errorf("failed to add replaced validator: %w", err)
 				}
 				continue
 			}
@@ -2707,47 +2727,6 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 	s.metrics.SetLocalStake(s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
 	s.metrics.SetTotalStake(totalWeight)
 	return nil
-}
-
-func (s *state) removeAndReAddValidator(subnetID ids.ID, nodeID ids.NodeID, weightDiff ValidatorWeightDiff, pk *bls.PublicKey, diff *diffValidator) error {
-	currentWeight := s.validators.GetWeight(subnetID, nodeID)
-	if err := s.validators.RemoveWeight(subnetID, nodeID, currentWeight); err != nil {
-		return fmt.Errorf("failed to remove weight of deleted validator: %w", err)
-	}
-
-	newWeight, err := computeNewStakerWeight(weightDiff, currentWeight)
-	if err != nil {
-		return err
-	}
-
-	err = s.validators.AddStaker(
-		subnetID,
-		nodeID,
-		pk,
-		diff.added.TxID,
-		newWeight,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to add validator: %w", err)
-	}
-	return nil
-}
-
-// computeNewStakerWeight applies the net weight diff to the validator's
-// current weight in the manager (which includes delegator weight) to
-// obtain the correct total weight after a replacement.
-func computeNewStakerWeight(weightDiff ValidatorWeightDiff, currentWeight uint64) (uint64, error) {
-	var newWeight uint64
-	var err error
-	if weightDiff.Decrease {
-		newWeight, err = safemath.Sub(currentWeight, weightDiff.Amount)
-	} else {
-		newWeight, err = safemath.Add(currentWeight, weightDiff.Amount)
-	}
-	if err != nil {
-		return 0, fmt.Errorf("failed to calculate new validator weight: %w", err)
-	}
-	return newWeight, nil
 }
 
 type validatorDiff struct {
