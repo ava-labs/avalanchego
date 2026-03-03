@@ -58,7 +58,10 @@ func TestOp_ApplyTo(t *testing.T) {
 			name: "transfer_from_eoa_to_eoaMaxNonce",
 			op: &Op{
 				Burn: map[common.Address]AccountDebit{
-					eoa: {Amount: *uint256.NewInt(100_000)},
+					eoa: {
+						Amount:     *uint256.NewInt(100_000),
+						MinBalance: *uint256.NewInt(100_000),
+					},
 				},
 				Mint: map[common.Address]uint256.Int{
 					eoaMaxNonce: *uint256.NewInt(100_000),
@@ -81,8 +84,14 @@ func TestOp_ApplyTo(t *testing.T) {
 			name: "burn_all_funds",
 			op: &Op{
 				Burn: map[common.Address]AccountDebit{
-					eoa:         {Amount: *uint256.NewInt(900_000)},
-					eoaMaxNonce: {Amount: *uint256.NewInt(100_000)},
+					eoa: {
+						Amount:     *uint256.NewInt(900_000),
+						MinBalance: *uint256.NewInt(900_000),
+					},
+					eoaMaxNonce: {
+						Amount:     *uint256.NewInt(100_000),
+						MinBalance: *uint256.NewInt(100_000),
+					},
 				},
 			},
 			wantAccounts: []account{
@@ -102,10 +111,95 @@ func TestOp_ApplyTo(t *testing.T) {
 			name: "insufficient_funds",
 			op: &Op{
 				Burn: map[common.Address]AccountDebit{
-					eoa: {Amount: *uint256.NewInt(1)},
+					eoa: {
+						Amount:     *uint256.NewInt(1),
+						MinBalance: *uint256.NewInt(1),
+					},
 				},
 			},
 			wantErr: core.ErrInsufficientFunds,
+		},
+		{
+			name: "fund_eoa_for_min_balance_tests",
+			op: &Op{
+				Mint: map[common.Address]uint256.Int{
+					eoa: *uint256.NewInt(500),
+				},
+			},
+			wantAccounts: []account{
+				{
+					address: eoa,
+					nonce:   2,
+					balance: uint256.NewInt(500),
+				},
+			},
+		},
+		{
+			name: "balance_below_min_balance",
+			op: &Op{
+				Burn: map[common.Address]AccountDebit{
+					eoa: {
+						Amount:     *uint256.NewInt(100),
+						MinBalance: *uint256.NewInt(1000),
+					},
+				},
+			},
+			wantErr: core.ErrInsufficientFunds,
+		},
+		{
+			name: "balance_covers_min_balance_debits_amount",
+			op: &Op{
+				Burn: map[common.Address]AccountDebit{
+					eoa: {
+						Amount:     *uint256.NewInt(100),
+						MinBalance: *uint256.NewInt(500),
+					},
+				},
+			},
+			wantAccounts: []account{
+				{
+					address: eoa,
+					nonce:   3,
+					balance: uint256.NewInt(400),
+				},
+			},
+		},
+		{
+			name: "min_balance_unset_does_not_allow_underflow",
+			op: &Op{
+				Burn: map[common.Address]AccountDebit{
+					eoa: {
+						Amount: *uint256.NewInt(500),
+					},
+				},
+			},
+			wantErr: errMinBalanceBelowAmount,
+			wantAccounts: []account{
+				{
+					address: eoa,
+					nonce:   3,
+					balance: uint256.NewInt(400),
+				},
+			},
+		},
+		{
+			name: "min_balance_below_amount_does_not_allow_underflow",
+			op: &Op{
+				Burn: map[common.Address]AccountDebit{
+					eoa: {
+						Amount:     *uint256.NewInt(500),
+						MinBalance: *uint256.NewInt(300),
+					},
+				},
+			},
+			wantErr: errMinBalanceBelowAmount,
+			wantAccounts: []account{
+				{
+					address: eoa,
+					nonce:   3,
+					balance: uint256.NewInt(400),
+				},
+			},
 		},
 	}
 	for _, tt := range steps {

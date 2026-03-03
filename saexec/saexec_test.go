@@ -382,7 +382,10 @@ func TestEndOfBlockOps(t *testing.T) {
 		{
 			Gas: 100_000,
 			Burn: map[common.Address]hook.AccountDebit{
-				exportEOA: {Amount: *uint256.NewInt(10)},
+				exportEOA: {
+					Amount:     *uint256.NewInt(10),
+					MinBalance: *uint256.NewInt(10),
+				},
 			},
 		},
 		{
