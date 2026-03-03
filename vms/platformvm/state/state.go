@@ -2599,7 +2599,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 				continue
 			}
 
-			if diff.validatorStatus() != added {
+			if diff.added == nil {
 				if err := s.validators.AddWeight(subnetID, nodeID, weightDiff.Amount); err != nil {
 					return fmt.Errorf("failed to increase validator weight: %w", err)
 				}
@@ -2618,7 +2618,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 			}
 
 			if diff.removed != nil {
-				// If we reached here, diff.validatorStatus() == added so diff.added != nil as well,
+				// If we reached here, diff.added != nil (from the check above),
 				// meaning this is a replacement. Use the individual added/removed weights
 				// instead of the net diff to compute the new weight directly.
 				addedWeight, removedWeight, err := diff.weightChanges()
@@ -2788,10 +2788,10 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				// prevPK is only set for validators that existed before
 				// (not newly added), and newPK is only set for
 				// validators that exist after (not deleted).
-				if inherited.prevPK != nil && diff.validatorStatus() != added {
+				if inherited.prevPK != nil && diff.added == nil {
 					change.prevPublicKey = bls.PublicKeyToUncompressedBytes(inherited.prevPK)
 				}
-				if inherited.newPK != nil && diff.validatorStatus() != deleted {
+				if inherited.newPK != nil && diff.removed == nil {
 					change.newPublicKey = bls.PublicKeyToUncompressedBytes(inherited.newPK)
 				}
 			}

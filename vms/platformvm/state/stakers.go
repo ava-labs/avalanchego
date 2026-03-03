@@ -267,23 +267,6 @@ type diffValidator struct {
 	deletedDelegators map[ids.ID]*Staker
 }
 
-// validatorStatus returns the status of the validator in this diff.
-//
-// validatorStatus is not affected by delegator ops so unmodified does not
-// mean that diffValidator hasn't changed, since delegators may have changed.
-// If a replacement occurred, we return added.
-func (d *diffValidator) validatorStatus() diffValidatorStatus {
-	// If both added and removed are non-nil, this represents a replacement,
-	// so we just return the added validator's status, we don't need the removed validator's status.
-	if d.added != nil {
-		return added
-	}
-	if d.removed != nil {
-		return deleted
-	}
-	return unmodified
-}
-
 // weightChanges returns the total weight added to and removed from this
 // validator by this diff. The added weight includes the added validator and all
 // added delegators. The removed weight includes the removed validator and all
@@ -345,7 +328,14 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 		return nil, unmodified
 	}
 
-	return validatorDiff.added, validatorDiff.validatorStatus()
+	switch {
+	case validatorDiff.added != nil:
+		return validatorDiff.added, added
+	case validatorDiff.removed != nil:
+		return nil, deleted
+	default:
+		return nil, unmodified
+	}
 }
 
 func (s *diffStakers) PutValidator(staker *Staker) error {
