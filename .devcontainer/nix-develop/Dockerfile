@@ -20,7 +20,7 @@ RUN nix develop --command sh -c "\
     # Replace the cloned commit with an orphan commit (same tree, no parents).
     # This prevents nix's libgit2 from failing when the bundle comes from a
     # shallow clone whose commit references missing parent objects.
-    TREE=\$(git log --format='%T' -1) && \
+    TREE=\$(git rev-parse HEAD^{tree}) && \
     NEW_COMMIT=\$(GIT_AUTHOR_NAME=build GIT_AUTHOR_EMAIL=build@localhost GIT_COMMITTER_NAME=build GIT_COMMITTER_EMAIL=build@localhost git commit-tree \"\$TREE\" -m 'devcontainer init') && \
     git update-ref HEAD \"\$NEW_COMMIT\" && \
     rm -f .git/shallow && \
