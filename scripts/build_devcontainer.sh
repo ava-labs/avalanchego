@@ -71,7 +71,46 @@ run_initialize_command() {
   (cd "${AVALANCHE_PATH}" && "${init_cmd[@]}")
 }
 
-if [[ "${MODE}" == "build" ]]; then
+# Find a pre-built devcontainer image for this config.
+find_image() {
+  docker images --format '{{.Repository}}' --filter "reference=vsc-$(basename "${AVALANCHE_PATH}")-*" 2>/dev/null | head -1
+}
+
+# Ensure a container is running for this config, starting one from the
+# pre-built image if necessary. Prints the container ID.
+ensure_container() {
+  # Already running?
+  local cid
+  cid="$(docker ps -q --filter "label=devcontainer.config_file=${CONFIG_PATH}" 2>/dev/null || true)"
+  if [[ -n "${cid}" ]]; then
+    echo "${cid}"
+    return
+  fi
+
+  # Stopped container from a previous run?
+  cid="$(docker ps -aq --filter "label=devcontainer.config_file=${CONFIG_PATH}" 2>/dev/null || true)"
+  if [[ -n "${cid}" ]]; then
+    docker start "${cid}" > /dev/null
+    echo "${cid}"
+    return
+  fi
+
+  # Start a new container from the pre-built image.
+  local image
+  image="$(find_image)"
+  if [[ -z "${image}" ]]; then
+    echo "Error: no devcontainer image found. Run '$0 --build ${CONFIG_NAME}' first." >&2
+    return 1
+  fi
+  cid="$(docker run -d \
+    -l "devcontainer.config_file=${CONFIG_PATH}" \
+    -l "devcontainer.local_folder=${AVALANCHE_PATH}" \
+    "${image}" \
+    sleep infinity)"
+  echo "${cid}"
+}
+
+if [[ "${MODE}" == "build" || "${MODE}" == "build-and-run" ]]; then
   run_initialize_command "${CONFIG_PATH}"
   echo "Building devcontainer '${CONFIG_NAME}'..."
   devcontainer build \
@@ -79,22 +118,8 @@ if [[ "${MODE}" == "build" ]]; then
     --config "${CONFIG_PATH}"
 fi
 
-if [[ "${MODE}" != "build" ]]; then
-  # Check if a container for this config is already running.
-  CONTAINER_ID="$(docker ps -q --filter "label=devcontainer.config_file=${CONFIG_PATH}" 2>/dev/null || true)"
-
-  if [[ -z "${CONTAINER_ID}" ]]; then
-    echo "Starting devcontainer '${CONFIG_NAME}'..."
-    devcontainer up \
-      --workspace-folder "${AVALANCHE_PATH}" \
-      --config "${CONFIG_PATH}"
-  else
-    echo "Devcontainer '${CONFIG_NAME}' is already running (${CONTAINER_ID})."
-  fi
-
-  echo "Entering devcontainer '${CONFIG_NAME}'..."
-  devcontainer exec \
-    --workspace-folder "${AVALANCHE_PATH}" \
-    --config "${CONFIG_PATH}" \
-    nix develop --command bash
+if [[ "${MODE}" == "run" || "${MODE}" == "build-and-run" ]]; then
+  CONTAINER_ID="$(ensure_container)"
+  echo "Entering devcontainer '${CONFIG_NAME}' (${CONTAINER_ID})..."
+  docker exec -it "${CONTAINER_ID}" nix develop --command bash
 fi

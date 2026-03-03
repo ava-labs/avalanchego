@@ -38,27 +38,23 @@ for name in "${configs[@]}"; do
   echo "Building devcontainer '${name}' via build_devcontainer.sh..."
   "${AVALANCHE_PATH}/scripts/build_devcontainer.sh" --build "${name}"
 
-  # Start the container for smoke testing.
-  echo "Starting devcontainer '${name}'..."
-  devcontainer up \
-    --workspace-folder "${AVALANCHE_PATH}" \
-    --config "${config_path}"
+  # Start a container from the built image for smoke testing (using docker
+  # directly to avoid devcontainer up rebuilding the image).
+  echo "Starting container for smoke testing '${name}'..."
+  IMAGE="$(docker images --format '{{.Repository}}' --filter "reference=vsc-$(basename "${AVALANCHE_PATH}")-*" | head -1)"
+  if [[ -z "${IMAGE}" ]]; then
+    echo "Error: no devcontainer image found after build." >&2
+    exit 1
+  fi
+  CONTAINER_ID="$(docker run -d \
+    -l "devcontainer.local_folder=${AVALANCHE_PATH}" \
+    "${IMAGE}" \
+    sleep infinity)"
 
   echo "Smoke-testing devcontainer '${name}'..."
-  devcontainer exec \
-    --workspace-folder "${AVALANCHE_PATH}" \
-    --config "${config_path}" \
-    nix develop --command go version
-
-  devcontainer exec \
-    --workspace-folder "${AVALANCHE_PATH}" \
-    --config "${config_path}" \
-    nix develop --command task --version
-
-  devcontainer exec \
-    --workspace-folder "${AVALANCHE_PATH}" \
-    --config "${config_path}" \
-    nix develop --command git rev-parse HEAD
+  docker exec "${CONTAINER_ID}" nix develop --command go version
+  docker exec "${CONTAINER_ID}" nix develop --command task --version
+  docker exec "${CONTAINER_ID}" nix develop --command git rev-parse HEAD
 
   echo "=== devcontainer '${name}' OK ==="
 done
