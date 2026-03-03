@@ -55,7 +55,24 @@ if [[ ! -f "${CONFIG_PATH}" ]]; then
   exit 1
 fi
 
-if [[ "${MODE}" != "run" ]]; then
+# Run the initializeCommand from a devcontainer.json config. 'devcontainer
+# build' does not execute initializeCommand, but the Dockerfile may depend on
+# files it creates, so we run it explicitly before building.
+run_initialize_command() {
+  local config_path="$1"
+  if ! jq -e '.initializeCommand' "${config_path}" > /dev/null 2>&1; then
+    return
+  fi
+  echo "Running initializeCommand from ${config_path}..."
+  local -a init_cmd=()
+  while IFS= read -r elem; do
+    init_cmd+=("$elem")
+  done < <(jq -r '.initializeCommand[]' "${config_path}")
+  (cd "${AVALANCHE_PATH}" && "${init_cmd[@]}")
+}
+
+if [[ "${MODE}" == "build" ]]; then
+  run_initialize_command "${CONFIG_PATH}"
   echo "Building devcontainer '${CONFIG_NAME}'..."
   devcontainer build \
     --workspace-folder "${AVALANCHE_PATH}" \

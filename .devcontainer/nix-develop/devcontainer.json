@@ -4,7 +4,7 @@
     "dockerfile": "Dockerfile",
     "context": "../.."
   },
-  "initializeCommand": ["sh", "-c", "mkdir -p tmp && git bundle create tmp/.git-bundle HEAD \"$(git symbolic-ref --short HEAD)\" && git config --local --list | grep '^remote\\.' > tmp/.git-remotes"],
+  "initializeCommand": ["sh", "-c", "mkdir -p tmp && git bundle create tmp/.git-bundle HEAD $(git symbolic-ref --short HEAD 2>/dev/null || true) && git config --local --list | grep '^remote\\.' > tmp/.git-remotes"],
   "workspaceMount": "",
   "workspaceFolder": "/workspace/avalanchego",
   "remoteUser": "root"

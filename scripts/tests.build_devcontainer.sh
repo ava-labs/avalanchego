@@ -22,23 +22,6 @@ if [[ ${#configs[@]} -eq 0 ]]; then
   exit 1
 fi
 
-# Run the initializeCommand from a devcontainer.json config. This is needed
-# because 'devcontainer build' (used by build_devcontainer.sh --build) does
-# not execute initializeCommand, but the Dockerfile may depend on files it
-# creates.
-run_initialize_command() {
-  local config_path="$1"
-  if ! jq -e '.initializeCommand' "${config_path}" > /dev/null 2>&1; then
-    return
-  fi
-  echo "Running initializeCommand from ${config_path}..."
-  local -a init_cmd=()
-  while IFS= read -r elem; do
-    init_cmd+=("$elem")
-  done < <(jq -r '.initializeCommand[]' "${config_path}")
-  (cd "${AVALANCHE_PATH}" && "${init_cmd[@]}")
-}
-
 cleanup() {
   echo "Cleaning up devcontainer containers..."
   # devcontainer up labels containers with devcontainer.local_folder
@@ -50,11 +33,8 @@ for name in "${configs[@]}"; do
   config_path="${DEVCONTAINER_DIR}/${name}/devcontainer.json"
   echo "=== Testing devcontainer config: ${name} ==="
 
-  # Run initializeCommand so that build_devcontainer.sh --build works on a
-  # clean checkout.
-  run_initialize_command "${config_path}"
-
-  # Test the build via build_devcontainer.sh.
+  # Test the build via build_devcontainer.sh (which handles initializeCommand
+  # internally, so this validates it works from a clean checkout).
   echo "Building devcontainer '${name}' via build_devcontainer.sh..."
   "${AVALANCHE_PATH}/scripts/build_devcontainer.sh" --build "${name}"
 
