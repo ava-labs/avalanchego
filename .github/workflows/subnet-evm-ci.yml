@@ -30,7 +30,7 @@ jobs:
       run:
         working-directory: ./graft/subnet-evm
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         os: [macos-latest, ubuntu-22.04, ubuntu-latest]
         attempts: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
