@@ -3360,3 +3360,208 @@ func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T)
 	require.Equal(pk1, historicalVdrs[nodeID].PublicKey,
 		"subnet validator's inherited public key should roll back to PK1")
 }
+
+func TestSubnetValidatorReplacementWithUnchangedPrimaryKey(t *testing.T) {
+	// When a subnet validator is replaced but the primary network validator
+	// is NOT replaced, the inherited public key does not change. Rolling
+	// back the subnet validator set must preserve the inherited key (not
+	// set it to nil).
+
+	require := require.New(t)
+
+	state := newTestState(t, memdb.New())
+
+	var (
+		nodeID    = ids.GenerateTestNodeID()
+		subnetID  = ids.GenerateTestID()
+		startTime = genesistest.DefaultValidatorStartTime
+		endTime1  = startTime.Add(24 * time.Hour)
+		endTime2  = startTime.Add(48 * time.Hour)
+	)
+
+	// Create primary network validator (PK1) — will NOT be replaced.
+	primaryUnsigned := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, txs.Validator{
+		NodeID: nodeID,
+		End:    uint64(endTime2.Unix()),
+		Wght:   10,
+	})
+	primaryTx := &txs.Tx{Unsigned: primaryUnsigned}
+	require.NoError(primaryTx.Initialize(txs.Codec))
+	primaryStaker, err := NewCurrentStaker(primaryTx.ID(), primaryUnsigned, startTime, 0)
+	require.NoError(err)
+	pk1 := primaryStaker.PublicKey
+	require.NotNil(pk1)
+
+	// Create subnet validator 1.
+	subnetUnsigned1 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+		NodeID: nodeID,
+		End:    uint64(endTime1.Unix()),
+		Wght:   5,
+	})
+	subnetTx1 := &txs.Tx{Unsigned: subnetUnsigned1}
+	require.NoError(subnetTx1.Initialize(txs.Codec))
+	subnetStaker1, err := NewCurrentStaker(subnetTx1.ID(), subnetUnsigned1, startTime, 0)
+	require.NoError(err)
+
+	// Create subnet validator 2 (replacement).
+	subnetUnsigned2 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+		NodeID: nodeID,
+		End:    uint64(endTime2.Unix()),
+		Wght:   8,
+	})
+	subnetTx2 := &txs.Tx{Unsigned: subnetUnsigned2}
+	require.NoError(subnetTx2.Initialize(txs.Codec))
+	subnetStaker2, err := NewCurrentStaker(subnetTx2.ID(), subnetUnsigned2, startTime, 0)
+	require.NoError(err)
+
+	// Block 0: Add primary validator + subnet validator 1.
+	state.AddTx(primaryTx, status.Committed)
+	state.AddTx(subnetTx1, status.Committed)
+
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+	require.NoError(d.PutCurrentValidator(primaryStaker))
+	require.NoError(d.PutCurrentValidator(subnetStaker1))
+	require.NoError(d.Apply(state))
+
+	state.SetHeight(0)
+	require.NoError(state.Commit())
+
+	// Sanity: subnet validator inherits PK1.
+	subnetVdrs := state.validators.GetMap(subnetID)
+	require.Contains(subnetVdrs, nodeID)
+	require.Equal(pk1, subnetVdrs[nodeID].PublicKey)
+
+	// Block 1: Replace only the subnet validator. Primary stays.
+	state.AddTx(subnetTx2, status.Committed)
+
+	d, err = NewDiffOn(state)
+	require.NoError(err)
+	d.DeleteCurrentValidator(subnetStaker1)
+	require.NoError(d.PutCurrentValidator(subnetStaker2))
+	require.NoError(d.Apply(state))
+
+	state.SetHeight(1)
+	require.NoError(state.Commit())
+
+	// Sanity: subnet validator still inherits PK1 (primary unchanged).
+	subnetVdrs = state.validators.GetMap(subnetID)
+	require.Contains(subnetVdrs, nodeID)
+	require.Equal(pk1, subnetVdrs[nodeID].PublicKey)
+
+	// Roll back subnet validator set from height 1 → height 0.
+	historicalVdrs := copyValidatorSet(state.validators.GetMap(subnetID))
+	delete(historicalVdrs, defaultValidatorNodeID)
+	require.NoError(state.ApplyValidatorWeightDiffs(t.Context(), historicalVdrs, 1, 1, subnetID))
+	require.NoError(state.ApplyValidatorPublicKeyDiffs(t.Context(), historicalVdrs, 1, 1, subnetID))
+
+	require.Contains(historicalVdrs, nodeID)
+	require.Equal(pk1, historicalVdrs[nodeID].PublicKey,
+		"subnet validator's inherited public key must remain PK1 after rollback")
+}
+
+func TestGetInheritedPublicKeys(t *testing.T) {
+	nodeID := ids.GenerateTestNodeID()
+	otherNodeID := ids.GenerateTestNodeID()
+
+	sk1, err := localsigner.New()
+	require.NoError(t, err)
+	pk1 := sk1.PublicKey()
+
+	sk2, err := localsigner.New()
+	require.NoError(t, err)
+	pk2 := sk2.PublicKey()
+
+	tests := []struct {
+		name              string
+		primaryValidators map[ids.NodeID]*baseStaker
+		primaryDiffs      map[ids.NodeID]*diffValidator
+		expectedPrevPK    *bls.PublicKey
+		expectedNewPK     *bls.PublicKey
+		expectedErr       error
+	}{
+		{
+			name:              "no primary validator and no diff",
+			primaryValidators: map[ids.NodeID]*baseStaker{},
+			primaryDiffs:      map[ids.NodeID]*diffValidator{},
+			expectedErr:       errMissingPrimaryNetworkValidator,
+		},
+		{
+			name: "primary validator exists with no diff",
+			primaryValidators: map[ids.NodeID]*baseStaker{
+				nodeID: {validator: &Staker{PublicKey: pk1}},
+			},
+			primaryDiffs:   map[ids.NodeID]*diffValidator{},
+			expectedPrevPK: pk1,
+			expectedNewPK:  pk1,
+		},
+		{
+			name: "primary validator exists with diff but removed is nil",
+			primaryValidators: map[ids.NodeID]*baseStaker{
+				nodeID: {validator: &Staker{PublicKey: pk1}},
+			},
+			primaryDiffs: map[ids.NodeID]*diffValidator{
+				nodeID: {removed: nil},
+			},
+			expectedPrevPK: pk1,
+			expectedNewPK:  pk1,
+		},
+		{
+			name: "primary validator replaced",
+			primaryValidators: map[ids.NodeID]*baseStaker{
+				nodeID: {validator: &Staker{PublicKey: pk2}},
+			},
+			primaryDiffs: map[ids.NodeID]*diffValidator{
+				nodeID: {
+					removed: &Staker{PublicKey: pk1},
+					added:   &Staker{PublicKey: pk2},
+				},
+			},
+			expectedPrevPK: pk1,
+			expectedNewPK:  pk2,
+		},
+		{
+			name: "primary validator purely deleted",
+			primaryValidators: map[ids.NodeID]*baseStaker{
+				nodeID: {validator: nil},
+			},
+			primaryDiffs: map[ids.NodeID]*diffValidator{
+				nodeID: {removed: &Staker{PublicKey: pk1}},
+			},
+			expectedPrevPK: pk1,
+			expectedNewPK:  nil,
+		},
+		{
+			name:              "primary validator purely deleted and not in base state",
+			primaryValidators: map[ids.NodeID]*baseStaker{},
+			primaryDiffs: map[ids.NodeID]*diffValidator{
+				nodeID: {removed: &Staker{PublicKey: pk1}},
+			},
+			expectedPrevPK: pk1,
+			expectedNewPK:  nil,
+		},
+		{
+			name: "different nodeID has no effect",
+			primaryValidators: map[ids.NodeID]*baseStaker{
+				otherNodeID: {validator: &Staker{PublicKey: pk1}},
+			},
+			primaryDiffs: map[ids.NodeID]*diffValidator{},
+			expectedErr:  errMissingPrimaryNetworkValidator,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			result, err := getInheritedPublicKeys(nodeID, tt.primaryValidators, tt.primaryDiffs)
+			if tt.expectedErr != nil {
+				require.ErrorIs(err, tt.expectedErr)
+				return
+			}
+			require.NoError(err)
+			require.Equal(tt.expectedPrevPK, result.prevPK)
+			require.Equal(tt.expectedNewPK, result.newPK)
+		})
+	}
+}
