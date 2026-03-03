@@ -43,6 +43,8 @@ type Staker struct {
 	Priority txs.Priority
 }
 
+// Equals returns true if this staker is equal to the provided staker.
+// If s.Less(other) and other.Less(s) are both false, then it doesn't mean that s.Equals(other) is true.
 func (s *Staker) Equals(other *Staker) bool {
 	if s == nil && other == nil {
 		return true
