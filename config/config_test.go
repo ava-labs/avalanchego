@@ -1162,12 +1162,15 @@ func TestApplySimplexParametersDefaults(t *testing.T) {
 }
 
 func TestApplySubnetConfigDefaults(t *testing.T) {
-	var customSnowK = snowball.DefaultParameters.K + 10
-	var expectedSnow = &snowball.DefaultParameters
-	expectedSnow.K = customSnowK
+	var (
+		customSnowK  = snowball.DefaultParameters.K + 10
+		expectedSnow = &snowball.DefaultParameters
 
-	var customSimplexNetworkDelay = simplex.DefaultParameters.MaxNetworkDelay + time.Second
-	var expectedSimplex = &simplex.DefaultParameters
+		customSimplexNetworkDelay = simplex.DefaultParameters.MaxNetworkDelay + time.Second
+		expectedSimplex           = &simplex.DefaultParameters
+	)
+
+	expectedSnow.K = customSnowK
 	expectedSimplex.MaxNetworkDelay = customSimplexNetworkDelay
 
 	tests := []struct {
