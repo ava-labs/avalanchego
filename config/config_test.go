@@ -1012,7 +1012,7 @@ func TestGetPrimaryNetworkConfigWithSnowQuorumSizeKey(t *testing.T) {
 	}
 }
 
-func TestSetSubnetConfigDefaults(t *testing.T) {
+func TestApplySubnetConfigDefaults(t *testing.T) {
 	// Custom values used across test inputs and verify functions — declared once
 	// to avoid duplication between the two.
 	var (
@@ -1131,7 +1131,7 @@ func TestSetSubnetConfigDefaults(t *testing.T) {
 			require := require.New(t)
 			v := setupViperFlags()
 			cfg := tt.input
-			setSubnetConfigDefaults(&cfg, v)
+			applySubnetConfigDefaults(&cfg, v)
 			tt.verify(require, cfg)
 		})
 	}

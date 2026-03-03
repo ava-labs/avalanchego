@@ -39,6 +39,8 @@ func (p Parameters) Verify() error {
 	if p.MaxRebroadcastWait <= 0 {
 		return fmt.Errorf("%w: maxRebroadcastWait must be positive", ErrInvalidParameters)
 	}
+	// TODO: we need to validate InitialValidators contains only unique nodes with valid keys.
+	// See: https://github.com/ava-labs/avalanchego/issues/5023
 	if len(p.InitialValidators) == 0 {
 		return fmt.Errorf("%w: initialValidators must be non-empty", ErrInvalidParameters)
 	}
