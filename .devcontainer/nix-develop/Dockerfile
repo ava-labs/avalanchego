@@ -10,14 +10,16 @@ COPY nix/ nix/
 RUN nix develop --profile /nix-dev-profile --command true
 
 # Clone the repo from a git bundle containing only the current branch.
-# The bundle is created by the initializeCommand in devcontainer.json.
+# The bundle and remote config are created by the initializeCommand in
+# devcontainer.json.
 COPY tmp/.git-bundle /tmp/.git-bundle
-ARG GIT_REMOTE_URL=https://github.com/ava-labs/avalanchego.git
+COPY tmp/.git-remotes /tmp/.git-remotes
 RUN nix develop --command sh -c "\
     git clone --single-branch /tmp/.git-bundle /workspace/avalanchego && \
     cd /workspace/avalanchego && \
-    git remote set-url origin \$GIT_REMOTE_URL" \
-    && rm /tmp/.git-bundle
+    git remote remove origin && \
+    while IFS='=' read -r key value; do git config \"\$key\" \"\$value\"; done < /tmp/.git-remotes" \
+    && rm /tmp/.git-bundle /tmp/.git-remotes
 
 WORKDIR /workspace/avalanchego
 
