@@ -1,0 +1,10 @@
+{
+  "name": "AvalancheGo (nix develop)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "../.."
+  },
+  "initializeCommand": ["sh", "-c", "mkdir -p tmp && git bundle create tmp/.git-bundle HEAD \"$(git symbolic-ref --short HEAD)\""],
+  "overrideCommand": false,
+  "remoteUser": "root"
+}
