@@ -3240,3 +3240,123 @@ func TestDiffMultipleBlocksRollback(t *testing.T) {
 		require.Equal(pk1, vdrs[nodeID].PublicKey)
 	}
 }
+
+func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T) {
+	// When both the primary network validator and a subnet validator for the
+	// same node are replaced in the same block, the subnet validator's
+	// inherited public key change must be recorded in the diff.
+
+	require := require.New(t)
+
+	state := newTestState(t, memdb.New())
+
+	var (
+		nodeID    = ids.GenerateTestNodeID()
+		subnetID  = ids.GenerateTestID()
+		startTime = genesistest.DefaultValidatorStartTime
+		endTime1  = startTime.Add(24 * time.Hour)
+		endTime2  = startTime.Add(48 * time.Hour)
+	)
+
+	// Create primary network validator 1 (PK1).
+	primaryUnsigned1 := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, txs.Validator{
+		NodeID: nodeID,
+		End:    uint64(endTime1.Unix()),
+		Wght:   10,
+	})
+	primaryTx1 := &txs.Tx{Unsigned: primaryUnsigned1}
+	require.NoError(primaryTx1.Initialize(txs.Codec))
+	primaryStaker1, err := NewCurrentStaker(primaryTx1.ID(), primaryUnsigned1, startTime, 0)
+	require.NoError(err)
+	pk1 := primaryStaker1.PublicKey
+	require.NotNil(pk1)
+
+	// Create subnet validator 1 (inherits PK1, PublicKey field is nil).
+	subnetUnsigned1 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+		NodeID: nodeID,
+		End:    uint64(endTime1.Unix()),
+		Wght:   5,
+	})
+	subnetTx1 := &txs.Tx{Unsigned: subnetUnsigned1}
+	require.NoError(subnetTx1.Initialize(txs.Codec))
+	subnetStaker1, err := NewCurrentStaker(subnetTx1.ID(), subnetUnsigned1, startTime, 0)
+	require.NoError(err)
+	require.Nil(subnetStaker1.PublicKey, "subnet validators must not carry their own BLS key")
+
+	// Create primary network validator 2 (PK2).
+	primaryUnsigned2 := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, txs.Validator{
+		NodeID: nodeID,
+		End:    uint64(endTime2.Unix()),
+		Wght:   10,
+	})
+	primaryTx2 := &txs.Tx{Unsigned: primaryUnsigned2}
+	require.NoError(primaryTx2.Initialize(txs.Codec))
+	primaryStaker2, err := NewCurrentStaker(primaryTx2.ID(), primaryUnsigned2, startTime, 0)
+	require.NoError(err)
+	pk2 := primaryStaker2.PublicKey
+	require.NotNil(pk2)
+	require.NotEqual(
+		bls.PublicKeyToUncompressedBytes(pk1),
+		bls.PublicKeyToUncompressedBytes(pk2),
+	)
+
+	// Create subnet validator 2 (inherits PK2).
+	subnetUnsigned2 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+		NodeID: nodeID,
+		End:    uint64(endTime2.Unix()),
+		Wght:   5,
+	})
+	subnetTx2 := &txs.Tx{Unsigned: subnetUnsigned2}
+	require.NoError(subnetTx2.Initialize(txs.Codec))
+	subnetStaker2, err := NewCurrentStaker(subnetTx2.ID(), subnetUnsigned2, startTime, 0)
+	require.NoError(err)
+
+	// Block 0: Add primary validator 1 + subnet validator 1.
+	state.AddTx(primaryTx1, status.Committed)
+	state.AddTx(subnetTx1, status.Committed)
+
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+	require.NoError(d.PutCurrentValidator(primaryStaker1))
+	require.NoError(d.PutCurrentValidator(subnetStaker1))
+	require.NoError(d.Apply(state))
+
+	state.SetHeight(0)
+	require.NoError(state.Commit())
+
+	// Sanity: subnet validator inherits PK1.
+	subnetVdrs := state.validators.GetMap(subnetID)
+	require.Contains(subnetVdrs, nodeID)
+	require.Equal(pk1, subnetVdrs[nodeID].PublicKey)
+
+	// Block 1: Replace both primary and subnet validators in the same block.
+	state.AddTx(primaryTx2, status.Committed)
+	state.AddTx(subnetTx2, status.Committed)
+
+	d, err = NewDiffOn(state)
+	require.NoError(err)
+	d.DeleteCurrentValidator(primaryStaker1)
+	require.NoError(d.PutCurrentValidator(primaryStaker2))
+	d.DeleteCurrentValidator(subnetStaker1)
+	require.NoError(d.PutCurrentValidator(subnetStaker2))
+	require.NoError(d.Apply(state))
+
+	state.SetHeight(1)
+	require.NoError(state.Commit())
+
+	// Sanity: subnet validator now inherits PK2.
+	subnetVdrs = state.validators.GetMap(subnetID)
+	require.Contains(subnetVdrs, nodeID)
+	require.Equal(pk2, subnetVdrs[nodeID].PublicKey)
+
+	// Roll back subnet validator set from height 1 → height 0.
+	// Should recover PK1 as the subnet validator's inherited key.
+	historicalVdrs := copyValidatorSet(state.validators.GetMap(subnetID))
+	delete(historicalVdrs, defaultValidatorNodeID)
+	require.NoError(state.ApplyValidatorWeightDiffs(t.Context(), historicalVdrs, 1, 1, subnetID))
+	require.NoError(state.ApplyValidatorPublicKeyDiffs(t.Context(), historicalVdrs, 1, 1, subnetID))
+
+	require.Contains(historicalVdrs, nodeID)
+	require.Equal(pk1, historicalVdrs[nodeID].PublicKey,
+		"subnet validator's inherited public key should roll back to PK1")
+}

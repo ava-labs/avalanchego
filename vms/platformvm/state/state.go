@@ -2738,12 +2738,34 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				weightDiff: weightDiff,
 			}
 			if diff.added != nil && diff.removed != nil {
-				// This is a replacement of the public key.
-				if diff.removed.PublicKey != nil {
-					change.prevPublicKey = bls.PublicKeyToUncompressedBytes(diff.removed.PublicKey)
+				// This is a replacement. Primary network validators
+				// carry their own BLS key, but subnet validators
+				// inherit it from the corresponding primary network
+				// validator, so we fall back to the inherited key.
+				prevPK := diff.removed.PublicKey
+				if prevPK == nil {
+					// Subnet validator: the old inherited key is the
+					// primary network validator's key before this
+					// diff. Check the primary diff's removed entry,
+					// falling back to the current inherited key if
+					// the primary was not replaced.
+					prevPK = pk
+					if primaryDiff, ok := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID][nodeID]; ok && primaryDiff.removed != nil {
+						prevPK = primaryDiff.removed.PublicKey
+					}
 				}
-				if diff.added.PublicKey != nil {
-					change.newPublicKey = bls.PublicKeyToUncompressedBytes(diff.added.PublicKey)
+				newPK := diff.added.PublicKey
+				if newPK == nil {
+					// Subnet validator: the new inherited key is the
+					// current primary network validator's key (which
+					// already reflects any replacement via Apply).
+					newPK = pk
+				}
+				if prevPK != nil {
+					change.prevPublicKey = bls.PublicKeyToUncompressedBytes(prevPK)
+				}
+				if newPK != nil {
+					change.newPublicKey = bls.PublicKeyToUncompressedBytes(newPK)
 				}
 			} else if pk != nil {
 				// This is not a replacement, and we anyway write the public key to the diff.
