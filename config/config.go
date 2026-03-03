@@ -166,7 +166,7 @@ func applySnowballParameterDefaults(config *snowball.Parameters, v *viper.Viper)
 	}
 	if config.Alpha != nil {
 		config.AlphaPreference = *config.Alpha
-		config.AlphaConfidence = config.AlphaPreference
+		config.AlphaConfidence = *config.Alpha
 	}
 }
 

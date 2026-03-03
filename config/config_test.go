@@ -1012,18 +1012,163 @@ func TestGetPrimaryNetworkConfigWithSnowQuorumSizeKey(t *testing.T) {
 	}
 }
 
-func TestApplySubnetConfigDefaults(t *testing.T) {
-	// Custom values used across test inputs and verify functions — declared once
-	// to avoid duplication between the two.
+func TestApplySnowballParametersDefaults(t *testing.T) {
 	var (
-		customSnowK           = snowball.DefaultParameters.K + 10
-		customAlphaPreference = snowball.DefaultParameters.AlphaPreference + 2
-		customAlphaConfidence = snowball.DefaultParameters.AlphaConfidence + 2
-		customBeta            = snowball.DefaultParameters.Beta + 2
+		customK                   = snowball.DefaultParameters.K + 10
+		customAlphaPreference     = snowball.DefaultParameters.AlphaPreference + 2
+		customAlphaConfidence     = snowball.DefaultParameters.AlphaConfidence + 2
+		customBeta                = snowball.DefaultParameters.Beta + 2
+		customConcurrentRepolls   = snowball.DefaultParameters.ConcurrentRepolls + 1
+		customOptimalProcessing   = snowball.DefaultParameters.OptimalProcessing + 5
+		customMaxOutstandingItems = snowball.DefaultParameters.MaxOutstandingItems + 5
+		customMaxItemProcessing   = snowball.DefaultParameters.MaxItemProcessingTime + time.Second
+		customQuorumSize          = snowball.DefaultParameters.AlphaPreference + 3
+	)
 
+	tests := []struct {
+		name       string
+		viperSetup func(*viper.Viper)
+		input      *snowball.Parameters
+		verify     func(*require.Assertions, *snowball.Parameters)
+	}{
+		{
+			name:  "nil config is a no-op",
+			input: nil,
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Nil(p)
+			},
+		},
+		{
+			name:  "all zero fields filled from defaults",
+			input: &snowball.Parameters{},
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Equal(&snowball.DefaultParameters, p)
+			},
+		},
+		{
+			name: "all non-zero fields preserved",
+			input: &snowball.Parameters{
+				K:                     customK,
+				AlphaPreference:       customAlphaPreference,
+				AlphaConfidence:       customAlphaConfidence,
+				Beta:                  customBeta,
+				ConcurrentRepolls:     customConcurrentRepolls,
+				OptimalProcessing:     customOptimalProcessing,
+				MaxOutstandingItems:   customMaxOutstandingItems,
+				MaxItemProcessingTime: customMaxItemProcessing,
+			},
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Equal(customK, p.K)
+				require.Equal(customAlphaPreference, p.AlphaPreference)
+				require.Equal(customAlphaConfidence, p.AlphaConfidence)
+				require.Equal(customBeta, p.Beta)
+				require.Equal(customConcurrentRepolls, p.ConcurrentRepolls)
+				require.Equal(customOptimalProcessing, p.OptimalProcessing)
+				require.Equal(customMaxOutstandingItems, p.MaxOutstandingItems)
+				require.Equal(customMaxItemProcessing, p.MaxItemProcessingTime)
+			},
+		},
+		{
+			name: "deprecated Alpha overrides AlphaPreference and AlphaConfidence",
+			input: &snowball.Parameters{
+				Alpha: &customAlphaPreference,
+			},
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Equal(customAlphaPreference, p.AlphaPreference)
+				require.Equal(customAlphaPreference, p.AlphaConfidence)
+			},
+		},
+		{
+			name:  "SnowQuorumSizeKey fills zero AlphaPreference and AlphaConfidence",
+			input: &snowball.Parameters{},
+			viperSetup: func(v *viper.Viper) {
+				v.Set(SnowQuorumSizeKey, customQuorumSize)
+			},
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Equal(customQuorumSize, p.AlphaPreference)
+				require.Equal(customQuorumSize, p.AlphaConfidence)
+			},
+		},
+		{
+			name: "SnowQuorumSizeKey does not override non-zero AlphaPreference and AlphaConfidence",
+			input: &snowball.Parameters{
+				AlphaPreference: customAlphaPreference,
+				AlphaConfidence: customAlphaConfidence,
+			},
+			viperSetup: func(v *viper.Viper) {
+				v.Set(SnowQuorumSizeKey, customQuorumSize)
+			},
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Equal(customAlphaPreference, p.AlphaPreference)
+				require.Equal(customAlphaConfidence, p.AlphaConfidence)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+			if tt.viperSetup != nil {
+				tt.viperSetup(v)
+			}
+			p := tt.input
+			applySnowballParameterDefaults(p, v)
+			tt.verify(require, p)
+		})
+	}
+}
+
+func TestApplySimplexParametersDefaults(t *testing.T) {
+	var (
 		customMaxNetworkDelay    = simplex.DefaultParameters.MaxNetworkDelay + time.Second
 		customMaxRebroadcastWait = simplex.DefaultParameters.MaxRebroadcastWait + time.Second
 	)
+
+	tests := []struct {
+		name   string
+		input  *simplex.Parameters
+		verify func(*require.Assertions, *simplex.Parameters)
+	}{
+		{
+			name:  "all zero fields filled from defaults",
+			input: &simplex.Parameters{},
+			verify: func(require *require.Assertions, p *simplex.Parameters) {
+				require.Equal(simplex.DefaultParameters, *p)
+			},
+		},
+		{
+			name: "all non-zero fields preserved",
+			input: &simplex.Parameters{
+				MaxNetworkDelay:    customMaxNetworkDelay,
+				MaxRebroadcastWait: customMaxRebroadcastWait,
+			},
+			verify: func(require *require.Assertions, p *simplex.Parameters) {
+				require.Equal(customMaxNetworkDelay, p.MaxNetworkDelay)
+				require.Equal(customMaxRebroadcastWait, p.MaxRebroadcastWait)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+			p := tt.input
+			applySimplexDefaults(p, v)
+			tt.verify(require, p)
+		})
+	}
+}
+
+func TestApplySubnetConfigDefaults(t *testing.T) {
+	var customSnowK = snowball.DefaultParameters.K + 10
+	var expectedSnow = &snowball.DefaultParameters
+	expectedSnow.K = customSnowK
+
+	var customSimplexNetworkDelay = simplex.DefaultParameters.MaxNetworkDelay + time.Second
+	var expectedSimplex = &simplex.DefaultParameters
+	expectedSimplex.MaxNetworkDelay = customSimplexNetworkDelay
 
 	tests := []struct {
 		name   string
@@ -1031,17 +1176,29 @@ func TestApplySubnetConfigDefaults(t *testing.T) {
 		verify func(*require.Assertions, subnets.Config)
 	}{
 		{
-			name:  "no parameters set defaults to snow",
+			name:  "none set",
 			input: subnets.Config{},
 			verify: func(require *require.Assertions, cfg subnets.Config) {
-				require.NotNil(cfg.SnowParameters)
 				require.Nil(cfg.SimplexParameters)
 				require.Nil(cfg.ConsensusParameters)
 				require.Equal(snowball.DefaultParameters, *cfg.SnowParameters)
 			},
 		},
 		{
-			name: "snow parameters set fills zero fields from viper",
+			name: "simplex mode set",
+			input: subnets.Config{
+				SimplexParameters: &simplex.Parameters{
+					MaxNetworkDelay: customSimplexNetworkDelay,
+				},
+			},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.Nil(cfg.SnowParameters)
+				require.Nil(cfg.ConsensusParameters)
+				require.Equal(expectedSimplex, cfg.SimplexParameters)
+			},
+		},
+		{
+			name: "snow mode set",
 			input: subnets.Config{
 				SnowParameters: &snowball.Parameters{
 					K: customSnowK,
@@ -1051,77 +1208,21 @@ func TestApplySubnetConfigDefaults(t *testing.T) {
 				require.NotNil(cfg.SnowParameters)
 				require.Nil(cfg.SimplexParameters)
 				require.Nil(cfg.ConsensusParameters)
-				// explicitly set field preserved
-				require.Equal(customSnowK, cfg.SnowParameters.K)
-				// zero fields filled from viper defaults
-				require.Equal(snowball.DefaultParameters.AlphaPreference, cfg.SnowParameters.AlphaPreference)
-				require.Equal(snowball.DefaultParameters.AlphaConfidence, cfg.SnowParameters.AlphaConfidence)
-				require.Equal(snowball.DefaultParameters.Beta, cfg.SnowParameters.Beta)
+
+				require.Equal(expectedSnow, cfg.SnowParameters)
 			},
 		},
 		{
-			name: "snow parameters set preserves all non-zero fields",
-			input: subnets.Config{
-				SnowParameters: &snowball.Parameters{
-					K:               customSnowK,
-					AlphaPreference: customAlphaPreference,
-					AlphaConfidence: customAlphaConfidence,
-					Beta:            customBeta,
-				},
-			},
-			verify: func(require *require.Assertions, cfg subnets.Config) {
-				require.NotNil(cfg.SnowParameters)
-				require.Equal(customSnowK, cfg.SnowParameters.K)
-				require.Equal(customAlphaPreference, cfg.SnowParameters.AlphaPreference)
-				require.Equal(customAlphaConfidence, cfg.SnowParameters.AlphaConfidence)
-				require.Equal(customBeta, cfg.SnowParameters.Beta)
-			},
-		},
-		{
-			name: "deprecated consensus parameters migrated to snow parameters",
+			name: "deprecated consensus parameters set",
 			input: subnets.Config{
 				ConsensusParameters: &snowball.Parameters{
-					K:               customSnowK,
-					AlphaPreference: customAlphaPreference,
-					AlphaConfidence: customAlphaConfidence,
-					Beta:            customBeta,
+					K: customSnowK,
 				},
 			},
 			verify: func(require *require.Assertions, cfg subnets.Config) {
 				require.NotNil(cfg.SnowParameters)
-				require.Nil(cfg.ConsensusParameters)
+				require.Equal(expectedSnow, cfg.SnowParameters)
 				require.Nil(cfg.SimplexParameters)
-				require.Equal(customSnowK, cfg.SnowParameters.K)
-				require.Equal(customAlphaPreference, cfg.SnowParameters.AlphaPreference)
-				require.Equal(customAlphaConfidence, cfg.SnowParameters.AlphaConfidence)
-				require.Equal(customBeta, cfg.SnowParameters.Beta)
-			},
-		},
-		{
-			name: "simplex parameters set fills zero fields from viper",
-			input: subnets.Config{
-				SimplexParameters: &simplex.Parameters{},
-			},
-			verify: func(require *require.Assertions, cfg subnets.Config) {
-				require.NotNil(cfg.SimplexParameters)
-				require.Nil(cfg.SnowParameters)
-				require.Nil(cfg.ConsensusParameters)
-				require.Equal(simplex.DefaultParameters.MaxNetworkDelay, cfg.SimplexParameters.MaxNetworkDelay)
-				require.Equal(simplex.DefaultParameters.MaxRebroadcastWait, cfg.SimplexParameters.MaxRebroadcastWait)
-			},
-		},
-		{
-			name: "simplex parameters set preserves non-zero fields",
-			input: subnets.Config{
-				SimplexParameters: &simplex.Parameters{
-					MaxNetworkDelay:    customMaxNetworkDelay,
-					MaxRebroadcastWait: customMaxRebroadcastWait,
-				},
-			},
-			verify: func(require *require.Assertions, cfg subnets.Config) {
-				require.NotNil(cfg.SimplexParameters)
-				require.Equal(customMaxNetworkDelay, cfg.SimplexParameters.MaxNetworkDelay)
-				require.Equal(customMaxRebroadcastWait, cfg.SimplexParameters.MaxRebroadcastWait)
 			},
 		},
 	}
