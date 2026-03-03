@@ -30,7 +30,6 @@ cleanup() {
 trap cleanup EXIT
 
 for name in "${configs[@]}"; do
-  config_path="${DEVCONTAINER_DIR}/${name}/devcontainer.json"
   echo "=== Testing devcontainer config: ${name} ==="
 
   # Test the build via build_devcontainer.sh (which handles initializeCommand
