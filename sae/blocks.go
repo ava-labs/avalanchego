@@ -14,25 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/hook"
-	saeparams "github.com/ava-labs/strevm/params"
-	"github.com/ava-labs/strevm/txgossip"
-	"github.com/ava-labs/strevm/worstcase"
 )
-
-func (vm *VM) newBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
-	return blocks.New(eth, parent, lastSettled, vm.log())
-}
 
 // maxFutureBlockDuration is the maximum time from the current time allowed for
 // blocks before they're considered future blocks and fail parsing or
@@ -65,217 +53,13 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 		return nil, fmt.Errorf("%w: >%s", errBlockTooFarInFuture, maxFutureBlockDuration)
 	}
 
-	return vm.newBlock(b, nil, nil)
+	return vm.blockBuilder.new(b, nil, nil)
 }
 
 // BuildBlock builds a new block, using the last block passed to
 // [VM.SetPreference] as the parent. The block context MAY be nil.
 func (vm *VM) BuildBlock(ctx context.Context, bCtx *block.Context) (*blocks.Block, error) {
-	return vm.buildBlock(
-		ctx,
-		bCtx,
-		vm.preference.Load(),
-		vm.mempool.TransactionsByPriority,
-		vm.hooks,
-	)
-}
-
-var (
-	errBlockTimeUnderMinimum = errors.New("block time under minimum allowed time")
-	errBlockTimeBeforeParent = errors.New("block time before parent time")
-	errBlockTimeAfterMaximum = errors.New("block time after maximum allowed time")
-	errExecutionLagging      = errors.New("execution lagging for settlement")
-)
-
-// buildBlock implements the block-building logic shared by [VM.BuildBlock] and
-// [VM.VerifyBlock].
-func (vm *VM) buildBlock(
-	ctx context.Context,
-	bCtx *block.Context,
-	parent *blocks.Block,
-	pendingTxs func(txpool.PendingFilter) []*txgossip.LazyTransaction,
-	builder hook.BlockBuilder,
-) (*blocks.Block, error) {
-	hdr := builder.BuildHeader(parent.Header())
-	log := vm.log().With(
-		zap.Uint64("parent_height", parent.Height()),
-		zap.Stringer("parent_hash", parent.Hash()),
-		zap.Uint64("block_time", hdr.Time),
-	)
-	if hdr.Root != (common.Hash{}) || hdr.GasLimit != 0 || hdr.BaseFee != nil || hdr.GasUsed != 0 {
-		log.Warn("Block builder returned header with at least one reserved field set",
-			zap.Stringer("root", hdr.Root),
-			zap.Uint64("gas_limit", hdr.GasLimit),
-			zap.Stringer("base_fee", hdr.BaseFee),
-			zap.Uint64("gas_used", hdr.GasUsed),
-		)
-	}
-
-	bTime := blocks.PreciseTime(vm.hooks, hdr)
-	pTime := blocks.PreciseTime(vm.hooks, parent.Header())
-
-	// It is allowed for [hook.Points] to further constrain the allowed block
-	// times. However, every block MUST at least satisfy these basic sanity
-	// checks.
-	if bTime.Unix() < saeparams.TauSeconds {
-		return nil, fmt.Errorf("%w: %d < %d", errBlockTimeUnderMinimum, hdr.Time, saeparams.TauSeconds)
-	}
-	if bTime.Compare(pTime) < 0 {
-		return nil, fmt.Errorf("%w: %s < %s", errBlockTimeBeforeParent, bTime.String(), pTime.String())
-	}
-	maxTime := vm.config.Now().Add(maxFutureBlockDuration)
-	if bTime.Compare(maxTime) > 0 {
-		return nil, fmt.Errorf("%w: %s > %s", errBlockTimeAfterMaximum, bTime.String(), maxTime.String())
-	}
-
-	// Underflow of Add(-tau) is prevented by the above check.
-	lastSettled, ok, err := blocks.LastToSettleAt(vm.hooks, bTime.Add(-saeparams.Tau), parent)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		log.Warn("Execution lagging when determining last block to settle")
-		return nil, errExecutionLagging
-	}
-
-	log = log.With(
-		zap.Uint64("last_settled_height", lastSettled.Height()),
-		zap.Stringer("last_settled_hash", lastSettled.Hash()),
-	)
-
-	state, err := worstcase.NewState(vm.hooks, vm.exec.ChainConfig(), vm.exec.StateCache(), lastSettled, vm.exec.SnapshotTree())
-	if err != nil {
-		log.Warn("Worst-case state not able to be created",
-			zap.Error(err),
-		)
-		return nil, err
-	}
-
-	unsettled := blocks.Range(lastSettled, parent)
-	for _, b := range unsettled {
-		log := log.With(
-			zap.Uint64("block_height", b.Height()),
-			zap.Stringer("block_hash", b.Hash()),
-		)
-		if err := state.StartBlock(b.Header()); err != nil {
-			log.Warn("Could not start historical worst-case calculation",
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("starting worst-case state for block %d: %v", b.Height(), err)
-		}
-		for i, tx := range b.Transactions() {
-			if err := state.ApplyTx(tx); err != nil {
-				log.Warn("Could not apply tx during historical worst-case calculation",
-					zap.Int("tx_index", i),
-					zap.Stringer("tx_hash", tx.Hash()),
-					zap.Error(err),
-				)
-				return nil, fmt.Errorf("applying tx %#x in block %d to worst-case state: %v", tx.Hash(), b.Height(), err)
-			}
-		}
-		for i, op := range vm.hooks.EndOfBlockOps(b.EthBlock()) {
-			if err := state.Apply(op); err != nil {
-				log.Warn("Could not apply op during historical worst-case calculation",
-					zap.Int("op_index", i),
-					zap.Stringer("op_id", op.ID),
-					zap.Error(err),
-				)
-				return nil, fmt.Errorf("applying op at end of block %d to worst-case state: %v", b.Height(), err)
-			}
-		}
-		if _, err := state.FinishBlock(); err != nil {
-			log.Warn("Could not finish historical worst-case calculation",
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("finishing worst-case state for block %d: %v", b.Height(), err)
-		}
-	}
-
-	hdr.Root = lastSettled.PostExecutionStateRoot()
-	if err := state.StartBlock(hdr); err != nil {
-		// A full queue is a normal mode of operation (backpressure working as
-		// intended) so should not be a warning.
-		logTo := log.Warn
-		if errors.Is(err, worstcase.ErrQueueFull) {
-			logTo = log.Debug
-		}
-		logTo("Could not start worst-case block calculation",
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("starting worst-case state for new block: %w", err)
-	}
-
-	hdr.GasLimit = state.GasLimit()
-	hdr.BaseFee = state.BaseFee().ToBig()
-
-	var (
-		candidates = pendingTxs(txpool.PendingFilter{
-			BaseFee: state.BaseFee(),
-		})
-		included []*types.Transaction
-	)
-	for _, ltx := range candidates {
-		// If we don't have enough gas remaining in the block for the minimum
-		// gas amount, we are done including transactions.
-		if remainingGas := state.GasLimit() - state.GasUsed(); remainingGas < params.TxGas {
-			break
-		}
-		txLog := log.With(
-			zap.Stringer("tx_hash", ltx.Hash),
-			zap.Int("tx_index", len(included)),
-			zap.Stringer("sender", ltx.Sender),
-		)
-
-		tx, ok := ltx.Resolve()
-		if !ok {
-			txLog.Debug("Could not resolve lazy transaction")
-			continue
-		}
-
-		// The [saexec.Executor] checks the worst-case balance before tx
-		// execution so we MUST record it at the equivalent point, before
-		// ApplyTx().
-		if err := state.ApplyTx(tx); err != nil {
-			txLog.Debug("Could not apply transaction", zap.Error(err))
-			continue
-		}
-		txLog.Trace("Including transaction")
-		included = append(included, tx)
-	}
-
-	// TODO: Should the [hook.BlockBuilder] populate [types.Header.GasUsed] so
-	// that [hook.Op.Gas] can be included?
-	hdr.GasUsed = state.GasUsed()
-
-	bounds, err := state.FinishBlock()
-	if err != nil {
-		log.Warn("Could not finish worst-case block calculation",
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("finishing worst-case state for new block: %v", err)
-	}
-
-	var receipts types.Receipts
-	settling := blocks.Range(parent.LastSettled(), lastSettled)
-	for _, b := range settling {
-		receipts = append(receipts, b.Receipts()...)
-	}
-
-	ethB, err := builder.BuildBlock(
-		hdr,
-		included,
-		receipts,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	b, err := vm.newBlock(ethB, parent, lastSettled)
-	if err != nil {
-		return nil, err
-	}
-	b.SetWorstCaseBounds(bounds)
-	return b, nil
+	return vm.blockBuilder.build(ctx, bCtx, vm.preference.Load())
 }
 
 var (
@@ -287,14 +71,6 @@ var (
 // VerifyBlock validates the block and, if successful, populates its ancestry.
 // The block context MAY be nil.
 func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Block) error {
-	// Sender caching should be performed as early as possible but not at the
-	// risk of spam. [VM.ParseBlock] is too early as there is no protection,
-	// whereas [VM.VerifyBlock] is only called after verifying the current
-	// proposer's signature. While a malicious proposer could exist, their time
-	// window is limited.
-	signer := vm.exec.SignerForBlock(b)
-	core.SenderCacher.Recover(signer, b.Transactions()) // asynchronous
-
 	parent, err := vm.GetBlock(ctx, b.Parent())
 	if err != nil {
 		return fmt.Errorf("%w %#x: %w", errUnknownParent, b.ParentHash(), err)
@@ -305,41 +81,7 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 		return fmt.Errorf("%w at height %d <= last-accepted (%d)", errBlockHeightTooLow, height, accepted)
 	}
 
-	txs := make([]*txgossip.LazyTransaction, len(b.Transactions()))
-	for i, tx := range b.Transactions() {
-		s, err := types.Sender(signer, tx)
-		if err != nil {
-			return fmt.Errorf("recovering sender of tx %#x: %v", tx.Hash(), err)
-		}
-
-		feeCap, err := uint256FromBig(tx.GasFeeCap())
-		if err != nil {
-			return fmt.Errorf("tx %#x fee cap: %v", tx.Hash(), err)
-		}
-		tipCap, err := uint256FromBig(tx.GasTipCap())
-		if err != nil {
-			return fmt.Errorf("tx %#x tip cap: %v", tx.Hash(), err)
-		}
-
-		txs[i] = &txgossip.LazyTransaction{
-			LazyTransaction: &txpool.LazyTransaction{
-				Hash:      tx.Hash(),
-				Tx:        tx,
-				GasFeeCap: feeCap,
-				GasTipCap: tipCap,
-				Gas:       tx.Gas(),
-			},
-			Sender: s,
-		}
-	}
-
-	rebuilt, err := vm.buildBlock(
-		ctx,
-		bCtx,
-		parent,
-		func(f txpool.PendingFilter) []*txgossip.LazyTransaction { return txs },
-		vm.hooks.BlockRebuilderFrom(b.EthBlock()),
-	)
+	rebuilt, err := vm.blockBuilder.rebuild(ctx, bCtx, parent, b)
 	if err != nil {
 		return err
 	}
@@ -411,7 +153,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (*blocks.Block, error) {
 				)
 			}
 
-			b, err := vm.newBlock(ethB, nil, nil)
+			b, err := vm.blockBuilder.new(ethB, nil, nil)
 			if err != nil {
 				return nil, err
 			}

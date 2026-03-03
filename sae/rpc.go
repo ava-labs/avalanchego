@@ -651,7 +651,7 @@ func (b *ethAPIBackend) getBlock(numOrHash rpc.BlockNumberOrHash) (*blocks.Block
 		return nil, nil
 	}
 
-	blk, err := b.vm.newBlock(ethBlock, nil, nil)
+	blk, err := b.vm.blockBuilder.new(ethBlock, nil, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -717,12 +717,10 @@ func TestAcceptBlock(t *testing.T) {
 
 func TestSemanticBlockChecks(t *testing.T) {
 	const now = 1e6
+	opt, _ := withVMTime(t, time.Unix(now, 0))
 	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Timestamp = now
-	}))
-	sut.rawVM.config.Now = func() time.Time {
-		return time.Unix(now, 0)
-	}
+	}), opt)
 
 	lastAccepted := sut.lastAcceptedBlock(t)
 	tests := []struct {
