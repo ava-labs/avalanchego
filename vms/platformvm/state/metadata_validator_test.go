@@ -119,57 +119,56 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	require.True(subnetDB.Has(testUptimeReward.txID[:]))
 }
 
-func TestValidatorDelegateeRewards(t *testing.T) {
-	require := require.New(t)
+func TestValidatorStakingInfo(t *testing.T) {
 	state := newValidatorState()
 
-	// get non-existent delegatee reward
+	// get non-existent staking info
 	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
-	_, err := state.GetDelegateeReward(subnetID, nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
+	_, err := state.GetStakingInfo(subnetID, nodeID)
+	require.ErrorIs(t, err, database.ErrNotFound)
 
-	// set non-existent delegatee reward
-	err = state.SetDelegateeReward(subnetID, nodeID, 100000)
-	require.ErrorIs(err, database.ErrNotFound)
+	// set non-existent staking info
+	err = state.SetStakingInfo(subnetID, nodeID, StakingInfo{DelegateeReward: 100000})
+	require.ErrorIs(t, err, database.ErrNotFound)
 
 	testMetadata := &validatorMetadata{
 		PotentialDelegateeReward: 100000,
 	}
-	// load delegatee reward
+	// load staking info
 	state.LoadValidatorMetadata(nodeID, subnetID, testMetadata)
 
-	// get delegatee reward
-	delegateeReward, err := state.GetDelegateeReward(subnetID, nodeID)
-	require.NoError(err)
-	require.Equal(testMetadata.PotentialDelegateeReward, delegateeReward)
+	// get staking info
+	stakingInfo, err := state.GetStakingInfo(subnetID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, testMetadata.PotentialDelegateeReward, stakingInfo.DelegateeReward)
 
-	// set delegatee reward
-	newDelegateeReward := testMetadata.PotentialDelegateeReward + 100000
-	require.NoError(state.SetDelegateeReward(subnetID, nodeID, newDelegateeReward))
+	// set staking info
+	wantDelegateeReward := testMetadata.PotentialDelegateeReward + 100000
+	require.NoError(t, state.SetStakingInfo(subnetID, nodeID, StakingInfo{DelegateeReward: wantDelegateeReward}))
 
-	// get new delegatee reward
-	delegateeReward, err = state.GetDelegateeReward(subnetID, nodeID)
-	require.NoError(err)
-	require.Equal(newDelegateeReward, delegateeReward)
+	// get new staking info
+	stakingInfo, err = state.GetStakingInfo(subnetID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantDelegateeReward, stakingInfo.DelegateeReward)
 
-	// load delegatee reward changes
+	// load staking info changes
 	newTestMetadata := &validatorMetadata{
 		PotentialDelegateeReward: testMetadata.PotentialDelegateeReward + 100000,
 	}
 	state.LoadValidatorMetadata(nodeID, subnetID, newTestMetadata)
 
-	// get new delegatee reward
-	delegateeReward, err = state.GetDelegateeReward(subnetID, nodeID)
-	require.NoError(err)
-	require.Equal(newTestMetadata.PotentialDelegateeReward, delegateeReward)
+	// get new staking info
+	stakingInfo, err = state.GetStakingInfo(subnetID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, newTestMetadata.PotentialDelegateeReward, stakingInfo.DelegateeReward)
 
-	// delete delegatee reward
+	// delete staking info
 	state.DeleteValidatorMetadata(nodeID, subnetID)
 
-	// get deleted delegatee reward
+	// get deleted staking info
 	_, _, err = state.GetUptime(nodeID, subnetID)
-	require.ErrorIs(err, database.ErrNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 }
 
 func TestAddValidatorMetadataWrite(t *testing.T) {
