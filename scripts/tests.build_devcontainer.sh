@@ -40,7 +40,7 @@ for name in "${configs[@]}"; do
   # Start a container from the built image for smoke testing (using docker
   # directly to avoid devcontainer up rebuilding the image).
   echo "Starting container for smoke testing '${name}'..."
-  IMAGE="$(docker images --format '{{.Repository}}' --filter "reference=vsc-$(basename "${AVALANCHE_PATH}")-*" | head -1)"
+  IMAGE="$(docker images --format '{{.Repository}}' --filter "reference=vsc-$(basename "${AVALANCHE_PATH}")-*" 2>/dev/null | head -1)"
   if [[ -z "${IMAGE}" ]]; then
     echo "Error: no devcontainer image found after build." >&2
     exit 1
@@ -51,9 +51,8 @@ for name in "${configs[@]}"; do
     sleep infinity)"
 
   echo "Smoke-testing devcontainer '${name}'..."
-  docker exec "${CONTAINER_ID}" nix develop --command go version
-  docker exec "${CONTAINER_ID}" nix develop --command task --version
-  docker exec "${CONTAINER_ID}" nix develop --command git rev-parse HEAD
+  docker exec "${CONTAINER_ID}" nix develop --command sh -c \
+    'go version && task --version && git rev-parse HEAD'
 
   echo "=== devcontainer '${name}' OK ==="
 done

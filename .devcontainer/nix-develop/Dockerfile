@@ -14,7 +14,7 @@ RUN nix develop --profile /nix-dev-profile --command true
 # devcontainer.json.
 COPY tmp/.git-bundle /tmp/.git-bundle
 COPY tmp/.git-remotes /tmp/.git-remotes
-RUN nix develop --command sh -c "\
+RUN nix develop /nix-dev-profile --command sh -c "\
     git clone /tmp/.git-bundle /workspace/avalanchego && \
     cd /workspace/avalanchego && \
     # Replace the cloned commit with an orphan commit (same tree, no parents).
