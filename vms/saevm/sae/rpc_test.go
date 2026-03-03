@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/hookstest"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -1157,6 +1158,11 @@ func TestDebugRPCs(t *testing.T) {
 			method:  "debug_dbAncients",
 			wantErr: testerr.Contains("not supported"),
 		},
+		{
+			method:  "debug_printBlock",
+			args:    []any{uint64(1)}, // SUT only has genesis, so block 1 doesn't exist.
+			wantErr: testerr.Contains("not found"),
+		},
 	}...)
 
 	// The profiling debug namespace is handled entirely by upstream code
@@ -1187,7 +1193,7 @@ func TestDebugRPCs(t *testing.T) {
 	})
 }
 
-func TestDebugGetRawTransaction(t *testing.T) {
+func TestDebugGetRaw(t *testing.T) {
 	ctx, sut := newSUT(t, 1, withDebugAPI())
 
 	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
@@ -1198,7 +1204,7 @@ func TestDebugGetRawTransaction(t *testing.T) {
 	b := sut.runConsensusLoop(t, tx)
 	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 
-	marshaled, err := tx.MarshalBinary()
+	txMarshaled, err := tx.MarshalBinary()
 	require.NoErrorf(t, err, "%T.MarshalBinary()", tx)
 
 	// Mempool tx: send without building a block, then query.
@@ -1212,14 +1218,27 @@ func TestDebugGetRawTransaction(t *testing.T) {
 	mempoolMarshaled, err := mempoolTx.MarshalBinary()
 	require.NoErrorf(t, err, "%T.MarshalBinary()", mempoolTx)
 
-	t.Logf("Tx in block: %#x", tx.Hash())
-	t.Logf("Tx in mempool: %#x", mempoolTx.Hash())
+	ethBlock := b.EthBlock()
+	wantBlockRLP, err := rlp.EncodeToBytes(ethBlock)
+	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", ethBlock)
+
+	wantHeaderRLP, err := rlp.EncodeToBytes(ethBlock.Header())
+	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", ethBlock.Header())
+
+	receipts := b.Receipts()
+	wantRawReceipts := make([]hexutil.Bytes, len(receipts))
+	for i, r := range receipts {
+		raw, err := r.MarshalBinary()
+		require.NoErrorf(t, err, "receipts[%d].MarshalBinary()", i)
+		wantRawReceipts[i] = raw
+	}
 
 	sut.testRPC(ctx, t, []rpcTest{
+		// debug_getRawTransaction
 		{
 			method: "debug_getRawTransaction",
 			args:   []any{tx.Hash()},
-			want:   hexutil.Bytes(marshaled),
+			want:   hexutil.Bytes(txMarshaled),
 		},
 		{
 			method: "debug_getRawTransaction",
@@ -1230,6 +1249,54 @@ func TestDebugGetRawTransaction(t *testing.T) {
 			method: "debug_getRawTransaction",
 			args:   []any{mempoolTx.Hash()},
 			want:   hexutil.Bytes(mempoolMarshaled),
+		},
+		// debug_getRawHeader
+		{
+			method: "debug_getRawHeader",
+			args:   []any{b.Hash()},
+			want:   hexutil.Bytes(wantHeaderRLP),
+		},
+		{
+			method: "debug_getRawHeader",
+			args:   []any{hexutil.Uint64(b.Height())},
+			want:   hexutil.Bytes(wantHeaderRLP),
+		},
+		{
+			method:  "debug_getRawHeader",
+			args:    []any{common.Hash{}},
+			wantErr: testerr.Contains("not found"),
+		},
+		// debug_getRawBlock
+		{
+			method: "debug_getRawBlock",
+			args:   []any{b.Hash()},
+			want:   hexutil.Bytes(wantBlockRLP),
+		},
+		{
+			method: "debug_getRawBlock",
+			args:   []any{hexutil.Uint64(b.Height())},
+			want:   hexutil.Bytes(wantBlockRLP),
+		},
+		{
+			method:  "debug_getRawBlock",
+			args:    []any{common.Hash{}},
+			wantErr: testerr.Contains("not found"),
+		},
+		// debug_getRawReceipts
+		{
+			method: "debug_getRawReceipts",
+			args:   []any{b.Hash()},
+			want:   wantRawReceipts,
+		},
+		{
+			method: "debug_getRawReceipts",
+			args:   []any{hexutil.Uint64(b.Height())},
+			want:   wantRawReceipts,
+		},
+		{
+			method: "debug_getRawReceipts",
+			args:   []any{common.Hash{}},
+			want:   []hexutil.Bytes{},
 		},
 	}...)
 }
