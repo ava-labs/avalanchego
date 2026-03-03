@@ -9,6 +9,13 @@ COPY flake.nix flake.lock ./
 COPY nix/ nix/
 RUN nix develop --profile /nix-dev-profile --command true
 
+# Create non-root dev user (nixos/nix has no adduser; edit files directly)
+RUN echo 'dev:x:1000:1000::/home/dev:/bin/sh' >> /etc/passwd \
+    && echo 'dev:x:1000:dev' >> /etc/group \
+    && echo 'dev:!:1::::::' >> /etc/shadow \
+    && mkdir -p /home/dev \
+    && chown 1000:1000 /home/dev
+
 # Clone the repo from a git bundle containing HEAD (and the branch ref if available).
 # The bundle and remote config are created by the initializeCommand in
 # devcontainer.json.
@@ -29,7 +36,12 @@ RUN nix develop /nix-dev-profile --command sh -c "\
     while IFS='=' read -r key value; do git config \"\$key\" \"\$value\"; done < /tmp/.git-remotes" \
     && rm /tmp/.git-bundle /tmp/.git-remotes
 
+# Transfer ownership after all root-level nix operations are complete
+RUN chown -R dev:dev /nix /workspace
+
 WORKDIR /workspace/avalanchego
+
+USER dev
 
 # Set the default command to enter the dev shell
 CMD ["nix", "develop", "--command", "bash"]
