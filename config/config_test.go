@@ -1162,15 +1162,12 @@ func TestApplySimplexParametersDefaults(t *testing.T) {
 }
 
 func TestApplySubnetConfigDefaults(t *testing.T) {
-	var (
-		customSnowK  = snowball.DefaultParameters.K + 10
-		expectedSnow = &snowball.DefaultParameters
-
-		customSimplexNetworkDelay = simplex.DefaultParameters.MaxNetworkDelay + time.Second
-		expectedSimplex           = &simplex.DefaultParameters
-	)
-
+	customSnowK := snowball.DefaultParameters.K + 10
+	expectedSnow := snowball.DefaultParameters
 	expectedSnow.K = customSnowK
+
+	customSimplexNetworkDelay := simplex.DefaultParameters.MaxNetworkDelay + time.Second
+	expectedSimplex := simplex.DefaultParameters
 	expectedSimplex.MaxNetworkDelay = customSimplexNetworkDelay
 
 	tests := []struct {
@@ -1197,7 +1194,7 @@ func TestApplySubnetConfigDefaults(t *testing.T) {
 			verify: func(require *require.Assertions, cfg subnets.Config) {
 				require.Nil(cfg.SnowParameters)
 				require.Nil(cfg.ConsensusParameters)
-				require.Equal(expectedSimplex, cfg.SimplexParameters)
+				require.Equal(expectedSimplex, *cfg.SimplexParameters)
 			},
 		},
 		{
@@ -1212,7 +1209,7 @@ func TestApplySubnetConfigDefaults(t *testing.T) {
 				require.Nil(cfg.SimplexParameters)
 				require.Nil(cfg.ConsensusParameters)
 
-				require.Equal(expectedSnow, cfg.SnowParameters)
+				require.Equal(expectedSnow, *cfg.SnowParameters)
 			},
 		},
 		{
@@ -1224,7 +1221,7 @@ func TestApplySubnetConfigDefaults(t *testing.T) {
 			},
 			verify: func(require *require.Assertions, cfg subnets.Config) {
 				require.NotNil(cfg.SnowParameters)
-				require.Equal(expectedSnow, cfg.SnowParameters)
+				require.Equal(expectedSnow, *cfg.SnowParameters)
 				require.Nil(cfg.SimplexParameters)
 			},
 		},
