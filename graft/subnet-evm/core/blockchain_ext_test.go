@@ -131,6 +131,7 @@ var reexecTests = []ReexecTest{
 // Additionally, create another BlockChain instance from its databases to ensure that BlockChain is
 // persisted correctly through a restart.
 // checkBlockChainState consumes `bc` and all database references, and it cannot be used afterwards.
+// Note: [BlockChain.Stop] is safe to be called multiple times.
 func checkBlockChainState(
 	t *testing.T,
 	bc *BlockChain,
