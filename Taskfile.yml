@@ -131,6 +131,18 @@ tasks:
     desc: Deletes the default kind cluster
     cmd: kind delete cluster
 
+  devcontainer:
+    desc: Builds and enters a devcontainer (run without args to list available configs)
+    cmd: ./scripts/build_devcontainer.sh {{.CLI_ARGS}}
+
+  devcontainer-build:
+    desc: Builds a devcontainer image (run without args to list available configs)
+    cmd: ./scripts/build_devcontainer.sh --build {{.CLI_ARGS}}
+
+  devcontainer-run:
+    desc: Enters a previously built devcontainer (run without args to list available configs)
+    cmd: ./scripts/build_devcontainer.sh --run {{.CLI_ARGS}}
+
   export-cchain-block-range:
     desc: Export range of C-Chain blocks from source to target directory.
     cmd: go run github.com/ava-labs/avalanchego/tests/reexecute/blockexport {{.CLI_ARGS}}
@@ -271,6 +283,10 @@ tasks:
       - task: build-xsvm
       - cmd: go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=120s
       - cmd: bash -x ./scripts/tests.build_antithesis_images.sh
+
+  test-build-devcontainer:
+    desc: Tests the build of devcontainer images
+    cmd: bash -x ./scripts/tests.build_devcontainer.sh
 
   test-build-image:
     # On mac, docker/podman/lima should work out-of-the-box.
