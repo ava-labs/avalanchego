@@ -63,14 +63,21 @@ if [[ "${MODE}" != "run" ]]; then
 fi
 
 if [[ "${MODE}" != "build" ]]; then
-  echo "Starting devcontainer '${CONFIG_NAME}'..."
-  devcontainer up \
-    --workspace-folder "${AVALANCHE_PATH}" \
-    --config "${CONFIG_PATH}"
+  # Check if a container for this config is already running.
+  CONTAINER_ID="$(docker ps -q --filter "label=devcontainer.config_file=${CONFIG_PATH}" 2>/dev/null || true)"
+
+  if [[ -z "${CONTAINER_ID}" ]]; then
+    echo "Starting devcontainer '${CONFIG_NAME}'..."
+    devcontainer up \
+      --workspace-folder "${AVALANCHE_PATH}" \
+      --config "${CONFIG_PATH}"
+  else
+    echo "Devcontainer '${CONFIG_NAME}' is already running (${CONTAINER_ID})."
+  fi
 
   echo "Entering devcontainer '${CONFIG_NAME}'..."
   devcontainer exec \
     --workspace-folder "${AVALANCHE_PATH}" \
     --config "${CONFIG_PATH}" \
-    /bin/bash
+    nix develop --command bash
 fi
