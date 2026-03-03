@@ -30,8 +30,8 @@ use integer_encoding::VarIntReader;
 
 use std::io::{Error, ErrorKind, Read};
 use std::iter::FusedIterator;
+use std::mem::size_of;
 
-use crate::node::ExtendableBytes;
 use crate::{FreeListParent, MaybePersistedNode, ReadableStorage, WritableStorage};
 
 /// Returns the maximum size needed to encode a `VarInt`.
@@ -168,7 +168,12 @@ impl FreeArea {
         })
     }
 
-    pub fn as_bytes<T: ExtendableBytes>(self, area_index: AreaIndex, encoded: &mut T) {
+    /// Serialize a `FreeArea` into the given buffer with the specified area size index.
+    ///
+    /// This is a helper method that combines writing the area size index byte followed by
+    /// the `FreeArea` data. This is used when freeing a node - the area size index must be
+    /// preserved from the original node, not calculated from the `FreeArea` size.
+    pub fn as_bytes<T: crate::node::ExtendableBytes>(self, area_index: AreaIndex, encoded: &mut T) {
         const RESERVE_SIZE: usize = size_of::<u8>() + var_int_max_size::<u64>();
 
         encoded.reserve(RESERVE_SIZE);
@@ -196,6 +201,16 @@ pub struct NodeAllocator<'a, S> {
 impl<'a, S: ReadableStorage> NodeAllocator<'a, S> {
     pub const fn new(storage: &'a S, header: &'a mut NodeStoreHeader) -> Self {
         Self { storage, header }
+    }
+
+    /// Helper to convert an `io::Error` to a `FileIoError` with context.
+    pub(crate) fn io_error(
+        &self,
+        error: std::io::Error,
+        offset: u64,
+        context: Option<String>,
+    ) -> FileIoError {
+        self.storage.file_io_error(error, offset, context)
     }
 
     /// Returns (index, `area_size`) for the stored area at `addr`.
@@ -585,12 +600,8 @@ pub mod test_utils {
         node: &Node,
         offset: u64,
     ) -> (u64, u64) {
-        let mut encoded_node = Vec::new();
-        node.as_bytes(AreaIndex::MIN, &mut encoded_node);
-        let encoded_node_len = encoded_node.len() as u64;
-        let area_size_index = AreaIndex::from_size(encoded_node_len).unwrap();
         let mut stored_area_bytes = Vec::new();
-        node.as_bytes(area_size_index, &mut stored_area_bytes);
+        let area_size_index = node.as_bytes(&mut stored_area_bytes).unwrap();
         let bytes_written = stored_area_bytes.len() as u64;
         nodestore
             .storage

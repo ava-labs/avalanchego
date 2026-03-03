@@ -75,7 +75,7 @@ fn manual_deserializer(b: &mut Bencher, input: &Vec<u8>) {
 
 fn to_bytes(input: &Node) -> Vec<u8> {
     let mut bytes = Vec::new();
-    input.as_bytes(firewood_storage::AreaIndex::MIN, &mut bytes);
+    let _area_index = input.as_bytes(&mut bytes).expect("to serialize node");
     bytes
 }
 
