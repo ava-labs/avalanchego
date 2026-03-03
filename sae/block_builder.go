@@ -66,7 +66,7 @@ func (b *blockBuilder) rebuild(
 ) (*blocks.Block, error) {
 	// Moving sender caching into [VM.ParseBlock] is not robust as there is
 	// insufficient spam protection, so it must be done here.
-	signer := b.exec.SignerForBlock(block)
+	signer := b.exec.SignerForBlock(block.EthBlock())
 	core.SenderCacher.Recover(signer, block.Transactions()) // asynchronous
 
 	txs := make([]*txgossip.LazyTransaction, len(block.Transactions()))

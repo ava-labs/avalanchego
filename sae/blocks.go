@@ -108,6 +108,47 @@ func canonicalBlock(db ethdb.Database, num uint64) (*types.Block, error) {
 	return b, nil
 }
 
+func (vm *VM) settledBlockFromDB(db ethdb.Reader, hash common.Hash, num uint64) (*blocks.Block, error) {
+	// Before doing any disk IO, we sanity check that num is for a settled
+	// block.
+	//
+	// If using this function with [readByHash] this check is required.
+	// Otherwise, there is a possible (read: near impossible but non-zero)
+	// chance that [VM.VerifyBlock] and [VM.AcceptBlock] were *both* called
+	// between checking the in-memory block store and loading the canonical
+	// number from the database. That could result in attempting to restore an
+	// unexecuted block, which would report an error.
+	//
+	// TODO(arr4n) I think [readHash] should be providing this guarantee
+	// as it has access to the [syncMap] and its lock.
+	if vm.last.settled.Load().Height() < num {
+		return nil, database.ErrNotFound
+	}
+
+	ethB := rawdb.ReadBlock(db, hash, num)
+	if num > vm.last.synchronous {
+		return blocks.RestoreSettledBlock(
+			ethB,
+			vm.log(),
+			vm.db,
+			vm.xdb,
+			vm.exec.ChainConfig(),
+		)
+	}
+
+	b, err := vm.blockBuilder.new(ethB, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	// Excess is only used for executing the next block, which can never
+	// be the case if `b` isn't actually the last synchronous block, so
+	// passing the same value for all is OK.
+	if err := b.MarkSynchronous(vm.hooks, vm.db, vm.xdb, vm.config.ExcessAfterLastSynchronous); err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
 // GetBlock returns the block with the given ID, or [database.ErrNotFound].
 //
 // It is expected that blocks that have been successfully verified should be
@@ -124,47 +165,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (*blocks.Block, error) {
 		func(b *blocks.Block) *blocks.Block {
 			return b
 		},
-		func(db ethdb.Reader, hash common.Hash, num uint64) (*blocks.Block, error) {
-			// A block that's not in memory has either been rejected, not yet
-			// verified, or settled. Of these, only the latter would be in the
-			// database.
-			//
-			// There is, however, a negligible (read: near impossible) but
-			// non-zero chance that [VM.VerifyBlock] and [VM.AcceptBlock] were
-			// *both* called between [readByHash] checking the in-memory block
-			// store and loading the canonical number from the database. That
-			// could result in an unexecuted block, which would cause an error
-			// when restoring it.
-			//
-			// TODO(arr4n) I think [readHash] should be providing this guarantee
-			// as it has access to the [syncMap] and its lock.
-			if vm.last.settled.Load().Height() < num {
-				return nil, database.ErrNotFound
-			}
-
-			ethB := rawdb.ReadBlock(db, hash, num)
-			if num > vm.last.synchronous {
-				return blocks.RestoreSettledBlock(
-					ethB,
-					vm.log(),
-					vm.db,
-					vm.xdb,
-					vm.exec.ChainConfig(),
-				)
-			}
-
-			b, err := vm.blockBuilder.new(ethB, nil, nil)
-			if err != nil {
-				return nil, err
-			}
-			// Excess is only used for executing the next block, which can never
-			// be the case if `b` isn't actually the last synchronous block, so
-			// passing the same value for all is OK.
-			if err := b.MarkSynchronous(vm.hooks, vm.db, vm.xdb, vm.config.ExcessAfterLastSynchronous); err != nil {
-				return nil, err
-			}
-			return b, nil
-		},
+		vm.settledBlockFromDB,
 		database.ErrNotFound,
 	)
 }
