@@ -2509,61 +2509,42 @@ func (s *state) writeExpiry() error {
 	return nil
 }
 
-// inheritedPublicKeys holds the previous and current public keys inherited
-// from the primary network validator.
-type inheritedPublicKeys struct {
-	// prevPK is the public key before the current diff was applied.
-	prevPK *bls.PublicKey
-	// newPK is the public key after the current diff was applied.
-	newPK *bls.PublicKey
+// publicKeyDiff holds the previous and current public keys before and after applying a validator diff, respectively.
+type publicKeyDiff struct {
+	// prev is the public key before the current diff was applied.
+	prev *bls.PublicKey
+	// new is the public key after the current diff was applied.
+	new *bls.PublicKey
 }
 
-// getInheritedPublicKeys returns the public keys inherited from the primary
-// network validator for [nodeID], both before and after the pending diff.
+// getPublicKeyDiff computes the BLS public key change for the given nodeID.
+// It returns the key both before (prev) and after (new) the diff is applied.
 //
-// primaryValidators is the base-state map of primary network validators.
-// primaryDiffs is the pending diff map for the primary network.
-//
-// Note: Either key may be nil — prevPK is nil when the primary network
-// validator did not exist before this diff, and newPK is nil when the
-// primary network validator was deleted (not replaced) in this diff.
-func getInheritedPublicKeys(
+// Either key in the result may be nil: prev is nil when the validator did
+// not exist before this diff, and new is nil when the validator was
+// deleted (not replaced) in this diff.
+func getPublicKeyDiff(
 	nodeID ids.NodeID,
-	primaryValidators map[ids.NodeID]*baseStaker,
-	primaryDiffs map[ids.NodeID]*diffValidator,
-) (inheritedPublicKeys, error) {
-	primaryDiff, hasPrimaryDiff := primaryDiffs[nodeID]
-	primaryRemoved := hasPrimaryDiff && primaryDiff.removed != nil
-
-	// prevPK: the inherited key before this diff was applied.
-	// If the primary validator was removed or replaced, the old key is on
-	// the removed entry. Otherwise the key did not change, so prevPK is
-	// set to newPK further below.
-	var prevPK *bls.PublicKey
-	if primaryRemoved {
-		prevPK = primaryDiff.removed.PublicKey
+	current map[ids.NodeID]*baseStaker,
+	diffs map[ids.NodeID]*diffValidator,
+) publicKeyDiff {
+	// If the validator was deleted, there is no post-diff validator and new
+	// stays nil.
+	var keys publicKeyDiff
+	if vdr, ok := current[nodeID]; ok && vdr.validator != nil {
+		keys.new = vdr.validator.PublicKey
 	}
-
-	// newPK: the inherited key after this diff was applied.
-	// If the primary validator was purely deleted, there is no post-diff validator and
-	// newPK stays nil.
-	var newPK *bls.PublicKey
-	if vdr, ok := primaryValidators[nodeID]; ok && vdr.validator != nil {
-		newPK = vdr.validator.PublicKey
-	} else if !primaryRemoved {
-		return inheritedPublicKeys{}, fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
+	// If the validator was removed or replaced, the prev key is on the removed
+	// entry.
+	// If the validator was unmodified, the prev key is equal to the new key.
+	// Otherwise, the validator was added and prev stays nil.
+	diff, changed := diffs[nodeID]
+	if removed := changed && diff.removed != nil; removed {
+		keys.prev = diff.removed.PublicKey
+	} else if added := changed && diff.added != nil; !added {
+		keys.prev = keys.new
 	}
-
-	// If the primary validator was not removed, the inherited key did not
-	// change — prevPK equals newPK.
-	if !primaryRemoved {
-		prevPK = newPK
-	}
-
-	return inheritedPublicKeys{
-		prevPK: prevPK,
-		newPK:  newPK,
-	}, nil
+	return keys
 }
 
 // updateValidatorManager updates the validator manager with the pending
@@ -2606,7 +2587,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 				continue
 			}
 
-			inherited, err := getInheritedPublicKeys(
+			pkDiff := getPublicKeyDiff(
 				nodeID,
 				s.currentStakers.validators[constants.PrimaryNetworkID],
 				s.currentStakers.validatorDiffs[constants.PrimaryNetworkID],
@@ -2640,7 +2621,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 					return fmt.Errorf("failed to calculate new validator weight: %w", err)
 				}
 
-				if err := s.validators.AddStaker(subnetID, nodeID, inherited.newPK, diff.added.TxID, newWeight); err != nil {
+				if err := s.validators.AddStaker(subnetID, nodeID, pkDiff.new, diff.added.TxID, newWeight); err != nil {
 					return fmt.Errorf("failed to add replaced validator: %w", err)
 				}
 				continue
@@ -2649,7 +2630,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 			err = s.validators.AddStaker(
 				subnetID,
 				nodeID,
-				inherited.newPK,
+				pkDiff.new,
 				diff.added.TxID,
 				weightDiff.Amount,
 			)
@@ -2750,7 +2731,7 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				return nil, err
 			}
 
-			inherited, err := getInheritedPublicKeys(
+			pkDiff := getPublicKeyDiff(
 				nodeID,
 				s.currentStakers.validators[constants.PrimaryNetworkID],
 				s.currentStakers.validatorDiffs[constants.PrimaryNetworkID],
@@ -2764,11 +2745,11 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 			change := &validatorDiff{
 				weightDiff: weightDiff,
 			}
-			if inherited.prevPK != nil && (diff.removed != nil || diff.added == nil) {
-				change.prevPublicKey = bls.PublicKeyToUncompressedBytes(inherited.prevPK)
+			if pkDiff.prev != nil && (diff.removed != nil || diff.added == nil) {
+				change.prevPublicKey = bls.PublicKeyToUncompressedBytes(pkDiff.prev)
 			}
-			if inherited.newPK != nil && (diff.added != nil || diff.removed == nil) {
-				change.newPublicKey = bls.PublicKeyToUncompressedBytes(inherited.newPK)
+			if pkDiff.new != nil && (diff.added != nil || diff.removed == nil) {
+				change.newPublicKey = bls.PublicKeyToUncompressedBytes(pkDiff.new)
 			}
 
 			subnetIDNodeID := subnetIDNodeID{

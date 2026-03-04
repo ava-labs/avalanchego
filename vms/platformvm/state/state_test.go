@@ -3459,9 +3459,8 @@ func TestSubnetValidatorReplacementWithUnchangedPrimaryKey(t *testing.T) {
 		"subnet validator's inherited public key must remain PK1 after rollback")
 }
 
-func TestGetInheritedPublicKeys(t *testing.T) {
+func TestGetPublicKeyDiffs(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
-	otherNodeID := ids.GenerateTestNodeID()
 
 	sk1, err := localsigner.New()
 	require.NoError(t, err)
@@ -3477,13 +3476,11 @@ func TestGetInheritedPublicKeys(t *testing.T) {
 		primaryDiffs      map[ids.NodeID]*diffValidator
 		expectedPrevPK    *bls.PublicKey
 		expectedNewPK     *bls.PublicKey
-		expectedErr       error
 	}{
 		{
 			name:              "no primary validator and no diff",
 			primaryValidators: map[ids.NodeID]*baseStaker{},
 			primaryDiffs:      map[ids.NodeID]*diffValidator{},
-			expectedErr:       errMissingPrimaryNetworkValidator,
 		},
 		{
 			name: "primary validator exists with no diff",
@@ -3540,12 +3537,15 @@ func TestGetInheritedPublicKeys(t *testing.T) {
 			expectedNewPK:  nil,
 		},
 		{
-			name: "different nodeID has no effect",
+			name: "primary validator only added",
 			primaryValidators: map[ids.NodeID]*baseStaker{
-				otherNodeID: {validator: &Staker{PublicKey: pk1}},
+				nodeID: {validator: &Staker{PublicKey: pk1}},
 			},
-			primaryDiffs: map[ids.NodeID]*diffValidator{},
-			expectedErr:  errMissingPrimaryNetworkValidator,
+			primaryDiffs: map[ids.NodeID]*diffValidator{
+				nodeID: {added: &Staker{PublicKey: pk1}},
+			},
+			expectedPrevPK: nil,
+			expectedNewPK:  pk1,
 		},
 	}
 
@@ -3553,14 +3553,10 @@ func TestGetInheritedPublicKeys(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			result, err := getInheritedPublicKeys(nodeID, tt.primaryValidators, tt.primaryDiffs)
-			if tt.expectedErr != nil {
-				require.ErrorIs(err, tt.expectedErr)
-				return
-			}
+			result := getPublicKeyDiff(nodeID, tt.primaryValidators, tt.primaryDiffs)
 			require.NoError(err)
-			require.Equal(tt.expectedPrevPK, result.prevPK)
-			require.Equal(tt.expectedNewPK, result.newPK)
+			require.Equal(tt.expectedPrevPK, result.prev)
+			require.Equal(tt.expectedNewPK, result.new)
 		})
 	}
 }
