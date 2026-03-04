@@ -107,7 +107,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
+	onParentAccept.EXPECT().GetStakingInfo(constants.PrimaryNetworkID, utx.NodeID()).Return(state.StakingInfo{}, nil).AnyTimes()
 
 	// wrong height
 	statelessProposalBlock, err := block.NewApricotProposalBlock(
@@ -209,7 +209,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetActiveL1ValidatorsIterator().Return(iterator.Empty[state.L1Validator]{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
-	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
+	onParentAccept.EXPECT().GetStakingInfo(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(state.StakingInfo{}, nil).AnyTimes()
 
 	// create proposal tx to be included in the proposal block
 	blkTx := &txs.Tx{

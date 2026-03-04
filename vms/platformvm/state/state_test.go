@@ -2404,3 +2404,92 @@ func TestGetCurrentValidators(t *testing.T) {
 		})
 	}
 }
+
+func TestSetUptimeAndSetStakingInfoBothPersist(t *testing.T) {
+	db := memdb.New()
+	state := newTestState(t, db)
+
+	// Use the default validator from genesis
+	nodeID := defaultValidatorNodeID
+
+	// Get initial uptime values
+	initialUpDuration, initialLastUpdated, err := state.GetUptime(nodeID)
+	require.NoError(t, err)
+
+	// Get initial staking info
+	initialStakingInfo, err := state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+
+	// Update uptime first, then staking info
+	wantUpDuration := initialUpDuration + 2*time.Hour
+	wantLastUpdated := initialLastUpdated.Add(time.Hour)
+	require.NoError(t, state.SetUptime(nodeID, wantUpDuration, wantLastUpdated))
+
+	wantDelegateeReward := initialStakingInfo.DelegateeReward + 100000
+	require.NoError(t, state.SetStakingInfo(
+		constants.PrimaryNetworkID,
+		nodeID,
+		StakingInfo{DelegateeReward: wantDelegateeReward},
+	))
+
+	// Commit and verify both changes persisted
+	require.NoError(t, state.Commit())
+
+	// Verify immediately after commit
+	upDuration, lastUpdated, err := state.GetUptime(nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantUpDuration, upDuration)
+	require.Equal(t, wantLastUpdated, lastUpdated)
+
+	stakingInfo, err := state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantDelegateeReward, stakingInfo.DelegateeReward)
+
+	// Reload state from DB and verify persistence
+	state = newTestState(t, db)
+
+	upDuration, lastUpdated, err = state.GetUptime(nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantUpDuration, upDuration)
+	require.Equal(t, wantLastUpdated, lastUpdated)
+
+	stakingInfo, err = state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantDelegateeReward, stakingInfo.DelegateeReward)
+
+	// Now test reverse order: staking info first, then uptime
+	wantDelegateeReward2 := wantDelegateeReward + 200000
+	require.NoError(t, state.SetStakingInfo(
+		constants.PrimaryNetworkID,
+		nodeID,
+		StakingInfo{DelegateeReward: wantDelegateeReward2},
+	))
+
+	wantUpDuration2 := wantUpDuration + 3*time.Hour
+	wantLastUpdated2 := wantLastUpdated.Add(2 * time.Hour)
+	require.NoError(t, state.SetUptime(nodeID, wantUpDuration2, wantLastUpdated2))
+
+	// Commit and verify both changes persisted
+	require.NoError(t, state.Commit())
+
+	upDuration, lastUpdated, err = state.GetUptime(nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantUpDuration2, upDuration)
+	require.Equal(t, wantLastUpdated2, lastUpdated)
+
+	stakingInfo, err = state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantDelegateeReward2, stakingInfo.DelegateeReward)
+
+	// Reload state from DB and verify persistence
+	state = newTestState(t, db)
+
+	upDuration, lastUpdated, err = state.GetUptime(nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantUpDuration2, upDuration)
+	require.Equal(t, wantLastUpdated2, lastUpdated)
+
+	stakingInfo, err = state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantDelegateeReward2, stakingInfo.DelegateeReward)
+}

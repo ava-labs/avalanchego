@@ -373,25 +373,28 @@ type ValidatorWeightDiff struct {
 }
 
 func (v *ValidatorWeightDiff) Add(amount uint64) error {
-	return v.addOrSub(false, amount)
+	return v.add(false, amount)
 }
 
 func (v *ValidatorWeightDiff) Sub(amount uint64) error {
-	return v.addOrSub(true, amount)
+	return v.add(true, amount)
 }
 
-func (v *ValidatorWeightDiff) addOrSub(sub bool, amount uint64) error {
-	if v.Decrease == sub {
+func (v *ValidatorWeightDiff) add(isNegative bool, amount uint64) error {
+	if v.Decrease == isNegative {
+		// Adding to the same sign, so we can just add the amounts together.
 		var err error
 		v.Amount, err = safemath.Add(v.Amount, amount)
 		return err
 	}
 
+	// Adding to the opposite sign, so we need to subtract the smaller from the
+	// larger and keep the sign of the larger.
 	if v.Amount > amount {
 		v.Amount -= amount
 	} else {
-		v.Amount = safemath.AbsDiff(v.Amount, amount)
-		v.Decrease = sub
+		v.Amount = amount - v.Amount
+		v.Decrease = isNegative
 	}
 	return nil
 }
@@ -732,12 +735,12 @@ func New(
 	return s, nil
 }
 
-func (s *State) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
-	return s.validatorState.GetDelegateeReward(subnetID, vdrID)
+func (s *State) GetStakingInfo(subnetID ids.ID, vdrID ids.NodeID) (StakingInfo, error) {
+	return s.validatorState.GetStakingInfo(subnetID, vdrID)
 }
 
-func (s *State) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, reward uint64) error {
-	return s.validatorState.SetDelegateeReward(subnetID, vdrID, reward)
+func (s *State) SetStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo StakingInfo) error {
+	return s.validatorState.SetStakingInfo(subnetID, vdrID, stakingInfo)
 }
 
 func (s *State) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
@@ -2177,7 +2180,6 @@ func (s *State) write(updateValidators bool, height uint64) error {
 		s.writeValidatorDiffs(height),
 		s.writeCurrentStakers(codecVersion),
 		s.writePendingStakers(),
-		s.validatorState.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
 		s.writeL1Validators(),
 		s.writeTXs(),
 		s.writeRewardUTXOs(),
@@ -2731,15 +2733,11 @@ func getOrSetDefault[K comparable, V any](m map[K]*V, k K) *V {
 
 func (s *State) writeCurrentStakers(codecVersion uint16) error {
 	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
-		// Select db to write to
-		validatorDB := s.currentSubnetValidatorList
 		delegatorDB := s.currentSubnetDelegatorList
 		if subnetID == constants.PrimaryNetworkID {
-			validatorDB = s.currentValidatorList
 			delegatorDB = s.currentDelegatorList
 		}
 
-		// Record the change in weight and/or public key for each validator.
 		for nodeID, validatorDiff := range validatorDiffs {
 			switch validatorDiff.validatorStatus {
 			case added:
@@ -2761,21 +2759,8 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 					PotentialDelegateeReward: 0,
 				}
 
-				metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
-				if err != nil {
-					return fmt.Errorf("failed to serialize current validator: %w", err)
-				}
-
-				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
-					return fmt.Errorf("failed to write current validator to list: %w", err)
-				}
-
-				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
+				s.validatorState.AddValidatorMetadata(nodeID, subnetID, metadata)
 			case deleted:
-				if err := validatorDB.Delete(validatorDiff.validator.TxID[:]); err != nil {
-					return fmt.Errorf("failed to delete current staker: %w", err)
-				}
-
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 			}
 
@@ -2789,6 +2774,15 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 			}
 		}
 	}
+
+	if err := s.validatorState.WriteValidatorMetadata(
+		s.currentValidatorList,
+		s.currentSubnetValidatorList,
+		codecVersion,
+	); err != nil {
+		return err
+	}
+
 	maps.Clear(s.currentStakers.validatorDiffs)
 	return nil
 }

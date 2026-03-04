@@ -987,3 +987,35 @@ func TestDiffStacking(t *testing.T) {
 	require.NoError(err)
 	require.Equal(owner3, owner)
 }
+
+func TestDiffStakingInfo(t *testing.T) {
+	state := newTestState(t, memdb.New())
+
+	d, err := NewDiffOn(state)
+	require.NoError(t, err)
+
+	// Get falls through to parent when not set in diff
+	initialStakingInfo, err := d.GetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+
+	// Set then Get returns the diff value
+	wantStakingInfo := StakingInfo{DelegateeReward: 200}
+	require.NoError(t, d.SetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID, wantStakingInfo))
+
+	gotStakingInfo, err := d.GetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantStakingInfo, gotStakingInfo)
+
+	// Parent state unchanged
+	parentStakingInfo, err := state.GetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+	require.Equal(t, initialStakingInfo, parentStakingInfo)
+
+	// Overwrite works correctly
+	wantStakingInfo = StakingInfo{DelegateeReward: 300}
+	require.NoError(t, d.SetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID, wantStakingInfo))
+
+	gotStakingInfo, err = d.GetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantStakingInfo, gotStakingInfo)
+}
