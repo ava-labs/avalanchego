@@ -8,7 +8,6 @@ import (
 	"errors"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -18,23 +17,23 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
-	synccommon "github.com/ava-labs/avalanchego/graft/coreth/sync"
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 var (
 	errNilConfig              = errors.New("nil extension config")
 	errNilSyncSummaryProvider = errors.New("nil sync summary provider")
-	errNilSyncableParser      = errors.New("nil syncable parser")
 	errNilClock               = errors.New("nil clock")
 )
 
@@ -67,7 +66,7 @@ type ExtensibleVM interface {
 	// VersionDB returns the versioned database for the VM
 	VersionDB() *versiondb.Database
 	// SyncerClient returns the syncer client for the VM
-	SyncerClient() vmsync.Client
+	SyncerClient() engine.Client
 }
 
 // InnerVM is the interface that must be implemented by the VM
@@ -83,7 +82,7 @@ type InnerVM interface {
 // ExtendedBlock is a block that can be used by the extension
 type ExtendedBlock interface {
 	snowman.Block
-	GetEthBlock() *types.Block
+	GetEthBlock() *ethtypes.Block
 	GetBlockExtension() BlockExtension
 }
 
@@ -137,16 +136,12 @@ type Config struct {
 	// for the VM to be used in consensus engine.
 	// Callback functions can be nil.
 	ConsensusCallbacks dummy.ConsensusCallbacks
-	// SyncSummaryProvider is the sync summary provider to use
-	// for the VM to be used in syncer.
-	// It's required and should be non-nil
-	SyncSummaryProvider synccommon.SummaryProvider
+	// SyncSummaryProvider provides and parses state sync summaries.
+	// It's required and should be non-nil.
+	SyncSummaryProvider message.SyncSummaryProvider
 	// SyncExtender can extend the syncer to handle custom sync logic.
 	// It's optional and can be nil
-	SyncExtender synccommon.Extender
-	// SyncableParser is to parse summary messages from the network.
-	// It's required and should be non-nil
-	SyncableParser message.SyncableParser
+	SyncExtender types.Extender
 	// BlockExtender allows the VM extension to create an extension to handle block processing events.
 	// It's optional and can be nil
 	BlockExtender BlockExtender
@@ -167,9 +162,6 @@ func (c *Config) Validate() error {
 	}
 	if c.SyncSummaryProvider == nil {
 		return errNilSyncSummaryProvider
-	}
-	if c.SyncableParser == nil {
-		return errNilSyncableParser
 	}
 	if c.Clock == nil {
 		return errNilClock

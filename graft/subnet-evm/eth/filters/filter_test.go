@@ -36,13 +36,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -384,7 +384,7 @@ func TestFilters(t *testing.T) {
 	// This test occasionally returns nil due to context handling differences with go-ethereum.
 	// These differences are not critical, so this test can simply be skipped.
 	t.Run("timeout", func(t *testing.T) {
-		t.Skip("Flaky")
+		t.Skip("Flaky test from go-ethereum")
 		f := sys.NewRangeFilter(0, -1, nil, nil)
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Hour))
 		defer cancel()

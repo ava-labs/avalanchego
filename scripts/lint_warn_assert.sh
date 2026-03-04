@@ -17,7 +17,6 @@ function test_warn_testify_assert {
   local root_dir
   root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")"; cd .. && pwd)"
   local config_path="${root_dir}/.golangci-warn-assert.yml"
-  local tools_mod="${root_dir}/tools/go.mod"
 
   local args=(
     --config "$config_path"
@@ -35,7 +34,7 @@ function test_warn_testify_assert {
 
   # Run golangci-lint and transform output to GitHub warning annotations
   local output
-  output=$(go tool -modfile="$tools_mod" golangci-lint run "${args[@]}" 2>&1) || true
+  output=$("${root_dir}/scripts/run_tool.sh" golangci-lint run "${args[@]}" 2>&1) || true
 
   if [[ -z "$output" ]]; then
     return 0

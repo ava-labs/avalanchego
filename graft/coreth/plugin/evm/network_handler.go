@@ -11,21 +11,20 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	"github.com/ava-labs/avalanchego/ids"
-
-	syncHandlers "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 )
 
 var _ message.RequestHandler = (*networkHandler)(nil)
 
-type LeafHandlers map[message.NodeType]syncHandlers.LeafRequestHandler
+type LeafHandlers map[message.NodeType]handlers.LeafRequestHandler
 
 type networkHandler struct {
 	leafRequestHandlers LeafHandlers
-	blockRequestHandler *syncHandlers.BlockRequestHandler
-	codeRequestHandler  *syncHandlers.CodeRequestHandler
+	blockRequestHandler *handlers.BlockRequestHandler
+	codeRequestHandler  *handlers.CodeRequestHandler
 }
 
 type LeafRequestTypeConfig struct {
@@ -38,7 +37,7 @@ type LeafRequestTypeConfig struct {
 
 // newNetworkHandler constructs the handler for serving network requests.
 func newNetworkHandler(
-	provider syncHandlers.SyncDataProvider,
+	provider handlers.SyncDataProvider,
 	diskDB ethdb.KeyValueReader,
 	networkCodec codec.Manager,
 	leafRequestHandlers LeafHandlers,
@@ -46,15 +45,15 @@ func newNetworkHandler(
 ) *networkHandler {
 	return &networkHandler{
 		leafRequestHandlers: leafRequestHandlers,
-		blockRequestHandler: syncHandlers.NewBlockRequestHandler(provider, networkCodec, syncStats),
-		codeRequestHandler:  syncHandlers.NewCodeRequestHandler(diskDB, networkCodec, syncStats),
+		blockRequestHandler: handlers.NewBlockRequestHandler(provider, networkCodec, syncStats),
+		codeRequestHandler:  handlers.NewCodeRequestHandler(diskDB, networkCodec, syncStats),
 	}
 }
 
 func (n networkHandler) HandleLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
-	handler, ok := n.leafRequestHandlers[leafsRequest.NodeType]
+	handler, ok := n.leafRequestHandlers[leafsRequest.LeafType()]
 	if !ok {
-		log.Debug("node type is not recognised, dropping request", "nodeID", nodeID, "requestID", requestID, "nodeType", leafsRequest.NodeType)
+		log.Debug("node type is not recognised, dropping request", "nodeID", nodeID, "requestID", requestID, "nodeType", leafsRequest.LeafType())
 		return nil, nil
 	}
 	return handler.OnLeafsRequest(ctx, nodeID, requestID, leafsRequest)

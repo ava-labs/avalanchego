@@ -34,7 +34,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/libevm/params"
 )
 
 const ourPath = "github.com/ava-labs/avalanchego/graft/subnet-evm" // Path to our module

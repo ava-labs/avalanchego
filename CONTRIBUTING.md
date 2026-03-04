@@ -4,11 +4,54 @@
 
 To start developing on AvalancheGo, you'll need a few things installed.
 
-- Golang version >= 1.24.12
+- Golang version >= 1.25.7
 - gcc
 - g++
 
 On MacOS, a modern version of bash is required (e.g. via [homebrew](https://brew.sh/) with `brew install bash`). The version installed by default is not compatible with AvalancheGo's [shell scripts](scripts).
+
+## Go Workspace
+
+This repository uses a [Go workspace](https://go.dev/doc/tutorial/workspaces) (`go.work`)
+to unify the main module with grafted modules (coreth, subnet-evm, evm) under `graft/`.
+This provides IDE support for navigating and refactoring across all modules seamlessly.
+
+### Behavioral changes from workspace mode
+
+When `go.work` is present at the repository root, some go command flags are restricted:
+
+| Flag | Workspace behavior |
+|------|-------------|
+| `-mod=readonly` | Implicit default and only allowed value |
+| `-mod=mod` | Not allowed (would modify go.mod) |
+| `-mod=vendor` | Not allowed (use `go work vendor` instead) |
+| `-modfile=path` | Not allowed (workspace manages module resolution) |
+
+These restrictions exist because the workspace manages dependencies across all member
+modules. Use `GOWORK=off` to disable workspace mode when needed:
+
+```bash
+GOWORK=off go <command>
+```
+
+Other behavioral changes:
+
+| Command | Behavior Change |
+|---------|-----------------|
+| `go list -m` | Lists all workspace modules (use `head -1` or specify module path for single result) |
+| `go mod tidy` | Only affects current module; run `task go-mod-tidy` to tidy all modules |
+| `go work sync` | Updates `go.work.sum`; prefer `task sync-go-work` after dependency changes |
+
+### Using a custom workspace
+
+The repo's `go.work` takes precedence over any workspace file in a parent directory.
+To use your own workspace (e.g., with local checkouts of repos not yet in the monorepo):
+
+```bash
+export GOWORK=~/src/my-go.work
+```
+
+See the [Go Modules Reference](https://go.dev/ref/mod#workspaces) for full workspace documentation.
 
 ## Running tasks
 
