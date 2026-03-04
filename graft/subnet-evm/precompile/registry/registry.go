@@ -7,14 +7,13 @@ package registry
 // Force imports of each precompile to ensure each precompile's init function runs and registers itself
 // with the registry.
 import (
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
-
-	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager"
 )
 
 // This list is kept just for reference. The actual addresses defined in respective packages of precompiles.
