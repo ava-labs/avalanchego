@@ -1181,6 +1181,7 @@ func TestApplySubnetConfigDefaults(t *testing.T) {
 			verify: func(require *require.Assertions, cfg subnets.Config) {
 				require.Nil(cfg.SimplexParameters)
 				require.Nil(cfg.ConsensusParameters)
+
 				require.Equal(snowball.DefaultParameters, *cfg.SnowParameters)
 			},
 		},
@@ -1194,6 +1195,7 @@ func TestApplySubnetConfigDefaults(t *testing.T) {
 			verify: func(require *require.Assertions, cfg subnets.Config) {
 				require.Nil(cfg.SnowParameters)
 				require.Nil(cfg.ConsensusParameters)
+
 				require.Equal(expectedSimplex, *cfg.SimplexParameters)
 			},
 		},
@@ -1205,7 +1207,6 @@ func TestApplySubnetConfigDefaults(t *testing.T) {
 				},
 			},
 			verify: func(require *require.Assertions, cfg subnets.Config) {
-				require.NotNil(cfg.SnowParameters)
 				require.Nil(cfg.SimplexParameters)
 				require.Nil(cfg.ConsensusParameters)
 
@@ -1220,9 +1221,10 @@ func TestApplySubnetConfigDefaults(t *testing.T) {
 				},
 			},
 			verify: func(require *require.Assertions, cfg subnets.Config) {
-				require.NotNil(cfg.SnowParameters)
-				require.Equal(expectedSnow, *cfg.SnowParameters)
+				require.Nil(cfg.ConsensusParameters)
 				require.Nil(cfg.SimplexParameters)
+
+				require.Equal(expectedSnow, *cfg.SnowParameters)
 			},
 		},
 	}
