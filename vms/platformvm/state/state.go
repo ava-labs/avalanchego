@@ -864,12 +864,12 @@ func New(
 	return s, nil
 }
 
-func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
-	return s.validatorState.GetDelegateeReward(subnetID, vdrID)
+func (s *state) GetStakingInfo(subnetID ids.ID, vdrID ids.NodeID) (StakingInfo, error) {
+	return s.validatorState.GetStakingInfo(subnetID, vdrID)
 }
 
-func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, reward uint64) error {
-	return s.validatorState.SetDelegateeReward(subnetID, vdrID, reward)
+func (s *state) SetStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo StakingInfo) error {
+	return s.validatorState.SetStakingInfo(subnetID, vdrID, stakingInfo)
 }
 
 func (s *state) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
