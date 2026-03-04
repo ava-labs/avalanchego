@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -489,20 +490,13 @@ func TestGetNextStakerToReward(t *testing.T) {
 			timestamp: now,
 			stateF: func(t *testing.T) state.Chain {
 				s := statetest.New(t, statetest.Config{})
-				iterator, err := s.GetCurrentStakerIterator()
-				defer iterator.Release()
 
+				currentStakerIterator, err := s.GetCurrentStakerIterator()
 				require.NoError(t, err)
-
+				defer currentStakerIterator.Release()
 				// statetest.New initializes the state with a genesis that contains validators.
 				// To test the case where there are no stakers, we need to delete the genesis validators.
-				stakers := make([]*state.Staker, 0)
-				for iterator.Next() {
-					currentStaker := iterator.Value()
-					stakers = append(stakers, currentStaker)
-				}
-
-				for _, staker := range stakers {
+				for _, staker := range iterator.ToSlice(currentStakerIterator) {
 					s.DeleteCurrentValidator(staker)
 				}
 				return s
@@ -570,7 +564,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 					EndTime:  now,
 					NodeID:   ids.GenerateTestNodeID(),
 				}
-				s.PutCurrentDelegator(staker1)
+				require.NoError(t, s.PutCurrentValidator(staker1))
 				s.PutCurrentDelegator(staker2)
 				return s
 			},
