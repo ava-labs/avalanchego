@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -34,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/coretest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -603,16 +601,7 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 	lastAccepted := vm.Blockchain().LastAcceptedBlock()
 	c := vm.Blockchain().StateCache()
 
-	// Firewood's state lives on disk, so we must copy the entire state into a new state cache, unlike HashDB.
-	if vm.Config().StateScheme == customrawdb.FirewoodScheme {
-		memdb := utilstest.CopyEthDB(t, vm.chaindb)
-		tdb := triedb.NewDatabase(memdb, &triedb.Config{
-			DBOverride: firewood.DefaultConfig(utilstest.CopyDir(t, vm.Blockchain().CacheConfig().ChainDataDir)).BackendConstructor,
-		})
-		tdb.Backend().(*firewood.TrieDB).SetHashAndHeight(lastAccepted.Hash(), lastAccepted.NumberU64())
-		c = extstate.NewDatabaseWithNodeDB(memdb, tdb)
-	}
-
+	// We must not commit this state to disk, as it will make it impossible to verify/accept the generated blocks in the same db for Firewood.
 	_, _, err := core.GenerateChainFromStateCache(
 		vm.chainConfig,
 		lastAccepted,
@@ -625,6 +614,7 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 			g.SetCoinbase(constants.BlackholeAddr) // necessary for syntactic validation of the block
 			gen(i, g)
 		},
+		false, /* don't commit to disk */
 	)
 	require.NoError(t, err)
 	vm.blockChain.DrainAcceptorQueue()

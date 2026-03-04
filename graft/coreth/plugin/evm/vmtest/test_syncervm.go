@@ -20,14 +20,12 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/coretest"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
@@ -687,16 +685,7 @@ func generateAndAcceptBlocks(t *testing.T, vm extension.InnerVM, numBlocks int, 
 	lastAccepted := vm.Ethereum().BlockChain().LastAcceptedBlock()
 	c := vm.Ethereum().BlockChain().StateCache()
 
-	// Firewood's state lives on disk, so we must copy the entire state into a new state cache, unlike HashDB.
-	if vm.Config().StateScheme == customrawdb.FirewoodScheme {
-		memdb := utilstest.CopyEthDB(t, vm.Ethereum().ChainDb())
-		tdb := triedb.NewDatabase(memdb, &triedb.Config{
-			DBOverride: firewood.DefaultConfig(utilstest.CopyDir(t, vm.Ethereum().BlockChain().CacheConfig().ChainDataDir)).BackendConstructor,
-		})
-		tdb.Backend().(*firewood.TrieDB).SetHashAndHeight(lastAccepted.Hash(), lastAccepted.NumberU64())
-		c = extstate.NewDatabaseWithNodeDB(memdb, tdb)
-	}
-
+	// We must not commit this state to disk, as it will make it impossible to verify/accept the generated blocks in the same db for Firewood.
 	_, _, err := core.GenerateChainFromStateCache(
 		vm.Ethereum().BlockChain().Config(),
 		lastAccepted,
@@ -709,6 +698,7 @@ func generateAndAcceptBlocks(t *testing.T, vm extension.InnerVM, numBlocks int, 
 			g.SetCoinbase(constants.BlackholeAddr) // necessary for syntactic validation of the block
 			gen(i, vm, g)
 		},
+		false, /* don't commit to disk */
 	)
 	require.NoError(err)
 	vm.Ethereum().BlockChain().DrainAcceptorQueue()

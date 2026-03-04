@@ -277,10 +277,10 @@ func (b *BlockGen) SetOnBlockGenerated(onBlockGenerated func(*types.Block)) {
 func GenerateChain(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, db ethdb.Database, n int, gap uint64, gen func(int, *BlockGen)) ([]*types.Block, []types.Receipts, error) {
 	stateCache := state.NewDatabase(db)
 	defer stateCache.TrieDB().Close()
-	return GenerateChainFromStateCache(config, parent, engine, stateCache, n, gap, gen)
+	return GenerateChainFromStateCache(config, parent, engine, stateCache, n, gap, gen, true)
 }
 
-func GenerateChainFromStateCache(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, stateCache state.Database, n int, gap uint64, gen func(int, *BlockGen)) ([]*types.Block, []types.Receipts, error) {
+func GenerateChainFromStateCache(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, stateCache state.Database, n int, gap uint64, gen func(int, *BlockGen), commit bool) ([]*types.Block, []types.Receipts, error) {
 	if config == nil {
 		config = params.TestChainConfig
 	}
@@ -315,8 +315,10 @@ func GenerateChainFromStateCache(config *params.ChainConfig, parent *types.Block
 		if err != nil {
 			panic(fmt.Sprintf("state write error: %v", err))
 		}
-		if err = triedb.Commit(root, false); err != nil {
-			panic(fmt.Sprintf("trie write error: %v", err))
+		if commit {
+			if err = triedb.Commit(root, false); err != nil {
+				panic(fmt.Sprintf("trie write error: %v", err))
+			}
 		}
 		if b.onBlockGenerated != nil {
 			b.onBlockGenerated(block)
