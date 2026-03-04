@@ -289,7 +289,7 @@ jobs:
           go test -race -fuzz=FuzzRangeProofCreation -fuzztime=1m
       - name: Upload Fuzz testdata
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ethhash-differential-fuzz-testdata
           path: ffi/tests/eth/testdata
@@ -324,7 +324,7 @@ jobs:
           go test -race -fuzz=. -fuzztime=1m
       - name: Upload Fuzz testdata
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: firewood-merkle-differential-fuzz-testdata
           path: ffi/tests/firewood/testdata

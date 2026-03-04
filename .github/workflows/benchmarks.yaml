@@ -31,7 +31,7 @@ jobs:
       - name: Run storage crate benchmarks
         run: cargo bench --frozen --profile maxperf --features ethhash,logger -p firewood-storage --bench serializer -- --noplot
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results
           path: target/criterion

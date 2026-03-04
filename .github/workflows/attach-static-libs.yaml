@@ -71,7 +71,7 @@ jobs:
         run: cargo build-static-ffi --target ${{ matrix.target }}
 
       - name: Upload binary
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
           path: target/${{ matrix.target }}/maxperf/libfirewood_ffi.a
@@ -141,7 +141,7 @@ jobs:
         run: FIREWOOD_LD_MODE=STATIC_LIBS go generate
 
       - name: Download binaries into libs directory
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: firewood-go-ethhash/ffi/libs
 

@@ -67,7 +67,7 @@ jobs:
           [[ -d bench ]] && cp -rv bench _site/
           
           [[ -d dev || -d bench ]] || { echo "::error::No benchmark data (dev/ or bench/) found"; exit 1; }
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: pages
           path: _site
@@ -85,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download pages artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: pages
           path: .
