@@ -121,5 +121,6 @@ fi
 if [[ "${MODE}" == "run" || "${MODE}" == "build-and-run" ]]; then
   CONTAINER_ID="$(ensure_container)"
   echo "Entering devcontainer '${CONFIG_NAME}' (${CONTAINER_ID})..."
-  docker exec -it "${CONTAINER_ID}" nix develop --command bash
+  NIX_SHELL="$(docker exec -u dev "${CONTAINER_ID}" printenv NIX_SHELL 2>/dev/null || echo "default")"
+  docker exec -it -u dev "${CONTAINER_ID}" nix develop ".#${NIX_SHELL}" --command bash
 fi
