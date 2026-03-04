@@ -307,7 +307,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	)
 	if test.stateScheme == customrawdb.FirewoodScheme {
 		tdb, ok := serverVM.vm.Blockchain().TrieDB().Backend().(*firewood.TrieDB)
-		require.True(ok)
+		require.Truef(ok, "expected TrieDB backend to be *firewood.TrieDB, got %T", serverVM.vm.Blockchain().TrieDB().Backend())
 		tdb.SetHashAndHeight(common.Hash{}, 0) // must be set for FillAccountsWithStorageAndCode to work
 	}
 	root, allAccounts = synctest.FillAccountsWithStorageAndCode(t, r, serverVM.vm.Blockchain().StateCache(), currentRoot, 1000)
