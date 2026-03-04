@@ -75,48 +75,48 @@ func SetACP224FeeManagerAllowListStatus(stateDB contract.StateDB, address common
 }
 
 // GetStoredFeeConfig returns fee config from contract storage in given state
-func GetStoredFeeConfig(stateDB contract.StateReader, addr common.Address) commontype.ACP224FeeConfig {
+func GetStoredFeeConfig(stateDB contract.StateReader) commontype.ACP224FeeConfig {
 	return commontype.ACP224FeeConfig{
-		ValidatorTargetGas: stateDB.GetState(addr, validatorTargetGasStorageKey) != (common.Hash{}),
-		TargetGas:          stateDB.GetState(addr, targetGasStorageKey).Big(),
-		StaticPricing:      stateDB.GetState(addr, staticPricingStorageKey) != (common.Hash{}),
-		MinGasPrice:        stateDB.GetState(addr, minGasPriceStorageKey).Big(),
-		TimeToDouble:       stateDB.GetState(addr, timeToDoubleStorageKey).Big(),
+		ValidatorTargetGas: stateDB.GetState(ContractAddress, validatorTargetGasStorageKey) != (common.Hash{}),
+		TargetGas:          stateDB.GetState(ContractAddress, targetGasStorageKey).Big(),
+		StaticPricing:      stateDB.GetState(ContractAddress, staticPricingStorageKey) != (common.Hash{}),
+		MinGasPrice:        stateDB.GetState(ContractAddress, minGasPriceStorageKey).Big(),
+		TimeToDouble:       stateDB.GetState(ContractAddress, timeToDoubleStorageKey).Big(),
 	}
 }
 
 // GetFeeConfigLastChangedAt returns the block number when the fee config was last changed
-func GetFeeConfigLastChangedAt(stateDB contract.StateReader, addr common.Address) *big.Int {
-	val := stateDB.GetState(addr, feeConfigLastChangedAtKey)
+func GetFeeConfigLastChangedAt(stateDB contract.StateReader) *big.Int {
+	val := stateDB.GetState(ContractAddress, feeConfigLastChangedAtKey)
 	return val.Big()
 }
 
 // StoreFeeConfig stores given [feeConfig] and block number in the [blockContext] to the [stateDB].
 // A validation on [feeConfig] is done before storing.
-func StoreFeeConfig(stateDB contract.StateDB, addr common.Address, feeConfig commontype.ACP224FeeConfig, blockContext contract.ConfigurationBlockContext) error {
+func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.ACP224FeeConfig, blockContext contract.ConfigurationBlockContext) error {
 	if err := feeConfig.Verify(); err != nil {
 		return fmt.Errorf("cannot verify fee config: %w", err)
 	}
 
 	if feeConfig.ValidatorTargetGas {
-		stateDB.SetState(addr, validatorTargetGasStorageKey, common.BigToHash(common.Big1))
+		stateDB.SetState(ContractAddress, validatorTargetGasStorageKey, common.BigToHash(common.Big1))
 	} else {
-		stateDB.SetState(addr, validatorTargetGasStorageKey, common.Hash{})
+		stateDB.SetState(ContractAddress, validatorTargetGasStorageKey, common.Hash{})
 	}
-	stateDB.SetState(addr, targetGasStorageKey, common.BigToHash(feeConfig.TargetGas))
+	stateDB.SetState(ContractAddress, targetGasStorageKey, common.BigToHash(feeConfig.TargetGas))
 	if feeConfig.StaticPricing {
-		stateDB.SetState(addr, staticPricingStorageKey, common.BigToHash(common.Big1))
+		stateDB.SetState(ContractAddress, staticPricingStorageKey, common.BigToHash(common.Big1))
 	} else {
-		stateDB.SetState(addr, staticPricingStorageKey, common.Hash{})
+		stateDB.SetState(ContractAddress, staticPricingStorageKey, common.Hash{})
 	}
-	stateDB.SetState(addr, minGasPriceStorageKey, common.BigToHash(feeConfig.MinGasPrice))
-	stateDB.SetState(addr, timeToDoubleStorageKey, common.BigToHash(feeConfig.TimeToDouble))
+	stateDB.SetState(ContractAddress, minGasPriceStorageKey, common.BigToHash(feeConfig.MinGasPrice))
+	stateDB.SetState(ContractAddress, timeToDoubleStorageKey, common.BigToHash(feeConfig.TimeToDouble))
 
 	blockNumber := blockContext.Number()
 	if blockNumber == nil {
 		return errors.New("blockNumber cannot be nil")
 	}
-	stateDB.SetState(addr, feeConfigLastChangedAtKey, common.BigToHash(blockNumber))
+	stateDB.SetState(ContractAddress, feeConfigLastChangedAtKey, common.BigToHash(blockNumber))
 	return nil
 }
 
@@ -166,7 +166,7 @@ func setFeeConfig(
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotSetFeeConfig, caller)
 	}
 
-	oldConfig := GetStoredFeeConfig(stateDB, addr)
+	oldConfig := GetStoredFeeConfig(stateDB)
 	topics, data, err := PackFeeConfigUpdatedEvent(
 		caller,
 		oldConfig,
@@ -183,7 +183,7 @@ func setFeeConfig(
 		BlockNumber: accessibleState.GetBlockContext().Number().Uint64(),
 	})
 
-	if err := StoreFeeConfig(stateDB, addr, feeConfig, accessibleState.GetBlockContext()); err != nil {
+	if err := StoreFeeConfig(stateDB, feeConfig, accessibleState.GetBlockContext()); err != nil {
 		return nil, remainingGas, err
 	}
 
@@ -226,7 +226,7 @@ func getFeeConfig(
 		return nil, 0, err
 	}
 
-	feeConfig := GetStoredFeeConfig(accessibleState.GetStateDB(), addr)
+	feeConfig := GetStoredFeeConfig(accessibleState.GetStateDB())
 
 	output, err := PackGetFeeConfigOutput(feeConfig)
 	if err != nil {
@@ -272,7 +272,7 @@ func getFeeConfigLastChangedAt(
 		return nil, 0, err
 	}
 
-	lastChangedAt := GetFeeConfigLastChangedAt(accessibleState.GetStateDB(), addr)
+	lastChangedAt := GetFeeConfigLastChangedAt(accessibleState.GetStateDB())
 	packedOutput, err := PackGetFeeConfigLastChangedAtOutput(lastChangedAt)
 	if err != nil {
 		return nil, remainingGas, err

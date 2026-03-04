@@ -54,7 +54,7 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 	}
 	// Store the initial fee config into the state when the fee manager activates.
 	if config.InitialFeeConfig != nil {
-		if err := StoreFeeConfig(state, ContractAddress, *config.InitialFeeConfig, blockContext); err != nil {
+		if err := StoreFeeConfig(state, *config.InitialFeeConfig, blockContext); err != nil {
 			// This should not happen since we already checked this config with Verify()
 			return fmt.Errorf("cannot configure given initial fee config: %w", err)
 		}
