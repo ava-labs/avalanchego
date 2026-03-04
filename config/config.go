@@ -62,7 +62,8 @@ const (
 type consensusMode int
 
 const (
-	modeSimplex consensusMode = iota
+	undefined consensusMode = iota
+	modeSimplex
 	modeSnow
 	modeSnowFromDeprecated
 	modeDefaultSnow
@@ -195,8 +196,11 @@ func resolveConsensusMode(config *subnets.Config) consensusMode {
 }
 
 // applySubnetConfigDefaults sets the default values for any unset fields in the subnets.Config.
-func applySubnetConfigDefaults(config *subnets.Config, v *viper.Viper) {
-	switch resolveConsensusMode(config) {
+func applySubnetConfigDefaults(config *subnets.Config, v *viper.Viper) error {
+	mode := resolveConsensusMode(config)
+	switch mode {
+	default:
+		return fmt.Errorf("unknown consensus mode: %d", mode)
 	case modeSimplex:
 		applySimplexDefaults(config.SimplexParameters, v)
 	case modeSnow:
@@ -208,6 +212,7 @@ func applySubnetConfigDefaults(config *subnets.Config, v *viper.Viper) {
 	case modeDefaultSnow:
 		config.SnowParameters = getPrimaryNetworkSnowConfig(v)
 	}
+	return nil
 }
 
 // getSubnetConfigFromBytes unmarshals a subnet config from rawBytes and validates it.
@@ -227,7 +232,9 @@ func getSubnetConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, 
 		return subnets.Config{}, err
 	}
 	// set unset fields
-	applySubnetConfigDefaults(&config, v)
+	if err := applySubnetConfigDefaults(&config, v); err != nil {
+		return subnets.Config{}, err
+	}
 
 	// validate parameters
 	if err := config.ValidParameters(); err != nil {
