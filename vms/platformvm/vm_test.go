@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -1385,12 +1385,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Mark the validator as connected. We should request the accepted frontier.
 	var reqID uint32
-	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
-		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+	externalSender.SendF = func(msg *message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+		inMsg, err := mc.Parse(msg.Bytes, ctx.NodeID, func() {})
 		require.NoError(err)
-		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
+		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op)
 
-		requestID, ok := message.GetRequestID(inMsg.Message())
+		requestID, ok := message.GetRequestID(inMsg.Message)
 		require.True(ok)
 
 		reqID = requestID
@@ -1426,11 +1426,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Report the validator removal as the last accepted block with the accepted
 	// frontier. We should request a confirmation that this block is accepted.
-	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
-		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+	externalSender.SendF = func(msg *message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+		inMsgIntf, err := mc.Parse(msg.Bytes, ctx.NodeID, func() {})
 		require.NoError(err)
-		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
-		inMsg := inMsgIntf.Message().(*p2ppb.GetAccepted)
+		require.Equal(message.GetAcceptedOp, inMsgIntf.Op)
+		inMsg := inMsgIntf.Message.(*p2ppb.GetAccepted)
 
 		reqID = inMsg.RequestId
 		return config.NodeIDs
@@ -1440,11 +1440,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Report the validator removal as accepted. We should request the validator
 	// removal block and any ancestors of it.
-	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
-		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+	externalSender.SendF = func(msg *message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+		inMsgIntf, err := mc.Parse(msg.Bytes, ctx.NodeID, func() {})
 		require.NoError(err)
-		require.Equal(message.GetAncestorsOp, inMsgIntf.Op())
-		inMsg := inMsgIntf.Message().(*p2ppb.GetAncestors)
+		require.Equal(message.GetAncestorsOp, inMsgIntf.Op)
+		inMsg := inMsgIntf.Message.(*p2ppb.GetAncestors)
 
 		reqID = inMsg.RequestId
 
@@ -1459,12 +1459,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Provide the validator removal block. We should process this block and
 	// then do another round of bootstrapping.
-	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
-		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+	externalSender.SendF = func(msg *message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+		inMsg, err := mc.Parse(msg.Bytes, ctx.NodeID, func() {})
 		require.NoError(err)
-		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
+		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op)
 
-		requestID, ok := message.GetRequestID(inMsg.Message())
+		requestID, ok := message.GetRequestID(inMsg.Message)
 		require.True(ok)
 
 		reqID = requestID
@@ -1475,11 +1475,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// We should again report the validator removal block as the last accepted
 	// block.
-	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
-		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+	externalSender.SendF = func(msg *message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+		inMsgIntf, err := mc.Parse(msg.Bytes, ctx.NodeID, func() {})
 		require.NoError(err)
-		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
-		inMsg := inMsgIntf.Message().(*p2ppb.GetAccepted)
+		require.Equal(message.GetAcceptedOp, inMsgIntf.Op)
+		inMsg := inMsgIntf.Message.(*p2ppb.GetAccepted)
 
 		reqID = inMsg.RequestId
 		return config.NodeIDs

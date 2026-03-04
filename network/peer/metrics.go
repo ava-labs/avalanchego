@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -107,9 +107,9 @@ func NewMetrics(registerer prometheus.Registerer) (*Metrics, error) {
 }
 
 // Sent updates the metrics for having sent [msg].
-func (m *Metrics) Sent(msg message.OutboundMessage) {
-	op := msg.Op().String()
-	saved := msg.BytesSavedCompression()
+func (m *Metrics) Sent(msg *message.OutboundMessage) {
+	op := msg.Op.String()
+	saved := msg.BytesSavedCompression
 	compressed := saved != 0 // assume that if [saved] == 0, [msg] wasn't compressed
 	compressedStr := strconv.FormatBool(compressed)
 
@@ -123,7 +123,7 @@ func (m *Metrics) Sent(msg message.OutboundMessage) {
 		ioLabel: sentLabel,
 		opLabel: op,
 	}
-	m.Bytes.With(bytesLabel).Add(float64(len(msg.Bytes())))
+	m.Bytes.With(bytesLabel).Add(float64(len(msg.Bytes)))
 	m.BytesSaved.With(bytesLabel).Add(float64(saved))
 }
 
@@ -134,16 +134,16 @@ func (m *Metrics) MultipleSendsFailed(op message.Op, count int) {
 }
 
 // SendFailed updates the metrics for having failed to send [msg].
-func (m *Metrics) SendFailed(msg message.OutboundMessage) {
-	op := msg.Op().String()
+func (m *Metrics) SendFailed(msg *message.OutboundMessage) {
+	op := msg.Op.String()
 	m.NumSendFailed.With(prometheus.Labels{
 		opLabel: op,
 	}).Inc()
 }
 
-func (m *Metrics) Received(msg message.InboundMessage, msgLen uint32) {
-	op := msg.Op().String()
-	saved := msg.BytesSavedCompression()
+func (m *Metrics) Received(msg *message.InboundMessage, msgLen uint32) {
+	op := msg.Op.String()
+	saved := msg.BytesSavedCompression
 	compressed := saved != 0 // assume that if [saved] == 0, [msg] wasn't compressed
 	compressedStr := strconv.FormatBool(compressed)
 

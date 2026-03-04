@@ -1,0 +1,119 @@
+name: Subnet-EVM
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  lint_test:
+    name: Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Set up solc
+        uses: ARR4N/setup-solc@v0.2.0
+        with:
+          versions: "0.8.30"
+      - name: Run all lint checks
+        run: ./scripts/run_task.sh lint-all-ci
+      - name: Check go.mod and go.sum are up-to-date
+        run: ./scripts/run_task.sh check-go-mod-tidy
+
+  unit_test:
+    name: Unit Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-22.04, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - run: ./scripts/run_task.sh build-test
+      - run: ./scripts/run_task.sh coverage
+
+  e2e_warp:
+    name: e2e warp tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Warp E2E Tests
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@70148edc6ecabb2836b89d890718011b892b7063
+        with:
+          run: ./scripts/run_task.sh test-e2e-warp-ci
+          working_directory: ./graft/subnet-evm
+          artifact_prefix: warp
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+
+  e2e_load:
+    name: e2e load tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run E2E Load Tests
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@70148edc6ecabb2836b89d890718011b892b7063
+        with:
+          run: ./scripts/run_task.sh test-e2e-load-ci
+          working_directory: ./graft/subnet-evm
+          artifact_prefix: load
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+
+  test_build_image:
+    name: Image build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install qemu (required for cross-platform builds)
+        run: |
+          sudo apt update
+          sudo apt -y install qemu-system qemu-user-static
+      - name: Check image build
+        run: ./scripts/run_task.sh test-build-image
+
+  test_build_antithesis_images:
+    name: Build Antithesis images
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "graft/subnet-evm/go.mod"
+      - name: Check antithesis image build
+        run: ./scripts/run_task.sh test-build-antithesis-images-ci

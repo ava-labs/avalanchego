@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -319,14 +319,14 @@ func NewNetwork(
 }
 
 func (n *network) Send(
-	msg message.OutboundMessage,
+	msg *message.OutboundMessage,
 	config common.SendConfig,
 	subnetID ids.ID,
 	allower subnets.Allower,
 ) set.Set[ids.NodeID] {
 	namedPeers := n.getPeers(config.NodeIDs, subnetID, allower)
 	n.peerConfig.Metrics.MultipleSendsFailed(
-		msg.Op(),
+		msg.Op,
 		config.NodeIDs.Len()-len(namedPeers),
 	)
 

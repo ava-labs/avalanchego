@@ -8,6 +8,9 @@ WORKDIR /build
 # Copy and download dependencies using go mod
 COPY go.mod .
 COPY go.sum .
+# Copy graft if it exists to support local replace directives
+RUN --mount=type=bind,source=.,target=/context \
+    if [ -d /context/graft ]; then cp -r /context/graft ./graft; fi
 RUN go mod download
 
 # Copy the code into the container

@@ -1,0 +1,48 @@
+name: Publish Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_id:
+        description: "The ID of the VM (binary dst in Docker image)"
+        default: ""
+        required: false
+        type: string
+      avalanche_version:
+        description: "The SHA or tag of avalanchego to use for the base image (must be compatible with the version in go.mod)"
+        default: ""
+        required: false
+        type: string
+      allow_tag_latest:
+        description: "Whether or not allowing to tag the image created as latest (only works for master branch)"
+        default: false
+        required: false
+        type: boolean
+
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+
+jobs:
+  publish_docker_image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 #v3.6.0
+      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 #v3.10.0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+      - name: Build and publish images to DockerHub
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+          IMAGE_NAME: "avaplatform/subnet-evm_avalanchego"
+          VM_ID: ${{ inputs.vm_id }}
+          PUBLISH: 1
+          PLATFORMS: "linux/amd64,linux/arm64"
+          AVALANCHE_VERSION: ${{ inputs.avalanche_version }}
+          ALLOW_TAG_LATEST: ${{ github.event_name != 'workflow_dispatch' || inputs.allow_tag_latest }}
+        run: ./scripts/run_task.sh build-docker-image

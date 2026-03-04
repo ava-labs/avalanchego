@@ -1,0 +1,6 @@
+**/artifacts/
+**/artifacts/*.abi
+**/artifacts/*.bin
+
+# IAllowList.abi gets generated as a side effect when compiling interfaces that inherit from it
+contracts/*/IAllowList.abi

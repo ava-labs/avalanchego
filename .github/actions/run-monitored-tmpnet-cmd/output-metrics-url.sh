@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# WARNING: This file is duplicated at:
+#   - .github/actions/c-chain-reexecution-benchmark/output-metrics-url.sh (copy)
+# Changes must be made to BOTH files.
+
 set -euo pipefail
 
 # Timestamps are in seconds

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package factory
@@ -44,16 +44,15 @@ func New(
 	case pebbledb.Name:
 		db, err = pebbledb.New(path, config, logger, reg)
 	default:
-		return nil, fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s, %s}",
-			name,
+		err = fmt.Errorf(
+			"db-type must be one of {%s, %s, %s}",
 			leveldb.Name,
 			memdb.Name,
 			pebbledb.Name,
 		)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create %s at %s: %w", name, path, err)
+		return nil, fmt.Errorf("couldn't create %q at %q: %w", name, path, err)
 	}
 
 	db = corruptabledb.New(db, logger)

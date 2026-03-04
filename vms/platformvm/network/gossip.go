@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -150,9 +151,9 @@ func (g *gossipMempool) Has(txID ids.ID) bool {
 	return ok
 }
 
-func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
+func (g *gossipMempool) BloomFilter() (*bloom.Filter, ids.ID) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	return g.bloom.Marshal()
+	return g.bloom.BloomFilter()
 }

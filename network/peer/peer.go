@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -102,7 +102,7 @@ type Peer interface {
 	// Send attempts to send [msg] to the peer. The peer takes ownership of
 	// [msg] for reference counting. This returns false if the message is
 	// guaranteed not to be delivered to the peer.
-	Send(ctx context.Context, msg message.OutboundMessage) bool
+	Send(ctx context.Context, msg *message.OutboundMessage) bool
 
 	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
 	// on this peer's gossip routine. It is not guaranteed that a GetPeerList
@@ -317,7 +317,7 @@ func (p *peer) ObservedUptime() uint32 {
 	return p.observedUptime.Get()
 }
 
-func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
+func (p *peer) Send(ctx context.Context, msg *message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
 }
 
@@ -594,10 +594,10 @@ func (p *peer) writeMessages() {
 	}
 }
 
-func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
-	msgBytes := msg.Bytes()
+func (p *peer) writeMessage(writer io.Writer, msg *message.OutboundMessage) {
+	msgBytes := msg.Bytes
 	p.Log.Verbo("sending message",
-		zap.Stringer("op", msg.Op()),
+		zap.Stringer("op", msg.Op),
 		zap.Stringer("nodeID", p.id),
 		zap.Binary("messageBytes", msgBytes),
 	)
@@ -621,7 +621,7 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 		return
 	}
 
-	if msg.Op() == message.PingOp {
+	if msg.Op == message.PingOp {
 		atomic.StoreInt64(&p.lastPingSent, p.Clock.Time().UnixMilli())
 	}
 
@@ -750,8 +750,8 @@ func (p *peer) shouldDisconnect() bool {
 	return false
 }
 
-func (p *peer) handle(msg message.InboundMessage) {
-	switch m := msg.Message().(type) { // Network-related message types
+func (p *peer) handle(msg *message.InboundMessage) {
+	switch m := msg.Message.(type) { // Network-related message types
 	case *p2p.Ping:
 		p.handlePing(m)
 		msg.OnFinishedHandling()
@@ -776,7 +776,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 	if !p.finishedHandshake.Get() {
 		p.Log.Debug("dropping message",
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("messageOp", msg.Op),
 			zap.String("reason", "handshake isn't finished"),
 		)
 		msg.OnFinishedHandling()
@@ -1011,7 +1011,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	}
 
 	port := uint16(msg.IpPort)
-	if msg.IpPort == 0 {
+	if port == 0 {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.HandshakeOp),

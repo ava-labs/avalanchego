@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -8,18 +8,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/message/messagemock"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestSybilOutboundMsgThrottler(t *testing.T) {
-	ctrl := gomock.NewController(t)
 	require := require.New(t)
 	config := MsgByteThrottlerConfig{
 		VdrAllocSize:        1024,
@@ -49,7 +46,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	require.NotNil(throttler.vdrs)
 
 	// Take from at-large allocation.
-	msg := testMsgWithSize(ctrl, 1)
+	msg := testMsgWithSize(1)
 	acquired := throttlerIntf.Acquire(msg, vdr1ID)
 	require.True(acquired)
 	require.Equal(config.AtLargeAllocSize-1, throttler.remainingAtLargeBytes)
@@ -66,7 +63,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	require.Empty(throttler.nodeToAtLargeBytesUsed)
 
 	// Use all the at-large allocation bytes and 1 of the validator allocation bytes
-	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize+1)
+	msg = testMsgWithSize(config.AtLargeAllocSize + 1)
 	acquired = throttlerIntf.Acquire(msg, vdr1ID)
 	require.True(acquired)
 	// vdr1 at-large bytes used: 1024. Validator bytes used: 1
@@ -78,7 +75,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	require.Equal(config.AtLargeAllocSize, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// The other validator should be able to acquire half the validator allocation.
-	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize/2)
+	msg = testMsgWithSize(config.AtLargeAllocSize / 2)
 	acquired = throttlerIntf.Acquire(msg, vdr2ID)
 	require.True(acquired)
 	// vdr2 at-large bytes used: 0. Validator bytes used: 512
@@ -89,7 +86,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	require.Len(throttler.nodeToAtLargeBytesUsed, 1)
 
 	// vdr1 should be able to acquire the rest of the validator allocation
-	msg = testMsgWithSize(ctrl, config.VdrAllocSize/2-1)
+	msg = testMsgWithSize(config.VdrAllocSize/2 - 1)
 	acquired = throttlerIntf.Acquire(msg, vdr1ID)
 	require.True(acquired)
 	// vdr1 at-large bytes used: 1024. Validator bytes used: 512
@@ -98,7 +95,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	require.Equal(config.AtLargeAllocSize, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// Trying to take more bytes for either node should fail
-	msg = testMsgWithSize(ctrl, 1)
+	msg = testMsgWithSize(1)
 	acquired = throttlerIntf.Acquire(msg, vdr1ID)
 	require.False(acquired)
 	acquired = throttlerIntf.Acquire(msg, vdr2ID)
@@ -111,7 +108,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	// When the choice exists, bytes should be given back to the validator allocation
 	// rather than the at-large allocation.
 	// vdr1 at-large bytes used: 511. Validator bytes used: 0
-	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize+1)
+	msg = testMsgWithSize(config.AtLargeAllocSize + 1)
 	throttlerIntf.Release(msg, vdr1ID)
 
 	require.Equal(config.NodeMaxAtLargeBytes/2, throttler.remainingVdrBytes)
@@ -123,19 +120,19 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	// Non-validator should be able to take the rest of the at-large bytes
 	// nonVdrID at-large bytes used: 513
 	nonVdrID := ids.GenerateTestNodeID()
-	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize/2+1)
+	msg = testMsgWithSize(config.AtLargeAllocSize/2 + 1)
 	acquired = throttlerIntf.Acquire(msg, nonVdrID)
 	require.True(acquired)
 	require.Zero(throttler.remainingAtLargeBytes)
 	require.Equal(config.AtLargeAllocSize/2+1, throttler.nodeToAtLargeBytesUsed[nonVdrID])
 
 	// Non-validator shouldn't be able to acquire more since at-large allocation empty
-	msg = testMsgWithSize(ctrl, 1)
+	msg = testMsgWithSize(1)
 	acquired = throttlerIntf.Acquire(msg, nonVdrID)
 	require.False(acquired)
 
 	// Release all of vdr2's messages
-	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize/2)
+	msg = testMsgWithSize(config.AtLargeAllocSize / 2)
 	throttlerIntf.Release(msg, vdr2ID)
 	require.Zero(throttler.nodeToAtLargeBytesUsed[vdr2ID])
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
@@ -143,7 +140,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	require.Zero(throttler.remainingAtLargeBytes)
 
 	// Release all of vdr1's messages
-	msg = testMsgWithSize(ctrl, config.VdrAllocSize/2-1)
+	msg = testMsgWithSize(config.VdrAllocSize/2 - 1)
 	throttlerIntf.Release(msg, vdr1ID)
 	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
@@ -151,7 +148,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	require.Zero(throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// Release nonVdr's messages
-	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize/2+1)
+	msg = testMsgWithSize(config.AtLargeAllocSize/2 + 1)
 	throttlerIntf.Release(msg, nonVdrID)
 	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
@@ -162,7 +159,6 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 
 // Ensure that the limit on taking from the at-large allocation is enforced
 func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
-	ctrl := gomock.NewController(t)
 	require := require.New(t)
 	config := MsgByteThrottlerConfig{
 		VdrAllocSize:        100,
@@ -181,23 +177,23 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	require.NoError(err)
 	throttler := throttlerIntf.(*outboundMsgThrottler)
 	nonVdrNodeID1 := ids.GenerateTestNodeID()
-	msg := testMsgWithSize(ctrl, config.NodeMaxAtLargeBytes)
+	msg := testMsgWithSize(config.NodeMaxAtLargeBytes)
 	acquired := throttlerIntf.Acquire(msg, nonVdrNodeID1)
 	require.True(acquired)
 
 	// Acquiring more should fail
-	msg = testMsgWithSize(ctrl, 1)
+	msg = testMsgWithSize(1)
 	acquired = throttlerIntf.Acquire(msg, nonVdrNodeID1)
 	require.False(acquired)
 
 	// A different non-validator should be able to acquire
 	nonVdrNodeID2 := ids.GenerateTestNodeID()
-	msg = testMsgWithSize(ctrl, config.NodeMaxAtLargeBytes)
+	msg = testMsgWithSize(config.NodeMaxAtLargeBytes)
 	acquired = throttlerIntf.Acquire(msg, nonVdrNodeID2)
 	require.True(acquired)
 
 	// Validator should only be able to take [MaxAtLargeBytes]
-	msg = testMsgWithSize(ctrl, config.NodeMaxAtLargeBytes+1)
+	msg = testMsgWithSize(config.NodeMaxAtLargeBytes + 1)
 	throttlerIntf.Acquire(msg, vdr1ID)
 	require.Equal(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 	require.Equal(uint64(1), throttler.nodeToVdrBytesUsed[vdr1ID])
@@ -208,7 +204,6 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 
 // Ensure that the throttler honors requested bypasses
 func TestBypassThrottling(t *testing.T) {
-	ctrl := gomock.NewController(t)
 	require := require.New(t)
 	config := MsgByteThrottlerConfig{
 		VdrAllocSize:        100,
@@ -227,31 +222,34 @@ func TestBypassThrottling(t *testing.T) {
 	require.NoError(err)
 	throttler := throttlerIntf.(*outboundMsgThrottler)
 	nonVdrNodeID1 := ids.GenerateTestNodeID()
-	msg := messagemock.NewOutboundMessage(ctrl)
-	msg.EXPECT().BypassThrottling().Return(true).AnyTimes()
-	msg.EXPECT().Op().Return(message.AppGossipOp).AnyTimes()
-	msg.EXPECT().Bytes().Return(make([]byte, config.NodeMaxAtLargeBytes)).AnyTimes()
+	msg := &message.OutboundMessage{
+		BypassThrottling: true,
+		Op:               message.AppGossipOp,
+		Bytes:            make([]byte, config.NodeMaxAtLargeBytes),
+	}
 	acquired := throttlerIntf.Acquire(msg, nonVdrNodeID1)
 	require.True(acquired)
 
 	// Acquiring more should not fail
-	msg = messagemock.NewOutboundMessage(ctrl)
-	msg.EXPECT().BypassThrottling().Return(true).AnyTimes()
-	msg.EXPECT().Op().Return(message.AppGossipOp).AnyTimes()
-	msg.EXPECT().Bytes().Return(make([]byte, 1)).AnyTimes()
+	msg = &message.OutboundMessage{
+		BypassThrottling: true,
+		Op:               message.AppGossipOp,
+		Bytes:            make([]byte, 1),
+	}
 	acquired = throttlerIntf.Acquire(msg, nonVdrNodeID1)
 	require.True(acquired)
 
 	// Acquiring more should not fail
-	msg2 := testMsgWithSize(ctrl, 1)
+	msg2 := testMsgWithSize(1)
 	acquired = throttlerIntf.Acquire(msg2, nonVdrNodeID1)
 	require.True(acquired)
 
 	// Validator should only be able to take [MaxAtLargeBytes]
-	msg = messagemock.NewOutboundMessage(ctrl)
-	msg.EXPECT().BypassThrottling().Return(true).AnyTimes()
-	msg.EXPECT().Op().Return(message.AppGossipOp).AnyTimes()
-	msg.EXPECT().Bytes().Return(make([]byte, config.NodeMaxAtLargeBytes+1)).AnyTimes()
+	msg = &message.OutboundMessage{
+		BypassThrottling: true,
+		Op:               message.AppGossipOp,
+		Bytes:            make([]byte, config.NodeMaxAtLargeBytes+1),
+	}
 	throttlerIntf.Acquire(msg, vdr1ID)
 	require.Zero(throttler.nodeToAtLargeBytesUsed[vdr1ID])
 	require.Zero(throttler.nodeToVdrBytesUsed[vdr1ID])
@@ -259,10 +257,10 @@ func TestBypassThrottling(t *testing.T) {
 	require.Equal(config.AtLargeAllocSize-1, throttler.remainingAtLargeBytes)
 }
 
-func testMsgWithSize(ctrl *gomock.Controller, size uint64) message.OutboundMessage {
-	msg := messagemock.NewOutboundMessage(ctrl)
-	msg.EXPECT().BypassThrottling().Return(false).AnyTimes()
-	msg.EXPECT().Op().Return(message.AppGossipOp).AnyTimes()
-	msg.EXPECT().Bytes().Return(make([]byte, size)).AnyTimes()
-	return msg
+func testMsgWithSize(size uint64) *message.OutboundMessage {
+	return &message.OutboundMessage{
+		BypassThrottling: false,
+		Op:               message.AppGossipOp,
+		Bytes:            make([]byte, size),
+	}
 }

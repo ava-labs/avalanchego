@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -53,12 +53,12 @@ type InternalHandler interface {
 		chainID ids.ID,
 		requestID uint32,
 		op message.Op,
-		failedMsg message.InboundMessage,
+		failedMsg *message.InboundMessage,
 		engineType p2p.EngineType,
 	)
 
 	// HandleInternal enqueues a message to be handled by the consensus engine
 	// in the future. This function should only be called with messages
 	// generated internally, and not from messages received from a peer.
-	HandleInternal(context.Context, message.InboundMessage)
+	HandleInternal(context.Context, *message.InboundMessage)
 }

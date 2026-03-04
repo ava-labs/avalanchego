@@ -94,12 +94,12 @@ and initiates a new test when one is found.
    - Mounting the same data volume as the avalanchego node
    - Reading bootstrap test configuration as described previously
    - Determining the image ID and versions for an image if the
-     avalanchego image for the pod uses the `latest` tag. This will
+     avalanchego image for the pod uses the `master` tag. This will
      only need to be performed the first pod that a bootstrap testing
      `StatefulSet` runs. Subsequent pods from the same `StatefulSet`
      should have an image qualified with its SHA and version details
      set by the previous test run's `wait-for-completion` pod.
-     - A new pod will be started with the `latest` image to execute
+     - A new pod will be started with the `master` image to execute
      `avalanchego --versions-json` to determine the image ID (which
      includes a sha256 hash) of the image and its avalanchego
      versions. Those values will then be applied to the `StatefulSet`
@@ -109,7 +109,7 @@ and initiates a new test when one is found.
      versions (including commit hash) of the binary that the image
      provides.
      - A separate pod is used because the image ID of a non-init
-       avalanchego container using a `latest`-tagged image is only
+       avalanchego container using a `master`-tagged image is only
        available when that container runs rather than when an init container runs.
      - While it would be possible to add an init container running the
        same avalanchego image as the primary avalanchego container,
@@ -178,8 +178,8 @@ sync bootstrap usually takes much longer.
 
 If avalanchego supported a `--bootstrap-mode` flag that exited on
 successful bootstrap, and a pod configured with this flag used an
-image with a `latest` tag, the pod would continuously bootstrap, exit,
-and restart with the current latest image. While appealingly simple,
+image with a `master` tag, the pod would continuously bootstrap, exit,
+and restart with the current `master` image. While appealingly simple,
 this approach doesn't directly support:
 
  - A mechanism for resuming a long-running bootstrap. Given the

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrapmonitor
@@ -49,18 +49,18 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 	}
 	log.Info("Retrieved bootstrap test config", zap.Reflect("testConfig", testConfig))
 
-	// If the image uses the latest tag, determine the latest image id and set the container image to that
-	if strings.HasSuffix(testConfig.Image, ":latest") {
+	// If the image uses the master tag, determine the master image id and set the container image to that
+	if strings.HasSuffix(testConfig.Image, ":master") {
 		log.Info("Determining image id for image", zap.String("image", testConfig.Image))
-		latestImageDetails, err := getLatestImageDetails(ctx, log, clientset, namespace, testConfig.Image, nodeContainerName)
+		masterImageDetails, err := getMasterImageDetails(ctx, log, clientset, namespace, testConfig.Image, nodeContainerName)
 		if err != nil {
-			return fmt.Errorf("failed to get latest image details: %w", err)
+			return fmt.Errorf("failed to get master image details: %w", err)
 		}
 		log.Info("Updating owning statefulset with image details",
-			zap.String("image", latestImageDetails.Image),
-			zap.Reflect("versions", latestImageDetails.Versions),
+			zap.String("image", masterImageDetails.Image),
+			zap.Reflect("versions", masterImageDetails.Versions),
 		)
-		if err := setImageDetails(ctx, log, clientset, namespace, podName, latestImageDetails); err != nil {
+		if err := setImageDetails(ctx, log, clientset, namespace, podName, masterImageDetails); err != nil {
 			return fmt.Errorf("failed to set container image: %w", err)
 		}
 	}

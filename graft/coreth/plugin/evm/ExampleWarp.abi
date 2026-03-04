@@ -1,0 +1,105 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "bytes",
+        "name": "payload",
+        "type": "bytes"
+      }
+    ],
+    "name": "sendWarpMessage",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "blockchainID",
+        "type": "bytes32"
+      }
+    ],
+    "name": "validateGetBlockchainID",
+    "outputs": [],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "index",
+        "type": "uint32"
+      }
+    ],
+    "name": "validateInvalidWarpBlockHash",
+    "outputs": [],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "index",
+        "type": "uint32"
+      }
+    ],
+    "name": "validateInvalidWarpMessage",
+    "outputs": [],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "index",
+        "type": "uint32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "sourceChainID",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "blockHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "validateWarpBlockHash",
+    "outputs": [],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "index",
+        "type": "uint32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "sourceChainID",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "originSenderAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes",
+        "name": "payload",
+        "type": "bytes"
+      }
+    ],
+    "name": "validateWarpMessage",
+    "outputs": [],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

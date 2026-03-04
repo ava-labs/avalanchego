@@ -10,6 +10,7 @@ BlockDB is a specialized database optimized for blockchain blocks.
 - **Configurable Durability**: Optional `syncToDisk` mode guarantees immediate recoverability
 - **Automatic Recovery**: Detects and recovers unindexed blocks after unclean shutdowns
 - **Block Compression**: zstd compression for block data
+- **In-Memory Cache**: LRU cache for recently accessed blocks
 
 ## Design
 
@@ -167,7 +168,6 @@ if err != nil {
 
 ## TODO
 
-- Implement a block cache for recently accessed blocks
 - Use a buffered pool to avoid allocations on reads and writes
 - Add performance benchmarks
 - Consider supporting missing data files (currently we error if any data files are missing)

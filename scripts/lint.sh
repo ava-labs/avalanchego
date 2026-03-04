@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+# This script does not perform any linting on the graft subdirectory.
+IGNORE_PATH="graft"
+
 if ! [[ "$0" =~ scripts/lint.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -29,11 +32,15 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
+TESTS=${TESTS:-"golangci_lint warn_testify_assert license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
   ./scripts/run_tool.sh golangci-lint run --config .golangci.yml
 }
+
+# Source shared helper for testify/assert warnings (provides test_warn_testify_assert)
+# shellcheck disable=SC1091
+source ./scripts/lint_warn_assert.sh
 
 # automatically checks license headers
 # to modify the file headers (if missing), remove "--verify" flag
@@ -49,7 +56,8 @@ function test_license_header {
       ! -name 'mocks_*.go' \
       ! -path './**/*mock/*.go' \
       ! -name '*.canoto.go' \
-      ! -name '*.bindings.go'
+      ! -name '*.bindings.go' \
+      ! -path "./${IGNORE_PATH}/*"
     )
 
   # shellcheck disable=SC2086
@@ -60,21 +68,21 @@ function test_license_header {
 }
 
 function test_single_import {
-  if grep -R -zo -P 'import \(\n\t".*"\n\)' .; then
+  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" 'import \(\n\t".*"\n\)' .; then
     echo ""
     return 1
   fi
 }
 
 function test_require_error_is_no_funcs_as_params {
-  if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
+  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
     echo ""
     return 1
   fi
 }
 
 function test_require_no_error_inline_func {
-  if grep -R -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
+  if grep -R -zo -P --exclude-dir="${IGNORE_PATH}" '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
     echo ""
     echo "Checking that a function with a single error return doesn't error should be done in-line."
     echo ""
@@ -84,7 +92,7 @@ function test_require_no_error_inline_func {
 
 # Ref: https://go.dev/doc/effective_go#blank_implements
 function test_interface_compliance_nil {
-  if grep -R -o -P '_ .+? = &.+?\{\}' .; then
+  if grep -R -o -P --exclude-dir="${IGNORE_PATH}" '_ .+? = &.+?\{\}' .; then
     echo ""
     echo "Interface compliance checks need to be of the form:"
     echo "  var _ json.Marshaler = (*RawMessage)(nil)"
@@ -95,11 +103,11 @@ function test_interface_compliance_nil {
 
 function test_import_testing_only_in_tests {
   ROOT=$( git rev-parse --show-toplevel )
-  NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' ! -path "${ROOT}/tests/*" );
+  NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' ! -path "${ROOT}/tests/*" ! -path "${ROOT}/${IGNORE_PATH}/*" );
 
   IMPORT_TESTING=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"');
   IMPORT_TESTIFY=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/stretchr/testify');
-  IMPORT_FROM_TESTS=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/ava-labs/avalanchego/tests/');
+  IMPORT_FROM_TESTS=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/ava-labs/avalanchego/.*?tests/');
   IMPORT_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '"github.com/ava-labs/avalanchego/.*?test"');
 
   # TODO(arr4n): send a PR to add support for build tags in `mockgen` and then enable this.

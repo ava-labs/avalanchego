@@ -18,7 +18,9 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 fuzzTime=${1:-1}
 fuzzDir=${2:-.}
 
-files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' "$fuzzDir")
+EXCLUDE_DIR="graft"
+
+files=$(grep -r --exclude-dir="$EXCLUDE_DIR" --include='**_test.go' --files-with-matches 'func Fuzz' "$fuzzDir")
 failed=false
 for file in ${files}
 do
