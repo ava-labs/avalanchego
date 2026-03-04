@@ -1582,7 +1582,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 					return nil
 				}
 
-				call := make(chan struct{}, 1)
+				call := make(chan struct{})
 				tt.setHandler(t, engine, call)
 
 				ctx := t.Context()
