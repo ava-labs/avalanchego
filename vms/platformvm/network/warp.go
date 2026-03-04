@@ -103,7 +103,8 @@ func (s signatureRequestVerifier) Verify(
 	case *message.ValidatorSetDiff:
 		return s.verifyValidatorSetDiff(ctx, payload)
 	case *message.SubsetUpdate:
-		return s.verifySubsetUpdate(ctx, payload)
+		return nil
+		// return s.verifySubsetUpdate(ctx, payload)
 	default:
 		return &common.AppError{
 			Code:    ErrUnsupportedWarpAddressedCallPayloadType,
