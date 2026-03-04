@@ -214,59 +214,56 @@ var (
 
 	minTargetGasACP224 = big.NewInt(1_000_000)
 
-	ErrTargetGasNilACP224               = errors.New("targetGas cannot be nil")
-	ErrMinGasPriceNil                   = errors.New("minGasPrice cannot be nil")
-	ErrTimeToDoubleNil                  = errors.New("timeToDouble cannot be nil")
-	ErrMinGasPriceTooLow                = errors.New("minGasPrice must be greater than 0")
-	ErrTargetGasMustBeZero              = errors.New("targetGas must be 0 when validatorTargetGas is true")
-	ErrTargetGasTooLowACP224            = errors.New("targetGas must be at least 1000000")
-	ErrTimeToDoubleTooLow               = errors.New("timeToDouble must be greater than 0")
-	ErrTimeToDoubleMustBeZero           = errors.New("timeToDouble must be 0 when staticPricing is true")
-	ErrInvalidValidatorTargetStaticCombo = errors.New("validatorTargetGas and staticPricing cannot both be true")
-	ErrTargetGasExceedsHashLengthACP224 = errors.New("targetGas exceeds hash length")
-	ErrMinGasPriceExceedsHashLength     = errors.New("minGasPrice exceeds hash length")
-	ErrTimeToDoubleExceedsHashLength    = errors.New("timeToDouble exceeds hash length")
+	errTargetGasNilACP224                = errors.New("targetGas cannot be nil")
+	errMinGasPriceNil                    = errors.New("minGasPrice cannot be nil")
+	errTimeToDoubleNil                   = errors.New("timeToDouble cannot be nil")
+	errMinGasPriceTooLow                 = errors.New("minGasPrice must be greater than 0")
+	errTargetGasMustBeZero               = errors.New("targetGas must be 0 when validatorTargetGas is true")
+	errTargetGasTooLowACP224             = errors.New("targetGas must be at least 1000000")
+	errTimeToDoubleTooLow                = errors.New("timeToDouble must be greater than 0")
+	errTimeToDoubleMustBeZero            = errors.New("timeToDouble must be 0 when staticPricing is true")
+	errInvalidValidatorTargetStaticCombo = errors.New("validatorTargetGas and staticPricing cannot both be true")
+	errTargetGasExceedsHashLengthACP224  = errors.New("targetGas exceeds hash length")
+	errMinGasPriceExceedsHashLength      = errors.New("minGasPrice exceeds hash length")
+	errTimeToDoubleExceedsHashLength     = errors.New("timeToDouble exceeds hash length")
 )
 
 // Verify checks fields of this ACP224FeeConfig to ensure a valid configuration is provided.
 func (a *ACP224FeeConfig) Verify() error {
 	switch {
 	case a.TargetGas == nil:
-		return ErrTargetGasNilACP224
+		return errTargetGasNilACP224
 	case a.MinGasPrice == nil:
-		return ErrMinGasPriceNil
+		return errMinGasPriceNil
 	case a.TimeToDouble == nil:
-		return ErrTimeToDoubleNil
+		return errTimeToDoubleNil
 	}
 
 	if a.ValidatorTargetGas && a.StaticPricing {
-		return ErrInvalidValidatorTargetStaticCombo
+		return errInvalidValidatorTargetStaticCombo
 	}
 
 	if a.MinGasPrice.Sign() <= 0 {
-		return ErrMinGasPriceTooLow
+		return errMinGasPriceTooLow
 	}
 
 	if a.ValidatorTargetGas {
 		if a.TargetGas.Sign() != 0 {
-			return ErrTargetGasMustBeZero
-		}
-		if a.TimeToDouble.Sign() <= 0 {
-			return ErrTimeToDoubleTooLow
+			return errTargetGasMustBeZero
 		}
 	} else {
 		if a.TargetGas.Cmp(minTargetGasACP224) < 0 {
-			return ErrTargetGasTooLowACP224
+			return errTargetGasTooLowACP224
 		}
 	}
 
 	if a.StaticPricing {
 		if a.TimeToDouble.Sign() != 0 {
-			return ErrTimeToDoubleMustBeZero
+			return errTimeToDoubleMustBeZero
 		}
 	} else {
 		if a.TimeToDouble.Sign() <= 0 {
-			return ErrTimeToDoubleTooLow
+			return errTimeToDoubleTooLow
 		}
 	}
 
@@ -289,13 +286,13 @@ func (a *ACP224FeeConfig) Equal(other *ACP224FeeConfig) bool {
 // checkByteLens checks byte lengths against common.HashLen (32 bytes) and returns error
 func (a *ACP224FeeConfig) checkByteLens() error {
 	if isBiggerThanHashLen(a.TargetGas) {
-		return fmt.Errorf("%w: %d bytes", ErrTargetGasExceedsHashLengthACP224, common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errTargetGasExceedsHashLengthACP224, common.HashLength)
 	}
 	if isBiggerThanHashLen(a.MinGasPrice) {
-		return fmt.Errorf("%w: %d bytes", ErrMinGasPriceExceedsHashLength, common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errMinGasPriceExceedsHashLength, common.HashLength)
 	}
 	if isBiggerThanHashLen(a.TimeToDouble) {
-		return fmt.Errorf("%w: %d bytes", ErrTimeToDoubleExceedsHashLength, common.HashLength)
+		return fmt.Errorf("%w: %d bytes", errTimeToDoubleExceedsHashLength, common.HashLength)
 	}
 	return nil
 }
