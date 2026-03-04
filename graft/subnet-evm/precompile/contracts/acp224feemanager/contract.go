@@ -42,11 +42,11 @@ var (
 	// Storage layout uses namespaced keys to prevent collisions with allowlist and other precompile state.
 	// AllowList uses keccak256(address) for role storage, so we use distinct prefixes for fee config.
 	validatorTargetGasStorageKey = common.Hash{'a', 'c', 'p', '2', '2', '4', 'v', 'g'}
-	targetGasStorageKey         = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'g'}
-	staticPricingStorageKey     = common.Hash{'a', 'c', 'p', '2', '2', '4', 's', 'p'}
-	minGasPriceStorageKey       = common.Hash{'a', 'c', 'p', '2', '2', '4', 'm', 'p'}
-	timeToDoubleStorageKey      = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'd'}
-	feeConfigLastChangedAtKey   = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
+	targetGasStorageKey          = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'g'}
+	staticPricingStorageKey      = common.Hash{'a', 'c', 'p', '2', '2', '4', 's', 'p'}
+	minGasPriceStorageKey        = common.Hash{'a', 'c', 'p', '2', '2', '4', 'm', 'p'}
+	timeToDoubleStorageKey       = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'd'}
+	feeConfigLastChangedAtKey    = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
 
 	ErrCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
 
@@ -102,7 +102,7 @@ func GetFeeConfigLastChangedAt(stateDB contract.StateReader, addr common.Address
 // A validation on [feeConfig] is done before storing.
 func StoreFeeConfig(stateDB contract.StateDB, addr common.Address, feeConfig commontype.ACP224FeeConfig, blockContext contract.ConfigurationBlockContext) error {
 	if err := feeConfig.Verify(); err != nil {
-		return fmt.Errorf("cannot verify fee config: %v", err)
+		return fmt.Errorf("cannot verify fee config: %w", err)
 	}
 
 	if feeConfig.ValidatorTargetGas {
