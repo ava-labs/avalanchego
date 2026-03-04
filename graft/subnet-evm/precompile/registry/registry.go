@@ -13,6 +13,8 @@ import (
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
+
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager"
 )
 
 // This list is kept just for reference. The actual addresses defined in respective packages of precompiles.
@@ -33,5 +35,6 @@ import (
 // FeeManagerAddress                = common.HexToAddress("0x0200000000000000000000000000000000000003")
 // RewardManagerAddress             = common.HexToAddress("0x0200000000000000000000000000000000000004")
 // WarpAddress                      = common.HexToAddress("0x0200000000000000000000000000000000000005")
+// ACP224FeeManagerAddress          = common.HexToAddress("0x0200000000000000000000000000000000000006")
 // ADD YOUR PRECOMPILE HERE
 // {YourPrecompile}Address          = common.HexToAddress("0x03000000000000000000000000000000000000??")

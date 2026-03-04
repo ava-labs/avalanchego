@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -40,7 +41,8 @@ var (
 	ACP224FeeManagerPrecompile contract.StatefulPrecompiledContract = createACP224FeeManagerPrecompile()
 
 	// Storage layout uses namespaced keys to prevent collisions with allowlist and other precompile state.
-	// AllowList uses keccak256(address) for role storage, so we use distinct prefixes for fee config.
+	// AllowList uses common.BytesToHash(address.Bytes()) (zero-left-padded addresses) for role storage,
+	// so we use distinct prefixes for fee config.
 	validatorTargetGasStorageKey = common.Hash{'a', 'c', 'p', '2', '2', '4', 'v', 'g'}
 	targetGasStorageKey          = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'g'}
 	staticPricingStorageKey      = common.Hash{'a', 'c', 'p', '2', '2', '4', 's', 'p'}
@@ -58,27 +60,18 @@ var (
 )
 
 // GetACP224FeeManagerAllowListStatus returns the role of [address] for the ACP224FeeManager list.
-func GetACP224FeeManagerAllowListStatus(
-	stateDB contract.StateDB,
-	precompileAddr common.Address,
-	address common.Address,
-) allowlist.Role {
-	return allowlist.GetAllowListStatus(stateDB, precompileAddr, address)
+func GetACP224FeeManagerAllowListStatus(stateDB contract.StateReader, address common.Address) allowlist.Role {
+	return allowlist.GetAllowListStatus(stateDB, ContractAddress, address)
 }
 
 // SetACP224FeeManagerAllowListStatus sets the permissions of [address] to [role] for the
 // ACP224FeeManager list. Assumes [role] has already been verified as valid.
-// This stores the [role] in the contract storage with address [precompileAddr]
+// This stores the [role] in the contract storage with address [ContractAddress]
 // and [address] hash. It means that any reusage of the [address] key for different value
 // conflicts with the same slot [role] is stored.
 // Precompile implementations must use a different key than [address] for their storage.
-func SetACP224FeeManagerAllowListStatus(
-	stateDB contract.StateDB,
-	precompileAddr common.Address,
-	address common.Address,
-	role allowlist.Role,
-) {
-	allowlist.SetAllowListRole(stateDB, precompileAddr, address, role)
+func SetACP224FeeManagerAllowListStatus(stateDB contract.StateDB, address common.Address, role allowlist.Role) {
+	allowlist.SetAllowListRole(stateDB, ContractAddress, address, role)
 }
 
 // GetStoredFeeConfig returns fee config from contract storage in given state
@@ -168,7 +161,7 @@ func setFeeConfig(
 
 	stateDB := accessibleState.GetStateDB()
 	// Verify that the caller is in the allow list and therefore has the right to call this function.
-	callerStatus := GetACP224FeeManagerAllowListStatus(stateDB, addr, caller)
+	callerStatus := GetACP224FeeManagerAllowListStatus(stateDB, caller)
 	if !callerStatus.IsEnabled() {
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotSetFeeConfig, caller)
 	}
@@ -263,7 +256,8 @@ func UnpackGetFeeConfigLastChangedAtOutput(output []byte) (*big.Int, error) {
 	if err != nil {
 		return new(big.Int), err
 	}
-	return res[0].(*big.Int), nil
+	unpacked := *abi.ConvertType(res[0], new(*big.Int)).(**big.Int)
+	return unpacked, nil
 }
 
 func getFeeConfigLastChangedAt(
