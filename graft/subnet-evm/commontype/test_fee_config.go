@@ -19,8 +19,7 @@ var ValidTestFeeConfig = FeeConfig{
 }
 
 var ValidTestACP224FeeConfig = ACP224FeeConfig{
-	TargetGas:         big.NewInt(15_000_000),
-	MinGasPrice:       big.NewInt(1),
-	MaxCapacityFactor: big.NewInt(100),
-	TimeToDouble:      big.NewInt(60),
+	TargetGas:    big.NewInt(15_000_000),
+	MinGasPrice:  big.NewInt(1),
+	TimeToDouble: big.NewInt(60),
 }
