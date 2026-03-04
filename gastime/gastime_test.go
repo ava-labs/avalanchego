@@ -362,6 +362,7 @@ func TestTargetClamping(t *testing.T) {
 	tests := []struct {
 		setTo, want gas.Gas
 	}{
+		{setTo: 0, want: MinTarget},
 		{setTo: 10, want: 10},
 		{setTo: MaxTarget + 1, want: MaxTarget},
 		{setTo: 20, want: 20},
