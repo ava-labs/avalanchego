@@ -14,7 +14,6 @@ import (
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
@@ -22,7 +21,7 @@ import (
 
 const (
 	// Gas costs for each function.
-	numFeeConfigField = 4 // targetGas, minGasPrice, maxCapacityFactor, timeToDouble
+	numFeeConfigField = 5 // validatorTargetGas, targetGas, staticPricing, minGasPrice, timeToDouble
 	// GetFeeConfigGasCost is the cost to read all fee config fields
 	GetFeeConfigGasCost uint64 = contract.ReadGasCostPerSlot * numFeeConfigField
 	// GetFeeConfigLastChangedAtGasCost is the cost to read the last changed at block number
@@ -42,9 +41,10 @@ var (
 
 	// Storage layout uses namespaced keys to prevent collisions with allowlist and other precompile state.
 	// AllowList uses keccak256(address) for role storage, so we use distinct prefixes for fee config.
+	validatorTargetGasStorageKey = common.Hash{'a', 'c', 'p', '2', '2', '4', 'v', 'g'}
 	targetGasStorageKey         = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'g'}
+	staticPricingStorageKey     = common.Hash{'a', 'c', 'p', '2', '2', '4', 's', 'p'}
 	minGasPriceStorageKey       = common.Hash{'a', 'c', 'p', '2', '2', '4', 'm', 'p'}
-	maxCapacityFactorStorageKey = common.Hash{'a', 'c', 'p', '2', '2', '4', 'm', 'c'}
 	timeToDoubleStorageKey      = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'd'}
 	feeConfigLastChangedAtKey   = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
 
@@ -84,10 +84,11 @@ func SetACP224FeeManagerAllowListStatus(
 // GetStoredFeeConfig returns fee config from contract storage in given state
 func GetStoredFeeConfig(stateDB contract.StateReader, addr common.Address) commontype.ACP224FeeConfig {
 	return commontype.ACP224FeeConfig{
-		TargetGas:         stateDB.GetState(addr, targetGasStorageKey).Big(),
-		MinGasPrice:       stateDB.GetState(addr, minGasPriceStorageKey).Big(),
-		MaxCapacityFactor: stateDB.GetState(addr, maxCapacityFactorStorageKey).Big(),
-		TimeToDouble:      stateDB.GetState(addr, timeToDoubleStorageKey).Big(),
+		ValidatorTargetGas: stateDB.GetState(addr, validatorTargetGasStorageKey) != (common.Hash{}),
+		TargetGas:          stateDB.GetState(addr, targetGasStorageKey).Big(),
+		StaticPricing:      stateDB.GetState(addr, staticPricingStorageKey) != (common.Hash{}),
+		MinGasPrice:        stateDB.GetState(addr, minGasPriceStorageKey).Big(),
+		TimeToDouble:       stateDB.GetState(addr, timeToDoubleStorageKey).Big(),
 	}
 }
 
@@ -101,12 +102,21 @@ func GetFeeConfigLastChangedAt(stateDB contract.StateReader, addr common.Address
 // A validation on [feeConfig] is done before storing.
 func StoreFeeConfig(stateDB contract.StateDB, addr common.Address, feeConfig commontype.ACP224FeeConfig, blockContext contract.ConfigurationBlockContext) error {
 	if err := feeConfig.Verify(); err != nil {
-		return fmt.Errorf("cannot verify fee config: %w", err)
+		return fmt.Errorf("cannot verify fee config: %v", err)
 	}
 
+	if feeConfig.ValidatorTargetGas {
+		stateDB.SetState(addr, validatorTargetGasStorageKey, common.BigToHash(common.Big1))
+	} else {
+		stateDB.SetState(addr, validatorTargetGasStorageKey, common.Hash{})
+	}
 	stateDB.SetState(addr, targetGasStorageKey, common.BigToHash(feeConfig.TargetGas))
+	if feeConfig.StaticPricing {
+		stateDB.SetState(addr, staticPricingStorageKey, common.BigToHash(common.Big1))
+	} else {
+		stateDB.SetState(addr, staticPricingStorageKey, common.Hash{})
+	}
 	stateDB.SetState(addr, minGasPriceStorageKey, common.BigToHash(feeConfig.MinGasPrice))
-	stateDB.SetState(addr, maxCapacityFactorStorageKey, common.BigToHash(feeConfig.MaxCapacityFactor))
 	stateDB.SetState(addr, timeToDoubleStorageKey, common.BigToHash(feeConfig.TimeToDouble))
 
 	blockNumber := blockContext.Number()
@@ -127,12 +137,12 @@ func PackSetFeeConfig(config commontype.ACP224FeeConfig) ([]byte, error) {
 // UnpackSetFeeConfigInput attempts to unpack [input] into the commontype.ACP224FeeConfig type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
-	res, err := ACP224FeeManagerABI.UnpackInput("setFeeConfig", input, false)
+	feeConfig := commontype.ACP224FeeConfig{}
+	err := ACP224FeeManagerABI.UnpackInputIntoInterface(&feeConfig, "setFeeConfig", input)
 	if err != nil {
 		return commontype.ACP224FeeConfig{}, err
 	}
-	unpacked := *abi.ConvertType(res[0], new(commontype.ACP224FeeConfig)).(*commontype.ACP224FeeConfig)
-	return unpacked, nil
+	return feeConfig, nil
 }
 
 func setFeeConfig(
@@ -203,12 +213,12 @@ func PackGetFeeConfigOutput(config commontype.ACP224FeeConfig) ([]byte, error) {
 // UnpackGetFeeConfigOutput attempts to unpack given [output] into the commontype.ACP224FeeConfig type output
 // assumes that [output] does not include selector (omits first 4 func signature bytes)
 func UnpackGetFeeConfigOutput(output []byte) (commontype.ACP224FeeConfig, error) {
-	res, err := ACP224FeeManagerABI.Unpack("getFeeConfig", output)
+	feeConfig := commontype.ACP224FeeConfig{}
+	err := ACP224FeeManagerABI.UnpackIntoInterface(&feeConfig, "getFeeConfig", output)
 	if err != nil {
 		return commontype.ACP224FeeConfig{}, err
 	}
-	unpacked := *abi.ConvertType(res[0], new(commontype.ACP224FeeConfig)).(*commontype.ACP224FeeConfig)
-	return unpacked, nil
+	return feeConfig, nil
 }
 
 func getFeeConfig(
@@ -253,8 +263,7 @@ func UnpackGetFeeConfigLastChangedAtOutput(output []byte) (*big.Int, error) {
 	if err != nil {
 		return new(big.Int), err
 	}
-	unpacked := *abi.ConvertType(res[0], new(*big.Int)).(**big.Int)
-	return unpacked, nil
+	return res[0].(*big.Int), nil
 }
 
 func getFeeConfigLastChangedAt(

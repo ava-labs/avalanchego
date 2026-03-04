@@ -183,19 +183,28 @@ func isBiggerThanHashLen(bigint *big.Int) bool {
 }
 
 // ACP224FeeConfig specifies the parameters for the ACP-224 dynamic gas limit mechanism.
-// This configuration defines the target gas consumption, minimum gas price, capacity parameters,
+// This configuration defines the target gas consumption, minimum gas price,
 // and the time-based price adjustment mechanism.
 type ACP224FeeConfig struct {
+	// ValidatorTargetGas indicates whether the target gas is determined by the validator set.
+	// When true, TargetGas must be 0 and TimeToDouble must be > 0.
+	// When false, TargetGas must be >= 1_000_000.
+	ValidatorTargetGas bool `json:"validatorTargetGas,omitempty"`
+
 	// TargetGas specifies the target gas consumption per second.
+	// Must be 0 when ValidatorTargetGas is true, >= 1_000_000 otherwise.
 	TargetGas *big.Int `json:"targetGas,omitempty"`
 
-	// MinGasPrice sets the minimum gas price in wei.
+	// StaticPricing indicates whether the gas price is static.
+	// When true, TimeToDouble must be 0.
+	// When false, TimeToDouble must be > 0.
+	StaticPricing bool `json:"staticPricing,omitempty"`
+
+	// MinGasPrice sets the minimum gas price in wei. Must be > 0.
 	MinGasPrice *big.Int `json:"minGasPrice,omitempty"`
 
-	// MaxCapacityFactor defines the maximum capacity factor (C = factor * T).
-	MaxCapacityFactor *big.Int `json:"maxCapacityFactor,omitempty"`
-
-	// TimeToDouble specifies the time (in seconds) for the gas price to double when operating at maximum capacity.
+	// TimeToDouble specifies the time (in seconds) for the gas price to double
+	// when operating at maximum capacity.
 	TimeToDouble *big.Int `json:"timeToDouble,omitempty"`
 }
 
@@ -203,44 +212,57 @@ var (
 	// EmptyACP224FeeConfig represents an empty ACP224 fee config
 	EmptyACP224FeeConfig = ACP224FeeConfig{}
 
-	ErrTargetGasNilACP224                 = errors.New("targetGas cannot be nil")
-	ErrMinGasPriceNil                     = errors.New("minGasPrice cannot be nil")
-	ErrMaxCapacityFactorNil               = errors.New("maxCapacityFactor cannot be nil")
-	ErrTimeToDoubleNil                    = errors.New("timeToDouble cannot be nil")
-	ErrTargetGasTooLowACP224              = errors.New("targetGas must be greater than 0")
-	ErrMinGasPriceTooLow                  = errors.New("minGasPrice must be greater than 0")
-	ErrMaxCapacityFactorTooLow            = errors.New("maxCapacityFactor must be greater than 0")
-	ErrTimeToDoubleTooLow                 = errors.New("timeToDouble must be greater than 0")
-	ErrTargetGasExceedsHashLengthACP224   = errors.New("targetGas exceeds hash length")
-	ErrMinGasPriceExceedsHashLength       = errors.New("minGasPrice exceeds hash length")
-	ErrMaxCapacityFactorExceedsHashLength = errors.New("maxCapacityFactor exceeds hash length")
-	ErrTimeToDoubleExceedsHashLength      = errors.New("timeToDouble exceeds hash length")
+	minTargetGasACP224 = big.NewInt(1_000_000)
+
+	ErrTargetGasNilACP224               = errors.New("targetGas cannot be nil")
+	ErrMinGasPriceNil                   = errors.New("minGasPrice cannot be nil")
+	ErrTimeToDoubleNil                  = errors.New("timeToDouble cannot be nil")
+	ErrMinGasPriceTooLow                = errors.New("minGasPrice must be greater than 0")
+	ErrTargetGasMustBeZero              = errors.New("targetGas must be 0 when validatorTargetGas is true")
+	ErrTargetGasTooLowACP224            = errors.New("targetGas must be at least 1000000")
+	ErrTimeToDoubleTooLow               = errors.New("timeToDouble must be greater than 0")
+	ErrTimeToDoubleMustBeZero           = errors.New("timeToDouble must be 0 when staticPricing is true")
+	ErrTargetGasExceedsHashLengthACP224 = errors.New("targetGas exceeds hash length")
+	ErrMinGasPriceExceedsHashLength     = errors.New("minGasPrice exceeds hash length")
+	ErrTimeToDoubleExceedsHashLength    = errors.New("timeToDouble exceeds hash length")
 )
 
 // Verify checks fields of this ACP224FeeConfig to ensure a valid configuration is provided.
 func (a *ACP224FeeConfig) Verify() error {
-	// Check for nil fields
 	switch {
 	case a.TargetGas == nil:
 		return ErrTargetGasNilACP224
 	case a.MinGasPrice == nil:
 		return ErrMinGasPriceNil
-	case a.MaxCapacityFactor == nil:
-		return ErrMaxCapacityFactorNil
 	case a.TimeToDouble == nil:
 		return ErrTimeToDoubleNil
 	}
 
-	// Check for valid values
-	switch {
-	case a.TargetGas.Cmp(common.Big0) != 1:
-		return ErrTargetGasTooLowACP224
-	case a.MinGasPrice.Cmp(common.Big0) != 1:
+	if a.MinGasPrice.Sign() <= 0 {
 		return ErrMinGasPriceTooLow
-	case a.MaxCapacityFactor.Cmp(common.Big0) != 1:
-		return ErrMaxCapacityFactorTooLow
-	case a.TimeToDouble.Cmp(common.Big0) != 1:
-		return ErrTimeToDoubleTooLow
+	}
+
+	if a.ValidatorTargetGas {
+		if a.TargetGas.Sign() != 0 {
+			return ErrTargetGasMustBeZero
+		}
+		if a.TimeToDouble.Sign() <= 0 {
+			return ErrTimeToDoubleTooLow
+		}
+	} else {
+		if a.TargetGas.Cmp(minTargetGasACP224) < 0 {
+			return ErrTargetGasTooLowACP224
+		}
+	}
+
+	if a.StaticPricing {
+		if a.TimeToDouble.Sign() != 0 {
+			return ErrTimeToDoubleMustBeZero
+		}
+	} else {
+		if a.TimeToDouble.Sign() <= 0 {
+			return ErrTimeToDoubleTooLow
+		}
 	}
 
 	return a.checkByteLens()
@@ -252,9 +274,10 @@ func (a *ACP224FeeConfig) Equal(other *ACP224FeeConfig) bool {
 		return false
 	}
 
-	return utils.BigEqual(a.TargetGas, other.TargetGas) &&
+	return a.ValidatorTargetGas == other.ValidatorTargetGas &&
+		utils.BigEqual(a.TargetGas, other.TargetGas) &&
+		a.StaticPricing == other.StaticPricing &&
 		utils.BigEqual(a.MinGasPrice, other.MinGasPrice) &&
-		utils.BigEqual(a.MaxCapacityFactor, other.MaxCapacityFactor) &&
 		utils.BigEqual(a.TimeToDouble, other.TimeToDouble)
 }
 
@@ -265,9 +288,6 @@ func (a *ACP224FeeConfig) checkByteLens() error {
 	}
 	if isBiggerThanHashLen(a.MinGasPrice) {
 		return fmt.Errorf("%w: %d bytes", ErrMinGasPriceExceedsHashLength, common.HashLength)
-	}
-	if isBiggerThanHashLen(a.MaxCapacityFactor) {
-		return fmt.Errorf("%w: %d bytes", ErrMaxCapacityFactorExceedsHashLength, common.HashLength)
 	}
 	if isBiggerThanHashLen(a.TimeToDouble) {
 		return fmt.Errorf("%w: %d bytes", ErrTimeToDoubleExceedsHashLength, common.HashLength)
