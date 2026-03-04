@@ -12,14 +12,14 @@ import (
 var _ state.Trie = (*storageTrie)(nil)
 
 type storageTrie struct {
-	*accountTrie
+	*baseAccountTrie
 }
 
-// `newStorageTrie` returns a wrapper around an `accountTrie` since Firewood
+// `newStorageTrie` returns a wrapper around a [baseAccountTrie] since Firewood
 // does not require a separate storage trie. All changes are managed by the account trie.
-func newStorageTrie(accountTrie *accountTrie) *storageTrie {
+func newStorageTrie(base *baseAccountTrie) *storageTrie {
 	return &storageTrie{
-		accountTrie: accountTrie,
+		baseAccountTrie: base,
 	}
 }
 

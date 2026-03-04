@@ -2235,3 +2235,82 @@ func TestArchivalQueries(t *testing.T) {
 		})
 	}
 }
+
+// TestFirewoodArchiveUnderDeferredPersistence verifies that a Firewood archive
+// node with deferred persistence (commit-interval=4096) can serve historical
+// state queries after a restart. With only 10 blocks and a commit interval of
+// 4096, only the latest revision is persisted on shutdown — earlier block
+// states are not on disk. The test confirms that the restarted VM can still
+// answer queries for every historical block by reconstructing the requested
+// state on the fly using Firewood's Reconstructed types.
+func TestFirewoodArchiveUnderDeferredPersistence(t *testing.T) {
+	require := require.New(t)
+	ctx := t.Context()
+
+	configJSON := `{
+		"pruning-enabled": false,
+		"commit-interval": 4096
+	}`
+
+	vm := newDefaultTestVM()
+	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+		ConfigJSON: configJSON,
+		Scheme:     customrawdb.FirewoodScheme,
+	})
+
+	numBlocks := 10
+	for range numBlocks {
+		nonce := vm.txPool.Nonce(vmtest.TestEthAddrs[0])
+		signedTx := newSignedLegacyTx(
+			t,
+			vm.chainConfig,
+			vmtest.TestKeys[0].ToECDSA(),
+			nonce,
+			&common.Address{},
+			big.NewInt(0),
+			21_000,
+			vmtest.InitialBaseFee,
+			nil,
+		)
+		blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
+		require.NoError(err)
+		require.NoError(blk.Accept(ctx))
+	}
+	vm.blockChain.DrainAcceptorQueue()
+
+	// Shutdown flushes deferred persistence to disk.
+	require.NoError(vm.Shutdown(ctx))
+
+	// Restart with the same database and config.
+	restartedVM := newDefaultTestVM()
+	newCTX := snowtest.Context(t, snowtest.CChainID)
+	newCTX.ChainDataDir = tvm.Ctx.ChainDataDir
+	conf, err := vmtest.OverrideSchemeConfig(customrawdb.FirewoodScheme, configJSON)
+	require.NoError(err)
+	require.NoError(restartedVM.Initialize(
+		ctx,
+		newCTX,
+		tvm.DB,
+		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])),
+		nil,
+		[]byte(conf),
+		[]*commonEng.Fx{},
+		tvm.AppSender,
+	))
+	defer func() { require.NoError(restartedVM.Shutdown(ctx)) }()
+
+	handlers, err := restartedVM.CreateHandlers(ctx)
+	require.NoError(err)
+
+	server := httptest.NewServer(handlers[ethRPCEndpoint])
+	t.Cleanup(server.Close)
+
+	client, err := ethclient.Dial(server.URL)
+	require.NoError(err)
+
+	for i := 0; i <= numBlocks; i++ {
+		nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
+		require.NoErrorf(err, "failed to get nonce at block %d", i)
+		require.Zero(nonce)
+	}
+}

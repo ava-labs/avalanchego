@@ -33,11 +33,11 @@ func (s *stateAccessor) OpenTrie(root common.Hash) (state.Trie, error) {
 //
 //nolint:revive // removing names loses context.
 func (*stateAccessor) OpenStorageTrie(stateRoot common.Hash, addr common.Address, accountRoot common.Hash, self state.Trie) (state.Trie, error) {
-	accountTrie, ok := self.(*accountTrie)
+	acctTrie, ok := self.(*accountTrie)
 	if !ok {
 		return nil, fmt.Errorf("invalid account trie type: %T", self)
 	}
-	return newStorageTrie(accountTrie), nil
+	return newStorageTrie(&acctTrie.baseAccountTrie), nil
 }
 
 // CopyTrie returns a deep copy of the given trie.
