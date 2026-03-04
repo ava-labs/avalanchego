@@ -137,11 +137,6 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	}
 	acceptor.backend.blkIDToState[childID] = childState
 
-	// Set expected calls on dependencies.
-	s.SetLastAccepted(blk.ID())
-	s.SetHeight(blk.Height())
-	s.AddStatelessBlock(blk)
-
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1)
 
@@ -219,11 +214,6 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		},
 	}
 	acceptor.backend.blkIDToState[childID] = childState
-
-	// Set expected calls on dependencies.
-	s.SetLastAccepted(blk.ID())
-	s.SetHeight(blk.Height())
-	s.AddStatelessBlock(blk)
 
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1)
