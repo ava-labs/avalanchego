@@ -141,7 +141,7 @@ func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
 func setFeeConfig(
 	accessibleState contract.AccessibleState,
 	caller common.Address,
-	addr common.Address,
+	_ common.Address,
 	input []byte,
 	suppliedGas uint64,
 	readOnly bool,
@@ -177,7 +177,7 @@ func setFeeConfig(
 	}
 
 	stateDB.AddLog(&types.Log{
-		Address:     addr,
+		Address:     ContractAddress,
 		Topics:      topics,
 		Data:        data,
 		BlockNumber: accessibleState.GetBlockContext().Number().Uint64(),
@@ -217,7 +217,7 @@ func UnpackGetFeeConfigOutput(output []byte) (commontype.ACP224FeeConfig, error)
 func getFeeConfig(
 	accessibleState contract.AccessibleState,
 	_ common.Address,
-	addr common.Address,
+	_ common.Address,
 	_ []byte,
 	suppliedGas uint64,
 	_ bool,
@@ -263,7 +263,7 @@ func UnpackGetFeeConfigLastChangedAtOutput(output []byte) (*big.Int, error) {
 func getFeeConfigLastChangedAt(
 	accessibleState contract.AccessibleState,
 	_ common.Address,
-	addr common.Address,
+	_ common.Address,
 	_ []byte,
 	suppliedGas uint64,
 	_ bool,
