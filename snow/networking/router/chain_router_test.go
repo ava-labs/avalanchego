@@ -1436,230 +1436,128 @@ func TestAppRequest(t *testing.T) {
 }
 
 func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
-	type testCase struct {
-		name               string
-		responseOp         message.Op
-		timeoutMsg         func(ids.NodeID, ids.ID, uint32, p2ppb.EngineType) *message.InboundMessage
-		responseMsg        func(ids.NodeID, ids.ID, uint32) *message.InboundMessage
-		setFailureHandler  func(*testing.T, *enginetest.Engine, ids.NodeID, uint32, chan<- struct{}, *sync.WaitGroup)
-		setResponseHandler func(*testing.T, *enginetest.Engine, chan<- struct{})
-	}
-
-	tests := []testCase{
+	var (
+		nodeID  = ids.GenerateTestNodeID()
+		chainID = snowtest.PChainID
+	)
+	const requestID uint32 = 1
+	tests := []struct {
+		timeout    *message.InboundMessage
+		response   *message.InboundMessage
+		setHandler func(*testing.T, *enginetest.Engine, chan<- struct{})
+	}{
 		{
-			name:       "StateSummaryFrontier",
-			responseOp: message.StateSummaryFrontierOp,
-			timeoutMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, _ p2ppb.EngineType) *message.InboundMessage {
-				return message.InternalGetStateSummaryFrontierFailed(nodeID, chainID, requestID)
-			},
-			responseMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) *message.InboundMessage {
-				return message.InboundStateSummaryFrontier(chainID, requestID, []byte("summary"), nodeID)
-			},
-			setFailureHandler: func(t *testing.T, engine *enginetest.Engine, nodeID ids.NodeID, requestID uint32, calls chan<- struct{}, wg *sync.WaitGroup) {
+			timeout:  message.InternalGetStateSummaryFrontierFailed(nodeID, chainID, requestID),
+			response: message.InboundStateSummaryFrontier(chainID, requestID, []byte("summary"), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
 				engine.GetStateSummaryFrontierFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
-					defer wg.Done()
 					require.Equal(t, nodeID, gotNodeID)
 					require.Equal(t, requestID, gotRequestID)
-					calls <- struct{}{}
-					return nil
-				}
-			},
-			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
-				engine.StateSummaryFrontierF = func(context.Context, ids.NodeID, uint32, []byte) error {
-					failedMessages <- struct{}{}
+					close(call)
 					return nil
 				}
 			},
 		},
 		{
-			name:       "AcceptedStateSummary",
-			responseOp: message.AcceptedStateSummaryOp,
-			timeoutMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, _ p2ppb.EngineType) *message.InboundMessage {
-				return message.InternalGetAcceptedStateSummaryFailed(nodeID, chainID, requestID)
-			},
-			responseMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) *message.InboundMessage {
-				return message.InboundAcceptedStateSummary(chainID, requestID, []ids.ID{ids.GenerateTestID()}, nodeID)
-			},
-			setFailureHandler: func(t *testing.T, engine *enginetest.Engine, nodeID ids.NodeID, requestID uint32, calls chan<- struct{}, wg *sync.WaitGroup) {
+			timeout:  message.InternalGetAcceptedStateSummaryFailed(nodeID, chainID, requestID),
+			response: message.InboundAcceptedStateSummary(chainID, requestID, []ids.ID{ids.GenerateTestID()}, nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
 				engine.GetAcceptedStateSummaryFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
-					defer wg.Done()
 					require.Equal(t, nodeID, gotNodeID)
 					require.Equal(t, requestID, gotRequestID)
-					calls <- struct{}{}
-					return nil
-				}
-			},
-			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
-				engine.AcceptedStateSummaryF = func(context.Context, ids.NodeID, uint32, set.Set[ids.ID]) error {
-					failedMessages <- struct{}{}
+					close(call)
 					return nil
 				}
 			},
 		},
 		{
-			name:       "AcceptedFrontier",
-			responseOp: message.AcceptedFrontierOp,
-			timeoutMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, _ p2ppb.EngineType) *message.InboundMessage {
-				return message.InternalGetAcceptedFrontierFailed(nodeID, chainID, requestID)
-			},
-			responseMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) *message.InboundMessage {
-				return message.InboundAcceptedFrontier(chainID, requestID, ids.GenerateTestID(), nodeID)
-			},
-			setFailureHandler: func(t *testing.T, engine *enginetest.Engine, nodeID ids.NodeID, requestID uint32, calls chan<- struct{}, wg *sync.WaitGroup) {
+			timeout:  message.InternalGetAcceptedFrontierFailed(nodeID, chainID, requestID),
+			response: message.InboundAcceptedFrontier(chainID, requestID, ids.GenerateTestID(), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
 				engine.GetAcceptedFrontierFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
-					defer wg.Done()
 					require.Equal(t, nodeID, gotNodeID)
 					require.Equal(t, requestID, gotRequestID)
-					calls <- struct{}{}
-					return nil
-				}
-			},
-			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
-				engine.AcceptedFrontierF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
-					failedMessages <- struct{}{}
+					close(call)
 					return nil
 				}
 			},
 		},
 		{
-			name:       "Accepted",
-			responseOp: message.AcceptedOp,
-			timeoutMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, _ p2ppb.EngineType) *message.InboundMessage {
-				return message.InternalGetAcceptedFailed(nodeID, chainID, requestID)
-			},
-			responseMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) *message.InboundMessage {
-				return message.InboundAccepted(chainID, requestID, []ids.ID{ids.GenerateTestID()}, nodeID)
-			},
-			setFailureHandler: func(t *testing.T, engine *enginetest.Engine, nodeID ids.NodeID, requestID uint32, calls chan<- struct{}, wg *sync.WaitGroup) {
+			timeout:  message.InternalGetAcceptedFailed(nodeID, chainID, requestID),
+			response: message.InboundAccepted(chainID, requestID, []ids.ID{ids.GenerateTestID()}, nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
 				engine.GetAcceptedFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
-					defer wg.Done()
 					require.Equal(t, nodeID, gotNodeID)
 					require.Equal(t, requestID, gotRequestID)
-					calls <- struct{}{}
-					return nil
-				}
-			},
-			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
-				engine.AcceptedF = func(context.Context, ids.NodeID, uint32, set.Set[ids.ID]) error {
-					failedMessages <- struct{}{}
+					close(call)
 					return nil
 				}
 			},
 		},
 		{
-			name:       "Ancestors",
-			responseOp: message.AncestorsOp,
-			timeoutMsg: message.InternalGetAncestorsFailed,
-			responseMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) *message.InboundMessage {
-				return &message.InboundMessage{
-					NodeID: nodeID,
-					Op:     message.AncestorsOp,
-					Message: &p2ppb.Ancestors{
-						ChainId:    chainID[:],
-						RequestId:  requestID,
-						Containers: [][]byte{[]byte("a")},
-					},
-					Expiration: mockable.MaxTime,
-				}
+			timeout: message.InternalGetAncestorsFailed(nodeID, chainID, requestID, engineType),
+			response: &message.InboundMessage{
+				NodeID: nodeID,
+				Op:     message.AncestorsOp,
+				Message: &p2ppb.Ancestors{
+					ChainId:    chainID[:],
+					RequestId:  requestID,
+					Containers: [][]byte{[]byte("a")},
+				},
+				Expiration: mockable.MaxTime,
 			},
-			setFailureHandler: func(t *testing.T, engine *enginetest.Engine, nodeID ids.NodeID, requestID uint32, calls chan<- struct{}, wg *sync.WaitGroup) {
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
 				engine.GetAncestorsFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
-					defer wg.Done()
 					require.Equal(t, nodeID, gotNodeID)
 					require.Equal(t, requestID, gotRequestID)
-					calls <- struct{}{}
-					return nil
-				}
-			},
-			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
-				engine.AncestorsF = func(context.Context, ids.NodeID, uint32, [][]byte) error {
-					failedMessages <- struct{}{}
+					close(call)
 					return nil
 				}
 			},
 		},
 		{
-			name:       "Put",
-			responseOp: message.PutOp,
-			timeoutMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, _ p2ppb.EngineType) *message.InboundMessage {
-				return message.InternalGetFailed(nodeID, chainID, requestID)
+			timeout: message.InternalGetFailed(nodeID, chainID, requestID),
+			response: &message.InboundMessage{
+				NodeID: nodeID,
+				Op:     message.PutOp,
+				Message: &p2ppb.Put{
+					ChainId:   chainID[:],
+					RequestId: requestID,
+					Container: []byte("container"),
+				},
+				Expiration: mockable.MaxTime,
 			},
-			responseMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) *message.InboundMessage {
-				return &message.InboundMessage{
-					NodeID: nodeID,
-					Op:     message.PutOp,
-					Message: &p2ppb.Put{
-						ChainId:   chainID[:],
-						RequestId: requestID,
-						Container: []byte("container"),
-					},
-					Expiration: mockable.MaxTime,
-				}
-			},
-			setFailureHandler: func(t *testing.T, engine *enginetest.Engine, nodeID ids.NodeID, requestID uint32, calls chan<- struct{}, wg *sync.WaitGroup) {
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
 				engine.GetFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
-					defer wg.Done()
 					require.Equal(t, nodeID, gotNodeID)
 					require.Equal(t, requestID, gotRequestID)
-					calls <- struct{}{}
-					return nil
-				}
-			},
-			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
-				engine.PutF = func(context.Context, ids.NodeID, uint32, []byte) error {
-					failedMessages <- struct{}{}
+					close(call)
 					return nil
 				}
 			},
 		},
 		{
-			name:       "Chits",
-			responseOp: message.ChitsOp,
-			timeoutMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, _ p2ppb.EngineType) *message.InboundMessage {
-				return message.InternalQueryFailed(nodeID, chainID, requestID)
-			},
-			responseMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) *message.InboundMessage {
-				return message.InboundChits(chainID, requestID, ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID(), nodeID)
-			},
-			setFailureHandler: func(t *testing.T, engine *enginetest.Engine, nodeID ids.NodeID, requestID uint32, calls chan<- struct{}, wg *sync.WaitGroup) {
+			timeout:  message.InternalQueryFailed(nodeID, chainID, requestID),
+			response: message.InboundChits(chainID, requestID, ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID(), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
 				engine.QueryFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
-					defer wg.Done()
 					require.Equal(t, nodeID, gotNodeID)
 					require.Equal(t, requestID, gotRequestID)
-					calls <- struct{}{}
-					return nil
-				}
-			},
-			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
-				engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) error {
-					failedMessages <- struct{}{}
+					close(call)
 					return nil
 				}
 			},
 		},
 		{
-			name:       "AppResponse",
-			responseOp: message.AppResponseOp,
-			timeoutMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, _ p2ppb.EngineType) *message.InboundMessage {
-				return message.InboundAppError(nodeID, chainID, requestID, common.ErrTimeout.Code, common.ErrTimeout.Message)
-			},
-			responseMsg: func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) *message.InboundMessage {
-				return message.InboundAppResponse(chainID, requestID, []byte("response"), nodeID)
-			},
-			setFailureHandler: func(t *testing.T, engine *enginetest.Engine, nodeID ids.NodeID, requestID uint32, calls chan<- struct{}, wg *sync.WaitGroup) {
+			timeout:  message.InboundAppError(nodeID, chainID, requestID, common.ErrTimeout.Code, common.ErrTimeout.Message),
+			response: message.InboundAppResponse(chainID, requestID, []byte("response"), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
 				engine.AppRequestFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32, appErr *common.AppError) error {
-					defer wg.Done()
 					require.Equal(t, nodeID, gotNodeID)
 					require.Equal(t, requestID, gotRequestID)
 					require.Equal(t, common.ErrTimeout.Code, appErr.Code)
 					require.Equal(t, common.ErrTimeout.Message, appErr.Message)
-					calls <- struct{}{}
-					return nil
-				}
-			},
-			setResponseHandler: func(_ *testing.T, engine *enginetest.Engine, failedMessages chan<- struct{}) {
-				engine.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error {
-					failedMessages <- struct{}{}
+					close(call)
 					return nil
 				}
 			},
@@ -1667,116 +1565,88 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		// Timeout path: early internal failure is handled once, then the timeout
-		// clears the outstanding request without invoking the response handler.
-		t.Run(tt.name+"/timeout", func(t *testing.T) {
-			require := require.New(t)
+		op := tt.response.Op
+		t.Run(op.String(), func(t *testing.T) {
+			test := func(t *testing.T, requireHandled func(cr *ChainRouter)) {
+				chainRouter, engine := newChainRouterTest(t)
 
-			chainRouter, engine := newChainRouterTest(t)
-			nodeID := ids.GenerateTestNodeID()
-			chainID := snowtest.PChainID
-			requestID := uint32(1)
-			ctx := t.Context()
+				unwantedCall := make(chan struct{})
+				engine.StateSummaryFrontierF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
+				engine.AcceptedFrontierF = func(context.Context, ids.NodeID, uint32, ids.ID) error { close(unwantedCall); return nil }
+				engine.AcceptedF = func(context.Context, ids.NodeID, uint32, set.Set[ids.ID]) error { close(unwantedCall); return nil }
+				engine.AncestorsF = func(context.Context, ids.NodeID, uint32, [][]byte) error { close(unwantedCall); return nil }
+				engine.PutF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
+				engine.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
+				engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) error {
+					close(unwantedCall)
+					return nil
+				}
 
-			var wg sync.WaitGroup
-			wg.Add(1)
-			calls := make(chan struct{}, 1)
-			failedMessages := make(chan struct{}, 1)
+				call := make(chan struct{}, 1)
+				tt.setHandler(t, engine, call)
 
-			tt.setFailureHandler(t, engine, nodeID, requestID, calls, &wg)
-			tt.setResponseHandler(t, engine, failedMessages)
+				ctx := t.Context()
+				chainRouter.RegisterRequest(ctx, nodeID, chainID, requestID, op, tt.timeout, engineType)
 
-			timeoutMsg := tt.timeoutMsg(nodeID, chainID, requestID, engineType)
-			chainRouter.RegisterRequest(ctx, nodeID, chainID, requestID, tt.responseOp, timeoutMsg, engineType)
+				require := require.New(t)
+				chainRouter.lock.Lock()
+				require.Equal(1, chainRouter.timedRequests.Len())
+				chainRouter.lock.Unlock()
 
-			chainRouter.lock.Lock()
-			require.Equal(1, chainRouter.timedRequests.Len())
-			chainRouter.lock.Unlock()
+				chainRouter.HandleInternal(ctx, tt.timeout)
+				<-call
 
-			chainRouter.HandleInternal(ctx, timeoutMsg)
+				chainRouter.lock.Lock()
+				require.Equal(1, chainRouter.timedRequests.Len())
+				chainRouter.lock.Unlock()
 
-			wg.Wait()
-			<-calls
+				requireHandled(chainRouter)
 
-			chainRouter.lock.Lock()
-			require.Equal(1, chainRouter.timedRequests.Len())
-			chainRouter.lock.Unlock()
+				chainRouter.lock.Lock()
+				require.Equal(0, chainRouter.timedRequests.Len())
+				chainRouter.lock.Unlock()
 
-			// Wait for the timeout manager to fire and clear the request.
-			// Note: relying on the timeout manager to fire results in longer running tests.
-			// The alternative not chosen here is to send a mock timeout messag early rather than
-			// relying on the production code, which tests both the timeout manager and its integration
-			// with the chain router.
-			require.Eventually(
-				func() bool {
-					chainRouter.lock.Lock()
-					defer chainRouter.lock.Unlock()
-					return chainRouter.timedRequests.Len() == 0
-				},
-				constants.DefaultNetworkInitialTimeout,
-				100*time.Millisecond,
-				"timed out waiting for timeout to clear request",
-			)
-
-			select {
-			case <-calls:
-				require.FailNow("unexpected call handling duplicate message")
-			case <-failedMessages:
-				require.FailNow("unexpected duplicate failure message")
-			case <-time.After(50 * time.Millisecond):
+				select {
+				case <-unwantedCall:
+					require.FailNow("unexpected duplicate failure message")
+				case <-time.After(50 * time.Millisecond):
+				}
 			}
-		})
 
-		// Response path: early internal failure is handled once, then the actual
-		// response clears the outstanding request without invoking the response handler.
-		t.Run(tt.name+"/response", func(t *testing.T) {
-			require := require.New(t)
+			// Timeout path: early internal failure is handled once, then the
+			// timeout clears the outstanding request without invoking the
+			// response handler.
+			t.Run("timeout", func(t *testing.T) {
+				test(t, func(cr *ChainRouter) {
+					// Wait for the timeout manager to fire and clear the
+					// request.
+					// Note: relying on the timeout manager to fire results in
+					// longer running tests. The alternative not chosen here is
+					// to send a mock timeout message early rather than relying
+					// on the production code, which tests both the timeout
+					// manager and its integration with the chain router.
+					require.Eventually(
+						t,
+						func() bool {
+							cr.lock.Lock()
+							defer cr.lock.Unlock()
+							return cr.timedRequests.Len() == 0
+						},
+						constants.DefaultNetworkInitialTimeout,
+						100*time.Millisecond,
+						"timed out waiting for timeout to clear request",
+					)
+				})
+			})
 
-			chainRouter, engine := newChainRouterTest(t)
-			nodeID := ids.GenerateTestNodeID()
-			chainID := snowtest.PChainID
-			requestID := uint32(1)
-			ctx := t.Context()
-
-			var wg sync.WaitGroup
-			wg.Add(1)
-			calls := make(chan struct{}, 1)
-			failedMessages := make(chan struct{}, 1)
-
-			tt.setFailureHandler(t, engine, nodeID, requestID, calls, &wg)
-			tt.setResponseHandler(t, engine, failedMessages)
-
-			timeoutMsg := tt.timeoutMsg(nodeID, chainID, requestID, engineType)
-			chainRouter.RegisterRequest(ctx, nodeID, chainID, requestID, tt.responseOp, timeoutMsg, engineType)
-
-			chainRouter.lock.Lock()
-			require.Equal(1, chainRouter.timedRequests.Len())
-			chainRouter.lock.Unlock()
-
-			chainRouter.HandleInternal(ctx, timeoutMsg)
-
-			wg.Wait()
-			<-calls
-
-			chainRouter.lock.Lock()
-			require.Equal(1, chainRouter.timedRequests.Len())
-			chainRouter.lock.Unlock()
-
-			responseMsg := tt.responseMsg(nodeID, chainID, requestID)
-			chainRouter.HandleInbound(ctx, responseMsg)
-
-			// Confirm handling the inbound message clears the request
-			chainRouter.lock.Lock()
-			require.Equal(0, chainRouter.timedRequests.Len())
-			chainRouter.lock.Unlock()
-
-			select {
-			case <-calls:
-				require.FailNow("unexpected call handling duplicate message")
-			case <-failedMessages:
-				require.FailNow("unexpected duplicate failure message")
-			case <-time.After(50 * time.Millisecond):
-			}
+			// Response path: early internal failure is handled once, then the
+			// actual response clears the outstanding request without invoking
+			// the response handler.
+			t.Run("response", func(t *testing.T) {
+				test(t, func(cr *ChainRouter) {
+					cr.HandleInbound(t.Context(), tt.response)
+				})
+			})
 		})
 	}
 }
