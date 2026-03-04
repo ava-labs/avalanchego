@@ -686,6 +686,7 @@ func generateAndAcceptBlocks(t *testing.T, vm extension.InnerVM, numBlocks int, 
 	c := vm.Ethereum().BlockChain().StateCache()
 
 	// We must not commit this state to disk, as it will make it impossible to verify/accept the generated blocks in the same db for Firewood.
+	// Firewood requires a linear and in-order history. All unused states will be cleaned at commit time.
 	_, _, err := core.GenerateChainFromStateCache(
 		vm.Ethereum().BlockChain().Config(),
 		lastAccepted,

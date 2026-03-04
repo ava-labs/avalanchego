@@ -280,6 +280,8 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	return GenerateChainFromStateCache(config, parent, engine, stateCache, n, gap, gen, true)
 }
 
+// GenerateChainFromStateCache is exactly like [GenerateChain], except allows other [triedb.Database] implementations.
+// The commit parameter controls whether the state changes are committed to the database.
 func GenerateChainFromStateCache(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, stateCache state.Database, n int, gap uint64, gen func(int, *BlockGen), commit bool) ([]*types.Block, []types.Receipts, error) {
 	if config == nil {
 		config = params.TestChainConfig
