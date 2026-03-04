@@ -51,15 +51,20 @@ for name in "${configs[@]}"; do
     sleep infinity)"
 
   echo "Smoke-testing devcontainer '${name}'..."
-  NIX_SHELL="$(docker exec "${CONTAINER_ID}" printenv NIX_SHELL 2>/dev/null || echo "default")"
-  docker exec "${CONTAINER_ID}" nix develop ".#${NIX_SHELL}" --command sh -c \
+  NIX_SHELL="$(docker exec -u dev "${CONTAINER_ID}" printenv NIX_SHELL 2>/dev/null || echo "default")"
+  docker exec -u dev "${CONTAINER_ID}" nix develop ".#${NIX_SHELL}" --command sh -c \
     'go version && task --version && git rev-parse HEAD'
+
+  # Verify the dev user is non-root
+  echo "Verifying non-root user in '${name}'..."
+  docker exec -u dev "${CONTAINER_ID}" nix develop ".#${NIX_SHELL}" --command sh -c \
+    'test "$(id -u)" -ne 0 && echo "Running as user: $(whoami) (uid=$(id -u))"'
 
   # Per-config extra tool checks
   case "${name}" in
     nix-develop-ai)
       echo "Verifying AI tools in '${name}'..."
-      docker exec "${CONTAINER_ID}" nix develop ".#${NIX_SHELL}" --command sh -c \
+      docker exec -u dev "${CONTAINER_ID}" nix develop ".#${NIX_SHELL}" --command sh -c \
         'claude --version && gh --version && codex --version'
       ;;
   esac
