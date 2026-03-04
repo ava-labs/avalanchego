@@ -2562,26 +2562,39 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
 		// Record the change in weight and/or public key for each validator.
 		for nodeID, diff := range validatorDiffs {
-			weightDiff, err := diff.WeightDiff()
+			addedWeight, removedWeight, err := diff.weightChanges()
 			if err != nil {
 				return err
 			}
-
-			isReplacement := diff.added != nil && diff.removed != nil
-
-			if weightDiff.Amount == 0 && !isReplacement {
-				continue // No weight change; go to the next validator.
+			// If the validator was replaced, addedWeight and removedWeight
+			// reflect the new and old weights respectively so we use them.
+			// Otherwise, a single validator is being modified (or a delegator is added),
+			// so the net weight change below is used.
+			if replaced := diff.added != nil && diff.removed != nil; !replaced {
+				if addedWeight > removedWeight {
+					addedWeight -= removedWeight
+					removedWeight = 0
+				} else {
+					removedWeight -= addedWeight
+					addedWeight = 0
+				}
 			}
 
-			if weightDiff.Decrease && !isReplacement {
-				if err := s.validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount); err != nil {
+			if removedWeight > 0 {
+				if err := s.validators.RemoveWeight(subnetID, nodeID, removedWeight); err != nil {
 					return fmt.Errorf("failed to reduce validator weight: %w", err)
 				}
+			}
+
+			// If the validator was deleted, we would have already removed its weight above.
+			if addedWeight == 0 {
 				continue
 			}
 
+			// We're just adding a delegator, so we only need to update the weight of the existing validator without
+			// adding a new staker to the validator manager.
 			if diff.added == nil {
-				if err := s.validators.AddWeight(subnetID, nodeID, weightDiff.Amount); err != nil {
+				if err := s.validators.AddWeight(subnetID, nodeID, addedWeight); err != nil {
 					return fmt.Errorf("failed to increase validator weight: %w", err)
 				}
 				continue
@@ -2592,47 +2605,12 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 				s.currentStakers.validators[constants.PrimaryNetworkID],
 				s.currentStakers.validatorDiffs[constants.PrimaryNetworkID],
 			)
-			if err != nil {
-				// This should never happen as there should always be a primary
-				// network validator corresponding to a subnet validator.
-				return err
-			}
-
-			if diff.removed != nil {
-				// If we reached here, diff.added != nil (from the check above),
-				// meaning this is a replacement. Use the individual added/removed weights
-				// instead of the net diff to compute the new weight directly.
-				addedWeight, removedWeight, err := diff.weightChanges()
-				if err != nil {
-					return err
-				}
-
-				currentWeight := s.validators.GetWeight(subnetID, nodeID)
-				if err := s.validators.RemoveWeight(subnetID, nodeID, currentWeight); err != nil {
-					return fmt.Errorf("failed to remove weight of replaced validator: %w", err)
-				}
-
-				remainingWeight, err := safemath.Sub(currentWeight, removedWeight)
-				if err != nil {
-					return fmt.Errorf("failed to calculate remaining validator weight: %w", err)
-				}
-				newWeight, err := safemath.Add(remainingWeight, addedWeight)
-				if err != nil {
-					return fmt.Errorf("failed to calculate new validator weight: %w", err)
-				}
-
-				if err := s.validators.AddStaker(subnetID, nodeID, pkDiff.new, diff.added.TxID, newWeight); err != nil {
-					return fmt.Errorf("failed to add replaced validator: %w", err)
-				}
-				continue
-			}
-
 			err = s.validators.AddStaker(
 				subnetID,
 				nodeID,
 				pkDiff.new,
 				diff.added.TxID,
-				weightDiff.Amount,
+				addedWeight,
 			)
 			if err != nil {
 				return fmt.Errorf("failed to add validator: %w", err)
@@ -2736,11 +2714,6 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				s.currentStakers.validators[constants.PrimaryNetworkID],
 				s.currentStakers.validatorDiffs[constants.PrimaryNetworkID],
 			)
-			if err != nil {
-				// This should never happen as there should always be a primary
-				// network validator corresponding to a subnet validator.
-				return nil, err
-			}
 
 			change := &validatorDiff{
 				weightDiff: weightDiff,
