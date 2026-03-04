@@ -1567,7 +1567,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 	for _, tt := range tests {
 		op := tt.response.Op
 		t.Run(op.String(), func(t *testing.T) {
-			test := func(t *testing.T, requireHandled func(cr *ChainRouter)) {
+			test := func(t *testing.T, handle func(cr *ChainRouter)) {
 				chainRouter, engine := newChainRouterTest(t)
 
 				unwantedCall := make(chan struct{})
@@ -1600,7 +1600,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 				require.Equal(1, chainRouter.timedRequests.Len())
 				chainRouter.lock.Unlock()
 
-				requireHandled(chainRouter)
+				handle(chainRouter)
 
 				chainRouter.lock.Lock()
 				require.Equal(0, chainRouter.timedRequests.Len())
