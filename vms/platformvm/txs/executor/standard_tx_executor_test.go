@@ -1196,7 +1196,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 func TestDurangoMemoField(t *testing.T) {
 	type test struct {
 		name      string
-		setupTest func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff)
+		setupTest func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff)
 	}
 
 	owners := &secp256k1fx.OutputOwners{
@@ -1207,7 +1207,7 @@ func TestDurangoMemoField(t *testing.T) {
 	tests := []test{
 		{
 			name: "AddSubnetValidatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				var primaryValidator *state.Staker
@@ -1248,7 +1248,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "CreateChainTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				subnetID := testSubnet1.ID()
@@ -1273,7 +1273,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "CreateSubnetTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				wallet := newWallet(t, env, walletConfig{})
@@ -1290,7 +1290,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "ImportTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				var (
@@ -1329,7 +1329,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "ExportTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				wallet := newWallet(t, env, walletConfig{})
@@ -1353,7 +1353,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "RemoveSubnetValidatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				var primaryValidator *state.Staker
@@ -1411,7 +1411,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "TransformSubnetTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				subnetID := testSubnet1.ID()
@@ -1445,7 +1445,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "AddPermissionlessValidatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 				var (
 					nodeID    = ids.GenerateTestNodeID()
@@ -1484,7 +1484,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "AddPermissionlessDelegatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				var primaryValidator *state.Staker
@@ -1524,7 +1524,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "TransferSubnetOwnershipTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				subnetID := testSubnet1.ID()
@@ -1546,7 +1546,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "BaseTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				wallet := newWallet(t, env, walletConfig{})
