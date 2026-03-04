@@ -345,6 +345,7 @@ func (s *State) FinishBlock() (*blocks.WorstCaseBounds, error) {
 	s.qSize += s.blockSize
 	return &blocks.WorstCaseBounds{
 		MaxBaseFee:          s.baseFee,
+		LatestEndTime:       s.clock.Clone(),
 		MinOpBurnerBalances: slices.Clone(s.minOpBurnerBalances),
 	}, nil
 }

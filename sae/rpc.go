@@ -39,6 +39,7 @@ import (
 // APIBackend is the union of all interfaces required to implement the SAE APIs.
 type APIBackend interface {
 	ethapi.Backend
+	// TODO(ceyonur): Add gasprice.Backend interface.
 	tracers.Backend
 	filters.BloomOverrider
 }
@@ -418,7 +419,7 @@ func (b *ethAPIBackend) GetBody(ctx context.Context, hash common.Hash, number rp
 	if hash == (common.Hash{}) {
 		return nil, errors.New("empty block hash")
 	}
-	n, err := b.resolveBlockNumber(number)
+	n, err := b.ResolveBlockNumber(number)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +470,7 @@ func neverErrs[T any](fn func(ethdb.Reader, common.Hash, uint64) *T) canonicalRe
 }
 
 func readByNumber[T any](b *ethAPIBackend, n rpc.BlockNumber, read canonicalReaderWithErr[T]) (*T, error) {
-	num, err := b.resolveBlockNumber(n)
+	num, err := b.ResolveBlockNumber(n)
 	if errors.Is(err, errFutureBlockNotResolved) {
 		return nil, nil
 	} else if err != nil {
@@ -525,7 +526,7 @@ func (b *ethAPIBackend) resolveBlockNumberOrHash(numOrHash rpc.BlockNumberOrHash
 		return 0, common.Hash{}, errBothNumberAndHash
 
 	case isNum:
-		num, err := b.resolveBlockNumber(rpcNum)
+		num, err := b.ResolveBlockNumber(rpcNum)
 		if err != nil {
 			return 0, common.Hash{}, err
 		}
@@ -560,7 +561,7 @@ func (b *ethAPIBackend) resolveBlockNumberOrHash(numOrHash rpc.BlockNumberOrHash
 
 var errFutureBlockNotResolved = errors.New("not accepted yet")
 
-func (b *ethAPIBackend) resolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
+func (b *ethAPIBackend) ResolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
 	head := b.vm.last.accepted.Load().Height()
 
 	switch bn {
@@ -602,6 +603,10 @@ func (b *ethAPIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Sub
 func (b *ethAPIBackend) SubscribeChainSideEvent(chan<- core.ChainSideEvent) event.Subscription {
 	// SAE never reorgs, so there are no side events.
 	return newNoopSubscription()
+}
+
+func (b *ethAPIBackend) LastAcceptedBlock() *blocks.Block {
+	return b.vm.last.accepted.Load()
 }
 
 func (b *ethAPIBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
