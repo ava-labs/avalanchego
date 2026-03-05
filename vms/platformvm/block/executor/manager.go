@@ -57,7 +57,7 @@ func NewManager(
 	metrics metrics.Metrics,
 	s *state.State,
 	txExecutorBackend *executor.Backend,
-	validatorManager validators.Manager,
+	validatorManager *validators.Manager,
 ) Manager {
 	lastAccepted := s.GetLastAccepted()
 	backend := &backend{
