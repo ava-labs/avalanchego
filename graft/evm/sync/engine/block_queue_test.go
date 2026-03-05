@@ -91,42 +91,48 @@ func TestBlockQueue_OperationDedupSemantics(t *testing.T) {
 	}
 }
 
-func TestBlockQueue_VerifyCanBeRequeuedAfterForget(t *testing.T) {
-	q := newBlockQueue()
+func TestBlockQueue_VerifyCanBeRequeuedAfterCleanup(t *testing.T) {
+	tests := []struct {
+		name          string
+		forgetCurrent bool
+		pruneBelow    uint64
+	}{
+		{
+			name:          "after forget",
+			forgetCurrent: true,
+		},
+		{
+			name:       "after prune drop",
+			pruneBelow: 101,
+		},
+	}
 
-	b := newMockBlock(100)
-	require.True(t, q.enqueue(b, OpVerify))
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			q := newBlockQueue()
+			b := newMockBlock(100)
+			require.True(t, q.enqueue(b, OpVerify))
 
-	batch := q.dequeueBatch()
-	require.Len(t, batch, 1)
-	require.Equal(t, OpVerify, batch[0].operation)
+			if tt.forgetCurrent {
+				batch := q.dequeueBatch()
+				require.Len(t, batch, 1)
+				require.Equal(t, OpVerify, batch[0].operation)
+				q.forget(batch)
+			}
+			if tt.pruneBelow != 0 {
+				// Drop blocks strictly below 101, so our block at height 100 is pruned.
+				q.removeBelowHeight(tt.pruneBelow)
+			}
+			require.Empty(t, q.dequeueBatch())
 
-	// Simulate coordinator having executed the batch.
-	q.forget(batch)
-
-	// Verify should be enqueueable again after forget.
-	require.True(t, q.enqueue(b, OpVerify))
-	batch2 := q.dequeueBatch()
-	require.Len(t, batch2, 1)
-	require.Equal(t, OpVerify, batch2[0].operation)
-}
-
-func TestBlockQueue_VerifyCanBeRequeuedAfterPruneDrop(t *testing.T) {
-	q := newBlockQueue()
-
-	b := newMockBlock(100)
-	require.True(t, q.enqueue(b, OpVerify))
-
-	// Drop blocks strictly below 101, so our block at height 100 is pruned.
-	q.removeBelowHeight(101)
-
-	require.Empty(t, q.dequeueBatch())
-
-	// Verify should be enqueueable again after being pruned.
-	require.True(t, q.enqueue(b, OpVerify))
-	batch := q.dequeueBatch()
-	require.Len(t, batch, 1)
-	require.Equal(t, OpVerify, batch[0].operation)
+			// Verify should be enqueueable again after cleanup.
+			require.True(t, q.enqueue(b, OpVerify))
+			batch := q.dequeueBatch()
+			require.Len(t, batch, 1)
+			require.Equal(t, OpVerify, batch[0].operation)
+		})
+	}
 }
 
 func TestBlockQueue_ConcurrentAccess(t *testing.T) {
