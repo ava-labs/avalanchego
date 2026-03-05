@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -46,7 +47,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	avalastat "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -1502,10 +1502,10 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(blk3.Accept(t.Context()))
 }
 
-func TestAddValidatorDuringRemoval(t *testing.T) {
+func TestAddValidatorDuringRemovalPostHelicon(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Durango)
+	vm, _, _ := defaultVM(t, upgradetest.Helicon)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1561,14 +1561,81 @@ func TestAddValidatorDuringRemoval(t *testing.T) {
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// Verify that the validator does exist
-	vdr, err := vm.state.GetCurrentValidator(subnetID, nodeID)
+	validator, err := vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
-	require.Equal(nodeID, vdr.NodeID)
+	require.Equal(uint64(1), validator.Weight)
 
-	// Verify that the transaction was executed
-	_, status, err := vm.state.GetTx(secondSubnetValidatorTx.ID())
+	// Verify that the invalid transaction was executed
+	_, _, err = vm.state.GetTx(secondSubnetValidatorTx.ID())
 	require.NoError(err)
-	require.Equal(avalastat.Committed, status)
+}
+
+func TestAddValidatorDuringRemovalPreHelicon(t *testing.T) {
+	require := require.New(t)
+
+	vm, _, _ := defaultVM(t, upgradetest.Durango)
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	var (
+		nodeID   = genesistest.DefaultNodeIDs[0]
+		subnetID = testSubnet1.ID()
+		wallet   = newWallet(t, vm, walletConfig{
+			subnetIDs: []ids.ID{subnetID},
+		})
+
+		duration     = defaultMinStakingDuration
+		firstEndTime = latestForkTime.Add(duration)
+	)
+
+	firstAddSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(firstEndTime.Unix()),
+			Wght:   1,
+		},
+		Subnet: subnetID,
+	})
+	require.NoError(err)
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(firstAddSubnetValidatorTx))
+	vm.ctx.Lock.Lock()
+
+	// Accept firstAddSubnetValidatorTx
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	// Verify that the validator was added
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+
+	secondEndTime := firstEndTime.Add(duration)
+	secondSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(secondEndTime.Unix()),
+			Wght:   1,
+		},
+		Subnet: subnetID,
+	})
+	require.NoError(err)
+
+	vm.clock.Set(firstEndTime)
+	vm.ctx.Lock.Unlock()
+	err = vm.issueTxFromRPC(secondSubnetValidatorTx)
+	vm.ctx.Lock.Lock()
+	require.ErrorIs(err, state.ErrAddingStakerAfterDeletion)
+
+	// Remove the first subnet validator
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	// Verify that the validator does not exist
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	require.ErrorIs(err, database.ErrNotFound)
+
+	// Verify that the invalid transaction was not executed
+	_, _, err = vm.state.GetTx(secondSubnetValidatorTx.ID())
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 // GetValidatorSet must return the BLS keys for a given validator correctly when
@@ -2391,7 +2458,7 @@ func TestSubnetValidatorManagerAfterMultipleExpiration(t *testing.T) {
 
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Durango)
+	vm, _, _ := defaultVM(t, upgradetest.Helicon)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2503,7 +2570,7 @@ func TestSubnetValidatorRemoveAddRemoveInSingleBlock(t *testing.T) {
 
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Durango)
+	vm, _, _ := defaultVM(t, upgradetest.Helicon)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2623,7 +2690,7 @@ func TestSubnetValidatorRemoveAndReplaceInSingleBlock(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(t, upgradetest.Durango)
+			vm, _, _ := defaultVM(t, upgradetest.Helicon)
 			vm.ctx.Lock.Lock()
 			defer vm.ctx.Lock.Unlock()
 

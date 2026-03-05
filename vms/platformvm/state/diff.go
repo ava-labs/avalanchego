@@ -32,8 +32,9 @@ type Diff interface {
 }
 
 type diff struct {
-	parentID      ids.ID
-	stateVersions Versions
+	allowAddingValidatorAfterDeletion StakerAdditionAfterDeletionLegality
+	parentID                          ids.ID
+	stateVersions                     Versions
 
 	timestamp                   time.Time
 	feeState                    gas.State
@@ -73,23 +74,31 @@ type diff struct {
 func NewDiff(
 	parentID ids.ID,
 	stateVersions Versions,
-) (Diff, error) {
+	allowAddingStakerAfterDeletion StakerAdditionAfterDeletionLegality,
+) (*diff, error) {
 	parentState, ok := stateVersions.GetState(parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:                    parentID,
-		stateVersions:               stateVersions,
-		timestamp:                   parentState.GetTimestamp(),
-		feeState:                    parentState.GetFeeState(),
-		l1ValidatorExcess:           parentState.GetL1ValidatorExcess(),
-		accruedFees:                 parentState.GetAccruedFees(),
-		parentNumActiveL1Validators: parentState.NumActiveL1Validators(),
-		expiryDiff:                  newExpiryDiff(),
-		l1ValidatorsDiff:            newL1ValidatorsDiff(),
-		subnetOwners:                make(map[ids.ID]fx.Owner),
-		subnetToL1Conversions:       make(map[ids.ID]SubnetToL1Conversion),
+		currentStakerDiffs: diffStakers{
+			isAdditionAfterDeletionAllowed: allowAddingStakerAfterDeletion,
+		},
+		pendingStakerDiffs: diffStakers{
+			isAdditionAfterDeletionAllowed: allowAddingStakerAfterDeletion,
+		},
+		allowAddingValidatorAfterDeletion: allowAddingStakerAfterDeletion,
+		parentID:                          parentID,
+		stateVersions:                     stateVersions,
+		timestamp:                         parentState.GetTimestamp(),
+		feeState:                          parentState.GetFeeState(),
+		l1ValidatorExcess:                 parentState.GetL1ValidatorExcess(),
+		accruedFees:                       parentState.GetAccruedFees(),
+		parentNumActiveL1Validators:       parentState.NumActiveL1Validators(),
+		expiryDiff:                        newExpiryDiff(),
+		l1ValidatorsDiff:                  newL1ValidatorsDiff(),
+		subnetOwners:                      make(map[ids.ID]fx.Owner),
+		subnetToL1Conversions:             make(map[ids.ID]SubnetToL1Conversion),
 	}, nil
 }
 
@@ -101,10 +110,10 @@ func (s stateGetter) GetState(ids.ID) (Chain, bool) {
 	return s.state, true
 }
 
-func NewDiffOn(parentState Chain) (Diff, error) {
+func NewDiffOn(parentState Chain, allowAddingStakerAfterDeletion StakerAdditionAfterDeletionLegality) (Diff, error) {
 	return NewDiff(ids.Empty, stateGetter{
 		state: parentState,
-	})
+	}, allowAddingStakerAfterDeletion)
 }
 
 func (d *diff) GetTimestamp() time.Time {

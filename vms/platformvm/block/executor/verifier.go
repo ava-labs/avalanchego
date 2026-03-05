@@ -62,7 +62,10 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	onDecisionState, err := state.NewDiff(parentID, v.backend)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		v.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(b.Timestamp()),
+	)
+	onDecisionState, err := state.NewDiff(parentID, v.backend, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return err
 	}
@@ -84,12 +87,12 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	onCommitState, err := state.NewDiffOn(onDecisionState)
+	onCommitState, err := state.NewDiffOn(onDecisionState, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return err
 	}
 
-	onAbortState, err := state.NewDiffOn(onDecisionState)
+	onAbortState, err := state.NewDiffOn(onDecisionState, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return err
 	}
@@ -114,7 +117,10 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 	}
 
 	parentID := b.Parent()
-	onAcceptState, err := state.NewDiff(parentID, v.backend)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		v.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(b.Timestamp()),
+	)
+	onAcceptState, err := state.NewDiff(parentID, v.backend, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return err
 	}
@@ -159,11 +165,11 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	onCommitState, err := state.NewDiff(parentID, v.backend)
+	onCommitState, err := state.NewDiff(parentID, v.backend, state.StakerAdditionAfterDeletionForbidden)
 	if err != nil {
 		return err
 	}
-	onAbortState, err := state.NewDiff(parentID, v.backend)
+	onAbortState, err := state.NewDiff(parentID, v.backend, state.StakerAdditionAfterDeletionForbidden)
 	if err != nil {
 		return err
 	}
@@ -189,7 +195,7 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	}
 
 	parentID := b.Parent()
-	onAcceptState, err := state.NewDiff(parentID, v)
+	onAcceptState, err := state.NewDiff(parentID, v, state.StakerAdditionAfterDeletionForbidden)
 	if err != nil {
 		return err
 	}

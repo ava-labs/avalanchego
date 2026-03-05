@@ -974,7 +974,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 		},
 	}
 	for currentIndex, diff := range diffs {
-		d, err := NewDiffOn(state)
+		d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 		require.NoError(err)
 
 		var expectedValidators set.Set[subnetIDNodeID]
@@ -1896,7 +1896,7 @@ func TestL1Validators(t *testing.T) {
 			state.SetHeight(0)
 			require.NoError(state.Commit())
 
-			d, err := NewDiffOn(state)
+			d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
 
 			expectedL1Validators := maps.Clone(initialL1Validators)
@@ -2551,7 +2551,7 @@ func TestCurrentValidatorRemoveAndReAddWithDifferentKey(t *testing.T) {
 	// Block 1 (via diff): Add the validator with the first public key.
 	state.AddTx(tx1, status.Committed)
 
-	addDiff, err := NewDiffOn(state)
+	addDiff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	require.NoError(addDiff.PutCurrentValidator(originalStaker))
 	require.NoError(addDiff.Apply(state))
@@ -2569,7 +2569,7 @@ func TestCurrentValidatorRemoveAndReAddWithDifferentKey(t *testing.T) {
 	//   Tx 2 – re-add a validator for the same node with a different BLS key.
 	state.AddTx(tx2, status.Committed)
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Tx 1: remove
@@ -2656,7 +2656,7 @@ func TestReplacementValidatorPrevPublicKeyDiff(t *testing.T) {
 	// Block 0: Add the original validator.
 	state.AddTx(tx1, status.Committed)
 
-	addDiff, err := NewDiffOn(state)
+	addDiff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	require.NoError(addDiff.PutCurrentValidator(originalStaker))
 	require.NoError(addDiff.Apply(state))
@@ -2667,7 +2667,7 @@ func TestReplacementValidatorPrevPublicKeyDiff(t *testing.T) {
 	// Block 1: Replace (delete original + add replacement).
 	state.AddTx(tx2, status.Committed)
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	d.DeleteCurrentValidator(originalStaker)
 	require.NoError(d.PutCurrentValidator(replacementStaker))
@@ -2735,7 +2735,7 @@ func TestDiffValidatorWeightChange(t *testing.T) {
 			}
 
 			// Block 0: Add the original validator.
-			d, err := NewDiffOn(state)
+			d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
 			require.NoError(d.PutCurrentValidator(&original))
 			require.NoError(d.Apply(state))
@@ -2755,7 +2755,7 @@ func TestDiffValidatorWeightChange(t *testing.T) {
 				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
 			}
 
-			d, err = NewDiffOn(state)
+			d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
 			d.DeleteCurrentValidator(&original)
 			require.NoError(d.PutCurrentValidator(&replacement))
@@ -2828,7 +2828,7 @@ func TestDiffMultipleValidatorsSameBlock(t *testing.T) {
 	}
 
 	// Block 0: Add validators A and B.
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	require.NoError(d.PutCurrentValidator(&stakerA))
 	require.NoError(d.PutCurrentValidator(&stakerB))
@@ -2860,7 +2860,7 @@ func TestDiffMultipleValidatorsSameBlock(t *testing.T) {
 		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
 	}
 
-	d, err = NewDiffOn(state)
+	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	d.DeleteCurrentValidator(&stakerA)
 	d.DeleteCurrentValidator(&stakerB)
@@ -2919,7 +2919,7 @@ func TestDiffRemoveValidatorNoPriorState(t *testing.T) {
 	}
 
 	// Block 0: Add the validator.
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	require.NoError(d.PutCurrentValidator(&staker))
 	require.NoError(d.Apply(state))
@@ -2927,7 +2927,7 @@ func TestDiffRemoveValidatorNoPriorState(t *testing.T) {
 	require.NoError(state.Commit())
 
 	// Block 1: Remove the validator without replacement.
-	d, err = NewDiffOn(state)
+	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	d.DeleteCurrentValidator(&staker)
 	require.NoError(d.Apply(state))
@@ -2996,7 +2996,7 @@ func TestDiffSubnetValidatorInheritsPublicKeyDiff(t *testing.T) {
 	// Block 0: Add primary + subnet validators.
 	state.AddTx(tx1, status.Committed)
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	require.NoError(d.PutCurrentValidator(primaryStaker))
 	require.NoError(d.PutCurrentValidator(&subnetStaker))
@@ -3024,7 +3024,7 @@ func TestDiffSubnetValidatorInheritsPublicKeyDiff(t *testing.T) {
 
 	state.AddTx(tx2, status.Committed)
 
-	d, err = NewDiffOn(state)
+	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	d.DeleteCurrentValidator(primaryStaker)
 	require.NoError(d.PutCurrentValidator(replacementPrimary))
@@ -3101,7 +3101,7 @@ func TestDiffMultipleBlocksRollback(t *testing.T) {
 
 	// Block 0: Add staker1 (weight=10, PK1).
 	state.AddTx(tx1, status.Committed)
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	require.NoError(d.PutCurrentValidator(staker1))
 	require.NoError(d.Apply(state))
@@ -3110,7 +3110,7 @@ func TestDiffMultipleBlocksRollback(t *testing.T) {
 
 	// Block 1: Replace with staker2 (weight=20, PK2).
 	state.AddTx(tx2, status.Committed)
-	d, err = NewDiffOn(state)
+	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	d.DeleteCurrentValidator(staker1)
 	require.NoError(d.PutCurrentValidator(staker2))
@@ -3120,7 +3120,7 @@ func TestDiffMultipleBlocksRollback(t *testing.T) {
 
 	// Block 2: Replace with staker3 (weight=30, PK3).
 	state.AddTx(tx3, status.Committed)
-	d, err = NewDiffOn(state)
+	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	d.DeleteCurrentValidator(staker2)
 	require.NoError(d.PutCurrentValidator(staker3))
@@ -3227,7 +3227,7 @@ func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T)
 	state.AddTx(primaryTx1, status.Committed)
 	state.AddTx(subnetTx1, status.Committed)
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	require.NoError(d.PutCurrentValidator(primaryStaker1))
 	require.NoError(d.PutCurrentValidator(subnetStaker1))
@@ -3245,7 +3245,7 @@ func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T)
 	state.AddTx(primaryTx2, status.Committed)
 	state.AddTx(subnetTx2, status.Committed)
 
-	d, err = NewDiffOn(state)
+	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	d.DeleteCurrentValidator(primaryStaker1)
 	require.NoError(d.PutCurrentValidator(primaryStaker2))
@@ -3330,7 +3330,7 @@ func TestSubnetValidatorReplacementWithUnchangedPrimaryKey(t *testing.T) {
 	state.AddTx(primaryTx, status.Committed)
 	state.AddTx(subnetTx1, status.Committed)
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	require.NoError(d.PutCurrentValidator(primaryStaker))
 	require.NoError(d.PutCurrentValidator(subnetStaker1))
@@ -3347,7 +3347,7 @@ func TestSubnetValidatorReplacementWithUnchangedPrimaryKey(t *testing.T) {
 	// Block 1: Replace only the subnet validator. Primary stays.
 	state.AddTx(subnetTx2, status.Committed)
 
-	d, err = NewDiffOn(state)
+	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	d.DeleteCurrentValidator(subnetStaker1)
 	require.NoError(d.PutCurrentValidator(subnetStaker2))

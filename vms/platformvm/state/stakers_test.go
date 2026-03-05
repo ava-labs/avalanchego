@@ -217,7 +217,7 @@ func TestDiffStakersUpdateValidator(t *testing.T) {
 	modifiedStaker.StartTime = startTime
 	modifiedStaker.EndTime = endTime
 
-	diff := diffStakers{}
+	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
 	require.False(existsInDiff(&diff, staker))
 
 	diff.DeleteValidator(staker)
@@ -245,7 +245,7 @@ func TestDiffStakersDeleteAddDeleteValidator(t *testing.T) {
 	v1Prime.StartTime = startTime
 	v1Prime.EndTime = endTime
 
-	diff := diffStakers{}
+	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
 
 	// Delete v1 (simulating removal of an existing validator from base state)
 	diff.DeleteValidator(v1)
@@ -279,7 +279,7 @@ func TestDiffStakersDeleteThenReAddSameValidator(t *testing.T) {
 	require := require.New(t)
 	v1 := newTestStaker()
 
-	diff := diffStakers{}
+	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
 
 	// Delete v1 (simulating removal of an existing validator from base state)
 	diff.DeleteValidator(v1)
@@ -311,7 +311,7 @@ func TestDiffValidatorWeightDiffAfterDeleteAndAdd(t *testing.T) {
 	modifiedStaker := *staker
 	modifiedStaker.Weight = 10
 
-	diff := diffStakers{}
+	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
 
 	// Delete the original validator (weight 5)
 	diff.DeleteValidator(staker)
@@ -549,7 +549,7 @@ func TestDiffStakersReplaceValidatorIterator(t *testing.T) {
 	replacement.EndTime = originalStaker.EndTime.Add(time.Hour)
 	replacement.NextTime = replacement.EndTime
 
-	diff := diffStakers{}
+	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
 
 	// Simulate replacement of the original validator
 	diff.DeleteValidator(originalStaker)
@@ -574,7 +574,7 @@ func TestGetStakerIteratorDeleteAndPut(t *testing.T) {
 	v.PutValidator(staker)
 
 	// diff stakers
-	d := diffStakers{}
+	d := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
 	updatedStaker := *staker
 	updatedStaker.Weight = 2
 
