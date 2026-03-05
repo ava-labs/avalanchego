@@ -130,7 +130,9 @@ type Config struct {
 
 	// Sync settings
 	StateSyncEnabled         bool   `json:"state-sync-enabled"`
-	StateSyncSkipResume      bool   `json:"state-sync-skip-resume"` // Forces state sync to use the highest available summary block
+	StateSyncSkipResume      bool   `json:"state-sync-skip-resume"`     // Forces state sync to use the highest available summary block
+	StateSyncDynamicEnabled  bool   `json:"state-sync-dynamic-enabled"` // Enables dynamic state sync orchestration.
+	StateSyncPivotInterval   uint64 `json:"state-sync-pivot-interval"`  // Block interval for forwarding dynamic sync target updates.
 	StateSyncServerTrieCache int    `json:"state-sync-server-trie-cache"`
 	StateSyncIDs             string `json:"state-sync-ids"`
 	StateSyncCommitInterval  uint64 `json:"state-sync-commit-interval"`

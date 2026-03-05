@@ -39,7 +39,9 @@ This package (`evm/sync`) contains the shared state sync implementation used by 
 - `leaf`: Generic leaf syncer (`CallbackSyncer`) that iterates trie ranges and invokes callbacks on each batch of received leafs.
 - `block`: Syncs parent blocks of the syncable block.
 - `code`: Syncs contract code referenced in the account trie, with concurrent workers and a persistent queue.
-- `engine`: `SyncerRegistry` orchestrates execution of multiple `Syncer` implementations (EVM state, blocks, code, and VM-specific syncers like the atomic trie).
+- `engine`: `SyncerRegistry` orchestrates execution of multiple `Syncer` implementations (EVM state, blocks, code, and VM-specific syncers like the atomic trie). The engine supports:
+  - Static mode (default): run syncers to completion, then finalize.
+  - Dynamic mode (opt-in): allow sync target updates while sync is running, defer block operations, and replay deferred operations after finalization.
 - `synctest`: Shared test utilities for trie and block generation.
 - `syncutils`: Iterator utilities for trie traversal.
 
@@ -65,6 +67,15 @@ The above information is called a _state summary_, and each syncable block corre
 1. The engine calls `Accept` on the chosen summary. The VM may return `false` to skip syncing to this summary (e.g., coreth skips state sync for less than `defaultStateSyncMinBlocks = 300_000` blocks). If the VM decides to perform the sync, it must return `true` without blocking and fetch the state from its peers asynchronously.
 1. The VM sends `common.StateSyncDone` on the `toEngine` channel on completion.
 1. The engine calls `VM.SetState(Bootstrapping)`. Then, blocks after the syncable block are processed one by one.
+
+### Engine execution modes
+
+`evm/sync/engine` has two execution modes:
+
+- Static mode: default behavior, equivalent to the original state sync flow.
+- Dynamic mode: syncers continue running while accepted blocks can advance the sync target (with pivot throttling), and block operations (`Accept`, `Reject`, `Verify`) are deferred and replayed in FIFO order after sync finalization.
+
+Unless explicitly enabled by VM configuration plumbing, state sync runs in static mode.
 
 ## Syncing state
 

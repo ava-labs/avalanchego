@@ -658,17 +658,19 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				BlockParser:      vm,
 			},
 		),
-		Enabled:             stateSyncEnabled,
-		SkipResume:          vm.config.StateSyncSkipResume,
-		MinBlocks:           vm.config.StateSyncMinBlocks,
-		RequestSize:         vm.config.StateSyncRequestSize,
-		LastAcceptedHeight:  lastAcceptedHeight, // TODO clean up how this is passed around
-		ChainDB:             vm.chaindb,
-		VerDB:               vm.versiondb,
-		MetadataDB:          vm.metadataDB,
-		Acceptor:            vm,
-		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
-		Extender:            vm.extensionConfig.SyncExtender,
+		Enabled:                 stateSyncEnabled,
+		SkipResume:              vm.config.StateSyncSkipResume,
+		DynamicStateSyncEnabled: vm.config.StateSyncDynamicEnabled,
+		PivotInterval:           vm.config.StateSyncPivotInterval,
+		MinBlocks:               vm.config.StateSyncMinBlocks,
+		RequestSize:             vm.config.StateSyncRequestSize,
+		LastAcceptedHeight:      lastAcceptedHeight, // TODO clean up how this is passed around
+		ChainDB:                 vm.chaindb,
+		VerDB:                   vm.versiondb,
+		MetadataDB:              vm.metadataDB,
+		Acceptor:                vm,
+		SyncSummaryProvider:     vm.extensionConfig.SyncSummaryProvider,
+		Extender:                vm.extensionConfig.SyncExtender,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume

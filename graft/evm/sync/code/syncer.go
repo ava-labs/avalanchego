@@ -114,6 +114,11 @@ func (c *Syncer) Sync(ctx context.Context) error {
 	return eg.Wait()
 }
 
+func (*Syncer) UpdateTarget(message.Syncable) error {
+	// Non-functional compatibility scaffolding.
+	return nil
+}
+
 // work fulfills any incoming requests from the producer channel by fetching code bytes from the network
 // and fulfilling them by updating the database.
 func (c *Syncer) work(ctx context.Context) error {

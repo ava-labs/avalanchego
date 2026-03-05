@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )
@@ -111,4 +112,9 @@ func (s *BlockSyncer) Sync(ctx context.Context) error {
 
 	log.Info("fetched blocks from peer", "total", blocksToFetch)
 	return batch.Write()
+}
+
+func (*BlockSyncer) UpdateTarget(message.Syncable) error {
+	// Non-functional compatibility scaffolding.
+	return nil
 }

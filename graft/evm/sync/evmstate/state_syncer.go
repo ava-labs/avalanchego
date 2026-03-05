@@ -176,6 +176,11 @@ func (t *stateSync) Sync(ctx context.Context) error {
 	return eg.Wait()
 }
 
+func (*stateSync) UpdateTarget(message.Syncable) error {
+	// Non-functional compatibility scaffolding.
+	return nil
+}
+
 // onStorageTrieFinished is called after a storage trie finishes syncing.
 func (t *stateSync) onStorageTrieFinished(root common.Hash) error {
 	<-t.triesInProgressSem // allow another trie to start (release the semaphore)
