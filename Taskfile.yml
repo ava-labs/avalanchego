@@ -41,7 +41,7 @@ tasks:
       find . -name 'BUILD.bazel' -type f | while read f; do
         # Skip root and graft module roots (manually maintained)
         case "$f" in
-          ./BUILD.bazel|./graft/coreth/BUILD.bazel|./graft/evm/BUILD.bazel|./graft/subnet-evm/BUILD.bazel|./.bazel/*)
+          ./BUILD.bazel|./graft/coreth/BUILD.bazel|./graft/evm/BUILD.bazel|./graft/subnet-evm/BUILD.bazel|./.bazel/*|./firewood/*)
             continue
             ;;
         esac
@@ -55,6 +55,10 @@ tasks:
   bazel-gazelle-generate:
     desc: Regenerate BUILD files with Gazelle (all modules)
     cmd: ./scripts/run_bazel.sh run //:gazelle
+
+  bazel-firewood-ffi:
+    desc: Run just the firewood FFI unit tests (included in bazel-test, this is a convenience shortcut)
+    cmd: ./scripts/run_bazel.sh test //firewood/ffi:ffi_test
 
   bazel-test:
     desc: Run unit tests with Bazel (shuffle on, race on)
@@ -217,6 +221,10 @@ tasks:
     desc: Checks that go version directives are consistent across all modules
     cmd: ./scripts/check_go_version.sh
 
+  check-rust-version:
+    desc: Checks that Rust version and edition in MODULE.bazel match firewood/Cargo.toml
+    cmd: ./scripts/check_rust_version.sh
+
   check-require-directives:
     desc: Checks that internal module require directives reference the same version
     cmd: ./scripts/check_require_directives.sh
@@ -313,6 +321,7 @@ tasks:
       - lint-shell
       - check-go-mod-tidy
       - check-go-version
+      - check-rust-version
       - check-require-directives
       - check-require-directives-round-trip
       - check-vcs-usage
@@ -327,6 +336,7 @@ tasks:
       - task: lint-shell
       - task: check-go-mod-tidy
       - task: check-go-version
+      - task: check-rust-version
       - task: check-require-directives
       - task: check-require-directives-round-trip
       - task: check-vcs-usage

@@ -1,0 +1,6 @@
+# gazelle:ignore
+
+exports_files([
+    "Cargo.toml",
+    "Cargo.lock",
+])
