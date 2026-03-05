@@ -132,9 +132,9 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 func (e *Engine) Start(_ context.Context, _ uint32) error {
 	e.logger.Info(
 		"Starting simplex engine",
-		zap.Int("tickInterval", int(e.tickInterval)),
-		zap.Uint64("MaxProposalWait", uint64(e.epoch.MaxProposalWait)),
-		zap.Uint64("MaxRebroadcastWait", uint64(e.epoch.MaxRebroadcastWait)),
+		zap.Duration("tickInterval", e.tickInterval),
+		zap.Duration("MaxProposalWait", e.epoch.MaxProposalWait),
+		zap.Duration("MaxRebroadcastWait", e.epoch.MaxRebroadcastWait),
 	)
 	if err := e.epoch.Start(); err != nil {
 		return fmt.Errorf("failed to start simplex epoch: %w", err)
