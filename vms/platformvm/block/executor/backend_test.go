@@ -51,11 +51,6 @@ func TestGetState(t *testing.T) {
 
 	{
 		// Case: block is not in the map and block isn't last accepted.
-		randomBlock := block.NewMockBlock(ctrl)
-		randomBlock.EXPECT().ID().Return(ids.GenerateTestID()).Times(1)
-		randomBlock.EXPECT().Height().Return(uint64(2178)).Times(1)
-		s.AddStatelessBlock(randomBlock)
-
 		_, ok := b.GetState(ids.GenerateTestID())
 		require.False(ok)
 	}

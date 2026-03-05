@@ -128,11 +128,13 @@ func TestBlockOptions(t *testing.T) {
 			expectedPreferenceType: &block.BanffCommitBlock{},
 		},
 		{
-			name: "banff proposal block; error fetching staker tx",
+			name: "banff proposal block; error fetching staker tx; db closed",
 			blkF: func(ctrl *gomock.Controller) *Block {
 				stakerTxID := ids.GenerateTestID()
 
 				state := statetest.New(t, statetest.Config{})
+				state.Close()
+
 				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
@@ -333,17 +335,12 @@ func TestBlockOptions(t *testing.T) {
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
 					}
-					primaryStaker = &state.Staker{
-						StartTime: primaryNetworkValidatorStartTime,
-						NodeID:    nodeID,
-					}
 				)
 				uptimes := uptimemock.NewCalculator(ctrl)
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
 
-				require.NoError(t, state.PutCurrentValidator(primaryStaker))
 				require.NoError(t, state.PutCurrentValidator(staker))
 
 				manager := &manager{
@@ -395,10 +392,6 @@ func TestBlockOptions(t *testing.T) {
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
 					}
-					primaryStaker = &state.Staker{
-						StartTime: primaryNetworkValidatorStartTime,
-						NodeID:    nodeID,
-					}
 					transformSubnetTx = &txs.Tx{
 						Unsigned: &txs.TransformSubnetTx{
 							UptimeRequirement: .2 * reward.PercentDenominator,
@@ -413,7 +406,6 @@ func TestBlockOptions(t *testing.T) {
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
 				require.NoError(t, state.PutCurrentValidator(staker))
-				require.NoError(t, state.PutCurrentValidator(primaryStaker))
 
 				state.AddSubnetTransformation(transformSubnetTx)
 
