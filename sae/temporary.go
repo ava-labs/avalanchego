@@ -22,22 +22,22 @@ import (
 
 var errUnimplemented = errors.New("unimplemented")
 
-func (b *ethAPIBackend) SuggestGasTipCap(context.Context) (*big.Int, error) {
+func (b *apiBackend) SuggestGasTipCap(context.Context) (*big.Int, error) {
 	panic(errUnimplemented)
 }
 
-func (b *ethAPIBackend) FeeHistory(context.Context, uint64, rpc.BlockNumber, []float64) (*big.Int, [][]*big.Int, []*big.Int, []float64, error) {
+func (b *apiBackend) FeeHistory(context.Context, uint64, rpc.BlockNumber, []float64) (*big.Int, [][]*big.Int, []*big.Int, []float64, error) {
 	panic(errUnimplemented)
 }
 
-func (b *ethAPIBackend) GetPoolNonce(context.Context, common.Address) (uint64, error) {
+func (b *apiBackend) GetPoolNonce(context.Context, common.Address) (uint64, error) {
 	panic(errUnimplemented)
 }
 
-func (b *ethAPIBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+func (b *apiBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
 	panic(errUnimplemented)
 }
 
-func (b *ethAPIBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
+func (b *apiBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	panic(errUnimplemented)
 }

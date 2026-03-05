@@ -20,15 +20,15 @@ import (
 	"github.com/ava-labs/strevm/blocks"
 )
 
-func (b *ethAPIBackend) RPCEVMTimeout() time.Duration {
+func (b *apiBackend) RPCEVMTimeout() time.Duration {
 	return b.vm.config.RPCConfig.EVMTimeout
 }
 
-func (b *ethAPIBackend) RPCGasCap() uint64 {
+func (b *apiBackend) RPCGasCap() uint64 {
 	return b.vm.config.RPCConfig.GasCap
 }
 
-func (b *ethAPIBackend) Engine() consensus.Engine {
+func (b *apiBackend) Engine() consensus.Engine {
 	return (*coinbaseAsAuthor)(nil)
 }
 
@@ -40,7 +40,7 @@ func (*coinbaseAsAuthor) Author(h *types.Header) (common.Address, error) {
 	return h.Coinbase, nil
 }
 
-func (b *ethAPIBackend) GetEVM(ctx context.Context, msg *core.Message, sdb *state.StateDB, hdr *types.Header, cfg *vm.Config, bCtx *vm.BlockContext) *vm.EVM {
+func (b *apiBackend) GetEVM(ctx context.Context, msg *core.Message, sdb *state.StateDB, hdr *types.Header, cfg *vm.Config, bCtx *vm.BlockContext) *vm.EVM {
 	if bCtx == nil {
 		bCtx = new(vm.BlockContext)
 		*bCtx = core.NewEVMBlockContext(hdr, b.vm.exec.ChainContext(), &hdr.Coinbase)
@@ -51,14 +51,14 @@ func (b *ethAPIBackend) GetEVM(ctx context.Context, msg *core.Message, sdb *stat
 
 // StateAndHeaderByNumber performs the same faking as
 // [ethAPIBackend.StateAndHeaderByNumberOrHash].
-func (b *ethAPIBackend) StateAndHeaderByNumber(ctx context.Context, num rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
+func (b *apiBackend) StateAndHeaderByNumber(ctx context.Context, num rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
 	return b.StateAndHeaderByNumberOrHash(ctx, rpc.BlockNumberOrHashWithNumber(num))
 }
 
 // StateAndHeaderByNumberOrHash fakes the returned [types.Header] to contain
 // post-execution results, mimicking a synchronous block. The [state.StateDB] is
 // opened at the post-execution root, as carried by the faked header.
-func (b *ethAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error) {
+func (b *apiBackend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error) {
 	if n, ok := numOrHash.Number(); ok && n == rpc.PendingBlockNumber {
 		return nil, nil, errors.New("state not available for pending block")
 	}

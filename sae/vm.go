@@ -67,7 +67,7 @@ type VM struct {
 	exec         *saexec.Executor
 	mempool      *txgossip.Set
 	blockBuilder blockBuilder
-	apiBackend   *ethAPIBackend
+	apiBackend   *apiBackend
 	newTxs       chan struct{}
 
 	// toClose are closed in reverse order during [VM.Shutdown]. If a resource
@@ -311,7 +311,7 @@ func NewVM[T hook.Transaction](
 		bloomIdx := newBloomIndexer(vm.db, chainIdx, override, cfg.RPCConfig.BlocksPerBloomSection)
 		vm.toClose = append(vm.toClose, bloomIdx.Close)
 
-		vm.apiBackend = &ethAPIBackend{
+		vm.apiBackend = &apiBackend{
 			vm:             vm,
 			accountManager: accountManager,
 			Set:            vm.mempool,

@@ -255,7 +255,7 @@ func (s *netAPI) Version() string {
 
 type blockChainAPI struct {
 	*ethapi.BlockChainAPI
-	b *ethAPIBackend
+	b *apiBackend
 }
 
 // We override [ethapi.BlockChainAPI.GetBlockReceipts] so that we do not return
@@ -313,7 +313,7 @@ func (b bloomOverrider) OverrideHeaderBloom(header *types.Header) types.Bloom {
 	))
 }
 
-type ethAPIBackend struct {
+type apiBackend struct {
 	vm             *VM
 	accountManager *accounts.Manager
 
@@ -323,27 +323,27 @@ type ethAPIBackend struct {
 	*bloomIndexer
 }
 
-var _ APIBackend = (*ethAPIBackend)(nil)
+var _ APIBackend = (*apiBackend)(nil)
 
-func (b *ethAPIBackend) ChainDb() ethdb.Database { //nolint:staticcheck // this name required by ethapi.Backend interface
+func (b *apiBackend) ChainDb() ethdb.Database { //nolint:staticcheck // this name required by ethapi.Backend interface
 	return b.vm.db
 }
 
-func (b *ethAPIBackend) ChainConfig() *params.ChainConfig {
+func (b *apiBackend) ChainConfig() *params.ChainConfig {
 	return b.vm.exec.ChainConfig()
 }
 
-func (b *ethAPIBackend) RPCTxFeeCap() float64 {
+func (b *apiBackend) RPCTxFeeCap() float64 {
 	return b.vm.config.RPCConfig.TxFeeCap
 }
 
-func (b *ethAPIBackend) UnprotectedAllowed() bool {
+func (b *apiBackend) UnprotectedAllowed() bool {
 	return false
 }
 
 // ExtRPCEnabled reports that external RPC access is enabled. This adds an
 // additional security measure in case we add support for the personal API.
-func (*ethAPIBackend) ExtRPCEnabled() bool {
+func (*apiBackend) ExtRPCEnabled() bool {
 	return true
 }
 
@@ -352,15 +352,15 @@ func (*ethAPIBackend) ExtRPCEnabled() bool {
 // block is defined as the most recently accepted block, but receipts are only
 // available after execution. Returning a non-nil block with incorrect or empty
 // receipts could cause geth to encounter errors.
-func (*ethAPIBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
+func (*apiBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
 	return nil, nil
 }
 
-func (b *ethAPIBackend) AccountManager() *accounts.Manager {
+func (b *apiBackend) AccountManager() *accounts.Manager {
 	return b.accountManager
 }
 
-func (b *ethAPIBackend) CurrentBlock() *types.Header {
+func (b *apiBackend) CurrentBlock() *types.Header {
 	return b.CurrentHeader()
 }
 
@@ -370,40 +370,40 @@ func (b *ethAPIBackend) CurrentBlock() *types.Header {
 // and no longer exposes the total difficulty of the chain at all via the API.
 //
 // TODO(JonathanOppenheimer): Once we update libevm, remove GetTd.
-func (b *ethAPIBackend) GetTd(ctx context.Context, hash common.Hash) *big.Int {
+func (b *apiBackend) GetTd(ctx context.Context, hash common.Hash) *big.Int {
 	return common.Big0
 }
 
-func (b *ethAPIBackend) SyncProgress() ethereum.SyncProgress {
+func (b *apiBackend) SyncProgress() ethereum.SyncProgress {
 	// Avalanchego does not expose APIs until after the node has fully synced.
 	return ethereum.SyncProgress{}
 }
 
-func (b *ethAPIBackend) HeaderByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Header, error) {
+func (b *apiBackend) HeaderByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Header, error) {
 	return readByNumber(b, n, neverErrs(rawdb.ReadHeader))
 }
 
-func (b *ethAPIBackend) BlockByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Block, error) {
+func (b *apiBackend) BlockByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Block, error) {
 	return readByNumber(b, n, neverErrs(rawdb.ReadBlock))
 }
 
-func (b *ethAPIBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
+func (b *apiBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
 	return readByHash(b.vm, hash, (*blocks.Block).Header, neverErrs(rawdb.ReadHeader), nil /* errWhenNotFound */)
 }
 
-func (b *ethAPIBackend) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
+func (b *apiBackend) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
 	return readByHash(b.vm, hash, (*blocks.Block).EthBlock, neverErrs(rawdb.ReadBlock), nil /* errWhenNotFound */)
 }
 
-func (b *ethAPIBackend) HeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Header, error) {
+func (b *apiBackend) HeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Header, error) {
 	return readByNumberOrHash(b, blockNrOrHash, (*blocks.Block).Header, neverErrs(rawdb.ReadHeader))
 }
 
-func (b *ethAPIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
+func (b *apiBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
 	return readByNumberOrHash(b, blockNrOrHash, (*blocks.Block).EthBlock, neverErrs(rawdb.ReadBlock))
 }
 
-func (b *ethAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (exists bool, tx *types.Transaction, blockHash common.Hash, blockNumber uint64, index uint64, err error) {
+func (b *apiBackend) GetTransaction(ctx context.Context, txHash common.Hash) (exists bool, tx *types.Transaction, blockHash common.Hash, blockNumber uint64, index uint64, err error) {
 	tx, blockHash, blockNumber, index = rawdb.ReadTransaction(b.vm.db, txHash)
 	if tx == nil {
 		return false, nil, common.Hash{}, 0, 0, nil
@@ -411,11 +411,11 @@ func (b *ethAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) 
 	return true, tx, blockHash, blockNumber, index, nil
 }
 
-func (b *ethAPIBackend) GetPoolTransaction(txHash common.Hash) *types.Transaction {
+func (b *apiBackend) GetPoolTransaction(txHash common.Hash) *types.Transaction {
 	return b.Set.Pool.Get(txHash)
 }
 
-func (b *ethAPIBackend) GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error) {
+func (b *apiBackend) GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error) {
 	if hash == (common.Hash{}) {
 		return nil, errors.New("empty block hash")
 	}
@@ -434,11 +434,11 @@ func (b *ethAPIBackend) GetBody(ctx context.Context, hash common.Hash, number rp
 	return rawdb.ReadBody(b.vm.db, hash, n), nil
 }
 
-func (b *ethAPIBackend) GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error) {
+func (b *apiBackend) GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error) {
 	return rawdb.ReadLogs(b.vm.db, blockHash, number), nil
 }
 
-func (b *ethAPIBackend) GetPoolTransactions() (types.Transactions, error) {
+func (b *apiBackend) GetPoolTransactions() (types.Transactions, error) {
 	pending := b.Pool.Pending(txpool.PendingFilter{})
 
 	var pendingCount int
@@ -469,7 +469,7 @@ func neverErrs[T any](fn func(ethdb.Reader, common.Hash, uint64) *T) canonicalRe
 	}
 }
 
-func readByNumber[T any](b *ethAPIBackend, n rpc.BlockNumber, read canonicalReaderWithErr[T]) (*T, error) {
+func readByNumber[T any](b *apiBackend, n rpc.BlockNumber, read canonicalReaderWithErr[T]) (*T, error) {
 	num, err := b.ResolveBlockNumber(n)
 	if errors.Is(err, errFutureBlockNotResolved) {
 		return nil, nil
@@ -500,7 +500,7 @@ func readByHash[T any](vm *VM, hash common.Hash, fromMem blockAccessor[T], fromD
 
 // TODO(arr4n) DRY [readByHash] and [readByNumberOrHash]
 
-func readByNumberOrHash[T any](b *ethAPIBackend, blockNrOrHash rpc.BlockNumberOrHash, fromMem blockAccessor[T], fromDB canonicalReaderWithErr[T]) (*T, error) {
+func readByNumberOrHash[T any](b *apiBackend, blockNrOrHash rpc.BlockNumberOrHash, fromMem blockAccessor[T], fromDB canonicalReaderWithErr[T]) (*T, error) {
 	n, hash, err := b.resolveBlockNumberOrHash(blockNrOrHash)
 	if err != nil {
 		return nil, err
@@ -517,7 +517,7 @@ var (
 	errNonCanonicalBlock    = errors.New("non-canonical block")
 )
 
-func (b *ethAPIBackend) resolveBlockNumberOrHash(numOrHash rpc.BlockNumberOrHash) (uint64, common.Hash, error) {
+func (b *apiBackend) resolveBlockNumberOrHash(numOrHash rpc.BlockNumberOrHash) (uint64, common.Hash, error) {
 	rpcNum, isNum := numOrHash.Number()
 	hash, isHash := numOrHash.Hash()
 
@@ -561,7 +561,7 @@ func (b *ethAPIBackend) resolveBlockNumberOrHash(numOrHash rpc.BlockNumberOrHash
 
 var errFutureBlockNotResolved = errors.New("not accepted yet")
 
-func (b *ethAPIBackend) ResolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
+func (b *apiBackend) ResolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
 	head := b.vm.last.accepted.Load().Height()
 
 	switch bn {
@@ -584,55 +584,55 @@ func (b *ethAPIBackend) ResolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
 	return n, nil
 }
 
-func (b *ethAPIBackend) Stats() (pending int, queued int) {
+func (b *apiBackend) Stats() (pending int, queued int) {
 	return b.Set.Pool.Stats()
 }
 
-func (b *ethAPIBackend) TxPoolContent() (map[common.Address][]*types.Transaction, map[common.Address][]*types.Transaction) {
+func (b *apiBackend) TxPoolContent() (map[common.Address][]*types.Transaction, map[common.Address][]*types.Transaction) {
 	return b.Set.Pool.Content()
 }
 
-func (b *ethAPIBackend) TxPoolContentFrom(addr common.Address) ([]*types.Transaction, []*types.Transaction) {
+func (b *apiBackend) TxPoolContentFrom(addr common.Address) ([]*types.Transaction, []*types.Transaction) {
 	return b.Set.Pool.ContentFrom(addr)
 }
 
-func (b *ethAPIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
+func (b *apiBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
 	return b.vm.exec.SubscribeChainEvent(ch)
 }
 
-func (b *ethAPIBackend) SubscribeChainSideEvent(chan<- core.ChainSideEvent) event.Subscription {
+func (b *apiBackend) SubscribeChainSideEvent(chan<- core.ChainSideEvent) event.Subscription {
 	// SAE never reorgs, so there are no side events.
 	return newNoopSubscription()
 }
 
-func (b *ethAPIBackend) LastAcceptedBlock() *blocks.Block {
+func (b *apiBackend) LastAcceptedBlock() *blocks.Block {
 	return b.vm.last.accepted.Load()
 }
 
-func (b *ethAPIBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
+func (b *apiBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	return b.Set.Pool.SubscribeTransactions(ch, true)
 }
 
-func (b *ethAPIBackend) SubscribeRemovedLogsEvent(chan<- core.RemovedLogsEvent) event.Subscription {
+func (b *apiBackend) SubscribeRemovedLogsEvent(chan<- core.RemovedLogsEvent) event.Subscription {
 	// SAE never reorgs, so no logs are ever removed.
 	return newNoopSubscription()
 }
 
-func (b *ethAPIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
+func (b *apiBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return b.vm.exec.SubscribeLogsEvent(ch)
 }
 
-func (b *ethAPIBackend) SubscribePendingLogsEvent(chan<- []*types.Log) event.Subscription {
+func (b *apiBackend) SubscribePendingLogsEvent(chan<- []*types.Log) event.Subscription {
 	// In SAE, "pending" refers to the execution status. There are no logs known
 	// for transactions pending execution.
 	return newNoopSubscription()
 }
 
-func (b *ethAPIBackend) SetHead(uint64) {
+func (b *apiBackend) SetHead(uint64) {
 	b.vm.log().Info("debug_setHead called but not supported by SAE")
 }
 
-func (b *ethAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
+func (b *apiBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
 	receipts, _, err := b.getReceipts(rpc.BlockNumberOrHashWithHash(hash, false))
 	if err != nil {
 		return nil, nil //nolint:nilerr // This follows Geth behavior for [ethapi.Backend.GetReceipts]
@@ -643,7 +643,7 @@ func (b *ethAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (type
 // getReceipts resolves receipts and the underlying [types.Block] by number or
 // hash, checking in-memory blocks first then falling back to the database.
 // Returns nils for blocks that are not yet executed.
-func (b *ethAPIBackend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, *types.Block, error) {
+func (b *apiBackend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, *types.Block, error) {
 	blk, err := readByNumberOrHash(
 		b,
 		numOrHash,
