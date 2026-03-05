@@ -1,0 +1,4 @@
+# CODEOWNERS
+# Note: more specific rules overrule wildcard
+*        @rkuris @demosdemon @RodrigoVillar @bernard-avalabs
+/ffi     @rkuris @demosdemon @alarso16 @RodrigoVillar @bernard-avalabs
