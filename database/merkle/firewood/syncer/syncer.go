@@ -75,11 +75,7 @@ func newWithDB(config Config, db sync.DB[*RangeProof, struct{}], targetRoot ids.
 }
 
 func (db *database) GetMerkleRoot(context.Context) (ids.ID, error) {
-	root, err := db.db.Root()
-	if err != nil {
-		return ids.ID{}, err
-	}
-	return ids.ID(root), nil
+	return ids.ID(db.db.Root()), nil
 }
 
 func (db *database) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error) {

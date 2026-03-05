@@ -6,7 +6,7 @@ go 1.25.7
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/ava-labs/avalanchego v0.0.0-initial-consistent-tag
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.2.0
 	github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
