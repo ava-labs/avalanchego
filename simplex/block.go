@@ -155,13 +155,17 @@ type blockTracker struct {
 	tree tree.Tree
 }
 
-func newBlockTracker(latestBlock *Block) *blockTracker {
+func newBlockTracker() *blockTracker {
 	return &blockTracker{
-		tree: tree.New(),
-		simplexDigestsToBlock: map[simplex.Digest]*Block{
-			latestBlock.digest: latestBlock,
-		},
+		tree:                  tree.New(),
+		simplexDigestsToBlock: make(map[simplex.Digest]*Block),
 	}
+}
+
+// init sets the latest block in the tracker.
+// This should only be called once, with the genesis or latest block.
+func (bt *blockTracker) init(latestBlock *Block) {
+	bt.simplexDigestsToBlock[latestBlock.digest] = latestBlock
 }
 
 func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) (*Block, bool) {
