@@ -36,6 +36,7 @@ import (
 // method that treats the chain as being asynchronous since genesis.
 type SinceGenesis struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
+	hooks   *Hooks
 	config  sae.Config
 
 	ctx          *snow.Context
@@ -48,7 +49,9 @@ type SinceGenesis struct {
 
 // NewSinceGenesis constructs a new [SinceGenesis].
 func NewSinceGenesis(c sae.Config) *SinceGenesis {
-	return &SinceGenesis{config: c}
+	return &SinceGenesis{
+		config: c,
+	}
 }
 
 // Initialize initializes the VM.
@@ -96,11 +99,13 @@ func (vm *SinceGenesis) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
-	inner, err := sae.NewVM(ctx, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
+	hooks := &Hooks{}
+	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
 		return err
 	}
 	vm.VM = inner
+	vm.hooks = hooks
 	vm.ctx = snowCtx
 
 	metrics := prometheus.NewRegistry()
@@ -122,7 +127,6 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	{
-
 		gossipHandler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
 			snowCtx.NodeID,
 			vm.Network,

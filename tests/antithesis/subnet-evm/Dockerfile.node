@@ -5,7 +5,7 @@ ARG BUILDER_IMAGE_TAG
 ARG AVALANCHEGO_NODE_IMAGE
 
 # ============= Compilation Stage ================
-FROM antithesis-subnet-evm-builder:$BUILDER_IMAGE_TAG AS builder
+FROM antithesis-avalanchego-builder:$BUILDER_IMAGE_TAG AS builder
 
 # The builder workdir will vary between instrumented and non-instrumented builders
 ARG BUILDER_WORKDIR

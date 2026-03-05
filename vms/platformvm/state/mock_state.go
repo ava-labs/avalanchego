@@ -470,21 +470,6 @@ func (mr *MockStateMockRecorder) GetCurrentValidators(ctx, subnetID any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidators", reflect.TypeOf((*MockState)(nil).GetCurrentValidators), ctx, subnetID)
 }
 
-// GetDelegateeReward mocks base method.
-func (m *MockState) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDelegateeReward", subnetID, nodeID)
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDelegateeReward indicates an expected call of GetDelegateeReward.
-func (mr *MockStateMockRecorder) GetDelegateeReward(subnetID, nodeID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), subnetID, nodeID)
-}
-
 // GetExpiryIterator mocks base method.
 func (m *MockState) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	m.ctrl.T.Helper()
@@ -615,6 +600,21 @@ func (m *MockState) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 func (mr *MockStateMockRecorder) GetRewardUTXOs(txID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardUTXOs", reflect.TypeOf((*MockState)(nil).GetRewardUTXOs), txID)
+}
+
+// GetStakingInfo mocks base method.
+func (m *MockState) GetStakingInfo(subnetID ids.ID, nodeID ids.NodeID) (StakingInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStakingInfo", subnetID, nodeID)
+	ret0, _ := ret[0].(StakingInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStakingInfo indicates an expected call of GetStakingInfo.
+func (mr *MockStateMockRecorder) GetStakingInfo(subnetID, nodeID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStakingInfo", reflect.TypeOf((*MockState)(nil).GetStakingInfo), subnetID, nodeID)
 }
 
 // GetStartTime mocks base method.
@@ -928,20 +928,6 @@ func (mr *MockStateMockRecorder) SetCurrentSupply(subnetID, cs any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockState)(nil).SetCurrentSupply), subnetID, cs)
 }
 
-// SetDelegateeReward mocks base method.
-func (m *MockState) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetDelegateeReward", subnetID, nodeID, amount)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetDelegateeReward indicates an expected call of SetDelegateeReward.
-func (mr *MockStateMockRecorder) SetDelegateeReward(subnetID, nodeID, amount any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), subnetID, nodeID, amount)
-}
-
 // SetFeeState mocks base method.
 func (m *MockState) SetFeeState(f gas.State) {
 	m.ctrl.T.Helper()
@@ -988,6 +974,20 @@ func (m *MockState) SetLastAccepted(blkID ids.ID) {
 func (mr *MockStateMockRecorder) SetLastAccepted(blkID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), blkID)
+}
+
+// SetStakingInfo mocks base method.
+func (m *MockState) SetStakingInfo(subnetID ids.ID, nodeID ids.NodeID, stakingInfo StakingInfo) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetStakingInfo", subnetID, nodeID, stakingInfo)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetStakingInfo indicates an expected call of SetStakingInfo.
+func (mr *MockStateMockRecorder) SetStakingInfo(subnetID, nodeID, stakingInfo any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetStakingInfo", reflect.TypeOf((*MockState)(nil).SetStakingInfo), subnetID, nodeID, stakingInfo)
 }
 
 // SetSubnetOwner mocks base method.

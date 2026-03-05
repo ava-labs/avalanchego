@@ -22,7 +22,6 @@ func (*Factory) New(logger logging.Logger) (interface{}, error) {
 	mempoolConfig.NoLocals = true
 	logger.Info("Creating new SAE since genesis")
 	res := adaptor.Convert(NewSinceGenesis(sae.Config{
-		Hooks:         &Hooks{},
 		MempoolConfig: mempoolConfig,
 		TrieDBConfig:  triedb.HashDefaults,
 	}))
