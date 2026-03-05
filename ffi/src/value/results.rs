@@ -646,6 +646,7 @@ pub(crate) trait NullHandleResult: CResult {
 }
 
 pub(crate) trait CResult: Sized {
+    #[cfg(panic = "unwind")]
     fn from_err(err: impl ToString) -> Self;
 
     #[cfg(panic = "unwind")]
@@ -673,6 +674,7 @@ macro_rules! impl_cresult {
     ($($Enum:ty),* $(,)?) => {
         $(
             impl CResult for $Enum {
+                #[cfg(panic = "unwind")]
                 fn from_err(err: impl ToString) -> Self {
                     Self::Err(err.to_string().into_bytes().into())
                 }
