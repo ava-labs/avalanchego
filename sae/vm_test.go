@@ -656,6 +656,92 @@ func TestCanCreateContractSoftError(t *testing.T) {
 	assert.Equalf(t, uint64(1), sdb.GetNonce(sut.wallet.Addresses()[0]), "%T.GetNonce([sender]) after blocked contract creation", sdb)
 }
 
+// TestCustomTransactionInclusion verifies that block building includes custom
+// transactions.
+func TestCustomTransactionInclusion(t *testing.T) {
+	const initialBalance = params.Ether
+	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+		for addr, acc := range c.genesis.Alloc {
+			acc.Balance = big.NewInt(initialBalance)
+			c.genesis.Alloc[addr] = acc
+		}
+	}))
+
+	var (
+		sender    = sut.wallet.Addresses()[0]
+		receiver  = zeroAddr
+		gasFeeCap = *uint256.NewInt(params.Wei)
+	)
+	const (
+		sent     = 10
+		received = 100
+	)
+	sut.hooks.Ops = []hookstest.Op{
+		{
+			Gas:       100_000,
+			GasFeeCap: gasFeeCap,
+			Burn: []hookstest.AccountDebit{
+				{
+					Address:    sender,
+					Amount:     *uint256.NewInt(sent),
+					MinBalance: *uint256.NewInt(sent),
+				},
+			},
+		},
+		{ // Invalid operation: receiver initially has no funds
+			Gas:       150_000,
+			GasFeeCap: gasFeeCap,
+			Burn: []hookstest.AccountDebit{
+				{
+					Address:    receiver,
+					Amount:     *uint256.NewInt(params.Wei),
+					MinBalance: *uint256.NewInt(params.Wei),
+				},
+			},
+		},
+		{
+			Gas:       200_000,
+			GasFeeCap: gasFeeCap,
+			Mint: []hookstest.AccountCredit{
+				{
+					Address: receiver,
+					Amount:  *uint256.NewInt(received),
+				},
+			},
+		},
+	}
+
+	b := sut.runConsensusLoop(t)
+	assert.Equalf(t, uint64(300_000), b.Header().GasUsed, "%T.GasUsed after op inclusion", b)
+	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+
+	// Verify nonces and balances are updated.
+	accounts := []struct {
+		name    string
+		address common.Address
+		nonce   uint64
+		balance uint64
+	}{
+		{
+			name:    "sender",
+			address: sender,
+			nonce:   1,
+			balance: initialBalance - sent,
+		},
+		{
+			name:    "receiver",
+			address: receiver,
+			nonce:   0, // only burning increments the nonce
+			balance: received,
+		},
+	}
+	sdb := sut.stateAt(t, b.PostExecutionStateRoot())
+	for _, a := range accounts {
+		assert.Equalf(t, a.nonce, sdb.GetNonce(a.address), "%T.GetNonce([%s])", sdb, a.name)
+		assert.Equalf(t, uint256.NewInt(a.balance), sdb.GetBalance(a.address), "%T.GetBalance([%s])", sdb, a.name)
+	}
+}
+
 func TestEmptyChainConfig(t *testing.T) {
 	_, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Config = &params.ChainConfig{

@@ -83,7 +83,7 @@ func (cb *ChainBuilder) NewBlock(tb testing.TB, txs []*types.Transaction, opts .
 	options.ApplyTo(allOpts, opts...)
 
 	last := cb.Last()
-	eth := NewEthBlock(last.EthBlock(), txs, allOpts.eth...)
+	eth := NewEthBlock(tb, last.EthBlock(), txs, allOpts.eth...)
 	b := NewBlock(tb, eth, last, nil, allOpts.sae...)
 
 	cb.chain = append(cb.chain, b)

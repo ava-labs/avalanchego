@@ -66,7 +66,7 @@ type VM struct {
 
 	exec         *saexec.Executor
 	mempool      *txgossip.Set
-	blockBuilder *blockBuilder
+	blockBuilder blockBuilder
 	apiBackend   *ethAPIBackend
 	newTxs       chan struct{}
 
@@ -104,9 +104,9 @@ type RPCConfig struct {
 // The state root of the last synchronous block MUST be available when creating
 // a [triedb.Database] from the provided [ethdb.Database] and [triedb.Config]
 // (the latter provided via the [Config]).
-func NewVM(
+func NewVM[T hook.Transaction](
 	ctx context.Context,
-	hooks hook.Points,
+	hooks hook.PointsG[T],
 	cfg Config,
 	snowCtx *snow.Context,
 	chainConfig *params.ChainConfig,
@@ -236,7 +236,7 @@ func NewVM(
 	}
 
 	{ // ==========  Block Builder  ==========
-		vm.blockBuilder = &blockBuilder{
+		vm.blockBuilder = &blockBuilderG[T]{
 			hooks,
 			cfg.Now,
 			snowCtx.Log,

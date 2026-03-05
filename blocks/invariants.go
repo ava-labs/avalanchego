@@ -115,6 +115,13 @@ func (b *Block) CheckOpBurnerBalanceBounds(stateDB *state.StateDB, opIndexInBloc
 }
 
 func (b *Block) checkBalanceBounds(log logging.Logger, stateDB *state.StateDB, opIndexInBlock int, accounts ...common.Address) {
+	if n := len(b.bounds.MinOpBurnerBalances); opIndexInBlock >= n {
+		log.Warn("Op not included in worst-case bounds",
+			zap.Int("num_ops", n),
+		)
+		return
+	}
+
 	minBals := b.bounds.MinOpBurnerBalances[opIndexInBlock]
 	if len(minBals) != len(accounts) {
 		log.Warn("Incorrect number of worst-case op-burner balances",

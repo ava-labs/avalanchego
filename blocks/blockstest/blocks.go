@@ -35,7 +35,8 @@ import (
 type EthBlockOption = options.Option[ethBlockProperties]
 
 // NewEthBlock constructs a raw Ethereum block with the given arguments.
-func NewEthBlock(parent *types.Block, txs types.Transactions, opts ...EthBlockOption) *types.Block {
+func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opts ...EthBlockOption) *types.Block {
+	tb.Helper()
 	props := &ethBlockProperties{
 		header: &types.Header{
 			Number:        new(big.Int).Add(parent.Number(), big.NewInt(1)),
@@ -45,12 +46,15 @@ func NewEthBlock(parent *types.Block, txs types.Transactions, opts ...EthBlockOp
 		},
 	}
 	props = options.ApplyTo(props, opts...)
-	return types.NewBlock(props.header, txs, nil, props.receipts, saetest.TrieHasher())
+	block, err := hookstest.BuildBlock(props.header, txs, props.receipts, props.ops)
+	require.NoError(tb, err, "hookstest.BuildBlock()")
+	return block
 }
 
 type ethBlockProperties struct {
 	header   *types.Header
 	receipts types.Receipts
+	ops      []hookstest.Op
 }
 
 // ModifyHeader returns an option to modify the [types.Header] constructed by
@@ -67,6 +71,14 @@ func ModifyHeader(fn func(*types.Header)) EthBlockOption {
 func WithReceipts(rs types.Receipts) EthBlockOption {
 	return options.Func[ethBlockProperties](func(p *ethBlockProperties) {
 		p.receipts = slices.Clone(rs)
+	})
+}
+
+// WithOps returns an option to set the ops of a block constructed by
+// [NewEthBlock].
+func WithOps(ops []hookstest.Op) EthBlockOption {
+	return options.Func[ethBlockProperties](func(p *ethBlockProperties) {
+		p.ops = slices.Clone(ops)
 	})
 }
 

@@ -26,21 +26,35 @@ import (
 	"github.com/ava-labs/strevm/worstcase"
 )
 
-type blockBuilder struct {
-	hooks   hook.Points
+// blockBuilder hides [blockBuilderG]'s generic type behind non-generic methods.
+type blockBuilder interface {
+	// new constructs a [blocks.Block] with the provided arguments. It is
+	// allowed for parent and lastSettled to be nil as an indication that the
+	// block hasn't yet been verified.
+	new(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error)
+	// build a new block on top of the provided parent. The block context MAY be
+	// nil.
+	build(ctx context.Context, bCtx *block.Context, parent *blocks.Block) (*blocks.Block, error)
+	// rebuild attempts to build a block identical to the provided block. If the
+	// provided block contains any invalid components, those components will be
+	// set to their valid counterparts in the returned block. The block context
+	// MAY be nil.
+	rebuild(ctx context.Context, bCtx *block.Context, parent, block *blocks.Block) (*blocks.Block, error)
+}
+
+type blockBuilderG[T hook.Transaction] struct {
+	hooks   hook.PointsG[T]
 	now     func() time.Time
 	log     logging.Logger
 	exec    *saexec.Executor
 	mempool *txgossip.Set
 }
 
-func (b *blockBuilder) new(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
+func (b *blockBuilderG[_]) new(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
 	return blocks.New(eth, parent, lastSettled, b.log)
 }
 
-// build a new block on top of the provided parent. The block context MAY be
-// nil.
-func (b *blockBuilder) build(
+func (b *blockBuilderG[_]) build(
 	ctx context.Context,
 	bCtx *block.Context,
 	parent *blocks.Block,
@@ -54,11 +68,7 @@ func (b *blockBuilder) build(
 	)
 }
 
-// rebuild attempts to build a block identical to the provided block. If the
-// provided block contains any invalid components, those components will be set
-// to their valid counterparts in the returned block. The block context MAY be
-// nil.
-func (b *blockBuilder) rebuild(
+func (b *blockBuilderG[_]) rebuild(
 	ctx context.Context,
 	bCtx *block.Context,
 	parent *blocks.Block,
@@ -97,12 +107,16 @@ func (b *blockBuilder) rebuild(
 		}
 	}
 
+	rebuilder, err := b.hooks.BlockRebuilderFrom(block.EthBlock())
+	if err != nil {
+		return nil, fmt.Errorf("%T.BlockRebuilderFrom(%#x): %v", b.hooks, block.Hash(), err)
+	}
 	return b.buildWithTxs(
 		ctx,
 		bCtx,
 		parent,
 		func(f txpool.PendingFilter) []*txgossip.LazyTransaction { return txs },
-		b.hooks.BlockRebuilderFrom(block.EthBlock()),
+		rebuilder,
 	)
 }
 
@@ -113,14 +127,14 @@ var (
 	errExecutionLagging      = errors.New("execution lagging for settlement")
 )
 
-// buildWithTxs implements the block-building logic shared by [blockBuilder.Build]
-// and [blockBuilder.Rebuild]. The block context MAY be nil.
-func (b *blockBuilder) buildWithTxs(
+// buildWithTxs implements the block-building logic shared by [blockBuilder.build]
+// and [blockBuilder.rebuild]. The block context MAY be nil.
+func (b *blockBuilderG[T]) buildWithTxs(
 	ctx context.Context,
 	bCtx *block.Context,
 	parent *blocks.Block,
 	pendingTxs func(txpool.PendingFilter) []*txgossip.LazyTransaction,
-	builder hook.BlockBuilder,
+	builder hook.BlockBuilder[T],
 ) (*blocks.Block, error) {
 	hdr := builder.BuildHeader(parent.Header())
 	log := b.log.With(
@@ -140,9 +154,9 @@ func (b *blockBuilder) buildWithTxs(
 	bTime := blocks.PreciseTime(b.hooks, hdr)
 	pTime := blocks.PreciseTime(b.hooks, parent.Header())
 
-	// It is allowed for [hook.Points] to further constrain the allowed block
-	// times. However, every block MUST at least satisfy these basic sanity
-	// checks.
+	// It is allowed for [hook.BlockBuilder] to further constrain the allowed
+	// block times. However, every block MUST at least satisfy these basic
+	// sanity checks.
 	if bTime.Unix() < saeparams.TauSeconds {
 		return nil, fmt.Errorf("%w: %d < %d", errBlockTimeUnderMinimum, hdr.Time, saeparams.TauSeconds)
 	}
@@ -199,7 +213,14 @@ func (b *blockBuilder) buildWithTxs(
 				return nil, fmt.Errorf("applying tx %#x in block %d to worst-case state: %v", tx.Hash(), block.Height(), err)
 			}
 		}
-		for i, op := range b.hooks.EndOfBlockOps(block.EthBlock()) {
+		ops, err := b.hooks.EndOfBlockOps(block.EthBlock())
+		if err != nil {
+			log.Warn("Could not extract ops during historical worst-case calculation",
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("extracting ops of block %d to worst-case state: %v", block.Height(), err)
+		}
+		for i, op := range ops {
 			if err := state.Apply(op); err != nil {
 				log.Warn("Could not apply op during historical worst-case calculation",
 					zap.Int("op_index", i),
@@ -268,9 +289,25 @@ func (b *blockBuilder) buildWithTxs(
 		txLog.Trace("Including transaction")
 		included = append(included, tx)
 	}
+	var includedOps []T
+	for tx := range builder.PotentialEndOfBlockOps() {
+		// TODO(StephenButtolph): Return additional information from
+		// [hook.PointsG.PotentialEndOfBlockOps] to terminate the loop early
+		// when there is insufficient block space remaining.
 
-	// TODO: Should the [hook.BlockBuilder] populate [types.Header.GasUsed] so
-	// that [hook.Op.Gas] can be included?
+		op := tx.AsOp()
+		opLog := log.With(
+			zap.Stringer("op_id", op.ID),
+			zap.Int("op_index", len(includedOps)),
+		)
+
+		if err := state.Apply(op); err != nil {
+			opLog.Debug("Could not apply op", zap.Error(err))
+			continue
+		}
+		opLog.Trace("Including op")
+		includedOps = append(includedOps, tx)
+	}
 	hdr.GasUsed = state.GasUsed()
 
 	bounds, err := state.FinishBlock()
@@ -291,6 +328,7 @@ func (b *blockBuilder) buildWithTxs(
 		hdr,
 		included,
 		receipts,
+		includedOps,
 	)
 	if err != nil {
 		return nil, err

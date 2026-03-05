@@ -10,6 +10,7 @@ package hook
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	"time"
 
@@ -28,24 +29,30 @@ import (
 	"github.com/ava-labs/strevm/saedb"
 )
 
-// Points define user-injected hook points.
+// PointsG define user-injected hook points.
 //
 // Directly using this interface as a [BlockBuilder] is indicative of this node
-// locally building a block. Calling [Points.BlockRebuilderFrom] with an
+// locally building a block. Calling [PointsG.BlockRebuilderFrom] with an
 // existing block is indicative of this node reconstructing a block built
 // elsewhere during verification.
+type PointsG[T Transaction] interface {
+	Points
+
+	BlockBuilder[T]
+	// BlockRebuilderFrom returns a [BlockBuilder] that will attempt to
+	// reconstruct the provided block. If the provided block is valid for
+	// inclusion, then the returned builder MUST be able to reconstruct an
+	// identical block.
+	BlockRebuilderFrom(block *types.Block) (BlockBuilder[T], error)
+}
+
+// Points define user-injected hook points which do not depend on generic
+// types.
 type Points interface {
 	// ExecutionResultsDB opens and returns a height-indexed database, which
 	// will be closed by the VM when no longer needed. It MAY use the provided
 	// directory for persistence and MUST NOT write data outside of it.
 	ExecutionResultsDB(dataDir string) (saedb.ExecutionResults, error)
-
-	BlockBuilder
-	// BlockRebuilderFrom returns a [BlockBuilder] that will attempt to
-	// reconstruct the provided block. If the provided block is valid for
-	// inclusion, then the returned builder MUST be able to reconstruct an
-	// identical block.
-	BlockRebuilderFrom(block *types.Block) BlockBuilder
 
 	// GasTargetAfter returns the gas target that should go into effect
 	// immediately after the provided block.
@@ -58,7 +65,7 @@ type Points interface {
 	// to perform while executing the block, after regular EVM transactions.
 	// These operations will be performed during both worst-case and actual
 	// execution.
-	EndOfBlockOps(*types.Block) []Op
+	EndOfBlockOps(*types.Block) ([]Op, error)
 	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
 	// so that consumers can use a single concrete type for both SAE and libevm hooks.
 	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
@@ -69,7 +76,7 @@ type Points interface {
 }
 
 // BlockBuilder constructs a block given its components.
-type BlockBuilder interface {
+type BlockBuilder[T Transaction] interface {
 	// BuildHeader constructs a header from the parent header.
 	//
 	// The returned header MUST have [types.Header.ParentHash],
@@ -81,6 +88,12 @@ type BlockBuilder interface {
 	// SAE always uses this method instead of directly constructing a header, to
 	// ensure any libevm header extras are properly populated.
 	BuildHeader(parent *types.Header) *types.Header
+	// PotentialEndOfBlockOps returns an iterator of custom transactions that
+	// would be valid to include into a block.
+	//
+	// SAE will filter any transactions whose [Op] can not be safely applied to
+	// the state.
+	PotentialEndOfBlockOps() iter.Seq[T]
 	// BuildBlock constructs a block with the given components.
 	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
@@ -89,7 +102,14 @@ type BlockBuilder interface {
 		header *types.Header,
 		txs []*types.Transaction,
 		receipts []*types.Receipt,
+		endOfBlockOps []T,
 	) (*types.Block, error)
+}
+
+// Transaction is a user-defined transaction type that can be represented as an
+// [Op].
+type Transaction interface {
+	AsOp() Op
 }
 
 // AccountDebit includes an amount that an account should have debited,

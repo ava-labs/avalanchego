@@ -19,27 +19,27 @@ import (
 	"github.com/ava-labs/strevm/hook"
 )
 
-var _ adaptor.ChainVM[*blocks.Block] = (*SinceGenesis)(nil)
+var _ adaptor.ChainVM[*blocks.Block] = (*SinceGenesis[hook.Transaction])(nil)
 
 // SinceGenesis is a harness around a [VM], providing an `Initialize` method
 // that treats the chain as being asynchronous since genesis.
-type SinceGenesis struct {
+type SinceGenesis[T hook.Transaction] struct {
 	*VM // created by [SinceGenesis.Initialize]
 
-	hooks  hook.Points
+	hooks  hook.PointsG[T]
 	config Config
 }
 
 // NewSinceGenesis constructs a new [SinceGenesis].
-func NewSinceGenesis(hooks hook.Points, c Config) *SinceGenesis {
-	return &SinceGenesis{
+func NewSinceGenesis[T hook.Transaction](hooks hook.PointsG[T], c Config) *SinceGenesis[T] {
+	return &SinceGenesis[T]{
 		hooks:  hooks,
 		config: c,
 	}
 }
 
 // Initialize initializes the VM.
-func (vm *SinceGenesis) Initialize(
+func (vm *SinceGenesis[_]) Initialize(
 	ctx context.Context,
 	snowCtx *snow.Context,
 	avaDB database.Database,
@@ -70,7 +70,7 @@ func (vm *SinceGenesis) Initialize(
 }
 
 // Shutdown gracefully closes the VM.
-func (vm *SinceGenesis) Shutdown(ctx context.Context) error {
+func (vm *SinceGenesis[_]) Shutdown(ctx context.Context) error {
 	if vm.VM == nil {
 		return nil
 	}
