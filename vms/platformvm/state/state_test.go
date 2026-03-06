@@ -2657,20 +2657,17 @@ func TestCurrentStakers(t *testing.T) {
 					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
 
-					d1 := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
-					d1.NodeID = v.NodeID
+					d1 := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
 					d1.NextTime = time.Time{}.Add(3 * time.Second)
 
 					require.NoError(t, cs.PutCurrentDelegator(d1))
 
-					d2 := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
-					d2.NodeID = v.NodeID
+					d2 := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
 					d2.NextTime = time.Time{}.Add(1 * time.Second)
 
 					require.NoError(t, cs.PutCurrentDelegator(d2))
 
-					d3 := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
-					d3.NodeID = v.NodeID
+					d3 := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
 					d3.NextTime = time.Time{}.Add(2 * time.Second)
 
 					require.NoError(t, cs.PutCurrentDelegator(d3))
