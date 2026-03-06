@@ -59,7 +59,9 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		return nil, err
 	}
 
-	storage, err := newStorage(ctx, config, qcDeserializer, &blockTracker{})
+	bt := newBlockTracker()
+
+	storage, err := newStorage(ctx, config, qcDeserializer, bt)
 	if err != nil {
 		return nil, err
 	}
@@ -78,17 +80,18 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		return nil, fmt.Errorf("expected last block to be of type *Block but got %T", lastBlock)
 	}
 
-	blockTracker := newBlockTracker(simplexBlock)
+	// Initialize the blockTracker with the last block fetched from Storage.
+	bt.init(simplexBlock)
+
 	blockBuilder := &BlockBuilder{
 		vm:           config.VM,
-		blockTracker: blockTracker,
+		blockTracker: bt,
 		log:          config.Log,
 	}
-	storage.blockTracker = blockTracker
 
 	blockDeserializer := &blockDeserializer{
 		parser:       config.VM,
-		blockTracker: blockTracker,
+		blockTracker: bt,
 	}
 
 	epochConfig := simplex.EpochConfig{
@@ -127,7 +130,12 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 }
 
 func (e *Engine) Start(_ context.Context, _ uint32) error {
-	e.logger.Info("Starting simplex engine")
+	e.logger.Info(
+		"Starting simplex engine",
+		zap.Duration("TickInterval", e.tickInterval),
+		zap.Duration("MaxProposalWait", e.epoch.MaxProposalWait),
+		zap.Duration("MaxRebroadcastWait", e.epoch.MaxRebroadcastWait),
+	)
 	if err := e.epoch.Start(); err != nil {
 		return fmt.Errorf("failed to start simplex epoch: %w", err)
 	}

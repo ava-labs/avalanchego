@@ -416,7 +416,8 @@ func buildQCWithBytes(t testing.TB, configs []*Config, msg []byte) []byte {
 	for _, config := range configs {
 		signer, _, err := NewBLSAuth(config)
 		require.NoError(t, err)
-		sig, _ := signer.Sign(msg)
+		sig, err := signer.Sign(msg)
+		require.NoError(t, err)
 		sigs = append(sigs, simplex.Signature{
 			Signer: config.Ctx.NodeID[:],
 			Value:  sig,
