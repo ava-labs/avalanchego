@@ -52,7 +52,7 @@ import (
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -230,7 +230,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(t, upgradetest.ApricotPhase3)
+			vm := defaultVM(t, upgradetest.ApricotPhase3)
 			vm.UpgradeConfig.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -516,7 +516,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(t, upgradetest.Cortina)
+	vm, baseDB, mutableSharedMemory := setupVM(t, nil, upgradetest.Cortina, 0)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -709,7 +709,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(t, upgradetest.Cortina)
+	vm, baseDB, mutableSharedMemory := setupVM(t, nil, upgradetest.Cortina, 0)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1010,13 +1010,12 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
 	currentHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
-	require.Equal(uint64(1), currentHeight)
 
 	expectedValidators1 := map[ids.NodeID]uint64{
 		genesistest.DefaultNodeIDs[0]: genesistest.DefaultValidatorWeight,
@@ -1025,7 +1024,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		genesistest.DefaultNodeIDs[3]: genesistest.DefaultValidatorWeight,
 		genesistest.DefaultNodeIDs[4]: genesistest.DefaultValidatorWeight,
 	}
-	validators, err := vm.GetValidatorSet(t.Context(), 1, constants.PrimaryNetworkID)
+	validators, err := vm.GetValidatorSet(t.Context(), currentHeight, constants.PrimaryNetworkID)
 	require.NoError(err)
 	for nodeID, weight := range expectedValidators1 {
 		require.Equal(weight, validators[nodeID].Weight)
@@ -1075,9 +1074,8 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	currentHeight, err = vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
-	require.Equal(uint64(2), currentHeight)
 
-	for i := uint64(1); i <= 2; i++ {
+	for i := uint64(1); i <= currentHeight; i++ {
 		validators, err = vm.GetValidatorSet(t.Context(), i, constants.PrimaryNetworkID)
 		require.NoError(err)
 		for nodeID, weight := range expectedValidators1 {
@@ -1111,9 +1109,8 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	currentHeight, err = vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
-	require.Equal(uint64(3), currentHeight)
 
-	for i := uint64(1); i <= 2; i++ {
+	for i := uint64(1); i <= currentHeight; i++ {
 		validators, err = vm.GetValidatorSet(t.Context(), i, constants.PrimaryNetworkID)
 		require.NoError(err)
 		for nodeID, weight := range expectedValidators1 {
@@ -1129,7 +1126,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		genesistest.DefaultNodeIDs[4]: genesistest.DefaultValidatorWeight,
 		extraNodeID:                   vm.MaxValidatorStake,
 	}
-	validators, err = vm.GetValidatorSet(t.Context(), 3, constants.PrimaryNetworkID)
+	validators, err = vm.GetValidatorSet(t.Context(), currentHeight, constants.PrimaryNetworkID)
 	require.NoError(err)
 	for nodeID, weight := range expectedValidators2 {
 		require.Equal(weight, validators[nodeID].Weight)
@@ -1151,7 +1148,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2EndTime := delegator2StartTime.Add(3 * defaultMinStakingDuration)
 	delegator2Stake := defaultMaxValidatorStake - validatorStake
 
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1253,7 +1250,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1390,7 +1387,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1505,7 +1502,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 func TestAddValidatorDuringRemoval(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Durango)
+	vm := defaultVMWithSubnet(t, upgradetest.Durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1585,7 +1582,7 @@ func TestAddValidatorDuringRemoval(t *testing.T) {
 //  8. Advance chain time for the primary network validator to be moved to the
 //     current validator set
 func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm := defaultVMWithSubnet(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1814,7 +1811,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1955,7 +1952,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm := defaultVMWithSubnet(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2144,12 +2141,12 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 func TestValidatorSetReturnsCopy(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm := defaultVM(t, upgradetest.Latest)
 
-	validators1, err := vm.GetValidatorSet(t.Context(), 1, constants.PrimaryNetworkID)
+	validators1, err := vm.GetValidatorSet(t.Context(), 0, constants.PrimaryNetworkID)
 	require.NoError(err)
 
-	validators2, err := vm.GetValidatorSet(t.Context(), 1, constants.PrimaryNetworkID)
+	validators2, err := vm.GetValidatorSet(t.Context(), 0, constants.PrimaryNetworkID)
 	require.NoError(err)
 
 	require.NotNil(validators1[genesistest.DefaultNodeIDs[0]])
@@ -2165,7 +2162,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm := defaultVMWithSubnet(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2291,7 +2288,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 func TestValidatorSetRaceCondition(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2357,7 +2354,7 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 
 func TestBanffStandardBlockWithNoChangesRemainsInvalid(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Etna)
+	vm := defaultVM(t, upgradetest.Etna)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
