@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+# Wrapper for CI and automation. For local development, bazelisk is
+# available in the nix dev shell (see flake.nix) or via direnv when
+# AVALANCHEGO_DIRENV_USE_FLAKE is set (see .envrc). Regular users can
+# also install bazelisk directly and alias it to `bazel`.
+# See docs/bazel.md "Prerequisites" for details.
+
 if command -v bazelisk > /dev/null 2>&1; then
   exec bazelisk "${@}"
 elif command -v nix > /dev/null 2>&1; then
