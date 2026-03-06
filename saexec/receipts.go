@@ -8,17 +8,13 @@ import (
 	"context"
 	"runtime"
 	"slices"
+	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/libevm/sync"
 
 	"github.com/ava-labs/strevm/blocks"
 )
-
-var receiptChPool = sync.Pool[chan *Receipt]{
-	New: func() chan *Receipt { return make(chan *Receipt, 1) },
-}
 
 func (e *Executor) createReceiptBuffers(b *blocks.Block) {
 	txs := make([]common.Hash, len(b.Transactions()))
@@ -26,7 +22,7 @@ func (e *Executor) createReceiptBuffers(b *blocks.Block) {
 		txs[i] = tx.Hash()
 	}
 	e.receipts.StoreFromFunc(func(common.Hash) chan *Receipt {
-		return receiptChPool.Get()
+		return make(chan *Receipt, 1)
 	}, txs...)
 	// This satisfies the minimum-lifespan guarantee of [Executor.RecentReceipt]
 	// but, in practice, will keep the receipts around until the block is an
@@ -34,15 +30,6 @@ func (e *Executor) createReceiptBuffers(b *blocks.Block) {
 	// This should adequately cover the post-tx-issuance period during which
 	// users request receipts.
 	runtime.AddCleanup(b, func(rs *syncMap[common.Hash, chan *Receipt]) {
-		for _, tx := range txs {
-			if ch, ok := rs.Load(tx); ok {
-				select {
-				case <-ch:
-				default:
-				}
-				receiptChPool.Put(ch)
-			}
-		}
 		rs.Delete(txs...)
 	}, e.receipts)
 }
