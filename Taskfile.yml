@@ -37,6 +37,9 @@ tasks:
 
   bazel-gazelle-delete:
     desc: Delete all gazelle-generated BUILD.bazel files (except manually maintained ones)
+    # TODO(marun) Remove before merge. This exists only to partition the PR into
+    # generated vs non-generated files for easier review. gazelle fix handles stale
+    # rules, and empty BUILD.bazel files left behind are harmless.
     cmd: |
       find . -name 'BUILD.bazel' -type f | while read f; do
         # Skip root and graft module roots (manually maintained)
