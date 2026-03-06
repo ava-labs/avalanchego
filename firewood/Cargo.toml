@@ -24,6 +24,7 @@ rust-version.workspace = true
 
 [dependencies]
 # Workspace dependencies
+aquamarine.workspace = true
 bytemuck_derive.workspace = true
 bytemuck.workspace = true
 coarsetime.workspace = true

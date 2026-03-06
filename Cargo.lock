@@ -1574,6 +1574,7 @@ dependencies = [
 name = "firewood"
 version = "0.2.0"
 dependencies = [
+ "aquamarine",
  "bytemuck",
  "bytemuck_derive",
  "clap",

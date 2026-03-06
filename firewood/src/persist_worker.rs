@@ -11,43 +11,30 @@
 //! methods to send revisions for persistence, with built-in backpressure to limit
 //! the number of unpersisted commits.
 //!
-//! The diagram below shows how commits are handled under deferred persistence.
-//! The main thread updates shared state and signals the background thread via
-//! condition variables. Backpressure is enforced by waiting when all permits
-//! are exhausted.
+//! # Permit model
 //!
-//! Below is an example when `commit_count` is set to 10:
+//! Backpressure is managed through a fixed pool of **permits**, sized by `commit_count`
+//! (the maximum number of unpersisted commits allowed at any time).
 //!
-//! ```mermaid
-//! sequenceDiagram
-//!     participant Caller
-//!     participant Main as Main Thread
-//!     participant BG as Background Thread
-//!     participant Disk
+//! - **Commits consume permits.** Each call to [`PersistWorker::persist`] stores the
+//!   latest committed revision and consumes one permit. If no permits remain, the
+//!   caller blocks until the background thread releases some.
 //!
-//!     loop Commits 1-4
-//!         Caller->>Main: commit()
-//!         Main->>Main: store latest revision, count -= 1
-//!         Note right of BG: Waiting (count > threshold)
-//!     end
+//! - **Persists release permits.** When the background thread writes a revision to disk,
+//!   all permits consumed since the last persist are released at once, unblocking any
+//!   waiting committers.
 //!
-//!     Caller->>Main: commit() (5th)
-//!     Main->>Main: store latest revision, count -= 1
-//!     Main->>BG: notify persist_ready
-//!     BG->>Disk: persist latest revision
-//!     Note right of Disk: Sub-interval (10/2) reached
+//! - **A threshold triggers persistence.** The background thread wakes when the number
+//!   of available permits drops to `persist_threshold` (equal to `commit_count / 2`,
+//!   rounded down). It then persists the most recent revision and releases the consumed
+//!   permits in bulk. Only the latest revision is persisted because persisting a revision
+//!   implicitly includes the effects of all prior revisions.
 //!
-//!     loop Commits 6-8
-//!         Caller->>Main: commit()
-//!         Main->>Main: store latest revision, count -= 1
-//!         Note right of BG: Waiting (count > threshold)
-//!     end
+//! For example, with `commit_count = 10` the pool starts with 10 permits and
+//! `persist_threshold = 5`. After 5 commits the available permits drop to 5,
+//! triggering a persist that releases all 5 consumed permits back to the pool.
 //!
-//!     Caller->>Main: close()
-//!     Main->>BG: shutdown signal
-//!     BG->>Disk: persist last committed revision
-//!     Note right of Disk: Latest committed revision is persisted
-//! ```
+//! See [`PersistWorker`] for a sequence diagram illustrating this flow.
 
 use std::{
     num::NonZeroU64,
@@ -78,6 +65,48 @@ pub enum PersistError {
 }
 
 /// Handle for managing the background persistence thread.
+///
+/// # Sequence diagram
+///
+/// Below is an example when `commit_count` is set to 10:
+///
+/// ```mermaid
+/// sequenceDiagram
+///     participant Caller
+///     participant Main as Main Thread
+///     participant BG as Background Thread
+///     participant Disk
+///
+///     Note over Main: permits = 10
+///
+///     loop Commits 1-4
+///         Caller->>Main: commit()
+///         Main->>Main: store latest revision, permits -= 1
+///         Note right of BG: Sleeping (permits > threshold)
+///     end
+///
+///     Note over Main: permits = 6
+///
+///     Caller->>Main: commit() (5th)
+///     Main->>Main: store latest revision, permits -= 1
+///     Note over Main: permits = 5 = threshold
+///     Main->>BG: notify persist_ready
+///     BG->>Disk: persist latest revision
+///     BG->>BG: release 5 permits
+///     Note over Main: permits = 10
+///
+///     loop Commits 6-8
+///         Caller->>Main: commit()
+///         Main->>Main: store latest revision, permits -= 1
+///         Note right of BG: Sleeping (permits > threshold)
+///     end
+///
+///     Caller->>Main: close()
+///     Main->>BG: shutdown signal
+///     BG->>Disk: persist last committed revision
+///     Note right of Disk: Latest committed revision is persisted
+/// ```
+#[cfg_attr(doc, aquamarine::aquamarine)]
 #[derive(Debug)]
 pub(crate) struct PersistWorker {
     /// The background thread responsible for persisting commits async.
