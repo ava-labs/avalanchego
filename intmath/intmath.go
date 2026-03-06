@@ -22,6 +22,14 @@ func BoundedSubtract[T constraints.Unsigned](a, b, floor T) T {
 	return a - b
 }
 
+// BoundedMultiply returns `min(a*b,ceil)` without overflow.
+func BoundedMultiply[T constraints.Unsigned](a, b, ceil T) T {
+	if b != 0 && a > ceil/b {
+		return ceil
+	}
+	return a * b
+}
+
 // ErrOverflow is returned if a return value would have overflowed its type.
 var ErrOverflow = errors.New("overflow")
 

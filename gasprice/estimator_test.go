@@ -291,8 +291,10 @@ func TestFeeHistory(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.HistoryMaxBlocksFromHead = 1
 	cfg.HistoryMaxBlocks = 2
+	gt, err := gastime.New(time.Now(), 1, math.MaxUint64, gastime.DefaultGasPriceConfig())
+	require.NoError(t, err)
 	bounds := &blocks.WorstCaseBounds{
-		LatestEndTime: gastime.New(time.Now(), 1, math.MaxUint64),
+		LatestEndTime: gt,
 	}
 	type (
 		blockSpec []*types.Transaction

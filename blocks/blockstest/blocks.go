@@ -133,7 +133,7 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saedb.ExecutionResults, co
 	require.NoErrorf(tb, tdb.Commit(hash, true), "%T.Commit(core.SetupGenesisBlock(...))", tdb)
 
 	b := NewBlock(tb, gen.ToBlock(), nil, nil)
-	h := &hookstest.Stub{Target: conf.gasTarget}
+	h := hookstest.NewStub(conf.gasTarget)
 	require.NoErrorf(tb, b.MarkSynchronous(h, db, xdb, conf.gasExcess), "%T.MarkSynchronous()", b)
 	return b
 }

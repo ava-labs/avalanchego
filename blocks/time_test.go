@@ -32,12 +32,9 @@ func TestGasTime(t *testing.T) {
 	)
 	rate := gastime.SafeRateOfTarget(target)
 
-	hooks := &hookstest.Stub{
-		Now: func() time.Time {
-			return time.Unix(unix, nanos)
-		},
-		Target: target,
-	}
+	hooks := hookstest.NewStub(target, hookstest.WithNow(func() time.Time {
+		return time.Unix(unix, nanos)
+	}))
 	parent := &types.Header{
 		Number: big.NewInt(1),
 	}
@@ -69,12 +66,9 @@ func FuzzTimeExtraction(f *testing.F) {
 			t.Skip("Zero target")
 		}
 
-		hooks := &hookstest.Stub{
-			Now: func() time.Time {
-				return time.Unix(unix, subSec)
-			},
-			Target: gas.Gas(target),
-		}
+		hooks := hookstest.NewStub(gas.Gas(target), hookstest.WithNow(func() time.Time {
+			return time.Unix(unix, subSec)
+		}))
 		parent := &types.Header{
 			Number: big.NewInt(1),
 		}

@@ -71,7 +71,7 @@ func newChain(tb testing.TB, db ethdb.Database, xdb saedb.ExecutionResults, star
 			// The target and excess are irrelevant for the purposes of
 			// [newChain], and non-zero sub-second time for genesis is
 			// unnecessary.
-			h := &hookstest.Stub{Target: 1}
+			h := hookstest.NewStub(1)
 			require.NoError(tb, b.MarkSynchronous(h, db, xdb, 0), "MarkSynchronous()")
 		}
 

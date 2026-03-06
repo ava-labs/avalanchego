@@ -124,12 +124,9 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	xdb := saetest.NewExecutionResultsDB()
 	conf := options.ApplyTo(&sutConfig{
-		hooks: &hookstest.Stub{
-			Target: 100e6,
-			ExecutionResultsDBFn: func(string) (saedb.ExecutionResults, error) {
-				return xdb, nil
-			},
-		},
+		hooks: hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saedb.ExecutionResults, error) {
+			return xdb, nil
+		})),
 		vmConfig: Config{
 			MempoolConfig: mempoolConf,
 		},

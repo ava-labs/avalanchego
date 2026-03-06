@@ -81,7 +81,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 	chain := blockstest.NewChainBuilder(config, genesis)
 	src := blocks.Source(chain.GetBlock)
 
-	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, nil, &hookstest.Stub{Target: 1e6}, logger)
+	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, nil, hookstest.NewStub(1e6), logger)
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)

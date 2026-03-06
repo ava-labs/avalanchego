@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/ava-labs/strevm/cmputils"
 	"github.com/ava-labs/strevm/gastime"
+	"github.com/ava-labs/strevm/hook"
 	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saetest"
 )
@@ -61,7 +63,8 @@ func TestMarkExecuted(t *testing.T) {
 	xdb := saetest.NewExecutionResultsDB()
 
 	settles := newBlock(t, newEthBlock(0, 0, nil), nil, nil)
-	settles.markExecutedForTests(t, db, xdb, gastime.New(time.Unix(0, 0), 1, 0))
+	tm := mustNewGasTime(t, time.Unix(0, 0), 1, 0, gastime.DefaultGasPriceConfig())
+	settles.markExecutedForTests(t, db, xdb, tm)
 	b := newBlock(t, ethB, nil, settles)
 
 	t.Run("before_MarkExecuted", func(t *testing.T) {
@@ -94,7 +97,7 @@ func TestMarkExecuted(t *testing.T) {
 		}
 	})
 
-	gasTime := gastime.New(time.Unix(42, 0), 1e6, 42)
+	gasTime := mustNewGasTime(t, time.Unix(42, 0), 1e6, 42, gastime.DefaultGasPriceConfig())
 	wallTime := time.Unix(42, 100)
 	stateRoot := common.Hash{'s', 't', 'a', 't', 'e'}
 	baseFee := uint256.NewInt(314159)
@@ -191,3 +194,10 @@ func TestMarkExecuted(t *testing.T) {
 type selfAsHasher common.Hash
 
 func (h selfAsHasher) Hash() common.Hash { return common.Hash(h) }
+
+func mustNewGasTime(tb testing.TB, at time.Time, target, excess gas.Gas, gasPriceConfig hook.GasPriceConfig) *gastime.Time {
+	tb.Helper()
+	tm, err := gastime.New(at, target, excess, gasPriceConfig)
+	require.NoError(tb, err, "gastime.New()")
+	return tm
+}

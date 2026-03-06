@@ -15,7 +15,7 @@ import (
 
 func TestSinceGenesisBeforeInit(t *testing.T) {
 	ctx := t.Context()
-	sut := NewSinceGenesis(&hookstest.Stub{}, Config{})
+	sut := NewSinceGenesis(hookstest.NewStub(0), Config{})
 	t.Run(fmt.Sprintf("%T.Version", sut), func(t *testing.T) {
 		got, err := sut.Version(ctx)
 		require.NoError(t, err)

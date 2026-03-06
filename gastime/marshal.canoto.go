@@ -27,13 +27,229 @@ var (
 )
 
 const (
+	canoto__config__targetToExcessScaling = 1
+	canoto__config__minPrice              = 2
+	canoto__config__staticPricing         = 3
+
+	canoto__config__targetToExcessScaling__tag = "\x08" // canoto.Tag(canoto__config__targetToExcessScaling, canoto.Varint)
+	canoto__config__minPrice__tag              = "\x10" // canoto.Tag(canoto__config__minPrice, canoto.Varint)
+	canoto__config__staticPricing__tag         = "\x18" // canoto.Tag(canoto__config__staticPricing, canoto.Varint)
+)
+
+type canotoData_config struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*config) CanotoSpec(...reflect.Type) *canoto.Spec {
+	var zero config
+	s := &canoto.Spec{
+		Name: "config",
+		Fields: []canoto.FieldType{
+			{
+				FieldNumber: canoto__config__targetToExcessScaling,
+				Name:        "targetToExcessScaling",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.targetToExcessScaling),
+			},
+			{
+				FieldNumber: canoto__config__minPrice,
+				Name:        "minPrice",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.minPrice),
+			},
+			{
+				FieldNumber: canoto__config__staticPricing,
+				Name:        "staticPricing",
+				OneOf:       "",
+				TypeBool:    true,
+			},
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// MakeCanoto creates a new empty value.
+func (*config) MakeCanoto() *config {
+	return new(config)
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *config) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *config) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = config{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canoto__config__targetToExcessScaling:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.targetToExcessScaling); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.targetToExcessScaling) {
+				return canoto.ErrZeroValue
+			}
+		case canoto__config__minPrice:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.minPrice); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.minPrice) {
+				return canoto.ErrZeroValue
+			}
+		case canoto__config__staticPricing:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadBool(&r, &c.staticPricing); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.staticPricing) {
+				return canoto.ErrZeroValue
+			}
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *config) ValidCanoto() bool {
+	if c == nil {
+		return true
+	}
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *config) CalculateCanotoCache() {
+	if c == nil {
+		return
+	}
+	var size uint64
+	if !canoto.IsZero(c.targetToExcessScaling) {
+		size += uint64(len(canoto__config__targetToExcessScaling__tag)) + canoto.SizeUint(c.targetToExcessScaling)
+	}
+	if !canoto.IsZero(c.minPrice) {
+		size += uint64(len(canoto__config__minPrice__tag)) + canoto.SizeUint(c.minPrice)
+	}
+	if !canoto.IsZero(c.staticPricing) {
+		size += uint64(len(canoto__config__staticPricing__tag)) + canoto.SizeBool
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *config) CachedCanotoSize() uint64 {
+	if c == nil {
+		return 0
+	}
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *config) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *config) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if c == nil {
+		return w
+	}
+	if !canoto.IsZero(c.targetToExcessScaling) {
+		canoto.Append(&w, canoto__config__targetToExcessScaling__tag)
+		canoto.AppendUint(&w, c.targetToExcessScaling)
+	}
+	if !canoto.IsZero(c.minPrice) {
+		canoto.Append(&w, canoto__config__minPrice__tag)
+		canoto.AppendUint(&w, c.minPrice)
+	}
+	if !canoto.IsZero(c.staticPricing) {
+		canoto.Append(&w, canoto__config__staticPricing__tag)
+		canoto.AppendBool(&w, true)
+	}
+	return w
+}
+
+const (
 	canoto__TimeMarshaler__Time   = 1
 	canoto__TimeMarshaler__target = 2
 	canoto__TimeMarshaler__excess = 3
+	canoto__TimeMarshaler__config = 4
 
 	canoto__TimeMarshaler__Time__tag   = "\x0a" // canoto.Tag(canoto__TimeMarshaler__Time, canoto.Len)
 	canoto__TimeMarshaler__target__tag = "\x10" // canoto.Tag(canoto__TimeMarshaler__target, canoto.Varint)
 	canoto__TimeMarshaler__excess__tag = "\x18" // canoto.Tag(canoto__TimeMarshaler__excess, canoto.Varint)
+	canoto__TimeMarshaler__config__tag = "\x22" // canoto.Tag(canoto__TimeMarshaler__config, canoto.Len)
 )
 
 type canotoData_TimeMarshaler struct {
@@ -68,6 +284,15 @@ func (*TimeMarshaler) CanotoSpec(types ...reflect.Type) *canoto.Spec {
 				OneOf:       "",
 				TypeUint:    canoto.SizeOf(zero.excess),
 			},
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.config),
+				/*FieldNumber:   */ canoto__TimeMarshaler__config,
+				/*Name:          */ "config",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*types:         */ types,
+			),
 		},
 	}
 	s.CalculateCanotoCache()
@@ -158,6 +383,30 @@ func (c *TimeMarshaler) UnmarshalCanotoFrom(r canoto.Reader) error {
 			if canoto.IsZero(c.excess) {
 				return canoto.ErrZeroValue
 			}
+		case canoto__TimeMarshaler__config:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.config).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
 		default:
 			return canoto.ErrUnknownField
 		}
@@ -181,6 +430,9 @@ func (c *TimeMarshaler) ValidCanoto() bool {
 	if c.Time != nil && !(c.Time).ValidCanoto() {
 		return false
 	}
+	if !(&c.config).ValidCanoto() {
+		return false
+	}
 	return true
 }
 
@@ -202,6 +454,10 @@ func (c *TimeMarshaler) CalculateCanotoCache() {
 	}
 	if !canoto.IsZero(c.excess) {
 		size += uint64(len(canoto__TimeMarshaler__excess__tag)) + canoto.SizeUint(c.excess)
+	}
+	(&c.config).CalculateCanotoCache()
+	if fieldSize := (&c.config).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canoto__TimeMarshaler__config__tag)) + canoto.SizeUint(fieldSize) + fieldSize
 	}
 	c.canotoData.size.Store(size)
 }
@@ -257,6 +513,11 @@ func (c *TimeMarshaler) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 	if !canoto.IsZero(c.excess) {
 		canoto.Append(&w, canoto__TimeMarshaler__excess__tag)
 		canoto.AppendUint(&w, c.excess)
+	}
+	if fieldSize := (&c.config).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canoto__TimeMarshaler__config__tag)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.config).MarshalCanotoInto(w)
 	}
 	return w
 }

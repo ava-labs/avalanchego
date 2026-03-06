@@ -32,6 +32,32 @@ func TestBoundedSubtract(t *testing.T) {
 	}
 }
 
+func TestBoundedMultiply(t *testing.T) {
+	tests := []struct {
+		a, b, ceil, want uint64
+	}{
+		{a: 2, b: 3, ceil: 10, want: 6},              // not bounded
+		{a: 2, b: 3, ceil: 6, want: 6},               // a*b == ceil
+		{a: 2, b: 3, ceil: 5, want: 5},               // bounded
+		{a: 0, b: 5, ceil: 10, want: 0},              // a == 0
+		{a: 0, b: 0, ceil: 0, want: 0},               // all zero
+		{a: 1, b: 1, ceil: 0, want: 0},               // ceil == 0 bounds everything
+		{a: 2, b: max, ceil: max, want: max},         // a*b would overflow uint64
+		{a: max, b: max, ceil: max, want: max},       // both at max, would overflow
+		{a: max, b: 2, ceil: max - 1, want: max - 1}, // a*b overflows, bounded to max-1
+	}
+
+	for _, tt := range tests {
+		l, r := tt.a, tt.b
+		for range 2 {
+			if got := BoundedMultiply(l, r, tt.ceil); got != tt.want {
+				t.Errorf("BoundedMultiply[%T](%[1]d, %d, %d) got %d; want %d", l, r, tt.ceil, got, tt.want)
+			}
+			l, r = r, l
+		}
+	}
+}
+
 func TestMulDiv(t *testing.T) {
 	// Invariants:
 	// wantQuo == wantQuoCeil i.f.f. wantRem == 0
