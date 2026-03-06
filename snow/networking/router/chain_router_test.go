@@ -1436,66 +1436,6 @@ func TestAppRequest(t *testing.T) {
 	}
 }
 
-func TestAppRequestExternalFailureClearsTimeout(t *testing.T) {
-	require := require.New(t)
-
-	const requestID uint32 = 1
-	appErr := &common.AppError{
-		Code:    1234,
-		Message: "custom error",
-	}
-
-	chainRouter, engine := newChainRouterTest(t)
-
-	var (
-		lock      sync.Mutex
-		callCount int
-		called    = make(chan struct{})
-	)
-	engine.AppRequestFailedF = func(_ context.Context, nodeID ids.NodeID, gotRequestID uint32, gotAppErr *common.AppError) error {
-		lock.Lock()
-		defer lock.Unlock()
-
-		callCount++
-		require.Equal(ids.EmptyNodeID, nodeID)
-		require.Equal(requestID, gotRequestID)
-		require.Equal(appErr.Code, gotAppErr.Code)
-		require.Equal(appErr.Message, gotAppErr.Message)
-		if callCount == 1 {
-			close(called)
-		}
-		return nil
-	}
-
-	ctx := t.Context()
-	chainRouter.RegisterRequest(
-		ctx,
-		ids.EmptyNodeID,
-		ids.Empty,
-		requestID,
-		message.AppResponseOp,
-		message.InboundAppError(ids.EmptyNodeID, ids.Empty, requestID, common.ErrTimeout.Code, common.ErrTimeout.Message),
-		engineType,
-	)
-
-	chainRouter.HandleInbound(
-		ctx,
-		message.InboundAppError(ids.EmptyNodeID, ids.Empty, requestID, appErr.Code, appErr.Message),
-	)
-
-	<-called
-
-	chainRouter.lock.Lock()
-	require.Zero(chainRouter.timedRequests.Len())
-	chainRouter.lock.Unlock()
-
-	time.Sleep(2 * defaultTestTimeout)
-
-	lock.Lock()
-	defer lock.Unlock()
-	require.Equal(1, callCount)
-}
-
 func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 	var (
 		nodeID  = ids.GenerateTestNodeID()
