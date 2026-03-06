@@ -9,7 +9,7 @@ go 1.25.7
 
 require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/avalanchego v0.0.0-00010101000000-000000000000
+	github.com/ava-labs/avalanchego v0.0.0-initial-consistent-tag
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-initial-consistent-tag
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.2.0
 	github.com/ava-labs/libevm v1.13.14-0.4.0.rc.2
