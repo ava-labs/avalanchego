@@ -45,6 +45,7 @@ import (
 const (
 	engineType         = p2ppb.EngineType_ENGINE_TYPE_DAG
 	testThreadPoolSize = 2
+	defaultTestTimeout = 500 * time.Millisecond
 )
 
 // TODO refactor tests in this file
@@ -1488,7 +1489,7 @@ func TestAppRequestExternalFailureClearsTimeout(t *testing.T) {
 	require.Zero(chainRouter.timedRequests.Len())
 	chainRouter.lock.Unlock()
 
-	time.Sleep(700 * time.Millisecond)
+	time.Sleep(2 * defaultTestTimeout)
 
 	lock.Lock()
 	defer lock.Unlock()
@@ -1715,9 +1716,9 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	// Create a timeout manager
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
-			InitialTimeout:     500 * time.Millisecond,
-			MinimumTimeout:     500 * time.Millisecond,
-			MaximumTimeout:     500 * time.Millisecond,
+			InitialTimeout:     defaultTestTimeout,
+			MinimumTimeout:     defaultTestTimeout,
+			MaximumTimeout:     defaultTestTimeout,
 			TimeoutCoefficient: 1,
 			TimeoutHalflife:    5 * time.Minute,
 		},
