@@ -193,19 +193,19 @@ func (b *blockBuilderG[T]) buildWithTxs(
 
 	unsettled := blocks.Range(lastSettled, parent)
 	for _, block := range unsettled {
-		log := log.With(
+		blockLog := log.With(
 			zap.Uint64("block_height", block.Height()),
 			zap.Stringer("block_hash", block.Hash()),
 		)
 		if err := state.StartBlock(block.Header()); err != nil {
-			log.Warn("Could not start historical worst-case calculation",
+			blockLog.Warn("Could not start historical worst-case calculation",
 				zap.Error(err),
 			)
 			return nil, fmt.Errorf("starting worst-case state for block %d: %v", block.Height(), err)
 		}
 		for i, tx := range block.Transactions() {
 			if err := state.ApplyTx(tx); err != nil {
-				log.Warn("Could not apply tx during historical worst-case calculation",
+				blockLog.Warn("Could not apply tx during historical worst-case calculation",
 					zap.Int("tx_index", i),
 					zap.Stringer("tx_hash", tx.Hash()),
 					zap.Error(err),
@@ -215,14 +215,14 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		}
 		ops, err := b.hooks.EndOfBlockOps(block.EthBlock())
 		if err != nil {
-			log.Warn("Could not extract ops during historical worst-case calculation",
+			blockLog.Warn("Could not extract ops during historical worst-case calculation",
 				zap.Error(err),
 			)
 			return nil, fmt.Errorf("extracting ops of block %d to worst-case state: %v", block.Height(), err)
 		}
 		for i, op := range ops {
 			if err := state.Apply(op); err != nil {
-				log.Warn("Could not apply op during historical worst-case calculation",
+				blockLog.Warn("Could not apply op during historical worst-case calculation",
 					zap.Int("op_index", i),
 					zap.Stringer("op_id", op.ID),
 					zap.Error(err),
@@ -231,7 +231,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			}
 		}
 		if _, err := state.FinishBlock(); err != nil {
-			log.Warn("Could not finish historical worst-case calculation",
+			blockLog.Warn("Could not finish historical worst-case calculation",
 				zap.Error(err),
 			)
 			return nil, fmt.Errorf("finishing worst-case state for block %d: %v", block.Height(), err)
