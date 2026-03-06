@@ -44,7 +44,7 @@ var (
 	errPullQuery                     = errors.New("unexpectedly called PullQuery")
 	errQueryFailed                   = errors.New("unexpectedly called QueryFailed")
 	errChits                         = errors.New("unexpectedly called Chits")
-	errSimplex                       = errors.New("unexpectedly called SimplexMessage")
+	errSimplex                       = errors.New("unexpectedly called Simplex")
 	errStart                         = errors.New("unexpectedly called Start")
 
 	_ common.Engine = (*Engine)(nil)
@@ -169,6 +169,7 @@ func (e *Engine) Default(cant bool) {
 	e.CantPullQuery = cant
 	e.CantQueryFailed = cant
 	e.CantChits = cant
+	e.CantSimplex = cant
 	e.CantConnected = cant
 	e.CantDisconnected = cant
 	e.CantHealth = cant

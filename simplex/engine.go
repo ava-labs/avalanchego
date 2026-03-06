@@ -15,12 +15,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/utils/logging"
-
-	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
+
+	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 var _ common.Engine = (*Engine)(nil)
@@ -236,10 +236,15 @@ func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*si
 	}
 }
 
+// Gossip is a no-op because there is no need for the Simplex engine
+// to periodically pull/push messages from the network.
+// This is all handled internally inside of Simplex consensus.
 func (*Engine) Gossip(_ context.Context) error {
 	return nil
 }
 
+// Notify is a no-op because the Simplex engine does not need to be notified of any events from the VM.
+// This is because the Simplex instance listens to the VM events by directly calling `WaitForEvent` when needed.
 func (*Engine) Notify(_ context.Context, _ common.Message) error {
 	return nil
 }

@@ -28,6 +28,7 @@ var (
 	_ ChitsHandler                = (*noOpChitsHandler)(nil)
 	_ AppHandler                  = (*noOpAppHandler)(nil)
 	_ InternalHandler             = (*noOpInternalHandler)(nil)
+	_ SimplexHandler              = (*noOpSimplexHandler)(nil)
 )
 
 type noOpStateSummaryFrontierHandler struct {
