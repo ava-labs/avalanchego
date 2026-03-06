@@ -13,6 +13,7 @@ var _ BootstrapableEngine = (*tracedBootstrapableEngine)(nil)
 
 type tracedBootstrapableEngine struct {
 	Engine
+
 	bootstrapableEngine BootstrapableEngine
 	tracer              trace.Tracer
 }

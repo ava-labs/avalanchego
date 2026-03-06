@@ -86,6 +86,7 @@ func NewManager(
 
 type manager struct {
 	*backend
+
 	acceptor block.Visitor
 	rejector block.Visitor
 

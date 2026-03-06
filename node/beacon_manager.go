@@ -18,6 +18,7 @@ var _ router.Router = (*beaconManager)(nil)
 
 type beaconManager struct {
 	router.Router
+
 	beacons                     validators.Manager
 	requiredConns               int64
 	numConns                    int64

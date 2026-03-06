@@ -56,7 +56,7 @@ linters:
     - copyloopvar
     - depguard
     - durationcheck
-    # - embeddedstructfieldcheck
+    - embeddedstructfieldcheck
     - errcheck
     - errorlint
     - forbidigo

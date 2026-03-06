@@ -18,8 +18,8 @@ var (
 )
 
 type BanffStandardBlock struct {
-	Time                 uint64 `serialize:"true" json:"time"`
-	ApricotStandardBlock `serialize:"true"`
+	Time                 uint64             `serialize:"true" json:"time"`
+	ApricotStandardBlock `serialize:"true"` //nolint:embeddedstructfieldcheck
 }
 
 func (b *BanffStandardBlock) Timestamp() time.Time {
@@ -50,7 +50,8 @@ func NewBanffStandardBlock(
 }
 
 type ApricotStandardBlock struct {
-	CommonBlock  `serialize:"true"`
+	CommonBlock `serialize:"true"`
+
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 

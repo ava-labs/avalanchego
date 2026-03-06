@@ -19,6 +19,7 @@ var _ appsenderpb.AppSenderServer = (*Server)(nil)
 
 type Server struct {
 	appsenderpb.UnsafeAppSenderServer
+
 	appSender common.AppSender
 }
 

@@ -14,6 +14,7 @@ var _ UnsignedTx = (*CreateSubnetTx)(nil)
 type CreateSubnetTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
+
 	// Who is authorized to manage this subnet
 	Owner fx.Owner `serialize:"true" json:"owner"`
 }

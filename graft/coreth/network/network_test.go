@@ -679,6 +679,7 @@ type TestRequestHandler interface {
 
 type HelloGreetingRequestHandler struct {
 	message.RequestHandler
+
 	codec codec.Manager
 }
 
@@ -726,6 +727,7 @@ func (g helloGossipMarshaller) UnmarshalGossip(bytes []byte) (*HelloGossip, erro
 
 type testRequestHandler struct {
 	message.RequestHandler
+
 	calls              uint32
 	processingDuration time.Duration
 	response           []byte

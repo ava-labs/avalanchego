@@ -17,8 +17,8 @@ var (
 )
 
 type BanffAbortBlock struct {
-	Time              uint64 `serialize:"true" json:"time"`
-	ApricotAbortBlock `serialize:"true"`
+	Time              uint64             `serialize:"true" json:"time"`
+	ApricotAbortBlock `serialize:"true"` //nolint:embeddedstructfieldcheck
 }
 
 func (b *BanffAbortBlock) Timestamp() time.Time {
