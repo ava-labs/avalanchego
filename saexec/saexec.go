@@ -9,6 +9,7 @@ package saexec
 
 import (
 	"fmt"
+	"io"
 	"sync/atomic"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
@@ -112,6 +113,8 @@ func New(
 	go e.processQueue()
 	return e, nil
 }
+
+var _ io.Closer = (*Executor)(nil)
 
 // Close shuts down the [Executor], waits for the currently executing block
 // to complete, and then releases all resources.

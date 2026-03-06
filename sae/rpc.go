@@ -54,10 +54,10 @@ func (vm *VM) ethRPCServer() (*rpc.Server, error) {
 
 	filterSystem := filters.NewFilterSystem(b, filters.Config{})
 	filterAPI := filters.NewFilterAPI(filterSystem, false /*isLightClient*/)
-	vm.toClose = append(vm.toClose, func() error {
+	vm.toClose = append(vm.toClose, closerFunc(func() error {
 		filters.CloseAPI(filterAPI)
 		return nil
-	})
+	}))
 
 	type api struct {
 		namespace string

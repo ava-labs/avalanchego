@@ -5,6 +5,7 @@ package sae
 
 import (
 	"context"
+	"io"
 	"math"
 
 	"github.com/ava-labs/libevm/core"
@@ -58,6 +59,8 @@ func (b *bloomIndexer) ServiceFilter(ctx context.Context, session *bloombits.Mat
 		go session.Multiplex(eth.BloomRetrievalBatch, eth.BloomRetrievalWait, b.handlers.Requests)
 	}
 }
+
+var _ io.Closer = (*bloomIndexer)(nil)
 
 func (b *bloomIndexer) Close() error {
 	b.handlers.Close()

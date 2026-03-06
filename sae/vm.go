@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -73,8 +74,15 @@ type VM struct {
 	// toClose are closed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
-	toClose [](func() error)
+	toClose []io.Closer
 }
+
+// closerFunc adapts a func() error to [io.Closer].
+type closerFunc func() error
+
+var _ io.Closer = (*closerFunc)(nil)
+
+func (f closerFunc) Close() error { return f() }
 
 // A Config configures construction of a new [VM].
 type Config struct {
@@ -142,7 +150,7 @@ func NewVM[T hook.Transaction](
 		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %v", hooks, snowCtx.ChainDataDir, err)
 	}
 	vm.xdb = xdb
-	vm.toClose = append(vm.toClose, xdb.Close)
+	vm.toClose = append(vm.toClose, &xdb)
 
 	lastSync, err := blocks.New(lastSynchronous, nil, nil, snowCtx.Log)
 	if err != nil {
@@ -180,7 +188,7 @@ func NewVM[T hook.Transaction](
 			return nil, fmt.Errorf("saexec.New(...): %v", err)
 		}
 		vm.exec = exec
-		vm.toClose = append(vm.toClose, exec.Close)
+		vm.toClose = append(vm.toClose, exec)
 
 		last := lastExecuted
 		for b, err := range unexecuted {
@@ -220,7 +228,7 @@ func NewVM[T hook.Transaction](
 		if err != nil {
 			return nil, fmt.Errorf("txpool.New(...): %v", err)
 		}
-		vm.toClose = append(vm.toClose, txPool.Close)
+		vm.toClose = append(vm.toClose, txPool)
 
 		metrics, err := bloom.NewMetrics("mempool", vm.metrics)
 		if err != nil {
@@ -290,11 +298,11 @@ func NewVM[T hook.Transaction](
 		vm.Network = network
 		vm.peers = peers
 		vm.mempool.RegisterPushGossiper(pushGossiper)
-		vm.toClose = append(vm.toClose, func() error {
+		vm.toClose = append(vm.toClose, closerFunc(func() error {
 			cancel()
 			wg.Wait()
 			return nil
-		})
+		}))
 	}
 
 	{ // ==========  API Backend  ==========
@@ -302,14 +310,14 @@ func NewVM[T hook.Transaction](
 		// RPCs (e.g. eth_sign) instead of nil-pointer panics. No
 		// actual account functionality is expected.
 		accountManager := accounts.NewManager(&accounts.Config{})
-		vm.toClose = append(vm.toClose, accountManager.Close)
+		vm.toClose = append(vm.toClose, accountManager)
 
 		chainIdx := chainIndexer{vm.exec}
 		override := bloomOverrider{vm.db}
 		// TODO(alarso16): if we are state syncing, we need to provide the first
 		// block available to the indexer via [core.ChainIndexer.AddCheckpoint].
 		bloomIdx := newBloomIndexer(vm.db, chainIdx, override, cfg.RPCConfig.BlocksPerBloomSection)
-		vm.toClose = append(vm.toClose, bloomIdx.Close)
+		vm.toClose = append(vm.toClose, bloomIdx)
 
 		vm.apiBackend = &apiBackend{
 			vm:             vm,
@@ -354,11 +362,11 @@ func canonicaliseLastSynchronous(db ethdb.Database, block *blocks.Block) error {
 func (vm *VM) signalNewTxsToEngine() {
 	ch := make(chan core.NewTxsEvent)
 	sub := vm.mempool.Pool.SubscribeTransactions(ch, false /*reorgs but ignored by legacypool*/)
-	vm.toClose = append(vm.toClose, func() error {
+	vm.toClose = append(vm.toClose, closerFunc(func() error {
 		defer close(ch)
 		sub.Unsubscribe()
 		return <-sub.Err() // guaranteed to be closed due to unsubscribing
-	})
+	}))
 
 	// See [VM.WaitForEvent] for why this requires a buffer.
 	vm.newTxs = make(chan struct{}, 1)
@@ -425,8 +433,8 @@ func (vm *VM) Shutdown(context.Context) error {
 
 func (vm *VM) close() error {
 	errs := make([]error, len(vm.toClose))
-	for i, fn := range slices.Backward(vm.toClose) {
-		errs[i] = fn()
+	for i, c := range slices.Backward(vm.toClose) {
+		errs[i] = c.Close()
 	}
 	return errors.Join(errs...)
 }
