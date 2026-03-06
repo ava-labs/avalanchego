@@ -2557,7 +2557,8 @@ func TestCurrentStakers(t *testing.T) {
 
 					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
-					require.ErrorIs(t, cs.PutCurrentValidator(v), errUnexpectedStaker)
+					err := cs.PutCurrentValidator(v)
+					require.ErrorIs(t, err, errUnexpectedStaker)
 				})
 			})
 
@@ -2566,7 +2567,8 @@ func TestCurrentStakers(t *testing.T) {
 					cs := tt.csF()
 
 					staker := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
-					require.ErrorIs(t, cs.DeleteCurrentValidator(staker), database.ErrNotFound)
+					err := cs.DeleteCurrentValidator(staker)
+					require.ErrorIs(t, err, database.ErrNotFound)
 				})
 
 				t.Run("validator deleted", func(t *testing.T) {
@@ -2691,7 +2693,8 @@ func TestCurrentStakers(t *testing.T) {
 					cs := tt.csF()
 
 					d := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
-					require.ErrorIs(t, cs.PutCurrentDelegator(d), database.ErrNotFound)
+					err := cs.PutCurrentDelegator(d)
+					require.ErrorIs(t, err, database.ErrNotFound)
 				})
 
 				t.Run("delegator added", func(t *testing.T) {
@@ -2727,7 +2730,8 @@ func TestCurrentStakers(t *testing.T) {
 
 					d := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
 					require.NoError(t, cs.PutCurrentDelegator(d))
-					require.ErrorIs(t, cs.PutCurrentDelegator(d), errUnexpectedStaker)
+					err := cs.PutCurrentDelegator(d)
+					require.ErrorIs(t, err, errUnexpectedStaker)
 				})
 			})
 
@@ -2735,7 +2739,8 @@ func TestCurrentStakers(t *testing.T) {
 				t.Run("validator does not exist", func(t *testing.T) {
 					cs := tt.csF()
 
-					require.ErrorIs(t, cs.DeleteCurrentDelegator(newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())), database.ErrNotFound)
+					err := cs.DeleteCurrentDelegator(newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID()))
+					require.ErrorIs(t, err, database.ErrNotFound)
 				})
 
 				t.Run("delegator does not exist", func(t *testing.T) {
@@ -2748,7 +2753,8 @@ func TestCurrentStakers(t *testing.T) {
 					require.NoError(t, cs.PutCurrentValidator(v))
 
 					d := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
-					require.ErrorIs(t, cs.DeleteCurrentDelegator(d), database.ErrNotFound)
+					err := cs.DeleteCurrentDelegator(d)
+					require.ErrorIs(t, err, database.ErrNotFound)
 				})
 
 				t.Run("delegator deleted", func(t *testing.T) {
