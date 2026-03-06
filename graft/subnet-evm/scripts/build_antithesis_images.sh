@@ -57,4 +57,4 @@ gen_antithesis_compose_config "${IMAGE_TAG}" "${SUBNET_EVM_PATH}/tests/antithesi
 # Build antithesis images with repo root as context (where graft/ lives)
 build_antithesis_images "${GO_VERSION}" "${IMAGE_PREFIX}" "antithesis-subnet-evm" "${IMAGE_TAG}" \
                         "${AVALANCHEGO_IMAGE_TAG}" "${SUBNET_EVM_PATH}/tests/antithesis/Dockerfile" \
-                        "${SUBNET_EVM_PATH}/Dockerfile" "${AVALANCHE_PATH}"
+                        "${AVALANCHE_PATH}/Dockerfile" "${AVALANCHE_PATH}" "" "" "subnet-evm"
