@@ -557,6 +557,19 @@ func (e *Engine) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) e
 	return errAppGossip
 }
 
+func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+	if e.SimplexF != nil {
+		return e.SimplexF(ctx, nodeID, msg)
+	}
+	if !e.CantSimplex {
+		return nil
+	}
+	if e.T != nil {
+		require.FailNow(e.T, errSimplex.Error())
+	}
+	return errSimplex
+}
+
 func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
 	if e.ChitsF != nil {
 		return e.ChitsF(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)

@@ -231,6 +231,23 @@ func (nop *noOpQueryHandler) PushQuery(_ context.Context, nodeID ids.NodeID, req
 	return nil
 }
 
+type noOpSimplexHandler struct {
+	log logging.Logger
+}
+
+func NewNoOpSimplexHandler(log logging.Logger) SimplexHandler {
+	return &noOpSimplexHandler{log: log}
+}
+
+func (nop *noOpSimplexHandler) Simplex(_ context.Context, nodeID ids.NodeID, _ *p2p.Simplex) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.SimplexOp),
+		zap.Stringer("nodeID", nodeID),
+	)
+	return nil
+}
+
 type noOpChitsHandler struct {
 	log logging.Logger
 }
