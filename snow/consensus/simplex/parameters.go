@@ -13,7 +13,7 @@ import (
 
 var ErrInvalidParameters = errors.New("simplex parameters must be valid")
 
-type SimplexValidatorInfo struct {
+type ValidatorInfo struct {
 	NodeID ids.NodeID `json:"nodeID" yaml:"nodeID"`
 
 	// PublicKey is the public key of the validator.
@@ -22,9 +22,9 @@ type SimplexValidatorInfo struct {
 }
 
 type Parameters struct {
-	MaxNetworkDelay    time.Duration          `json:"maxNetworkDelay"    yaml:"maxNetworkDelay"`
-	MaxRebroadcastWait time.Duration          `json:"maxRebroadcastWait" yaml:"maxRebroadcastWait"`
-	InitialValidators  []SimplexValidatorInfo `json:"initialValidators"  yaml:"initialValidators"`
+	MaxNetworkDelay    time.Duration   `json:"maxNetworkDelay"    yaml:"maxNetworkDelay"`
+	MaxRebroadcastWait time.Duration   `json:"maxRebroadcastWait" yaml:"maxRebroadcastWait"`
+	InitialValidators  []ValidatorInfo `json:"initialValidators"  yaml:"initialValidators"`
 }
 
 var DefaultParameters = Parameters{
@@ -39,6 +39,8 @@ func (p Parameters) Verify() error {
 	if p.MaxRebroadcastWait <= 0 {
 		return fmt.Errorf("%w: maxRebroadcastWait must be positive", ErrInvalidParameters)
 	}
+	// TODO: we need to validate InitialValidators contains only unique nodes with valid keys.
+	// See: https://github.com/ava-labs/avalanchego/issues/5023
 	if len(p.InitialValidators) == 0 {
 		return fmt.Errorf("%w: initialValidators must be non-empty", ErrInvalidParameters)
 	}

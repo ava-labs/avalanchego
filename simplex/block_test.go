@@ -88,7 +88,7 @@ func TestBlockSerialization(t *testing.T) {
 			testVM.ParseBlockF = tt.parseFunc
 			deserializer := &blockDeserializer{
 				parser:       testVM,
-				blockTracker: newBlockTracker(genesisBlock, testVM),
+				blockTracker: func() *blockTracker { bt := newBlockTracker(); bt.init(genesisBlock); return bt }(),
 			}
 
 			// Deserialize the block

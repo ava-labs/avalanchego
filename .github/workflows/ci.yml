@@ -183,7 +183,7 @@ jobs:
       - uses: ./.github/actions/install-nix
       - shell: nix develop --command bash -x {0}
         run: task check-generate-load-contract-bindings
-  go_mod_tidy:
+  check_go_mod_tidy:
     name: Up-to-date go.mod and go.sum
     runs-on: ubuntu-latest
     steps:

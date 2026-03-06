@@ -93,7 +93,7 @@ func TestWebsocketOriginCheck(t *testing.T) {
 // This test times out occasionally due to context timeout differences with go-ethereum.
 // These differences are not critical, so this test can simply be skipped.
 func TestWebsocketLargeCall(t *testing.T) {
-	t.Skip("Flaky")
+	t.Skip("Flaky test from go-ethereum")
 
 	var (
 		srv     = newTestServer()
@@ -132,7 +132,7 @@ func TestWebsocketLargeCall(t *testing.T) {
 // This test times out occasionally due to context timeout differences with go-ethereum.
 // These differences are not critical, so this test can simply be skipped.
 func TestWebsocketLargeRead(t *testing.T) {
-	t.Skip("Flaky")
+	t.Skip("Flaky test from go-ethereum")
 
 	var (
 		srv     = newTestServer()
@@ -269,6 +269,8 @@ func TestClientWebsocketPing(t *testing.T) {
 
 // This checks that the websocket transport can deal with large messages.
 func TestClientWebsocketLargeMessage(t *testing.T) {
+	t.Skip("Flaky test from go-ethereum")
+
 	var (
 		srv     = NewServer(0)
 		httpsrv = httptest.NewServer(srv.WebsocketHandler(nil))

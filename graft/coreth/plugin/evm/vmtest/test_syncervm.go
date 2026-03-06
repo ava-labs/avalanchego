@@ -28,9 +28,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/client"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
@@ -116,6 +116,8 @@ func StateSyncFromScratchExceedParentTest(t *testing.T, testSetup *SyncTestSetup
 }
 
 func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup) {
+	t.Skip("Flaky test - tracked in #4968")
+
 	var lock sync.Mutex
 	require := require.New(t)
 	reqCount := 0

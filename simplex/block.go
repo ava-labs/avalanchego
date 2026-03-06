@@ -173,6 +173,12 @@ func newBlockTracker(latestBlock *Block, vm block.ChainVM) *blockTracker {
 	}
 }
 
+// init sets the latest block in the tracker.
+// This should only be called once, with the genesis or latest block.
+func (bt *blockTracker) init(latestBlock *Block) {
+	bt.simplexDigestsToBlock[latestBlock.digest] = latestBlock
+}
+
 func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) (*Block, bool) {
 	bt.lock.Lock()
 	defer bt.lock.Unlock()

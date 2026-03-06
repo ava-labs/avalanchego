@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -38,7 +38,7 @@ func NewSummary(blockHash common.Hash, blockNumber uint64, blockRoot common.Hash
 		},
 		AtomicRoot: atomicRoot,
 	}
-	bytes, err := message.Codec.Marshal(message.Version, &summary)
+	bytes, err := message.CorethCodec.Marshal(message.Version, &summary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal syncable summary: %w", err)
 	}

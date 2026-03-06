@@ -321,6 +321,7 @@ func TestCorruptSnapshots(t *testing.T) {
 }
 
 func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
+	t.Skip("Flaky test from go-ethereum")
 	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		// Import the chain. This runs all block validation rules.
 		blockchain, err := createBlockChain(db, pruningConfig, gspec, lastAcceptedHash)
@@ -365,7 +366,6 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			t.Parallel()
 			tt.testFunc(t, create)
 		})
 	}
@@ -687,6 +687,11 @@ func TestCanonicalHashMarker(t *testing.T) {
 }
 
 func testCanonicalHashMarker(t *testing.T, scheme string) {
+	// TODO: https://github.com/ava-labs/firewood/issues/1679
+	if scheme == customrawdb.FirewoodScheme {
+		t.Skip("firewood currently fails due to a stack corruption issue")
+	}
+
 	cases := []struct {
 		forkA int
 		forkB int

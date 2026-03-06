@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
-	pSimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 type newBlockConfig struct {
@@ -52,7 +52,9 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 		digest := computeDigest(bytes)
 		block.digest = digest
 
-		block.blockTracker = newBlockTracker(block, vm)
+		bt := newBlockTracker()
+		bt.init(block)
+		block.blockTracker = bt
 		return block
 	}
 	if config.round == 0 {
@@ -88,7 +90,7 @@ func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 }
 
 type testNode struct {
-	pSimplex.SimplexValidatorInfo
+	simplexparams.ValidatorInfo
 	signFunc SignFunc
 }
 
@@ -134,14 +136,14 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 }
 
 // newSimplexChainParams creates simplex chain parameters with the given nodes as initial validators.
-func newSimplexChainParams(nodes []*testNode) *pSimplex.Parameters {
-	params := &pSimplex.Parameters{
+func newSimplexChainParams(nodes []*testNode) *simplexparams.Parameters {
+	params := &simplexparams.Parameters{
 		MaxNetworkDelay:    1 * time.Second,
 		MaxRebroadcastWait: 1 * time.Second,
 	}
-	params.InitialValidators = make([]pSimplex.SimplexValidatorInfo, len(nodes))
+	params.InitialValidators = make([]simplexparams.ValidatorInfo, len(nodes))
 	for i, node := range nodes {
-		params.InitialValidators[i] = node.SimplexValidatorInfo
+		params.InitialValidators[i] = node.ValidatorInfo
 	}
 	return params
 }
@@ -154,7 +156,7 @@ func generateTestNodes(t *testing.T, num uint64) []*testNode {
 
 		nodeID := ids.GenerateTestNodeID()
 		nodes[i] = &testNode{
-			SimplexValidatorInfo: pSimplex.SimplexValidatorInfo{
+			ValidatorInfo: simplexparams.ValidatorInfo{
 				NodeID:    nodeID,
 				PublicKey: ls.PublicKey().Compress(),
 			},

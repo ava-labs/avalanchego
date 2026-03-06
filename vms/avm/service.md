@@ -565,7 +565,7 @@ avm.getUTXOs({
     sourceChain: string, //optional
     encoding: string //optional
 }) -> {
-    numFetched: int,
+    numFetched: string,
     utxos: []string,
     endIndex: {
         address: string,

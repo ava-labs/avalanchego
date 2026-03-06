@@ -70,6 +70,12 @@ func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 
 type hooks struct{}
 
+// PreprocessingGasCharge is not necessary.
+// It is required to implement the vm.Hooks interface, but is only needed post-SAE.
+func (hooks) PreprocessingGasCharge(common.Hash) (uint64, error) {
+	return 0, nil
+}
+
 // OverrideNewEVMArgs is a hook that is called in [vm.NewEVM].
 // It allows for the modification of the EVM arguments before the EVM is created.
 // Specifically, we set Random to be the same as Difficulty since Shanghai.

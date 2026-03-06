@@ -851,7 +851,11 @@ func (m *manager) createAvalancheChain(
 
 	// sanity check
 	if sb.Config().SnowParameters == nil {
-		return nil, fmt.Errorf("snowball parameters not specified for subnet %s", ctx.SubnetID)
+		msg := "snowball parameters not specified for subnet %s"
+		if sb.Config().SimplexParameters != nil {
+			msg += ", this chain is configured with simplex"
+		}
+		return nil, fmt.Errorf(msg, ctx.SubnetID)
 	}
 	consensusParams := *sb.Config().SnowParameters
 	sampleK := consensusParams.K
@@ -1260,7 +1264,11 @@ func (m *manager) createSnowmanChain(
 
 	// sanity check
 	if sb.Config().SnowParameters == nil {
-		return nil, fmt.Errorf("snowball parameters not specified for subnet %s", ctx.SubnetID)
+		msg := "snowball parameters not specified for subnet %s"
+		if sb.Config().SimplexParameters != nil {
+			msg += ", this chain is configured with simplex"
+		}
+		return nil, fmt.Errorf(msg, ctx.SubnetID)
 	}
 	consensusParams := *sb.Config().SnowParameters
 	sampleK := consensusParams.K

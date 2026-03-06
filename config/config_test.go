@@ -410,7 +410,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{
 				"validatorOnly": true,
-				"snowballParameters": {
+				"snowParameters": {
 					"k": 111,
 					"alphaPreference": 1234
 				}
@@ -444,13 +444,13 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				require.True(config.ValidatorOnly)
 				require.Equal(16, config.SnowParameters.AlphaConfidence)
 				// must still respect defaults
-				require.Equal(20, config.SnowParameters.K)
+				require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
 			},
 			expectedErr: nil,
 		},
 		"correct snowball config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "snowballParameters":{"alphaConfidence":16}}`,
+			givenJSON: `{"validatorOnly": true, "snowParameters":{"alphaConfidence":16}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
@@ -459,7 +459,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				require.True(config.ValidatorOnly)
 				require.Equal(16, config.SnowParameters.AlphaConfidence)
 				// must still respect defaults
-				require.Equal(20, config.SnowParameters.K)
+				require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
 			},
 			expectedErr: nil,
 		},
@@ -476,63 +476,14 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			},
 			expectedErr: subnets.ErrTooManyConsensusParameters,
 		},
-		"default simplex params set": {
-			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `
-			{
-				"simplexParameters": {
-						"initialValidators": [
-								{
-										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
-										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
-								},
-								{
-										"nodeID": "NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh",
-										"publicKey": "qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM"
-								}
-						]
-				}
-			}`,
-			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				config, ok := given[id]
-				require.True(ok)
-
-				require.False(config.ValidatorOnly)
-				require.Equal(simplex.DefaultParameters.MaxNetworkDelay, config.SimplexParameters.MaxNetworkDelay)
-				require.Equal(simplex.DefaultParameters.MaxRebroadcastWait, config.SimplexParameters.MaxRebroadcastWait)
-
-				pkBytes, err := base64.StdEncoding.DecodeString(
-					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",
-				)
-				require.NoError(err)
-
-				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
-				require.NoError(err)
-				validator := simplex.SimplexValidatorInfo{
-					NodeID:    nodeID,
-					PublicKey: pkBytes,
-				}
-				require.Equal(validator, config.SimplexParameters.InitialValidators[0])
-
-				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
-				require.NoError(err)
-				validator2 := simplex.SimplexValidatorInfo{
-					NodeID:    nodeID2,
-					PublicKey: pkBytes,
-				}
-				require.Equal(validator2, config.SimplexParameters.InitialValidators[1])
-			},
-			expectedErr: nil,
-		},
 		"correct simplex config": {
 			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `
 			{
 				"validatorOnly": true,
 				"simplexParameters": {
-						"MaxNetworkDelay":1000,
-						"MaxRebroadcastWait":1000,
+						"maxNetworkDelay":1000,
+						"maxRebroadcastWait":1000,
 						"initialValidators": [
 								{
 										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
@@ -561,7 +512,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 
 				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
 				require.NoError(err)
-				validator := simplex.SimplexValidatorInfo{
+				validator := simplex.ValidatorInfo{
 					NodeID:    nodeID,
 					PublicKey: pkBytes,
 				}
@@ -569,7 +520,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 
 				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
 				require.NoError(err)
-				validator2 := simplex.SimplexValidatorInfo{
+				validator2 := simplex.ValidatorInfo{
 					NodeID:    nodeID2,
 					PublicKey: pkBytes,
 				}
@@ -630,7 +581,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				// should respect defaults
-				require.Equal(20, config.SnowParameters.K)
+				require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
 			},
 			expectedErr: nil,
 		},
@@ -638,8 +589,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"simplexParameters": {
-						"MaxNetworkDelay":1000,
-						"MaxRebroadcastWait":1000,
+						"maxNetworkDelay":1000,
+						"maxRebroadcastWait":1000,
 						"initialValidators": [
 								{
 										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
@@ -670,7 +621,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 
 				nodeID, err := ids.NodeIDFromString("NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx")
 				require.NoError(err)
-				validator := simplex.SimplexValidatorInfo{
+				validator := simplex.ValidatorInfo{
 					NodeID:    nodeID,
 					PublicKey: pkBytes,
 				}
@@ -678,7 +629,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 
 				nodeID2, err := ids.NodeIDFromString("NodeID-NF3dhwiiGHc1MoT85T7MwWk2xLF9zpgeh")
 				require.NoError(err)
-				validator2 := simplex.SimplexValidatorInfo{
+				validator2 := simplex.ValidatorInfo{
 					NodeID:    nodeID2,
 					PublicKey: pkBytes,
 				}
@@ -696,7 +647,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"invalid snow consensus parameters": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"snowballParameters": {
+					"snowParameters": {
 						"k": 111,
 						"alphaPreference": 1234
 					}
@@ -710,7 +661,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"correct snow config": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"snowballParameters": {
+					"snowParameters": {
 							"k": 30,
 							"alphaPreference": 16,
 							"alphaConfidence": 20
@@ -727,14 +678,14 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(20, config.SnowParameters.AlphaConfidence)
 				require.Equal(30, config.SnowParameters.K)
 				// must still respect defaults
-				require.Equal(256, config.SnowParameters.MaxOutstandingItems)
+				require.Equal(snowball.DefaultParameters.MaxOutstandingItems, config.SnowParameters.MaxOutstandingItems)
 			},
 			expectedErr: nil,
 		},
 		"multiple configs": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"snowballParameters": {
+					"snowParameters": {
 						"alphaConfidence": 16
 					},
 					"simplexParameters": {}
@@ -765,7 +716,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(20, config.SnowParameters.AlphaConfidence)
 				require.Equal(30, config.SnowParameters.K)
 				// must still respect defaults
-				require.Equal(256, config.SnowParameters.MaxOutstandingItems)
+				require.Equal(snowball.DefaultParameters.MaxOutstandingItems, config.SnowParameters.MaxOutstandingItems)
 			},
 			expectedErr: nil,
 		},
@@ -786,6 +737,86 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			if test.expectedErr != nil {
 				return
 			}
+			test.testF(require, subnetConfigs)
+		})
+	}
+}
+
+func TestConfigWithSnowQuorumSizeKey(t *testing.T) {
+	snowQuorumSize := 8
+	tests := map[string]struct {
+		givenJSON string
+		testF     func(*require.Assertions, subnets.Config)
+	}{
+		"no alpha params set": {
+			givenJSON: `{
+				"consensusParameters": {
+					"k": 15
+				},
+				"validatorOnly": true
+			}`,
+			testF: func(require *require.Assertions, config subnets.Config) {
+				require.True(config.ValidatorOnly)
+				require.Equal(snowQuorumSize, config.SnowParameters.AlphaPreference)
+				require.Equal(snowQuorumSize, config.SnowParameters.AlphaConfidence)
+				require.Equal(15, config.SnowParameters.K)
+			},
+		},
+		"alpha preference set": {
+			givenJSON: `{
+				"consensusParameters": {
+					"k": 13,
+					"alphaPreference": 7
+				},
+				"validatorOnly": true
+			}`,
+			testF: func(require *require.Assertions, config subnets.Config) {
+				require.True(config.ValidatorOnly)
+				require.Equal(7, config.SnowParameters.AlphaPreference)
+				require.Equal(snowQuorumSize, config.SnowParameters.AlphaConfidence)
+			},
+		},
+		"alpha confidence set": {
+			givenJSON: `{
+				"consensusParameters": {
+					"k": 13,
+					"alphaConfidence": 9
+				},
+				"validatorOnly": true
+			}`,
+			testF: func(require *require.Assertions, config subnets.Config) {
+				require.True(config.ValidatorOnly)
+				require.Equal(snowQuorumSize, config.SnowParameters.AlphaPreference)
+				require.Equal(9, config.SnowParameters.AlphaConfidence)
+			},
+		},
+		"both alpha params set": {
+			givenJSON: `{
+				"consensusParameters": {
+					"k": 13,
+					"alphaConfidence": 9,
+					"alphaPreference": 7
+				},
+				"validatorOnly": true
+			}`,
+			testF: func(require *require.Assertions, config subnets.Config) {
+				require.True(config.ValidatorOnly)
+				require.Equal(7, config.SnowParameters.AlphaPreference)
+				require.Equal(9, config.SnowParameters.AlphaConfidence)
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			v := setupViperFlags()
+			v.Set(SnowQuorumSizeKey, snowQuorumSize)
+
+			subnetConfigs, err := getSubnetConfigFromBytes([]byte(test.givenJSON), v)
+			require.NoError(err)
+
 			test.testF(require, subnetConfigs)
 		})
 	}
@@ -946,25 +977,308 @@ func setupFile(t *testing.T, path string, fileName string, value string) {
 	require.NoError(os.WriteFile(filePath, []byte(value), 0o600))
 }
 
-func TestGetPrimaryNetworkConfig(t *testing.T) {
-	require := require.New(t)
-	v := setupViperFlags()
+func TestGetPrimaryNetworkConfigWithSnowQuorumSizeKey(t *testing.T) {
+	snowQuorumSize := 8
+	tests := map[string]struct {
+		setFlag            bool
+		expectedPreference int
+		expectedConfidence int
+	}{
+		"SnowQuorumSizeKey not set": {
+			setFlag:            false,
+			expectedPreference: snowball.DefaultParameters.AlphaPreference,
+			expectedConfidence: snowball.DefaultParameters.AlphaConfidence,
+		},
+		"SnowQuorumSizeKey set": {
+			setFlag:            true,
+			expectedPreference: snowQuorumSize,
+			expectedConfidence: snowQuorumSize,
+		},
+	}
 
-	config := getPrimaryNetworkConfig(v)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
 
-	// Verify basic config structure
-	require.False(config.ValidatorOnly, "ValidatorOnly should be false for primary network")
+			v := setupViperFlags()
+			if test.setFlag {
+				v.Set(SnowQuorumSizeKey, snowQuorumSize)
+			}
 
-	// Verify SnowParameters have the default values from snowball.DefaultParameters
-	require.NotNil(config.SnowParameters, "SnowParameters should not be nil")
-	require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
-	require.Equal(snowball.DefaultParameters.AlphaPreference, config.SnowParameters.AlphaPreference)
-	require.Equal(snowball.DefaultParameters.AlphaConfidence, config.SnowParameters.AlphaConfidence)
-	require.Equal(snowball.DefaultParameters.Beta, config.SnowParameters.Beta)
-	require.Equal(snowball.DefaultParameters.ConcurrentRepolls, config.SnowParameters.ConcurrentRepolls)
-	require.Equal(snowball.DefaultParameters.OptimalProcessing, config.SnowParameters.OptimalProcessing)
-	require.Equal(snowball.DefaultParameters.MaxOutstandingItems, config.SnowParameters.MaxOutstandingItems)
-	require.Equal(snowball.DefaultParameters.MaxItemProcessingTime, config.SnowParameters.MaxItemProcessingTime)
+			config := getPrimaryNetworkSnowConfig(v)
+			require.Equal(test.expectedPreference, config.AlphaPreference)
+			require.Equal(test.expectedConfidence, config.AlphaConfidence)
+		})
+	}
+}
+
+func TestApplySnowballParametersDefaults(t *testing.T) {
+	var (
+		customK                   = snowball.DefaultParameters.K + 10
+		customAlphaPreference     = snowball.DefaultParameters.AlphaPreference + 2
+		customAlphaConfidence     = snowball.DefaultParameters.AlphaConfidence + 2
+		customBeta                = snowball.DefaultParameters.Beta + 2
+		customConcurrentRepolls   = snowball.DefaultParameters.ConcurrentRepolls + 1
+		customOptimalProcessing   = snowball.DefaultParameters.OptimalProcessing + 5
+		customMaxOutstandingItems = snowball.DefaultParameters.MaxOutstandingItems + 5
+		customMaxItemProcessing   = snowball.DefaultParameters.MaxItemProcessingTime + time.Second
+		customQuorumSize          = snowball.DefaultParameters.AlphaPreference + 3
+	)
+
+	tests := []struct {
+		name       string
+		viperSetup func(*viper.Viper)
+		input      *snowball.Parameters
+		verify     func(*require.Assertions, *snowball.Parameters)
+	}{
+		{
+			name:  "nil config is a no-op",
+			input: nil,
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Nil(p)
+			},
+		},
+		{
+			name:  "all zero fields filled from defaults",
+			input: &snowball.Parameters{},
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Equal(&snowball.DefaultParameters, p)
+			},
+		},
+		{
+			name: "all non-zero fields preserved",
+			input: &snowball.Parameters{
+				K:                     customK,
+				AlphaPreference:       customAlphaPreference,
+				AlphaConfidence:       customAlphaConfidence,
+				Beta:                  customBeta,
+				ConcurrentRepolls:     customConcurrentRepolls,
+				OptimalProcessing:     customOptimalProcessing,
+				MaxOutstandingItems:   customMaxOutstandingItems,
+				MaxItemProcessingTime: customMaxItemProcessing,
+			},
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Equal(customK, p.K)
+				require.Equal(customAlphaPreference, p.AlphaPreference)
+				require.Equal(customAlphaConfidence, p.AlphaConfidence)
+				require.Equal(customBeta, p.Beta)
+				require.Equal(customConcurrentRepolls, p.ConcurrentRepolls)
+				require.Equal(customOptimalProcessing, p.OptimalProcessing)
+				require.Equal(customMaxOutstandingItems, p.MaxOutstandingItems)
+				require.Equal(customMaxItemProcessing, p.MaxItemProcessingTime)
+			},
+		},
+		{
+			name: "deprecated Alpha overrides AlphaPreference and AlphaConfidence",
+			input: &snowball.Parameters{
+				Alpha: &customAlphaPreference,
+			},
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Equal(customAlphaPreference, p.AlphaPreference)
+				require.Equal(customAlphaPreference, p.AlphaConfidence)
+			},
+		},
+		{
+			name:  "SnowQuorumSizeKey fills zero AlphaPreference and AlphaConfidence",
+			input: &snowball.Parameters{},
+			viperSetup: func(v *viper.Viper) {
+				v.Set(SnowQuorumSizeKey, customQuorumSize)
+			},
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Equal(customQuorumSize, p.AlphaPreference)
+				require.Equal(customQuorumSize, p.AlphaConfidence)
+			},
+		},
+		{
+			name: "SnowQuorumSizeKey does not override non-zero AlphaPreference and AlphaConfidence",
+			input: &snowball.Parameters{
+				AlphaPreference: customAlphaPreference,
+				AlphaConfidence: customAlphaConfidence,
+			},
+			viperSetup: func(v *viper.Viper) {
+				v.Set(SnowQuorumSizeKey, customQuorumSize)
+			},
+			verify: func(require *require.Assertions, p *snowball.Parameters) {
+				require.Equal(customAlphaPreference, p.AlphaPreference)
+				require.Equal(customAlphaConfidence, p.AlphaConfidence)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+			if tt.viperSetup != nil {
+				tt.viperSetup(v)
+			}
+			p := tt.input
+			applySnowballParameterDefaults(p, v)
+			tt.verify(require, p)
+		})
+	}
+}
+
+func TestApplySimplexParametersDefaults(t *testing.T) {
+	var (
+		customMaxNetworkDelay    = simplex.DefaultParameters.MaxNetworkDelay + time.Second
+		customMaxRebroadcastWait = simplex.DefaultParameters.MaxRebroadcastWait + time.Second
+	)
+
+	tests := []struct {
+		name   string
+		input  *simplex.Parameters
+		verify func(*require.Assertions, *simplex.Parameters)
+	}{
+		{
+			name:  "all zero fields filled from defaults",
+			input: &simplex.Parameters{},
+			verify: func(require *require.Assertions, p *simplex.Parameters) {
+				require.Equal(simplex.DefaultParameters, *p)
+			},
+		},
+		{
+			name: "all non-zero fields preserved",
+			input: &simplex.Parameters{
+				MaxNetworkDelay:    customMaxNetworkDelay,
+				MaxRebroadcastWait: customMaxRebroadcastWait,
+			},
+			verify: func(require *require.Assertions, p *simplex.Parameters) {
+				require.Equal(customMaxNetworkDelay, p.MaxNetworkDelay)
+				require.Equal(customMaxRebroadcastWait, p.MaxRebroadcastWait)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+			p := tt.input
+			applySimplexDefaults(p, v)
+			tt.verify(require, p)
+		})
+	}
+}
+
+func TestApplySubnetConfigDefaults(t *testing.T) {
+	customSnowK := snowball.DefaultParameters.K + 10
+	expectedSnow := snowball.DefaultParameters
+	expectedSnow.K = customSnowK
+
+	customSimplexNetworkDelay := simplex.DefaultParameters.MaxNetworkDelay + time.Second
+	expectedSimplex := simplex.DefaultParameters
+	expectedSimplex.MaxNetworkDelay = customSimplexNetworkDelay
+
+	tests := []struct {
+		name   string
+		input  subnets.Config
+		verify func(*require.Assertions, subnets.Config)
+	}{
+		{
+			name:  "none set",
+			input: subnets.Config{},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.Nil(cfg.SimplexParameters)
+				require.Nil(cfg.ConsensusParameters)
+
+				require.Equal(snowball.DefaultParameters, *cfg.SnowParameters)
+			},
+		},
+		{
+			name: "simplex mode set",
+			input: subnets.Config{
+				SimplexParameters: &simplex.Parameters{
+					MaxNetworkDelay: customSimplexNetworkDelay,
+				},
+			},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.Nil(cfg.SnowParameters)
+				require.Nil(cfg.ConsensusParameters)
+
+				require.Equal(expectedSimplex, *cfg.SimplexParameters)
+			},
+		},
+		{
+			name: "snow mode set",
+			input: subnets.Config{
+				SnowParameters: &snowball.Parameters{
+					K: customSnowK,
+				},
+			},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.Nil(cfg.SimplexParameters)
+				require.Nil(cfg.ConsensusParameters)
+
+				require.Equal(expectedSnow, *cfg.SnowParameters)
+			},
+		},
+		{
+			name: "deprecated consensus parameters set",
+			input: subnets.Config{
+				ConsensusParameters: &snowball.Parameters{
+					K: customSnowK,
+				},
+			},
+			verify: func(require *require.Assertions, cfg subnets.Config) {
+				require.Nil(cfg.ConsensusParameters)
+				require.Nil(cfg.SimplexParameters)
+
+				require.Equal(expectedSnow, *cfg.SnowParameters)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+			cfg := tt.input
+			applySubnetConfigDefaults(&cfg, v)
+			tt.verify(require, cfg)
+		})
+	}
+}
+
+func TestResolveConsensusMode(t *testing.T) {
+	tests := []struct {
+		name  string
+		input subnets.Config
+		want  consensusMode
+	}{
+		{
+			name:  "empty config defaults to snow",
+			input: subnets.Config{},
+			want:  modeDefaultSnow,
+		},
+		{
+			name: "simplex parameters set",
+			input: subnets.Config{
+				SimplexParameters: &simplex.Parameters{},
+			},
+			want: modeSimplex,
+		},
+		{
+			name: "snow parameters set",
+			input: subnets.Config{
+				SnowParameters: &snowball.Parameters{},
+			},
+			want: modeSnow,
+		},
+		{
+			name: "deprecated consensus parameters set",
+			input: subnets.Config{
+				ConsensusParameters: &snowball.Parameters{},
+			},
+			want: modeSnowFromDeprecated,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, resolveConsensusMode(&tt.input))
+		})
+	}
 }
 
 func setupViperFlags() *viper.Viper {

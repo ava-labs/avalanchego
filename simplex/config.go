@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
-	pSimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 // Config wraps all the parameters needed for a simplex engine
@@ -28,19 +28,19 @@ type Config struct {
 
 	DB database.KeyValueReaderWriter
 
-	// The file location where simplex will store its WAL.
+	// In the case of a crash, Simplex uses the WAL to recover its state and resume consensus.
 	WAL simplex.WriteAheadLog
 
 	// SignBLS is the signing function used for this node to sign messages.
 	SignBLS SignFunc
 
 	// Parameters passed in by the subnet configuration
-	Params *pSimplex.Parameters
+	Params *simplexparams.Parameters
 }
 
 // Context is information about the current execution.
 type SimplexChainContext struct {
-	// Network is the ID of the network this context exists within.
+	// NodeID is the ID of this node
 	NodeID ids.NodeID
 
 	// ChainID is the ID of the chain this context exists within.
@@ -49,6 +49,6 @@ type SimplexChainContext struct {
 	// SubnetID is the ID of the subnet this context exists within.
 	SubnetID ids.ID
 
-	// NodeID is the ID of this node
+	// Network is the ID of the network this context exists within.
 	NetworkID uint32
 }

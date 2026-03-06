@@ -42,7 +42,12 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client/stats"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
@@ -57,10 +62,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client/stats"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -78,10 +80,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 
+	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
-	vmsync "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync"
-	statesyncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
-	handlerstats "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers/stats"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
@@ -95,7 +95,7 @@ var (
 	_ block.ChainVM                      = (*VM)(nil)
 	_ block.BuildBlockWithContextChainVM = (*VM)(nil)
 	_ block.StateSyncableVM              = (*VM)(nil)
-	_ statesyncclient.EthBlockParser     = (*VM)(nil)
+	_ client.EthBlockParser              = (*VM)(nil)
 )
 
 const (
@@ -248,8 +248,8 @@ type VM struct {
 
 	logger subnetevmlog.Logger
 	// State sync server and client
-	vmsync.Server
-	vmsync.Client
+	engine.Server
+	engine.Client
 
 	// Avalanche Warp Messaging backend
 	// Used to serve BLS signatures of warp messages over RPC
@@ -445,7 +445,7 @@ func (vm *VM) Initialize(
 		vm.ethConfig.Miner.Etherbase = constants.BlackholeAddr
 	}
 
-	vm.networkCodec = message.Codec
+	vm.networkCodec = message.SubnetEVMCodec
 	vm.Network, err = network.NewNetwork(vm.ctx, appSender, vm.networkCodec, vm.config.MaxOutboundActiveRequests, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
@@ -679,7 +679,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	)
 	vm.Network.SetRequestHandler(networkHandler)
 
-	vm.Server = vmsync.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval) // parse nodeIDs from state sync IDs in vm config
+	vm.Server = engine.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval)
 	// parse nodeIDs from state sync IDs in vm config
 	var stateSyncIDs []ids.NodeID
 	if vm.config.StateSyncEnabled && len(vm.config.StateSyncIDs) > 0 {
@@ -698,30 +698,31 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	leafMetricsNames := make(map[message.NodeType]string)
 	leafMetricsNames[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.MetricName
 
-	vm.Client = vmsync.NewClient(&vmsync.ClientConfig{
+	vm.Client = engine.NewClient(&engine.ClientConfig{
 		StateSyncDone: vm.stateSyncDone,
-		Chain:         vm.eth,
+		Chain:         newChainContextAdapter(vm.eth),
 		State:         vm.State,
-		Client: statesyncclient.NewClient(
-			&statesyncclient.ClientConfig{
-				NetworkClient:    vm.Network,
+		Client: client.New(
+			&client.Config{
+				Network:          vm.Network,
 				Codec:            vm.networkCodec,
 				Stats:            stats.NewClientSyncerStats(leafMetricsNames),
 				StateSyncNodeIDs: stateSyncIDs,
 				BlockParser:      vm,
 			},
 		),
-		Enabled:            vm.config.StateSyncEnabled,
-		SkipResume:         vm.config.StateSyncSkipResume,
-		MinBlocks:          vm.config.StateSyncMinBlocks,
-		RequestSize:        vm.config.StateSyncRequestSize,
-		LastAcceptedHeight: lastAcceptedHeight, // TODO clean up how this is passed around
-		ChaindDB:           vm.chaindb,
-		VerDB:              vm.versiondb,
-		MetadataDB:         vm.metadataDB,
-		Acceptor:           vm,
-		Parser:             vm.extensionConfig.SyncableParser,
-		Extender:           nil,
+		Enabled:             vm.config.StateSyncEnabled,
+		SkipResume:          vm.config.StateSyncSkipResume,
+		MinBlocks:           vm.config.StateSyncMinBlocks,
+		RequestSize:         vm.config.StateSyncRequestSize,
+		LastAcceptedHeight:  lastAcceptedHeight, // TODO clean up how this is passed around
+		ChainDB:             vm.chaindb,
+		VerDB:               vm.versiondb,
+		MetadataDB:          vm.metadataDB,
+		Acceptor:            vm,
+		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
+		Extender:            nil,
+		LeafsRequestType:    message.SubnetEVMLeafsRequestType,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
@@ -1294,8 +1295,7 @@ func (vm *VM) ReadLastAccepted() (common.Hash, uint64, error) {
 func defaultExtensions() *extension.Config {
 	return &extension.Config{
 		Clock:               &mockable.Clock{},
-		SyncSummaryProvider: &message.BlockSyncSummaryProvider{},
-		SyncableParser:      message.NewBlockSyncSummaryParser(),
+		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.SubnetEVMCodec),
 	}
 }
 

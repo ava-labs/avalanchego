@@ -5,8 +5,6 @@ package subnets
 
 import (
 	"errors"
-	"time"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
@@ -17,8 +15,7 @@ import (
 var (
 	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
 	errNoParametersSet                  = errors.New("consensus config must have either snowball or simplex parameters set")
-	ErrUnsupportedConsensusParameters   = errors.New("consensusParameters is deprecated; use either snowballParameters or simplexParameters instead")
-	ErrTooManyConsensusParameters       = errors.New("only one of consensusParameters, snowballParameters, or simplexParameters can be set")
+	ErrTooManyConsensusParameters       = errors.New("only one of consensusParameters, snowParameters, or simplexParameters can be set")
 )
 
 type Config struct {
@@ -34,8 +31,8 @@ type Config struct {
 	// Deprecated: Use either SnowParameters or SimplexParameters instead.
 	ConsensusParameters *snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
 
-	SnowParameters    *snowball.Parameters `json:"snowballParameters" yaml:"snowballParameters"`
-	SimplexParameters *simplex.Parameters  `json:"simplexParameters"  yaml:"simplexParameters"`
+	SnowParameters    *snowball.Parameters `json:"snowParameters"    yaml:"snowParameters"`
+	SimplexParameters *simplex.Parameters  `json:"simplexParameters" yaml:"simplexParameters"`
 
 	// ProposerNumHistoricalBlocks is the number of historical snowman++ blocks
 	// this node will index per chain. If set to 0, the node will index all
@@ -57,20 +54,19 @@ type Config struct {
 	ProposerNumHistoricalBlocks uint64 `json:"proposerNumHistoricalBlocks" yaml:"proposerNumHistoricalBlocks"`
 }
 
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 // ValidConsensusConfiguration ensures that at most one consensus parameter type is set.
 // If none are set, then the default snowball parameters will be used for SnowParameters.
 func (c *Config) ValidConsensusConfiguration() error {
-	numSet := 0
-	if c.SimplexParameters != nil {
-		numSet++
-	}
-	if c.SnowParameters != nil {
-		numSet++
-	}
-	if c.ConsensusParameters != nil {
-		numSet++
-	}
-
+	numSet := boolToInt(c.SimplexParameters != nil) +
+		boolToInt(c.SnowParameters != nil) +
+		boolToInt(c.ConsensusParameters != nil)
 	if numSet > 1 {
 		return ErrTooManyConsensusParameters
 	}
@@ -82,9 +78,6 @@ func (c *Config) ValidParameters() error {
 		return errAllowedNodesWhenNotValidatorOnly
 	}
 
-	if c.ConsensusParameters != nil {
-		return ErrUnsupportedConsensusParameters
-	}
 	if c.SnowParameters != nil {
 		return c.SnowParameters.Verify()
 	}

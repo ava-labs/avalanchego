@@ -23,6 +23,9 @@ var (
 	errUnknownParentBlock      = errors.New("unknown parent block")
 	errTooManyProcessingBlocks = errors.New("too many processing blocks")
 	errBlockProcessingTooLong  = errors.New("block processing too long")
+	errAcceptanceTimeTooHigh   = errors.New("acceptance time too high")
+
+	maxAcceptanceTime = 15 * time.Second
 
 	_ Factory   = (*TopologicalFactory)(nil)
 	_ Consensus = (*Topological)(nil)
@@ -144,9 +147,12 @@ func (ts *Topological) NumProcessing() int {
 func (ts *Topological) Add(blk Block) error {
 	blkID := blk.ID()
 	height := blk.Height()
-	ts.ctx.Log.Verbo("adding block",
+	parentID := blk.Parent()
+	ts.ctx.Log.Trace("adding block",
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", height),
+		zap.Time("timestamp", blk.Timestamp()),
+		zap.Stringer("parentID", parentID),
 	)
 
 	// Make sure a block is not inserted twice.
@@ -157,7 +163,6 @@ func (ts *Topological) Add(blk Block) error {
 	ts.metrics.Verified(height)
 	ts.metrics.Issued(blkID, ts.pollNumber)
 
-	parentID := blk.Parent()
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
 		return errUnknownParentBlock
@@ -331,9 +336,21 @@ func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 		errs = append(errs, err)
 	}
 
+	// Check average acceptance time
+	avgAcceptanceTime := ts.metrics.GetAverageAcceptanceTime()
+	if avgAcceptanceTime > maxAcceptanceTime {
+		err := fmt.Errorf("%w: %s > %s",
+			errAcceptanceTimeTooHigh,
+			avgAcceptanceTime,
+			maxAcceptanceTime,
+		)
+		errs = append(errs, err)
+	}
+
 	return map[string]interface{}{
 		"processingBlocks":       numProcessingBlks,
 		"longestProcessingBlock": maxTimeProcessing.String(), // .String() is needed here to ensure a human readable format
+		"avgAcceptanceTime":      avgAcceptanceTime.String(),
 		"lastAcceptedID":         ts.lastAcceptedID,
 		"lastAcceptedHeight":     ts.lastAcceptedHeight,
 	}, errors.Join(errs...)
@@ -599,6 +616,7 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 		zap.Stringer("blkID", pref),
 		zap.Uint64("height", height),
 		zap.Time("timestamp", timestamp),
+		zap.Stringer("parentID", ts.lastAcceptedID),
 	)
 	if err := child.Accept(ctx); err != nil {
 		return err

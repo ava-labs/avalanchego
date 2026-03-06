@@ -1,23 +1,5 @@
 {
   "nodes": {
-    "go-flake": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-PPX4of5NK7HA4g4MMT1xYHjgpHYotB+uAA4Oh9sLhpI=",
-        "path": "./nix/go",
-        "type": "path"
-      },
-      "original": {
-        "path": "./nix/go",
-        "type": "path"
-      },
-      "parent": []
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1765838191,
@@ -36,7 +18,6 @@
     },
     "root": {
       "inputs": {
-        "go-flake": "go-flake",
         "nixpkgs": "nixpkgs"
       }
     }

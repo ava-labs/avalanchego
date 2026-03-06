@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/simplex"
@@ -15,8 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
-	pSimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 var _ common.Engine = (*Engine)(nil)
@@ -46,32 +46,34 @@ type Engine struct {
 	common.AppHandler
 	validators.Connector
 
-	epoch              *simplex.Epoch
-	blockDeserializer  *blockDeserializer
-	quorumDeserializer *QCDeserializer
-	logger             logging.Logger
-	vm                 block.ChainVM
-	consensusCtx       *snow.ConsensusContext
+	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+)
 
-	tickInterval time.Duration
-	shutdown     chan struct{}
-}
-
+var (
+	errUnknownMessageType   = errors.New("unknown message type")
+	errNilSimplexParameters = errors.New("simplex parameters cannot be nil")
+)
+  
 // The VM must be initialized before creating the engine
-func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config *Config) (*Engine, error) {
-	if isNonValidator(config) {
+func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
+  if isNonValidator(config) {
 		config.Log.Info("Out node is not a validator for the subnet",
 			zap.Stringer("nodeID", config.Ctx.NodeID),
 			zap.Stringer("chainID", config.Ctx.ChainID),
 			zap.Stringer("subnetID", config.Ctx.SubnetID),
 		)
 		return nonValidatingEngine(consensusCtx, config)
+  }
+  
+	if config.Params == nil {
+		return nil, errNilSimplexParameters
 	}
 
 	signer, verifier, err := NewBLSAuth(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create BLS auth: %w", err)
 	}
+
 	qcDeserializer := &QCDeserializer{
 		verifier: &verifier,
 	}
@@ -84,7 +86,9 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		return nil, err
 	}
 
-	storage, err := newStorage(ctx, config, qcDeserializer, &blockTracker{})
+	bt := newBlockTracker()
+
+	storage, err := newStorage(ctx, config, qcDeserializer, bt)
 	if err != nil {
 		return nil, err
 	}
@@ -103,21 +107,22 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		return nil, fmt.Errorf("expected last block to be of type *Block but got %T", lastBlock)
 	}
 
-	blockTracker := newBlockTracker(simplexBlock, config.VM)
+	// Initialize the blockTracker with the last block fetched from Storage.
+	bt.init(simplexBlock)
+
 	blockBuilder := &BlockBuilder{
 		vm:           config.VM,
-		blockTracker: blockTracker,
+		blockTracker: bt,
 		log:          config.Log,
 	}
-	storage.blockTracker = blockTracker
 
 	blockDeserializer := &blockDeserializer{
 		parser:       config.VM,
-		blockTracker: blockTracker,
+		blockTracker: bt,
 	}
 
 	epochConfig := simplex.EpochConfig{
-		MaxProposalWait:     config.Params.MaxProposalWait,
+		MaxProposalWait:     config.Params.MaxNetworkDelay,
 		MaxRebroadcastWait:  config.Params.MaxRebroadcastWait,
 		QCDeserializer:      qcDeserializer,
 		Logger:              config.Log,
@@ -159,18 +164,32 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		AppHandler:   config.VM,
 		vm:           config.VM,
 		consensusCtx: consensusCtx,
+    	epoch:              epoch,
+		blockDeserializer:  blockDeserializer,
+		quorumDeserializer: qcDeserializer,
+		logger:             config.Log,
+
+		tickInterval: getTickInterval(config.Params),
+		shutdown:     make(chan struct{}, 1),
+    
+	tickInterval time.Duration
+	shutdown     chan struct{}
+	shutdownOnce sync.Once
 	}, nil
 }
 
-func (e *Engine) Start(ctx context.Context, _ uint32) error {
-	if e.nonValidator {
+func (e *Engine) Start(_ context.Context, _ uint32) error {
+  if e.nonValidator {
 		e.logger.Info("non-validator cannot start simplex engine")
 		return nil
 	}
-
-	e.logger.Info("Starting simplex engine")
-	err := e.epoch.Start()
-	if err != nil {
+	e.logger.Info(
+		"Starting simplex engine",
+		zap.Duration("TickInterval", e.tickInterval),
+		zap.Duration("MaxProposalWait", e.epoch.MaxProposalWait),
+		zap.Duration("MaxRebroadcastWait", e.epoch.MaxRebroadcastWait),
+	)
+	if err := e.epoch.Start(); err != nil {
 		return fmt.Errorf("failed to start simplex epoch: %w", err)
 	}
 
@@ -182,8 +201,10 @@ func (e *Engine) Start(ctx context.Context, _ uint32) error {
 	return e.vm.SetState(ctx, snow.NormalOp)
 }
 
-func getTickInterval(params *pSimplex.Parameters) time.Duration {
-	tick := min(int64(params.MaxProposalWait), int64(params.MaxRebroadcastWait)) / 10
+
+// getTickInterval defines a reasonable tick interval for simplex to advance time.
+func getTickInterval(params *simplexparams.Parameters) time.Duration {
+	tick := min(int64(params.MaxNetworkDelay), int64(params.MaxRebroadcastWait)) / 10
 	return time.Duration(tick)
 }
 
@@ -197,7 +218,6 @@ func (e *Engine) tick() {
 		case tick := <-ticker.C:
 			e.epoch.AdvanceTime(tick)
 		case <-e.shutdown:
-			ticker.Stop()
 			return
 		}
 	}
@@ -248,9 +268,11 @@ func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*si
 }
 
 func (e *Engine) Shutdown(_ context.Context) error {
-	e.epoch.Stop()
-	e.logger.Info("Stopped simplex engine")
-	close(e.shutdown)
+	e.shutdownOnce.Do(func() {
+		e.epoch.Stop()
+		e.logger.Info("Stopped simplex engine")
+		close(e.shutdown)
+	})
 	return nil
 }
 
@@ -337,3 +359,4 @@ func isNonValidator(config *Config) bool {
 	}
 	return true
 }
+
