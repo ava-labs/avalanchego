@@ -387,6 +387,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
+	state.EXPECT().GetCurrentValidator(gomock.Any(), gomock.Any()).Return(nil, database.ErrNotFound).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -405,7 +406,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	require.Equal(currentValidator, gotCurrentValidator)
 
 	// Delete the current validator
-	d.DeleteCurrentValidator(currentValidator)
+	require.NoError(d.DeleteCurrentValidator(currentValidator))
 
 	// Make sure the deletion worked
 	state.EXPECT().GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID).Return(nil, database.ErrNotFound).Times(1)
@@ -454,12 +455,6 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	currentDelegator := &Staker{
-		TxID:     ids.GenerateTestID(),
-		SubnetID: ids.GenerateTestID(),
-		NodeID:   ids.GenerateTestNodeID(),
-	}
-
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
@@ -467,12 +462,27 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
+	state.EXPECT().GetCurrentValidator(gomock.Any(), gomock.Any()).Return(nil, database.ErrNotFound).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	// Put a current delegator
-	d.PutCurrentDelegator(currentDelegator)
+	currentValidator := &Staker{
+		TxID:     ids.GenerateTestID(),
+		SubnetID: ids.GenerateTestID(),
+		NodeID:   ids.GenerateTestNodeID(),
+	}
+
+	require.NoError(d.PutCurrentValidator(currentValidator))
+
+	currentDelegator := &Staker{
+		TxID:     ids.GenerateTestID(),
+		SubnetID: currentValidator.SubnetID,
+		NodeID:   currentValidator.NodeID,
+	}
+
+	require.NoError(d.PutCurrentDelegator(currentDelegator))
 
 	// Assert that we get the current delegator back
 	// Mock iterator for [state] returns no delegators.
@@ -487,7 +497,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	require.Equal(gotCurrentDelegatorIter.Value(), currentDelegator)
 
 	// Delete the current delegator
-	d.DeleteCurrentDelegator(currentDelegator)
+	require.NoError(d.DeleteCurrentDelegator(currentDelegator))
 
 	// Make sure the deletion worked.
 	// The iterator should have no elements.

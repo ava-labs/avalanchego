@@ -547,7 +547,7 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	service.vm.state.PutCurrentDelegator(staker)
+	require.NoError(service.vm.state.PutCurrentDelegator(staker))
 	service.vm.state.AddTx(tx, status.Committed)
 	require.NoError(service.vm.state.Commit())
 
@@ -701,7 +701,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	)
 	require.NoError(err)
 
-	service.vm.state.PutCurrentDelegator(staker)
+	require.NoError(service.vm.state.PutCurrentDelegator(staker))
 	service.vm.state.AddTx(delTx, status.Committed)
 	require.NoError(service.vm.state.Commit())
 
@@ -750,7 +750,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	tx, err := blockbuilder.NewRewardValidatorTx(service.vm.ctx, delTx.ID())
 	require.NoError(err)
 	service.vm.state.AddTx(tx, status.Committed)
-	service.vm.state.DeleteCurrentDelegator(staker)
+	require.NoError(service.vm.state.DeleteCurrentDelegator(staker))
 	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{DelegateeReward: 100000}))
 	require.NoError(service.vm.state.Commit())
 

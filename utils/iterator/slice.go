@@ -8,6 +8,10 @@ var _ Iterator[any] = (*slice[any])(nil)
 // ToSlice returns a slice that contains all of the elements from [it] in order.
 // [it] will be released before returning.
 func ToSlice[T any](it Iterator[T]) []T {
+	if it == nil {
+		return nil
+	}
+
 	defer it.Release()
 
 	var elements []T

@@ -654,7 +654,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
-	env.state.DeleteCurrentValidator(staker)
+	require.NoError(env.state.DeleteCurrentValidator(staker))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 

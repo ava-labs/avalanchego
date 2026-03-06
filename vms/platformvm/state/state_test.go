@@ -215,10 +215,11 @@ func TestState_writeStakers(t *testing.T) {
 		addStakerTx *txs.Tx // If tx is nil, the staker is being removed
 
 		// Check that the staker is duly stored/removed in P-chain state
-		expectedCurrentValidator  *Staker
-		expectedPendingValidator  *Staker
-		expectedCurrentDelegators []*Staker
-		expectedPendingDelegators []*Staker
+		expectedCurrentValidator           *Staker
+		expectedPendingValidator           *Staker
+		wantGetCurrentDelegatorIteratorErr error
+		expectedCurrentDelegators          []*Staker
+		expectedPendingDelegators          []*Staker
 
 		// Check that the validator entry has been set correctly in the
 		// in-memory validator set.
@@ -277,19 +278,21 @@ func TestState_writeStakers(t *testing.T) {
 			},
 		},
 		"add pending primary network validator": {
-			staker:                   primaryNetworkPendingValidatorStaker,
-			addStakerTx:              addPrimaryNetworkValidator,
-			expectedPendingValidator: primaryNetworkPendingValidatorStaker,
-			expectedValidatorDiffs:   map[subnetIDNodeID]*validatorDiff{},
+			staker:                             primaryNetworkPendingValidatorStaker,
+			addStakerTx:                        addPrimaryNetworkValidator,
+			expectedPendingValidator:           primaryNetworkPendingValidatorStaker,
+			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
+			expectedValidatorDiffs:             map[subnetIDNodeID]*validatorDiff{},
 		},
 		"add pending primary network delegator": {
-			initialStakers:            []*Staker{primaryNetworkPendingValidatorStaker},
-			initialTxs:                []*txs.Tx{addPrimaryNetworkValidator},
-			staker:                    primaryNetworkPendingDelegatorStaker,
-			addStakerTx:               addPrimaryNetworkDelegator,
-			expectedPendingValidator:  primaryNetworkPendingValidatorStaker,
-			expectedPendingDelegators: []*Staker{primaryNetworkPendingDelegatorStaker},
-			expectedValidatorDiffs:    map[subnetIDNodeID]*validatorDiff{},
+			initialStakers:                     []*Staker{primaryNetworkPendingValidatorStaker},
+			initialTxs:                         []*txs.Tx{addPrimaryNetworkValidator},
+			staker:                             primaryNetworkPendingDelegatorStaker,
+			addStakerTx:                        addPrimaryNetworkDelegator,
+			expectedPendingValidator:           primaryNetworkPendingValidatorStaker,
+			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
+			expectedPendingDelegators:          []*Staker{primaryNetworkPendingDelegatorStaker},
+			expectedValidatorDiffs:             map[subnetIDNodeID]*validatorDiff{},
 		},
 		"add current subnet validator": {
 			initialStakers:           []*Staker{primaryNetworkCurrentValidatorStaker},
@@ -317,9 +320,10 @@ func TestState_writeStakers(t *testing.T) {
 			},
 		},
 		"delete current primary network validator": {
-			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker},
-			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator},
-			staker:         primaryNetworkCurrentValidatorStaker,
+			initialStakers:                     []*Staker{primaryNetworkCurrentValidatorStaker},
+			initialTxs:                         []*txs.Tx{addPrimaryNetworkValidator},
+			staker:                             primaryNetworkCurrentValidatorStaker,
+			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
 			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
 				{
 					subnetID: constants.PrimaryNetworkID,
@@ -365,10 +369,11 @@ func TestState_writeStakers(t *testing.T) {
 			},
 		},
 		"delete pending primary network validator": {
-			initialStakers:         []*Staker{primaryNetworkPendingValidatorStaker},
-			initialTxs:             []*txs.Tx{addPrimaryNetworkValidator},
-			staker:                 primaryNetworkPendingValidatorStaker,
-			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{},
+			initialStakers:                     []*Staker{primaryNetworkPendingValidatorStaker},
+			initialTxs:                         []*txs.Tx{addPrimaryNetworkValidator},
+			staker:                             primaryNetworkPendingValidatorStaker,
+			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
+			expectedValidatorDiffs:             map[subnetIDNodeID]*validatorDiff{},
 		},
 		"delete pending primary network delegator": {
 			initialStakers: []*Staker{
@@ -379,14 +384,16 @@ func TestState_writeStakers(t *testing.T) {
 				addPrimaryNetworkValidator,
 				addPrimaryNetworkDelegator,
 			},
-			staker:                   primaryNetworkPendingDelegatorStaker,
-			expectedPendingValidator: primaryNetworkPendingValidatorStaker,
-			expectedValidatorDiffs:   map[subnetIDNodeID]*validatorDiff{},
+			staker:                             primaryNetworkPendingDelegatorStaker,
+			expectedPendingValidator:           primaryNetworkPendingValidatorStaker,
+			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
+			expectedValidatorDiffs:             map[subnetIDNodeID]*validatorDiff{},
 		},
 		"delete current subnet validator": {
-			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker, subnetCurrentValidatorStaker},
-			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator, addSubnetValidator},
-			staker:         subnetCurrentValidatorStaker,
+			initialStakers:                     []*Staker{primaryNetworkCurrentValidatorStaker, subnetCurrentValidatorStaker},
+			initialTxs:                         []*txs.Tx{addPrimaryNetworkValidator, addSubnetValidator},
+			staker:                             subnetCurrentValidatorStaker,
+			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
 			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
 				{
 					subnetID: subnetID,
@@ -418,18 +425,18 @@ func TestState_writeStakers(t *testing.T) {
 					case staker.Priority.IsPendingValidator():
 						require.NoError(state.PutPendingValidator(staker))
 					case staker.Priority.IsCurrentDelegator():
-						state.PutCurrentDelegator(staker)
+						require.NoError(state.PutCurrentDelegator(staker))
 					case staker.Priority.IsPendingDelegator():
 						state.PutPendingDelegator(staker)
 					}
 				} else {
 					switch {
 					case staker.Priority.IsCurrentValidator():
-						state.DeleteCurrentValidator(staker)
+						require.NoError(state.DeleteCurrentValidator(staker))
 					case staker.Priority.IsPendingValidator():
 						state.DeletePendingValidator(staker)
 					case staker.Priority.IsCurrentDelegator():
-						state.DeleteCurrentDelegator(staker)
+						require.NoError(state.DeleteCurrentDelegator(staker))
 					case staker.Priority.IsPendingDelegator():
 						state.DeletePendingDelegator(staker)
 					}
@@ -494,7 +501,7 @@ func TestState_writeStakers(t *testing.T) {
 				}
 
 				it, err := state.GetCurrentDelegatorIterator(test.staker.SubnetID, test.staker.NodeID)
-				require.NoError(err)
+				require.ErrorIs(err, test.wantGetCurrentDelegatorIteratorErr)
 				require.Equal(
 					test.expectedCurrentDelegators,
 					iterator.ToSlice(it),
@@ -987,7 +994,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 			})
 		}
 		for _, removed := range diff.removedValidators {
-			d.DeleteCurrentValidator(&removed)
+			require.NoError(d.DeleteCurrentValidator(&removed))
 
 			expectedValidators.Remove(subnetIDNodeID{
 				subnetID: removed.SubnetID,
@@ -2141,7 +2148,7 @@ func TestL1ValidatorAfterLegacyRemoval(t *testing.T) {
 	state.SetHeight(1)
 	require.NoError(state.Commit())
 
-	state.DeleteCurrentValidator(legacyStaker)
+	require.NoError(state.DeleteCurrentValidator(legacyStaker))
 
 	l1Validator := L1Validator{
 		ValidationID:          ids.GenerateTestID(),
@@ -2492,4 +2499,337 @@ func TestSetUptimeAndSetStakingInfoBothPersist(t *testing.T) {
 	stakingInfo, err = state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 	require.Equal(t, wantDelegateeReward2, stakingInfo.DelegateeReward)
+}
+
+func TestCurrentStakers(t *testing.T) {
+	tests := []struct {
+		name string
+		csF  func() CurrentStakers
+	}{
+		{
+			name: "base",
+			csF: func() CurrentStakers {
+				return newTestState(t, memdb.New())
+			},
+		},
+		{
+			name: "diff",
+			csF: func() CurrentStakers {
+				diff, err := NewDiffOn(newTestState(t, memdb.New()))
+				require.NoError(t, err)
+
+				return diff
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Run("get current validator", func(t *testing.T) {
+				t.Run("validator does not exist", func(t *testing.T) {
+					cs := tt.csF()
+
+					_, err := cs.GetCurrentValidator(ids.GenerateTestID(), ids.GenerateTestNodeID())
+					require.ErrorIs(t, err, database.ErrNotFound)
+				})
+
+				t.Run("validator exists", func(t *testing.T) {
+					cs := tt.csF()
+					want := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(want))
+
+					got, err := cs.GetCurrentValidator(want.SubnetID, want.NodeID)
+					require.NoError(t, err)
+					require.Equal(t, want, got)
+				})
+			})
+
+			t.Run("put current validator", func(t *testing.T) {
+				t.Run("validator does not exist", func(t *testing.T) {
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+				})
+
+				t.Run("duplicate put", func(t *testing.T) {
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+					err := cs.PutCurrentValidator(v)
+					require.ErrorIs(t, err, errUnexpectedStaker)
+				})
+			})
+
+			t.Run("delete current validator", func(t *testing.T) {
+				t.Run("validator does not exist", func(t *testing.T) {
+					cs := tt.csF()
+
+					staker := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					err := cs.DeleteCurrentValidator(staker)
+					require.ErrorIs(t, err, database.ErrNotFound)
+				})
+
+				t.Run("validator deleted", func(t *testing.T) {
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+					require.NoError(t, cs.DeleteCurrentValidator(v))
+				})
+			})
+
+			t.Run("get staking info", func(t *testing.T) {
+				t.Run("validator does not exist", func(t *testing.T) {
+					cs := tt.csF()
+
+					_, err := cs.GetStakingInfo(ids.GenerateTestID(), ids.GenerateTestNodeID())
+					require.ErrorIs(t, err, database.ErrNotFound)
+				})
+
+				t.Run("default to not found", func(t *testing.T) {
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+
+					_, err := cs.GetStakingInfo(v.SubnetID, v.NodeID)
+					require.ErrorIs(t, err, database.ErrNotFound)
+				})
+			})
+
+			t.Run("set staking info", func(t *testing.T) {
+				t.Run("validator does not exist", func(t *testing.T) {
+					cs := tt.csF()
+
+					require.ErrorIs(
+						t,
+						cs.SetStakingInfo(ids.GenerateTestID(), ids.GenerateTestNodeID(), StakingInfo{DelegateeReward: 123}),
+						database.ErrNotFound,
+					)
+				})
+
+				t.Run("staking info updated", func(t *testing.T) {
+					// TODO -- this behavior is different across base and diff. Currently base does not
+					// allow us to update mutable data associated with a validator before it has been
+					// written.
+					t.Skip("TODO: different behavior across implementations")
+
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+					require.NoError(t, cs.SetStakingInfo(v.SubnetID, v.NodeID, StakingInfo{DelegateeReward: 123}))
+
+					got, err := cs.GetStakingInfo(v.SubnetID, v.NodeID)
+					require.NoError(t, err)
+					require.Equal(t, uint64(123), got)
+				})
+			})
+
+			t.Run("get current delegator iterator", func(t *testing.T) {
+				t.Run("validator does not exist", func(t *testing.T) {
+					cs := tt.csF()
+
+					_, err := cs.GetCurrentDelegatorIterator(ids.GenerateTestID(), ids.GenerateTestNodeID())
+					require.ErrorIs(t, err, database.ErrNotFound)
+				})
+
+				t.Run("no delegators", func(t *testing.T) {
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+
+					var gotDelegators []*Staker
+					itr, err := cs.GetCurrentDelegatorIterator(v.SubnetID, v.NodeID)
+					require.NoError(t, err)
+
+					for itr.Next() {
+						gotDelegators = append(gotDelegators, itr.Value())
+					}
+
+					require.Empty(t, gotDelegators)
+				})
+
+				t.Run("delegators ordered by increasing next time", func(t *testing.T) {
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+
+					d1 := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
+					d1.NextTime = time.Time{}.Add(3 * time.Second)
+
+					require.NoError(t, cs.PutCurrentDelegator(d1))
+
+					d2 := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
+					d2.NextTime = time.Time{}.Add(1 * time.Second)
+
+					require.NoError(t, cs.PutCurrentDelegator(d2))
+
+					d3 := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
+					d3.NextTime = time.Time{}.Add(2 * time.Second)
+
+					require.NoError(t, cs.PutCurrentDelegator(d3))
+
+					itr, err := cs.GetCurrentDelegatorIterator(v.SubnetID, v.NodeID)
+					require.NoError(t, err)
+
+					wantDelegators := []*Staker{d2, d3, d1}
+					var gotDelegators []*Staker
+
+					for itr.Next() {
+						gotDelegators = append(gotDelegators, itr.Value())
+					}
+
+					require.Equal(t, wantDelegators, gotDelegators)
+				})
+			})
+
+			t.Run("put current delegator", func(t *testing.T) {
+				t.Run("validator does not exist", func(t *testing.T) {
+					cs := tt.csF()
+
+					d := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					err := cs.PutCurrentDelegator(d)
+					require.ErrorIs(t, err, database.ErrNotFound)
+				})
+
+				t.Run("delegator added", func(t *testing.T) {
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+
+					d := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
+					require.NoError(t, cs.PutCurrentDelegator(d))
+
+					itr, err := cs.GetCurrentDelegatorIterator(v.SubnetID, v.NodeID)
+					require.NoError(t, err)
+
+					wantDelegators := []*Staker{d}
+					var gotDelegators []*Staker
+
+					for itr.Next() {
+						gotDelegators = append(gotDelegators, itr.Value())
+					}
+
+					require.Equal(t, wantDelegators, gotDelegators)
+				})
+
+				t.Run("duplicate put", func(t *testing.T) {
+					// TODO currently we do not error if a duplicate delegator is added
+					t.Skip("TODO: fix me")
+
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+
+					d := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
+					require.NoError(t, cs.PutCurrentDelegator(d))
+					err := cs.PutCurrentDelegator(d)
+					require.ErrorIs(t, err, errUnexpectedStaker)
+				})
+			})
+
+			t.Run("delete current delegator", func(t *testing.T) {
+				t.Run("validator does not exist", func(t *testing.T) {
+					cs := tt.csF()
+
+					err := cs.DeleteCurrentDelegator(newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID()))
+					require.ErrorIs(t, err, database.ErrNotFound)
+				})
+
+				t.Run("delegator does not exist", func(t *testing.T) {
+					// TODO currently we do not error when on deletions on delegators that do not exist
+					t.Skip("TODO: fix me")
+
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+
+					d := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
+					err := cs.DeleteCurrentDelegator(d)
+					require.ErrorIs(t, err, database.ErrNotFound)
+				})
+
+				t.Run("delegator deleted", func(t *testing.T) {
+					cs := tt.csF()
+
+					v := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+					require.NoError(t, cs.PutCurrentValidator(v))
+
+					d := newTestStaker(constants.PrimaryNetworkID, v.NodeID)
+					require.NoError(t, cs.PutCurrentDelegator(d))
+
+					require.NoError(t, cs.DeleteCurrentDelegator(d))
+				})
+			})
+		})
+
+		t.Run("get current staker iterator", func(t *testing.T) {
+			t.Run("no stakers", func(t *testing.T) {
+				cs := tt.csF()
+
+				itr, err := cs.GetCurrentStakerIterator()
+				require.NoError(t, err)
+
+				gotStakers := []*Staker{}
+				for itr.Next() {
+					if itr.Value().NodeID == defaultValidatorNodeID {
+						// Ignore the validator provided as a default that we did not add as part of test
+						continue
+					}
+
+					gotStakers = append(gotStakers, itr.Value())
+				}
+
+				require.Empty(t, gotStakers)
+			})
+
+			t.Run("sorted by priority", func(t *testing.T) {
+				cs := tt.csF()
+
+				v1 := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+				v1.Priority = txs.PrimaryNetworkValidatorCurrentPriority
+				require.NoError(t, cs.PutCurrentValidator(v1))
+
+				d1 := newTestStaker(v1.SubnetID, v1.NodeID)
+				d1.Priority = txs.PrimaryNetworkDelegatorCurrentPriority
+				require.NoError(t, cs.PutCurrentDelegator(d1))
+
+				v2 := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
+				v2.Priority = txs.SubnetPermissionedValidatorCurrentPriority
+				require.NoError(t, cs.PutCurrentValidator(v2))
+
+				v3 := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
+				v3.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
+				require.NoError(t, cs.PutCurrentValidator(v3))
+
+				d2 := newTestStaker(v3.SubnetID, v3.NodeID)
+				d2.Priority = txs.SubnetPermissionlessDelegatorCurrentPriority
+				require.NoError(t, cs.PutCurrentDelegator(d2))
+
+				itr, err := cs.GetCurrentStakerIterator()
+				require.NoError(t, err)
+
+				wantStakers := []*Staker{v2, d2, v3, d1, v1}
+				gotStakers := []*Staker{}
+				for itr.Next() {
+					if itr.Value().NodeID == defaultValidatorNodeID {
+						// Ignore the validator provided as a default that we did not add as part of test
+						continue
+					}
+
+					gotStakers = append(gotStakers, itr.Value())
+				}
+
+				require.Equal(t, wantStakers, gotStakers)
+			})
+		})
+	}
 }

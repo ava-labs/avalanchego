@@ -182,7 +182,9 @@ func advanceTimeTo(
 			changes.DeletePendingValidator(stakerToRemove)
 
 		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
-			changes.PutCurrentDelegator(&stakerToAdd)
+			if err := changes.PutCurrentDelegator(&stakerToAdd); err != nil {
+				return nil, false, fmt.Errorf("putting current delegator: %w", err)
+			}
 			changes.DeletePendingDelegator(stakerToRemove)
 
 		default:
@@ -217,7 +219,9 @@ func advanceTimeTo(
 			break
 		}
 
-		changes.DeleteCurrentValidator(stakerToRemove)
+		if err := changes.DeleteCurrentValidator(stakerToRemove); err != nil {
+			return nil, false, fmt.Errorf("deleting current validator: %w", err)
+		}
 		changed = true
 	}
 

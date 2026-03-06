@@ -263,9 +263,11 @@ func (mr *MockStateMockRecorder) CommitBatch() *gomock.Call {
 }
 
 // DeleteCurrentDelegator mocks base method.
-func (m *MockState) DeleteCurrentDelegator(staker *Staker) {
+func (m *MockState) DeleteCurrentDelegator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeleteCurrentDelegator", staker)
+	ret := m.ctrl.Call(m, "DeleteCurrentDelegator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // DeleteCurrentDelegator indicates an expected call of DeleteCurrentDelegator.
@@ -275,9 +277,11 @@ func (mr *MockStateMockRecorder) DeleteCurrentDelegator(staker any) *gomock.Call
 }
 
 // DeleteCurrentValidator mocks base method.
-func (m *MockState) DeleteCurrentValidator(staker *Staker) {
+func (m *MockState) DeleteCurrentValidator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeleteCurrentValidator", staker)
+	ret := m.ctrl.Call(m, "DeleteCurrentValidator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // DeleteCurrentValidator indicates an expected call of DeleteCurrentValidator.
@@ -813,9 +817,11 @@ func (mr *MockStateMockRecorder) NumActiveL1Validators() *gomock.Call {
 }
 
 // PutCurrentDelegator mocks base method.
-func (m *MockState) PutCurrentDelegator(staker *Staker) {
+func (m *MockState) PutCurrentDelegator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "PutCurrentDelegator", staker)
+	ret := m.ctrl.Call(m, "PutCurrentDelegator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // PutCurrentDelegator indicates an expected call of PutCurrentDelegator.

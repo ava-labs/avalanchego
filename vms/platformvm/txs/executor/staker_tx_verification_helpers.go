@@ -4,11 +4,13 @@
 package executor
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -145,7 +147,9 @@ func GetMaxWeight(
 	endTime time.Time,
 ) (uint64, error) {
 	currentDelegatorIterator, err := chainState.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
-	if err != nil {
+	if errors.Is(err, database.ErrNotFound) {
+		currentDelegatorIterator = iterator.Empty[*state.Staker]{}
+	} else if err != nil {
 		return 0, err
 	}
 
@@ -168,9 +172,12 @@ func GetMaxWeight(
 	currentDelegatorIterator.Release()
 
 	currentDelegatorIterator, err = chainState.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
-	if err != nil {
+	if errors.Is(err, database.ErrNotFound) {
+		currentDelegatorIterator = iterator.Empty[*state.Staker]{}
+	} else if err != nil {
 		return 0, err
 	}
+
 	pendingDelegatorIterator, err := chainState.GetPendingDelegatorIterator(validator.SubnetID, validator.NodeID)
 	if err != nil {
 		currentDelegatorIterator.Release()

@@ -296,7 +296,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 	require.NoError(env.state.PutCurrentValidator(vdrStaker))
 	env.state.AddTx(vdrTx, status.Committed)
-	env.state.PutCurrentDelegator(delStaker)
+	require.NoError(env.state.PutCurrentDelegator(delStaker))
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	env.state.SetHeight(dummyHeight)
@@ -428,7 +428,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 	require.NoError(env.state.PutCurrentValidator(vdrStaker))
 	env.state.AddTx(vdrTx, status.Committed)
-	env.state.PutCurrentDelegator(delStaker)
+	require.NoError(env.state.PutCurrentDelegator(delStaker))
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(vdrEndTime), 0))
 	env.state.SetHeight(dummyHeight)
@@ -653,7 +653,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 	require.NoError(env.state.PutCurrentValidator(vdrStaker))
 	env.state.AddTx(vdrTx, status.Committed)
-	env.state.PutCurrentDelegator(delStaker)
+	require.NoError(env.state.PutCurrentDelegator(delStaker))
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(vdrEndTime), 0))
 	env.state.SetHeight(dummyHeight)
@@ -822,7 +822,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	require.NoError(env.state.PutCurrentValidator(vdrStaker))
 	env.state.AddTx(vdrTx, status.Committed)
-	env.state.PutCurrentDelegator(delStaker)
+	require.NoError(env.state.PutCurrentDelegator(delStaker))
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	env.state.SetHeight(dummyHeight)
