@@ -5,7 +5,7 @@ module github.com/ava-labs/avalanchego/graft/coreth
 // CONTRIBUTING.md for more details.
 
 // See ../../go.mod for guidelines on updating the Go version.
-go 1.26.1
+go 1.25.0
 
 require (
 	github.com/ava-labs/avalanchego v0.0.0-initial-consistent-tag
