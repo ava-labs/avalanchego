@@ -157,7 +157,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		metrics,
 		res.state,
 		&res.backend,
-		validatorstest.Manager,
+		validatorstest.NewManager(t),
 	)
 
 	txVerifier := network.NewLockedTxVerifier(&res.ctx.Lock, res.blkManager)

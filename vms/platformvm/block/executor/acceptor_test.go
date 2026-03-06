@@ -60,7 +60,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 			state: s,
 		},
 		metrics:    metrics.Noop,
-		validators: validatorstest.Manager,
+		validators: validatorstest.NewManager(t),
 	}
 
 	require.NoError(acceptor.ApricotProposalBlock(blk))
@@ -94,7 +94,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 			},
 		},
 		metrics:    metrics.Noop,
-		validators: validatorstest.Manager,
+		validators: validatorstest.NewManager(t),
 	}
 
 	blk, err := block.NewApricotAtomicBlock(
@@ -169,7 +169,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 			},
 		},
 		metrics:    metrics.Noop,
-		validators: validatorstest.Manager,
+		validators: validatorstest.NewManager(t),
 	}
 
 	blk, err := block.NewBanffStandardBlock(
@@ -253,7 +253,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			},
 		},
 		metrics:    metrics.Noop,
-		validators: validatorstest.Manager,
+		validators: validatorstest.NewManager(t),
 	}
 
 	blk, err := block.NewApricotCommitBlock(parentID, 1 /*height*/)
@@ -367,7 +367,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			},
 		},
 		metrics:    metrics.Noop,
-		validators: validatorstest.Manager,
+		validators: validatorstest.NewManager(t),
 	}
 
 	blk, err := block.NewApricotAbortBlock(parentID, 1 /*height*/)

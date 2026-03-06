@@ -155,7 +155,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 		metrics,
 		res.state,
 		res.backend,
-		validatorstest.Manager,
+		validatorstest.NewManager(t),
 	)
 	addSubnet(t, res)
 
