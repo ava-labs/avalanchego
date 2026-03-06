@@ -259,7 +259,7 @@ func TestVMConfig(t *testing.T) {
 	}).vm
 
 	require.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
-	require.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
+	require.Equal(t, vm.config.EnabledEthAPIs, enabledEthAPIs, "EnabledEthAPIs should be set")
 	require.NoError(t, vm.Shutdown(t.Context()))
 }
 
@@ -2213,7 +2213,8 @@ func TestAllowFeeRecipientEnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	etherBase := common.HexToAddress("0x0123456789")
-	c := config.NewDefaultConfig()
+	c, _, err := config.GetConfig(nil, avagoconstants.LocalID)
+	require.NoError(t, err)
 	c.FeeRecipient = etherBase.String()
 	configJSON, err := json.Marshal(c)
 	require.NoError(t, err)
@@ -2263,7 +2264,8 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	require.NoError(t, err)
 
 	etherBase := common.HexToAddress("0x0123456789") // give custom ether base
-	c := config.NewDefaultConfig()
+	c, _, err := config.GetConfig(nil, avagoconstants.LocalID)
+	require.NoError(t, err)
 	c.FeeRecipient = etherBase.String()
 	configJSON, err := json.Marshal(c)
 	require.NoError(t, err)
@@ -2406,7 +2408,8 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	etherBase := common.HexToAddress("0x0123456789") // give custom ether base
-	c := config.NewDefaultConfig()
+	c, _, err := config.GetConfig(nil, avagoconstants.LocalID)
+	require.NoError(t, err)
 	c.FeeRecipient = etherBase.String()
 	configJSON, err := json.Marshal(c)
 	require.NoError(t, err)
