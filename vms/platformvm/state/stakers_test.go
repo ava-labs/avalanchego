@@ -20,8 +20,7 @@ import (
 func TestBaseStakersPruning(t *testing.T) {
 	require := require.New(t)
 	staker := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
-	delegator := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
-	delegator.NodeID = staker.NodeID
+	delegator := newTestStaker(constants.PrimaryNetworkID, staker.NodeID)
 
 	v := newBaseStakers()
 
