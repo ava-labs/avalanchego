@@ -335,19 +335,19 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			return
 		}
 
-			// External failures and timeout-fired failures both clear the
-			// outstanding request.
-			//
-			// External failures (`AppError`) also remove the request from the
-			// timeout-manager so the timeout callback does not fire later.
-			// Timeout-fired failures do not need to remove the request from the
-			// timeout-manager because we are currently executing the callback,
-			// which already clears the request.
-			//
-			// Early internal failures caused by benching, disconnect, or a request
-			// to self are delivered once, but the request remains outstanding
-			// until the real response arrives or the timeout fires.
-			switch {
+		// External failures and timeout-fired failures both clear the
+		// outstanding request.
+		//
+		// External failures (`AppError`) also remove the request from the
+		// timeout-manager so the timeout callback does not fire later.
+		// Timeout-fired failures do not need to remove the request from the
+		// timeout-manager because we are currently executing the callback,
+		// which already clears the request.
+		//
+		// Early internal failures caused by benching, disconnect, or a request
+		// to self are delivered once, but the request remains outstanding
+		// until the real response arrives or the timeout fires.
+		switch {
 		case !internal:
 			cr.timeoutManager.RemoveRequest(uniqueRequestID)
 			fallthrough
