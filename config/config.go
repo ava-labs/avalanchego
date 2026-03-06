@@ -111,101 +111,11 @@ func getPrimaryNetworkSnowConfig(v *viper.Viper) *snowball.Parameters {
 		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
 		MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
 	}
-	if config.K == 0 {
-		config.K = v.GetInt(SnowSampleSizeKey)
-	}
-	if config.AlphaPreference == 0 {
-		config.AlphaPreference = v.GetInt(SnowPreferenceQuorumSizeKey)
-	}
-	if config.AlphaConfidence == 0 {
-		config.AlphaConfidence = v.GetInt(SnowConfidenceQuorumSizeKey)
-	}
-	if config.Beta == 0 {
-		config.Beta = v.GetInt(SnowCommitThresholdKey)
-	}
-	if config.ConcurrentRepolls == 0 {
-		config.ConcurrentRepolls = v.GetInt(SnowConcurrentRepollsKey)
-	}
-	if config.OptimalProcessing == 0 {
-		config.OptimalProcessing = v.GetInt(SnowOptimalProcessingKey)
-	}
-	if config.MaxOutstandingItems == 0 {
-		config.MaxOutstandingItems = v.GetInt(SnowMaxProcessingKey)
-	}
-	if config.MaxItemProcessingTime == 0 {
-		config.MaxItemProcessingTime = v.GetDuration(SnowMaxTimeProcessingKey)
-	}
-
 	if v.IsSet(SnowQuorumSizeKey) {
-		config.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
-		config.AlphaConfidence = config.AlphaPreference
+		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
+		p.AlphaConfidence = p.AlphaPreference
 	}
-	if config.Alpha != nil {
-		config.AlphaPreference = *config.Alpha
-		config.AlphaConfidence = config.AlphaPreference
-	}
-}
-
-func getDefaultSnowParams(v *viper.Viper) *snowball.Parameters {
-	p := snowball.DefaultParameters
-	setSnowDefaults(&p, v)
-
-	return &p
-}
-
-// setSimplexDefaults sets the default values for any unset fields in the
-// simplex.Parameters.
-func setSimplexDefaults(config *subnets.Config, v *viper.Viper) {
-	if config.SimplexParameters.MaxNetworkDelay == 0 {
-		config.SimplexParameters.MaxNetworkDelay = v.GetDuration(SimplexMaxNetworkDelayKey)
-	}
-	if config.SimplexParameters.MaxRebroadcastWait == 0 {
-		config.SimplexParameters.MaxRebroadcastWait = v.GetDuration(SimplexMaxRebroadcastWaitKey)
-	}
-}
-
-// setConfigDefaults sets the default values for any unset fields in the subnets.Config.
-func setConfigDefaults(config *subnets.Config, v *viper.Viper) {
-	switch {
-	case config.SimplexParameters != nil:
-		setSimplexDefaults(config, v)
-	case config.SnowParameters != nil:
-		setSnowDefaults(config.SnowParameters, v)
-	case config.ConsensusParameters != nil:
-		setSnowDefaults(config.ConsensusParameters, v)
-		config.SnowParameters = config.ConsensusParameters
-		config.ConsensusParameters = nil
-	default:
-		// If no consensus parameters are set, default to snowball parameters
-		config.SnowParameters = getDefaultSnowParams(v)
-	}
-}
-
-// getConfigFromBytes unmarshals a subnet config from rawBytes and validates it.
-// It also sets any unset fields to their default values for the provided subnet config.
-func getConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, error) {
-	config := getPrimaryNetworkConfig(v)
-	config.SnowParameters = nil
-	config.SimplexParameters = nil
-	config.ConsensusParameters = nil
-
-	if err := json.Unmarshal(rawBytes, &config); err != nil {
-		return subnets.Config{}, fmt.Errorf("%w: %s", errUnmarshalling, err.Error())
-	}
-
-	// Ensure that at most one consensus parameter type is set
-	if err := config.ValidConsensusConfiguration(); err != nil {
-		return subnets.Config{}, err
-	}
-	// set unset fields
-	setConfigDefaults(&config, v)
-
-	// validate parameters
-	if err := config.ValidParameters(); err != nil {
-		return subnets.Config{}, err
-	}
-
-	return config, nil
+	return p
 }
 
 // applySnowballParameterDefaults populates unset fields in a snowball.Parameters
