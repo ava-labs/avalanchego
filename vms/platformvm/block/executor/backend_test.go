@@ -14,19 +14,19 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 )
 
 func TestGetState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-
+	s := statetest.New(t, statetest.Config{})
 	var (
-		mockState     = state.NewMockState(ctrl)
 		onAcceptState = state.NewMockDiff(ctrl)
 		blkID1        = ids.GenerateTestID()
 		blkID2        = ids.GenerateTestID()
 		b             = &backend{
-			state: mockState,
+			state: s,
 			blkIDToState: map[ids.ID]*blockState{
 				blkID1: {
 					onAcceptState: onAcceptState,
@@ -51,7 +51,6 @@ func TestGetState(t *testing.T) {
 
 	{
 		// Case: block is not in the map and block isn't last accepted.
-		mockState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID())
 		_, ok := b.GetState(ids.GenerateTestID())
 		require.False(ok)
 	}
@@ -59,10 +58,10 @@ func TestGetState(t *testing.T) {
 	{
 		// Case: block is not in the map and block is last accepted.
 		blkID := ids.GenerateTestID()
-		mockState.EXPECT().GetLastAccepted().Return(blkID)
+		s.SetLastAccepted(blkID)
 		gotState, ok := b.GetState(blkID)
 		require.True(ok)
-		require.Equal(mockState, gotState)
+		require.Equal(s, gotState)
 	}
 }
 
@@ -73,8 +72,9 @@ func TestBackendGetBlock(t *testing.T) {
 	var (
 		blkID1       = ids.GenerateTestID()
 		statelessBlk = block.NewMockBlock(ctrl)
-		state        = state.NewMockState(ctrl)
-		b            = &backend{
+		state        = statetest.New(t, statetest.Config{})
+
+		b = &backend{
 			state: state,
 			blkIDToState: map[ids.ID]*blockState{
 				blkID1: {
@@ -94,7 +94,6 @@ func TestBackendGetBlock(t *testing.T) {
 	{
 		// Case: block isn't in the map or database.
 		blkID := ids.GenerateTestID()
-		state.EXPECT().GetStatelessBlock(blkID).Return(nil, database.ErrNotFound)
 		_, err := b.GetBlock(blkID)
 		require.Equal(database.ErrNotFound, err)
 	}
@@ -102,7 +101,9 @@ func TestBackendGetBlock(t *testing.T) {
 	{
 		// Case: block isn't in the map and is in database.
 		blkID := ids.GenerateTestID()
-		state.EXPECT().GetStatelessBlock(blkID).Return(statelessBlk, nil)
+		statelessBlk.EXPECT().ID().Return(blkID).Times(1)
+		statelessBlk.EXPECT().Height().Return(uint64(2178)).Times(1)
+		state.AddStatelessBlock(statelessBlk)
 		gotBlk, err := b.GetBlock(blkID)
 		require.NoError(err)
 		require.Equal(statelessBlk, gotBlk)
@@ -112,7 +113,7 @@ func TestBackendGetBlock(t *testing.T) {
 func TestGetTimestamp(t *testing.T) {
 	type test struct {
 		name              string
-		backendF          func(*gomock.Controller) *backend
+		backendF          func() *backend
 		expectedTimestamp time.Time
 	}
 
@@ -120,7 +121,7 @@ func TestGetTimestamp(t *testing.T) {
 	tests := []test{
 		{
 			name: "block is in map",
-			backendF: func(*gomock.Controller) *backend {
+			backendF: func() *backend {
 				return &backend{
 					blkIDToState: map[ids.ID]*blockState{
 						blkID: {
@@ -133,9 +134,9 @@ func TestGetTimestamp(t *testing.T) {
 		},
 		{
 			name: "block isn't map",
-			backendF: func(ctrl *gomock.Controller) *backend {
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetTimestamp().Return(time.Unix(1337, 0))
+			backendF: func() *backend {
+				state := statetest.New(t, statetest.Config{})
+				state.SetTimestamp(time.Unix(1337, 0))
 				return &backend{
 					state: state,
 				}
@@ -146,9 +147,7 @@ func TestGetTimestamp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-
-			backend := tt.backendF(ctrl)
+			backend := tt.backendF()
 			gotTimestamp := backend.getTimestamp(blkID)
 			require.Equal(t, tt.expectedTimestamp, gotTimestamp)
 		})

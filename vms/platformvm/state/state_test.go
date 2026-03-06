@@ -52,7 +52,7 @@ import (
 
 var defaultValidatorNodeID = ids.GenerateTestNodeID()
 
-func newTestState(t testing.TB, db database.Database) *state {
+func newTestState(t testing.TB, db database.Database) *State {
 	s, err := New(
 		db,
 		genesistest.NewBytes(t, genesistest.Config{
@@ -76,8 +76,8 @@ func newTestState(t testing.TB, db database.Database) *state {
 		}),
 	)
 	require.NoError(t, err)
-	require.IsType(t, (*state)(nil), s)
-	return s.(*state)
+	require.IsType(t, (*State)(nil), s)
+	return s
 }
 
 func TestStateSyncGenesis(t *testing.T) {
@@ -1257,17 +1257,17 @@ func TestStateSubnetOwner(t *testing.T) {
 func TestStateSubnetToL1Conversion(t *testing.T) {
 	tests := []struct {
 		name  string
-		setup func(s *state, subnetID ids.ID, c SubnetToL1Conversion)
+		setup func(s *State, subnetID ids.ID, c SubnetToL1Conversion)
 	}{
 		{
 			name: "in-memory",
-			setup: func(s *state, subnetID ids.ID, c SubnetToL1Conversion) {
+			setup: func(s *State, subnetID ids.ID, c SubnetToL1Conversion) {
 				s.SetSubnetToL1Conversion(subnetID, c)
 			},
 		},
 		{
 			name: "cache",
-			setup: func(s *state, subnetID ids.ID, c SubnetToL1Conversion) {
+			setup: func(s *State, subnetID ids.ID, c SubnetToL1Conversion) {
 				s.subnetToL1ConversionCache.Put(subnetID, c)
 			},
 		},

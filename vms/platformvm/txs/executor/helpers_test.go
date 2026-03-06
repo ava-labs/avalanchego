@@ -68,7 +68,7 @@ type environment struct {
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
 	msm            *mutableSharedMemory
-	state          state.State
+	state          *state.State
 	states         map[ids.ID]state.Chain
 	uptimes        uptime.Manager
 	backend        Backend

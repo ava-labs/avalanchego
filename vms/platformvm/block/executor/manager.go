@@ -55,7 +55,7 @@ type Manager interface {
 func NewManager(
 	mempool *mempool.Mempool,
 	metrics metrics.Metrics,
-	s state.State,
+	s *state.State,
 	txExecutorBackend *executor.Backend,
 	validatorManager validators.Manager,
 ) Manager {
