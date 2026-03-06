@@ -139,6 +139,8 @@ func (vm *VM) ethRPCServer() (*rpc.Server, error) {
 		//  - newPendingTransactions
 		//  - logs
 		{"eth", filterAPI},
+		// Avalanche-custom eth extensions:
+		{"eth", &customAPI{b}},
 	}
 
 	if vm.config.RPCConfig.EnableDBInspecting {
