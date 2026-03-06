@@ -1,0 +1,9 @@
+[profile.default]
+# Skip tests prefixed with test_slow in default profile
+default-filter = "not test(test_slow)"
+
+[profile.ci]
+# Do not cancel the test run on the first failure.
+fail-fast = false
+# Override default filter to run all tests including slow ones
+default-filter = "all()"
