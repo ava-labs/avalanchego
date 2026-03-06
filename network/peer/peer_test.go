@@ -131,6 +131,7 @@ func newRawTestPeer(t *testing.T, config *Config) *rawTestPeer {
 func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPeer {
 	return &testPeer{
 		Peer: Start(
+			context.Background(),
 			self.config,
 			conn,
 			peer.cert,
