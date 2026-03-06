@@ -67,17 +67,17 @@ func init() {
 	vdrs = map[ids.NodeID]*validators.GetValidatorOutput{
 		testVdrs[0].nodeID: {
 			NodeID:    testVdrs[0].nodeID,
-			PublicKey: testVdrs[0].vdr.PublicKey,
+			PublicKey: testVdrs[0].vdr.PublicKey(),
 			Weight:    testVdrs[0].vdr.Weight,
 		},
 		testVdrs[1].nodeID: {
 			NodeID:    testVdrs[1].nodeID,
-			PublicKey: testVdrs[1].vdr.PublicKey,
+			PublicKey: testVdrs[1].vdr.PublicKey(),
 			Weight:    testVdrs[1].vdr.Weight,
 		},
 		testVdrs[2].nodeID: {
 			NodeID:    testVdrs[2].nodeID,
-			PublicKey: testVdrs[2].vdr.PublicKey,
+			PublicKey: testVdrs[2].vdr.PublicKey(),
 			Weight:    testVdrs[2].vdr.Weight,
 		},
 	}
@@ -128,8 +128,7 @@ func newTestValidator() *testValidator {
 		nodeID: nodeID,
 		sk:     sk,
 		vdr: &avalancheWarp.Validator{
-			PublicKey:      pk,
-			PublicKeyBytes: pk.Serialize(),
+			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 			Weight:         3,
 			NodeIDs:        []ids.NodeID{nodeID},
 		},
@@ -214,7 +213,7 @@ func createSnowCtx(tb testing.TB, validatorRanges []validatorRange) *snow.Contex
 				Weight: validatorRange.weight,
 			}
 			if validatorRange.publicKey {
-				validatorOutput.PublicKey = testVdrs[i].vdr.PublicKey
+				validatorOutput.PublicKey = testVdrs[i].vdr.PublicKey()
 			}
 			validatorSet[testVdrs[i].nodeID] = validatorOutput
 		}
@@ -295,7 +294,6 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 
 		pk := vdr.sk.PublicKey()
 		warpValidators.Validators = append(warpValidators.Validators, &validators.Warp{
-			PublicKey:      pk,
 			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 			Weight:         20,
 			NodeIDs:        []ids.NodeID{vdr.nodeID},
@@ -784,7 +782,7 @@ func makeWarpPredicateTests(tb testing.TB, rules extras.AvalancheRules) []precom
 			validatorSet[testVdrs[i].nodeID] = &validators.GetValidatorOutput{
 				NodeID:    testVdrs[i].nodeID,
 				Weight:    20,
-				PublicKey: testVdrs[i%numSigners].vdr.PublicKey,
+				PublicKey: testVdrs[i%numSigners].vdr.PublicKey(),
 			}
 		}
 		warpValidators, err := validators.FlattenValidatorSet(validatorSet)
