@@ -11,7 +11,8 @@ set -euo pipefail
 if command -v bazelisk > /dev/null 2>&1; then
   exec bazelisk "${@}"
 elif command -v nix > /dev/null 2>&1; then
-  exec nix run nixpkgs#bazelisk -- "${@}"
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  exec nix develop "${REPO_ROOT}" --command bazelisk "${@}"
 else
   echo "Error: bazelisk not found. Install via 'nix develop' or see docs/bazel.md" >&2
   exit 1
