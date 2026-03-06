@@ -22,11 +22,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/txpool"
 	atomicvm "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
@@ -36,7 +36,7 @@ import (
 // method that treats the chain as being asynchronous since genesis.
 type SinceGenesis struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
-	hooks   *Hooks
+	hooks   *hooks
 	config  sae.Config
 
 	ctx          *snow.Context
@@ -99,7 +99,13 @@ func (vm *SinceGenesis) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
-	hooks := &Hooks{}
+	txs := txpool.NewTxs()
+	hooks := &hooks{
+		blockBuilder{
+			potentialTxs: txs,
+		},
+		snowCtx.Log,
+	}
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
 		return err
@@ -114,8 +120,6 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	{
-		const mempoolSize = 4096
-		txs := txpool.NewTxs(snowCtx, mempoolSize)
 		mempool, err := txpool.NewMempool(txs, metrics, func(tx *atomic.Tx) error {
 			// TODO: Implement me
 			return nil
