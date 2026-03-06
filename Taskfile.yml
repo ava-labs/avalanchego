@@ -75,10 +75,6 @@ tasks:
     desc: Clean Bazel cache (full expunge)
     cmd: ./scripts/run_bazel.sh clean --expunge
 
-  bazel-query:
-    desc: Query Bazel targets
-    cmd: ./scripts/run_bazel.sh query '//...' {{.CLI_ARGS}}
-
   bazel-mod-tidy:
     desc: Update use_repo() in MODULE.bazel from go.mod
     cmd: ./scripts/run_bazel.sh mod tidy
