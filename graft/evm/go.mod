@@ -1,7 +1,7 @@
 module github.com/ava-labs/avalanchego/graft/evm
 
 // See ../../go.mod for guidelines on updating the Go version.
-go 1.26.0
+go 1.26.1
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1

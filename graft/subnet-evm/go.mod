@@ -5,7 +5,7 @@ module github.com/ava-labs/avalanchego/graft/subnet-evm
 // CONTRIBUTING.md for more details.
 
 // See ../../go.mod for guidelines on updating the Go version.
-go 1.26.0
+go 1.26.1
 
 require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
