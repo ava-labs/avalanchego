@@ -7,8 +7,8 @@ load("@io_bazel_rules_go//go:def.bzl", _go_test = "go_test")
 def go_test(**kwargs):
     """go_test wrapper that enables shuffle by default.
 
-    This wrapper exists because .bazelrc --test_arg applies to all test
-    targets including gazelle_test, which doesn't understand Go test
+    This wrapper exists because .bazelrc --test_arg applies to test
+    targets for all languages / rules, which don't understand Go's test
     flags. By wrapping go_test and injecting shuffle via args, it only
     applies to Go test binaries.
 
