@@ -72,6 +72,9 @@
 
             # s5cmd for rapid s3 interactions
             s5cmd
+
+            # Dev container CLI
+            devcontainer
           ];
 
           # Add scripts/ directory to PATH so kind-with-registry.sh is accessible
