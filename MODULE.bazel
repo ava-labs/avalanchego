@@ -10,9 +10,9 @@ bazel_dep(name = "protobuf", version = "29.3", repo_name = "com_google_protobuf"
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 
-# Go SDK - version should match go.mod and nix/go/default.nix
+# Go SDK - reads version from go.mod (ensured consistent with all go.mod files)
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
-go_sdk.download(version = "1.25.7")
+go_sdk.from_file(go_mod = "//:go.mod")
 
 # Go dependencies from go.work (aggregates all go.mod files)
 go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps")

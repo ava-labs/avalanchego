@@ -42,20 +42,21 @@ task bazel-clean
 
 ### Toolchain Strategy
 
-The build uses `go_sdk.download()` to download a specific Go version,
-ensuring reproducible builds without requiring a Nix shell:
+The build uses `go_sdk.from_file()` to read the Go version from
+`go.mod`, ensuring a single source of truth without manual syncing:
 
 ```python
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
-go_sdk.download(version = "1.xx.x")
+go_sdk.from_file(go_mod = "//:go.mod")
 ```
 
 **Approaches considered:**
 
 | Approach | Pros | Cons |
 |----------|------|------|
-| `go_sdk.download()` (chosen) | Reproducible, no nix required for builds | Go version must be synced manually across go.mod files |
-| `go_sdk.host()` | Single source of truth via nix | Requires nix shell, not hermetic outside nix |
+| `go_sdk.from_file()` (chosen) | Reproducible, single source of truth via go.mod, no nix required | None significant |
+| `go_sdk.download()` | Explicit version in MODULE.bazel | Go version must be synced manually across go.mod files |
+| `go_sdk.host()` | Uses system Go | Requires nix shell, not hermetic outside nix |
 | `rules_nixpkgs_go` | Bazel calls Nix directly, fully hermetic | **Incompatible with rules_go v0.57+** (toolchain API mismatch) |
 
 > **Note:** rules_nixpkgs_go v0.13.0 proved incompatible with rules_go
@@ -68,7 +69,7 @@ go_sdk.download(version = "1.xx.x")
 | Tool | Version | Pin Mechanism | Rationale |
 |------|---------|---------------|-----------|
 | Bazel | 8.0.1 | `.bazelversion` + bazelisk | Current LTS with native bzlmod support |
-| Go | 1.25.7 | `MODULE.bazel` go_sdk.download | Must match go.mod |
+| Go | 1.25.7 | `go.mod` via go_sdk.from_file | Single source of truth |
 | rules_go | 0.57.0 | `MODULE.bazel` | Go 1.25+ support (compiles `pack` from source) |
 | gazelle | 0.45.0 | `MODULE.bazel` | Compatible with rules_go 0.57.0 |
 
@@ -583,8 +584,10 @@ bazel build --config=release //main:avalanchego   # Release build (stamped)
    but incompatible with remote execution.
 
 2. **Go version sync** - Go version must be kept in sync across
-   `MODULE.bazel`, `go.work`, `go.mod` files, and `nix/go/default.nix`.
-   Use `task update-go-version -- <version>` to update all files except
+   `go.work`, `go.mod` files, and `nix/go/default.nix`. Bazel reads
+   the version from `go.mod` via `go_sdk.from_file()`, so
+   `MODULE.bazel` doesn't need separate updating. Use
+   `task update-go-version -- <version>` to update all files except
    nix (which requires SHA changes). CI enforces consistency via
    `task check-go-version`.
 
