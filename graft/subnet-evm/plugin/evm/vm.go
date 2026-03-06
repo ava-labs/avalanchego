@@ -767,7 +767,7 @@ func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
 	return vm.ctx.Metrics.Register(chainStateMetricsPrefix, chainStateRegisterer)
 }
 
-func (vm *VM) SetState(_ context.Context, state snow.State) error {
+func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	vm.vmLock.Lock()
 	defer vm.vmLock.Unlock()
 	switch state {
@@ -777,7 +777,7 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	case snow.Bootstrapping:
 		return vm.onBootstrapStarted()
 	case snow.NormalOp:
-		return vm.onNormalOperationsStarted()
+		return vm.onNormalOperationsStarted(ctx)
 	default:
 		return snow.ErrUnknownState
 	}
@@ -800,13 +800,13 @@ func (vm *VM) onBootstrapStarted() error {
 }
 
 // onNormalOperationsStarted marks this VM as bootstrapped
-func (vm *VM) onNormalOperationsStarted() error {
+func (vm *VM) onNormalOperationsStarted(ctx context.Context) error {
 	if vm.bootstrapped.Get() {
 		return nil
 	}
 	vm.bootstrapped.Set(true)
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(ctx)
 	vm.cancel = cancel
 
 	// Initially sync the uptime tracker so that APIs expose recent data even if
