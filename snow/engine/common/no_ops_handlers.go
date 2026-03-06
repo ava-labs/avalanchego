@@ -28,6 +28,7 @@ var (
 	_ ChitsHandler                = (*noOpChitsHandler)(nil)
 	_ AppHandler                  = (*noOpAppHandler)(nil)
 	_ InternalHandler             = (*noOpInternalHandler)(nil)
+	_ SimplexHandler              = (*noOpSimplexHandler)(nil)
 )
 
 type noOpStateSummaryFrontierHandler struct {
@@ -379,6 +380,23 @@ func (nop *noOpInternalHandler) Notify(_ context.Context, msg Message) error {
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.NotifyOp),
 		zap.Stringer("message", msg),
+	)
+	return nil
+}
+
+type noOpSimplexHandler struct {
+	log logging.Logger
+}
+
+func NewNoOpSimplexHandler(log logging.Logger) SimplexHandler {
+	return &noOpSimplexHandler{log: log}
+}
+
+func (nop *noOpSimplexHandler) Simplex(_ context.Context, nodeID ids.NodeID, _ *p2p.Simplex) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.SimplexOp),
+		zap.Stringer("nodeID", nodeID),
 	)
 	return nil
 }

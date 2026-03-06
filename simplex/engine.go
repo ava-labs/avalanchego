@@ -15,15 +15,20 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/snow"
-	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 var _ common.Engine = (*Engine)(nil)
+
+var (
+	errUnknownMessageType   = errors.New("unknown message type")
+	errNilSimplexParameters = errors.New("simplex parameters cannot be nil")
+)
 
 type Engine struct {
 	// nonValidator marks that this node is not a validator
@@ -47,6 +52,7 @@ type Engine struct {
 	// Handler that passes application messages to the VM
 	common.AppHandler
 	validators.Connector
+	vm block.ChainVM
 
 	epoch              *simplex.Epoch
 	blockDeserializer  *blockDeserializer
@@ -266,6 +272,29 @@ func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*si
 	default:
 		return nil, errUnknownMessageType
 	}
+}
+
+// Gossip is a no-op because there is no need for the Simplex engine
+// to periodically pull/push messages from the network.
+// This is all handled internally inside of Simplex consensus.
+func (*Engine) Gossip(_ context.Context) error {
+	return nil
+}
+
+// Notify is a no-op because the Simplex engine does not need to be notified of any events from the VM.
+// This is because the Simplex instance listens to the VM events by directly calling `WaitForEvent` when needed.
+func (*Engine) Notify(_ context.Context, _ common.Message) error {
+	return nil
+}
+
+func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
+	vmIntf, vmErr := e.vm.HealthCheck(ctx)
+	intf := map[string]interface{}{
+		"consensus": struct{}{},
+		"vm":        vmIntf,
+	}
+
+	return intf, vmErr
 }
 
 func (e *Engine) Shutdown(_ context.Context) error {

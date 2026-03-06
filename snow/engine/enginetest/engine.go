@@ -44,7 +44,7 @@ var (
 	errPullQuery                     = errors.New("unexpectedly called PullQuery")
 	errQueryFailed                   = errors.New("unexpectedly called QueryFailed")
 	errChits                         = errors.New("unexpectedly called Chits")
-	errSimplex                       = errors.New("unexpectedly called SimplexMessage")
+	errSimplex                       = errors.New("unexpectedly called Simplex")
 	errStart                         = errors.New("unexpectedly called Start")
 
 	_ common.Engine = (*Engine)(nil)
@@ -169,6 +169,7 @@ func (e *Engine) Default(cant bool) {
 	e.CantPullQuery = cant
 	e.CantQueryFailed = cant
 	e.CantChits = cant
+	e.CantSimplex = cant
 	e.CantConnected = cant
 	e.CantDisconnected = cant
 	e.CantHealth = cant
@@ -580,6 +581,19 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 		require.FailNow(e.T, errChits.Error())
 	}
 	return errChits
+}
+
+func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+	if e.SimplexF != nil {
+		return e.SimplexF(ctx, nodeID, msg)
+	}
+	if !e.CantSimplex {
+		return nil
+	}
+	if e.T != nil {
+		require.FailNow(e.T, errSimplex.Error())
+	}
+	return errSimplex
 }
 
 func (e *Engine) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
