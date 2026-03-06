@@ -15,13 +15,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/snow"
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ common.Engine = (*Engine)(nil)
-
-var errUnknownMessageType = errors.New("unknown message type")
 
 type Engine struct {
 	// nonValidator marks that this node is not a validator
@@ -46,25 +48,35 @@ type Engine struct {
 	common.AppHandler
 	validators.Connector
 
-	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
-)
+	epoch              *simplex.Epoch
+	blockDeserializer  *blockDeserializer
+	quorumDeserializer *QCDeserializer
+	logger             logging.Logger
+
+	tickInterval time.Duration
+	shutdown     chan struct{}
+	shutdownOnce sync.Once
+
+	vm           block.ChainVM
+	consensusCtx *snow.ConsensusContext
+}
 
 var (
 	errUnknownMessageType   = errors.New("unknown message type")
 	errNilSimplexParameters = errors.New("simplex parameters cannot be nil")
 )
-  
+
 // The VM must be initialized before creating the engine
-func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
-  if isNonValidator(config) {
+func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Config) (*Engine, error) {
+	if isNonValidator(config) {
 		config.Log.Info("Out node is not a validator for the subnet",
 			zap.Stringer("nodeID", config.Ctx.NodeID),
 			zap.Stringer("chainID", config.Ctx.ChainID),
 			zap.Stringer("subnetID", config.Ctx.SubnetID),
 		)
-		return nonValidatingEngine(consensusCtx, config)
-  }
-  
+		return nonValidatingEngine(snowCtx, config)
+	}
+
 	if config.Params == nil {
 		return nil, errNilSimplexParameters
 	}
@@ -146,10 +158,6 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	}
 
 	return &Engine{
-		epoch:                       epoch,
-		blockDeserializer:           blockDeserializer,
-		quorumDeserializer:          qcDeserializer,
-		logger:                      config.Log,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
@@ -160,26 +168,20 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
 		Connector:                   config.VM,
 
-		tickInterval: getTickInterval(config.Params),
-		AppHandler:   config.VM,
-		vm:           config.VM,
-		consensusCtx: consensusCtx,
-    	epoch:              epoch,
+		tickInterval:       getTickInterval(config.Params),
+		AppHandler:         config.VM,
+		vm:                 config.VM,
+		consensusCtx:       snowCtx,
 		blockDeserializer:  blockDeserializer,
 		quorumDeserializer: qcDeserializer,
+		epoch:              epoch,
 		logger:             config.Log,
-
-		tickInterval: getTickInterval(config.Params),
-		shutdown:     make(chan struct{}, 1),
-    
-	tickInterval time.Duration
-	shutdown     chan struct{}
-	shutdownOnce sync.Once
+		shutdown:           make(chan struct{}, 1),
 	}, nil
 }
 
-func (e *Engine) Start(_ context.Context, _ uint32) error {
-  if e.nonValidator {
+func (e *Engine) Start(ctx context.Context, _ uint32) error {
+	if e.nonValidator {
 		e.logger.Info("non-validator cannot start simplex engine")
 		return nil
 	}
@@ -200,7 +202,6 @@ func (e *Engine) Start(_ context.Context, _ uint32) error {
 	})
 	return e.vm.SetState(ctx, snow.NormalOp)
 }
-
 
 // getTickInterval defines a reasonable tick interval for simplex to advance time.
 func getTickInterval(params *simplexparams.Parameters) time.Duration {
@@ -359,4 +360,3 @@ func isNonValidator(config *Config) bool {
 	}
 	return true
 }
-

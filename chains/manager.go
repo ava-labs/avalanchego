@@ -1790,7 +1790,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		Params:             sb.Config().SimplexParameters,
 	}
 
-	engine, err := simplex.NewEngine(ctx, context.TODO(), config)
+	engine, err := simplex.NewEngine(context.TODO(), ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create simplex engine: %w", err)
 	}

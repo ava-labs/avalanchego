@@ -114,7 +114,7 @@ func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 		constants.PrimaryNetworkID: {},
 		subnetID: {
 			SimplexParameters: &simplex.Parameters{
-				MaxProposalWait:    10 * time.Second,
+				MaxNetworkDelay:    10 * time.Second,
 				MaxRebroadcastWait: 5 * time.Second,
 			},
 		},
