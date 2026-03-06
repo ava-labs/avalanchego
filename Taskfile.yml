@@ -16,6 +16,93 @@ includes:
 tasks:
   default: ./scripts/run_task.sh --list
 
+  # All bazel invocations are to ./scripts/run_bazel.sh which will invoke bazelisk without a
+  # dependency on being in a nix shell.
+
+  bazel-build:
+    desc: Build avalanchego with Bazel
+    cmd: ./scripts/run_bazel.sh build //main:avalanchego
+
+  bazel-build-race:
+    desc: Build avalanchego with Bazel (race detection)
+    cmd: ./scripts/run_bazel.sh build --config=race //main:avalanchego
+
+  bazel-build-opt:
+    desc: Build avalanchego with Bazel (optimized)
+    cmd: ./scripts/run_bazel.sh build --compilation_mode=opt //main:avalanchego
+
+  bazel-generate-patches:
+    desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
+    cmd: ./scripts/generate_bazel_patches.sh
+
+  bazel-gazelle-delete:
+    desc: Delete all gazelle-generated BUILD.bazel files (except manually maintained ones)
+    # TODO(marun) Remove before merge. This exists only to partition the PR into
+    # generated vs non-generated files for easier review. gazelle fix handles stale
+    # rules, and empty BUILD.bazel files left behind are harmless.
+    cmd: |
+      find . -name 'BUILD.bazel' -type f | while read f; do
+        # Skip root and graft module roots (manually maintained)
+        case "$f" in
+          ./BUILD.bazel|./graft/coreth/BUILD.bazel|./graft/evm/BUILD.bazel|./graft/subnet-evm/BUILD.bazel|./.bazel/*)
+            continue
+            ;;
+        esac
+        # Skip files with '# keep' comments (have manual customizations)
+        if grep -q '# keep' "$f"; then
+          continue
+        fi
+        rm -f "$f"
+      done
+
+  bazel-gazelle-generate:
+    desc: Regenerate BUILD files with Gazelle (all modules)
+    cmd: ./scripts/run_bazel.sh run //:gazelle
+
+  bazel-test:
+    desc: Run unit tests with Bazel (shuffle on, race on)
+    cmd: ./scripts/run_bazel.sh test //...
+
+  bazel-test-fast:
+    desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
+    cmd: ./scripts/run_bazel.sh test --config=fast //...
+
+  bazel-clean:
+    desc: Clean Bazel cache
+    cmd: ./scripts/run_bazel.sh clean
+
+  bazel-clean-all:
+    desc: Clean Bazel cache (full expunge)
+    cmd: ./scripts/run_bazel.sh clean --expunge
+
+  bazel-mod-tidy:
+    desc: Update use_repo() in MODULE.bazel from go.mod
+    cmd: ./scripts/run_bazel.sh mod tidy
+
+  bazel-fmt:
+    desc: Format BUILD.bazel files with buildifier
+    cmd: buildifier -r .
+
+  bazel-test-e2e:
+    desc: Run E2E tests with bazel-built binary
+    cmds:
+      - task: bazel-build
+      - task: build-xsvm
+      - cmd: |
+          AVALANCHEGO_PATH=$(./scripts/run_bazel.sh cquery --output=files //main:avalanchego 2>/dev/null) \
+          bash -x ./scripts/tests.e2e.existing.sh
+
+  bazel-test-e2e-ci:
+    desc: Run E2E tests with bazel-built binary [serially with race detection]
+    env:
+      E2E_SERIAL: 1
+    cmds:
+      - task: bazel-build-race
+      - task: build-xsvm
+      - cmd: |
+          AVALANCHEGO_PATH=$(./scripts/run_bazel.sh cquery --output=files //main:avalanchego 2>/dev/null) \
+          bash -x ./scripts/tests.e2e.existing.sh
+
   build:
     desc: Builds avalanchego
     cmd: ./scripts/build.sh
@@ -74,6 +161,22 @@ tasks:
   build-xsvm-image:
     desc: Builds xsvm image
     cmd: ./scripts/build_xsvm_image.sh
+
+  check-bazel-fmt:
+    desc: Check that BUILD.bazel files are formatted with buildifier
+    cmds:
+      - task: bazel-fmt
+      - task: check-clean-branch
+
+  check-bazel-generate-patches:
+    desc: Checks that generated patches are up-to-date (requires a clean working tree)
+    cmds:
+      - task: bazel-generate-patches
+      - task: check-clean-branch
+
+  check-bazel-gazelle-generate:
+    desc: Check that generated BUILD files are up-to-date
+    cmd: ./scripts/run_bazel.sh test //:gazelle_test
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
@@ -181,6 +284,8 @@ tasks:
       - cmd: cd graft/coreth && GOWORK=off go mod tidy
       - cmd: cd graft/subnet-evm && GOWORK=off go mod tidy
       - task: sync-go-work
+      # Update use_repo() in MODULE.bazel to match go.mod dependencies
+      - cmd: ./scripts/run_bazel.sh mod tidy
 
   install-nix:
     desc: Installs nix with an OS-appropriate installer
@@ -199,6 +304,7 @@ tasks:
     deps:
       - lint
       - lint-action
+      - lint-bazel
       - lint-shell
       - check-go-mod-tidy
       - check-go-version
@@ -210,11 +316,22 @@ tasks:
     cmds:
       - task: lint
       - task: lint-action
+      - task: lint-bazel
       - task: lint-shell
       - task: check-go-mod-tidy
       - task: check-go-version
       - task: check-require-directives
       - task: check-require-directives-round-trip
+
+  lint-bazel:
+    desc: Checks Bazel BUILD files are formatted and up-to-date (requires clean git tree)
+    cmds:
+      - task: check-bazel-fmt
+      - task: check-bazel-gazelle-generate
+      # Must run after fmt and gazelle since either could modify source BUILD
+      # files in .bazel/patches/build_files/. In practice gazelle skips them
+      # (they have `# gazelle:ignore`) but buildifier will reformat them.
+      - task: check-bazel-generate-patches
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
