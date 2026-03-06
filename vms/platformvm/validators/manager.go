@@ -18,11 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -47,98 +45,9 @@ var (
 	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
 )
 
-// Manager adds the ability to introduce newly accepted blocks IDs to the State
-// interface.
-// type Manager interface {
-// 	validators.State
-
-// 	// OnAcceptedBlockID registers the ID of the latest accepted block.
-// 	// It is used to update the [recentlyAccepted] sliding window.
-// 	OnAcceptedBlockID(blkID ids.ID)
-// }
-
-type State interface {
-	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
-
-	GetLastAccepted() ids.ID
-	GetStatelessBlock(blockID ids.ID) (block.Block, error)
-
-	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
-	// block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
-	ApplyValidatorWeightDiffs(
-		ctx context.Context,
-		validators map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-		subnetID ids.ID,
-	) error
-
-	// ApplyAllValidatorWeightDiffs iterates from [startHeight] towards the genesis
-	// block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
-	ApplyAllValidatorWeightDiffs(
-		ctx context.Context,
-		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-	) error
-
-	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
-	// genesis block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
-	ApplyValidatorPublicKeyDiffs(
-		ctx context.Context,
-		validators map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-		subnetID ids.ID,
-	) error
-
-	// ApplyAllValidatorPublicKeyDiffs iterates from [startHeight] towards the
-	// genesis block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
-	ApplyAllValidatorPublicKeyDiffs(
-		ctx context.Context,
-		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-	) error
-
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*state.Staker, []state.L1Validator, uint64, error)
-}
-
 func NewManager(
 	cfg config.Internal,
-	state State,
+	state *state.State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 ) *Manager {
@@ -159,11 +68,13 @@ func NewManager(
 	}
 }
 
+// Manager adds the ability to introduce newly accepted blocks IDs to the State
+// interface.
 // TODO: Remove requirement for the P-chain's context lock to be held when
 // calling exported functions.
 type Manager struct {
 	cfg     config.Internal
-	state   State
+	state   *state.State
 	metrics metrics.Metrics
 	clk     *mockable.Clock
 
@@ -423,6 +334,8 @@ func (m *Manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 	return chain.SubnetID, nil
 }
 
+// OnAcceptedBlockID registers the ID of the latest accepted block.
+// It is used to update the [recentlyAccepted] sliding window.
 func (m *Manager) OnAcceptedBlockID(blkID ids.ID) {
 	m.recentlyAccepted.Add(blkID)
 }
