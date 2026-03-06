@@ -738,12 +738,14 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2ppb.Simplex:
+		// TODO: remove debug log.
 		h.ctx.Log.Debug("received simplex message",
 			zap.Stringer("nodeID", nodeID),
 			zap.String("messageOp", op),
 			zap.Stringer("message", body),
 		)
-		return nil
+		return engine.Simplex(ctx, nodeID, msg)
+
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
 		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
