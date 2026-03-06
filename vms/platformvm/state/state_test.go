@@ -215,11 +215,11 @@ func TestState_writeStakers(t *testing.T) {
 		addStakerTx *txs.Tx // If tx is nil, the staker is being removed
 
 		// Check that the staker is duly stored/removed in P-chain state
-		expectedCurrentValidator  *Staker
+		expectedCurrentValidator           *Staker
 		expectedPendingValidator           *Staker
 		wantGetCurrentDelegatorIteratorErr error
 		expectedCurrentDelegators          []*Staker
-		expectedPendingDelegators []*Staker
+		expectedPendingDelegators          []*Staker
 
 		// Check that the validator entry has been set correctly in the
 		// in-memory validator set.
@@ -278,21 +278,21 @@ func TestState_writeStakers(t *testing.T) {
 			},
 		},
 		"add pending primary network validator": {
-			staker:                   primaryNetworkPendingValidatorStaker,
-			addStakerTx:              addPrimaryNetworkValidator,
-			expectedPendingValidator: primaryNetworkPendingValidatorStaker,
+			staker:                             primaryNetworkPendingValidatorStaker,
+			addStakerTx:                        addPrimaryNetworkValidator,
+			expectedPendingValidator:           primaryNetworkPendingValidatorStaker,
 			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
-			expectedValidatorDiffs:   map[subnetIDNodeID]*validatorDiff{},
+			expectedValidatorDiffs:             map[subnetIDNodeID]*validatorDiff{},
 		},
 		"add pending primary network delegator": {
-			initialStakers:            []*Staker{primaryNetworkPendingValidatorStaker},
-			initialTxs:                []*txs.Tx{addPrimaryNetworkValidator},
-			staker:                    primaryNetworkPendingDelegatorStaker,
-			addStakerTx:               addPrimaryNetworkDelegator,
-			expectedPendingValidator:  primaryNetworkPendingValidatorStaker,
+			initialStakers:                     []*Staker{primaryNetworkPendingValidatorStaker},
+			initialTxs:                         []*txs.Tx{addPrimaryNetworkValidator},
+			staker:                             primaryNetworkPendingDelegatorStaker,
+			addStakerTx:                        addPrimaryNetworkDelegator,
+			expectedPendingValidator:           primaryNetworkPendingValidatorStaker,
 			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
-			expectedPendingDelegators: []*Staker{primaryNetworkPendingDelegatorStaker},
-			expectedValidatorDiffs:    map[subnetIDNodeID]*validatorDiff{},
+			expectedPendingDelegators:          []*Staker{primaryNetworkPendingDelegatorStaker},
+			expectedValidatorDiffs:             map[subnetIDNodeID]*validatorDiff{},
 		},
 		"add current subnet validator": {
 			initialStakers:           []*Staker{primaryNetworkCurrentValidatorStaker},
@@ -320,9 +320,9 @@ func TestState_writeStakers(t *testing.T) {
 			},
 		},
 		"delete current primary network validator": {
-			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker},
-			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator},
-			staker:         primaryNetworkCurrentValidatorStaker,
+			initialStakers:                     []*Staker{primaryNetworkCurrentValidatorStaker},
+			initialTxs:                         []*txs.Tx{addPrimaryNetworkValidator},
+			staker:                             primaryNetworkCurrentValidatorStaker,
 			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
 			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
 				{
@@ -369,11 +369,11 @@ func TestState_writeStakers(t *testing.T) {
 			},
 		},
 		"delete pending primary network validator": {
-			initialStakers:         []*Staker{primaryNetworkPendingValidatorStaker},
-			initialTxs:             []*txs.Tx{addPrimaryNetworkValidator},
-			staker:                 primaryNetworkPendingValidatorStaker,
+			initialStakers:                     []*Staker{primaryNetworkPendingValidatorStaker},
+			initialTxs:                         []*txs.Tx{addPrimaryNetworkValidator},
+			staker:                             primaryNetworkPendingValidatorStaker,
 			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
-			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{},
+			expectedValidatorDiffs:             map[subnetIDNodeID]*validatorDiff{},
 		},
 		"delete pending primary network delegator": {
 			initialStakers: []*Staker{
@@ -384,15 +384,15 @@ func TestState_writeStakers(t *testing.T) {
 				addPrimaryNetworkValidator,
 				addPrimaryNetworkDelegator,
 			},
-			staker:                   primaryNetworkPendingDelegatorStaker,
-			expectedPendingValidator: primaryNetworkPendingValidatorStaker,
+			staker:                             primaryNetworkPendingDelegatorStaker,
+			expectedPendingValidator:           primaryNetworkPendingValidatorStaker,
 			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
-			expectedValidatorDiffs:   map[subnetIDNodeID]*validatorDiff{},
+			expectedValidatorDiffs:             map[subnetIDNodeID]*validatorDiff{},
 		},
 		"delete current subnet validator": {
-			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker, subnetCurrentValidatorStaker},
-			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator, addSubnetValidator},
-			staker:         subnetCurrentValidatorStaker,
+			initialStakers:                     []*Staker{primaryNetworkCurrentValidatorStaker, subnetCurrentValidatorStaker},
+			initialTxs:                         []*txs.Tx{addPrimaryNetworkValidator, addSubnetValidator},
+			staker:                             subnetCurrentValidatorStaker,
 			wantGetCurrentDelegatorIteratorErr: database.ErrNotFound,
 			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
 				{
@@ -425,18 +425,18 @@ func TestState_writeStakers(t *testing.T) {
 					case staker.Priority.IsPendingValidator():
 						require.NoError(state.PutPendingValidator(staker))
 					case staker.Priority.IsCurrentDelegator():
-						state.PutCurrentDelegator(staker)
+						require.NoError(state.PutCurrentDelegator(staker))
 					case staker.Priority.IsPendingDelegator():
 						state.PutPendingDelegator(staker)
 					}
 				} else {
 					switch {
 					case staker.Priority.IsCurrentValidator():
-						state.DeleteCurrentValidator(staker)
+						require.NoError(state.DeleteCurrentValidator(staker))
 					case staker.Priority.IsPendingValidator():
 						state.DeletePendingValidator(staker)
 					case staker.Priority.IsCurrentDelegator():
-						state.DeleteCurrentDelegator(staker)
+						require.NoError(state.DeleteCurrentDelegator(staker))
 					case staker.Priority.IsPendingDelegator():
 						state.DeletePendingDelegator(staker)
 					}
