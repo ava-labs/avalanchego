@@ -180,7 +180,7 @@ tasks:
 
   check-bazel-gazelle-generate:
     desc: Check that generated BUILD files are up-to-date
-    cmd: ./scripts/run_bazel.sh test //:gazelle_test //graft/coreth:gazelle_test //graft/evm:gazelle_test //graft/subnet-evm:gazelle_test
+    cmd: ./scripts/run_bazel.sh test //:gazelle_test
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
