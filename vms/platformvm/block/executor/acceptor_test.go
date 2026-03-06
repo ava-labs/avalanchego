@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic/atomicmock"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -141,6 +142,11 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1)
 
 	require.NoError(acceptor.ApricotAtomicBlock(blk))
+
+	_, _, height, err := s.GetCurrentValidators(t.Context(), constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(blk.Height(), height)
+	require.Equal(blk.ID(), s.GetLastAccepted())
 }
 
 func TestAcceptorVisitStandardBlock(t *testing.T) {
@@ -221,6 +227,11 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	require.NoError(acceptor.BanffStandardBlock(blk))
 	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
+
+	_, _, height, err := s.GetCurrentValidators(t.Context(), constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(blk.Height(), height)
+	require.Equal(blk.ID(), s.GetLastAccepted())
 }
 
 func TestAcceptorVisitCommitBlock(t *testing.T) {
@@ -288,6 +299,11 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	err = acceptor.ApricotCommitBlock(blk)
 	require.ErrorIs(err, errMissingBlockState)
 
+	_, _, height, err := s.GetCurrentValidators(t.Context(), constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(blk.Height()-1, height)
+	require.Equal(parentID, s.GetLastAccepted())
+
 	parentOnCommitState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -325,6 +341,11 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	require.NoError(acceptor.ApricotCommitBlock(blk))
 	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
+
+	_, _, height, err = s.GetCurrentValidators(t.Context(), constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(blk.Height(), height)
+	require.Equal(blk.ID(), s.GetLastAccepted())
 }
 
 func TestAcceptorVisitAbortBlock(t *testing.T) {
