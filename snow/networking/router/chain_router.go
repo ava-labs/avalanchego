@@ -341,7 +341,11 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 		//
 		// For an early internal failure message due to benching, disconnect, or a request to self, we do not clear
 		// the timeout and instead wait for the actual response or timeout.
-		if timeout || !internal {
+		switch {
+		case !internal:
+			cr.timeoutManager.RemoveRequest(uniqueRequestID)
+			fallthrough
+		case timeout:
 			cr.timedRequests.Delete(uniqueRequestID)
 			cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 		}
