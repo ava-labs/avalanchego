@@ -2148,7 +2148,7 @@ func TestL1ValidatorAfterLegacyRemoval(t *testing.T) {
 	state.SetHeight(1)
 	require.NoError(state.Commit())
 
-	state.DeleteCurrentValidator(legacyStaker)
+	require.NoError(state.DeleteCurrentValidator(legacyStaker))
 
 	l1Validator := L1Validator{
 		ValidationID:          ids.GenerateTestID(),
