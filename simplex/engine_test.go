@@ -5,6 +5,7 @@ package simplex
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -43,6 +44,49 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 
 	for _, msg := range allSimplexMessages {
 		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
+	}
+}
+
+func TestHealthCheck(t *testing.T) {
+	vmHealthErr := errors.New("vm health error")
+	vmHealthResult := map[string]interface{}{"healthy": true}
+
+	tests := []struct {
+		name        string
+		vmResult    interface{}
+		vmErr       error
+		expectedErr error
+	}{
+		{
+			name:        "vm healthy",
+			vmResult:    vmHealthResult,
+			vmErr:       nil,
+			expectedErr: nil,
+		},
+		{
+			name:        "vm unhealthy",
+			vmResult:    nil,
+			vmErr:       vmHealthErr,
+			expectedErr: vmHealthErr,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine, _ := setupEngine(t)
+			engine.vm.(*wrappedVM).VM.VM.HealthCheckF = func(context.Context) (interface{}, error) {
+				return tt.vmResult, tt.vmErr
+			}
+
+			result, err := engine.HealthCheck(t.Context())
+			require.ErrorIs(t, err, tt.expectedErr)
+
+			resultMap, ok := result.(map[string]interface{})
+			require.True(t, ok)
+			require.Contains(t, resultMap, "consensus")
+			require.Contains(t, resultMap, "vm")
+			require.Equal(t, tt.vmResult, resultMap["vm"])
+		})
 	}
 }
 
