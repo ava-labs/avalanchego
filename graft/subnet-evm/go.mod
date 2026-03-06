@@ -11,7 +11,7 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego v0.0.0-initial-consistent-tag
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-initial-consistent-tag
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.1.0
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.2.0
 	github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3
