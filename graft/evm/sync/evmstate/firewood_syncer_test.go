@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
@@ -147,10 +148,12 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	// so the codec choice only affects the code request handler which is auxiliary to these tests.
 	var (
 		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
-		mockClient         = statesyncclient.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
 		serverDB           = dbFromState(t, serverState)
-		rHandler           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetRangeProofHandler(serverDB))
-		cHandler           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetChangeProofHandler(serverDB))
+		clients            = map[uint64]*p2p.Client{
+			p2p.FirewoodRangeProofHandlerID:  p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetRangeProofHandler(serverDB)),
+			p2p.FirewoodChangeProofHandlerID: p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetChangeProofHandler(serverDB)),
+		}
+		mockClient = statesyncclient.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil, clients)
 	)
 
 	// Create the producer code queue.
@@ -167,8 +170,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 		dbFromState(t, clientState),
 		root,
 		codeQueue,
-		rHandler,
-		cHandler,
+		mockClient,
 	)
 	require.NoError(t, err, "NewFirewoodSyncer()")
 	return firewoodSyncer, codeSyncer, codeQueue
