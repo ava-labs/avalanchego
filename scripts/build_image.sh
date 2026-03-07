@@ -37,8 +37,8 @@ FORCE_TAG_MASTER="${FORCE_TAG_MASTER:-}"
 
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
-source "$AVALANCHE_PATH"/scripts/git_commit.sh
-source "$AVALANCHE_PATH"/scripts/image_tag.sh
+source "$AVALANCHE_PATH"/scripts/vcs.sh
+image_tag="$(vcs_branch_or_tag)"
 
 if [[ -z "${SKIP_BUILD_RACE}" && $image_tag == *"-r" ]]; then
   echo "Branch name must not end in '-r'"
@@ -74,11 +74,9 @@ DOCKER_CMD="docker buildx build ${*}"
 GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 DOCKER_CMD="${DOCKER_CMD} --build-arg GO_VERSION=${GO_VERSION}"
 
-# Provide the git commit as a build argument to avoid requiring this
-# to be discovered within the image. This enables image builds from
-# git worktrees since a non-primary worktree won't have a .git
-# directory to copy into the image.
-DOCKER_CMD="${DOCKER_CMD} --build-arg AVALANCHEGO_COMMIT=${git_commit}"
+# Provide the commit hash as a build argument to avoid requiring VCS
+# tooling within the image.
+DOCKER_CMD="${DOCKER_CMD} --build-arg AVALANCHEGO_COMMIT=${vcs_commit}"
 
 if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
   # Default to pushing when the image name includes a slash which indicates the
@@ -107,24 +105,24 @@ else
   DOCKER_CMD="${DOCKER_CMD} --load"
 fi
 
-echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash , $DOCKER_IMAGE:$image_tag"
-${DOCKER_CMD} -t "$DOCKER_IMAGE:$commit_hash" -t "$DOCKER_IMAGE:$image_tag" \
+echo "Building Docker Image with tags: $DOCKER_IMAGE:$vcs_commit_short , $DOCKER_IMAGE:$image_tag"
+${DOCKER_CMD} -t "$DOCKER_IMAGE:$vcs_commit_short" -t "$DOCKER_IMAGE:$image_tag" \
               "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 
 if [[ -z "${SKIP_BUILD_RACE}" ]]; then
-   echo "Building Docker Image with tags (race detector): $DOCKER_IMAGE:$commit_hash-r , $DOCKER_IMAGE:$image_tag-r"
-   ${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-r" -t "$DOCKER_IMAGE:$image_tag-r" \
+   echo "Building Docker Image with tags (race detector): $DOCKER_IMAGE:$vcs_commit_short-r , $DOCKER_IMAGE:$image_tag-r"
+   ${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$vcs_commit_short-r" -t "$DOCKER_IMAGE:$image_tag-r" \
                  "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 fi
 
 # Tag latest when pushing to a registry and the tag is a release (vMAJOR.MINOR.PATCH)
 if [[ "${DOCKER_IMAGE}" == *"/"* && $image_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Tagging current avalanchego images as $DOCKER_IMAGE:latest"
-  docker buildx imagetools create -t "$DOCKER_IMAGE:latest" "$DOCKER_IMAGE:$commit_hash"
+  docker buildx imagetools create -t "$DOCKER_IMAGE:latest" "$DOCKER_IMAGE:$vcs_commit_short"
 fi
 
 # Forcibly tag the image as `master` if requested. This is only intended to be used for testing.
 if [[ "${DOCKER_IMAGE}" == *"/"* && -n "${FORCE_TAG_MASTER}" ]]; then
   echo "Tagging current avalanchego images as $DOCKER_IMAGE:master"
-  docker buildx imagetools create -t "$DOCKER_IMAGE:master" "$DOCKER_IMAGE:$commit_hash"
+  docker buildx imagetools create -t "$DOCKER_IMAGE:master" "$DOCKER_IMAGE:$vcs_commit_short"
 fi

@@ -36,7 +36,7 @@ for prefix in "${TAG_PREFIXES[@]}"; do
 done
 
 echo "Verifying tags for $VERSION on $REMOTE:"
-remote_refs=$(git ls-remote --tags "$REMOTE" | awk '{print $2}')
+remote_refs=$(git ls-remote --tags "$REMOTE" | awk '{print $2}') # vcs-ok: git ls-remote --tags has no jj equivalent
 
 missing=()
 for tag in "${TAGS[@]}"; do
