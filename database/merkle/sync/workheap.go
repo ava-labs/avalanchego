@@ -5,9 +5,11 @@ package sync
 
 import (
 	"bytes"
+	"math/big"
 
 	"github.com/google/btree"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -156,4 +158,72 @@ func (wh *workHeap) remove(item *workItem) {
 
 func (wh *workHeap) Len() int {
 	return wh.innerHeap.Len()
+}
+
+// statusBytes is the number of bytes of the keyspace to consider
+// when calculating the progress percentage.
+// Keys larger than this will be truncated.
+const statusBytes = 64
+
+var (
+	totalSpace      = new(big.Int).Lsh(big.NewInt(1), statusBytes*8)
+	totalSpaceFloat = new(big.Float).SetInt(totalSpace)
+)
+
+// Status returns the approximate percentage of work in the heap
+// for a given [ids.ID] root, relative to the entire keyspace.
+// If there are many keys larger than 64 bytes, the returned percentage
+// may be inaccurate.
+func (wh *workHeap) Status(root ids.ID) float64 {
+	progress := new(big.Int)
+	wh.sortedItems.Ascend(func(item *workItem) bool {
+		if item.localRootID != root {
+			return true
+		}
+
+		// Determine the start value (0x0 if no value)
+		start := maybeToBig(item.start, statusBytes)
+		if start == nil {
+			start = big.NewInt(0)
+		}
+
+		// Determine the end value (max if no value)
+		end := maybeToBig(item.end, statusBytes)
+		if end == nil {
+			end = new(big.Int).Lsh(big.NewInt(1), uint(statusBytes*8)) // 2^(maxSize*8)
+		}
+
+		// Add complete range size: end - start
+		progress.Add(progress, end)
+		progress.Sub(progress, start)
+
+		return true
+	})
+
+	// Calculate total key space size (2^(statusBytes * 8) for statusBytes-size keys)
+
+	// Calculate percentage: (progress / totalSpace) * 100
+	progressFloat := new(big.Float).SetInt(progress)
+	progressFloat.Quo(progressFloat, totalSpaceFloat)
+	progressFloat.Mul(progressFloat, big.NewFloat(100))
+
+	pct, _ := progressFloat.Float64()
+
+	return pct
+}
+
+func maybeToBig(b maybe.Maybe[[]byte], maxLength int) *big.Int {
+	if !b.HasValue() {
+		return nil
+	}
+	s := b.Value()
+	if len(b.Value()) > maxLength {
+		s = s[:maxLength]
+	}
+
+	// Right-pad with zeros so that short keys occupy the most significant bytes.
+	padded := make([]byte, maxLength)
+	copy(padded, s)
+
+	return new(big.Int).SetBytes(padded)
 }
