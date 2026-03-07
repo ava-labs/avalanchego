@@ -42,7 +42,7 @@ var errInterrupted = errors.New("interrupted sync")
 type syncTest struct {
 	ctx               context.Context
 	prepareForTest    func(t *testing.T, r *rand.Rand) (clientDB state.Database, serverDB state.Database, syncRoot common.Hash)
-	expectedError     error
+	wantError         error
 	GetLeafsIntercept func(message.LeafsRequest, message.LeafsResponse) (message.LeafsResponse, error)
 	GetCodeIntercept  func([]common.Hash, [][]byte) ([][]byte, error)
 }
@@ -91,10 +91,10 @@ func testSync(t *testing.T, test syncTest, c codec.Manager, leafReqType message.
 	eg.Go(func() error { return stateSyncer.Sync(egCtx) })
 
 	err = eg.Wait()
-	require.ErrorIs(t, err, test.expectedError, "unexpected error during sync")
+	require.ErrorIs(t, err, test.wantError, "unexpected error during sync")
 
 	// Only assert database consistency if the sync was expected to succeed.
-	if test.expectedError != nil {
+	if test.wantError != nil {
 		return
 	}
 
@@ -177,7 +177,7 @@ func TestSimpleSyncCases(t *testing.T) {
 			GetLeafsIntercept: func(_ message.LeafsRequest, _ message.LeafsResponse) (message.LeafsResponse, error) {
 				return message.LeafsResponse{}, clientErr
 			},
-			expectedError: clientErr,
+			wantError: clientErr,
 		},
 		"failed to fetch code": {
 			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
@@ -188,7 +188,7 @@ func TestSimpleSyncCases(t *testing.T) {
 			GetCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {
 				return nil, clientErr
 			},
-			expectedError: clientErr,
+			wantError: clientErr,
 		},
 	}
 	for name, test := range tests {
@@ -216,7 +216,7 @@ func TestCancelSync(t *testing.T) {
 				root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, 2000)
 				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
 			},
-			expectedError: context.Canceled,
+			wantError: context.Canceled,
 			GetLeafsIntercept: func(_ message.LeafsRequest, lr message.LeafsResponse) (message.LeafsResponse, error) {
 				cancel()
 				return lr, nil
@@ -261,7 +261,7 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 				return clientDB, serverDB, root
 			},
-			expectedError:     errInterrupted,
+			wantError:         errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
 		}, c, leafReqType)
 
@@ -298,7 +298,7 @@ func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 				return clientDB, serverDB, root
 			},
-			expectedError:     errInterrupted,
+			wantError:         errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
 		}, c, leafReqType)
 
@@ -340,7 +340,7 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 				return clientDB, serverDB, root1
 			},
-			expectedError:     errInterrupted,
+			wantError:         errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
 		}, c, leafReqType)
 
@@ -377,7 +377,7 @@ func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testi
 			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 				return clientDB, serverDB, root
 			},
-			expectedError:     errInterrupted,
+			wantError:         errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
 		}, c, leafReqType)
 
@@ -411,7 +411,7 @@ func TestResumeSyncLargeStorageTrieWithSpreadOutDuplicatesInterrupted(t *testing
 			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
 				return clientDB, serverDB, root
 			},
-			expectedError:     errInterrupted,
+			wantError:         errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
 		}, c, leafReqType)
 
@@ -563,8 +563,8 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB, serverDB stat
 		}
 		// check snapshot consistency
 		snapshotVal := rawdb.ReadAccountSnapshot(clientDB.DiskDB(), accHash)
-		expectedSnapshotVal := types.SlimAccountRLP(acc)
-		require.Equal(t, expectedSnapshotVal, snapshotVal)
+		wantSnapshotVal := types.SlimAccountRLP(acc)
+		require.Equal(t, wantSnapshotVal, snapshotVal)
 
 		// check code consistency
 		if !bytes.Equal(acc.CodeHash, types.EmptyCodeHash[:]) {

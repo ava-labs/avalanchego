@@ -147,6 +147,11 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	return s.syncer.Sync(ctx)
 }
 
+func (*Syncer) UpdateTarget(message.Syncable) error {
+	// Non-functional compatibility scaffolding.
+	return nil
+}
+
 // Finalize commits any pending database changes to disk.
 // This ensures that even if the sync is cancelled or fails, we preserve
 // the progress up to the last fully synced height.

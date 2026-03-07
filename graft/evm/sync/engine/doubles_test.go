@@ -6,11 +6,50 @@ package engine
 import (
 	"context"
 	"errors"
+	"math/big"
 	"sync"
 	"time"
 
+	ethtypes "github.com/ava-labs/libevm/core/types"
+
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )
+
+// mockEthBlockWrapper implements [EthBlockWrapper] for testing.
+type mockEthBlockWrapper struct {
+	ethBlock  *ethtypes.Block
+	acceptErr error
+	rejectErr error
+	verifyErr error
+
+	acceptCount int
+	rejectCount int
+	verifyCount int
+}
+
+func newMockBlock(height uint64) *mockEthBlockWrapper {
+	header := &ethtypes.Header{Number: new(big.Int).SetUint64(height)}
+	return &mockEthBlockWrapper{
+		ethBlock: ethtypes.NewBlockWithHeader(header),
+	}
+}
+
+func (m *mockEthBlockWrapper) GetEthBlock() *ethtypes.Block { return m.ethBlock }
+func (m *mockEthBlockWrapper) Accept(context.Context) error {
+	m.acceptCount++
+	return m.acceptErr
+}
+func (m *mockEthBlockWrapper) Reject(context.Context) error {
+	m.rejectCount++
+	return m.rejectErr
+}
+func (m *mockEthBlockWrapper) Verify(context.Context) error {
+	m.verifyCount++
+	return m.verifyErr
+}
+
+var _ EthBlockWrapper = (*mockEthBlockWrapper)(nil)
 
 // FuncSyncer adapts a function to the simple Syncer shape used in tests. It is
 // useful for defining small, behavior-driven syncers inline.
@@ -24,6 +63,9 @@ type FuncSyncer struct {
 func (f FuncSyncer) Sync(ctx context.Context) error { return f.fn(ctx) }
 func (f FuncSyncer) Name() string                   { return f.name }
 func (f FuncSyncer) ID() string                     { return f.id }
+func (f FuncSyncer) UpdateTarget(message.Syncable) error {
+	return nil
+}
 
 var _ types.Syncer = FuncSyncer{}
 

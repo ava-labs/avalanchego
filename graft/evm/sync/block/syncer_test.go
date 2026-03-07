@@ -25,74 +25,65 @@ import (
 )
 
 func TestBlockSyncer_ParameterizedTests(t *testing.T) {
+	const defaultFromHeight = uint64(10)
+
 	tests := []struct {
-		name                     string
-		numBlocks                int
-		prePopulateBlocks        []int
-		fromHeight               uint64
-		blocksToFetch            uint64
-		expectedBlocks           []int
-		verifyZeroBlocksReceived bool
+		name              string
+		prePopulateBlocks []int
+		fromHeight        uint64
+		blocksToFetch     uint64
+		wantBlocks        []int
 	}{
 		{
-			name:           "normal case - all blocks retrieved from network",
-			numBlocks:      10,
-			fromHeight:     5,
-			blocksToFetch:  3,
-			expectedBlocks: []int{3, 4, 5},
+			name:          "normal case - all blocks retrieved from network",
+			fromHeight:    5,
+			blocksToFetch: 3,
+			wantBlocks:    []int{3, 4, 5},
 		},
 		{
-			name:                     "all blocks already available",
-			numBlocks:                10,
-			prePopulateBlocks:        []int{3, 4, 5},
-			fromHeight:               5,
-			blocksToFetch:            3,
-			expectedBlocks:           []int{3, 4, 5},
-			verifyZeroBlocksReceived: true,
+			name:              "all blocks already available",
+			prePopulateBlocks: []int{3, 4, 5},
+			fromHeight:        5,
+			blocksToFetch:     3,
+			wantBlocks:        []int{3, 4, 5},
 		},
 		{
 			name:              "some blocks already available",
-			numBlocks:         10,
 			prePopulateBlocks: []int{4, 5},
 			fromHeight:        5,
 			blocksToFetch:     3,
-			expectedBlocks:    []int{3, 4, 5},
+			wantBlocks:        []int{3, 4, 5},
 		},
 		{
 			name:              "most recent block missing",
-			numBlocks:         10,
 			prePopulateBlocks: []int{3, 4},
 			fromHeight:        5,
 			blocksToFetch:     3,
-			expectedBlocks:    []int{3, 4, 5},
+			wantBlocks:        []int{3, 4, 5},
 		},
 		{
-			name:           "edge case - from height 1",
-			numBlocks:      10,
-			fromHeight:     1,
-			blocksToFetch:  1,
-			expectedBlocks: []int{1},
+			name:          "edge case - from height 1",
+			fromHeight:    1,
+			blocksToFetch: 1,
+			wantBlocks:    []int{1},
 		},
 		{
-			name:           "single block sync",
-			numBlocks:      10,
-			fromHeight:     7,
-			blocksToFetch:  1,
-			expectedBlocks: []int{7},
+			name:          "single block sync",
+			fromHeight:    7,
+			blocksToFetch: 1,
+			wantBlocks:    []int{7},
 		},
 		{
-			name:           "large sync - many blocks",
-			numBlocks:      50,
-			fromHeight:     40,
-			blocksToFetch:  35,
-			expectedBlocks: []int{6, 10, 20, 30, 40},
+			name:          "large sync - many blocks",
+			fromHeight:    40,
+			blocksToFetch: 35,
+			wantBlocks:    []int{6, 10, 20, 30, 40},
 		},
 		{
-			name:           "fetch genesis block",
-			numBlocks:      10,
-			fromHeight:     10,
-			blocksToFetch:  30,
-			expectedBlocks: []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			name:          "fetch genesis block",
+			fromHeight:    10,
+			blocksToFetch: 30,
+			wantBlocks:    []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 		},
 	}
 
@@ -100,7 +91,12 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 		messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
-				env := newTestEnvironment(t, tt.numBlocks, c)
+				numBlocks := int(defaultFromHeight)
+				if tt.fromHeight > defaultFromHeight {
+					numBlocks = int(tt.fromHeight)
+				}
+
+				env := newTestEnvironment(t, numBlocks, c)
 				require.NoError(t, env.prePopulateBlocks(tt.prePopulateBlocks))
 
 				syncer, err := env.createSyncer(tt.fromHeight, tt.blocksToFetch)
@@ -108,12 +104,7 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 
 				require.NoError(t, syncer.Sync(t.Context()))
 
-				env.verifyBlocksInDB(t, tt.expectedBlocks)
-
-				if tt.verifyZeroBlocksReceived {
-					// Client should not have received any block requests since all blocks were on disk
-					require.Zero(t, env.client.BlocksReceived())
-				}
+				env.verifyBlocksInDB(t, tt.wantBlocks)
 			})
 		})
 	}
@@ -132,6 +123,21 @@ func TestBlockSyncer_ContextCancellation(t *testing.T) {
 		cancel()
 		err = syncer.Sync(ctx)
 		require.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestBlockSyncer_NoNetworkRequestsWhenBlocksAlreadyOnDisk(t *testing.T) {
+	t.Parallel()
+
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
+		env := newTestEnvironment(t, 10, c)
+		require.NoError(t, env.prePopulateBlocks([]int{3, 4, 5}))
+
+		syncer, err := env.createSyncer(5, 3)
+		require.NoError(t, err)
+
+		require.NoError(t, syncer.Sync(t.Context()))
+		require.Zero(t, env.client.BlocksReceived())
 	})
 }
 
@@ -183,8 +189,8 @@ func newTestEnvironment(t *testing.T, numBlocks int, c codec.Manager) *testEnvir
 func (e *testEnvironment) prePopulateBlocks(blockHeights []int) error {
 	batch := e.chainDB.NewBatch()
 	for _, height := range blockHeights {
-		if height <= len(e.blocks) {
-			// blocks[0] is block number 1, blocks[1] is block number 2, etc.
+		if height < len(e.blocks) {
+			// Generated test blocks are indexed by height.
 			block := e.blocks[height]
 			rawdb.WriteBlock(batch, block)
 			rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
@@ -209,11 +215,11 @@ func (e *testEnvironment) createSyncer(fromHeight uint64, blocksToFetch uint64) 
 }
 
 // verifyBlocksInDB checks that the expected blocks are present in the database (by block height)
-func (e *testEnvironment) verifyBlocksInDB(t *testing.T, expectedBlockHeights []int) {
+func (e *testEnvironment) verifyBlocksInDB(t *testing.T, wantBlockHeights []int) {
 	t.Helper()
 
 	// Verify expected blocks are present
-	for _, height := range expectedBlockHeights {
+	for _, height := range wantBlockHeights {
 		if height >= len(e.blocks) {
 			continue
 		}
