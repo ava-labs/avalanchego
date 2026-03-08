@@ -1,0 +1,37 @@
+name: firewood-benchmarks
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # @v2 -> v2.8.2
+        with:
+          shared-key: "maxperf-ethhash-logger"
+          cache-all-crates: true
+          cache-workspace-crates: true
+      - name: Cargo Fetch (run `cargo generate-lockfile` if this fails)
+        run: cargo fetch --locked --verbose
+      - name: Build
+        run: cargo build --frozen --profile maxperf --features ethhash,logger --workspace --benches
+      - name: Run firewood crate hashop benchmark
+        run: cargo bench --frozen --profile maxperf --features ethhash,logger -p firewood --bench hashops -- --noplot
+      - name: Run firewood crate defer_persist benchmark
+        run: cargo bench --frozen --profile maxperf --features ethhash,logger -p firewood --bench defer_persist -- --noplot
+      - name: Run storage crate benchmarks
+        run: cargo bench --frozen --profile maxperf --features ethhash,logger -p firewood-storage --bench serializer -- --noplot
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-results
+          path: target/criterion
