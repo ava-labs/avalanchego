@@ -224,6 +224,9 @@ func (dl *diskLayer) stopGeneration() {
 	cancel := dl.cancel
 	done := dl.done
 	if cancel == nil || done == nil {
+		// Generation was skipped for this layer so there is nothing to stop.
+		// Note: abortStarted remains zero, which diffToDisk accounts for
+		// by falling back to time.Now() when computing disk layer age.
 		return
 	}
 
