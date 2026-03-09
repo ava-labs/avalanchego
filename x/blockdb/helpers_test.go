@@ -35,6 +35,7 @@ func newHeightIndexDatabase(t *testing.T, config DatabaseConfig) database.Height
 	}
 	db, err := New(config, logging.NoLog{})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 	return db
 }
 

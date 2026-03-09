@@ -126,7 +126,7 @@ func TestNew_Params(t *testing.T) {
 			hdb, err := New(tt.config, nil)
 
 			if tt.wantErr != nil {
-				require.Equal(t, tt.wantErr.Error(), err.Error())
+				require.EqualError(t, err, tt.wantErr.Error())
 				return
 			}
 
