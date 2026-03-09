@@ -173,8 +173,8 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		// guaranteed when using the [Executor] via the public API, it's clearer
 		// to check than to require the reader to reason about dropping the
 		// flag.
-		if ch, ok := e.receipts.Load(tx.Hash()); ok {
-			ch <- &Receipt{receipt, signer, tx}
+		if r, ok := e.receipts.Load(tx.Hash()); ok {
+			r.Put(&Receipt{receipt, signer, tx})
 		}
 		receipts[ti] = receipt
 	}

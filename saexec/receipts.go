@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm/eventual"
 
 	"github.com/ava-labs/strevm/blocks"
 )
@@ -21,15 +22,15 @@ func (e *Executor) createReceiptBuffers(b *blocks.Block) {
 	for i, tx := range b.Transactions() {
 		txs[i] = tx.Hash()
 	}
-	e.receipts.StoreFromFunc(func(common.Hash) chan *Receipt {
-		return make(chan *Receipt, 1)
+	e.receipts.StoreFromFunc(func(common.Hash) eventual.Value[*Receipt] {
+		return eventual.New[*Receipt]()
 	}, txs...)
 	// This satisfies the minimum-lifespan guarantee of [Executor.RecentReceipt]
 	// but, in practice, will keep the receipts around until the block is an
 	// ancestor of the last-settled block. See [sae.VM.AcceptBlock] for details.
 	// This should adequately cover the post-tx-issuance period during which
 	// users request receipts.
-	runtime.AddCleanup(b, func(rs *syncMap[common.Hash, chan *Receipt]) {
+	runtime.AddCleanup(b, func(rs *syncMap[common.Hash, eventual.Value[*Receipt]]) {
 		rs.Delete(txs...)
 	}, e.receipts)
 }
@@ -60,24 +61,15 @@ type Receipt struct {
 // transaction, either because it hasn't been enqueued, or because it has been
 // cleared from the cache.
 //
-// The only possible error is one returned by [context.Cause] upon context
-// cancellation.
+// The only possible error is one returned by [eventual.Value.PeekCtx] upon
+// context cancellation.
 func (e *Executor) RecentReceipt(ctx context.Context, tx common.Hash) (*Receipt, bool, error) {
-	ch, ok := e.receipts.Load(tx)
+	v, ok := e.receipts.Load(tx)
 	if !ok {
 		return nil, false, nil
 	}
-	// TODO(arr4n) abstract the internal libevm/parallel `eventual` type into a
-	// separate package and use it here with `peek()`. It's semantically
-	// identical but clearer than receiving and then immediately sending a value
-	// with a single-buffered channel.
-	select {
-	case r := <-ch:
-		ch <- r
-		return r, true, nil
-	case <-ctx.Done():
-		return nil, true, context.Cause(ctx)
-	}
+	r, err := v.PeekCtx(ctx)
+	return r, true, err
 }
 
 // A syncMap holds values keyed by uniformly distributed keys, allowing for

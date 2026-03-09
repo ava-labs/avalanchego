@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
+	"github.com/ava-labs/libevm/libevm/eventual"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
 
@@ -44,7 +45,7 @@ type Executor struct {
 	headEvents  event.FeedOf[core.ChainHeadEvent]
 	chainEvents event.FeedOf[core.ChainEvent]
 	logEvents   event.FeedOf[[]*types.Log]
-	receipts    *syncMap[common.Hash, chan *Receipt]
+	receipts    *syncMap[common.Hash, eventual.Value[*Receipt]]
 
 	chainContext *chainContext
 	chainConfig  *params.ChainConfig
@@ -106,7 +107,7 @@ func New(
 		stateCache:  cache,
 		snaps:       snaps,
 		xdb:         xdb,
-		receipts:    newSyncMap[common.Hash, chan *Receipt](),
+		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
 	}
 	e.lastExecuted.Store(lastExecuted)
 
