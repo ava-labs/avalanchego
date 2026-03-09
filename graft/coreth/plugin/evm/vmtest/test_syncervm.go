@@ -699,7 +699,7 @@ func generateAndAcceptBlocks(t *testing.T, vm extension.InnerVM, numBlocks int, 
 			g.SetCoinbase(constants.BlackholeAddr) // necessary for syntactic validation of the block
 			gen(i, vm, g)
 		},
-		false, /* don't commit to disk */
+		core.WithoutDiskCommit(),
 	)
 	require.NoError(err)
 	vm.Ethereum().BlockChain().DrainAcceptorQueue()
