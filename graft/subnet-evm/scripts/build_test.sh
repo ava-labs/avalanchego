@@ -16,4 +16,4 @@ fi
 
 cd "$REPO_ROOT/graft/subnet-evm"
 # shellcheck disable=SC2046
-go test -gcflags=all=-d=variablemakehash=n -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic github.com/ava-labs/avalanchego/graft/subnet-evm/core -count 5
+GODEBUG=containermaxprocs=0,updatemaxprocs=0 go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic github.com/ava-labs/avalanchego/graft/subnet-evm/core -count 5
