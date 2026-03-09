@@ -41,8 +41,6 @@ type TestClient struct {
 	// GetBlocksIntercept is called on every GetBlocks request if set to a non-nil callback.
 	// The returned response will be returned by TestClient to the caller.
 	GetBlocksIntercept func(blockReq message.BlockRequest, blocks types.Blocks) (types.Blocks, error)
-
-	clients map[uint64]*p2p.Client
 }
 
 func NewTestClient(
