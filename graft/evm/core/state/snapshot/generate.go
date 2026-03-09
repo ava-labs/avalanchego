@@ -174,9 +174,7 @@ func (dl *diskLayer) checkAndFlush(batch ethdb.Batch, stats *generatorStats, cur
 // gathering and logging, since the method surfs the blocks as they arrive, often
 // being restarted.
 func (dl *diskLayer) generate(stats *generatorStats) {
-	if dl.done != nil {
-		defer close(dl.done)
-	}
+	defer close(dl.done)
 
 	// If a database wipe is in operation, wait until it's done
 	if stats.wiping != nil {
