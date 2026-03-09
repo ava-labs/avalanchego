@@ -45,6 +45,12 @@ type requestEntry struct {
 	op message.Op
 	// The engine type of the request that was made
 	engineType p2p.EngineType
+
+	// handled is true iff the message was already handled by the router.
+	// When a peer is benched, the router immediately sends a failed response to the
+	// consensus engine and marks handled as true, so that it can send and track the request/response,
+	// but skip sending the response to consensus.
+	handled bool
 }
 
 type peer struct {
@@ -83,7 +89,7 @@ type ChainRouter struct {
 	// Parameters for doing health checks
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
-	timedRequests *linked.Hashmap[ids.RequestID, requestEntry]
+	timedRequests *linked.Hashmap[ids.RequestID, *requestEntry]
 }
 
 // Initialize the router.
@@ -111,7 +117,7 @@ func (cr *ChainRouter) Initialize(
 	cr.criticalChains = criticalChains
 	cr.sybilProtectionEnabled = sybilProtectionEnabled
 	cr.onFatal = onFatal
-	cr.timedRequests = linked.NewHashmap[ids.RequestID, requestEntry]()
+	cr.timedRequests = linked.NewHashmap[ids.RequestID, *requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
 
@@ -174,10 +180,11 @@ func (cr *ChainRouter) RegisterRequest(
 		Op:        byte(op),
 	}
 	// Add to the set of unfulfilled requests
-	cr.timedRequests.Put(uniqueRequestID, requestEntry{
+	cr.timedRequests.Put(uniqueRequestID, &requestEntry{
 		time:       cr.clock.Time(),
 		op:         op,
 		engineType: engineType,
+		handled:    false,
 	})
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	cr.lock.Unlock()
@@ -198,13 +205,15 @@ func (cr *ChainRouter) RegisterRequest(
 		shouldMeasureLatency,
 		uniqueRequestID,
 		func() {
-			cr.handleMessage(ctx, timeoutMsg, true)
+			// Note: timeout manager prepends this function with a notification to the benchlist manager
+			// of the failure (timeout).
+			cr.handleMessage(ctx, timeoutMsg, true, true)
 		},
 	)
 }
 
 func (cr *ChainRouter) HandleInbound(ctx context.Context, msg *message.InboundMessage) {
-	cr.handleMessage(ctx, msg, false)
+	cr.handleMessage(ctx, msg, false, false)
 }
 
 func (cr *ChainRouter) HandleInternal(ctx context.Context, msg *message.InboundMessage) {
@@ -212,14 +221,14 @@ func (cr *ChainRouter) HandleInternal(ctx context.Context, msg *message.InboundM
 	// may be sent while holding the chain's context lock. To enforce the
 	// expected lock ordering, we must not grab the chain router lock while
 	// holding the chain's context lock.
-	go cr.handleMessage(ctx, msg, true)
+	go cr.handleMessage(ctx, msg, true, false)
 }
 
 // handleMessage routes a message to the specified chain. Messages may be
 // unrequested, responses, or timeouts. The internal flag indicates whether the
 // message is being sent from an internal component, such as due to a timeout,
 // or if the message originated from a remote peer.
-func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMessage, internal bool) {
+func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMessage, internal, timeout bool) {
 	nodeID := msg.NodeID
 	op := msg.Op
 
@@ -313,17 +322,48 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 	}
 
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
-		// Create the request ID of the request we sent that this message is in
-		// response to.
-		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
-		if req == nil {
-			// This was a duplicated response.
+		uniqueRequestID := ids.RequestID{
+			NodeID:    nodeID,
+			ChainID:   chainID,
+			RequestID: requestID,
+			Op:        byte(expectedResponse),
+		}
+		req, exists := cr.timedRequests.Get(uniqueRequestID)
+		if !exists {
+			// This was a duplicated message
 			msg.OnFinishedHandling()
 			return
 		}
 
-		// Tell the timeout manager we are no longer expecting a response
-		cr.timeoutManager.RemoveRequest(uniqueRequestID)
+		// External failures and timeout-fired failures both clear the
+		// outstanding request.
+		//
+		// External failures (`AppError`) also remove the request from the
+		// timeout-manager so the timeout callback does not fire later.
+		// Timeout-fired failures do not need to remove the request from the
+		// timeout-manager because we are currently executing the callback,
+		// which already clears the request.
+		//
+		// Early internal failures caused by benching, disconnect, or a request
+		// to self are delivered once, but the request remains outstanding
+		// until the real response arrives or the timeout fires.
+		switch {
+		case !internal:
+			cr.timeoutManager.RemoveRequest(uniqueRequestID)
+			fallthrough
+		case timeout:
+			cr.timedRequests.Delete(uniqueRequestID)
+			cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
+		}
+
+		if req.handled {
+			// This was a duplicated message
+			msg.OnFinishedHandling()
+			return
+		}
+
+		// Prevent duplicate handling of the request
+		req.handled = true
 
 		// Pass the failure to the chain
 		chain.Push(
@@ -358,6 +398,13 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 
 	// Tell the timeout manager we got a response
 	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
+
+	if req.handled {
+		// This message was already marked as handled internally. Skip pushing
+		// to the chain.
+		msg.OnFinishedHandling()
+		return
+	}
 
 	// Pass the response to the chain
 	chain.Push(
@@ -720,5 +767,5 @@ func (cr *ChainRouter) clearRequest(
 
 	cr.timedRequests.Delete(uniqueRequestID)
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
-	return uniqueRequestID, &request
+	return uniqueRequestID, request
 }
