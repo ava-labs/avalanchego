@@ -4,7 +4,6 @@
 package code
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -192,7 +191,7 @@ func TestSessionedQueue_ConcurrentAddCodeAndPivot_BoundariesHold(t *testing.T) {
 		defer wg.Done()
 		for i := range numAdds {
 			h := crypto.Keccak256Hash([]byte{byte(i), byte(i >> 8)})
-			addErrCh <- q.AddCode(context.Background(), []common.Hash{h})
+			addErrCh <- q.AddCode(t.Context(), []common.Hash{h})
 		}
 	}()
 
@@ -224,7 +223,7 @@ func TestSessionedQueue_ConcurrentAddCodeAndFinalize_CloseSafe(t *testing.T) {
 		close(started)
 		for i := range 10_000 {
 			h := crypto.Keccak256Hash([]byte{byte(i), byte(i >> 8), byte(i >> 16)})
-			if err := q.AddCode(context.Background(), []common.Hash{h}); err != nil {
+			if err := q.AddCode(t.Context(), []common.Hash{h}); err != nil {
 				errCh <- err
 				return
 			}

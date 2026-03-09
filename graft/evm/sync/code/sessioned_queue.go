@@ -259,16 +259,13 @@ func (q *SessionedQueue) Finalize() error {
 	return nil
 }
 
-func (q *SessionedQueue) closeEventChannelOnce() bool {
-	closed := false
+func (q *SessionedQueue) closeEventChannelOnce() {
 	q.closeChanOnce.Do(func() {
 		q.chanLock.Lock()
 		defer q.chanLock.Unlock()
 		close(q.in)
 		q.in = nil
-		closed = true
 	})
-	return closed
 }
 
 func (q *SessionedQueue) sendEventLocked(ctx context.Context, ev Event) error {

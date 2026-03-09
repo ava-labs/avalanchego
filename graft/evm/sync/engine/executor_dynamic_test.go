@@ -89,6 +89,12 @@ func TestDynamicExecutor_OnBlockAccepted(t *testing.T) {
 				}
 				require.Equal(t, wantUpdates, syncer.updates)
 
+				if tt.updateErr != nil {
+					require.Equal(t, StateAborted, executor.coordinator.CurrentState())
+				} else {
+					require.Equal(t, tt.state, executor.coordinator.CurrentState())
+				}
+
 				queued := executor.coordinator.queue.dequeueBatch()
 				require.Len(t, queued, 1)
 				require.Equal(t, OpAccept, queued[0].operation)

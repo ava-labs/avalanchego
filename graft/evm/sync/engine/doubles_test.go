@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	ethtypes "github.com/ava-labs/libevm/core/types"
-
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 // mockEthBlockWrapper implements [EthBlockWrapper] for testing.
@@ -40,10 +40,12 @@ func (m *mockEthBlockWrapper) Accept(context.Context) error {
 	m.acceptCount++
 	return m.acceptErr
 }
+
 func (m *mockEthBlockWrapper) Reject(context.Context) error {
 	m.rejectCount++
 	return m.rejectErr
 }
+
 func (m *mockEthBlockWrapper) Verify(context.Context) error {
 	m.verifyCount++
 	return m.verifyErr
@@ -63,7 +65,7 @@ type FuncSyncer struct {
 func (f FuncSyncer) Sync(ctx context.Context) error { return f.fn(ctx) }
 func (f FuncSyncer) Name() string                   { return f.name }
 func (f FuncSyncer) ID() string                     { return f.id }
-func (f FuncSyncer) UpdateTarget(message.Syncable) error {
+func (FuncSyncer) UpdateTarget(message.Syncable) error {
 	return nil
 }
 

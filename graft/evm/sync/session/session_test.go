@@ -197,7 +197,8 @@ func requireContextCanceledWithCause(t testing.TB, ctx context.Context, want err
 	t.Helper()
 	select {
 	case <-ctx.Done():
-		require.ErrorIs(t, context.Cause(ctx), want)
+		cause := context.Cause(ctx)
+		require.ErrorIs(t, cause, want)
 	case <-time.After(1 * time.Second):
 		require.FailNow(t, "timed out waiting for cancellation")
 	}

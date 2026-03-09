@@ -101,7 +101,7 @@ func TestCodeSyncer_BasicScenarios(t *testing.T) {
 
 				go func() {
 					if !tt.preFetchAll {
-						_ = queue.AddCode(context.Background(), codeHashes)
+						_ = queue.AddCode(t.Context(), codeHashes)
 					}
 					_ = queue.Finalize()
 				}()
@@ -136,7 +136,7 @@ func TestCodeSyncer_RequestError(t *testing.T) {
 		require.NoError(t, err)
 
 		go func() {
-			_ = queue.AddCode(context.Background(), []common.Hash{codeHash})
+			_ = queue.AddCode(t.Context(), []common.Hash{codeHash})
 			_ = queue.Finalize()
 		}()
 
@@ -204,7 +204,7 @@ func TestCodeSyncer_SessionedWorkerErrorDoesNotHang(t *testing.T) {
 		case err := <-syncDone:
 			require.ErrorIs(t, err, errDummy)
 		case <-ctx.Done():
-			t.Fatal("sync hung after worker error — runner.ctx was not canceled")
+			require.FailNow(t, "sync hung after worker error - runner.ctx was not canceled")
 		}
 	})
 }

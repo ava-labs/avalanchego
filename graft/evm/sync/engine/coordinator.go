@@ -32,6 +32,7 @@ var (
 	errInvalidState         = errors.New("invalid coordinator state")
 	errBatchCancelled       = errors.New("batch execution cancelled")
 	errBatchOperationFailed = errors.New("batch operation failed")
+	errCommitTargetRequired = errors.New("commit target not set")
 )
 
 // Callbacks allows the coordinator to delegate VM-specific work back to the client.
@@ -47,8 +48,14 @@ type Callbacks struct {
 type Coordinator struct {
 	// state is managed atomically to allow cheap concurrent checks/updates.
 	state atomic.Int32
-	// target stores the current [message.Syncable] when [Coordinator.UpdateSyncTarget] is called.
-	target atomic.Value
+	// updateMu serializes [UpdateSyncTarget] calls.
+	updateMu sync.Mutex
+	// targetMu protects commitTarget reads/writes.
+	targetMu sync.RWMutex
+	// commitTarget is the latest fully accepted fanout target.
+	commitTarget message.Syncable
+	// targetEpoch increments after each successful commitTarget update.
+	targetEpoch atomic.Uint64
 
 	queue          *blockQueue
 	syncerRegistry *SyncerRegistry
@@ -62,10 +69,14 @@ type Coordinator struct {
 	pivotInterval uint64
 	pivot         *pivotPolicy
 
-	// initial is the original sync target passed to Start. This is used as the
-	// commit target for dynamic sync to avoid committing to a pivoted target
-	// that syncers may not have actually downloaded.
+	// initial is the original sync target passed to Start. It is kept for
+	// logging/fallback but finalization uses [commitTarget].
 	initial message.Syncable
+
+	// cancel is the lifecycle cancel function set once in Start before
+	// transitioning to StateRunning. Reads after observing StateRunning
+	// are safe without a lock (atomic state store provides happens-before).
+	cancel context.CancelCauseFunc
 }
 
 // CoordinatorOption follows the functional options pattern for Coordinator.
@@ -92,15 +103,71 @@ func NewCoordinator(syncerRegistry *SyncerRegistry, cbs Callbacks, opts ...Coord
 	return co
 }
 
+func (co *Coordinator) setCommitTarget(target message.Syncable) {
+	co.targetMu.Lock()
+	defer co.targetMu.Unlock()
+	co.commitTarget = target
+}
+
+func (co *Coordinator) getCommitTarget() message.Syncable {
+	co.targetMu.RLock()
+	defer co.targetMu.RUnlock()
+	return co.commitTarget
+}
+
+func (co *Coordinator) markAborted() {
+	for {
+		state := co.CurrentState()
+		if state == StateAborted || state == StateCompleted {
+			return
+		}
+		if co.state.CompareAndSwap(int32(state), int32(StateAborted)) {
+			return
+		}
+	}
+}
+
+func (co *Coordinator) beginFinalizing() error {
+	for {
+		switch co.CurrentState() {
+		case StateRunning:
+			if co.state.CompareAndSwap(int32(StateRunning), int32(StateFinalizing)) {
+				return nil
+			}
+		case StateFinalizing:
+			return nil
+		default:
+			return errInvalidState
+		}
+	}
+}
+
+// contextCause returns the underlying cause stored via [context.WithCancelCause],
+// or fallback if the cause is nil or plain [context.Canceled].
+func contextCause(ctx context.Context, fallback error) error {
+	if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+		return cause
+	}
+	return fallback
+}
+
+func (co *Coordinator) abort(err error) {
+	co.markAborted()
+	if co.cancel != nil {
+		co.cancel(err)
+	}
+}
+
 // Start launches all syncers and returns immediately. Failures are monitored
 // in the background and will transition to [StateAborted].
 func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 	co.state.Store(int32(StateInitializing))
 	co.initial = initial
-	co.target.Store(initial)
+	co.setCommitTarget(initial)
 	co.pivot = newPivotPolicy(co.pivotInterval)
 
 	cctx, cancel := context.WithCancelCause(ctx)
+	co.cancel = cancel
 	g := co.syncerRegistry.StartAsync(cctx, initial)
 
 	co.state.Store(int32(StateRunning))
@@ -109,18 +176,27 @@ func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 		// Ensure registered syncers that implement [types.Finalizer] get a chance to flush
 		// best-effort cleanup regardless of success or failure.
 		err := g.Wait()
-		co.syncerRegistry.FinalizeAll(co.initial)
-
-		if err != nil {
-			co.finish(cancel, err)
-			return
+		if errors.Is(err, context.Canceled) {
+			// Preserve the original abort cause stored via context.WithCancelCause.
+			err = contextCause(cctx, err)
+		}
+		if err == nil {
+			// Close the target update window as soon as syncers finish.
+			if errTransition := co.beginFinalizing(); errTransition != nil {
+				err = contextCause(cctx, errTransition)
+			}
 		}
 
-		if err := co.ProcessQueuedBlockOperations(cctx); err != nil {
-			co.finish(cancel, err)
-			return
+		finalizeTarget := co.getCommitTarget()
+		if finalizeTarget == nil {
+			finalizeTarget = co.initial
 		}
-		co.finish(cancel, nil)
+		co.syncerRegistry.FinalizeAll(finalizeTarget)
+
+		if err == nil {
+			err = co.ProcessQueuedBlockOperations(cctx)
+		}
+		co.finish(cancel, err)
 	}()
 }
 
@@ -131,21 +207,31 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 		return err
 	}
 
-	co.state.Store(int32(StateFinalizing))
+	if err := co.beginFinalizing(); err != nil {
+		return errInvalidState
+	}
+
+	target := co.getCommitTarget()
+	if target == nil {
+		co.markAborted()
+		return errCommitTargetRequired
+	}
 
 	if co.callbacks.FinalizeVM != nil {
-		if err := co.callbacks.FinalizeVM(ctx, co.initial); err != nil {
-			co.state.Store(int32(StateAborted))
+		if err := co.callbacks.FinalizeVM(ctx, target); err != nil {
+			co.markAborted()
 			return err
 		}
 	}
 
 	if err := ctx.Err(); err != nil {
-		co.state.Store(int32(StateAborted))
+		co.markAborted()
 		return err
 	}
 
-	co.state.Store(int32(StateExecutingBatch))
+	if !co.state.CompareAndSwap(int32(StateFinalizing), int32(StateExecutingBatch)) {
+		return errInvalidState
+	}
 
 	// Drain the queue in batches. Enqueues are allowed during batch execution. Any
 	// operations arriving mid-batch will be picked up by a subsequent iteration.
@@ -158,6 +244,7 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 		// Ensure we drop dedupe markers even on error to avoid leaking memory.
 		co.queue.forget(operations)
 		if err != nil {
+			co.markAborted()
 			return err
 		}
 	}
@@ -168,6 +255,9 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 // UpdateSyncTarget broadcasts a new target to all syncers and removes stale blocks from queue.
 // Only valid in [StateRunning] state.
 func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
+	co.updateMu.Lock()
+	defer co.updateMu.Unlock()
+
 	if co.CurrentState() != StateRunning {
 		return errInvalidState
 	}
@@ -180,14 +270,15 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 		return errInvalidState
 	}
 
-	// Remove blocks from queue that will never be executed (behind the new target).
-	co.queue.removeBelowHeight(newTarget.Height())
-
-	co.target.Store(newTarget)
-
 	if err := co.syncerRegistry.UpdateSyncTarget(newTarget); err != nil {
+		co.abort(err)
 		return err
 	}
+
+	co.setCommitTarget(newTarget)
+	co.targetEpoch.Add(1)
+	// Remove blocks from queue that will never be executed (behind the new target).
+	co.queue.removeBelowHeight(newTarget.Height())
 	co.pivot.advance()
 	return nil
 }
@@ -211,9 +302,17 @@ func (co *Coordinator) CurrentState() State {
 
 func (co *Coordinator) finish(cancel context.CancelCauseFunc, err error) {
 	if err != nil {
-		co.state.Store(int32(StateAborted))
+		co.markAborted()
 	} else {
-		co.state.Store(int32(StateCompleted))
+		for {
+			state := co.CurrentState()
+			if state == StateCompleted || state == StateAborted {
+				break
+			}
+			if co.state.CompareAndSwap(int32(state), int32(StateCompleted)) {
+				break
+			}
+		}
 	}
 	if cancel != nil {
 		cancel(err)

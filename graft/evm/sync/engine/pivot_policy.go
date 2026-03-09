@@ -11,6 +11,9 @@ const defaultPivotInterval = uint64(10000)
 // pivotPolicy encapsulates the logic for deciding when to forward
 // a new sync target based on a fixed block-height interval. It is
 // safe for concurrent use.
+//
+// The shouldForward -> advance sequence must be externally serialized.
+// In coordinator flow this is guaranteed by Coordinator.updateMu.
 type pivotPolicy struct {
 	interval uint64
 	// nextHeight is the next height threshold at or beyond which we
