@@ -231,9 +231,11 @@ func (dl *diskLayer) stopGeneration() {
 	//
 	// Note that we set this time regardless if abortion was skipped otherwise we
 	// will never restart generation (age will always be negative).
+	dl.lock.Lock()
 	if dl.abortStarted.IsZero() {
 		dl.abortStarted = time.Now()
 	}
+	dl.lock.Unlock()
 
 	dl.cancelOnce.Do(func() {
 		close(cancel)
