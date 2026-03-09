@@ -975,83 +975,60 @@ func testGenerateBrokenSnapshotWithDanglingStorage(t *testing.T, scheme string) 
 	}
 }
 
-// TestReleaseStopsGeneration verifies that Release() properly stops snapshot
-// generation without hanging. This prevents a race condition during shutdown
-// where the generator could access the database after it's closed.
-func TestReleaseStopsGeneration(t *testing.T) {
-	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme} {
-		t.Run(scheme+"/after_completion", func(t *testing.T) {
-			testReleaseStopsCompletedGeneration(t, scheme)
-		})
-		t.Run(scheme+"/during_generation", func(t *testing.T) {
-			testReleaseStopsMidGeneration(t, scheme)
-		})
-	}
-}
-
-// testReleaseStopsCompletedGeneration tests that Release() terminates the
+// TestReleaseStopsCompletedGeneration tests that Release() terminates the
 // generator goroutine after generation has finished (the goroutine is idle,
 // waiting to be stopped).
-func testReleaseStopsCompletedGeneration(t *testing.T, scheme string) {
-	helper := newHelper(scheme)
-	stRoot := helper.makeStorageTrie(common.Hash{}, []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, false)
+func TestReleaseStopsCompletedGeneration(t *testing.T) {
+	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme} {
+		t.Run(scheme, func(t *testing.T) {
+			helper := newHelper(scheme)
+			stRoot := helper.makeStorageTrie(common.Hash{}, []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, false)
 
-	helper.addTrieAccount("acc-1", &types.StateAccount{Balance: uint256.NewInt(1), Root: stRoot, CodeHash: types.EmptyCodeHash.Bytes()})
-	helper.addTrieAccount("acc-2", &types.StateAccount{Balance: uint256.NewInt(2), Root: types.EmptyRootHash, CodeHash: types.EmptyCodeHash.Bytes()})
-	helper.addTrieAccount("acc-3", &types.StateAccount{Balance: uint256.NewInt(3), Root: stRoot, CodeHash: types.EmptyCodeHash.Bytes()})
+			helper.addTrieAccount("acc-1", &types.StateAccount{Balance: uint256.NewInt(1), Root: stRoot, CodeHash: types.EmptyCodeHash.Bytes()})
+			helper.addTrieAccount("acc-2", &types.StateAccount{Balance: uint256.NewInt(2), Root: types.EmptyRootHash, CodeHash: types.EmptyCodeHash.Bytes()})
+			helper.addTrieAccount("acc-3", &types.StateAccount{Balance: uint256.NewInt(3), Root: stRoot, CodeHash: types.EmptyCodeHash.Bytes()})
 
-	helper.makeStorageTrie(hashData([]byte("acc-1")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
-	helper.makeStorageTrie(hashData([]byte("acc-3")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
+			helper.makeStorageTrie(hashData([]byte("acc-1")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
+			helper.makeStorageTrie(hashData([]byte("acc-3")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
 
-	_, snap := helper.CommitAndGenerate()
+			_, snap := helper.CommitAndGenerate()
 
-	// Wait for generation to complete
-	select {
-	case <-snap.genPending:
-	case <-time.After(time.Second):
-		t.Fatal("Snapshot generation did not complete")
-	}
+			// Wait for generation to complete
+			select {
+			case <-snap.genPending:
+			case <-time.After(time.Second):
+				t.Fatal("Snapshot generation did not complete")
+			}
 
-	// Release should stop the generator goroutine without hanging
-	done := make(chan struct{})
-	go func() {
-		snap.Release()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("Release() hung — stopGeneration() was likely not called")
+			if err := snap.Release(); err != nil {
+				t.Fatal("snap.Release()", err)
+			}
+		})
 	}
 }
 
-// testReleaseStopsMidGeneration tests that Release() cancels and waits for
+// TestReleaseStopsMidGeneration tests that Release() cancels and waits for
 // the generator goroutine while generation is still in progress.
-func testReleaseStopsMidGeneration(t *testing.T, scheme string) {
-	helper := newHelper(scheme)
-	stRoot := helper.makeStorageTrie(common.Hash{}, []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, false)
+func TestReleaseStopsMidGeneration(t *testing.T) {
+	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme} {
+		t.Run(scheme, func(t *testing.T) {
+			helper := newHelper(scheme)
+			stRoot := helper.makeStorageTrie(common.Hash{}, []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, false)
 
-	helper.addTrieAccount("acc-1", &types.StateAccount{Balance: uint256.NewInt(1), Root: stRoot, CodeHash: types.EmptyCodeHash.Bytes()})
-	helper.addTrieAccount("acc-2", &types.StateAccount{Balance: uint256.NewInt(2), Root: types.EmptyRootHash, CodeHash: types.EmptyCodeHash.Bytes()})
-	helper.addTrieAccount("acc-3", &types.StateAccount{Balance: uint256.NewInt(3), Root: stRoot, CodeHash: types.EmptyCodeHash.Bytes()})
+			helper.addTrieAccount("acc-1", &types.StateAccount{Balance: uint256.NewInt(1), Root: stRoot, CodeHash: types.EmptyCodeHash.Bytes()})
+			helper.addTrieAccount("acc-2", &types.StateAccount{Balance: uint256.NewInt(2), Root: types.EmptyRootHash, CodeHash: types.EmptyCodeHash.Bytes()})
+			helper.addTrieAccount("acc-3", &types.StateAccount{Balance: uint256.NewInt(3), Root: stRoot, CodeHash: types.EmptyCodeHash.Bytes()})
 
-	helper.makeStorageTrie(hashData([]byte("acc-1")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
-	helper.makeStorageTrie(hashData([]byte("acc-3")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
+			helper.makeStorageTrie(hashData([]byte("acc-1")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
+			helper.makeStorageTrie(hashData([]byte("acc-3")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
 
-	_, snap := helper.CommitAndGenerate()
+			_, snap := helper.CommitAndGenerate()
 
-	// Call Release immediately without waiting for generation to finish.
-	// This exercises the cancel signal through checkAndFlush.
-	done := make(chan struct{})
-	go func() {
-		snap.Release()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("Release() hung during mid-generation cancellation")
+			// Call Release immediately without waiting for generation to finish.
+			// This exercises the cancel signal through checkAndFlush.
+			if err := snap.Release(); err != nil {
+				t.Fatal("snap.Release()", err)
+			}
+		})
 	}
 }
