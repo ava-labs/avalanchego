@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
@@ -275,12 +276,29 @@ func (b *BlockGen) SetOnBlockGenerated(onBlockGenerated func(*types.Block)) {
 func GenerateChain(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, db ethdb.Database, n int, gap uint64, gen func(int, *BlockGen)) ([]*types.Block, []types.Receipts, error) {
 	stateCache := state.NewDatabase(db)
 	defer stateCache.TrieDB().Close()
-	return GenerateChainFromStateCache(config, parent, engine, stateCache, n, gap, gen, true)
+	return GenerateChainFromStateCache(config, parent, engine, stateCache, n, gap, gen)
+}
+
+type generateChainConfig struct {
+	commitToDisk bool
+}
+
+// GenerateChainOption configures [GenerateChainFromStateCache].
+type GenerateChainOption = options.Option[generateChainConfig]
+
+// WithoutDiskCommit skips persisting trie state to disk, allowing blocks
+// to be separately accepted by a VM on the same database.
+func WithoutDiskCommit() GenerateChainOption {
+	return options.Func[generateChainConfig](func(c *generateChainConfig) {
+		c.commitToDisk = false
+	})
 }
 
 // GenerateChainFromStateCache is exactly like [GenerateChain], except allows other [triedb.Database] implementations.
-// The commit parameter controls whether the state changes are committed to the database.
-func GenerateChainFromStateCache(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, stateCache state.Database, n int, gap uint64, gen func(int, *BlockGen), commit bool) ([]*types.Block, []types.Receipts, error) {
+func GenerateChainFromStateCache(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, stateCache state.Database, n int, gap uint64, gen func(int, *BlockGen), opts ...GenerateChainOption) ([]*types.Block, []types.Receipts, error) {
+	cfg := generateChainConfig{commitToDisk: true}
+	options.ApplyTo(&cfg, opts...)
+
 	if config == nil {
 		config = params.TestChainConfig
 	}
@@ -314,7 +332,7 @@ func GenerateChainFromStateCache(config *params.ChainConfig, parent *types.Block
 		if err != nil {
 			panic(fmt.Sprintf("state write error: %v", err))
 		}
-		if commit {
+		if cfg.commitToDisk {
 			if err = triedb.Commit(root, false); err != nil {
 				panic(fmt.Sprintf("trie write error: %v", err))
 			}
