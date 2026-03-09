@@ -15,7 +15,7 @@ module github.com/ava-labs/avalanchego
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
 //   - Consider updating the version of golangci-lint (see tools/external/go.mod)
-go 1.25.0
+go 1.25.8
 
 require (
 	connectrpc.com/connect v1.18.1
@@ -25,7 +25,7 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-initial-consistent-tag
 	github.com/ava-labs/avalanchego/graft/subnet-evm v0.0.0-initial-consistent-tag
-	github.com/ava-labs/libevm v1.13.15-0.20260120173328-de5fd6fcd5df
+	github.com/ava-labs/libevm v1.13.14-0.4.0.rc.2
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -96,7 +96,7 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0-20260302180144-d96fd1b8000f
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.2.0
 	github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
