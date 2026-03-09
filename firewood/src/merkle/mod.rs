@@ -1131,15 +1131,6 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     }
 }
 
-/// Returns an iterator where each element is the result of combining
-/// 2 nibbles of `nibbles`. If `nibbles` is odd length, panics in
-/// debug mode and drops the final nibble in release mode.
-pub fn nibbles_to_bytes_iter(nibbles: &[u8]) -> impl Iterator<Item = u8> {
-    debug_assert_eq!(nibbles.len() & 1, 0);
-    #[expect(clippy::indexing_slicing)]
-    nibbles.chunks_exact(2).map(|p| (p[0] << 4) | p[1])
-}
-
 /// The [`PrefixOverlap`] type represents the _shared_ and _unique_ parts of two potentially overlapping slices.
 /// As the type-name implies, the `shared` property only constitues a shared *prefix*.
 /// The `unique_*` properties, [`unique_a`][`PrefixOverlap::unique_a`] and [`unique_b`][`PrefixOverlap::unique_b`]
