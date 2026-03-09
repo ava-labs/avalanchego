@@ -58,6 +58,8 @@
 //! | `firewood_set!(name, value, expensive)` | Set only if expensive metrics enabled |
 //! | `firewood_record!(name, value)` | Always record to histogram |
 //! | `firewood_record!(name, value, expensive)` | Record only if expensive metrics enabled |
+//! | `fwd_timed_result!(name, expr)` | Time a `Result` expression and record histogram on `Ok` |
+//! | `fwd_expensive_timed_result!(name, expr)` | Same as `fwd_timed_result!`, gated by expensive metrics |
 //!
 //! For registration, use `metrics::describe_*` macros or [`register_histogram_with_buckets`].
 
@@ -263,6 +265,53 @@ macro_rules! firewood_record {
     ($name:expr, $value:expr, $($labels:tt)+) => {
         ::metrics::histogram!($name, $($labels)+).record($value)
     };
+}
+
+/// Times a `Result` expression and records elapsed milliseconds to a histogram on success.
+///
+/// Returns a tuple `(result, elapsed_duration)` where `elapsed_duration` is a
+/// `coarsetime::Duration`.
+///
+/// # Usage
+/// ```ignore
+/// let (result, elapsed) = fwd_timed_result!(registry::LATENCY_MS_BUCKET, work());
+/// let value = result?;
+/// ```
+#[macro_export]
+macro_rules! fwd_timed_result {
+    ($name:expr, $expr:expr) => {{
+        let __fwd_start = ::coarsetime::Instant::now();
+        let __fwd_result = $expr;
+        let __fwd_elapsed = __fwd_start.elapsed();
+        if __fwd_result.is_ok() {
+            $crate::firewood_record!($name, __fwd_elapsed.as_f64() * 1000.0);
+        }
+        (__fwd_result, __fwd_elapsed)
+    }};
+}
+
+/// Times a `Result` expression and records elapsed milliseconds to a histogram on success
+/// (only when expensive metrics are enabled).
+///
+/// Returns a tuple `(result, elapsed_duration)` where `elapsed_duration` is a
+/// `coarsetime::Duration`.
+///
+/// # Usage
+/// ```ignore
+/// let (result, elapsed) = fwd_expensive_timed_result!(registry::LATENCY_MS_BUCKET, work());
+/// let value = result?;
+/// ```
+#[macro_export]
+macro_rules! fwd_expensive_timed_result {
+    ($name:expr, $expr:expr) => {{
+        let __fwd_start = ::coarsetime::Instant::now();
+        let __fwd_result = $expr;
+        let __fwd_elapsed = __fwd_start.elapsed();
+        if __fwd_result.is_ok() {
+            $crate::firewood_record!($name, __fwd_elapsed.as_f64() * 1000.0, expensive);
+        }
+        (__fwd_result, __fwd_elapsed)
+    }};
 }
 
 /// Returns a histogram handle for advanced operations.
