@@ -74,17 +74,25 @@ func TestDynamicExecutor_OnBlockAccepted(t *testing.T) {
 			executor.coordinator.state.Store(int32(tt.state))
 
 			deferred, err := executor.OnBlockAccepted(newMockBlock(100))
-			require.True(t, deferred)
 			require.ErrorIs(t, err, tt.wantErr)
-			wantUpdates := 0
-			if tt.state == StateRunning {
-				wantUpdates = 1
-			}
-			require.Equal(t, wantUpdates, syncer.updates)
 
-			queued := executor.coordinator.queue.dequeueBatch()
-			require.Len(t, queued, 1)
-			require.Equal(t, OpAccept, queued[0].operation)
+			if tt.state == StateExecutingBatch {
+				// During batch replay, blocks are not re-enqueued to avoid
+				// infinite re-entrancy loops.
+				require.False(t, deferred)
+				require.Empty(t, executor.coordinator.queue.dequeueBatch())
+			} else {
+				require.True(t, deferred)
+				wantUpdates := 0
+				if tt.state == StateRunning {
+					wantUpdates = 1
+				}
+				require.Equal(t, wantUpdates, syncer.updates)
+
+				queued := executor.coordinator.queue.dequeueBatch()
+				require.Len(t, queued, 1)
+				require.Equal(t, OpAccept, queued[0].operation)
+			}
 		})
 	}
 }
@@ -92,18 +100,31 @@ func TestDynamicExecutor_OnBlockAccepted(t *testing.T) {
 func TestDynamicExecutor_OnBlockRejectedAndVerified(t *testing.T) {
 	tests := []struct {
 		name   string
+		state  State
 		call   func(*dynamicExecutor, EthBlockWrapper) (bool, error)
 		wantOp BlockOperationType
 	}{
 		{
 			name:   "reject is deferred",
+			state:  StateRunning,
 			call:   (*dynamicExecutor).OnBlockRejected,
 			wantOp: OpReject,
 		},
 		{
 			name:   "verify is deferred",
+			state:  StateRunning,
 			call:   (*dynamicExecutor).OnBlockVerified,
 			wantOp: OpVerify,
+		},
+		{
+			name:  "reject during batch replay is not deferred",
+			state: StateExecutingBatch,
+			call:  (*dynamicExecutor).OnBlockRejected,
+		},
+		{
+			name:  "verify during batch replay is not deferred",
+			state: StateExecutingBatch,
+			call:  (*dynamicExecutor).OnBlockVerified,
 		},
 	}
 
@@ -113,15 +134,20 @@ func TestDynamicExecutor_OnBlockRejectedAndVerified(t *testing.T) {
 			require.NoError(t, registry.Register(&targetTrackingSyncer{name: "target-tracker", id: "target-tracker"}))
 
 			executor := newDynamicExecutor(registry, noopAcceptor{}, 1)
-			executor.coordinator.state.Store(int32(StateRunning))
+			executor.coordinator.state.Store(int32(tt.state))
 
 			deferred, err := tt.call(executor, newMockBlock(100))
-			require.True(t, deferred)
 			require.NoError(t, err)
 
-			queued := executor.coordinator.queue.dequeueBatch()
-			require.Len(t, queued, 1)
-			require.Equal(t, tt.wantOp, queued[0].operation)
+			if tt.state == StateExecutingBatch {
+				require.False(t, deferred)
+				require.Empty(t, executor.coordinator.queue.dequeueBatch())
+			} else {
+				require.True(t, deferred)
+				queued := executor.coordinator.queue.dequeueBatch()
+				require.Len(t, queued, 1)
+				require.Equal(t, tt.wantOp, queued[0].operation)
+			}
 		})
 	}
 }

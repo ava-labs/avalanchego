@@ -40,10 +40,10 @@ type blockOperation struct {
 
 // blockQueue buffers block operations (accept/reject/verify) that arrive while
 // the coordinator is in the Running state. Operations are processed in FIFO order.
-// It is cleared (drained) on UpdateSyncTarget to avoid drops and is snapshotted
-// at finalization via DequeueBatch. Enqueue is always allowed; a DequeueBatch
-// only captures the current buffered operations and clears them, and new enqueues
-// after the snapshot are not part of that batch.
+// Blocks below the sync target height are pruned on UpdateSyncTarget and the
+// buffer is snapshotted at finalization via dequeueBatch. Enqueue is always
+// allowed. A dequeueBatch only captures the current buffered operations and
+// clears them. New enqueues after the snapshot are not part of that batch.
 type blockQueue struct {
 	mu sync.Mutex
 	// buffered operations accumulated before finalization

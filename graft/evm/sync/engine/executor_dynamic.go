@@ -53,8 +53,10 @@ func (d *dynamicExecutor) Execute(ctx context.Context, summary message.Syncable)
 // OnBlockAccepted enqueues the block for deferred processing and updates the sync target.
 func (d *dynamicExecutor) OnBlockAccepted(b EthBlockWrapper) (bool, error) {
 	if d.coordinator.CurrentState() == StateExecutingBatch {
-		// Still enqueue for the next batch, but don't update target.
-		return d.enqueue(b, OpAccept), nil
+		// During batch replay the block is already being executed directly
+		// by executeBlockOperations. Re-enqueueing here would cause an
+		// infinite loop (Accept -> OnEngineAccept -> enqueue -> dequeue -> Accept ...).
+		return false, nil
 	}
 
 	if !d.enqueue(b, OpAccept) {
@@ -76,11 +78,17 @@ func (d *dynamicExecutor) OnBlockAccepted(b EthBlockWrapper) (bool, error) {
 
 // OnBlockRejected enqueues the block for deferred rejection.
 func (d *dynamicExecutor) OnBlockRejected(b EthBlockWrapper) (bool, error) {
+	if d.coordinator.CurrentState() == StateExecutingBatch {
+		return false, nil
+	}
 	return d.enqueue(b, OpReject), nil
 }
 
 // OnBlockVerified enqueues the block for deferred verification.
 func (d *dynamicExecutor) OnBlockVerified(b EthBlockWrapper) (bool, error) {
+	if d.coordinator.CurrentState() == StateExecutingBatch {
+		return false, nil
+	}
 	return d.enqueue(b, OpVerify), nil
 }
 
