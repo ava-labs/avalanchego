@@ -36,6 +36,8 @@ pub(crate) const DB_FILE_NAME: &str = "firewood.db";
 /// Revision manager configuratoin
 pub struct RevisionManagerConfig {
     /// The number of committed revisions to keep in memory.
+    ///
+    /// Must be > `deferred_persistence_commit_count`.
     #[builder(default = 128)]
     max_revisions: usize,
 
@@ -60,6 +62,12 @@ pub struct RevisionManagerConfig {
 
     #[builder(default = CacheReadStrategy::WritesOnly)]
     cache_read_strategy: CacheReadStrategy,
+
+    /// The maximum number of unpersisted revisions that can exist at a given time.
+    ///
+    /// Must be < `max_revisions`.
+    #[builder(default = nonzero!(1u64))]
+    deferred_persistence_commit_count: NonZeroU64,
 }
 
 impl RevisionManagerConfig {
@@ -113,9 +121,6 @@ pub struct ConfigManager {
     /// Whether to enable `RootStore`.
     #[builder(default = false)]
     pub root_store: bool,
-    /// The maximum number of unpersisted revisions that can exist at a given time.
-    #[builder(default = nonzero!(1u64))]
-    pub deferred_persistence_commit_count: NonZeroU64,
     /// Revision manager configuration.
     #[builder(default = RevisionManagerConfig::builder().build())]
     pub manager: RevisionManagerConfig,
@@ -183,10 +188,25 @@ pub(crate) enum RevisionManagerError {
     RootStoreError(#[source] Box<dyn std::error::Error + Send + Sync>),
     #[error("A deferred persistence error occurred: {0}")]
     PersistError(#[source] PersistError),
+    #[error(
+        "max_revisions ({max_revisions}) must be > deferred_persistence_commit_count ({commit_count})"
+    )]
+    InsufficientRevisions {
+        max_revisions: usize,
+        commit_count: u64,
+    },
 }
 
 impl RevisionManager {
     pub fn new(config: ConfigManager) -> Result<Self, RevisionManagerError> {
+        let commit_count = config.manager.deferred_persistence_commit_count.get();
+        if (config.manager.max_revisions as u64) <= commit_count {
+            return Err(RevisionManagerError::InsufficientRevisions {
+                max_revisions: config.manager.max_revisions,
+                commit_count,
+            });
+        }
+
         if config.create {
             std::fs::create_dir_all(&config.root_dir).map_err(RevisionManagerError::IOError)?;
         }
@@ -247,7 +267,7 @@ impl RevisionManager {
         }
 
         let persist_worker = PersistWorker::new(
-            config.deferred_persistence_commit_count,
+            config.manager.deferred_persistence_commit_count,
             header,
             root_store.clone(),
         );
@@ -893,5 +913,58 @@ mod tests {
         let memory_limit = config.compute_node_cache_memory_limit().unwrap();
 
         assert_eq!(memory_limit.get(), 256_000_000);
+    }
+
+    #[test]
+    fn test_revision_count() {
+        let db_dir = tempfile::tempdir().unwrap();
+        let commit_count = nonzero!(10u64);
+
+        // `max_revisions` < `commit_count`
+        let config = ConfigManager::builder()
+            .root_dir(db_dir.as_ref().to_path_buf())
+            .node_hash_algorithm(NodeHashAlgorithm::compile_option())
+            .create(true)
+            .manager(
+                RevisionManagerConfig::builder()
+                    .max_revisions(5)
+                    .deferred_persistence_commit_count(commit_count)
+                    .build(),
+            )
+            .build();
+
+        let result = RevisionManager::new(config);
+        assert!(result.is_err());
+
+        // `max_revisions` == `commit_count`
+        let config = ConfigManager::builder()
+            .root_dir(db_dir.as_ref().to_path_buf())
+            .node_hash_algorithm(NodeHashAlgorithm::compile_option())
+            .manager(
+                RevisionManagerConfig::builder()
+                    .max_revisions(commit_count.get() as usize)
+                    .deferred_persistence_commit_count(commit_count)
+                    .build(),
+            )
+            .build();
+
+        let result = RevisionManager::new(config);
+        assert!(result.is_err());
+
+        // `max_revisions` > `commit_count`
+        let max_revisions = commit_count.get().wrapping_add(1) as usize;
+        let config = ConfigManager::builder()
+            .root_dir(db_dir.as_ref().to_path_buf())
+            .node_hash_algorithm(NodeHashAlgorithm::compile_option())
+            .manager(
+                RevisionManagerConfig::builder()
+                    .max_revisions(max_revisions)
+                    .deferred_persistence_commit_count(commit_count)
+                    .build(),
+            )
+            .build();
+
+        let result = RevisionManager::new(config);
+        assert!(result.is_ok());
     }
 }

@@ -71,6 +71,8 @@ pub struct DatabaseHandleArgs<'a> {
     pub free_list_cache_size: usize,
 
     /// The maximum number of revisions to keep.
+    ///
+    /// Must be > `deferred_persistence_commit_count`.
     pub revisions: usize,
 
     /// The cache read strategy to use.
@@ -102,6 +104,8 @@ pub struct DatabaseHandleArgs<'a> {
     pub node_hash_algorithm: NodeHashAlgorithm,
 
     /// The maximum number of unpersisted revisions that can exist at a given time.
+    ///
+    /// Note: `revisions` must be > `deferred_persistence_commit_count`.
     pub deferred_persistence_commit_count: u64,
 }
 
@@ -115,6 +119,8 @@ impl DatabaseHandleArgs<'_> {
         };
         let free_list_cache_size = NonZeroUsize::new(self.free_list_cache_size)
             .ok_or_else(|| invalid_data("free list cache size should be non-zero"))?;
+        let commit_count = NonZeroU64::new(self.deferred_persistence_commit_count)
+            .ok_or(api::Error::ZeroCommitCount)?;
 
         let memory_limit = NonZeroUsize::new(self.node_cache_memory_limit);
 
@@ -122,7 +128,8 @@ impl DatabaseHandleArgs<'_> {
             let builder = RevisionManagerConfig::builder()
                 .max_revisions(self.revisions)
                 .cache_read_strategy(cache_read_strategy)
-                .free_list_cache_size(free_list_cache_size);
+                .free_list_cache_size(free_list_cache_size)
+                .deferred_persistence_commit_count(commit_count);
 
             if let Some(memory_limit) = memory_limit {
                 builder.node_cache_memory_limit(memory_limit).build()
@@ -159,15 +166,12 @@ impl DatabaseHandle {
     /// If the path is empty, or if the configuration is invalid, this will return an error.
     pub fn new(args: DatabaseHandleArgs<'_>) -> Result<Self, api::Error> {
         let metrics_context = MetricsContext::new(args.expensive_metrics);
-        let commit_count = NonZeroU64::new(args.deferred_persistence_commit_count)
-            .ok_or(api::Error::ZeroCommitCount)?;
 
         let cfg = DbConfig::builder()
             .node_hash_algorithm(args.node_hash_algorithm.into())
             .truncate(args.truncate)
             .manager(args.as_rev_manager_config()?)
             .root_store(args.root_store)
-            .deferred_persistence_commit_count(commit_count)
             .build();
 
         let path = args

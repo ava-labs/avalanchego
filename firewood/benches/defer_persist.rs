@@ -3,6 +3,7 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use firewood::db::{BatchOp, Db, DbConfig};
+use firewood::manager::RevisionManagerConfig;
 use firewood::v2::api::{Db as _, Proposal as _};
 use firewood_storage::NodeHashAlgorithm;
 use rand::{RngExt, distr::Alphanumeric};
@@ -14,6 +15,7 @@ fn bench_deferred_persistence<const N: usize, const COMMIT_COUNT: u64>(criterion
     const KEY_LEN: usize = 4;
     let rng = &firewood_storage::SeededRng::from_option(Some(1234));
     let commit_count = NonZeroU64::new(COMMIT_COUNT).unwrap();
+    let max_revisions = commit_count.get().wrapping_add(1) as usize;
 
     criterion
         .benchmark_group("deferred_persistence")
@@ -35,7 +37,12 @@ fn bench_deferred_persistence<const N: usize, const COMMIT_COUNT: u64>(criterion
                     let tmpdir = tempfile::tempdir().unwrap();
                     let dbcfg = DbConfig::builder()
                         .node_hash_algorithm(NodeHashAlgorithm::compile_option())
-                        .deferred_persistence_commit_count(commit_count)
+                        .manager(
+                            RevisionManagerConfig::builder()
+                                .max_revisions(max_revisions)
+                                .deferred_persistence_commit_count(commit_count)
+                                .build(),
+                        )
                         .build();
                     let db = Db::new(tmpdir, dbcfg).unwrap();
 

@@ -204,6 +204,14 @@ pub enum Error {
 
     #[error("commit count must be positive")]
     ZeroCommitCount,
+
+    #[error(
+        "max_revisions ({max_revisions}) must be > deferred_persistence_commit_count ({commit_count})"
+    )]
+    InsufficientRevisions {
+        max_revisions: usize,
+        commit_count: u64,
+    },
 }
 
 impl From<std::convert::Infallible> for Error {
@@ -215,7 +223,7 @@ impl From<std::convert::Infallible> for Error {
 impl From<RevisionManagerError> for Error {
     fn from(err: RevisionManagerError) -> Self {
         use RevisionManagerError::{
-            FileIoError, IOError, NotLatest, PersistError, RevisionNotFound,
+            FileIoError, IOError, InsufficientRevisions, NotLatest, PersistError, RevisionNotFound,
             RevisionWithoutAddress, RootStoreError,
         };
         match err {
@@ -228,6 +236,13 @@ impl From<RevisionManagerError> for Error {
             IOError(err) => Self::IO(err),
             RootStoreError(err) => Self::RootStoreError(err),
             PersistError(err) => Self::DeferredPersistenceError(err),
+            InsufficientRevisions {
+                max_revisions,
+                commit_count,
+            } => Self::InsufficientRevisions {
+                max_revisions,
+                commit_count,
+            },
         }
     }
 }
