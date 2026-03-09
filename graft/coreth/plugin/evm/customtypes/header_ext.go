@@ -190,7 +190,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 // NOTE: both generators currently do not support type aliases.
 // We are using custom versions of these programs for now to support type aliases,
 // see https://github.com/ava-labs/avalanchego/graft/coreth/pull/746#discussion_r1969673252
-//go:generate go tool -modfile=../../../../../tools/go.mod gencodec -type HeaderSerializable -field-override headerMarshaling -out gen_header_serializable_json.go
+//go:generate go tool gencodec -type HeaderSerializable -field-override headerMarshaling -out gen_header_serializable_json.go
 //go:generate go tool rlpgen -type HeaderSerializable -out gen_header_serializable_rlp.go
 
 // HeaderSerializable defines the header of a block in the Ethereum blockchain,

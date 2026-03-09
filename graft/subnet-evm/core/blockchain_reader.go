@@ -31,9 +31,9 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"

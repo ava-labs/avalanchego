@@ -1162,6 +1162,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MeterVMEnabled:                          n.Config.MeterVMEnabled,
 			Metrics:                                 n.MetricsGatherer,
 			MeterDBMetrics:                          n.MeterDBMetricsGatherer,
+			ProposerMinBlockDelay:                   n.Config.ProposerMinBlockDelay,
 			SubnetConfigs:                           n.Config.SubnetConfigs,
 			ChainConfigs:                            n.Config.ChainConfigs,
 			FrontierPollFrequency:                   n.Config.FrontierPollFrequency,

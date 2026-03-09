@@ -2,6 +2,20 @@
 
 ## Pending (v1.14.2)
 
+### Breaking Changes
+
+- Removed `graft/subnet-evm/compatibility.json` in favor of using a single source of truth in `version/compatibility.json`. External tools that relied on this file should now use `version/compatibility.json` from the main AvalancheGo repository.
+
+### Config
+
+- Removed `pull-gossip-poll-size` from the X-chain and P-chain configs.
+- Removed `proposerMinBlockDelay` from subnet configs.
+
+### Fixes
+
+- Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space.
+- Updated minimum go version to `v1.25.7`.
+
 ## [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1)
 
 This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0). It is optional, but encouraged.

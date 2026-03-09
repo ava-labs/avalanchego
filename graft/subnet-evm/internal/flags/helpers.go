@@ -35,8 +35,8 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/version"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/params"
 	"github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v2"
 )

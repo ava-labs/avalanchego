@@ -2,7 +2,6 @@
 // See the file LICENSE for licensing terms.
 
 //go:build linux || netbsd || openbsd
-// +build linux netbsd openbsd
 
 package ulimit
 

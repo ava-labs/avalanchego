@@ -373,13 +373,12 @@ type stateBlk struct {
  *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
  */
 type state struct {
-	validatorState
-
-	validators validators.Manager
-	ctx        *snow.Context
-	upgrades   upgrade.Config
-	metrics    metrics.Metrics
-	rewards    reward.Calculator
+	validatorState *validatorState
+	validators     validators.Manager
+	ctx            *snow.Context
+	upgrades       upgrade.Config
+	metrics        metrics.Metrics
+	rewards        reward.Calculator
 
 	baseDB *versiondb.Database
 
@@ -860,6 +859,14 @@ func New(
 	}
 
 	return s, nil
+}
+
+func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
+	return s.validatorState.GetDelegateeReward(subnetID, vdrID)
+}
+
+func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, reward uint64) error {
+	return s.validatorState.SetDelegateeReward(subnetID, vdrID, reward)
 }
 
 func (s *state) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
@@ -2249,7 +2256,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeValidatorDiffs(height),
 		s.writeCurrentStakers(codecVersion),
 		s.writePendingStakers(),
-		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
+		s.validatorState.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
 		s.writeL1Validators(),
 		s.writeTXs(),
 		s.writeRewardUTXOs(),

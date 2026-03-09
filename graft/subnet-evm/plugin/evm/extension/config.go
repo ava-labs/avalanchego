@@ -8,19 +8,18 @@ import (
 	"errors"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -28,12 +27,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 var (
 	errNilConfig              = errors.New("nil extension config")
 	errNilSyncSummaryProvider = errors.New("nil sync summary provider")
-	errNilSyncableParser      = errors.New("nil syncable parser")
 	errNilClock               = errors.New("nil clock")
 )
 
@@ -41,16 +40,14 @@ type ExtensibleVM interface {
 	// SetExtensionConfig sets the configuration for the VM extension
 	// Should be called before any other method and only once
 	SetExtensionConfig(config *Config) error
-	// NewClient returns a client to send messages with for the given protocol
-	NewClient(protocol uint64) *p2p.Client
-	// AddHandler registers a server handler for an application protocol
-	AddHandler(protocol uint64, handler p2p.Handler) error
 	// GetExtendedBlock returns the VMBlock for the given ID or an error if the block is not found
 	GetExtendedBlock(context.Context, ids.ID) (ExtendedBlock, error)
 	// LastAcceptedExtendedBlock returns the last accepted VM block
 	LastAcceptedExtendedBlock() ExtendedBlock
 	// ChainConfig returns the chain config for the VM
 	ChainConfig() *params.ChainConfig
+	// P2PNetwork returns the p2p network
+	P2PNetwork() *p2p.Network
 	// P2PValidators returns the validators for the network
 	P2PValidators() *p2p.Validators
 	// Blockchain returns the blockchain client
@@ -78,7 +75,7 @@ type InnerVM interface {
 // ExtendedBlock is a block that can be used by the extension
 type ExtendedBlock interface {
 	snowman.Block
-	GetEthBlock() *types.Block
+	GetEthBlock() *ethtypes.Block
 	GetBlockExtension() BlockExtension
 }
 
@@ -133,16 +130,12 @@ type Config struct {
 	// for the VM to be used in consensus engine.
 	// Callback functions can be nil.
 	ConsensusCallbacks dummy.ConsensusCallbacks
-	// SyncSummaryProvider is the sync summary provider to use
-	// for the VM to be used in syncer.
-	// It's required and should be non-nil
-	SyncSummaryProvider sync.SummaryProvider
+	// SyncSummaryProvider provides and parses state sync summaries.
+	// It's required and should be non-nil.
+	SyncSummaryProvider message.SyncSummaryProvider
 	// SyncExtender can extend the syncer to handle custom sync logic.
 	// It's optional and can be nil
-	SyncExtender sync.Extender
-	// SyncableParser is to parse summary messages from the network.
-	// It's required and should be non-nil
-	SyncableParser message.SyncableParser
+	SyncExtender types.Extender
 	// BlockExtender allows the VM extension to create an extension to handle block processing events.
 	// It's optional and can be nil
 	BlockExtender BlockExtender
@@ -163,9 +156,6 @@ func (c *Config) Validate() error {
 	}
 	if c.SyncSummaryProvider == nil {
 		return errNilSyncSummaryProvider
-	}
-	if c.SyncableParser == nil {
-		return errNilSyncableParser
 	}
 	if c.Clock == nil {
 		return errNilClock

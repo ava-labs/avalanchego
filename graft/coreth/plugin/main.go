@@ -12,19 +12,20 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 )
 
 func main() {
 	evm.RegisterAllLibEVMExtras()
 
-	version, err := PrintVersion()
+	printVersion, err := PrintVersion()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s\n", err)
 		os.Exit(1)
 	}
-	if version {
-		fmt.Println(evm.Version)
+	if printVersion {
+		fmt.Println(version.Current.SemanticWithCommit(version.GitCommit))
 		os.Exit(0)
 	}
 	if err := ulimit.Set(ulimit.DefaultFDLimit, logging.NoLog{}); err != nil {

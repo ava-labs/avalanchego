@@ -42,3 +42,9 @@ jobs:
       env:
         IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
         IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+
+    - name: Build and push images for subnet-evm test setup
+      run: ./scripts/run_task.sh build-antithesis-images-subnet-evm
+      env:
+        IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
+        IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}

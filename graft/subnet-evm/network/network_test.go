@@ -18,8 +18,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/network/peertest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -583,7 +583,7 @@ func TestNetworkRouting(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	network, err := NewNetwork(ctx, sender, networkCodec, 1, prometheus.NewRegistry())
 	require.NoError(err)
-	require.NoError(network.AddHandler(uint64(protocol), handler))
+	require.NoError(network.P2PNetwork().AddHandler(uint64(protocol), handler))
 
 	nodeID := ids.GenerateTestNodeID()
 	foobar := append([]byte{byte(protocol)}, []byte("foobar")...)

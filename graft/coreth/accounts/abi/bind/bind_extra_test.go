@@ -9,12 +9,12 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind/backends"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"

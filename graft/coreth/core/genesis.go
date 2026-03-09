@@ -38,7 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
-	"github.com/ava-labs/avalanchego/graft/coreth/triedb/pathdb"
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -55,7 +55,7 @@ import (
 	"github.com/holiman/uint256"
 )
 
-//go:generate go tool -modfile=../../../tools/go.mod gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
+//go:generate go tool gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
 
 var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 

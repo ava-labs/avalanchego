@@ -6,8 +6,6 @@ package snowman
 import (
 	"context"
 
-	"go.uber.org/zap"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/job"
 	"github.com/ava-labs/avalanchego/utils/bag"
@@ -56,9 +54,6 @@ func (v *voter) Execute(ctx context.Context, _ []ids.ID, _ []ids.ID) error {
 	}
 
 	for _, result := range results {
-		v.e.Ctx.Log.Debug("finishing poll",
-			zap.Stringer("result", &result),
-		)
 		if err := v.e.Consensus.RecordPoll(ctx, result); err != nil {
 			return err
 		}

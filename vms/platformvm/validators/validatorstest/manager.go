@@ -32,10 +32,6 @@ func (manager) GetWarpValidatorSets(context.Context, uint64) (map[ids.ID]snowval
 	return nil, nil
 }
 
-func (manager) GetWarpValidatorSet(context.Context, uint64, ids.ID) (snowvalidators.WarpSet, error) {
-	return snowvalidators.WarpSet{}, nil
-}
-
 func (manager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*snowvalidators.GetValidatorOutput, error) {
 	return nil, nil
 }

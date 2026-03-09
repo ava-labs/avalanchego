@@ -2,7 +2,6 @@
 // See the file LICENSE for licensing terms.
 
 //go:build !windows && !openbsd
-// +build !windows,!openbsd
 
 package storage
 

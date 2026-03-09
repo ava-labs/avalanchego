@@ -76,6 +76,13 @@ func (c *cacheDB) Has(height BlockHeight) (bool, error) {
 	return c.db.Has(height)
 }
 
+func (c *cacheDB) Sync(start, end uint64) error {
+	if c.closed.Load() {
+		return database.ErrClosed
+	}
+	return c.db.Sync(start, end)
+}
+
 func (c *cacheDB) Close() error {
 	if !c.closed.CompareAndSwap(false, true) {
 		return database.ErrClosed

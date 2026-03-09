@@ -76,8 +76,3 @@ func checkDatabaseState(t *testing.T, db *Database, maxHeight uint64) {
 	actualMaxHeight := db.maxBlockHeight.Load()
 	require.Equal(t, maxHeight, actualMaxHeight, "maxBlockHeight mismatch")
 }
-
-// Helper function to create a pointer to uint64
-func uint64Ptr(v uint64) *uint64 {
-	return &v
-}

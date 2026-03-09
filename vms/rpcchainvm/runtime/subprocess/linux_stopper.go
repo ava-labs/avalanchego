@@ -2,7 +2,6 @@
 // See the file LICENSE for licensing terms.
 
 //go:build linux
-// +build linux
 
 // ^ SIGTERM signal is not available on Windows
 // ^ syscall.SysProcAttr only has field Pdeathsig on Linux

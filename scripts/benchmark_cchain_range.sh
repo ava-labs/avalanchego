@@ -20,7 +20,8 @@ set -euo pipefail
 # Environment variables:
 #   Data sources (provide S3 sources OR local paths):
 #     BLOCK_DIR_SRC: S3 object key for blocks (triggers S3 import).
-#     CURRENT_STATE_DIR_SRC: S3 object key for state (triggers S3 import).
+#     CURRENT_STATE_DIR_SRC: S3 object key for state. Optional—if unset, creates
+#                            empty state directory for genesis execution.
 #     BLOCK_DIR: Path to local block directory.
 #     CURRENT_STATE_DIR: Path to local current state directory.
 #
@@ -60,16 +61,21 @@ show_usage() {
 Usage: $0 [test-name]
 
 Available tests:
-  help                         - Show this help message
+  help                              - Show this help message
 
-  default                      - Quick test run (blocks 101-200, hashdb)
-  hashdb-101-250k              - Blocks 101-250k with hashdb
-  hashdb-archive-101-250k      - Blocks 101-250k with hashdb archive
-  hashdb-33m-33m500k           - Blocks 33m-33.5m with hashdb
-  firewood-101-250k            - Blocks 101-250k with firewood
-  firewood-archive-101-250k    - Blocks 101-250k with firewood archive
-  firewood-33m-33m500k         - Blocks 33m-33.5m with firewood
-  firewood-33m-40m             - Blocks 33m-40m with firewood
+  default                           - Quick test run (blocks 101-200, hashdb)
+  hashdb-101-250k                   - Blocks 101-250k with hashdb
+  hashdb-archive-101-250k           - Blocks 101-250k with hashdb archive
+  hashdb-33m-33m500k                - Blocks 33m-33.5m with hashdb
+  hashdb-69m-69m100k                - Blocks 69m-69.1m with hashdb
+  hashdb-archive-69m-69m100k        - Blocks 69m-69.1m with hashdb archive
+  hashdb-archive-ssc-69m-69m100k    - Blocks 69m-69.1m with hashdb archive from a statesynced checkpoint
+  firewood-101-250k                 - Blocks 101-250k with firewood
+  firewood-archive-101-250k         - Blocks 101-250k with firewood archive
+  firewood-33m-33m500k              - Blocks 33m-33.5m with firewood
+  firewood-archive-33m-33m500k      - Blocks 33m-33.5m with firewood archive
+  firewood-33m-40m                  - Blocks 33m-40m with firewood
+  firewood-archive-33m-40m          - Blocks 33m-40m with firewood archive
 EOF
 }
 
@@ -107,6 +113,26 @@ if [[ -n "$TEST_NAME" ]]; then
             START_BLOCK="${START_BLOCK:-33000001}"
             END_BLOCK="${END_BLOCK:-33500000}"
             ;;
+        hashdb-69m-69m100k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-69m-70m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-full-69m}"
+            START_BLOCK="${START_BLOCK:-69000001}"
+            END_BLOCK="${END_BLOCK:-69100000}"
+            ;;
+        hashdb-archive-69m-69m100k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-69m-70m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-archive-69m}"
+            START_BLOCK="${START_BLOCK:-69000001}"
+            END_BLOCK="${END_BLOCK:-69100000}"
+            CONFIG="${CONFIG:-archive}"
+            ;;
+        hashdb-archive-ssc-69m-69m100k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-69m-70m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-hashdb-statesync-checkpoint-69m}"
+            START_BLOCK="${START_BLOCK:-69000001}"
+            END_BLOCK="${END_BLOCK:-69100000}"
+            CONFIG="${CONFIG:-archive}"
+            ;;
         firewood-101-250k)
             BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-1m-ldb}"
             CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-100}"
@@ -128,12 +154,26 @@ if [[ -n "$TEST_NAME" ]]; then
             END_BLOCK="${END_BLOCK:-33500000}"
             CONFIG="${CONFIG:-firewood}"
             ;;
+        firewood-archive-33m-33m500k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-30m-40m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-archive-33m}"
+            START_BLOCK="${START_BLOCK:-33000001}"
+            END_BLOCK="${END_BLOCK:-33500000}"
+            CONFIG="${CONFIG:-firewood-archive}"
+            ;;
         firewood-33m-40m)
             BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-30m-40m-ldb}"
             CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-33m}"
             START_BLOCK="${START_BLOCK:-33000001}"
             END_BLOCK="${END_BLOCK:-40000000}"
             CONFIG="${CONFIG:-firewood}"
+            ;;
+        firewood-archive-33m-40m)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-30m-40m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-archive-33m}"
+            START_BLOCK="${START_BLOCK:-33000001}"
+            END_BLOCK="${END_BLOCK:-40000000}"
+            CONFIG="${CONFIG:-firewood-archive}"
             ;;
         *)
             error "Unknown test '$TEST_NAME'"
@@ -148,20 +188,20 @@ if [[ -n "${CHAOS_MODE:-}" && -n "${TEST_NAME:-}" ]]; then
 fi
 
 # Determine data source: S3 import or local paths
-if [[ -n "${BLOCK_DIR_SRC:-}" && -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
-    # S3 mode - import data
+if [[ -n "${BLOCK_DIR_SRC:-}" ]]; then
+    # S3 mode - import data (CURRENT_STATE_DIR_SRC is optional; if unset, genesis mode)
     TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
     EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR:-/tmp/reexec-${TEST_NAME:-custom}-${TIMESTAMP}}"
 
     BLOCK_DIR_SRC="${BLOCK_DIR_SRC}" \
-    CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC}" \
+    CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-}" \
     EXECUTION_DATA_DIR="${EXECUTION_DATA_DIR}" \
-    "${SCRIPT_DIR}/import_cchain_data.sh"
+    "${SCRIPT_DIR}/setup_cchain_data.sh"
 
     BLOCK_DIR="${EXECUTION_DATA_DIR}/blocks"
     CURRENT_STATE_DIR="${EXECUTION_DATA_DIR}/current-state"
-elif [[ -n "${BLOCK_DIR_SRC:-}" || -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
-    error "Both BLOCK_DIR_SRC and CURRENT_STATE_DIR_SRC must be provided together"
+elif [[ -n "${CURRENT_STATE_DIR_SRC:-}" ]]; then
+    error "CURRENT_STATE_DIR_SRC requires BLOCK_DIR_SRC to also be set"
 elif [[ -z "${BLOCK_DIR:-}" || -z "${CURRENT_STATE_DIR:-}" ]]; then
     show_usage
     echo ""
