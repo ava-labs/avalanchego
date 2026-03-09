@@ -70,6 +70,7 @@ pub enum PersistError {
 ///
 /// Below is an example when `commit_count` is set to 10:
 ///
+#[cfg_attr(doc, aquamarine::aquamarine)]
 /// ```mermaid
 /// sequenceDiagram
 ///     participant Caller
@@ -106,7 +107,6 @@ pub enum PersistError {
 ///     BG->>Disk: persist last committed revision
 ///     Note right of Disk: Latest committed revision is persisted
 /// ```
-#[cfg_attr(doc, aquamarine::aquamarine)]
 #[derive(Debug)]
 pub(crate) struct PersistWorker {
     /// The background thread responsible for persisting commits async.
