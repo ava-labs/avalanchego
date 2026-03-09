@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -414,7 +415,8 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 			tdb.Firewood,
 			summary.GetBlockRoot(),
 			codeQueue,
-			c.config.Client,
+			c.config.Client.AddClient(p2p.FirewoodRangeProofHandlerID),
+			c.config.Client.AddClient(p2p.FirewoodChangeProofHandlerID),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create firewood syncer: %w", err)

@@ -50,23 +50,17 @@ func NewTestClient(
 	leafHandler handlers.LeafRequestHandler,
 	codesHandler *handlers.CodeRequestHandler,
 	blocksHandler *handlers.BlockRequestHandler,
-	clients map[uint64]*p2p.Client,
 ) *TestClient {
 	return &TestClient{
 		codec:         codec,
 		leafsHandler:  leafHandler,
 		codesHandler:  codesHandler,
 		blocksHandler: blocksHandler,
-		clients:       clients,
 	}
 }
 
-func (ml *TestClient) AddClient(handlerID uint64) *p2p.Client {
-	client, exists := ml.clients[handlerID]
-	if !exists {
-		panic(fmt.Sprintf("no client for handler ID %d", handlerID))
-	}
-	return client
+func (*TestClient) AddClient(uint64) *p2p.Client {
+	panic("AddClient is not supported in TestClient")
 }
 
 func (*TestClient) StateSyncNodes() []ids.NodeID {

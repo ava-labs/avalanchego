@@ -175,7 +175,6 @@ func newTestEnvironment(t *testing.T, numBlocks int, c codec.Manager) *testEnvir
 			nil,
 			nil,
 			blockHandler,
-			nil,
 		),
 	}
 }
