@@ -36,7 +36,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth/tracers"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -203,6 +205,177 @@ func (eth *Ethereum) pathState(block *types.Block) (*state.StateDB, func(), erro
 	return nil, nil, errors.New("historical state not available in path scheme yet")
 }
 
+// firewoodState reconstructs historical state for a Firewood-backed chain by
+// walking back to a persisted revision, then re-executing blocks forward.
+// The final Reconstructed view is cached in an LRU for subsequent queries.
+func (eth *Ethereum) firewoodState(ctx context.Context, block *types.Block, readOnly bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	// Fast path: state is available directly.
+	if statedb, err := eth.blockchain.StateAt(block.Root()); err == nil {
+		return statedb, noopReleaser, nil
+	}
+
+	// Check cache.
+	if cached, ok := eth.reconstructedCache.Get(block.Root()); ok {
+		entry := cached.(*reconstructedCacheEntry)
+		entry.mu.Lock()
+		defer entry.mu.Unlock()
+		accessor := firewood.NewReconstructedStateAccessor(
+			eth.blockchain.StateCache(),
+			entry.reconstructed,
+		)
+		statedb, err := state.New(block.Root(), accessor, nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating state from cached reconstructed: %w", err)
+		}
+		return statedb, noopReleaser, nil
+	}
+
+	// Get the Firewood TrieDB.
+	fwDB, ok := eth.blockchain.TrieDB().Backend().(*firewood.TrieDB)
+	if !ok {
+		return nil, nil, errors.New("expected Firewood backend for historical state reconstruction")
+	}
+
+	// Walk back to find a persisted revision.
+	maxWalkBack := eth.blockchain.CacheConfig().CommitInterval
+	if maxWalkBack == 0 {
+		maxWalkBack = 4096
+	}
+
+	current := block
+	for i := uint64(0); i < maxWalkBack; i++ {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
+		if eth.blockchain.HasState(current.Root()) {
+			break
+		}
+		if current.NumberU64() == 0 {
+			return nil, nil, errors.New("genesis state is missing")
+		}
+		parent := eth.blockchain.GetBlock(current.ParentHash(), current.NumberU64()-1)
+		if parent == nil {
+			return nil, nil, fmt.Errorf("missing block %v %d", current.ParentHash(), current.NumberU64()-1)
+		}
+		current = parent
+	}
+
+	if !eth.blockchain.HasState(current.Root()) {
+		return nil, nil, fmt.Errorf("no persisted state found within %d blocks", maxWalkBack)
+	}
+
+	// If we walked back to the target block itself, state IS available.
+	if current.Hash() == block.Hash() {
+		statedb, err := eth.blockchain.StateAt(block.Root())
+		if err != nil {
+			return nil, nil, err
+		}
+		return statedb, noopReleaser, nil
+	}
+
+	// Get the base revision.
+	baseRoot := current.Root()
+	rev, err := fwDB.Firewood.Revision(ffi.Hash(baseRoot))
+	if err != nil {
+		return nil, nil, fmt.Errorf("opening base revision at %s: %w", baseRoot.Hex(), err)
+	}
+
+	// Create initial Reconstructed from the base revision.
+	recon, err := rev.Reconstruct(nil)
+	if err != nil {
+		rev.Drop()
+		return nil, nil, fmt.Errorf("initial reconstruction: %w", err)
+	}
+
+	// Re-execute blocks forward from current+1 to the target block.
+	var logged time.Time
+	start := time.Now()
+
+	for current.NumberU64() < block.NumberU64() {
+		if err := ctx.Err(); err != nil {
+			recon.Drop()
+			return nil, nil, err
+		}
+
+		if time.Since(logged) > 8*time.Second {
+			log.Info("Reconstructing historical state",
+				"block", current.NumberU64()+1,
+				"target", block.NumberU64(),
+				"remaining", block.NumberU64()-current.NumberU64()-1,
+				"elapsed", time.Since(start),
+			)
+			logged = time.Now()
+		}
+
+		parentHeader := current.Header()
+		next := current.NumberU64() + 1
+		nextBlock := eth.blockchain.GetBlockByNumber(next)
+		if nextBlock == nil {
+			recon.Drop()
+			return nil, nil, fmt.Errorf("block #%d not found", next)
+		}
+
+		// Create a state.StateDB backed by the current Reconstructed.
+		accessor := firewood.NewReconstructedStateAccessor(
+			eth.blockchain.StateCache(),
+			recon,
+		)
+		statedb, err := state.New(common.Hash(recon.Root()), accessor, nil)
+		if err != nil {
+			recon.Drop()
+			return nil, nil, fmt.Errorf("creating state for block %d: %w", next, err)
+		}
+
+		// Execute the block.
+		_, _, _, err = eth.blockchain.Processor().Process(nextBlock, parentHeader, statedb, vm.Config{})
+		if err != nil {
+			recon.Drop()
+			return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
+		}
+
+		// Finalise to flush dirty state to the trie.
+		statedb.Finalise(eth.blockchain.Config().IsEIP158(nextBlock.Number()))
+
+		// Extract accumulated BatchOps from the underlying accessor.
+		ops := firewood.ExtractUpdateOps(statedb.Database())
+
+		// Chain Reconstruct to get the next view.
+		nextRecon, err := recon.Reconstruct(ops)
+		if err != nil {
+			// recon is already invalidated by Reconstruct even on error.
+			return nil, nil, fmt.Errorf("reconstructing state at block %d: %w", next, err)
+		}
+		recon = nextRecon
+		current = nextBlock
+	}
+
+	// Cache the final Reconstructed.
+	entry := &reconstructedCacheEntry{
+		reconstructed: recon,
+		rev:           rev,
+	}
+	eth.reconstructedCache.Add(block.Root(), entry)
+
+	// Return a read-only StateDB from the final Reconstructed.
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	accessor := firewood.NewReconstructedStateAccessor(
+		eth.blockchain.StateCache(),
+		recon,
+	)
+	statedb, err := state.New(block.Root(), accessor, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating final state: %w", err)
+	}
+
+	log.Info("Historical state reconstructed",
+		"block", block.NumberU64(),
+		"elapsed", time.Since(start),
+	)
+
+	return statedb, noopReleaser, nil
+}
+
 // stateAtBlock retrieves the state database associated with a certain block.
 // If no state is locally available for the given block, a number of blocks
 // are attempted to be reexecuted to generate the desired state. The optional
@@ -234,7 +407,7 @@ func (eth *Ethereum) stateAtBlock(ctx context.Context, block *types.Block, reexe
 	if eth.blockchain.TrieDB().Scheme() == rawdb.HashScheme && !isFirewood {
 		return eth.hashState(ctx, block, reexec, base, readOnly, preferDisk)
 	}
-	return eth.pathState(block)
+	return eth.firewoodState(ctx, block, readOnly)
 }
 
 // stateAtTransaction returns the execution environment of a certain transaction.
