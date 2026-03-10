@@ -243,6 +243,7 @@ type stateBlk struct {
  *   |-- lastAcceptedKey -> lastAccepted
  *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
  */
+// State is the complete persisted state of the Platform chain.
 type State struct {
 	validatorState *validatorState
 	validators     validators.Manager
@@ -1320,17 +1321,17 @@ func (s *State) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	}
 }
 
-// ApplyAllValidatorWeightDiffs iterates from [startHeight] towards the genesis
+// ApplyAllValidatorWeightDiffs iterates from `startHeight` towards the genesis
 // block until it has applied all of the diffs up to and including
-// [endHeight]. Applying the diffs modifies [validators].
+// `endHeight`. Applying the diffs modifies `validators`.
 //
 // Invariant: If attempting to generate the validator set for
-// [endHeight - 1], [validators] must initially contain the validator
-// weights for [startHeight].
+// `endHeight - 1`, `validators` must initially contain the validator
+// weights for `startHeight`.
 //
-// Note: Because this function iterates towards the genesis, [startHeight]
-// will typically be greater than or equal to [endHeight]. If [startHeight]
-// is less than [endHeight], no diffs will be applied.
+// Note: Because this function iterates towards the genesis, `startHeight`
+// will typically be greater than or equal to `endHeight`. If `startHeight`
+// is less than `endHeight`, no diffs will be applied.
 func (s *State) ApplyAllValidatorWeightDiffs(
 	ctx context.Context,
 	allValidators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
@@ -1396,17 +1397,17 @@ func (s *State) ApplyAllValidatorWeightDiffs(
 	return diffIter.Error()
 }
 
-// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
+// ApplyValidatorWeightDiffs iterates from `startHeight` towards the genesis
 // block until it has applied all of the diffs up to and including
-// [endHeight]. Applying the diffs modifies [validators].
+// `endHeight`. Applying the diffs modifies `validators`.
 //
 // Invariant: If attempting to generate the validator set for
-// [endHeight - 1], [validators] must initially contain the validator
-// weights for [startHeight].
+// `endHeight - 1`, `validators` must initially contain the validator
+// weights for `startHeight`.
 //
-// Note: Because this function iterates towards the genesis, [startHeight]
-// will typically be greater than or equal to [endHeight]. If [startHeight]
-// is less than [endHeight], no diffs will be applied.
+// Note: Because this function iterates towards the genesis, `startHeight`
+// will typically be greater than or equal to `endHeight`. If `startHeight`
+// is less than `endHeight`, no diffs will be applied.
 func (s *State) ApplyValidatorWeightDiffs(
 	ctx context.Context,
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -1499,17 +1500,17 @@ func applyWeightDiff(
 	return nil
 }
 
-// ApplyAllValidatorPublicKeyDiffs iterates from [startHeight] towards the
+// ApplyAllValidatorPublicKeyDiffs iterates from `startHeight` towards the
 // genesis block until it has applied all of the diffs up to and including
-// [endHeight]. Applying the diffs modifies [validators].
+// `endHeight`. Applying the diffs modifies `validators`.
 //
 // Invariant: If attempting to generate the validator set for
-// [endHeight - 1], [validators] must initially contain the validator
-// weights for [startHeight].
+// `endHeight - 1`, `validators` must initially contain the validator
+// weights for `startHeight`.
 //
-// Note: Because this function iterates towards the genesis, [startHeight]
-// will typically be greater than or equal to [endHeight]. If [startHeight]
-// is less than [endHeight], no diffs will be applied.
+// Note: Because this function iterates towards the genesis, `startHeight`
+// will typically be greater than or equal to `endHeight`. If `startHeight`
+// is less than `endHeight`, no diffs will be applied.
 func (s *State) ApplyAllValidatorPublicKeyDiffs(
 	ctx context.Context,
 	allValidators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
@@ -1555,17 +1556,17 @@ func (s *State) ApplyAllValidatorPublicKeyDiffs(
 	return diffIter.Error()
 }
 
-// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
+// ApplyValidatorPublicKeyDiffs iterates from `startHeight` towards the
 // genesis block until it has applied all of the diffs up to and including
-// [endHeight]. Applying the diffs modifies [validators].
+// `endHeight`. Applying the diffs modifies `validators`.
 //
 // Invariant: If attempting to generate the validator set for
-// [endHeight - 1], [validators] must initially contain the validator
-// weights for [startHeight].
+// `endHeight - 1`, `validators` must initially contain the validator
+// weights for `startHeight`.
 //
-// Note: Because this function iterates towards the genesis, [startHeight]
-// will typically be greater than or equal to [endHeight]. If [startHeight]
-// is less than [endHeight], no diffs will be applied.
+// Note: Because this function iterates towards the genesis, `startHeight`
+// will typically be greater than or equal to `endHeight`. If `startHeight`
+// is less than `endHeight`, no diffs will be applied.
 func (s *State) ApplyValidatorPublicKeyDiffs(
 	ctx context.Context,
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
