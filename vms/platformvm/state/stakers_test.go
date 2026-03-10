@@ -576,8 +576,7 @@ func TestGetStakerIteratorDeleteAndPut(t *testing.T) {
 	diffStakersIterator := d.GetStakerIterator(baseStakersIterator)
 
 	diffStakersSlice := iterator.ToSlice(diffStakersIterator)
-	require.Len(diffStakersSlice, 1)
-	require.Equal(diffStakersSlice[0], &updatedStaker)
+	require.Equal([]*Staker{&updatedStaker}, diffStakersSlice)
 }
 
 func existsInDiff(bs *diffStakers, staker *Staker) bool {
