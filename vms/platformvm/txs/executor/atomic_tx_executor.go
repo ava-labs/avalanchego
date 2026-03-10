@@ -140,6 +140,7 @@ func (e *atomicTxExecutor) atomicTx() error {
 	onAccept, err := state.NewDiff(
 		e.parentID,
 		e.stateVersions,
+		state.StakerAdditionAfterDeletionForbidden,
 	)
 	if err != nil {
 		return err
