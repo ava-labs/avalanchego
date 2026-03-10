@@ -41,6 +41,11 @@ const (
 	// outstanding when broadcasting.
 	maxOutstandingBroadcastRequests = 50
 
+	// maxParallelFetches is the maximum number of concurrent GetAncestors requests
+	// allowed at once. Higher values improve throughput when syncing from peers
+	// with high latency or when the node has few peers.
+	maxParallelFetches = 200
+
 	// minimumLogInterval is the minimum time between log entries to avoid noise
 	minimumLogInterval = 5 * time.Second
 
@@ -155,7 +160,7 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		defer config.Ctx.Lock.Unlock()
 
 		if err := bs.Timeout(); err != nil {
-			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping: %w", zap.Error(err))
+			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping", zap.Error(err))
 		}
 	}
 	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
@@ -623,30 +628,34 @@ func (b *Bootstrapper) process(
 			now.Sub(b.lastProgressUpdateTime) >= minimumLogInterval
 
 		if shouldLog {
-			totalBlocksToFetch := b.tipHeight - b.startingHeight
+			// Guard against uint64 underflow: tipHeight should always be >=
+			// startingHeight, but check defensively before subtracting.
+			if b.tipHeight >= b.startingHeight {
+				totalBlocksToFetch := b.tipHeight - b.startingHeight
 
-			etaPtr, progressPercentage := b.etaTracker.AddSample(
-				numFetched,
-				totalBlocksToFetch,
-				now,
-			)
-
-			// Update the last progress update time and previous progress for next iteration
-			b.lastProgressUpdateTime = now
-
-			// Only log if we have a valid ETA estimate
-			if etaPtr != nil {
-				logger := b.Ctx.Log.Info
-				if b.restarted {
-					// Lower log level for restarted bootstrapping.
-					logger = b.Ctx.Log.Debug
-				}
-				logger("fetching blocks",
-					zap.Uint64("numFetchedBlocks", numFetched),
-					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
-					zap.Duration("eta", *etaPtr),
-					zap.Float64("pctComplete", progressPercentage),
+				etaPtr, progressPercentage := b.etaTracker.AddSample(
+					numFetched,
+					totalBlocksToFetch,
+					now,
 				)
+
+				// Update the last progress update time and previous progress for next iteration
+				b.lastProgressUpdateTime = now
+
+				// Only log if we have a valid ETA estimate
+				if etaPtr != nil {
+					logger := b.Ctx.Log.Info
+					if b.restarted {
+						// Lower log level for restarted bootstrapping.
+						logger = b.Ctx.Log.Debug
+					}
+					logger("fetching blocks",
+						zap.Uint64("numFetchedBlocks", numFetched),
+						zap.Uint64("numTotalBlocks", totalBlocksToFetch),
+						zap.Duration("eta", *etaPtr),
+						zap.Float64("pctComplete", progressPercentage),
+					)
+				}
 			}
 		}
 	}
@@ -664,6 +673,23 @@ func (b *Bootstrapper) process(
 // being fetched. After executing all pending blocks it will either restart
 // bootstrapping, or transition into normal operations.
 func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
+	// Dispatch parallel fetch requests to fill the pipeline up to maxParallelFetches.
+	// This allows multiple GetAncestors requests to be in-flight simultaneously,
+	// improving throughput when peers have high latency or when there are few peers.
+	numOutstanding := b.outstandingRequests.Len()
+	if numToFetch := maxParallelFetches - numOutstanding; numToFetch > 0 {
+		fetched := 0
+		for blkID := range b.missingBlockIDs {
+			if fetched >= numToFetch {
+				break
+			}
+			if err := b.fetch(ctx, blkID); err != nil {
+				return err
+			}
+			fetched++
+		}
+	}
+
 	if numMissingBlockIDs := b.missingBlockIDs.Len(); numMissingBlockIDs != 0 {
 		return nil
 	}
