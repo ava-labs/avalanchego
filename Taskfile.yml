@@ -63,6 +63,18 @@ tasks:
     desc: Run unit tests with Bazel (shuffle on, race on)
     cmd: ./scripts/run_bazel.sh test //...
 
+  bazel-test-main:
+    desc: Run main module unit tests with Bazel (excludes graft modules)
+    cmd: ./scripts/run_bazel.sh test //... -- -//graft/...
+
+  bazel-test-coreth:
+    desc: Run coreth/evm unit tests with Bazel
+    cmd: ./scripts/run_bazel.sh test //graft/coreth/... //graft/evm/...
+
+  bazel-test-subnet-evm:
+    desc: Run subnet-evm unit tests with Bazel
+    cmd: ./scripts/run_bazel.sh test //graft/subnet-evm/...
+
   bazel-test-fast:
     desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
     cmd: ./scripts/run_bazel.sh test --config=fast //...
