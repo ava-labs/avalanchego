@@ -1040,6 +1040,7 @@ func (n *Node) initAPIServer() error {
 		apiRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
 		n.Config.HTTPAllowedHosts,
+		server.DefaultRPCCacheConfig(),
 	)
 	return err
 }
