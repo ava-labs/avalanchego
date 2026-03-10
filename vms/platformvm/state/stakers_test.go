@@ -181,8 +181,6 @@ func TestDiffStakersAddDeleteAddDeleteValidator(t *testing.T) {
 	diff.DeleteValidator(staker)
 
 	// Validators created and deleted in the same diff are marked as unmodified.
-	// This means they won't be pushed to baseState if diff.Apply(baseState) is
-	// called.
 	_, status = diff.GetValidator(staker.SubnetID, staker.NodeID)
 	require.Equal(unmodified, status)
 	require.False(existsInDiff(&diff, staker))
