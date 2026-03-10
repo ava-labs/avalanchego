@@ -287,14 +287,8 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 	blkID := blk.ID()
 	// Set expected calls on dependencies.
-	// Make sure the parent is accepted first.
-	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
-		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
-		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-	)
+	parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2)
+	parentStatelessBlk.EXPECT().Height().Return(blk.Height() - 1).Times(2)
 
 	err = acceptor.ApricotCommitBlock(blk)
 	require.ErrorIs(err, errMissingBlockState)
@@ -401,18 +395,16 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 
 	blkID := blk.ID()
 	// Set expected calls on dependencies.
-	// Make sure the parent is accepted first.
-	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
-		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-
-		// These are called when we add the parent's stateless block to the state
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
-		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-	)
+	parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2)
+	parentStatelessBlk.EXPECT().Height().Return(blk.Height() - 1).Times(2)
 
 	err = acceptor.ApricotAbortBlock(blk)
 	require.ErrorIs(err, errMissingBlockState)
+
+	_, _, height, err := s.GetCurrentValidators(t.Context(), constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(blk.Height()-1, height)
+	require.Equal(parentID, s.GetLastAccepted())
 
 	parentOnAbortState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 
@@ -452,4 +444,9 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require.NoError(acceptor.ApricotAbortBlock(blk))
 	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
+
+	_, _, height, err = s.GetCurrentValidators(t.Context(), constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(blk.Height(), height)
+	require.Equal(blk.ID(), s.GetLastAccepted())
 }
