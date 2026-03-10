@@ -61,28 +61,6 @@ pub use primitives::{AreaIndex, LinearAddress};
 // Re-export types from header module
 pub use header::NodeStoreHeader;
 
-/// The [`NodeStore`] handles the serialization of nodes and
-/// free space management of nodes in the page store. It lays out the format
-/// of the [`PageStore`]. More specifically, it places a [`FileIdentifyingMagic`]
-/// and a [`FreeSpaceHeader`] at the beginning
-///
-/// Nodestores represent a revision of the trie. There are three types of nodestores:
-/// - Committed: A committed revision of the trie. It has no in-memory changes.
-/// - `MutableProposal`: A proposal that is still being modified. It has some nodes in memory.
-/// - `ImmutableProposal`: A proposal that has been hashed and assigned addresses. It has no in-memory changes.
-///
-/// The general lifecycle of nodestores is as follows:
-/// ```mermaid
-/// flowchart TD
-/// subgraph subgraph["Committed Revisions"]
-/// L("Latest Nodestore&lt;Committed, S&gt;") --- |...|O("Oldest NodeStore&lt;Committed, S&gt;")
-/// end
-/// O --> E("Expire")
-/// L --> |start propose|M("NodeStore&lt;ProposedMutable, S&gt;")
-/// M --> |finish propose + hash|I("NodeStore&lt;ProposedImmutable, S&gt;")
-/// I --> |commit|N("New commit NodeStore&lt;Committed, S&gt;")
-/// style E color:#FFFFFF, fill:#AA00FF, stroke:#AA00FF
-/// ```
 use std::mem::take;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -482,7 +460,20 @@ impl ImmutableProposal {
 /// 3. Create a new mutable proposal from either a [Committed] or [`ImmutableProposal`] [`NodeStore`] using [`NodeStore::new`].
 /// 4. Convert a mutable proposal to an immutable proposal using [`std::convert::TryInto`], which hashes the nodes and assigns addresses
 /// 5. Convert an immutable proposal to a committed revision using [`std::convert::TryInto`], which writes the nodes to disk.
-
+///
+/// The general lifecycle of nodestores is as follows:
+#[cfg_attr(doc, aquamarine::aquamarine)]
+/// ```mermaid
+/// flowchart TD
+/// subgraph subgraph["Committed Revisions"]
+/// L("Latest Nodestore&lt;Committed, S&gt;") --- |...|O("Oldest NodeStore&lt;Committed, S&gt;")
+/// end
+/// O --> E("Expire")
+/// L --> |start propose|M("NodeStore&lt;ProposedMutable, S&gt;")
+/// M --> |finish propose + hash|I("NodeStore&lt;ProposedImmutable, S&gt;")
+/// I --> |commit|N("New commit NodeStore&lt;Committed, S&gt;")
+/// style E color:#FFFFFF, fill:#AA00FF, stroke:#AA00FF
+/// ```
 #[derive(Debug)]
 pub struct NodeStore<T, S> {
     /// This is one of [Committed], [`ImmutableProposal`], or [`MutableProposal`].

@@ -36,62 +36,28 @@ pub(crate) const DB_FILE_NAME: &str = "firewood.db";
 /// Revision manager configuratoin
 pub struct RevisionManagerConfig {
     /// The number of committed revisions to keep in memory.
+    ///
+    /// Must be > `deferred_persistence_commit_count`.
     #[builder(default = 128)]
     max_revisions: usize,
 
-    /// The size of the node cache (number of entries).
-    ///
-    /// **Deprecated:** Use `node_cache_memory_limit` instead for memory-based sizing.
-    /// If specified, this value is multiplied by 128 to estimate memory usage.
-    /// Cannot be specified together with `node_cache_memory_limit`.
-    #[deprecated(since = "0.2.0", note = "Use node_cache_memory_limit instead")]
-    #[builder(default, setter(strip_option))]
-    node_cache_size: Option<NonZero<usize>>,
-
     /// The memory limit for the node cache in bytes.
     ///
-    /// If neither this nor `node_cache_size` is specified, defaults to 192MB (1,500,000 × 128).
-    /// Cannot be specified together with `node_cache_size`.
-    #[builder(default, setter(strip_option))]
-    node_cache_memory_limit: Option<NonZero<usize>>,
+    /// Defaults to 192MB (equivalent to 1,500,000 nodes × 128 bytes).
+    #[builder(default = nonzero!(192_000_000_usize))]
+    node_cache_memory_limit: NonZero<usize>,
 
     #[builder(default_code = "NonZero::new(1000000).expect(\"non-zero\")")]
     free_list_cache_size: NonZero<usize>,
 
     #[builder(default = CacheReadStrategy::WritesOnly)]
     cache_read_strategy: CacheReadStrategy,
-}
 
-impl RevisionManagerConfig {
-    /// Compute the actual node cache memory limit from the configuration.
+    /// The maximum number of unpersisted revisions that can exist at a given time.
     ///
-    /// # Errors
-    ///
-    /// Returns an error if both `node_cache_size` and `node_cache_memory_limit` are specified.
-    #[expect(deprecated)]
-    pub(crate) fn compute_node_cache_memory_limit(
-        &self,
-    ) -> Result<NonZero<usize>, crate::v2::api::Error> {
-        // Convert entry count to memory: size × 128 bytes per node (estimate)
-        const BYTES_PER_NODE_ESTIMATE: usize = 128;
-        // Default: 192MB (equivalent to 1,500,000 nodes × 128 bytes)
-        const DEFAULT_MEMORY_LIMIT: usize = 192_000_000;
-
-        match (self.node_cache_size, self.node_cache_memory_limit) {
-            (Some(_), Some(_)) => Err(crate::v2::api::Error::ConflictingCacheConfig),
-            (Some(size), None) => {
-                warn!(
-                    "node_cache_size is deprecated as of 0.2.0; use node_cache_memory_limit instead"
-                );
-                Ok(
-                    NonZero::new(size.get().saturating_mul(BYTES_PER_NODE_ESTIMATE))
-                        .expect("non-zero size produces non-zero memory"),
-                )
-            }
-            (None, Some(limit)) => Ok(limit),
-            (None, None) => Ok(NonZero::new(DEFAULT_MEMORY_LIMIT).expect("default is non-zero")),
-        }
-    }
+    /// Must be < `max_revisions`.
+    #[builder(default = nonzero!(1u64))]
+    deferred_persistence_commit_count: NonZeroU64,
 }
 
 #[derive(Clone, Debug, TypedBuilder)]
@@ -113,9 +79,6 @@ pub struct ConfigManager {
     /// Whether to enable `RootStore`.
     #[builder(default = false)]
     pub root_store: bool,
-    /// The maximum number of unpersisted revisions that can exist at a given time.
-    #[builder(default = nonzero!(1u64))]
-    pub deferred_persistence_commit_count: NonZeroU64,
     /// Revision manager configuration.
     #[builder(default = RevisionManagerConfig::builder().build())]
     pub manager: RevisionManagerConfig,
@@ -183,28 +146,33 @@ pub(crate) enum RevisionManagerError {
     RootStoreError(#[source] Box<dyn std::error::Error + Send + Sync>),
     #[error("A deferred persistence error occurred: {0}")]
     PersistError(#[source] PersistError),
+    #[error(
+        "max_revisions ({max_revisions}) must be > deferred_persistence_commit_count ({commit_count})"
+    )]
+    InsufficientRevisions {
+        max_revisions: usize,
+        commit_count: u64,
+    },
 }
 
 impl RevisionManager {
     pub fn new(config: ConfigManager) -> Result<Self, RevisionManagerError> {
+        let commit_count = config.manager.deferred_persistence_commit_count.get();
+        if (config.manager.max_revisions as u64) <= commit_count {
+            return Err(RevisionManagerError::InsufficientRevisions {
+                max_revisions: config.manager.max_revisions,
+                commit_count,
+            });
+        }
+
         if config.create {
             std::fs::create_dir_all(&config.root_dir).map_err(RevisionManagerError::IOError)?;
         }
 
         let file = config.root_dir.join(DB_FILE_NAME);
-        let node_cache_memory_limit =
-            config
-                .manager
-                .compute_node_cache_memory_limit()
-                .map_err(|e| {
-                    RevisionManagerError::IOError(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        e,
-                    ))
-                })?;
         let fb = FileBacked::new(
             file,
-            node_cache_memory_limit,
+            config.manager.node_cache_memory_limit,
             config.manager.free_list_cache_size,
             config.truncate,
             config.create,
@@ -247,7 +215,7 @@ impl RevisionManager {
         }
 
         let persist_worker = PersistWorker::new(
-            config.deferred_persistence_commit_count,
+            config.manager.deferred_persistence_commit_count,
             header,
             root_store.clone(),
         );
@@ -846,52 +814,55 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_config_both_specified_error() {
-        // Test that specifying both node_cache_size and node_cache_memory_limit returns an error
-        #[expect(deprecated)]
-        let result = RevisionManagerConfig::builder()
-            .node_cache_size(NonZero::new(1000).unwrap())
-            .node_cache_memory_limit(NonZero::new(128_000).unwrap())
-            .build()
-            .compute_node_cache_memory_limit();
+    fn test_revision_count() {
+        let db_dir = tempfile::tempdir().unwrap();
+        let commit_count = nonzero!(10u64);
 
+        // `max_revisions` < `commit_count`
+        let config = ConfigManager::builder()
+            .root_dir(db_dir.as_ref().to_path_buf())
+            .node_hash_algorithm(NodeHashAlgorithm::compile_option())
+            .create(true)
+            .manager(
+                RevisionManagerConfig::builder()
+                    .max_revisions(5)
+                    .deferred_persistence_commit_count(commit_count)
+                    .build(),
+            )
+            .build();
+
+        let result = RevisionManager::new(config);
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            crate::v2::api::Error::ConflictingCacheConfig
-        ));
-    }
 
-    #[test]
-    fn test_cache_config_default_memory_limit() {
-        // Test that when neither field is specified, we get the default memory limit
-        let config = RevisionManagerConfig::builder().build();
-        let memory_limit = config.compute_node_cache_memory_limit().unwrap();
-
-        // Default should be 192MB (1,500,000 × 128 bytes)
-        assert_eq!(memory_limit.get(), 192_000_000);
-    }
-
-    #[test]
-    fn test_cache_config_size_to_memory_conversion() {
-        // Test that node_cache_size is correctly converted to memory (× 128)
-        #[expect(deprecated)]
-        let config = RevisionManagerConfig::builder()
-            .node_cache_size(NonZero::new(1000).unwrap())
+        // `max_revisions` == `commit_count`
+        let config = ConfigManager::builder()
+            .root_dir(db_dir.as_ref().to_path_buf())
+            .node_hash_algorithm(NodeHashAlgorithm::compile_option())
+            .manager(
+                RevisionManagerConfig::builder()
+                    .max_revisions(commit_count.get() as usize)
+                    .deferred_persistence_commit_count(commit_count)
+                    .build(),
+            )
             .build();
-        let memory_limit = config.compute_node_cache_memory_limit().unwrap();
 
-        assert_eq!(memory_limit.get(), 1000 * 128);
-    }
+        let result = RevisionManager::new(config);
+        assert!(result.is_err());
 
-    #[test]
-    fn test_cache_config_memory_limit_used_directly() {
-        // Test that node_cache_memory_limit is used directly when specified
-        let config = RevisionManagerConfig::builder()
-            .node_cache_memory_limit(NonZero::new(256_000_000).unwrap())
+        // `max_revisions` > `commit_count`
+        let max_revisions = commit_count.get().wrapping_add(1) as usize;
+        let config = ConfigManager::builder()
+            .root_dir(db_dir.as_ref().to_path_buf())
+            .node_hash_algorithm(NodeHashAlgorithm::compile_option())
+            .manager(
+                RevisionManagerConfig::builder()
+                    .max_revisions(max_revisions)
+                    .deferred_persistence_commit_count(commit_count)
+                    .build(),
+            )
             .build();
-        let memory_limit = config.compute_node_cache_memory_limit().unwrap();
 
-        assert_eq!(memory_limit.get(), 256_000_000);
+        let result = RevisionManager::new(config);
+        assert!(result.is_ok());
     }
 }

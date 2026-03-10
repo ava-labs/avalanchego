@@ -36,7 +36,7 @@ mod revision;
 mod value;
 
 use firewood::v2::api::DbView;
-use firewood_metrics::{firewood_increment, firewood_record, set_metrics_context};
+use firewood_metrics::set_metrics_context;
 
 pub use crate::handle::*;
 pub use crate::iterator::*;
@@ -516,17 +516,7 @@ pub extern "C" fn fwd_commit_proposal(proposal: Option<Box<ProposalHandle<'_>>>)
     #[cfg(feature = "block-replay")]
     let proposal_ptr = proposal.as_ref().map(|h| std::ptr::from_ref(&**h));
 
-    let result = invoke_with_handle(proposal, move |proposal| {
-        proposal.commit_proposal(|commit_time| {
-            firewood_increment!(crate::registry::COMMIT_MS, commit_time.as_millis());
-            firewood_increment!(crate::registry::COMMIT_COUNT, 1);
-            firewood_record!(
-                crate::registry::COMMIT_MS_BUCKET,
-                commit_time.as_f64() * 1000.0,
-                expensive
-            );
-        })
-    });
+    let result = invoke_with_handle(proposal, move |proposal| proposal.commit_proposal());
 
     #[cfg(feature = "block-replay")]
     replay::record_commit(proposal_ptr, &result);

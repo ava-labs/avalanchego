@@ -53,4 +53,4 @@ cbindgen = "0.29.2"
 workspace = true
 
 [package.metadata.cargo-machete]
-ignored = ["cbindgen", "metrics"]
+ignored = ["cbindgen", "coarsetime"]
