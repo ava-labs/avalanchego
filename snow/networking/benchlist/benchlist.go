@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
+	timerpkg "github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -201,11 +202,8 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 func (b *benchlist) run() {
 	defer close(b.shutdownDone)
 
-	timer := time.NewTimer(0)
+	timer := timerpkg.StoppedTimer()
 	defer timer.Stop()
-
-	// Drain the initial timer fire since nothing is benched yet.
-	<-timer.C
 
 	for {
 		select {
