@@ -76,7 +76,6 @@ func newTestState(t testing.TB, db database.Database) *State {
 		}),
 	)
 	require.NoError(t, err)
-	require.IsType(t, (*State)(nil), s)
 	return s
 }
 

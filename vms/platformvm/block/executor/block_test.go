@@ -11,6 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime/uptimemock"
@@ -132,8 +133,11 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				stakerTxID := ids.GenerateTestID()
 
-				state := statetest.New(t, statetest.Config{})
-				state.Close()
+				db := memdb.New()
+				state := statetest.New(t, statetest.Config{
+					DB: db,
+				})
+				require.NoError(t, db.Close())
 
 				uptimes := uptimemock.NewCalculator(ctrl)
 
