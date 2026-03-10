@@ -1078,15 +1078,19 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "block not found",
 			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := block.NewMockBlock(ctrl)
-				block.EXPECT().ID().Return(blockID).Times(1)
-				block.EXPECT().Height().Return(blockHeight).Times(1)
+				block, err := block.NewBanffStandardBlock(
+					time.Now(),
+					blockID,
+					blockHeight,
+					nil,
+				)
+				require.NoError(t, err)
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddStatelessBlock(block)
 
 				manager := executormock.NewManager(ctrl)
-				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
+				manager.EXPECT().GetStatelessBlock(block.ID()).Return(nil, database.ErrNotFound)
 				return &Service{
 					vm: &VM{
 						state:   state,

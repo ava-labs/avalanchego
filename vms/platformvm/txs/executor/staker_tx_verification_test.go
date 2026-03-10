@@ -555,7 +555,7 @@ func TestGetValidatorRules(t *testing.T) {
 		name          string
 		subnetID      ids.ID
 		backend       *Backend
-		chainStateF   func() state.Chain
+		chain         state.Chain
 		expectedRules *addValidatorRules
 		expectedErr   error
 	}
@@ -583,9 +583,7 @@ func TestGetValidatorRules(t *testing.T) {
 					AVAXAssetID: avaxAssetID,
 				},
 			},
-			chainStateF: func() state.Chain {
-				return nil
-			},
+			chain: nil,
 			expectedRules: &addValidatorRules{
 				assetID:           avaxAssetID,
 				minValidatorStake: config.MinValidatorStake,
@@ -596,13 +594,10 @@ func TestGetValidatorRules(t *testing.T) {
 			},
 		},
 		{
-			name:     "can't get subnet transformation",
-			subnetID: subnetID,
-			backend:  nil,
-			chainStateF: func() state.Chain {
-				s := statetest.New(t, statetest.Config{})
-				return s
-			},
+			name:          "can't get subnet transformation",
+			subnetID:      subnetID,
+			backend:       nil,
+			chain:         statetest.New(t, statetest.Config{}),
 			expectedRules: &addValidatorRules{},
 			expectedErr:   database.ErrNotFound,
 		},
@@ -610,8 +605,8 @@ func TestGetValidatorRules(t *testing.T) {
 			name:     "subnet",
 			subnetID: subnetID,
 			backend:  nil,
-			chainStateF: func() state.Chain {
-				state := statetest.New(t, statetest.Config{})
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
 				tx := &txs.Tx{
 					Unsigned: &txs.TransformSubnetTx{
 						AssetID:           customAssetID,
@@ -623,9 +618,9 @@ func TestGetValidatorRules(t *testing.T) {
 						Subnet:            subnetID,
 					},
 				}
-				state.AddSubnetTransformation(tx)
-				return state
-			},
+				s.AddSubnetTransformation(tx)
+				return s
+			}(),
 			expectedRules: &addValidatorRules{
 				assetID:           customAssetID,
 				minValidatorStake: config.MinValidatorStake,
@@ -642,8 +637,7 @@ func TestGetValidatorRules(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			chainState := tt.chainStateF()
-			rules, err := getValidatorRules(tt.backend, chainState, tt.subnetID)
+			rules, err := getValidatorRules(tt.backend, tt.chain, tt.subnetID)
 			if tt.expectedErr != nil {
 				require.ErrorIs(err, tt.expectedErr)
 				return
@@ -659,7 +653,7 @@ func TestGetDelegatorRules(t *testing.T) {
 		name          string
 		subnetID      ids.ID
 		backend       *Backend
-		chainStateF   func(*gomock.Controller) state.Chain
+		chain         state.Chain
 		expectedRules *addDelegatorRules
 		expectedErr   error
 	}
@@ -684,9 +678,7 @@ func TestGetDelegatorRules(t *testing.T) {
 					AVAXAssetID: avaxAssetID,
 				},
 			},
-			chainStateF: func(*gomock.Controller) state.Chain {
-				return nil
-			},
+			chain: nil,
 			expectedRules: &addDelegatorRules{
 				assetID:                  avaxAssetID,
 				minDelegatorStake:        config.MinDelegatorStake,
@@ -697,13 +689,10 @@ func TestGetDelegatorRules(t *testing.T) {
 			},
 		},
 		{
-			name:     "can't get subnet transformation",
-			subnetID: subnetID,
-			backend:  nil,
-			chainStateF: func(*gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
-				return state
-			},
+			name:          "can't get subnet transformation",
+			subnetID:      subnetID,
+			backend:       nil,
+			chain:         statetest.New(t, statetest.Config{}),
 			expectedRules: &addDelegatorRules{},
 			expectedErr:   database.ErrNotFound,
 		},
@@ -711,8 +700,8 @@ func TestGetDelegatorRules(t *testing.T) {
 			name:     "subnet",
 			subnetID: subnetID,
 			backend:  nil,
-			chainStateF: func(*gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
 				tx := &txs.Tx{
 					Unsigned: &txs.TransformSubnetTx{
 						AssetID:                  customAssetID,
@@ -726,9 +715,9 @@ func TestGetDelegatorRules(t *testing.T) {
 						Subnet:                   subnetID,
 					},
 				}
-				state.AddSubnetTransformation(tx)
-				return state
-			},
+				s.AddSubnetTransformation(tx)
+				return s
+			}(),
 			expectedRules: &addDelegatorRules{
 				assetID:                  customAssetID,
 				minDelegatorStake:        config.MinDelegatorStake,
@@ -743,10 +732,8 @@ func TestGetDelegatorRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
 
-			chainState := tt.chainStateF(ctrl)
-			rules, err := getDelegatorRules(tt.backend, chainState, tt.subnetID)
+			rules, err := getDelegatorRules(tt.backend, tt.chain, tt.subnetID)
 			if tt.expectedErr != nil {
 				require.ErrorIs(err, tt.expectedErr)
 				return
