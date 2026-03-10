@@ -333,7 +333,7 @@ func (b *benchlist) processTimeouts() {
 // newFailureProbabilityAverager creates a failure probability averager with an
 // optimistic prior to slightly favor newly tracked nodes.
 func (b *benchlist) newFailureProbabilityAverager(now time.Time) math.Averager {
-	return math.NewAverager(0, b.halflife, now)
+	return math.NewAverager(success, b.halflife, now)
 }
 
 // canBench returns true if benching nodeID would not exceed the max portion
