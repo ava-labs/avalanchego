@@ -68,8 +68,7 @@ func NewManager(
 	}
 }
 
-// Manager adds the ability to introduce newly accepted blocks IDs to the State
-// interface.
+// Manager implements [validators.State] and additionally tracks recently accepted block IDs via OnAcceptedBlockID.
 // TODO: Remove requirement for the P-chain's context lock to be held when
 // calling exported functions.
 type Manager struct {
