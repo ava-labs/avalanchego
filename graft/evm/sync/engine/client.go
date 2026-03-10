@@ -465,24 +465,52 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		return nil, fmt.Errorf("failed to create block syncer: %w", err)
 	}
 
-	codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create code queue: %w", err)
-	}
-
-	codeSyncer, err := code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create code syncer: %w", err)
-	}
-
-	stateSyncer, err := evmstate.NewSyncer(
-		c.config.Client, c.config.ChainDB,
-		summary.GetBlockRoot(),
-		codeQueue, c.config.RequestSize,
-		c.config.LeafsRequestType,
+	var (
+		codeSyncer  types.Syncer
+		stateSyncer types.Syncer
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
+	if c.config.DynamicStateSyncEnabled {
+		// Dynamic mode is wired through session-aware queue/syncer constructors.
+		// This allows pivot/session boundaries to be integrated explicitly.
+		codeQueue, err := code.NewSessionedQueue(c.config.ChainDB, c.config.StateSyncDone)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sessioned code queue: %w", err)
+		}
+
+		codeSyncer, err = code.NewDynamicSyncer(c.config.Client, c.config.ChainDB, codeQueue)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sessioned code syncer: %w", err)
+		}
+
+		stateSyncer, err = evmstate.NewDynamicSyncer(
+			c.config.Client, c.config.ChainDB,
+			summary.GetBlockRoot(),
+			codeQueue, c.config.RequestSize,
+			c.config.LeafsRequestType,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create dynamic EVM state syncer: %w", err)
+		}
+	} else {
+		codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create code queue: %w", err)
+		}
+
+		codeSyncer, err = code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create code syncer: %w", err)
+		}
+
+		stateSyncer, err = evmstate.NewSyncer(
+			c.config.Client, c.config.ChainDB,
+			summary.GetBlockRoot(),
+			codeQueue, c.config.RequestSize,
+			c.config.LeafsRequestType,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
+		}
 	}
 
 	syncers := []types.Syncer{blockSyncer, codeSyncer, stateSyncer}

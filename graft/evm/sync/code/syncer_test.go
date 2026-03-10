@@ -177,7 +177,7 @@ func TestCodeSyncer_SessionedWorkerErrorDoesNotHang(t *testing.T) {
 		codeQueue, err := NewSessionedQueue(clientDB, quit, WithSessionedCapacity(100))
 		require.NoError(t, err)
 
-		codeSyncer, err := NewSyncerFromSessionedQueue(
+		codeSyncer, err := NewDynamicSyncer(
 			mockClient, clientDB, codeQueue,
 			WithNumWorkers(1), WithCodeHashesPerRequest(1),
 		)
@@ -225,7 +225,7 @@ func TestCodeSyncer_SessionedQueuePivotIgnoresStaleHashes(t *testing.T) {
 		codeQueue, err := NewSessionedQueue(clientDB, quit, WithSessionedCapacity(10))
 		require.NoError(t, err)
 
-		codeSyncer, err := NewSyncerFromSessionedQueue(
+		codeSyncer, err := NewDynamicSyncer(
 			mockClient,
 			clientDB,
 			codeQueue,

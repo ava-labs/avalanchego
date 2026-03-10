@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -18,23 +19,36 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )
 
-const blocksPerRequest = 32
+const (
+	blocksPerRequest = 32
+
+	// SyncerID is the stable identifier for the block syncer.
+	SyncerID = "state_block_sync"
+)
 
 var (
-	_                        types.Syncer = (*BlockSyncer)(nil)
+	_                        types.Syncer = (*Syncer)(nil)
 	errBlocksToFetchRequired              = errors.New("blocksToFetch must be > 0")
 	errFromHashRequired                   = errors.New("fromHash must be non-zero when fromHeight > 0")
 )
 
-type BlockSyncer struct {
+type syncTarget struct {
+	hash   common.Hash
+	height uint64
+}
+
+type Syncer struct {
 	db            ethdb.Database
 	client        client.Client
 	fromHash      common.Hash
 	fromHeight    uint64
 	blocksToFetch uint64
+
+	targetMu     sync.Mutex
+	latestTarget *syncTarget
 }
 
-func NewSyncer(client client.Client, db ethdb.Database, fromHash common.Hash, fromHeight uint64, blocksToFetch uint64) (*BlockSyncer, error) {
+func NewSyncer(client client.Client, db ethdb.Database, fromHash common.Hash, fromHeight uint64, blocksToFetch uint64) (*Syncer, error) {
 	if blocksToFetch == 0 {
 		return nil, errBlocksToFetchRequired
 	}
@@ -43,7 +57,7 @@ func NewSyncer(client client.Client, db ethdb.Database, fromHash common.Hash, fr
 		return nil, errFromHashRequired
 	}
 
-	return &BlockSyncer{
+	return &Syncer{
 		client:        client,
 		db:            db,
 		fromHash:      fromHash,
@@ -53,45 +67,93 @@ func NewSyncer(client client.Client, db ethdb.Database, fromHash common.Hash, fr
 }
 
 // Name returns the human-readable name for this sync task.
-func (*BlockSyncer) Name() string {
+func (*Syncer) Name() string {
 	return "Block Syncer"
 }
 
 // ID returns the stable identifier for this sync task.
-func (*BlockSyncer) ID() string {
-	return "state_block_sync"
+func (*Syncer) ID() string {
+	return SyncerID
 }
 
-// Sync fetches (up to) BlocksToFetch blocks from peers
-// using Client and writes them to disk.
-// the process begins with FromHash and it fetches parents recursively.
-// fetching starts from the first ancestor not found on disk
+// Sync fetches blocks for the initial target and, if a materially newer
+// target arrived via UpdateTarget during the first pass, performs one
+// bounded catch-up pass. At most two passes are executed per Sync call.
+func (s *Syncer) Sync(ctx context.Context) error {
+	if err := s.syncWindow(ctx, s.fromHash, s.fromHeight); err != nil {
+		return err
+	}
+
+	catchUp := s.consumeTarget(s.fromHeight)
+	if catchUp == nil {
+		return nil
+	}
+	return s.syncWindow(ctx, catchUp.hash, catchUp.height)
+}
+
+// UpdateTarget records a newer sync target. It is thread-safe, non-blocking,
+// and monotonic - targets at or below the current ceiling are ignored.
+func (s *Syncer) UpdateTarget(newTarget message.Syncable) error {
+	s.targetMu.Lock()
+	defer s.targetMu.Unlock()
+
+	newHeight := newTarget.Height()
+	ceiling := s.fromHeight
+	if s.latestTarget != nil && s.latestTarget.height > ceiling {
+		ceiling = s.latestTarget.height
+	}
+	if newHeight <= ceiling {
+		return nil
+	}
+	s.latestTarget = &syncTarget{
+		hash:   newTarget.GetBlockHash(),
+		height: newHeight,
+	}
+	return nil
+}
+
+// consumeTarget atomically reads and clears latestTarget if the drift from
+// passStartHeight is material (greater than blocksToFetch). Returns nil
+// when no catch-up is needed.
+func (s *Syncer) consumeTarget(passStartHeight uint64) *syncTarget {
+	s.targetMu.Lock()
+	defer s.targetMu.Unlock()
+
+	t := s.latestTarget
+	// A catch-up pass is only worthwhile when the new target has drifted
+	// beyond what the previous pass already covered (blocksToFetch).
+	driftExceedsWindow := t != nil && t.height > passStartHeight && t.height-passStartHeight > s.blocksToFetch
+	if !driftExceedsWindow {
+		return nil
+	}
+	s.latestTarget = nil
+	return t
+}
+
+// syncWindow fetches up to blocksToFetch blocks ending at targetHash/targetHeight.
+// Blocks already on disk are skipped - remaining blocks are fetched from peers.
 //
-// TODO: We could inspect the database more accurately to ensure we never fetch
-// any blocks that are locally available.
-// We could also prevent overrequesting blocks, if the number of blocks needed
-// to be fetched isn't a multiple of blocksPerRequest.
-func (s *BlockSyncer) Sync(ctx context.Context) error {
-	nextHash := s.fromHash
-	nextHeight := s.fromHeight
+// TODO(powerslider): We could inspect the database more accurately to ensure we never fetch
+// any blocks that are locally available. We could also prevent overrequesting blocks, if
+// the number of blocks needed to be fetched isn't a multiple of blocksPerRequest.
+func (s *Syncer) syncWindow(ctx context.Context, targetHash common.Hash, targetHeight uint64) error {
+	nextHash := targetHash
+	nextHeight := targetHeight
 	blocksToFetch := s.blocksToFetch
 
-	// first, check for blocks already available on disk so we don't
+	// First, check for blocks already available on disk so we don't
 	// request them from peers.
 	for blocksToFetch > 0 {
 		blk := rawdb.ReadBlock(s.db, nextHash, nextHeight)
 		if blk == nil {
-			// block was not found
 			break
 		}
-
-		// block exists
 		nextHash = blk.ParentHash()
 		nextHeight--
 		blocksToFetch--
 	}
 
-	// get any blocks we couldn't find on disk from peers and write
+	// Fetch any blocks we couldn't find on disk from peers and write
 	// them to disk.
 	batch := s.db.NewBatch()
 	for fetched := uint64(0); fetched < blocksToFetch && (nextHash != common.Hash{}); {
@@ -112,9 +174,4 @@ func (s *BlockSyncer) Sync(ctx context.Context) error {
 
 	log.Info("fetched blocks from peer", "total", blocksToFetch)
 	return batch.Write()
-}
-
-func (*BlockSyncer) UpdateTarget(message.Syncable) error {
-	// Non-functional compatibility scaffolding.
-	return nil
 }

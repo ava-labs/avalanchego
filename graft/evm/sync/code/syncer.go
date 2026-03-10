@@ -22,7 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
-const defaultNumCodeFetchingWorkers = 5
+const (
+	defaultNumCodeFetchingWorkers = 5
+
+	// SyncerID is the stable identifier for the code syncer.
+	SyncerID = "state_code_sync"
+)
 
 var (
 	_ types.Syncer = (*Syncer)(nil)
@@ -120,9 +125,9 @@ func NewSyncer(client client.Client, db ethdb.Database, codeHashes <-chan common
 	return newSyncer(client, db, codeHashes, nil, opts...)
 }
 
-// NewSyncerFromSessionedQueue creates a code syncer that consumes code hashes from
+// NewDynamicSyncer creates a code syncer that consumes code hashes from
 // sessioned queue events and ignores stale hashes from prior sessions.
-func NewSyncerFromSessionedQueue(client client.Client, db ethdb.Database, queue *SessionedQueue, opts ...SyncerOption) (*Syncer, error) {
+func NewDynamicSyncer(client client.Client, db ethdb.Database, queue *SessionedQueue, opts ...SyncerOption) (*Syncer, error) {
 	if queue == nil {
 		return nil, errSessionedQueueRequired
 	}
@@ -136,7 +141,7 @@ func (*Syncer) Name() string {
 
 // ID returns the stable identifier for this sync task.
 func (*Syncer) ID() string {
-	return "state_code_sync"
+	return SyncerID
 }
 
 // Sync starts the worker thread and populates the code hashes queue with active work.

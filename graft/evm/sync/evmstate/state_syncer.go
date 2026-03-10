@@ -30,6 +30,9 @@ const (
 	numStorageTrieSegments = 4
 	numMainTrieSegments    = 8
 	defaultNumWorkers      = 8
+
+	// StateSyncerID is the stable identifier for the EVM state syncer.
+	StateSyncerID = "state_evm_state_sync"
 )
 
 var (
@@ -37,6 +40,11 @@ var (
 	errCodeRequestQueueRequired              = errors.New("code request queue is required")
 	errLeafsRequestSizeRequired              = errors.New("leafs request size must be > 0")
 )
+
+type codeRequestQueue interface {
+	AddCode(context.Context, []common.Hash) error
+	Finalize() error
+}
 
 // stateSync keeps the state of the entire state sync operation.
 type stateSync struct {
@@ -48,7 +56,7 @@ type stateSync struct {
 	leafsRequestType message.LeafsRequestType  // type of leafs request to use (coreth or subnet-evm wire format)
 	segments         chan leaf.SyncTask        // channel of tasks to sync
 	syncer           *leaf.CallbackSyncer      // performs the sync, looping over each task's range and invoking specified callbacks
-	codeQueue        *code.Queue               // queue that manages the asynchronous download and batching of code hashes
+	codeQueue        codeRequestQueue          // queue that manages the asynchronous download and batching of code hashes
 	trieQueue        *trieQueue                // manages a persistent list of storage tries we need to sync and any segments that are created for them
 
 	// track the main account trie specifically to commit its root at the end of the operation
@@ -82,6 +90,15 @@ func WithBatchSize(n uint) SyncerOption {
 }
 
 func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...SyncerOption) (types.Syncer, error) {
+	return newSyncer(client, db, root, codeQueue, leafsRequestSize, leafsRequestType, opts...)
+}
+
+// NewDynamicSyncer creates a state syncer wired to a session-aware code queue.
+func NewDynamicSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue *code.SessionedQueue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...SyncerOption) (types.Syncer, error) {
+	return newSyncer(client, db, root, codeQueue, leafsRequestSize, leafsRequestType, opts...)
+}
+
+func newSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue codeRequestQueue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...SyncerOption) (types.Syncer, error) {
 	if leafsRequestSize == 0 {
 		return nil, errLeafsRequestSizeRequired
 	}
@@ -152,10 +169,16 @@ func (*stateSync) Name() string {
 
 // ID returns the stable identifier for this sync task.
 func (*stateSync) ID() string {
-	return "state_evm_state_sync"
+	return StateSyncerID
 }
 
 func (t *stateSync) Sync(ctx context.Context) error {
+	if sq, ok := t.codeQueue.(*code.SessionedQueue); ok {
+		if _, err := sq.Start(t.root); err != nil {
+			return err
+		}
+	}
+
 	// Start the leaf syncer and storage trie producer.
 	eg, egCtx := errgroup.WithContext(ctx)
 
