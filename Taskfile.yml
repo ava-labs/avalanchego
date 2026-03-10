@@ -300,16 +300,24 @@ tasks:
     cmd: ./scripts/actionlint.sh
 
   lint-all:
-    desc: Runs all lint checks in parallel
+    desc: Runs all lint checks
+    cmds:
+      # Phase 1: Read-only checks (safe to parallelize)
+      - task: _lint-readonly
+      # Phase 2: Tree-mutating checks (must be sequential to avoid
+      # git index and bazel server contention)
+      - task: check-go-mod-tidy
+      - task: check-require-directives-round-trip
+      - task: lint-bazel
+
+  _lint-readonly:
+    internal: true
     deps:
       - lint
       - lint-action
-      - lint-bazel
       - lint-shell
-      - check-go-mod-tidy
       - check-go-version
       - check-require-directives
-      - check-require-directives-round-trip
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
