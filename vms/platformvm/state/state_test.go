@@ -3467,7 +3467,6 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 			require := require.New(t)
 
 			result := getPublicKeyDiff(nodeID, tt.primaryValidators, tt.primaryDiffs)
-			require.NoError(err)
 			require.Equal(tt.expectedPrevPK, result.prev)
 			require.Equal(tt.expectedNewPK, result.new)
 		})
