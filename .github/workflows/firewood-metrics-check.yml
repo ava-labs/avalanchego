@@ -1,0 +1,89 @@
+name: Firewood Metrics Change Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-metrics-check.yml"
+
+concurrency:
+  group: firewood-metrics-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-metrics-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Fetch full history to compare changes
+
+      - name: Check for metric-related changes
+        id: check-metrics
+        run: |
+          # Get the base commit for comparison
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_COMMIT="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_COMMIT="${{ github.event.before }}"
+          fi
+
+          # Check if Grafana dashboard was modified - exit early if so
+          if git diff --name-only $BASE_COMMIT..HEAD | grep -q "firewood/benchmark/Grafana-dashboard.json"; then
+            echo "firewood/benchmark/Grafana-dashboard.json was modified - skipping metrics check"
+            exit 0
+          fi
+
+          # Regex pattern to match metric-related code changes
+          METRIC_REGEX_PATTERN="(counter!|gauge!|histogram!|#\\[metrics\\])" # ci trigger
+
+          # Check for metric-related changes (only in firewood/)
+          METRIC_CHANGES=$(git diff $BASE_COMMIT..HEAD --unified=0 -- firewood/ | grep -E "$METRIC_REGEX_PATTERN" || true)
+
+          if [ -n "$METRIC_CHANGES" ]; then
+            echo "⚠️  WARNING: Found metric-related changes, but no dashboard modification:"
+            echo "$METRIC_CHANGES"
+          else
+            echo "✅ No metric-related changes found"
+          fi
+
+          # Set output variables for the comment step
+          echo "metric_changes_found=$([ -n "$METRIC_CHANGES" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "metric_changes<<EOF" >> $GITHUB_OUTPUT
+          echo "$METRIC_CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Look for previous comment
+        if: github.repository == github.event.pull_request.head.repo.full_name && steps.check-metrics.outputs.metric_changes_found == 'true'
+        id: find-comment
+        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # @v4.0.0
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: github-actions[bot]
+          body-includes: "## Metrics Change Detection ⚠️"
+
+      - name: Comment on PR (if applicable)
+        if: github.repository == github.event.pull_request.head.repo.full_name && steps.check-metrics.outputs.metric_changes_found == 'true'
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # @v5.0.0
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ## Metrics Change Detection ⚠️
+
+            This PR contains changes related to metrics:
+
+            ```
+            ${{ steps.check-metrics.outputs.metric_changes }}
+            ```
+
+            However, the dashboard was not modified.
+
+            You may need to update `firewood/benchmark/Grafana-dashboard.json` accordingly.
+
+            ---
+
+            *This check is automated to help maintain the dashboard.*
+          edit-mode: replace
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}

@@ -1,0 +1,33 @@
+name: ffi-nix
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "firewood/ffi/flake.nix"
+      - "firewood/ffi/flake.lock"
+      - "firewood/ffi/go.mod"
+      - "firewood/ffi/go.sum"
+      - ".github/workflows/firewood-ffi-nix.yml"
+  pull_request:
+    paths:
+      - "firewood/ffi/flake.nix"
+      - "firewood/ffi/flake.lock"
+      - "firewood/ffi/go.mod"
+      - "firewood/ffi/go.sum"
+      - ".github/workflows/firewood-ffi-nix.yml"
+
+jobs:
+  ffi-nix:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firewood
+    steps:
+      - uses: actions/checkout@v6
+      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # @v21
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # @v13
+      - name: Check that FFI flake is up-to-date
+        run: ./scripts/run-just.sh check-ffi-flake
+      - name: Test nix build of Golang FFI bindings
+        run: ./scripts/run-just.sh test-ffi-nix

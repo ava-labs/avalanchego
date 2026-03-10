@@ -1,0 +1,32 @@
+name: expected golangci.yaml diff
+
+on:
+  pull_request:
+    paths:
+      - "firewood/.github/scripts/verify_golangci_yaml_changes.sh"
+      - ".github/workflows/firewood-expected-golangci-yaml-diff.yml"
+      - "firewood/.github/.golangci.yaml.patch"
+      - "firewood/ffi/.golangci.yaml"
+      # if updating the general CI workflow, go ahead and update the golangci.yaml
+      - ".github/workflows/firewood-ci.yml"
+      # for good measure, if someone is editing the go.mod or go.sum files then
+      # they should make sure the golangci.yaml is up to date
+      - "firewood/ffi/go.mod"
+      - "firewood/ffi/go.sum"
+  push:
+    branches:
+      - "master"
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-expected-golangci-yaml-diff.yml"
+
+jobs:
+  expected-golangci-yaml-diff:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firewood
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate expected golangci-lint changes
+        run: .github/scripts/verify_golangci_yaml_changes.sh

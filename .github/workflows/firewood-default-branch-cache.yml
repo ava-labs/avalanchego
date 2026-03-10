@@ -1,0 +1,35 @@
+# because apparently caches are isolated across branches
+name: firewood-default-branch-cache
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-default-branch-cache.yml"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firewood
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
+        with:
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # @v2 -> v2.8.2
+        with:
+          save-if: "false"
+          shared-key: "debug-no-features"
+          workspaces: "firewood -> target"
+      - name: Check
+        run: cargo check --workspace --all-targets
+      - name: Build
+        run: cargo build --workspace --all-targets

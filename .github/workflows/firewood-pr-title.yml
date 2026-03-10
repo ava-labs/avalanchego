@@ -1,0 +1,48 @@
+# Check that the PR title matches the conventional commit format
+name: firewood-pr-title
+
+permissions:
+  pull-requests: write
+
+on:
+  pull_request:
+    types:
+      - edited
+      - opened
+      - reopened
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-pr-title.yml"
+
+jobs:
+  check-pr-title:
+   runs-on: ubuntu-latest
+   permissions:
+    pull-requests: read
+   steps:
+     - name: Check PR title follows conventional commits
+       uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # @v6.1.1
+       with:
+         types: |
+           build
+           chore
+           ci
+           docs
+           feat
+           fix
+           perf
+           refactor
+           style
+           test
+         # scope is not required ("feat: whatever" is okay)
+         requireScope: false
+         # if the PR only has one commit, we can validate the commit message
+         # instead of the PR title
+         validateSingleCommit: true
+         subjectPattern: ^.{1,}$
+         subjectPatternError: |
+           The subject "{subject}" found in the pull request title "{title}"
+           didn't match the configured pattern. Please ensure that the subject
+           matches the conventional commit format.
+       env:
+         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
