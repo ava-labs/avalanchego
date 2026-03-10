@@ -402,11 +402,7 @@ func (b *benchlist) resetTimer(timer *time.Timer) {
 	}
 
 	if _, deadline, ok := b.timeoutHeap.Peek(); ok {
-		remaining := time.Until(deadline)
-		if remaining <= 0 {
-			remaining = 0
-		}
-		timer.Reset(remaining)
+		timer.Reset(time.Until(deadline))
 	}
 }
 
