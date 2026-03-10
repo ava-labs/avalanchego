@@ -92,8 +92,8 @@ type benchlist struct {
 
 	// Event queue: producers push observations; the single consumer goroutine
 	// pops and processes them. The queue is unbounded so producers never block.
-	// We use the blocking deque for thread safety, not for its blocking behavior.
-	events     *buffer.UnboundedBlockingDeque[event]
+	eventsMu   sync.Mutex
+	events     buffer.Deque[event]
 	eventReady chan struct{} // capacity 1
 
 	// Owned by run goroutine only. All accesses are safe without additional
@@ -143,7 +143,7 @@ func newBenchlist(
 		benchProbability:   config.BenchProbability,
 		benchDuration:      config.BenchDuration,
 		maxPortion:         config.MaxPortion,
-		events:             buffer.NewUnboundedBlockingDeque[event](eventQueueInitSize),
+		events:             buffer.NewUnboundedDeque[event](eventQueueInitSize),
 		eventReady:         make(chan struct{}, 1),
 		nodes:              make(map[ids.NodeID]*node),
 		timeoutHeap:        heap.NewMap[ids.NodeID, time.Time](time.Time.Before),
@@ -180,7 +180,9 @@ func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 // queue, then signals the consumer. Never blocks.
 func (b *benchlist) enqueue(ev event) {
 	ev.time = time.Now()
-	_ = b.events.PushRight(ev)
+	b.eventsMu.Lock()
+	b.events.PushRight(ev)
+	b.eventsMu.Unlock()
 	select {
 	case b.eventReady <- struct{}{}:
 	default:
@@ -228,8 +230,13 @@ func (b *benchlist) shutdown() {
 
 // processEvents drains all queued observations and applies them.
 func (b *benchlist) processEvents() {
-	for b.events.Len() > 0 {
-		ev, _ := b.events.PopLeft()
+	for {
+		b.eventsMu.Lock()
+		ev, ok := b.events.PopLeft()
+		b.eventsMu.Unlock()
+		if !ok {
+			return
+		}
 		b.processObservation(ev)
 	}
 }
