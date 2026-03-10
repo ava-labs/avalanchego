@@ -315,7 +315,6 @@ func (b *benchlist) processTimeouts() {
 		n.isBenched = false
 		oldFailureProbability := n.failureProbability.Read()
 		n.failureProbability = b.newFailureProbabilityAverager(now)
-		resetFailureProbability := n.failureProbability.Read()
 
 		b.lock.Lock()
 		b.benched.Remove(nodeID)
@@ -324,7 +323,6 @@ func (b *benchlist) processTimeouts() {
 		b.ctx.Log.Debug("unbenching node due to timeout",
 			zap.Stringer("nodeID", nodeID),
 			zap.Float64("oldFailureProbability", oldFailureProbability),
-			zap.Float64("resetFailureProbability", resetFailureProbability),
 		)
 		b.benchable.Unbenched(b.ctx.ChainID, nodeID)
 	}
