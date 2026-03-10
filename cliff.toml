@@ -19,10 +19,13 @@ body = """
 {% endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | trim | upper_first }}
-    {% for commit in commits %}
-        - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
-            {% if commit.breaking %}[**breaking**] {% endif %}\
-            {{ commit.message | upper_first }}\
+    {% for commit in commits -%}
+        {% if commit.remote.pr_labels is defined and commit.remote.pr_labels is containing("no-changelog") -%}
+            {% continue %}
+        {% endif -%}
+        - {% if commit.scope %}*({{ commit.scope }})* {% endif -%}
+            {% if commit.breaking %}[**breaking**] {% endif -%}
+            {{ commit.message | upper_first }}
     {% endfor %}
 {% endfor %}\n
 """
@@ -44,6 +47,15 @@ postprocessors = [
 # render_always = true
 # output file path
 # output = "test.md"
+
+[remote.github]
+# The owner of the GitHub repository.
+owner = "ava-labs"
+# The name of the GitHub repository.
+repo = "firewood"
+# GitHub personal access token for authenticating to the GitHub API.
+# Should be set via GITHUB_TOKEN environment variable.
+# token = ""
 
 [git]
 # Parse commits according to the conventional commits specification.

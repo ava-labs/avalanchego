@@ -23,9 +23,8 @@ use firewood_storage::{
     CheckOpt, CheckerReport, Committed, FileBacked, FileIoError, HashedNodeReader,
     ImmutableProposal, NodeHashAlgorithm, NodeStore, Parentable, ReadableStorage, TrieReader,
 };
-use nonzero_ext::nonzero;
 use std::io::Write;
-use std::num::{NonZeroU64, NonZeroUsize};
+use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error;
@@ -136,9 +135,6 @@ pub struct DbConfig {
     /// Whether to enable `RootStore`.
     #[builder(default = false)]
     pub root_store: bool,
-    /// The maximum number of unpersisted revisions that can exist at a given time.
-    #[builder(default = nonzero!(1u64))]
-    pub deferred_persistence_commit_count: NonZeroU64,
 }
 
 /// A database instance.
@@ -190,7 +186,6 @@ impl Db {
             .create(cfg.create_if_missing)
             .truncate(cfg.truncate)
             .root_store(cfg.root_store)
-            .deferred_persistence_commit_count(cfg.deferred_persistence_commit_count)
             .manager(cfg.manager)
             .build();
         let manager = RevisionManager::new(config_manager)?;
@@ -1418,11 +1413,17 @@ mod test {
     #[test]
     fn test_deferred_persist_close_with_high_commit_count() {
         const HIGH_COMMIT_COUNT: NonZeroU64 = nonzero!(1_000_000u64);
+        const MAX_REVISIONS: usize = HIGH_COMMIT_COUNT.get() as usize + 1;
 
         // Set commit count to an arbitrarily high number so persist happens
         // only on shutdown
         let dbcfg = DbConfig::builder()
-            .deferred_persistence_commit_count(HIGH_COMMIT_COUNT)
+            .manager(
+                RevisionManagerConfig::builder()
+                    .max_revisions(MAX_REVISIONS)
+                    .deferred_persistence_commit_count(HIGH_COMMIT_COUNT)
+                    .build(),
+            )
             .build();
 
         let db = TestDb::new_with_config(dbcfg);
@@ -1449,7 +1450,11 @@ mod test {
         const NUM_REVISIONS: u64 = COMMIT_COUNT.get() + 1;
 
         let dbcfg = DbConfig::builder()
-            .deferred_persistence_commit_count(COMMIT_COUNT)
+            .manager(
+                RevisionManagerConfig::builder()
+                    .deferred_persistence_commit_count(COMMIT_COUNT)
+                    .build(),
+            )
             .build();
 
         let db = TestDb::new_with_config(dbcfg);
@@ -1487,7 +1492,11 @@ mod test {
         const COMMIT_COUNT: NonZeroU64 = nonzero!(10u64);
 
         let dbcfg = DbConfig::builder()
-            .deferred_persistence_commit_count(COMMIT_COUNT)
+            .manager(
+                RevisionManagerConfig::builder()
+                    .deferred_persistence_commit_count(COMMIT_COUNT)
+                    .build(),
+            )
             .build();
 
         let db = TestDb::new_with_config(dbcfg);
@@ -1518,15 +1527,15 @@ mod test {
     fn test_deferred_persistence_root_store() {
         const NUM_COMMITS: usize = 20;
         const COMMIT_COUNT: NonZeroU64 = nonzero!(10u64);
-        const MAX_IN_MEMORY_REVISIONS: usize = 2;
+        const MAX_REVISIONS: usize = COMMIT_COUNT.get() as usize + 1;
 
         let dbcfg = DbConfig::builder()
             .manager(
                 RevisionManagerConfig::builder()
-                    .max_revisions(MAX_IN_MEMORY_REVISIONS)
+                    .max_revisions(MAX_REVISIONS)
+                    .deferred_persistence_commit_count(COMMIT_COUNT)
                     .build(),
             )
-            .deferred_persistence_commit_count(COMMIT_COUNT)
             .root_store(true)
             .build();
 
@@ -1583,7 +1592,11 @@ mod test {
         const COMMIT_COUNT: NonZeroU64 = nonzero!(10u64);
 
         let dbcfg = DbConfig::builder()
-            .deferred_persistence_commit_count(COMMIT_COUNT)
+            .manager(
+                RevisionManagerConfig::builder()
+                    .deferred_persistence_commit_count(COMMIT_COUNT)
+                    .build(),
+            )
             .root_store(true)
             .build();
 

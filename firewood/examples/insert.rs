@@ -31,8 +31,8 @@ struct Args {
     read_verify_percent: u16,
     #[arg(short, long)]
     seed: Option<u64>,
-    #[arg(short, long, default_value_t = NonZeroUsize::new(20480).expect("is non-zero"))]
-    cache_size: NonZeroUsize,
+    #[arg(short, long, default_value_t = NonZeroUsize::new(192_000_000).expect("is non-zero"))]
+    cache_memory_limit: NonZeroUsize,
     #[arg(short, long, default_value_t = true)]
     truncate: bool,
     #[arg(short, long, default_value_t = 128)]
@@ -54,9 +54,8 @@ fn string_to_range(input: &str) -> Result<RangeInclusive<usize>, Box<dyn Error +
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
-    #[expect(deprecated)]
     let mgrcfg = RevisionManagerConfig::builder()
-        .node_cache_size(args.cache_size)
+        .node_cache_memory_limit(args.cache_memory_limit)
         .max_revisions(args.revisions)
         .build();
     let cfg = DbConfig::builder()

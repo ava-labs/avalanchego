@@ -224,12 +224,7 @@ impl<'db> RangeProofContext<'db> {
             }
         };
 
-        let metrics_cb = |commit_time: coarsetime::Duration| {
-            firewood_increment!(crate::registry::COMMIT_MS, commit_time.as_millis());
-            firewood_increment!(crate::registry::MERGE_COUNT, 1);
-        };
-
-        let result = proposal_handle.commit_proposal(metrics_cb);
+        let result = proposal_handle.commit_proposal();
         let result = if let Err(api::Error::ParentNotLatest { .. }) = result
             && allow_rebase
         {
@@ -237,12 +232,13 @@ impl<'db> RangeProofContext<'db> {
             let proposal_handle = db
                 .merge_key_value_range(start_key, end_key, self.proof.key_values())?
                 .handle;
-            proposal_handle.commit_proposal(metrics_cb)
+            proposal_handle.commit_proposal()
         } else {
             result
         };
 
         let hash = result?;
+        firewood_increment!(crate::registry::MERGE_COUNT, 1);
         self.proposal_state = Some(ProposalState::Committed(hash.clone()));
 
         Ok(hash)

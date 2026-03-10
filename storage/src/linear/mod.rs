@@ -1,18 +1,8 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-//! A `LinearStore` provides a view of a set of bytes at
-//! a given time. A `LinearStore` has three different types,
-//! which refer to another base type, as follows:
-//! ```mermaid
-//! stateDiagram-v2
-//!     R1(Committed) --> R2(Committed)
-//!     R2(Committed) --> R3(FileBacked)
-//!     P1(Proposed) --> R3(FileBacked)
-//!     P2(Proposed) --> P1(Proposed)
-//! ```
-//!
-//! Each type is described in more detail below.
+//! This module provides the [`ReadableStorage`] and [`WritableStorage`] traits,
+//! which define the interface for reading and writing to a linear store.
 
 #![expect(
     clippy::missing_errors_doc,
