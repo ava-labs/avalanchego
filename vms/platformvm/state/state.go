@@ -2448,18 +2448,6 @@ type publicKeyDiff struct {
 // getPublicKeyDiff computes the BLS public key change for the given nodeID.
 // It returns the key both before (prev) and after (new) the diff is applied.
 //
-// Note: This function may return a nil public key and no error if the primary
-// network validator does not have a public key.
-func (s *State) getInheritedPublicKey(nodeID ids.NodeID) (*bls.PublicKey, error) {
-	if vdr, ok := s.currentStakers.validators[constants.PrimaryNetworkID][nodeID]; ok && vdr.validator != nil {
-		// The primary network validator is present.
-		return vdr.validator.PublicKey, nil
-	}
-	if vdr, ok := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID][nodeID]; ok && vdr.validator != nil {
-		// The primary network validator is being modified.
-		return vdr.validator.PublicKey, nil
-	}
-	return nil, fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
 // Either key in the result may be nil: prev is nil when the validator did
 // not exist before this diff, and new is nil when the validator was
 // deleted (not replaced) in this diff.
