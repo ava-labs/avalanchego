@@ -3247,9 +3247,9 @@ func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T)
 
 	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
+	d.DeleteCurrentValidator(subnetStaker1)
 	d.DeleteCurrentValidator(primaryStaker1)
 	require.NoError(d.PutCurrentValidator(primaryStaker2))
-	d.DeleteCurrentValidator(subnetStaker1)
 	require.NoError(d.PutCurrentValidator(subnetStaker2))
 	require.NoError(d.Apply(state))
 
