@@ -92,6 +92,7 @@ type benchlist struct {
 
 	// Event queue: producers push observations; the single consumer goroutine
 	// pops and processes them. The queue is unbounded so producers never block.
+	// We use the blocking deque for thread safety, not for its blocking behavior.
 	events     *buffer.UnboundedBlockingDeque[event]
 	eventReady chan struct{} // capacity 1
 
