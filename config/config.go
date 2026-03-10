@@ -554,6 +554,9 @@ func getBenchlistConfig(v *viper.Viper, snowballParameters *snowball.Parameters)
 	if snowballParameters == nil {
 		return benchlist.Config{}, errors.New("snowball parameters must be non-nil")
 	}
+	// AlphaConfidence is used here to ensure that benching can't cause a
+	// liveness failure. If AlphaPreference were used, the benchlist may grow to
+	// a point that committing would be extremely unlikely to happen.
 	alpha := snowballParameters.AlphaConfidence
 	k := snowballParameters.K
 
