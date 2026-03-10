@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/corruptabledb"
+	"github.com/ava-labs/avalanchego/database/firewood"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
@@ -21,10 +22,10 @@ import (
 //
 // It also wraps the database with a corruptable DB.
 //
-// dbName is the name of the database, either leveldb, memdb, or pebbledb.
-// dbPath is the path to the database folder.
+// name is the database type: leveldb, memdb, pebbledb, or firewood.
+// path is the path to the database folder.
 // readOnly indicates if the database should be read-only.
-// dbConfig is the database configuration in JSON format.
+// config is the database configuration in JSON format.
 func New(
 	name string,
 	path string,
@@ -44,12 +45,15 @@ func New(
 		db = memdb.New()
 	case pebbledb.Name:
 		db, err = pebbledb.New(path, config, logger, reg)
+	case firewood.Name:
+		db, err = firewood.New(path, config, logger)
 	default:
 		err = fmt.Errorf(
-			"db-type must be one of {%s, %s, %s}",
+			"db-type must be one of {%s, %s, %s, %s}",
 			leveldb.Name,
 			memdb.Name,
 			pebbledb.Name,
+			firewood.Name,
 		)
 	}
 	if err != nil {
