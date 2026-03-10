@@ -12,13 +12,19 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/libevm/eventual"
+	"github.com/ava-labs/libevm/params"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/strevm/blocks"
+	"github.com/ava-labs/strevm/gastime"
+	"github.com/ava-labs/strevm/hook"
 	"github.com/ava-labs/strevm/saedb"
 )
 
@@ -94,30 +100,78 @@ func (e *Executor) processQueue() {
 var errFatal = errors.New("fatal execution error")
 
 func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
-	log.Debug("Executing block")
-
-	// Since `b` hasn't been executed, it definitely hasn't been settled, so we
-	// are guaranteed to have a non-nil parent available.
-	parent := b.ParentBlock()
 	// If the VM were to encounter an error after enqueuing the block, we would
 	// receive the same block twice for execution should consensus retry
 	// acceptance.
-	if last := e.lastExecuted.Load().Hash(); last != parent.Hash() {
-		return fmt.Errorf("executing block built on parent %#x when last executed %#x", parent.Hash(), last)
+	if last := e.lastExecuted.Load().Hash(); last != b.ParentHash() {
+		return fmt.Errorf("executing block built on parent %#x when last executed %#x", b.ParentHash(), last)
 	}
 
-	stateDB, err := state.New(parent.PostExecutionStateRoot(), e.stateCache, e.snaps)
+	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
 	if err != nil {
-		return fmt.Errorf("state.New(%#x, ...): %v", parent.PostExecutionStateRoot(), err)
+		return err
 	}
+
+	return e.afterExecution(b, result)
+}
+
+type (
+	// ReceiptStore receives per-transaction receipts during block execution.
+	// Only the [Executor] needs to provide a real implementation to [Execute]
+	// and all other callers MUST use [NullReceiptStore].
+	ReceiptStore interface {
+		Load(common.Hash) (eventual.Value[*Receipt], bool)
+	}
+
+	// ExecutionResults holds the outputs of [Execute].
+	ExecutionResults struct {
+		BaseFee  *uint256.Int
+		StateDB  *state.StateDB
+		Signer   types.Signer
+		BlockCtx vm.BlockContext
+		Receipts types.Receipts
+		FinishBy struct {
+			Gas  *gastime.Time
+			Wall time.Time
+		}
+	}
+)
+
+// Execute executes the transactions in the [blocks.Block], beginning from the
+// post-execution state of the [blocks.Block.ParentBlock]. `maxNumTxs` limits
+// the number of transactions to process, allowing partial execution for
+// intra-block inspection.
+//
+// Although Execute does not call [blocks.Block.MarkExecuted] it does mutate
+// consensus-critical internal values (e.g. interim execution time). A "live"
+// accepted block (as against one recovered from the database) MUST NOT be
+// passed directly to [Execute], only to [Executor.Enqueue].
+func Execute(
+	b *blocks.Block,
+	sdbo saedb.StateDBOpener,
+	maxNumTxs int,
+	hooks hook.Points,
+	config *params.ChainConfig,
+	chainCtx core.ChainContext,
+	receiptStore ReceiptStore,
+	log logging.Logger,
+) (*ExecutionResults, error) {
+	log.Debug("Executing block")
+
+	parent := b.ParentBlock()
 
 	gasClock := parent.ExecutedByGasTime().Clone()
-	gasClock.BeforeBlock(e.hooks, b.Header())
+	gasClock.BeforeBlock(hooks, b.Header())
 	perTxClock := gasClock.Time.Clone()
 
-	rules := e.chainConfig.Rules(b.Number(), true /*isMerge*/, b.BuildTime())
-	if err := e.hooks.BeforeExecutingBlock(rules, stateDB, b.EthBlock()); err != nil {
-		return fmt.Errorf("before-block hook: %v", err)
+	stateDB, err := sdbo.StateDB(parent.PostExecutionStateRoot())
+	if err != nil {
+		return nil, err
+	}
+
+	rules := config.Rules(b.Number(), true /*isMerge*/, b.BuildTime())
+	if err := hooks.BeforeExecutingBlock(rules, stateDB, b.EthBlock()); err != nil {
+		return nil, fmt.Errorf("before-block hook: %v", err)
 	}
 
 	baseFee := gasClock.BaseFee()
@@ -125,18 +179,21 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	header := types.CopyHeader(b.Header())
 	header.BaseFee = baseFee.ToBig()
 
+	signer := types.MakeSigner(config, b.Number(), b.BuildTime())
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
 	var blockGasConsumed gas.Gas
 
-	signer := e.SignerForBlock(b.EthBlock())
-	receipts := make(types.Receipts, len(b.Transactions()))
-	for ti, tx := range b.Transactions() {
+	txs := b.Transactions()
+	txs = txs[:min(len(txs), maxNumTxs)]
+	receipts := make(types.Receipts, len(txs))
+
+	for ti, tx := range txs {
 		stateDB.SetTxContext(tx.Hash(), ti)
 		b.CheckSenderBalanceBound(stateDB, signer, tx)
 
 		receipt, err := core.ApplyTransaction(
-			e.chainConfig,
-			e.chainContext,
+			config,
+			chainCtx,
 			&header.Coinbase,
 			&gasPool,
 			stateDB,
@@ -146,7 +203,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 			vm.Config{},
 		)
 		if err != nil {
-			return fmt.Errorf("%w: transaction execution errored (not reverted) [%d](%#x): %v", errFatal, ti, tx.Hash(), err)
+			return nil, fmt.Errorf("%w: transaction execution errored (not reverted) [%d](%#x): %v", errFatal, ti, tx.Hash(), err)
 		}
 
 		perTxClock.Tick(gas.Gas(receipt.GasUsed))
@@ -169,20 +226,16 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		tip := tx.EffectiveGasTipValue(header.BaseFee)
 		receipt.EffectiveGasPrice = tip.Add(header.BaseFee, tip)
 
-		// Even though we populated the value ourselves and `ok == true` is
-		// guaranteed when using the [Executor] via the public API, it's clearer
-		// to check than to require the reader to reason about dropping the
-		// flag.
-		if r, ok := e.receipts.Load(tx.Hash()); ok {
+		if r, ok := receiptStore.Load(tx.Hash()); ok {
 			r.Put(&Receipt{receipt, signer, tx})
 		}
 		receipts[ti] = receipt
 	}
 
 	numTxs := len(b.Transactions())
-	ops, err := e.hooks.EndOfBlockOps(b.EthBlock())
+	ops, err := hooks.EndOfBlockOps(b.EthBlock())
 	if err != nil {
-		return fmt.Errorf("%w: %T.EndOfBlockOps(%#x): %v", errFatal, e.hooks, b.Hash(), err)
+		return nil, fmt.Errorf("%w: %T.EndOfBlockOps(%#x): %v", errFatal, hooks, b.Hash(), err)
 	}
 	for i, o := range ops {
 		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
@@ -191,14 +244,14 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		b.SetInterimExecutionTime(perTxClock)
 
 		if err := o.ApplyTo(stateDB); err != nil {
-			return fmt.Errorf("%w: applying end-of-block operation [%d](%v): %v", errFatal, i, o.ID, err)
+			return nil, fmt.Errorf("%w: applying end-of-block operation [%d](%v): %v", errFatal, i, o.ID, err)
 		}
 	}
 
-	e.hooks.AfterExecutingBlock(stateDB, b.EthBlock(), receipts)
+	hooks.AfterExecutingBlock(stateDB, b.EthBlock(), receipts)
 	endTime := time.Now()
-	if err := gasClock.AfterBlock(blockGasConsumed, e.hooks, b.Header()); err != nil {
-		return fmt.Errorf("after-block gas time update: %w", err)
+	if err := gasClock.AfterBlock(blockGasConsumed, hooks, b.Header()); err != nil {
+		return nil, fmt.Errorf("after-block gas time update: %w", err)
 	}
 
 	log.Debug(
@@ -208,11 +261,24 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		zap.Time("wall_time", endTime),
 	)
 
+	r := &ExecutionResults{
+		BaseFee:  baseFee,
+		StateDB:  stateDB,
+		Signer:   signer,
+		BlockCtx: core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
+		Receipts: receipts,
+	}
+	r.FinishBy.Gas = gasClock
+	r.FinishBy.Wall = endTime
+	return r, nil
+}
+
+func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	e.chainContext.recent.Put(b.NumberU64(), b.Header())
 
-	root, err := stateDB.Commit(b.NumberU64(), true)
+	root, err := r.StateDB.Commit(b.NumberU64(), true)
 	if err != nil {
-		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
+		return fmt.Errorf("%T.Commit() at end of block %d: %w", r.StateDB, b.NumberU64(), err)
 	}
 	if num := b.NumberU64(); saedb.ShouldCommitTrieDB(num) {
 		tdb := e.stateCache.TrieDB()
@@ -226,9 +292,20 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	// 1. [blocks.Block.MarkExecuted] guarantees disk then in-memory changes.
 	// 2. Internal indicator of last executed MUST follow in-memory change.
 	// 3. External indicator of last executed MUST follow internal indicator.
-	if err := b.MarkExecuted(e.db, e.xdb, gasClock.Clone(), endTime, header.BaseFee, receipts, root, &e.lastExecuted /* (2) */); err != nil {
+	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
-	e.sendPostExecutionEvents(b.EthBlock(), receipts) // (3)
+	e.sendPostExecutionEvents(b.EthBlock(), r.Receipts) // (3)
 	return nil
+}
+
+// NullReceiptStore is a no-op [ReceiptStore] for use when receipt broadcasting
+// is not needed (e.g. state tracing).
+type NullReceiptStore struct{}
+
+var _ ReceiptStore = (*NullReceiptStore)(nil)
+
+// Load always returns the zero value and false.
+func (*NullReceiptStore) Load(common.Hash) (eventual.Value[*Receipt], bool) {
+	return eventual.Value[*Receipt]{}, false
 }

@@ -45,11 +45,12 @@ import (
 var zeroAddr common.Address
 
 type rpcTest struct {
-	method     string
-	args       []any
-	want       any // untyped nil means no return value.
-	wantErr    testerr.Want
-	eventually bool
+	method       string
+	args         []any
+	want         any // untyped nil means no return value.
+	wantErr      testerr.Want
+	eventually   bool
+	extraCmpOpts []cmp.Option
 }
 
 func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
@@ -74,6 +75,7 @@ func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
 				t.Errorf("CallContext(...) %s", diff)
 				t.FailNow()
 			}
+			opts := append(opts, tc.extraCmpOpts...)
 			if diff := cmp.Diff(tc.want, got.Elem().Interface(), opts...); diff != "" {
 				t.Errorf("Unmarshalled %T diff (-want +got):\n%s", got.Elem().Interface(), diff)
 			}
