@@ -168,18 +168,17 @@ func newBenchlist(
 // RegisterResponse notes that we received a response from nodeID prior to the
 // timeout firing.
 func (b *benchlist) RegisterResponse(nodeID ids.NodeID) {
-	b.enqueue(event{nodeID: nodeID, value: success})
+	b.enqueue(event{nodeID: nodeID, value: success, time: time.Now()})
 }
 
 // RegisterFailure notes that a request to nodeID timed out.
 func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
-	b.enqueue(event{nodeID: nodeID, value: failure})
+	b.enqueue(event{nodeID: nodeID, value: failure, time: time.Now()})
 }
 
-// enqueue captures the observation time and adds the event to the unbounded
-// queue, then signals the consumer. Never blocks.
+// enqueue adds the event to the unbounded queue and signals the consumer.
+// Never blocks.
 func (b *benchlist) enqueue(ev event) {
-	ev.time = time.Now()
 	b.eventsMu.Lock()
 	b.events.PushRight(ev)
 	b.eventsMu.Unlock()
