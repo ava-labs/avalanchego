@@ -233,13 +233,8 @@ func TestDiffStakersDeleteAddDeleteValidator(t *testing.T) {
 	require := require.New(t)
 	v1 := newTestStaker()
 
-	startTime := v1.StartTime
-	endTime := v1.EndTime.Add(genesistest.DefaultValidatorDuration)
-
 	v1Prime := *v1
 	v1Prime.Weight++
-	v1Prime.StartTime = startTime
-	v1Prime.EndTime = endTime
 
 	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
 
