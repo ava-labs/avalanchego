@@ -493,7 +493,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 				currentStakerIterator, err := s.GetCurrentStakerIterator()
 				require.NoError(t, err)
-				defer currentStakerIterator.Release()
+
 				// statetest.New initializes the state with a genesis that contains validators.
 				// To test the case where there are no stakers, we need to delete the genesis validators.
 				for _, staker := range iterator.ToSlice(currentStakerIterator) {
