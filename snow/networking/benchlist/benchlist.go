@@ -376,8 +376,9 @@ func (b *benchlist) canBench(nodeID ids.NodeID) bool {
 
 // benchedStake returns the total stake weight of currently benched validators.
 func (b *benchlist) benchedStake() (uint64, error) {
+	var benchedNodeIDs set.Set[ids.NodeID]
 	b.lock.RLock()
-	benchedNodeIDs := set.Of(b.benched.List()...)
+	benchedNodeIDs.Union(b.benched)
 	b.lock.RUnlock()
 
 	weight, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, benchedNodeIDs)
