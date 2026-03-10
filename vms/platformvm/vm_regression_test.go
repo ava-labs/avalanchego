@@ -2458,7 +2458,7 @@ func TestSubnetValidatorManagerAfterMultipleExpiration(t *testing.T) {
 
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Helicon)
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
