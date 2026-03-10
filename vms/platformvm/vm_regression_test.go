@@ -2863,7 +2863,7 @@ func TestDelegatorWeightAfterMultipleExpiration(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(secondTx))
 	vm.ctx.Lock.Lock()
 
-	require.NoError(buildAndAcceptProposalBlock(vm))
+	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
 
 	secondActiveHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
@@ -2893,7 +2893,7 @@ func TestDelegatorWeightAfterMultipleExpiration(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(thirdTx))
 	vm.ctx.Lock.Lock()
 
-	require.NoError(buildAndAcceptProposalBlock(vm))
+	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
 
 	thirdActiveHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
@@ -2984,7 +2984,7 @@ func TestDelegatorRemoveAddInSingleBlock(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(addTx2))
 	vm.ctx.Lock.Lock()
 
-	require.NoError(buildAndAcceptProposalBlock(vm))
+	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
 
 	// After the proposal block: D1 is removed, D2 is active.
 	stake = vm.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
@@ -3000,7 +3000,7 @@ func TestDelegatorRemoveAddInSingleBlock(t *testing.T) {
 	// Step 3: Advance time to D2's end and accept the proposal block to
 	// remove D2.
 	vm.clock.Set(secondEndTime)
-	require.NoError(buildAndAcceptProposalBlock(vm))
+	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
 
 	// After D2 is removed, only the genesis validator weight remains.
 	stake = vm.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
@@ -3094,7 +3094,7 @@ func TestDelegatorReplacementWeight(t *testing.T) {
 			require.NoError(vm.issueTxFromRPC(addTx2))
 			vm.ctx.Lock.Lock()
 
-			require.NoError(buildAndAcceptProposalBlock(vm))
+			require.NoError(buildAndAcceptPreferredOracleBlock(vm))
 
 			// After accepting, D2 should be active with the replacement weight.
 			stake = vm.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
@@ -3195,7 +3195,7 @@ func TestDelegatorAndValidatorExpireTogether(t *testing.T) {
 	vm.clock.Set(endTime)
 
 	// First proposal block: rewards the delegator
-	require.NoError(buildAndAcceptProposalBlock(vm))
+	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
 
 	afterDelegatorHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
@@ -3206,7 +3206,7 @@ func TestDelegatorAndValidatorExpireTogether(t *testing.T) {
 	require.Equal(vm.MinValidatorStake, vdrSet[nodeID].Weight)
 
 	// Second proposal block: rewards the validator.
-	require.NoError(buildAndAcceptProposalBlock(vm))
+	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
 
 	afterValidatorHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
@@ -3240,7 +3240,7 @@ func buildAndAcceptStandardBlock(vm *VM) error {
 	return vm.SetPreference(context.Background(), vm.manager.LastAccepted())
 }
 
-func buildAndAcceptProposalBlock(vm *VM) error {
+func buildAndAcceptPreferredOracleBlock(vm *VM) error {
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {
 		return err
