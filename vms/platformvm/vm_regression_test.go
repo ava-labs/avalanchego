@@ -3260,17 +3260,17 @@ func buildAndAcceptProposalBlock(vm *VM) error {
 		return err
 	}
 
-	commit := options[0]
+	prefOption := options[0]
 
 	if err := blk.Accept(context.Background()); err != nil {
 		return err
 	}
 
-	if err := commit.Verify(context.Background()); err != nil {
+	if err := prefOption.Verify(context.Background()); err != nil {
 		return err
 	}
 
-	if err := commit.Accept(context.Background()); err != nil {
+	if err := prefOption.Accept(context.Background()); err != nil {
 		return err
 	}
 
