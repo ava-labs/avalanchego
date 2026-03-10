@@ -3387,8 +3387,7 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 		name              string
 		primaryValidators map[ids.NodeID]*baseStaker
 		primaryDiffs      map[ids.NodeID]*diffValidator
-		expectedPrevPK    *bls.PublicKey
-		expectedNewPK     *bls.PublicKey
+		expected          publicKeyDiff
 	}{
 		{
 			name:              "no primary validator and no diff",
@@ -3400,9 +3399,11 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 			primaryValidators: map[ids.NodeID]*baseStaker{
 				nodeID: {validator: &Staker{PublicKey: pk1}},
 			},
-			primaryDiffs:   map[ids.NodeID]*diffValidator{},
-			expectedPrevPK: pk1,
-			expectedNewPK:  pk1,
+			primaryDiffs: map[ids.NodeID]*diffValidator{},
+			expected: publicKeyDiff{
+				prev: pk1,
+				new:  pk1,
+			},
 		},
 		{
 			name: "primary validator exists with diff but removed is nil",
@@ -3412,8 +3413,10 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 			primaryDiffs: map[ids.NodeID]*diffValidator{
 				nodeID: {removed: nil},
 			},
-			expectedPrevPK: pk1,
-			expectedNewPK:  pk1,
+			expected: publicKeyDiff{
+				prev: pk1,
+				new:  pk1,
+			},
 		},
 		{
 			name: "primary validator replaced",
@@ -3426,8 +3429,10 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 					added:   &Staker{PublicKey: pk2},
 				},
 			},
-			expectedPrevPK: pk1,
-			expectedNewPK:  pk2,
+			expected: publicKeyDiff{
+				prev: pk1,
+				new:  pk2,
+			},
 		},
 		{
 			name: "primary validator purely deleted",
@@ -3437,8 +3442,10 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 			primaryDiffs: map[ids.NodeID]*diffValidator{
 				nodeID: {removed: &Staker{PublicKey: pk1}},
 			},
-			expectedPrevPK: pk1,
-			expectedNewPK:  nil,
+			expected: publicKeyDiff{
+				prev: pk1,
+				new:  nil,
+			},
 		},
 		{
 			name:              "primary validator purely deleted and not in base state",
@@ -3446,8 +3453,10 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 			primaryDiffs: map[ids.NodeID]*diffValidator{
 				nodeID: {removed: &Staker{PublicKey: pk1}},
 			},
-			expectedPrevPK: pk1,
-			expectedNewPK:  nil,
+			expected: publicKeyDiff{
+				prev: pk1,
+				new:  nil,
+			},
 		},
 		{
 			name: "primary validator only added",
@@ -3457,8 +3466,10 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 			primaryDiffs: map[ids.NodeID]*diffValidator{
 				nodeID: {added: &Staker{PublicKey: pk1}},
 			},
-			expectedPrevPK: nil,
-			expectedNewPK:  pk1,
+			expected: publicKeyDiff{
+				prev: nil,
+				new:  pk1,
+			},
 		},
 	}
 
@@ -3467,8 +3478,7 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 			require := require.New(t)
 
 			result := getPublicKeyDiff(nodeID, tt.primaryValidators, tt.primaryDiffs)
-			require.Equal(tt.expectedPrevPK, result.prev)
-			require.Equal(tt.expectedNewPK, result.new)
+			require.Equal(tt.expected, result)
 		})
 	}
 }
