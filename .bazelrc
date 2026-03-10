@@ -1,3 +1,6 @@
+# Keep MODULE.bazel.lock up to date automatically
+common --lockfile_mode=update
+
 # Go settings - match scripts/build_test.sh defaults
 
 # Test settings (match scripts/build_test.sh)
