@@ -736,11 +736,6 @@ func TestCanonicalHashMarker(t *testing.T) {
 }
 
 func testCanonicalHashMarker(t *testing.T, scheme string) {
-	// TODO: https://github.com/ava-labs/firewood/issues/1679
-	if scheme == customrawdb.FirewoodScheme {
-		t.Skip("firewood currently fails due to a stack corruption issue")
-	}
-
 	var cases = []struct {
 		forkA int
 		forkB int
