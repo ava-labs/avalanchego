@@ -2605,77 +2605,8 @@ func TestCurrentValidatorRemoveAndReAddWithDifferentKey(t *testing.T) {
 	reloadedValidatorSet := reloadedState.validators.GetMap(subnetID)
 	require.Contains(reloadedValidatorSet, nodeID)
 	require.Equal(pk2, reloadedValidatorSet[nodeID].PublicKey)
-}
 
-func TestReplacementValidatorPrevPublicKeyDiff(t *testing.T) {
-	require := require.New(t)
-
-	db := memdb.New()
-	state := newTestState(t, db)
-
-	var (
-		nodeID    = ids.GenerateTestNodeID()
-		subnetID  = constants.PrimaryNetworkID
-		startTime = genesistest.DefaultValidatorStartTime
-		endTime1  = startTime.Add(24 * time.Hour)
-		endTime2  = startTime.Add(48 * time.Hour)
-	)
-
-	// Create the first validator (PK1).
-	unsignedTx1 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
-		NodeID: nodeID,
-		End:    uint64(endTime1.Unix()),
-		Wght:   10,
-	})
-	tx1 := &txs.Tx{Unsigned: unsignedTx1}
-	require.NoError(tx1.Initialize(txs.Codec))
-
-	originalStaker, err := NewCurrentStaker(tx1.ID(), unsignedTx1, startTime, 0)
-	require.NoError(err)
-	pk1 := originalStaker.PublicKey
-	require.NotNil(pk1)
-
-	// Create the replacement validator (PK2).
-	unsignedTx2 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
-		NodeID: nodeID,
-		End:    uint64(endTime2.Unix()),
-		Wght:   10,
-	})
-	tx2 := &txs.Tx{Unsigned: unsignedTx2}
-	require.NoError(tx2.Initialize(txs.Codec))
-
-	replacementStaker, err := NewCurrentStaker(tx2.ID(), unsignedTx2, startTime, 0)
-	require.NoError(err)
-	pk2 := replacementStaker.PublicKey
-	require.NotNil(pk2)
-	require.NotEqual(
-		bls.PublicKeyToUncompressedBytes(pk1),
-		bls.PublicKeyToUncompressedBytes(pk2),
-	)
-
-	// Block 0: Add the original validator.
-	state.AddTx(tx1, status.Committed)
-
-	addDiff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
-	require.NoError(err)
-	require.NoError(addDiff.PutCurrentValidator(originalStaker))
-	require.NoError(addDiff.Apply(state))
-
-	state.SetHeight(0)
-	require.NoError(state.Commit())
-
-	// Block 1: Replace (delete original + add replacement).
-	state.AddTx(tx2, status.Committed)
-
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
-	require.NoError(err)
-	d.DeleteCurrentValidator(originalStaker)
-	require.NoError(d.PutCurrentValidator(replacementStaker))
-	require.NoError(d.Apply(state))
-
-	state.SetHeight(1)
-	require.NoError(state.Commit())
-
+	// Verify that historical diff reconstruction recovers the original key.
 	historicalVdrs := state.validators.GetMap(subnetID)
 	err = state.ApplyValidatorWeightDiffs(t.Context(), historicalVdrs, 1, 1, subnetID)
 	require.NoError(err)
