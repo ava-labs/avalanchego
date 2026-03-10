@@ -522,61 +522,53 @@ func TestStakerEquals(t *testing.T) {
 	}
 }
 
-func TestDiffStakersReplaceValidatorIterator(t *testing.T) {
-	// When a validator from the parent state is deleted and then replaced
-	// by a different staker for the same node, GetStakerIterator returns only the replacement — not both the
-	// original and the replacement.
-
-	require := require.New(t)
-
-	// Create a validator that "exists in parent state".
-	originalStaker := newTestStaker()
-
-	// Build a replacement for the same subnet/node but with a different TxID
-	// and higher weight, so it is clearly a different staker.
-	replacement := *originalStaker
-	replacement.TxID = ids.GenerateTestID()
-	replacement.Weight = originalStaker.Weight + 10
-	replacement.EndTime = originalStaker.EndTime.Add(time.Hour)
-	replacement.NextTime = replacement.EndTime
-
-	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
-
-	// Simulate replacement of the original validator
-	diff.DeleteValidator(originalStaker)
-	require.NoError(diff.PutValidator(&replacement))
-
-	// Build the diff iterator on top of a parent that contains the original.
-	parentIterator := iterator.FromSlice(originalStaker)
-	stakers := iterator.ToSlice(diff.GetStakerIterator(parentIterator))
-
-	// We expect exactly one staker: the replacement.
-	// The original must be filtered out because it was deleted.
-	require.Equal([]*Staker{&replacement}, stakers)
-}
-
 func TestGetStakerIteratorDeleteAndPut(t *testing.T) {
-	require := require.New(t)
+	// When a validator from the parent state is deleted and then replaced,
+	// GetStakerIterator returns only the replacement — not both.
+	tests := []struct {
+		name            string
+		makeReplacement func(*Staker) *Staker
+	}{
+		{
+			name: "same TxID",
+			makeReplacement: func(original *Staker) *Staker {
+				replacement := *original
+				replacement.Weight = 2
+				return &replacement
+			},
+		},
+		{
+			name: "different TxID",
+			makeReplacement: func(original *Staker) *Staker {
+				replacement := *original
+				replacement.TxID = ids.GenerateTestID()
+				replacement.Weight = original.Weight + 10
+				replacement.EndTime = original.EndTime.Add(time.Hour)
+				replacement.NextTime = replacement.EndTime
+				return &replacement
+			},
+		},
+	}
 
-	staker := newTestStaker()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
 
-	// base stakers (initial state)
-	v := newBaseStakers()
-	v.PutValidator(staker)
+			staker := newTestStaker()
 
-	// diff stakers
-	d := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
-	updatedStaker := *staker
-	updatedStaker.Weight = 2
+			base := newBaseStakers()
+			base.PutValidator(staker)
 
-	d.DeleteValidator(staker)
-	require.NoError(d.PutValidator(&updatedStaker))
+			diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
+			replacement := tt.makeReplacement(staker)
 
-	baseStakersIterator := v.GetStakerIterator()
-	diffStakersIterator := d.GetStakerIterator(baseStakersIterator)
+			diff.DeleteValidator(staker)
+			require.NoError(diff.PutValidator(replacement))
 
-	diffStakersSlice := iterator.ToSlice(diffStakersIterator)
-	require.Equal([]*Staker{&updatedStaker}, diffStakersSlice)
+			stakers := iterator.ToSlice(diff.GetStakerIterator(base.GetStakerIterator()))
+			require.Equal([]*Staker{replacement}, stakers)
+		})
+	}
 }
 
 func existsInDiff(bs *diffStakers, staker *Staker) bool {
