@@ -2911,107 +2911,6 @@ func TestDelegatorWeightAfterMultipleExpiration(t *testing.T) {
 	require.Equal(genesistest.DefaultValidatorWeight+defaultMinDelegatorStake, vdrSet[nodeID].Weight)
 }
 
-func TestDelegatorRemoveAddInSingleBlock(t *testing.T) {
-	// Add a delegator D1 and accept it. Then build a proposal block that
-	// simultaneously removes D1 and adds a new delegator D2
-	// via the proposal block's decision transactions. Finally, advance
-	// time to D2's end to reward (remove) D2 in a second proposal block.
-
-	require := require.New(t)
-
-	vm, _, _ := defaultVM(t, upgradetest.Latest)
-	vm.ctx.Lock.Lock()
-	defer vm.ctx.Lock.Unlock()
-
-	var (
-		nodeID       = genesistest.DefaultNodeIDs[0]
-		wallet       = newWallet(t, vm, walletConfig{})
-		rewardsOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		}
-
-		duration      = defaultMinStakingDuration
-		firstEndTime  = latestForkTime.Add(duration)
-		secondEndTime = firstEndTime.Add(duration)
-	)
-
-	// Step 1: Add delegator D1 (weight defaultMinDelegatorStake) and accept it.
-	addTx, err := wallet.IssueAddPermissionlessDelegatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: nodeID,
-				End:    uint64(firstEndTime.Unix()),
-				Wght:   defaultMinDelegatorStake,
-			},
-			Subnet: constants.PrimaryNetworkID,
-		},
-		vm.ctx.AVAXAssetID,
-		rewardsOwner,
-	)
-	require.NoError(err)
-
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addTx))
-	vm.ctx.Lock.Lock()
-
-	require.NoError(buildAndAcceptStandardBlock(vm))
-
-	// Verify D1 is active.
-	stake := vm.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
-	require.Equal(genesistest.DefaultValidatorWeight+defaultMinDelegatorStake, stake)
-
-	// Step 2: Issue D2 to mempool, advance time to D1's end, and build a
-	// proposal block that rewards D1 and includes D2.
-	addTx2, err := wallet.IssueAddPermissionlessDelegatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: nodeID,
-				End:    uint64(secondEndTime.Unix()),
-				Wght:   2 * defaultMinDelegatorStake,
-			},
-			Subnet: constants.PrimaryNetworkID,
-		},
-		vm.ctx.AVAXAssetID,
-		rewardsOwner,
-	)
-	require.NoError(err)
-
-	vm.clock.Set(firstEndTime)
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addTx2))
-	vm.ctx.Lock.Lock()
-
-	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
-
-	// After the proposal block: D1 is removed, D2 is active.
-	stake = vm.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
-	require.Equal(genesistest.DefaultValidatorWeight+2*defaultMinDelegatorStake, stake)
-
-	currentHeight, err := vm.GetCurrentHeight(t.Context())
-	require.NoError(err)
-
-	vdrSet, err := vm.GetValidatorSet(t.Context(), currentHeight, constants.PrimaryNetworkID)
-	require.NoError(err)
-	require.Equal(genesistest.DefaultValidatorWeight+2*defaultMinDelegatorStake, vdrSet[nodeID].Weight)
-
-	// Step 3: Advance time to D2's end and accept the proposal block to
-	// remove D2.
-	vm.clock.Set(secondEndTime)
-	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
-
-	// After D2 is removed, only the genesis validator weight remains.
-	stake = vm.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
-	require.Equal(genesistest.DefaultValidatorWeight, stake)
-
-	currentHeight, err = vm.GetCurrentHeight(t.Context())
-	require.NoError(err)
-
-	vdrSet, err = vm.GetValidatorSet(t.Context(), currentHeight, constants.PrimaryNetworkID)
-	require.NoError(err)
-	require.Equal(genesistest.DefaultValidatorWeight, vdrSet[nodeID].Weight)
-}
-
 func TestDelegatorReplacementWeight(t *testing.T) {
 	// Add a delegator D1 (weight 2*defaultMinDelegatorStake) and accept it.
 	// Then build a proposal block that rewards D1 and adds a replacement D2
@@ -3105,6 +3004,22 @@ func TestDelegatorReplacementWeight(t *testing.T) {
 			vdrSet, err := vm.GetValidatorSet(t.Context(), currentHeight, constants.PrimaryNetworkID)
 			require.NoError(err)
 			require.Equal(genesistest.DefaultValidatorWeight+tt.replacedWeight, vdrSet[nodeID].Weight)
+
+			// Step 3: Advance time to D2's end and accept the proposal block to
+			// remove D2.
+			vm.clock.Set(secondEndTime)
+			require.NoError(buildAndAcceptPreferredOracleBlock(vm))
+
+			// After D2 is removed, only the genesis validator weight remains.
+			stake = vm.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
+			require.Equal(genesistest.DefaultValidatorWeight, stake)
+
+			currentHeight, err = vm.GetCurrentHeight(t.Context())
+			require.NoError(err)
+
+			vdrSet, err = vm.GetValidatorSet(t.Context(), currentHeight, constants.PrimaryNetworkID)
+			require.NoError(err)
+			require.Equal(genesistest.DefaultValidatorWeight, vdrSet[nodeID].Weight)
 		})
 	}
 }
