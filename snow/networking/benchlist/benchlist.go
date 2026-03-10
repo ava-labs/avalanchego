@@ -402,6 +402,11 @@ func (b *benchlist) benchedStake() (uint64, error) {
 // reset when the next event arrives.
 func (b *benchlist) resetTimer(timer *time.Timer) {
 	if !timer.Stop() {
+		// The default case is required because the run loop may have
+		// already consumed the timer value via case <-timer.C.
+		// If the timer has not delivered yet and we hit the default
+		// path, it will trigger an extra iteration through the for loop
+		// in run. This extra iteration does not cause an issue.
 		select {
 		case <-timer.C:
 		default:
