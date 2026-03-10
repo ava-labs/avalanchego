@@ -190,7 +190,7 @@ func (wh *workHeap) Status(root ids.ID) float64 {
 		// Determine the end value (max if no value)
 		end := maybeToBig(item.end, statusBytes)
 		if end == nil {
-			end = new(big.Int).Lsh(big.NewInt(1), uint(statusBytes*8)) // 2^(maxSize*8)
+			end = new(big.Int).Set(totalSpace)
 		}
 
 		// Add complete range size: end - start

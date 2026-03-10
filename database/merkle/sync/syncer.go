@@ -307,7 +307,7 @@ func (s *Syncer[_, _]) logProgress(ctx context.Context) {
 			s.workLock.Lock()
 			percentage := s.processedWork.Status(root)
 			s.workLock.Unlock()
-			s.config.Log.Info("syncing progress", zap.Float64("percent complete", percentage), zap.Stringer("target root", root))
+			s.config.Log.Info("syncing progress", zap.Float64("percent_complete", percentage), zap.Stringer("target root", root))
 		}
 	}
 }
