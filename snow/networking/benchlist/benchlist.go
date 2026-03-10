@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
-	timerpkg "github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 const (
@@ -203,21 +203,21 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 func (b *benchlist) run() {
 	defer close(b.shutdownDone)
 
-	timer := timerpkg.StoppedTimer()
-	defer timer.Stop()
+	t := timer.StoppedTimer()
+	defer t.Stop()
 
 	for {
 		select {
 		case <-b.shutdownChan:
 			return
 		case <-b.eventReady:
-		case <-timer.C:
+		case <-t.C:
 		}
 
 		b.processEvents()
 		b.processTimeouts()
 		b.updateMetrics()
-		b.resetTimer(timer)
+		b.resetTimer(t)
 	}
 }
 
