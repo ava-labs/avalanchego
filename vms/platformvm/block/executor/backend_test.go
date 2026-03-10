@@ -113,7 +113,7 @@ func TestBackendGetBlock(t *testing.T) {
 func TestGetTimestamp(t *testing.T) {
 	type test struct {
 		name              string
-		backendF          func() *backend
+		backend           *backend
 		expectedTimestamp time.Time
 	}
 
@@ -121,34 +121,31 @@ func TestGetTimestamp(t *testing.T) {
 	tests := []test{
 		{
 			name: "block is in map",
-			backendF: func() *backend {
-				return &backend{
-					blkIDToState: map[ids.ID]*blockState{
-						blkID: {
-							timestamp: time.Unix(1337, 0),
-						},
+			backend: &backend{
+				blkIDToState: map[ids.ID]*blockState{
+					blkID: {
+						timestamp: time.Unix(1337, 0),
 					},
-				}
+				},
 			},
 			expectedTimestamp: time.Unix(1337, 0),
 		},
 		{
 			name: "block isn't map",
-			backendF: func() *backend {
+			backend: func() *backend {
 				state := statetest.New(t, statetest.Config{})
 				state.SetTimestamp(time.Unix(1337, 0))
 				return &backend{
 					state: state,
 				}
-			},
+			}(),
 			expectedTimestamp: time.Unix(1337, 0),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend := tt.backendF()
-			gotTimestamp := backend.getTimestamp(blkID)
+			gotTimestamp := tt.backend.getTimestamp(blkID)
 			require.Equal(t, tt.expectedTimestamp, gotTimestamp)
 		})
 	}

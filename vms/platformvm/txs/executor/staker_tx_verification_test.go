@@ -34,7 +34,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 	type test struct {
 		name        string
 		backendF    func(*gomock.Controller) *Backend
-		stateF      func(*testing.T, *gomock.Controller) state.Chain
+		chain       state.Chain
 		sTxF        func() *txs.Tx
 		txF         func() *txs.AddPermissionlessValidatorTx
 		expectedErr error
@@ -119,11 +119,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 			},
 
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
-				state.SetTimestamp(now)
-				return state
-			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				return s
+			}(),
 			sTxF: func() *txs.Tx {
 				return nil
 			},
@@ -143,11 +143,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: &utils.Atomic[bool]{},
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
-				state.SetTimestamp(now)
-				return state
-			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				return s
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -169,11 +169,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
-				state.SetTimestamp(verifiedTx.StartTime())
-				return state
-			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(verifiedTx.StartTime())
+				return s
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -195,12 +195,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
-				state.SetTimestamp(now)
-				state.AddSubnetTransformation(&transformTx)
-				return state
-			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				s.AddSubnetTransformation(&transformTx)
+				return s
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -224,12 +224,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
-				state.SetTimestamp(now)
-				state.AddSubnetTransformation(&transformTx)
-				return state
-			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				s.AddSubnetTransformation(&transformTx)
+				return s
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -253,12 +253,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
-				state.SetTimestamp(now)
-				state.AddSubnetTransformation(&transformTx)
-				return state
-			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				s.AddSubnetTransformation(&transformTx)
+				return s
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -283,12 +283,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
-				state.SetTimestamp(now)
-				state.AddSubnetTransformation(&transformTx)
-				return state
-			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				s.AddSubnetTransformation(&transformTx)
+				return s
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -316,12 +316,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
-				state.SetTimestamp(time.Unix(1, 0))
-				state.AddSubnetTransformation(&transformTx)
-				return state
-			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(time.Unix(1, 0))
+				s.AddSubnetTransformation(&transformTx)
+				return s
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -349,12 +349,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
-				state := statetest.New(t, statetest.Config{})
-				state.SetTimestamp(now)
-				state.AddSubnetTransformation(&transformTx)
-				return state
-			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				s.AddSubnetTransformation(&transformTx)
+				return s
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -384,7 +384,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
+			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
 				s.SetTimestamp(now)
 				s.AddSubnetTransformation(&transformTx)
@@ -396,7 +396,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 				require.NoError(t, s.PutCurrentValidator(staker))
 				return s
-			},
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -418,7 +418,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
+			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
 				s.SetTimestamp(now)
 				s.AddSubnetTransformation(&transformTx)
@@ -431,7 +431,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
 				return s
-			},
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -465,7 +465,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
+			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
 				s.SetTimestamp(now)
 				s.AddSubnetTransformation(&transformTx)
@@ -477,7 +477,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
 				return s
-			},
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -511,7 +511,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Bootstrapped: bootstrapped,
 				}
 			},
-			stateF: func(t *testing.T, _ *gomock.Controller) state.Chain {
+			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
 				s.SetTimestamp(now)
 				s.AddSubnetTransformation(&transformTx)
@@ -522,7 +522,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
 				return s
-			},
+			}(),
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
@@ -539,13 +539,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 			var (
 				backend = tt.backendF(ctrl)
-				chain   = tt.stateF(t, ctrl)
 				sTx     = tt.sTxF()
 				tx      = tt.txF()
 			)
 
-			feeCalculator := state.PickFeeCalculator(backend.Config, chain)
-			err := verifyAddPermissionlessValidatorTx(backend, feeCalculator, chain, sTx, tx)
+			feeCalculator := state.PickFeeCalculator(backend.Config, tt.chain)
+			err := verifyAddPermissionlessValidatorTx(backend, feeCalculator, tt.chain, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
