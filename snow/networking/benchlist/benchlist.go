@@ -85,7 +85,6 @@ type benchlist struct {
 	numBenched    prometheus.Gauge
 	weightBenched prometheus.Gauge
 
-	clock              mockable.Clock
 	halflife           time.Duration
 	unbenchProbability float64
 	benchProbability   float64
