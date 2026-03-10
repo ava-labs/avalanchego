@@ -212,7 +212,7 @@ func addSubnet(t *testing.T, env *environment) {
 	)
 	require.NoError(err)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)
