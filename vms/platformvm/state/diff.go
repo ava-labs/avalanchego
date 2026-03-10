@@ -74,7 +74,7 @@ func NewDiff(
 	parentID ids.ID,
 	stateVersions Versions,
 	allowAddingStakerAfterDeletion StakerAdditionAfterDeletionLegality,
-) (*diff, error) {
+) (Diff, error) {
 	parentState, ok := stateVersions.GetState(parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
