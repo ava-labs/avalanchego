@@ -235,7 +235,7 @@ struct PredictiveReader<'a> {
     offset: u64,
     len: usize,
     pos: usize,
-    started: coarsetime::Instant,
+    started: std::time::Instant,
 }
 
 impl<'a> PredictiveReader<'a> {
@@ -248,7 +248,7 @@ impl<'a> PredictiveReader<'a> {
             offset: start,
             len: 0,
             pos: 0,
-            started: coarsetime::Instant::now(),
+            started: std::time::Instant::now(),
         }
     }
 }
@@ -256,7 +256,7 @@ impl<'a> PredictiveReader<'a> {
 impl Drop for PredictiveReader<'_> {
     fn drop(&mut self) {
         let elapsed = self.started.elapsed();
-        firewood_increment!(crate::registry::IO_READ_MS, elapsed.as_millis());
+        firewood_increment!(crate::registry::IO_READ_MS, elapsed.as_millis() as u64);
         firewood_increment!(crate::registry::IO_READ_COUNT, 1);
     }
 }

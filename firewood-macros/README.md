@@ -22,7 +22,6 @@ Add the dependency to your `Cargo.toml`:
 [dependencies]
 firewood-macros.workspace = true
 metrics = "0.24"
-coarsetime = "0.1"
 ```
 
 ### Basic Usage
@@ -73,7 +72,7 @@ For `#[metrics("query", "data retrieval")]`:
 ## Requirements
 
 - Functions must return a `Result<T, E>` type
-- The `metrics` and `coarsetime` crates must be available in scope
+- The `metrics` crate must be available in scope
 - Rust 1.70+ (for `is_some_and` method)
 
 ## Performance Characteristics
@@ -93,7 +92,7 @@ metrics::counter!(concat!("my.metric", "_ms"), labels)
 
 ### Minimal Overhead
 
-- Single timestamp capture at function start, using the coarsetime crate, which is known to be extremely fast
+- Single timestamp capture at function start using `std::time::Instant`, which uses vDSO on modern Linux (no syscall overhead)
 - Branch-free label selection based on `Result::is_err()`
 - Direct counter increments without intermediate allocations
 
@@ -122,7 +121,7 @@ fn my_function() -> Result<String, Error> {
     });
 
     // Start timing
-    let __metrics_start = coarsetime::Instant::now();
+    let __metrics_start = ::std::time::Instant::now();
 
     // Execute original function
     let __metrics_result = (|| {

@@ -233,11 +233,11 @@ impl DatabaseHandle {
                 handle.commit_proposal()
             });
         let root_hash = root_hash_result?;
-        firewood_increment!(crate::registry::BATCH_MS, elapsed.as_millis());
+        firewood_increment!(crate::registry::BATCH_MS, elapsed.as_millis() as u64);
         firewood_increment!(crate::registry::BATCH_COUNT, 1);
         firewood_record!(
             crate::registry::BATCH_MS_BUCKET,
-            elapsed.as_f64() * 1000.0,
+            elapsed.as_secs_f64() * 1000.0,
             expensive
         );
 

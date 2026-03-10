@@ -21,7 +21,6 @@ rust-version.workspace = true
 aquamarine.workspace = true
 bytemuck.workspace = true
 bytemuck_derive.workspace = true
-coarsetime.workspace = true
 fastrace.workspace = true
 firewood-metrics.workspace = true
 hex.workspace = true

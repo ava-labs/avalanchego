@@ -27,7 +27,6 @@ rust-version.workspace = true
 aquamarine.workspace = true
 bytemuck_derive.workspace = true
 bytemuck.workspace = true
-coarsetime.workspace = true
 fastrace.workspace = true
 firewood-macros.workspace = true
 firewood-metrics.workspace = true
@@ -85,4 +84,4 @@ harness = false
 workspace = true
 
 [package.metadata.cargo-machete]
-ignored = ["coarsetime", "hex-literal"]
+ignored = ["hex-literal"]

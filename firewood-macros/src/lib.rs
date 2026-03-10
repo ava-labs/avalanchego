@@ -84,7 +84,7 @@ impl Parse for MetricsArgs {
 ///
 /// # Requirements
 /// - The function must return a `Result<T, E>` type
-/// - The `metrics` and `coarsetime` crates must be available
+/// - The `metrics` crate must be available
 #[proc_macro_attribute]
 pub fn metrics(args: TokenStream, input: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(input as ItemFn);
@@ -187,7 +187,7 @@ fn generate_metrics_wrapper(input_fn: &ItemFn, args: &MetricsArgs) -> proc_macro
         #fn_vis #fn_sig {
             #registration_code
 
-            let __metrics_start = coarsetime::Instant::now();
+            let __metrics_start = ::std::time::Instant::now();
 
             let __metrics_result = { #fn_block };
 
@@ -205,7 +205,7 @@ fn generate_metrics_wrapper(input_fn: &ItemFn, args: &MetricsArgs) -> proc_macro
 
             // Increment timing counter (base name + "_ms") using compile-time concatenation
             metrics::counter!(concat!(#metric_prefix, "_ms"), __metrics_labels)
-                .increment(__metrics_start.elapsed().as_millis());
+                .increment(__metrics_start.elapsed().as_millis() as u64);
 
             __metrics_result
         }
@@ -278,7 +278,7 @@ mod tests {
         assert!(generated_code.contains("__METRICS_LABELS_ERROR"));
         assert!(generated_code.contains("test.metric"));
         assert!(
-            generated_code.contains("coarsetime")
+            generated_code.contains("std")
                 && generated_code.contains("Instant")
                 && generated_code.contains("now")
         );

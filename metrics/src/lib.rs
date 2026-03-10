@@ -270,7 +270,7 @@ macro_rules! firewood_record {
 /// Times a `Result` expression and records elapsed milliseconds to a histogram on success.
 ///
 /// Returns a tuple `(result, elapsed_duration)` where `elapsed_duration` is a
-/// `coarsetime::Duration`.
+/// `std::time::Duration`.
 ///
 /// # Usage
 /// ```ignore
@@ -280,11 +280,11 @@ macro_rules! firewood_record {
 #[macro_export]
 macro_rules! fwd_timed_result {
     ($name:expr, $expr:expr) => {{
-        let __fwd_start = ::coarsetime::Instant::now();
+        let __fwd_start = ::std::time::Instant::now();
         let __fwd_result = $expr;
         let __fwd_elapsed = __fwd_start.elapsed();
         if __fwd_result.is_ok() {
-            $crate::firewood_record!($name, __fwd_elapsed.as_f64() * 1000.0);
+            $crate::firewood_record!($name, __fwd_elapsed.as_secs_f64() * 1000.0);
         }
         (__fwd_result, __fwd_elapsed)
     }};
@@ -294,7 +294,7 @@ macro_rules! fwd_timed_result {
 /// (only when expensive metrics are enabled).
 ///
 /// Returns a tuple `(result, elapsed_duration)` where `elapsed_duration` is a
-/// `coarsetime::Duration`.
+/// `std::time::Duration`.
 ///
 /// # Usage
 /// ```ignore
@@ -304,11 +304,11 @@ macro_rules! fwd_timed_result {
 #[macro_export]
 macro_rules! fwd_expensive_timed_result {
     ($name:expr, $expr:expr) => {{
-        let __fwd_start = ::coarsetime::Instant::now();
+        let __fwd_start = ::std::time::Instant::now();
         let __fwd_result = $expr;
         let __fwd_elapsed = __fwd_start.elapsed();
         if __fwd_result.is_ok() {
-            $crate::firewood_record!($name, __fwd_elapsed.as_f64() * 1000.0, expensive);
+            $crate::firewood_record!($name, __fwd_elapsed.as_secs_f64() * 1000.0, expensive);
         }
         (__fwd_result, __fwd_elapsed)
     }};

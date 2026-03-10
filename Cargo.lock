@@ -968,17 +968,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "coarsetime"
-version = "0.1.37"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e58eb270476aa4fc7843849f8a35063e8743b4dbcdf6dd0f8ea0886980c204c2"
-dependencies = [
- "libc",
- "wasix",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1578,7 +1567,6 @@ dependencies = [
  "bytemuck",
  "bytemuck_derive",
  "clap",
- "coarsetime",
  "criterion",
  "ctor",
  "derive-where",
@@ -1643,7 +1631,6 @@ name = "firewood-ffi"
 version = "0.2.0"
 dependencies = [
  "cbindgen",
- "coarsetime",
  "env_logger",
  "firewood",
  "firewood-metrics",
@@ -1696,7 +1683,6 @@ dependencies = [
 name = "firewood-macros"
 version = "0.1.0"
 dependencies = [
- "coarsetime",
  "metrics",
  "proc-macro2",
  "quote",
@@ -1739,7 +1725,6 @@ dependencies = [
  "bytemuck_derive",
  "bytes",
  "cfg-if",
- "coarsetime",
  "criterion",
  "derive-where",
  "enum-as-inner",
@@ -5101,15 +5086,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5428f8bf88ea5ddc08faddef2ac4a67e390b88186c703ce6dbd955e1c145aca5"
 dependencies = [
  "wit-bindgen",
-]
-
-[[package]]
-name = "wasix"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1757e0d1f8456693c7e5c6c629bdb54884e032aa0bb53c155f6a39f94440d332"
-dependencies = [
- "wasi",
 ]
 
 [[package]]

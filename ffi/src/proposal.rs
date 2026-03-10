@@ -87,7 +87,7 @@ impl ProposalHandle<'_> {
         // clear the cached view so that it does not hold onto the proposal view
         handle.clear_cached_view();
 
-        firewood_increment!(crate::registry::COMMIT_MS, commit_time.as_millis());
+        firewood_increment!(crate::registry::COMMIT_MS, commit_time.as_millis() as u64);
         firewood_increment!(crate::registry::COMMIT_COUNT, 1);
 
         Ok(hash_key)
@@ -121,11 +121,11 @@ impl<'db> CreateProposalResult<'db> {
         let (proposal_result, propose_time) =
             fwd_expensive_timed_result!(crate::registry::PROPOSE_MS_BUCKET, f());
         let proposal = proposal_result?;
-        firewood_increment!(crate::registry::PROPOSE_MS, propose_time.as_millis());
+        firewood_increment!(crate::registry::PROPOSE_MS, propose_time.as_millis() as u64);
         firewood_increment!(crate::registry::PROPOSE_COUNT, 1);
         firewood_record!(
             crate::registry::PROPOSE_MS_BUCKET,
-            propose_time.as_f64() * 1000.0,
+            propose_time.as_secs_f64() * 1000.0,
             expensive
         );
 
