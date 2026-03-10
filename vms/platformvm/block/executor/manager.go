@@ -159,7 +159,10 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return fmt.Errorf("failed verifying warp messages: %w", err)
 	}
 
-	stateDiff, err := state.NewDiff(m.preferred, m)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		m.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(m.txExecutorBackend.Clk.Time()),
+	)
+	stateDiff, err := state.NewDiff(m.preferred, m, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return fmt.Errorf("failed creating state diff: %w", err)
 	}
