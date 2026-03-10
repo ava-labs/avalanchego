@@ -3033,7 +3033,7 @@ func TestDelegatorReplacementWeight(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(t, upgradetest.Durango)
+			vm, _, _ := defaultVM(t, upgradetest.Latest)
 			vm.ctx.Lock.Lock()
 			defer vm.ctx.Lock.Unlock()
 
