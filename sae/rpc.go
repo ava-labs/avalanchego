@@ -32,16 +32,17 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/strevm/blocks"
+	"github.com/ava-labs/strevm/gasprice"
 	"github.com/ava-labs/strevm/saexec"
 	"github.com/ava-labs/strevm/txgossip"
 )
 
-// APIBackend is the union of all interfaces required to implement the SAE APIs.
+// APIBackend is the union of all interfaces required to implement the Ethereum APIs.
 type APIBackend interface {
 	ethapi.Backend
-	// TODO(ceyonur): Add gasprice.Backend interface.
 	tracers.Backend
 	filters.BloomOverrider
+	filters.Backend
 }
 
 // APIBackend returns an API backend backed by the [VM].
@@ -83,6 +84,9 @@ func (vm *VM) ethRPCServer() (*rpc.Server, error) {
 		// - txpool_status
 		{"txpool", ethapi.NewTxPoolAPI(b)},
 		// Standard Ethereum node APIs:
+		// - eth_gasPrice
+		// - eth_maxPriorityFeePerGas
+		// - eth_feeHistory
 		// - eth_syncing
 		{"eth", ethapi.NewEthereumAPI(b)},
 		// Standard Ethereum node APIs:
@@ -319,6 +323,7 @@ type apiBackend struct {
 	vm             *VM
 	accountManager *accounts.Manager
 
+	*gasprice.Estimator
 	*txgossip.Set
 	chainIndexer
 	bloomOverrider
@@ -382,11 +387,11 @@ func (b *apiBackend) SyncProgress() ethereum.SyncProgress {
 }
 
 func (b *apiBackend) HeaderByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Header, error) {
-	return readByNumber(b, n, neverErrs(rawdb.ReadHeader))
+	return readByNumber(b.vm, n, neverErrs(rawdb.ReadHeader))
 }
 
 func (b *apiBackend) BlockByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Block, error) {
-	return readByNumber(b, n, neverErrs(rawdb.ReadBlock))
+	return readByNumber(b.vm, n, neverErrs(rawdb.ReadBlock))
 }
 
 func (b *apiBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
@@ -471,14 +476,14 @@ func neverErrs[T any](fn func(ethdb.Reader, common.Hash, uint64) *T) canonicalRe
 	}
 }
 
-func readByNumber[T any](b *apiBackend, n rpc.BlockNumber, read canonicalReaderWithErr[T]) (*T, error) {
-	num, err := b.ResolveBlockNumber(n)
+func readByNumber[T any](vm *VM, n rpc.BlockNumber, read canonicalReaderWithErr[T]) (*T, error) {
+	num, err := vm.ResolveBlockNumber(n)
 	if errors.Is(err, errFutureBlockNotResolved) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
 	}
-	return read(b.vm.db, rawdb.ReadCanonicalHash(b.vm.db, num), num)
+	return read(vm.db, rawdb.ReadCanonicalHash(vm.db, num), num)
 }
 
 // readByHash returns `fromMem(b)` if a block with the specified hash is in the
@@ -533,7 +538,7 @@ func (b *apiBackend) resolveBlockNumberOrHash(numOrHash rpc.BlockNumberOrHash) (
 			return 0, common.Hash{}, err
 		}
 
-		hash := rawdb.ReadCanonicalHash(b.db, num)
+		hash := rawdb.ReadCanonicalHash(b.vm.db, num)
 		if hash == (common.Hash{}) {
 			return 0, common.Hash{}, fmt.Errorf("block %d not found", num)
 		}
@@ -542,13 +547,13 @@ func (b *apiBackend) resolveBlockNumberOrHash(numOrHash rpc.BlockNumberOrHash) (
 	case isHash:
 		if bl, ok := b.vm.blocks.Load(hash); ok {
 			n := bl.NumberU64()
-			if numOrHash.RequireCanonical && hash != rawdb.ReadCanonicalHash(b.db, n) {
+			if numOrHash.RequireCanonical && hash != rawdb.ReadCanonicalHash(b.vm.db, n) {
 				return 0, common.Hash{}, errNonCanonicalBlock
 			}
 			return n, hash, nil
 		}
 
-		numPtr := rawdb.ReadHeaderNumber(b.db, hash)
+		numPtr := rawdb.ReadHeaderNumber(b.vm.db, hash)
 		if numPtr == nil {
 			return 0, common.Hash{}, fmt.Errorf("block %#x not found", hash)
 		}
@@ -564,19 +569,37 @@ func (b *apiBackend) resolveBlockNumberOrHash(numOrHash rpc.BlockNumberOrHash) (
 var errFutureBlockNotResolved = errors.New("not accepted yet")
 
 func (b *apiBackend) ResolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
-	head := b.vm.last.accepted.Load().Height()
+	return b.vm.ResolveBlockNumber(bn)
+}
+
+// ResolveBlockNumber resolves the [rpc.BlockNumber], supporting the following
+// named blocks:
+//
+// - [rpc.PendingBlockNumber]: last accepted (i.e. pending execution)
+// - [rpc.LatestBlockNumber]: last executed
+// - [rpc.SafeBlockNumber] and [rpc.FinalizedBlockNumber]: last settled
+//
+// Explicit, positive block numbers are returned unmodified as long as the block
+// has been accepted.
+//
+// NOTE: the definition of safe and finalized as the last-settled block DOES NOT
+// affect finality of consensus under SAE, which is immediate upon acceptance.
+// Safe blocks can be thought of as safe against hard-drive corruption on the
+// specific validator, while final blocks are labelled as such only to maintain
+// monotonicity of the naming convention.
+func (vm *VM) ResolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
+	head := vm.last.accepted.Load().Height()
 
 	switch bn {
-	case rpc.PendingBlockNumber: // i.e. pending execution
+	case rpc.PendingBlockNumber:
 		return head, nil
 	case rpc.LatestBlockNumber:
-		return b.vm.exec.LastExecuted().Height(), nil
+		return vm.exec.LastExecuted().Height(), nil
 	case rpc.SafeBlockNumber, rpc.FinalizedBlockNumber:
-		return b.vm.last.settled.Load().Height(), nil
+		return vm.last.settled.Load().Height(), nil
 	}
 
 	if bn < 0 {
-		// Any future definitions should be added above.
 		return 0, fmt.Errorf("%s block unsupported", bn.String())
 	}
 	n := uint64(bn) //nolint:gosec // Non-negative check performed above
@@ -605,10 +628,6 @@ func (b *apiBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscr
 func (b *apiBackend) SubscribeChainSideEvent(chan<- core.ChainSideEvent) event.Subscription {
 	// SAE never reorgs, so there are no side events.
 	return newNoopSubscription()
-}
-
-func (b *apiBackend) LastAcceptedBlock() *blocks.Block {
-	return b.vm.last.accepted.Load()
 }
 
 func (b *apiBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {

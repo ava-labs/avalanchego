@@ -81,7 +81,7 @@ func (b *apiBackend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash
 		hdr.Root = bl.PostExecutionStateRoot()
 		hdr.BaseFee = bl.BaseFee().ToBig()
 	} else {
-		hdr = rawdb.ReadHeader(b.db, hash, num)
+		hdr = rawdb.ReadHeader(b.vm.db, hash, num)
 
 		// TODO(arr4n) export [blocks.executionResults] to avoid multiple
 		// database reads and canoto unmarshallings here.
@@ -98,7 +98,7 @@ func (b *apiBackend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash
 		hdr.BaseFee = bf.ToBig()
 	}
 
-	sdb, err := state.New(hdr.Root, b.exec.StateCache(), nil)
+	sdb, err := state.New(hdr.Root, b.vm.exec.StateCache(), nil)
 	if err != nil {
 		return nil, nil, err
 	}

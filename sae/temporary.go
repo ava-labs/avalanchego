@@ -9,7 +9,6 @@ package sae
 import (
 	"context"
 	"errors"
-	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
@@ -17,18 +16,9 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers"
-	"github.com/ava-labs/libevm/rpc"
 )
 
 var errUnimplemented = errors.New("unimplemented")
-
-func (b *apiBackend) SuggestGasTipCap(context.Context) (*big.Int, error) {
-	panic(errUnimplemented)
-}
-
-func (b *apiBackend) FeeHistory(context.Context, uint64, rpc.BlockNumber, []float64) (*big.Int, [][]*big.Int, []*big.Int, []float64, error) {
-	panic(errUnimplemented)
-}
 
 func (b *apiBackend) GetPoolNonce(context.Context, common.Address) (uint64, error) {
 	panic(errUnimplemented)

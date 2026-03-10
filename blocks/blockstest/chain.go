@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -25,10 +24,10 @@ import (
 //
 // It is not safe for concurrent use.
 type ChainBuilder struct {
-	config       *params.ChainConfig
-	chain        []*blocks.Block
-	blocksByHash sync.Map
-	headEvents   event.FeedOf[core.ChainHeadEvent]
+	config         *params.ChainConfig
+	chain          []*blocks.Block
+	blocksByHash   sync.Map
+	acceptedBlocks event.FeedOf[*blocks.Block]
 
 	defaultOpts []ChainOption
 }
@@ -88,7 +87,7 @@ func (cb *ChainBuilder) NewBlock(tb testing.TB, txs []*types.Transaction, opts .
 
 	cb.chain = append(cb.chain, b)
 	cb.blocksByHash.Store(b.Hash(), b)
-	cb.headEvents.Send(core.ChainHeadEvent{Block: b.EthBlock()})
+	cb.acceptedBlocks.Send(b)
 
 	return b
 }
@@ -129,10 +128,10 @@ func (cb *ChainBuilder) GetBlock(h common.Hash, num uint64) (*blocks.Block, bool
 // chain height.
 var ErrBlockNotFound = errors.New("block not found")
 
-// SubscribeChainHeadEvent subscribes to chain head events fired by
+// SubscribeAcceptedBlocks subscribes to accepted block events fired by
 // [ChainBuilder.NewBlock].
-func (cb *ChainBuilder) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return cb.headEvents.Subscribe(ch)
+func (cb *ChainBuilder) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
+	return cb.acceptedBlocks.Subscribe(ch)
 }
 
 // LastAcceptedBlock returns the last block in the chain.

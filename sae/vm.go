@@ -31,11 +31,13 @@ import (
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/strevm/blocks"
+	"github.com/ava-labs/strevm/gasprice"
 	"github.com/ava-labs/strevm/hook"
 	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saexec"
@@ -64,6 +66,7 @@ type VM struct {
 		accepted, settled atomic.Pointer[blocks.Block]
 		synchronous       uint64
 	}
+	acceptedBlocks event.FeedOf[*blocks.Block]
 
 	exec         *saexec.Executor
 	mempool      *txgossip.Set
@@ -319,11 +322,18 @@ func NewVM[T hook.Transaction](
 		bloomIdx := newBloomIndexer(vm.db, chainIdx, override, cfg.RPCConfig.BlocksPerBloomSection)
 		vm.toClose = append(vm.toClose, bloomIdx)
 
+		estimator, err := gasprice.NewEstimator(&estimatorBackend{vm}, snowCtx.Log, gasprice.DefaultConfig())
+		if err != nil {
+			return nil, fmt.Errorf("gasprice.NewEstimator(...): %v", err)
+		}
+		vm.toClose = append(vm.toClose, estimator)
+
 		vm.apiBackend = &apiBackend{
 			vm:             vm,
 			accountManager: accountManager,
 			Set:            vm.mempool,
 			chainIndexer:   chainIdx,
+			Estimator:      estimator,
 			bloomIndexer:   bloomIdx,
 			bloomOverrider: override,
 		}
