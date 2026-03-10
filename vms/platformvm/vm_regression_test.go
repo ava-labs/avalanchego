@@ -1557,15 +1557,13 @@ func TestAddValidatorDuringRemovalPostHelicon(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(secondSubnetValidatorTx))
 	vm.ctx.Lock.Lock()
 
-	// Remove the first subnet validator
+	// Replace the subnet validator
 	require.NoError(buildAndAcceptStandardBlock(vm))
-
-	// Verify that the validator does exist
+	// Verify that the validator exists
 	validator, err := vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
 	require.Equal(uint64(1), validator.Weight)
-
-	// Verify that the invalid transaction was executed
+	// Verify that the transaction was executed
 	_, _, err = vm.state.GetTx(secondSubnetValidatorTx.ID())
 	require.NoError(err)
 }
