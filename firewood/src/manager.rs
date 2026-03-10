@@ -41,21 +41,11 @@ pub struct RevisionManagerConfig {
     #[builder(default = 128)]
     max_revisions: usize,
 
-    /// The size of the node cache (number of entries).
-    ///
-    /// **Deprecated:** Use `node_cache_memory_limit` instead for memory-based sizing.
-    /// If specified, this value is multiplied by 128 to estimate memory usage.
-    /// Cannot be specified together with `node_cache_memory_limit`.
-    #[deprecated(since = "0.2.0", note = "Use node_cache_memory_limit instead")]
-    #[builder(default, setter(strip_option))]
-    node_cache_size: Option<NonZero<usize>>,
-
     /// The memory limit for the node cache in bytes.
     ///
-    /// If neither this nor `node_cache_size` is specified, defaults to 192MB (1,500,000 × 128).
-    /// Cannot be specified together with `node_cache_size`.
-    #[builder(default, setter(strip_option))]
-    node_cache_memory_limit: Option<NonZero<usize>>,
+    /// Defaults to 192MB (equivalent to 1,500,000 nodes × 128 bytes).
+    #[builder(default = nonzero!(192_000_000_usize))]
+    node_cache_memory_limit: NonZero<usize>,
 
     #[builder(default_code = "NonZero::new(1000000).expect(\"non-zero\")")]
     free_list_cache_size: NonZero<usize>,
@@ -68,38 +58,6 @@ pub struct RevisionManagerConfig {
     /// Must be < `max_revisions`.
     #[builder(default = nonzero!(1u64))]
     deferred_persistence_commit_count: NonZeroU64,
-}
-
-impl RevisionManagerConfig {
-    /// Compute the actual node cache memory limit from the configuration.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if both `node_cache_size` and `node_cache_memory_limit` are specified.
-    #[expect(deprecated)]
-    pub(crate) fn compute_node_cache_memory_limit(
-        &self,
-    ) -> Result<NonZero<usize>, crate::v2::api::Error> {
-        // Convert entry count to memory: size × 128 bytes per node (estimate)
-        const BYTES_PER_NODE_ESTIMATE: usize = 128;
-        // Default: 192MB (equivalent to 1,500,000 nodes × 128 bytes)
-        const DEFAULT_MEMORY_LIMIT: usize = 192_000_000;
-
-        match (self.node_cache_size, self.node_cache_memory_limit) {
-            (Some(_), Some(_)) => Err(crate::v2::api::Error::ConflictingCacheConfig),
-            (Some(size), None) => {
-                warn!(
-                    "node_cache_size is deprecated as of 0.2.0; use node_cache_memory_limit instead"
-                );
-                Ok(
-                    NonZero::new(size.get().saturating_mul(BYTES_PER_NODE_ESTIMATE))
-                        .expect("non-zero size produces non-zero memory"),
-                )
-            }
-            (None, Some(limit)) => Ok(limit),
-            (None, None) => Ok(NonZero::new(DEFAULT_MEMORY_LIMIT).expect("default is non-zero")),
-        }
-    }
 }
 
 #[derive(Clone, Debug, TypedBuilder)]
@@ -212,19 +170,9 @@ impl RevisionManager {
         }
 
         let file = config.root_dir.join(DB_FILE_NAME);
-        let node_cache_memory_limit =
-            config
-                .manager
-                .compute_node_cache_memory_limit()
-                .map_err(|e| {
-                    RevisionManagerError::IOError(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        e,
-                    ))
-                })?;
         let fb = FileBacked::new(
             file,
-            node_cache_memory_limit,
+            config.manager.node_cache_memory_limit,
             config.manager.free_list_cache_size,
             config.truncate,
             config.create,
@@ -863,56 +811,6 @@ mod tests {
             root_store_dir.exists(),
             "root_store directory should be created when root_store is enabled"
         );
-    }
-
-    #[test]
-    fn test_cache_config_both_specified_error() {
-        // Test that specifying both node_cache_size and node_cache_memory_limit returns an error
-        #[expect(deprecated)]
-        let result = RevisionManagerConfig::builder()
-            .node_cache_size(NonZero::new(1000).unwrap())
-            .node_cache_memory_limit(NonZero::new(128_000).unwrap())
-            .build()
-            .compute_node_cache_memory_limit();
-
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            crate::v2::api::Error::ConflictingCacheConfig
-        ));
-    }
-
-    #[test]
-    fn test_cache_config_default_memory_limit() {
-        // Test that when neither field is specified, we get the default memory limit
-        let config = RevisionManagerConfig::builder().build();
-        let memory_limit = config.compute_node_cache_memory_limit().unwrap();
-
-        // Default should be 192MB (1,500,000 × 128 bytes)
-        assert_eq!(memory_limit.get(), 192_000_000);
-    }
-
-    #[test]
-    fn test_cache_config_size_to_memory_conversion() {
-        // Test that node_cache_size is correctly converted to memory (× 128)
-        #[expect(deprecated)]
-        let config = RevisionManagerConfig::builder()
-            .node_cache_size(NonZero::new(1000).unwrap())
-            .build();
-        let memory_limit = config.compute_node_cache_memory_limit().unwrap();
-
-        assert_eq!(memory_limit.get(), 1000 * 128);
-    }
-
-    #[test]
-    fn test_cache_config_memory_limit_used_directly() {
-        // Test that node_cache_memory_limit is used directly when specified
-        let config = RevisionManagerConfig::builder()
-            .node_cache_memory_limit(NonZero::new(256_000_000).unwrap())
-            .build();
-        let memory_limit = config.compute_node_cache_memory_limit().unwrap();
-
-        assert_eq!(memory_limit.get(), 256_000_000);
     }
 
     #[test]
