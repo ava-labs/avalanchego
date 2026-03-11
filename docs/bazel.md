@@ -141,8 +141,8 @@ x_defs = {
 },
 ```
 
-**Rule of thumb**: Don't delete BUILD.bazel files that contain gazelle
-directives or `# keep` comments.
+**Rule of thumb**: Use `# keep` only for custom content that Gazelle
+would otherwise remove or rewrite.
 
 **Caveat**: Gazelle's `fix` mode does not rename existing function
 calls in files with `# keep` comments. This means changes to

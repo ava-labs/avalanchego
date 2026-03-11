@@ -58,26 +58,6 @@ tasks:
     desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
     cmd: ./scripts/generate_bazel_patches.sh
 
-  bazel-gazelle-delete:
-    desc: Delete all gazelle-generated BUILD.bazel files (except manually maintained ones)
-    # TODO(marun) Remove before merge. This exists only to partition the PR into
-    # generated vs non-generated files for easier review. gazelle fix handles stale
-    # rules, and empty BUILD.bazel files left behind are harmless.
-    cmd: |
-      find . -name 'BUILD.bazel' -type f | while read f; do
-        # Skip root and graft module roots (manually maintained)
-        case "$f" in
-          ./BUILD.bazel|./graft/coreth/BUILD.bazel|./graft/evm/BUILD.bazel|./graft/subnet-evm/BUILD.bazel|./.bazel/*)
-            continue
-            ;;
-        esac
-        # Skip files with '# keep' comments (have manual customizations)
-        if grep -q '# keep' "$f"; then
-          continue
-        fi
-        rm -f "$f"
-      done
-
   bazel-gazelle-generate:
     desc: Regenerate BUILD files with Gazelle (all modules)
     cmd: ./scripts/run_bazel.sh run //:gazelle
