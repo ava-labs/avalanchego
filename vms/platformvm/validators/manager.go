@@ -334,7 +334,7 @@ func (m *Manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 }
 
 // OnAcceptedBlockID registers the ID of the latest accepted block.
-// It is used to update the [recentlyAccepted] sliding window.
+// It is used to update the recentlyAccepted sliding window.
 func (m *Manager) OnAcceptedBlockID(blkID ids.ID) {
 	m.recentlyAccepted.Add(blkID)
 }
