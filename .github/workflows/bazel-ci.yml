@@ -32,6 +32,7 @@ jobs:
       - name: Check Bazel metadata
         uses: ./.github/actions/run-bazel-task
         with:
+          prune_runner_disk: 'false'
           task: bazel-check-metadata
   unit-main:
     needs: check-metadata
@@ -41,6 +42,7 @@ jobs:
       - name: Run unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
+          prune_runner_disk: 'false'
           task: bazel-test-main
   unit-coreth:
     needs: check-metadata
@@ -50,6 +52,7 @@ jobs:
       - name: Run coreth unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
+          prune_runner_disk: 'false'
           task: bazel-test-coreth
   unit-subnet-evm:
     needs: check-metadata

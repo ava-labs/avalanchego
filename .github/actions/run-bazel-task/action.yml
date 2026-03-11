@@ -5,11 +5,16 @@ inputs:
   task:
     description: 'Task to run via scripts/run_task.sh'
     required: true
+  prune_runner_disk:
+    description: 'Whether to reclaim disk space on the runner before running the task'
+    required: false
+    default: 'true'
 
 runs:
   using: composite
   steps:
     - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be #v1.3.1
+      if: ${{ inputs.prune_runner_disk == 'true' }}
       with:
         tool-cache: true
         docker-images: true
