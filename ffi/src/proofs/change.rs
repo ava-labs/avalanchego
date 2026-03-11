@@ -12,8 +12,8 @@ use rlp::Rlp;
 
 use firewood::{
     ProofError,
+    api::{self, DbView as _, FrozenChangeProof},
     logger::warn,
-    v2::api::{self, DbView as _, FrozenChangeProof},
 };
 
 use std::cmp::Ordering;

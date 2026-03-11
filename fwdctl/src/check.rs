@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use askama::Template;
 use clap::Args;
-use firewood::v2::api;
+use firewood::api;
 use firewood_storage::{
     CacheReadStrategy, CheckOpt, DBStats, FileBacked, NodeStore, NodeStoreHeader,
 };

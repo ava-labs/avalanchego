@@ -276,7 +276,7 @@ pub(crate) fn record_commit(
 
     let returned_hash_bytes = match result {
         crate::HashResult::Some(hash) => {
-            let api_hash: firewood::v2::api::HashKey = (*hash).into();
+            let api_hash: firewood::api::HashKey = (*hash).into();
             let bytes: [u8; 32] = api_hash.into();
             Some(bytes)
         }

@@ -12,9 +12,9 @@ use std::num::NonZeroUsize;
 use std::ops::RangeInclusive;
 use std::time::Instant;
 
+use firewood::api::{Db as _, DbView, KeyType, Proposal as _, ValueType};
 use firewood::db::{BatchOp, Db, DbConfig};
 use firewood::manager::RevisionManagerConfig;
-use firewood::v2::api::{Db as _, DbView, KeyType, Proposal as _, ValueType};
 use rand::{RngExt, distr::Alphanumeric};
 
 #[derive(Parser, Debug)]
@@ -128,9 +128,9 @@ fn get_keys_to_verify<'a, K: KeyType + 'a, V: ValueType + 'a>(
 }
 
 fn verify_keys(
-    db: &impl firewood::v2::api::Db,
+    db: &impl firewood::api::Db,
     verify: HashMap<&[u8], &[u8]>,
-) -> Result<(), firewood::v2::api::Error> {
+) -> Result<(), firewood::api::Error> {
     if !verify.is_empty() {
         let hash = db.root_hash().expect("root hash should exist");
         let revision = db.revision(hash)?;

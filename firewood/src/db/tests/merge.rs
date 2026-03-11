@@ -2,8 +2,8 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::{
+    api::{Db, DbView, Proposal},
     db::BatchOp,
-    v2::api::{Db, DbView, Proposal},
 };
 
 use super::*;

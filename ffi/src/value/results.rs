@@ -1,8 +1,8 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use firewood::api;
 use firewood::merkle;
-use firewood::v2::api;
 use firewood_storage::TrieHash;
 use std::fmt;
 

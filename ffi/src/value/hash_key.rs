@@ -25,13 +25,13 @@ impl fmt::Display for HashKey {
     }
 }
 
-impl From<firewood::v2::api::HashKey> for HashKey {
-    fn from(value: firewood::v2::api::HashKey) -> Self {
+impl From<firewood::api::HashKey> for HashKey {
+    fn from(value: firewood::api::HashKey) -> Self {
         Self(value.into())
     }
 }
 
-impl From<HashKey> for firewood::v2::api::HashKey {
+impl From<HashKey> for firewood::api::HashKey {
     fn from(value: HashKey) -> Self {
         value.0.into()
     }

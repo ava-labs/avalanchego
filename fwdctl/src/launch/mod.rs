@@ -12,7 +12,7 @@ use clap::{Args, Subcommand, ValueEnum};
 use log::{debug, info};
 use thiserror::Error;
 
-type FwdError = firewood::v2::api::Error;
+type FwdError = firewood::api::Error;
 
 #[derive(Debug, Error)]
 pub enum LaunchError {

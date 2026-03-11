@@ -35,7 +35,7 @@ mod replay;
 mod revision;
 mod value;
 
-use firewood::v2::api::DbView;
+use firewood::api::DbView;
 use firewood_metrics::set_metrics_context;
 
 pub use crate::handle::*;
@@ -836,7 +836,7 @@ pub extern "C" fn fwd_db_dump(db: Option<&DatabaseHandle>) -> ValueResult {
 ///   returned value.
 #[unsafe(no_mangle)]
 pub extern "C" fn fwd_revision_dump(revision: Option<&RevisionHandle>) -> ValueResult {
-    invoke_with_handle(revision, firewood::v2::api::DbView::dump_to_string)
+    invoke_with_handle(revision, firewood::api::DbView::dump_to_string)
 }
 
 /// Dumps the Trie structure of a proposal to a DOT (Graphviz) format string for debugging.
@@ -861,5 +861,5 @@ pub extern "C" fn fwd_revision_dump(revision: Option<&RevisionHandle>) -> ValueR
 ///   returned value.
 #[unsafe(no_mangle)]
 pub extern "C" fn fwd_proposal_dump(proposal: Option<&ProposalHandle>) -> ValueResult {
-    invoke_with_handle(proposal, firewood::v2::api::DbView::dump_to_string)
+    invoke_with_handle(proposal, firewood::api::DbView::dump_to_string)
 }

@@ -2,8 +2,8 @@
 // See the file LICENSE.md for licensing terms.
 
 use clap::{Args, value_parser};
+use firewood::api;
 use firewood::db::{Db, DbConfig};
-use firewood::v2::api;
 
 use crate::DatabasePath;
 

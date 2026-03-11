@@ -688,13 +688,13 @@ impl<'a, T: HashedNodeReader> PreOrderIterator<'a, T> {
 mod tests {
     use crate::{
         Proof,
+        api::{Db as _, DbView, Proposal as _},
         db::{BatchOp, Db, DbConfig},
         iter::{MerkleKeyValueIter, key_from_nibble_iter},
         merkle::{
             Key, Merkle, Value,
             changes::{ChangeProof, DiffMerkleNodeStream, PreOrderIterator},
         },
-        v2::api::{Db as _, DbView, Proposal as _},
     };
 
     use firewood_storage::{

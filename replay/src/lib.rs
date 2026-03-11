@@ -23,8 +23,8 @@ use std::collections::HashMap;
 use std::io::{self, Read};
 use std::time::Instant;
 
+use firewood::api::{self, Db as DbApi, DbView as DbViewApi, Proposal as ProposalApi};
 use firewood::db::{BatchOp, Db, Proposal};
-use firewood::v2::api::{self, Db as DbApi, DbView as DbViewApi, Proposal as ProposalApi};
 use firewood_metrics::firewood_increment;
 use firewood_storage::InvalidTrieHashLength;
 

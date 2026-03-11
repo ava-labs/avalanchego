@@ -205,7 +205,7 @@ mod tests {
     #![expect(clippy::unwrap_used, reason = "Tests can use unwrap")]
     #![expect(clippy::indexing_slicing, reason = "Tests can use indexing")]
 
-    use crate::v2::api::TryIntoBatch;
+    use crate::api::TryIntoBatch;
 
     use super::*;
 
@@ -285,7 +285,7 @@ mod tests {
 
         assert_eq!(batches.len(), 1);
         // The batch should be a Put operation since value is non-empty
-        if let crate::v2::api::BatchOp::Put { key, value } = &batches[0] {
+        if let crate::api::BatchOp::Put { key, value } = &batches[0] {
             assert_eq!(key.as_ref() as &[u8], b"test");
             assert_eq!(value.as_ref() as &[u8], b"data");
         } else {

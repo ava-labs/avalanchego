@@ -3,8 +3,8 @@
 
 use std::fmt;
 
+use firewood::api::{self, ArcDynDbView, BoxKeyValueIter};
 use firewood::merkle;
-use firewood::v2::api::{self, ArcDynDbView, BoxKeyValueIter};
 use firewood_metrics::MetricsContext;
 use std::iter::FusedIterator;
 

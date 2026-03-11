@@ -11,8 +11,8 @@
 )]
 
 use crate::TestRunner;
+use firewood::api::{Db as _, Proposal as _};
 use firewood::db::{BatchOp, Db};
-use firewood::v2::api::{Db as _, Proposal as _};
 use log::debug;
 use pretty_duration::pretty_duration;
 use sha2::{Digest, Sha256};

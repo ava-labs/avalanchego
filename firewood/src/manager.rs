@@ -18,14 +18,12 @@ use firewood_storage::logger::{trace, warn};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use typed_builder::TypedBuilder;
 
-use crate::db::UseParallel;
+use crate::api::{self, ArcDynDbView, HashKey, IntoBatchIter, OptionalHashKeyExt};
+use crate::db::{BatchOp, UseParallel};
 use crate::merkle::Merkle;
 use crate::merkle::parallel::ParallelMerkle;
 use crate::persist_worker::{PersistError, PersistWorker};
 use crate::root_store::RootStore;
-use crate::v2::api::{self, BatchOp, IntoBatchIter};
-use crate::v2::api::{ArcDynDbView, HashKey, OptionalHashKeyExt};
-
 use firewood_metrics::{firewood_increment, firewood_set};
 pub use firewood_storage::CacheReadStrategy;
 use firewood_storage::{

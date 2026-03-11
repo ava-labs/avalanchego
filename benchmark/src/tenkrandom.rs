@@ -9,9 +9,9 @@
 use std::error::Error;
 use std::time::Instant;
 
+use firewood::api::{Db as _, Proposal as _};
 use firewood::db::{BatchOp, Db};
 use firewood::logger::debug;
-use firewood::v2::api::{Db as _, Proposal as _};
 
 use crate::{Args, TestRunner};
 use sha2::{Digest, Sha256};

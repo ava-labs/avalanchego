@@ -19,10 +19,10 @@ use super::{
     types::{Proof, ProofNode, ProofType},
 };
 use crate::{
+    api::{FrozenChangeProof, FrozenRangeProof},
     db::BatchOp,
     merkle::{Key, Value},
     proofs::magic::{BATCH_DELETE, BATCH_DELETE_RANGE, BATCH_PUT},
-    v2::api::{FrozenChangeProof, FrozenRangeProof},
 };
 
 impl FrozenRangeProof {

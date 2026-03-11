@@ -3,8 +3,8 @@
 
 use clap::Args;
 
+use firewood::api::{self, Db as _};
 use firewood::db::{Db, DbConfig};
-use firewood::v2::api::{self, Db as _};
 
 use crate::DatabasePath;
 

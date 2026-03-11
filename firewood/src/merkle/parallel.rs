@@ -1,9 +1,9 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::api::IntoBatchIter;
 use crate::db::BatchOp;
 use crate::merkle::{Key, Merkle, Value};
-use crate::v2::api::IntoBatchIter;
 use firewood_metrics::{current_metrics_context, set_metrics_context};
 use firewood_storage::logger::error;
 use firewood_storage::{

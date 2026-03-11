@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::v2::api::OptionalHashKeyExt;
+use crate::api::OptionalHashKeyExt;
 
 use super::*;
 use ethereum_types::H256;

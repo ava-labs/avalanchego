@@ -2,8 +2,8 @@
 // See the file LICENSE.md for licensing terms.
 
 use clap::Args;
+use firewood::api;
 use firewood::db::{Db, DbConfig};
-use firewood::v2::api;
 use std::io::stdout;
 
 use crate::DatabasePath;

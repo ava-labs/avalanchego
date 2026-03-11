@@ -1,8 +1,8 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::api::{KeyType, KeyValuePair};
 use crate::merkle::{Key, Value};
-use crate::v2::api::{KeyType, KeyValuePair};
 
 use firewood_storage::{
     BranchNode, Child, FileIoError, NibblesIterator, Node, PathBuf, PathComponent, PathIterItem,

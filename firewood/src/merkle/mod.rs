@@ -9,11 +9,11 @@ mod merge;
 /// Parallel merkle
 pub mod parallel;
 
-use crate::iter::{MerkleKeyValueIter, PathIterator};
-use crate::merkle::changes::{ChangeProof, DiffMerkleNodeStream};
-use crate::v2::api::{
+use crate::api::{
     self, BatchIter, FrozenProof, FrozenRangeProof, KeyType, KeyValuePair, ValueType,
 };
+use crate::iter::{MerkleKeyValueIter, PathIterator};
+use crate::merkle::changes::{ChangeProof, DiffMerkleNodeStream};
 use crate::{Proof, ProofCollection, ProofError, ProofNode, RangeProof};
 use firewood_metrics::firewood_increment;
 use firewood_storage::{

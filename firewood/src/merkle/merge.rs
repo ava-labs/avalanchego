@@ -4,10 +4,10 @@
 use firewood_storage::{FileIoError, TrieReader};
 
 use crate::{
+    api::{BatchIter, KeyType, KeyValuePair},
     db::BatchOp,
     iter::{FilteredKeyRangeIter, MerkleKeyValueIter},
     merkle::Key,
-    v2::api::{BatchIter, KeyType, KeyValuePair},
 };
 
 /// Serializes a sequence of key-value pairs merged with the base merkle trie

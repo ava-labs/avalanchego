@@ -5,9 +5,9 @@
 
 use criterion::profiler::Profiler;
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use firewood::api::{Db as _, Proposal as _};
 use firewood::db::{BatchOp, DbConfig};
 use firewood::merkle::Merkle;
-use firewood::v2::api::{Db as _, Proposal as _};
 use firewood_storage::{MemStore, NodeHashAlgorithm, NodeStore};
 use pprof::ProfilerGuard;
 use rand::{RngExt, distr::Alphanumeric};

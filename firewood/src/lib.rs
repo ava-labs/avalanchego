@@ -162,8 +162,11 @@ mod persist_worker;
 /// Root store module
 pub mod root_store;
 
-/// Version 2 API
-pub mod v2;
+/// The public API
+pub mod api;
+
+/// A batch operation and associated types
+mod batch_op;
 
 /// Expose the storage logger
 pub use firewood_storage::logger;

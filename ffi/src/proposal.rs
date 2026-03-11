@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use firewood::v2::api::{self, BoxKeyValueIter, DbView, HashKey, IntoBatchIter, Proposal as _};
+use firewood::api::{self, BoxKeyValueIter, DbView, HashKey, IntoBatchIter, Proposal as _};
 
 use crate::{IteratorHandle, iterator::CreateIteratorResult, metrics::MetricsContextExt};
 use firewood_metrics::{firewood_increment, firewood_record, fwd_expensive_timed_result};

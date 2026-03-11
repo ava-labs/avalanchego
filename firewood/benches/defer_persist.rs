@@ -2,9 +2,9 @@
 // See the file LICENSE.md for licensing terms.
 
 use criterion::{Criterion, criterion_group, criterion_main};
+use firewood::api::{Db as _, Proposal as _};
 use firewood::db::{BatchOp, Db, DbConfig};
 use firewood::manager::RevisionManagerConfig;
-use firewood::v2::api::{Db as _, Proposal as _};
 use firewood_storage::NodeHashAlgorithm;
 use rand::{RngExt, distr::Alphanumeric};
 use std::iter::repeat_with;

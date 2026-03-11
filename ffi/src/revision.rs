@@ -3,8 +3,8 @@
 
 use crate::metrics::MetricsContextExt;
 use crate::{CreateIteratorResult, IteratorHandle};
-use firewood::v2::api;
-use firewood::v2::api::{ArcDynDbView, BoxKeyValueIter, DbView, HashKey};
+use firewood::api;
+use firewood::api::{ArcDynDbView, BoxKeyValueIter, DbView, HashKey};
 use firewood_metrics::MetricsContext;
 
 #[derive(Debug)]

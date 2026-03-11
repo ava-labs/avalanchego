@@ -11,8 +11,8 @@ use std::time::Instant;
 
 use fastrace::prelude::SpanContext;
 use fastrace::{Span, func_path};
+use firewood::api::{Db as _, Proposal as _};
 use firewood::db::Db;
-use firewood::v2::api::{Db as _, Proposal as _};
 use log::info;
 
 use pretty_duration::pretty_duration;

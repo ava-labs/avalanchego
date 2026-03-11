@@ -55,7 +55,7 @@ mod tests {
     use super::*;
 
     #[cfg(feature = "ethhash")]
-    use firewood::v2::api::HashKeyExt;
+    use firewood::api::HashKeyExt;
     use test_case::test_case;
 
     #[test_case(&[], "", None; "empty slice")]

@@ -5,8 +5,8 @@ use std::num::NonZeroUsize;
 
 use firewood::{
     ProofError,
+    api::{self, DbView, FrozenRangeProof, HashKey},
     logger::warn,
-    v2::api::{self, DbView, FrozenRangeProof, HashKey},
 };
 use firewood_metrics::{MetricsContext, firewood_increment};
 

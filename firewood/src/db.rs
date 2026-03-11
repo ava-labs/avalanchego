@@ -9,13 +9,13 @@
 #[cfg(test)]
 mod tests;
 
-use crate::iter::MerkleKeyValueIter;
-use crate::merkle::{Merkle, Value};
-pub use crate::v2::api::BatchOp;
-use crate::v2::api::{
+pub use crate::api::BatchOp;
+use crate::api::{
     self, ArcDynDbView, FrozenProof, FrozenRangeProof, HashKey, IntoBatchIter, KeyType,
     KeyValuePair, OptionalHashKeyExt,
 };
+use crate::iter::MerkleKeyValueIter;
+use crate::merkle::{Merkle, Value};
 
 use crate::manager::{ConfigManager, RevisionManager, RevisionManagerConfig};
 use firewood_metrics::firewood_counter;
@@ -419,9 +419,9 @@ mod test {
     };
     use nonzero_ext::nonzero;
 
+    use crate::api::{Db as _, DbView, HashKeyExt, Proposal as _};
     use crate::db::{Db, Proposal, UseParallel};
     use crate::manager::RevisionManagerConfig;
-    use crate::v2::api::{Db as _, DbView, HashKeyExt, Proposal as _};
 
     use super::{BatchOp, DbConfig};
 

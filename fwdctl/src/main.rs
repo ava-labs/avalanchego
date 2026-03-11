@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use firewood::v2::api;
+use firewood::api;
 
 pub mod check;
 pub mod create;
