@@ -24,9 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	platformvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 func TestAcceptorVisitProposalBlock(t *testing.T) {
@@ -50,7 +49,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	blkID := blk.ID()
 
 	s := statetest.New(t, statetest.Config{})
-	manager := platformvalidators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
+	manager := validators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
 
 	acceptor := &acceptor{
 		backend: &backend{
@@ -84,7 +83,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 
 	s := statetest.New(t, statetest.Config{})
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
-	manager := platformvalidators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
+	manager := validators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
 
 	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
@@ -159,11 +158,10 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 
 	s := statetest.New(t, statetest.Config{})
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
-	manager := platformvalidators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
+	manager := validators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
 
 	parentID := ids.GenerateTestID()
 	clk := &mockable.Clock{}
-
 	acceptor := &acceptor{
 		backend: &backend{
 			lastAccepted: parentID,
@@ -246,7 +244,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 	s := statetest.New(t, statetest.Config{})
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
-	manager := platformvalidators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
+	manager := validators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
 
 	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
@@ -355,7 +353,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 
 	s := statetest.New(t, statetest.Config{})
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
-	manager := platformvalidators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
+	manager := validators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
 
 	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
