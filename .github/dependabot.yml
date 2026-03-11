@@ -25,8 +25,30 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 0
+  - package-ecosystem: "cargo"
+    directory: "/firewood"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
+  - package-ecosystem: github-actions
+    directory: "/firewood"
+    schedule:
+      interval: weekly
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "security"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    # Group all GitHub Actions updates into a single PR to reduce noise
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10 # Enable GitHub Actions updates for security
