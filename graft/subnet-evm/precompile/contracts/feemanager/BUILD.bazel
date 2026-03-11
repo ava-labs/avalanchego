@@ -14,9 +14,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/commontype",
+        "//graft/evm/precompile/contract",
         "//graft/evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/allowlist",
-        "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/modules",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",
@@ -36,6 +36,7 @@ graft_go_test(
     embed = [":feemanager"],
     deps = [
         "//graft/evm/commontype",
+        "//graft/evm/precompile/contract",
         "//graft/evm/precompile/precompileconfig",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/core",
@@ -46,7 +47,6 @@ graft_go_test(
         "//graft/subnet-evm/plugin/evm/customtypes",
         "//graft/subnet-evm/precompile/allowlist",
         "//graft/subnet-evm/precompile/allowlist/allowlisttest",
-        "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/contracts/feemanager/feemanagertest/bindings",
         "//graft/subnet-evm/precompile/contracts/utilstest",
         "//graft/subnet-evm/precompile/precompiletest",

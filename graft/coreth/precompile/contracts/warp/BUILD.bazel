@@ -13,8 +13,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/modules",
+        "//graft/evm/precompile/contract",
         "//graft/evm/precompile/precompileconfig",
         "//utils/constants",
         "//vms/evm/predicate",
@@ -38,10 +38,11 @@ graft_go_test(
     ],
     embed = [":warp"],
     deps = [
+        "//graft/coreth/core/extstate",
         "//graft/coreth/params/extras",
         "//graft/coreth/params/extras/extrastest",
-        "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/precompiletest",
+        "//graft/evm/precompile/contract",
         "//graft/evm/precompile/precompileconfig",
         "//ids",
         "//snow",
