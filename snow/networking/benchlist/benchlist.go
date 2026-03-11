@@ -414,7 +414,15 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 	)
 	for i, candidate := range candidates {
 		candidateStake := b.vdrs.GetWeight(b.ctx.SubnetID, candidate.nodeID)
-		evictedStake += candidateStake
+		newEvictedStake, err := math.Add(evictedStake, candidateStake)
+		if err != nil {
+			b.ctx.Log.Error("benchlist evicted stake overflow",
+				zap.Uint64("evictedStake", evictedStake),
+				zap.Uint64("candidateStake", candidateStake),
+			)
+			return false
+		}
+		evictedStake = newEvictedStake
 		evictNodes = candidates[:i+1]
 		if evictedStake >= targetEvictStake {
 			break
