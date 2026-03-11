@@ -19,7 +19,7 @@ go_library(
         "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/plugin/evm/upgrade/cortina",
-        "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/precompile/precompileconfig",
         "//utils/timer/mockable",
         "//utils/units",
         "//vms/evm/acp176",

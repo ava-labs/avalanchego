@@ -11,6 +11,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/precompile/precompileconfig",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/core/extstate",
         "//graft/subnet-evm/ethclient/simulated",
@@ -19,7 +20,6 @@ go_library(
         "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/contracts/utilstest",
         "//graft/subnet-evm/precompile/modules",
-        "//graft/subnet-evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/precompiletest",
         "//utils",
         "@com_github_ava_labs_libevm//common",

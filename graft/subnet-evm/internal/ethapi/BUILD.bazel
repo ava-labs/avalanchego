@@ -14,9 +14,9 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/internal/ethapi",
     visibility = ["//graft/subnet-evm:__subpackages__"],
     deps = [
+        "//graft/evm/commontype",
         "//graft/evm/firewood",
         "//graft/evm/rpc",
-        "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/consensus",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/eth/gasestimator",
@@ -62,8 +62,8 @@ graft_go_test(
     data = glob(["testdata/**"]),
     embed = [":ethapi"],
     deps = [
+        "//graft/evm/commontype",
         "//graft/evm/rpc",
-        "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/consensus",
         "//graft/subnet-evm/consensus/dummy",
         "//graft/subnet-evm/core",

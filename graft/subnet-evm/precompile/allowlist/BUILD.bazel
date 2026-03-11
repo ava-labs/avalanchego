@@ -13,8 +13,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/contract",
-        "//graft/subnet-evm/precompile/precompileconfig",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//core/vm",
@@ -31,10 +31,10 @@ graft_go_test(
     ],
     embed = [":allowlist"],
     deps = [
+        "//graft/evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/allowlist/allowlisttest",
         "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/modules",
-        "//graft/subnet-evm/precompile/precompileconfig",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_stretchr_testify//require",

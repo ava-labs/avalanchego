@@ -11,7 +11,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/miner",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/subnet-evm/commontype",
+        "//graft/evm/commontype",
+        "//graft/evm/precompile/precompileconfig",
         "//graft/subnet-evm/consensus",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/core/extstate",
@@ -19,7 +20,6 @@ go_library(
         "//graft/subnet-evm/params",
         "//graft/subnet-evm/plugin/evm/customheader",
         "//graft/subnet-evm/plugin/evm/customtypes",
-        "//graft/subnet-evm/precompile/precompileconfig",
         "//utils/timer/mockable",
         "//utils/units",
         "//vms/evm/predicate",

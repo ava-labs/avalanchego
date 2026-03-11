@@ -15,7 +15,7 @@ go_library(
     deps = [
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/modules",
-        "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/precompile/precompileconfig",
         "//utils/constants",
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
@@ -41,8 +41,8 @@ graft_go_test(
         "//graft/coreth/params/extras",
         "//graft/coreth/params/extras/extrastest",
         "//graft/coreth/precompile/contract",
-        "//graft/coreth/precompile/precompileconfig",
         "//graft/coreth/precompile/precompiletest",
+        "//graft/evm/precompile/precompileconfig",
         "//ids",
         "//snow",
         "//snow/engine/snowman/block",

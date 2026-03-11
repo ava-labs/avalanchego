@@ -13,7 +13,7 @@ import (
 	big "math/big"
 	reflect "reflect"
 
-	precompileconfig "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
+	precompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	snow "github.com/ava-labs/avalanchego/snow"
 	set "github.com/ava-labs/avalanchego/utils/set"
 	predicate "github.com/ava-labs/avalanchego/vms/evm/predicate"

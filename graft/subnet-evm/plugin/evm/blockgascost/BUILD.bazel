@@ -7,7 +7,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/blockgascost",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/subnet-evm/commontype",
+        "//graft/evm/commontype",
         "//utils/math",
     ],
 )
@@ -17,7 +17,7 @@ graft_go_test(
     srcs = ["cost_test.go"],
     embed = [":blockgascost"],
     deps = [
-        "//graft/subnet-evm/commontype",
+        "//graft/evm/commontype",
         "@com_github_stretchr_testify//require",
     ],
 )
