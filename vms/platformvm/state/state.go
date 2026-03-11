@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -61,8 +60,6 @@ const (
 )
 
 var (
-	_ State = (*state)(nil)
-
 	errValidatorSetAlreadyPopulated   = errors.New("validator set already populated")
 	errIsNotSubnet                    = errors.New("is not a subnet")
 	errMissingPrimaryNetworkValidator = errors.New("missing primary network validator")
@@ -152,132 +149,6 @@ type Chain interface {
 
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
-}
-
-type State interface {
-	Chain
-	uptime.State
-	avax.UTXOReader
-
-	GetLastAccepted() ids.ID
-	SetLastAccepted(blkID ids.ID)
-
-	GetStatelessBlock(blockID ids.ID) (block.Block, error)
-
-	// Invariant: [block] is an accepted block.
-	AddStatelessBlock(block block.Block)
-
-	GetBlockIDAtHeight(height uint64) (ids.ID, error)
-
-	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
-	GetSubnetIDs() ([]ids.ID, error)
-	GetChains(subnetID ids.ID) ([]*txs.Tx, error)
-
-	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
-	// block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// will typically be greater than or equal to [endHeight]. If [startHeight]
-	// is less than [endHeight], no diffs will be applied.
-	ApplyValidatorWeightDiffs(
-		ctx context.Context,
-		validators map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-		subnetID ids.ID,
-	) error
-
-	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
-	// genesis block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// will typically be greater than or equal to [endHeight]. If [startHeight]
-	// is less than [endHeight], no diffs will be applied.
-	ApplyValidatorPublicKeyDiffs(
-		ctx context.Context,
-		validators map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-		subnetID ids.ID,
-	) error
-
-	// ApplyAllValidatorWeightDiffs iterates from [startHeight] towards the genesis
-	// block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// will typically be greater than or equal to [endHeight]. If [startHeight]
-	// is less than [endHeight], no diffs will be applied.
-	ApplyAllValidatorWeightDiffs(
-		ctx context.Context,
-		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-	) error
-
-	// ApplyAllValidatorPublicKeyDiffs iterates from [startHeight] towards the
-	// genesis block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// will typically be greater than or equal to [endHeight]. If [startHeight]
-	// is less than [endHeight], no diffs will be applied.
-	ApplyAllValidatorPublicKeyDiffs(
-		ctx context.Context,
-		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-	) error
-
-	SetHeight(height uint64)
-
-	// GetCurrentValidators returns subnet and L1 validators for the given
-	// subnetID along with the current P-chain height.
-	// This method works for both subnets and L1s. Depending of the requested
-	// subnet/L1 validator schema, the return values can include only subnet
-	// validator, only L1 validators or both if there are initial stakers in the
-	// L1 conversion.
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error)
-
-	// Discard uncommitted changes to the database.
-	Abort()
-
-	// ReindexBlocks converts any block indices using the legacy storage format
-	// to the new format. If this database has already updated the indices,
-	// this function will return immediately, without iterating over the
-	// database.
-	//
-	// TODO: Remove after v1.14.x is activated
-	ReindexBlocks(lock sync.Locker, log logging.Logger) error
-
-	// Commit changes to the base database.
-	Commit() error
-
-	// Returns a batch of unwritten changes that, when written, will commit all
-	// pending changes to the base database.
-	CommitBatch() (database.Batch, error)
-
-	Checksum() ids.ID
-
-	Close() error
 }
 
 // Prior to https://github.com/ava-labs/avalanchego/pull/1719, blocks were
@@ -372,7 +243,8 @@ type stateBlk struct {
  *   |-- lastAcceptedKey -> lastAccepted
  *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
  */
-type state struct {
+// State is the complete persisted state of the Platform chain.
+type State struct {
 	validatorState *validatorState
 	validators     validators.Manager
 	ctx            *snow.Context
@@ -580,7 +452,7 @@ func New(
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
-) (State, error) {
+) (*State, error) {
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
 		metricsReg,
@@ -755,7 +627,7 @@ func New(
 		return nil, err
 	}
 
-	s := &state{
+	s := &State{
 		validatorState: newValidatorState(),
 
 		validators: validators,
@@ -864,37 +736,43 @@ func New(
 	return s, nil
 }
 
-func (s *state) GetStakingInfo(subnetID ids.ID, vdrID ids.NodeID) (StakingInfo, error) {
+func (s *State) GetStakingInfo(subnetID ids.ID, vdrID ids.NodeID) (StakingInfo, error) {
 	return s.validatorState.GetStakingInfo(subnetID, vdrID)
 }
 
-func (s *state) SetStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo StakingInfo) error {
+func (s *State) SetStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo StakingInfo) error {
 	return s.validatorState.SetStakingInfo(subnetID, vdrID, stakingInfo)
 }
 
-func (s *state) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
+func (s *State) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	return s.expiryDiff.getExpiryIterator(
 		iterator.FromTree(s.expiry),
 	), nil
 }
 
 // HasExpiry allows for concurrent reads.
-func (s *state) HasExpiry(entry ExpiryEntry) (bool, error) {
+func (s *State) HasExpiry(entry ExpiryEntry) (bool, error) {
 	if has, modified := s.expiryDiff.modified[entry]; modified {
 		return has, nil
 	}
 	return s.expiry.Has(entry), nil
 }
 
-func (s *state) PutExpiry(entry ExpiryEntry) {
+func (s *State) PutExpiry(entry ExpiryEntry) {
 	s.expiryDiff.PutExpiry(entry)
 }
 
-func (s *state) DeleteExpiry(entry ExpiryEntry) {
+func (s *State) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
 }
 
-func (s *state) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
+// GetCurrentValidators returns subnet and L1 validators for the given
+// subnetID along with the current P-chain height.
+// This method works for both subnets and L1s. Depending of the requested
+// subnet/L1 validator schema, the return values can include only subnet
+// validator, only L1 validators or both if there are initial stakers in the
+// L1 conversion.
+func (s *State) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
 	// First add the current validators (non-L1)
 	legacyBaseStakers := s.currentStakers.validators[subnetID]
 	legacyStakers := make([]*Staker, 0, len(legacyBaseStakers))
@@ -929,17 +807,17 @@ func (s *state) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*S
 	return legacyStakers, l1Validators, s.currentHeight, nil
 }
 
-func (s *state) GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error) {
+func (s *State) GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error) {
 	return s.l1ValidatorsDiff.getActiveL1ValidatorsIterator(
 		s.activeL1Validators.newIterator(),
 	), nil
 }
 
-func (s *state) NumActiveL1Validators() int {
+func (s *State) NumActiveL1Validators() int {
 	return s.activeL1Validators.len() + s.l1ValidatorsDiff.netAddedActive
 }
 
-func (s *state) WeightOfL1Validators(subnetID ids.ID) (uint64, error) {
+func (s *State) WeightOfL1Validators(subnetID ids.ID) (uint64, error) {
 	if weight, modified := s.l1ValidatorsDiff.modifiedTotalWeight[subnetID]; modified {
 		return weight, nil
 	}
@@ -958,7 +836,7 @@ func (s *state) WeightOfL1Validators(subnetID ids.ID) (uint64, error) {
 }
 
 // GetL1Validator allows for concurrent reads.
-func (s *state) GetL1Validator(validationID ids.ID) (L1Validator, error) {
+func (s *State) GetL1Validator(validationID ids.ID) (L1Validator, error) {
 	if l1Validator, modified := s.l1ValidatorsDiff.modified[validationID]; modified {
 		if l1Validator.isDeleted() {
 			return L1Validator{}, database.ErrNotFound
@@ -972,7 +850,7 @@ func (s *state) GetL1Validator(validationID ids.ID) (L1Validator, error) {
 // getPersistedL1Validator returns the currently persisted
 // L1Validator with the given validationID. It is guaranteed that any
 // returned validator is either active or inactive (not deleted).
-func (s *state) getPersistedL1Validator(validationID ids.ID) (L1Validator, error) {
+func (s *State) getPersistedL1Validator(validationID ids.ID) (L1Validator, error) {
 	if l1Validator, ok := s.activeL1Validators.get(validationID); ok {
 		return l1Validator, nil
 	}
@@ -980,7 +858,7 @@ func (s *state) getPersistedL1Validator(validationID ids.ID) (L1Validator, error
 	return getL1Validator(s.inactiveCache, s.inactiveDB, validationID)
 }
 
-func (s *state) HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
+func (s *State) HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
 	if has, modified := s.l1ValidatorsDiff.hasL1Validator(subnetID, nodeID); modified {
 		return has, nil
 	}
@@ -1003,69 +881,69 @@ func (s *state) HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error)
 	return has, nil
 }
 
-func (s *state) PutL1Validator(l1Validator L1Validator) error {
+func (s *State) PutL1Validator(l1Validator L1Validator) error {
 	return s.l1ValidatorsDiff.putL1Validator(s, l1Validator)
 }
 
-func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+func (s *State) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	return s.currentStakers.GetValidator(subnetID, nodeID)
 }
 
-func (s *state) PutCurrentValidator(staker *Staker) error {
+func (s *State) PutCurrentValidator(staker *Staker) error {
 	s.currentStakers.PutValidator(staker)
 	return nil
 }
 
-func (s *state) DeleteCurrentValidator(staker *Staker) {
+func (s *State) DeleteCurrentValidator(staker *Staker) {
 	s.currentStakers.DeleteValidator(staker)
 }
 
-func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
+func (s *State) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
-func (s *state) PutCurrentDelegator(staker *Staker) {
+func (s *State) PutCurrentDelegator(staker *Staker) {
 	s.currentStakers.PutDelegator(staker)
 }
 
-func (s *state) DeleteCurrentDelegator(staker *Staker) {
+func (s *State) DeleteCurrentDelegator(staker *Staker) {
 	s.currentStakers.DeleteDelegator(staker)
 }
 
-func (s *state) GetCurrentStakerIterator() (iterator.Iterator[*Staker], error) {
+func (s *State) GetCurrentStakerIterator() (iterator.Iterator[*Staker], error) {
 	return s.currentStakers.GetStakerIterator(), nil
 }
 
-func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+func (s *State) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	return s.pendingStakers.GetValidator(subnetID, nodeID)
 }
 
-func (s *state) PutPendingValidator(staker *Staker) error {
+func (s *State) PutPendingValidator(staker *Staker) error {
 	s.pendingStakers.PutValidator(staker)
 	return nil
 }
 
-func (s *state) DeletePendingValidator(staker *Staker) {
+func (s *State) DeletePendingValidator(staker *Staker) {
 	s.pendingStakers.DeleteValidator(staker)
 }
 
-func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
+func (s *State) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	return s.pendingStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
-func (s *state) PutPendingDelegator(staker *Staker) {
+func (s *State) PutPendingDelegator(staker *Staker) {
 	s.pendingStakers.PutDelegator(staker)
 }
 
-func (s *state) DeletePendingDelegator(staker *Staker) {
+func (s *State) DeletePendingDelegator(staker *Staker) {
 	s.pendingStakers.DeleteDelegator(staker)
 }
 
-func (s *state) GetPendingStakerIterator() (iterator.Iterator[*Staker], error) {
+func (s *State) GetPendingStakerIterator() (iterator.Iterator[*Staker], error) {
 	return s.pendingStakers.GetStakerIterator(), nil
 }
 
-func (s *state) GetSubnetIDs() ([]ids.ID, error) {
+func (s *State) GetSubnetIDs() ([]ids.ID, error) {
 	if s.cachedSubnetIDs != nil {
 		return s.cachedSubnetIDs, nil
 	}
@@ -1090,14 +968,14 @@ func (s *state) GetSubnetIDs() ([]ids.ID, error) {
 	return subnetIDs, nil
 }
 
-func (s *state) AddSubnet(subnetID ids.ID) {
+func (s *State) AddSubnet(subnetID ids.ID) {
 	s.addedSubnetIDs = append(s.addedSubnetIDs, subnetID)
 	if s.cachedSubnetIDs != nil {
 		s.cachedSubnetIDs = append(s.cachedSubnetIDs, subnetID)
 	}
 }
 
-func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
+func (s *State) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	if owner, exists := s.subnetOwners[subnetID]; exists {
 		return owner, nil
 	}
@@ -1142,12 +1020,12 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	return subnet.Owner, nil
 }
 
-func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
+func (s *State) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	s.subnetOwners[subnetID] = owner
 }
 
 // GetSubnetToL1Conversion allows for concurrent reads.
-func (s *state) GetSubnetToL1Conversion(subnetID ids.ID) (SubnetToL1Conversion, error) {
+func (s *State) GetSubnetToL1Conversion(subnetID ids.ID) (SubnetToL1Conversion, error) {
 	if c, ok := s.subnetToL1Conversions[subnetID]; ok {
 		return c, nil
 	}
@@ -1169,11 +1047,11 @@ func (s *state) GetSubnetToL1Conversion(subnetID ids.ID) (SubnetToL1Conversion, 
 	return c, nil
 }
 
-func (s *state) SetSubnetToL1Conversion(subnetID ids.ID, c SubnetToL1Conversion) {
+func (s *State) SetSubnetToL1Conversion(subnetID ids.ID, c SubnetToL1Conversion) {
 	s.subnetToL1Conversions[subnetID] = c
 }
 
-func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
+func (s *State) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 	if tx, exists := s.transformedSubnets[subnetID]; exists {
 		return tx, nil
 	}
@@ -1202,12 +1080,12 @@ func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 	return transformSubnetTx, nil
 }
 
-func (s *state) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
+func (s *State) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
 	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
 	s.transformedSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
 }
 
-func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
+func (s *State) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	if chains, cached := s.chainCache.Get(subnetID); cached {
 		return chains, nil
 	}
@@ -1236,7 +1114,7 @@ func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	return txs, nil
 }
 
-func (s *state) AddChain(createChainTxIntf *txs.Tx) {
+func (s *State) AddChain(createChainTxIntf *txs.Tx) {
 	createChainTx := createChainTxIntf.Unsigned.(*txs.CreateChainTx)
 	subnetID := createChainTx.SubnetID
 	s.addedChains[subnetID] = append(s.addedChains[subnetID], createChainTxIntf)
@@ -1246,7 +1124,7 @@ func (s *state) AddChain(createChainTxIntf *txs.Tx) {
 	}
 }
 
-func (s *state) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
+func (s *State) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
 	if chainDB, cached := s.chainDBCache.Get(subnetID); cached {
 		return chainDB
 	}
@@ -1256,7 +1134,7 @@ func (s *state) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
 	return chainDB
 }
 
-func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
+func (s *State) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
 	}
@@ -1293,14 +1171,14 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	return ptx.tx, ptx.status, nil
 }
 
-func (s *state) AddTx(tx *txs.Tx, status status.Status) {
+func (s *State) AddTx(tx *txs.Tx, status status.Status) {
 	s.addedTxs[tx.ID()] = &txAndStatus{
 		tx:     tx,
 		status: status,
 	}
 }
 
-func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
+func (s *State) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	if utxos, exists := s.addedRewardUTXOs[txID]; exists {
 		return utxos, nil
 	}
@@ -1329,11 +1207,11 @@ func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	return utxos, nil
 }
 
-func (s *state) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
+func (s *State) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
 	s.addedRewardUTXOs[txID] = append(s.addedRewardUTXOs[txID], utxo)
 }
 
-func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+func (s *State) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	if utxo, exists := s.modifiedUTXOs[utxoID]; exists {
 		if utxo == nil {
 			return nil, database.ErrNotFound
@@ -1343,19 +1221,19 @@ func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	return s.utxoState.GetUTXO(utxoID)
 }
 
-func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+func (s *State) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
 	return s.utxoState.UTXOIDs(addr, start, limit)
 }
 
-func (s *state) AddUTXO(utxo *avax.UTXO) {
+func (s *State) AddUTXO(utxo *avax.UTXO) {
 	s.modifiedUTXOs[utxo.InputID()] = utxo
 }
 
-func (s *state) DeleteUTXO(utxoID ids.ID) {
+func (s *State) DeleteUTXO(utxoID ids.ID) {
 	s.modifiedUTXOs[utxoID] = nil
 }
 
-func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
+func (s *State) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	staker, err := s.currentStakers.GetValidator(constants.PrimaryNetworkID, nodeID)
 	if err != nil {
 		return time.Time{}, err
@@ -1364,47 +1242,47 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 }
 
 // GetTimestamp allows for concurrent reads.
-func (s *state) GetTimestamp() time.Time {
+func (s *State) GetTimestamp() time.Time {
 	return s.timestamp
 }
 
-func (s *state) SetTimestamp(tm time.Time) {
+func (s *State) SetTimestamp(tm time.Time) {
 	s.timestamp = tm
 }
 
-func (s *state) GetFeeState() gas.State {
+func (s *State) GetFeeState() gas.State {
 	return s.feeState
 }
 
-func (s *state) SetFeeState(feeState gas.State) {
+func (s *State) SetFeeState(feeState gas.State) {
 	s.feeState = feeState
 }
 
-func (s *state) GetL1ValidatorExcess() gas.Gas {
+func (s *State) GetL1ValidatorExcess() gas.Gas {
 	return s.l1ValidatorExcess
 }
 
-func (s *state) SetL1ValidatorExcess(e gas.Gas) {
+func (s *State) SetL1ValidatorExcess(e gas.Gas) {
 	s.l1ValidatorExcess = e
 }
 
-func (s *state) GetAccruedFees() uint64 {
+func (s *State) GetAccruedFees() uint64 {
 	return s.accruedFees
 }
 
-func (s *state) SetAccruedFees(accruedFees uint64) {
+func (s *State) SetAccruedFees(accruedFees uint64) {
 	s.accruedFees = accruedFees
 }
 
-func (s *state) GetLastAccepted() ids.ID {
+func (s *State) GetLastAccepted() ids.ID {
 	return s.lastAccepted
 }
 
-func (s *state) SetLastAccepted(lastAccepted ids.ID) {
+func (s *State) SetLastAccepted(lastAccepted ids.ID) {
 	s.lastAccepted = lastAccepted
 }
 
-func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
+func (s *State) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 	if subnetID == constants.PrimaryNetworkID {
 		return s.currentSupply, nil
 	}
@@ -1435,7 +1313,7 @@ func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 	return supply, nil
 }
 
-func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
+func (s *State) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	if subnetID == constants.PrimaryNetworkID {
 		s.currentSupply = cs
 	} else {
@@ -1443,7 +1321,18 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	}
 }
 
-func (s *state) ApplyAllValidatorWeightDiffs(
+// ApplyAllValidatorWeightDiffs iterates from `startHeight` towards the genesis
+// block until it has applied all of the diffs up to and including
+// `endHeight`. Applying the diffs modifies `validators`.
+//
+// Invariant: If attempting to generate the validator set for
+// `endHeight - 1`, `validators` must initially contain the validator
+// weights for `startHeight`.
+//
+// Note: Because this function iterates towards the genesis, `startHeight`
+// will typically be greater than or equal to `endHeight`. If `startHeight`
+// is less than `endHeight`, no diffs will be applied.
+func (s *State) ApplyAllValidatorWeightDiffs(
 	ctx context.Context,
 	allValidators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
@@ -1508,7 +1397,18 @@ func (s *state) ApplyAllValidatorWeightDiffs(
 	return diffIter.Error()
 }
 
-func (s *state) ApplyValidatorWeightDiffs(
+// ApplyValidatorWeightDiffs iterates from `startHeight` towards the genesis
+// block until it has applied all of the diffs up to and including
+// `endHeight`. Applying the diffs modifies `validators`.
+//
+// Invariant: If attempting to generate the validator set for
+// `endHeight - 1`, `validators` must initially contain the validator
+// weights for `startHeight`.
+//
+// Note: Because this function iterates towards the genesis, `startHeight`
+// will typically be greater than or equal to `endHeight`. If `startHeight`
+// is less than `endHeight`, no diffs will be applied.
+func (s *State) ApplyValidatorWeightDiffs(
 	ctx context.Context,
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
@@ -1600,7 +1500,18 @@ func applyWeightDiff(
 	return nil
 }
 
-func (s *state) ApplyAllValidatorPublicKeyDiffs(
+// ApplyAllValidatorPublicKeyDiffs iterates from `startHeight` towards the
+// genesis block until it has applied all of the diffs up to and including
+// `endHeight`. Applying the diffs modifies `validators`.
+//
+// Invariant: If attempting to generate the validator set for
+// `endHeight - 1`, `validators` must initially contain the validator
+// weights for `startHeight`.
+//
+// Note: Because this function iterates towards the genesis, `startHeight`
+// will typically be greater than or equal to `endHeight`. If `startHeight`
+// is less than `endHeight`, no diffs will be applied.
+func (s *State) ApplyAllValidatorPublicKeyDiffs(
 	ctx context.Context,
 	allValidators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
@@ -1645,7 +1556,18 @@ func (s *state) ApplyAllValidatorPublicKeyDiffs(
 	return diffIter.Error()
 }
 
-func (s *state) ApplyValidatorPublicKeyDiffs(
+// ApplyValidatorPublicKeyDiffs iterates from `startHeight` towards the
+// genesis block until it has applied all of the diffs up to and including
+// `endHeight`. Applying the diffs modifies `validators`.
+//
+// Invariant: If attempting to generate the validator set for
+// `endHeight - 1`, `validators` must initially contain the validator
+// weights for `startHeight`.
+//
+// Note: Because this function iterates towards the genesis, `startHeight`
+// will typically be greater than or equal to `endHeight`. If `startHeight`
+// is less than `endHeight`, no diffs will be applied.
+func (s *State) ApplyValidatorPublicKeyDiffs(
 	ctx context.Context,
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
@@ -1695,7 +1617,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	return diffIter.Error()
 }
 
-func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
+func (s *State) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
@@ -1774,7 +1696,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 }
 
 // Load pulls data previously stored on disk that is expected to be in memory.
-func (s *state) load() error {
+func (s *State) load() error {
 	return errors.Join(
 		s.loadMetadata(),
 		s.loadExpiry(),
@@ -1785,7 +1707,7 @@ func (s *state) load() error {
 	)
 }
 
-func (s *state) loadMetadata() error {
+func (s *State) loadMetadata() error {
 	timestamp, err := database.GetTimestamp(s.singletonDB, TimestampKey)
 	if err != nil {
 		return err
@@ -1857,7 +1779,7 @@ func (s *state) loadMetadata() error {
 	return nil
 }
 
-func (s *state) loadExpiry() error {
+func (s *State) loadExpiry() error {
 	it := s.expiryDB.NewIterator()
 	defer it.Release()
 
@@ -1874,7 +1796,7 @@ func (s *state) loadExpiry() error {
 	return nil
 }
 
-func (s *state) loadActiveL1Validators() error {
+func (s *State) loadActiveL1Validators() error {
 	it := s.activeDB.NewIterator()
 	defer it.Release()
 	for it.Next() {
@@ -1900,7 +1822,7 @@ func (s *state) loadActiveL1Validators() error {
 	return nil
 }
 
-func (s *state) loadCurrentValidators() error {
+func (s *State) loadCurrentValidators() error {
 	s.currentStakers = newBaseStakers()
 
 	validatorIt := s.currentValidatorList.NewIterator()
@@ -2070,7 +1992,7 @@ func (s *state) loadCurrentValidators() error {
 	)
 }
 
-func (s *state) loadPendingValidators() error {
+func (s *State) loadPendingValidators() error {
 	s.pendingStakers = newBaseStakers()
 
 	validatorIt := s.pendingValidatorList.NewIterator()
@@ -2156,7 +2078,7 @@ func (s *state) loadPendingValidators() error {
 
 // Invariant: initValidatorSets requires loadActiveL1Validators and
 // loadCurrentValidators to have already been called.
-func (s *state) initValidatorSets() error {
+func (s *State) initValidatorSets() error {
 	if s.validators.NumSubnets() != 0 {
 		// Enforce the invariant that the validator set is empty here.
 		return errValidatorSetAlreadyPopulated
@@ -2246,7 +2168,7 @@ func (s *state) initValidatorSets() error {
 	return nil
 }
 
-func (s *state) write(updateValidators bool, height uint64) error {
+func (s *State) write(updateValidators bool, height uint64) error {
 	codecVersion := CodecVersion1
 	if !s.upgrades.IsDurangoActivated(s.GetTimestamp()) {
 		codecVersion = CodecVersion0
@@ -2273,7 +2195,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	)
 }
 
-func (s *state) Close() error {
+func (s *State) Close() error {
 	return errors.Join(
 		s.expiryDB.Close(),
 		s.weightsDB.Close(),
@@ -2306,7 +2228,7 @@ func (s *state) Close() error {
 	)
 }
 
-func (s *state) sync(genesis []byte) error {
+func (s *State) sync(genesis []byte) error {
 	wasInitialized, err := isInitialized(s.singletonDB)
 	if err != nil {
 		return fmt.Errorf(
@@ -2335,7 +2257,7 @@ func (s *state) sync(genesis []byte) error {
 	return nil
 }
 
-func (s *state) init(genesisBytes []byte) error {
+func (s *State) init(genesisBytes []byte) error {
 	// Create the genesis block and save it as being accepted (We don't do
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
@@ -2360,13 +2282,15 @@ func (s *state) init(genesisBytes []byte) error {
 	return s.Commit()
 }
 
-func (s *state) AddStatelessBlock(block block.Block) {
+// AddStatelessBlock stores block as an accepted block.
+// Invariant: [block] is an accepted block.
+func (s *State) AddStatelessBlock(block block.Block) {
 	blkID := block.ID()
 	s.addedBlockIDs[block.Height()] = blkID
 	s.addedBlocks[blkID] = block
 }
 
-func (s *state) SetHeight(height uint64) {
+func (s *State) SetHeight(height uint64) {
 	if s.indexedHeights == nil {
 		// If indexedHeights hasn't been created yet, then we are newly tracking
 		// the range. This means we should initialize the LowerBound to the
@@ -2380,7 +2304,8 @@ func (s *state) SetHeight(height uint64) {
 	s.currentHeight = height
 }
 
-func (s *state) Commit() error {
+// Commit commits changes to the base database.
+func (s *State) Commit() error {
 	defer s.Abort()
 	batch, err := s.CommitBatch()
 	if err != nil {
@@ -2389,15 +2314,18 @@ func (s *state) Commit() error {
 	return batch.Write()
 }
 
-func (s *state) Abort() {
+// Abort discards uncommitted changes to the database.
+func (s *State) Abort() {
 	s.baseDB.Abort()
 }
 
-func (s *state) Checksum() ids.ID {
+func (s *State) Checksum() ids.ID {
 	return s.utxoState.Checksum()
 }
 
-func (s *state) CommitBatch() (database.Batch, error) {
+// CommitBatch returns a batch of unwritten changes that, when written, will
+// commit all pending changes to the base database.
+func (s *State) CommitBatch() (database.Batch, error) {
 	// updateValidators is set to true here so that the validator manager is
 	// kept up to date with the last accepted state.
 	if err := s.write(true /*=updateValidators*/, s.currentHeight); err != nil {
@@ -2406,7 +2334,7 @@ func (s *state) CommitBatch() (database.Batch, error) {
 	return s.baseDB.CommitBatch()
 }
 
-func (s *state) writeBlocks() error {
+func (s *State) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
 		blkBytes := blk.Bytes()
 		blkHeight := blk.Height()
@@ -2430,7 +2358,7 @@ func (s *state) writeBlocks() error {
 	return nil
 }
 
-func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
+func (s *State) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 	if blk, exists := s.addedBlocks[blockID]; exists {
 		return blk, nil
 	}
@@ -2460,7 +2388,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 	return blk, nil
 }
 
-func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+func (s *State) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if blkID, exists := s.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
@@ -2487,7 +2415,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return blkID, nil
 }
 
-func (s *state) writeExpiry() error {
+func (s *State) writeExpiry() error {
 	for entry, isAdded := range s.expiryDiff.modified {
 		var (
 			key = entry.Marshal()
@@ -2554,7 +2482,7 @@ func getPublicKeyDiff(
 // writeL1Validators.
 //
 // TODO: L1s with no active weight should not be held in memory.
-func (s *state) updateValidatorManager(updateValidators bool) error {
+func (s *State) updateValidatorManager(updateValidators bool) error {
 	if !updateValidators {
 		return nil
 	}
@@ -2698,7 +2626,7 @@ type validatorDiff struct {
 // pending validator set changes.
 //
 // This function must be called prior to writeCurrentStakers.
-func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, error) {
+func (s *State) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, error) {
 	changes := make(map[subnetIDNodeID]*validatorDiff)
 
 	// Calculate the changes to the pre-ACP-77 validator set
@@ -2776,7 +2704,7 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 // validator set changes to disk.
 //
 // This function must be called prior to writeCurrentStakers.
-func (s *state) writeValidatorDiffs(height uint64) error {
+func (s *State) writeValidatorDiffs(height uint64) error {
 	changes, err := s.calculateValidatorDiffs()
 	if err != nil {
 		return err
@@ -2835,7 +2763,7 @@ func getOrSetDefault[K comparable, V any](m map[K]*V, k K) *V {
 	return v
 }
 
-func (s *state) writeCurrentStakers(codecVersion uint16) error {
+func (s *State) writeCurrentStakers(codecVersion uint16) error {
 	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
 		delegatorDB := s.currentSubnetDelegatorList
 		if subnetID == constants.PrimaryNetworkID {
@@ -2922,7 +2850,7 @@ func writeCurrentDelegatorDiff(
 	return nil
 }
 
-func (s *state) writePendingStakers() error {
+func (s *State) writePendingStakers() error {
 	for subnetID, subnetValidatorDiffs := range s.pendingStakers.validatorDiffs {
 		delete(s.pendingStakers.validatorDiffs, subnetID)
 
@@ -2985,7 +2913,7 @@ func writePendingDiff(
 	return nil
 }
 
-func (s *state) writeL1Validators() error {
+func (s *State) writeL1Validators() error {
 	// Write modified weights
 	for subnetID, weight := range s.l1ValidatorsDiff.modifiedTotalWeight {
 		var err error
@@ -3071,7 +2999,7 @@ func (s *state) writeL1Validators() error {
 	return nil
 }
 
-func (s *state) writeTXs() error {
+func (s *State) writeTXs() error {
 	for txID, txStatus := range s.addedTxs {
 		stx := txBytesAndStatus{
 			Tx:     txStatus.tx.Bytes(),
@@ -3097,7 +3025,7 @@ func (s *state) writeTXs() error {
 	return nil
 }
 
-func (s *state) writeRewardUTXOs() error {
+func (s *State) writeRewardUTXOs() error {
 	for txID, utxos := range s.addedRewardUTXOs {
 		delete(s.addedRewardUTXOs, txID)
 		s.rewardUTXOsCache.Put(txID, utxos)
@@ -3118,7 +3046,7 @@ func (s *state) writeRewardUTXOs() error {
 	return nil
 }
 
-func (s *state) writeUTXOs() error {
+func (s *State) writeUTXOs() error {
 	for utxoID, utxo := range s.modifiedUTXOs {
 		delete(s.modifiedUTXOs, utxoID)
 
@@ -3135,7 +3063,7 @@ func (s *state) writeUTXOs() error {
 	return nil
 }
 
-func (s *state) writeSubnets() error {
+func (s *State) writeSubnets() error {
 	for _, subnetID := range s.addedSubnetIDs {
 		if err := s.subnetDB.Put(subnetID[:], nil); err != nil {
 			return fmt.Errorf("failed to write subnet: %w", err)
@@ -3145,7 +3073,7 @@ func (s *state) writeSubnets() error {
 	return nil
 }
 
-func (s *state) writeSubnetOwners() error {
+func (s *State) writeSubnetOwners() error {
 	for subnetID, owner := range s.subnetOwners {
 		delete(s.subnetOwners, subnetID)
 
@@ -3166,7 +3094,7 @@ func (s *state) writeSubnetOwners() error {
 	return nil
 }
 
-func (s *state) writeSubnetToL1Conversions() error {
+func (s *State) writeSubnetToL1Conversions() error {
 	for subnetID, c := range s.subnetToL1Conversions {
 		delete(s.subnetToL1Conversions, subnetID)
 
@@ -3184,7 +3112,7 @@ func (s *state) writeSubnetToL1Conversions() error {
 	return nil
 }
 
-func (s *state) writeTransformedSubnets() error {
+func (s *State) writeTransformedSubnets() error {
 	for subnetID, tx := range s.transformedSubnets {
 		txID := tx.ID()
 
@@ -3200,7 +3128,7 @@ func (s *state) writeTransformedSubnets() error {
 	return nil
 }
 
-func (s *state) writeSubnetSupplies() error {
+func (s *State) writeSubnetSupplies() error {
 	for subnetID, supply := range s.modifiedSupplies {
 		delete(s.modifiedSupplies, subnetID)
 		s.supplyCache.Put(subnetID, &supply)
@@ -3211,7 +3139,7 @@ func (s *state) writeSubnetSupplies() error {
 	return nil
 }
 
-func (s *state) writeChains() error {
+func (s *State) writeChains() error {
 	for subnetID, chains := range s.addedChains {
 		for _, chain := range chains {
 			chainDB := s.getChainDB(subnetID)
@@ -3226,7 +3154,7 @@ func (s *state) writeChains() error {
 	return nil
 }
 
-func (s *state) writeMetadata() error {
+func (s *State) writeMetadata() error {
 	if !s.persistedTimestamp.Equal(s.timestamp) {
 		if err := database.PutTimestamp(s.singletonDB, TimestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
@@ -3296,7 +3224,12 @@ func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
 	return blk, true, err
 }
 
-func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
+// ReindexBlocks converts any block indices using the legacy storage format to
+// the new format. If this database has already updated the indices, this
+// function will return immediately, without iterating over the database.
+//
+// TODO: Remove after v1.14.x is activated
+func (s *State) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 	has, err := s.singletonDB.Has(BlocksReindexedKey)
 	if err != nil {
 		return err
@@ -3431,11 +3364,11 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 	return s.Commit()
 }
 
-func (s *state) GetUptime(vdrID ids.NodeID) (time.Duration, time.Time, error) {
+func (s *State) GetUptime(vdrID ids.NodeID) (time.Duration, time.Time, error) {
 	return s.validatorState.GetUptime(vdrID, constants.PrimaryNetworkID)
 }
 
-func (s *state) SetUptime(vdrID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
+func (s *State) SetUptime(vdrID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
 	return s.validatorState.SetUptime(vdrID, constants.PrimaryNetworkID, upDuration, lastUpdated)
 }
 
