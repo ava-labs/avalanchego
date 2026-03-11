@@ -81,7 +81,7 @@ go_test(
         "//vms/platformvm/txs/mempool",
         "//vms/platformvm/txs/txstest",
         "//vms/platformvm/utxo",
-        "//vms/platformvm/validators/validatorstest",
+        "//vms/platformvm/validators",
         "//vms/secp256k1fx",
         "//wallet/chain/p/wallet",
         "@com_github_prometheus_client_golang//prometheus",

@@ -15,10 +15,11 @@ go_library(
         "//ids",
         "//snow",
         "//snow/validators",
+        "//utils/buffer",
         "//utils/heap",
         "//utils/math",
         "//utils/set",
-        "//utils/timer/mockable",
+        "//utils/timer",
         "@com_github_prometheus_client_golang//prometheus",
         "@org_uber_go_zap//:zap",
     ],
@@ -27,15 +28,18 @@ go_library(
 go_test(
     name = "benchlist_test",
     srcs = [
-        "benchable_test.go",
         "benchlist_test.go",
+        "manager_test.go",
     ],
     embed = [":benchlist"],
     deps = [
+        "//api/metrics",
         "//ids",
         "//snow/snowtest",
         "//snow/validators",
+        "//utils/set",
         "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/testutil",
         "@com_github_stretchr_testify//require",
     ],
 )
