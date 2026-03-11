@@ -31,7 +31,7 @@ type backend struct {
 	// Note that Genesis block is a commit block so no need to update
 	// blkIDToState with it upon backend creation (Genesis is already accepted)
 	blkIDToState map[ids.ID]*blockState
-	state        state.State
+	state        *state.State
 
 	ctx *snow.Context
 }
