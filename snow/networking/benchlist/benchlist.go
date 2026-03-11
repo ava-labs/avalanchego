@@ -381,19 +381,18 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 	// so that benching the incoming node does not exceed the max portion.
 	targetEvictStake := newBenchedStake - uint64(maxBenchedStake)
 
+	// TODO: If this path shows up hot, avoid the O(n) scan/sort here by keeping
+	// benched nodes in a structure ordered by failure probability. We currently
+	// prefer simpler per-observation bookkeeping and pay this cost only when a
+	// node crosses the bench threshold while the benchlist is at capacity.
 	// Scan the currently benched nodes and find all potential eviction candidates.
-	candidates := make([]*node, 0)
+	var candidates []*node
 	for _, node := range b.nodes {
 		if !node.isBenched || node.failureProbability.Read() > incomingFailureProbability {
 			continue
 		}
 
 		candidates = append(candidates, node)
-	}
-	// If there are no candidates for eviction, skip benching the incoming node
-	// because the entire currently benched set has a higher failure probability.
-	if len(candidates) == 0 {
-		return false
 	}
 	// Sort the candidates in ascending order of failure probability.
 	// We want to select nodes in ascending order of failure probability, so that we
@@ -404,12 +403,14 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 	})
 
 	// Select a sufficient set of candidates to evict to make room for the incoming node.
-	evictedStake := uint64(0)
-	evictNodes := make([]*node, 0, len(candidates)/2)
-	for _, candidate := range candidates {
+	var (
+		evictedStake uint64
+		evictNodes   []*node
+	)
+	for i, candidate := range candidates {
 		candidateStake := b.vdrs.GetWeight(b.ctx.SubnetID, candidate.nodeID)
 		evictedStake += candidateStake
-		evictNodes = append(evictNodes, candidate)
+		evictNodes = candidates[:i+1]
 		if evictedStake >= targetEvictStake {
 			break
 		}
