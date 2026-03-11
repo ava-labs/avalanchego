@@ -79,7 +79,7 @@ type environment struct {
 	ctx            *snow.Context
 	msm            *mutableSharedMemory
 	fx             fx.Fx
-	state          state.State
+	state          *state.State
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
 	backend        txexecutor.Backend
@@ -252,7 +252,7 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(err)
 
 	genesisID := env.state.GetLastAccepted()
-	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
+	stateDiff, err := state.NewDiff(genesisID, env.blkManager, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
