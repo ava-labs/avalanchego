@@ -60,7 +60,13 @@ type event struct {
 type node struct {
 	nodeID             ids.NodeID
 	failureProbability math.Averager
+	currentFailureProb float64
 	isBenched          bool
+}
+
+type benchOrderEntry struct {
+	nodeID             ids.NodeID
+	failureProbability float64
 }
 
 // If a remote node does not respond to a request, the local node waits for a
@@ -103,8 +109,9 @@ type benchlist struct {
 	// synchronization because external goroutines communicate observations via
 	// [events], and these fields are only read/written while processing those
 	// queued events (or timer fires) in [run].
-	nodes       map[ids.NodeID]*node
-	timeoutHeap heap.Map[ids.NodeID, time.Time]
+	nodes            map[ids.NodeID]*node
+	timeoutHeap      heap.Map[ids.NodeID, time.Time]
+	benchedByFailure heap.Map[ids.NodeID, benchOrderEntry]
 
 	// Protects only the benched set snapshot. Written by the consumer goroutine
 	// after each state transition; read by IsBenched on any goroutine.
@@ -150,8 +157,14 @@ func newBenchlist(
 		eventReady:         make(chan struct{}, 1),
 		nodes:              make(map[ids.NodeID]*node),
 		timeoutHeap:        heap.NewMap[ids.NodeID, time.Time](time.Time.Before),
-		shutdownChan:       make(chan struct{}),
-		shutdownDone:       make(chan struct{}),
+		benchedByFailure: heap.NewMap[ids.NodeID, benchOrderEntry](func(a, b benchOrderEntry) bool {
+			if a.failureProbability != b.failureProbability {
+				return a.failureProbability < b.failureProbability
+			}
+			return a.nodeID.Compare(b.nodeID) < 0
+		}),
+		shutdownChan: make(chan struct{}),
+		shutdownDone: make(chan struct{}),
 	}
 
 	err := errors.Join(
@@ -246,6 +259,13 @@ func (b *benchlist) processEvents() {
 // processObservation updates a node's EWMA and transitions bench state if the
 // failure probability crosses a threshold.
 func (b *benchlist) processObservation(ev event) {
+	b.processObservationWithMakeRoom(ev, b.tryMakeRoom)
+}
+
+func (b *benchlist) processObservationWithMakeRoom(
+	ev event,
+	tryMakeRoom func(ids.NodeID, float64) bool,
+) {
 	nodeID := ev.nodeID
 
 	n, ok := b.nodes[nodeID]
@@ -261,21 +281,33 @@ func (b *benchlist) processObservation(ev event) {
 		n = &node{
 			nodeID:             nodeID,
 			failureProbability: b.newFailureProbabilityAverager(ev.time),
+			currentFailureProb: success,
 		}
 		b.nodes[nodeID] = n
 	}
 
 	n.failureProbability.Observe(ev.value, ev.time)
 	p := n.failureProbability.Read()
+	n.currentFailureProb = p
+	if n.isBenched {
+		b.benchedByFailure.Push(nodeID, benchOrderEntry{
+			nodeID:             nodeID,
+			failureProbability: p,
+		})
+	}
 
 	switch {
 	case !n.isBenched && p > b.benchProbability:
-		if !b.tryMakeRoom(nodeID, p) {
+		if !tryMakeRoom(nodeID, p) {
 			return
 		}
 
 		n.isBenched = true
 		b.timeoutHeap.Push(nodeID, time.Now().Add(b.benchDuration))
+		b.benchedByFailure.Push(nodeID, benchOrderEntry{
+			nodeID:             nodeID,
+			failureProbability: p,
+		})
 
 		b.lock.Lock()
 		b.benched.Add(nodeID)
@@ -289,6 +321,7 @@ func (b *benchlist) processObservation(ev event) {
 	case n.isBenched && p < b.unbenchProbability:
 		n.isBenched = false
 		b.timeoutHeap.Remove(nodeID)
+		b.benchedByFailure.Remove(nodeID)
 
 		b.lock.Lock()
 		b.benched.Remove(nodeID)
@@ -322,6 +355,8 @@ func (b *benchlist) processTimeouts() {
 		n.isBenched = false
 		oldFailureProbability := n.failureProbability.Read()
 		n.failureProbability = b.newFailureProbabilityAverager(now)
+		n.currentFailureProb = n.failureProbability.Read()
+		b.benchedByFailure.Remove(nodeID)
 
 		b.lock.Lock()
 		b.benched.Remove(nodeID)
@@ -341,20 +376,15 @@ func (b *benchlist) newFailureProbabilityAverager(now time.Time) math.Averager {
 	return math.NewAverager(success, b.halflife, now)
 }
 
-// tryMakeRoom checks whether benching nodeID fits within maxPortion.
-// If it fits directly, returns true. If not, it attempts greedy eviction:
-// find the least-failing set of benched nodes whose probability is strictly below
-// incomingFailureProbability, verify the stake swap fits, unbench the
-// victim, and return true. Returns false if benching is not possible.
-func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability float64) bool {
+func (b *benchlist) benchingFits(nodeID ids.NodeID) (uint64, error) {
 	incomingStake := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID)
 	if incomingStake == 0 {
-		return false
+		return 0, nil
 	}
 
 	benchedStake, err := b.benchedStake()
 	if err != nil {
-		return false
+		return 0, err
 	}
 
 	totalStake, err := b.vdrs.TotalWeight(b.ctx.SubnetID)
@@ -363,7 +393,7 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 			zap.Stringer("subnetID", b.ctx.SubnetID),
 			zap.Error(err),
 		)
-		return false
+		return 0, err
 	}
 
 	maxBenchedStake := float64(totalStake) * b.maxPortion
@@ -376,24 +406,95 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 			zap.Uint64("benchedStake", benchedStake),
 			zap.Uint64("incomingStake", incomingStake),
 		)
-		return false
+		return 0, err
 	}
 	if float64(newBenchedStake) <= maxBenchedStake {
-		return true
+		return 0, nil
 	}
 
 	// If benching exceeds the max portion, we must evict >= targetEvictStake
 	// so that benching the incoming node does not exceed the max portion.
 	targetEvictStake := newBenchedStake - uint64(maxBenchedStake)
+	return targetEvictStake, nil
+}
 
-	// TODO: If this path shows up hot, avoid the O(n) scan/sort here by keeping
-	// benched nodes in a structure ordered by failure probability. We currently
-	// prefer simpler per-observation bookkeeping and pay this cost only when a
-	// node crosses the bench threshold while the benchlist is at capacity.
+// tryMakeRoom checks whether benching nodeID fits within maxPortion.
+// If it fits directly, returns true. If not, it greedily evicts the currently
+// benched nodes with the lowest failure probability that are still strictly
+// better than the incoming node. Returns false if benching is not possible.
+func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability float64) bool {
+	targetEvictStake, err := b.benchingFits(nodeID)
+	if err != nil {
+		return false
+	}
+	if targetEvictStake == 0 {
+		return true
+	}
+
+	var (
+		evictedStake uint64
+		evictEntries []benchOrderEntry
+	)
+	for evictedStake < targetEvictStake {
+		entry, ok := b.peekEvictionCandidate()
+		if !ok || entry.failureProbability >= incomingFailureProbability {
+			break
+		}
+
+		b.benchedByFailure.Pop()
+		evictEntries = append(evictEntries, entry)
+		evictedStake += b.vdrs.GetWeight(b.ctx.SubnetID, entry.nodeID)
+	}
+
+	if evictedStake < targetEvictStake {
+		for _, entry := range evictEntries {
+			b.benchedByFailure.Push(entry.nodeID, entry)
+		}
+		b.logBenchRefused(nodeID, incomingFailureProbability, targetEvictStake, evictedStake)
+		return false
+	}
+
+	for _, entry := range evictEntries {
+		evictNode := b.nodes[entry.nodeID]
+		evictNode.isBenched = false
+		b.timeoutHeap.Remove(evictNode.nodeID)
+		b.lock.Lock()
+		b.benched.Remove(evictNode.nodeID)
+		b.lock.Unlock()
+		b.benchable.Unbenched(b.ctx.ChainID, evictNode.nodeID)
+	}
+
+	return true
+}
+
+func (b *benchlist) peekEvictionCandidate() (benchOrderEntry, bool) {
+	for {
+		_, entry, ok := b.benchedByFailure.Peek()
+		if !ok {
+			return benchOrderEntry{}, false
+		}
+		n, exists := b.nodes[entry.nodeID]
+		if exists && n.isBenched && n.currentFailureProb == entry.failureProbability {
+			return entry, true
+		}
+
+		b.benchedByFailure.Pop()
+	}
+}
+
+func (b *benchlist) tryMakeRoomByScanSort(nodeID ids.NodeID, incomingFailureProbability float64) bool {
+	targetEvictStake, err := b.benchingFits(nodeID)
+	if err != nil {
+		return false
+	}
+	if targetEvictStake == 0 {
+		return true
+	}
+
 	// Scan the currently benched nodes and find all potential eviction candidates.
 	var candidates []*node
 	for _, node := range b.nodes {
-		if !node.isBenched || node.failureProbability.Read() >= incomingFailureProbability {
+		if !node.isBenched || node.currentFailureProb >= incomingFailureProbability {
 			continue
 		}
 
@@ -404,7 +505,10 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 	// evict nodes from the benchlist with the lowest failure probability => maximize
 	// probability of successful queries.
 	slices.SortFunc(candidates, func(a, b *node) int {
-		return cmp.Compare(a.failureProbability.Read(), b.failureProbability.Read())
+		if a.currentFailureProb != b.currentFailureProb {
+			return cmp.Compare(a.currentFailureProb, b.currentFailureProb)
+		}
+		return a.nodeID.Compare(b.nodeID)
 	})
 
 	// Select a sufficient set of candidates to evict to make room for the incoming node.
@@ -424,15 +528,7 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 	// If we couldn't evict enough stake to make room for the incoming node, skip
 	// benching it and return early.
 	if evictedStake < targetEvictStake {
-		b.ctx.Log.Debug("not benching node",
-			zap.String("reason", "benched stake would exceed max"),
-			zap.Stringer("nodeID", nodeID),
-			zap.Float64("incomingFailureProbability", incomingFailureProbability),
-			zap.Float64("benchedStake", float64(newBenchedStake)),
-			zap.Float64("maxBenchedStake", maxBenchedStake),
-			zap.Float64("evictableStake", float64(evictedStake)),
-			zap.Float64("targetEvictStake", float64(targetEvictStake)),
-		)
+		b.logBenchRefused(nodeID, incomingFailureProbability, targetEvictStake, evictedStake)
 		return false
 	}
 
@@ -447,6 +543,38 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 	}
 
 	return true
+}
+
+func (b *benchlist) logBenchRefused(
+	nodeID ids.NodeID,
+	incomingFailureProbability float64,
+	targetEvictStake uint64,
+	evictedStake uint64,
+) {
+	benchedStake, err := b.benchedStake()
+	if err != nil {
+		return
+	}
+	totalStake, err := b.vdrs.TotalWeight(b.ctx.SubnetID)
+	if err != nil {
+		return
+	}
+	maxBenchedStake := float64(totalStake) * b.maxPortion
+	incomingStake := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID)
+	newBenchedStake, err := math.Add(benchedStake, incomingStake)
+	if err != nil {
+		return
+	}
+
+	b.ctx.Log.Debug("not benching node",
+		zap.String("reason", "benched stake would exceed max"),
+		zap.Stringer("nodeID", nodeID),
+		zap.Float64("incomingFailureProbability", incomingFailureProbability),
+		zap.Float64("benchedStake", float64(newBenchedStake)),
+		zap.Float64("maxBenchedStake", maxBenchedStake),
+		zap.Float64("evictableStake", float64(evictedStake)),
+		zap.Float64("targetEvictStake", float64(targetEvictStake)),
+	)
 }
 
 // benchedStake returns the total stake weight of currently benched validators.
