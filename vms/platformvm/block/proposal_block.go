@@ -18,9 +18,9 @@ var (
 )
 
 type BanffProposalBlock struct {
-	Time                 uint64    `serialize:"true" json:"time"`
-	Transactions         []*txs.Tx `serialize:"true" json:"txs"`
-	ApricotProposalBlock `serialize:"true"`
+	Time                 uint64             `serialize:"true" json:"time"`
+	Transactions         []*txs.Tx          `serialize:"true" json:"txs"`
+	ApricotProposalBlock `serialize:"true"` //nolint:embeddedstructfieldcheck
 }
 
 func (b *BanffProposalBlock) initialize(bytes []byte) error {
@@ -81,7 +81,8 @@ func NewBanffProposalBlock(
 
 type ApricotProposalBlock struct {
 	CommonBlock `serialize:"true"`
-	Tx          *txs.Tx `serialize:"true" json:"tx"`
+
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (b *ApricotProposalBlock) initialize(bytes []byte) error {

@@ -38,6 +38,7 @@ var (
 // verifier handles the logic for verifying a block.
 type verifier struct {
 	*backend
+
 	txExecutorBackend *executor.Backend
 	pChainHeight      uint64
 }

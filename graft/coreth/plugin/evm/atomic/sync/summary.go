@@ -21,7 +21,8 @@ var _ message.Syncable = (*Summary)(nil)
 // at the given block.
 type Summary struct {
 	*message.BlockSyncSummary `serialize:"true"`
-	AtomicRoot                common.Hash `serialize:"true"`
+
+	AtomicRoot common.Hash `serialize:"true"`
 
 	summaryID  ids.ID
 	bytes      []byte

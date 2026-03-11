@@ -31,6 +31,7 @@ type AddValidatorTx struct {
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
 	Validator `serialize:"true" json:"validator"`
+
 	// Where to send staked tokens when done validating
 	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating

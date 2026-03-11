@@ -47,8 +47,8 @@ type Genesis struct {
 }
 
 type GenesisAsset struct {
-	Alias             string `serialize:"true"`
-	txs.CreateAssetTx `serialize:"true"`
+	Alias             string             `serialize:"true"`
+	txs.CreateAssetTx `serialize:"true"` //nolint:embeddedstructfieldcheck
 }
 
 func (g *GenesisAsset) Compare(other *GenesisAsset) int {

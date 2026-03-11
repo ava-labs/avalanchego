@@ -33,6 +33,7 @@ type Owner struct {
 // PrimaryDelegator is the repr. of a primary network delegator sent over APIs.
 type PrimaryDelegator struct {
 	Staker
+
 	RewardOwner     *Owner       `json:"rewardOwner,omitempty"`
 	PotentialReward *json.Uint64 `json:"potentialReward,omitempty"`
 }
@@ -47,10 +48,11 @@ type UTXO struct {
 
 // APIL1Validator is the representation of a L1 validator sent over APIs.
 type APIL1Validator struct {
+	BaseL1Validator
+
 	NodeID    ids.NodeID  `json:"nodeID"`
 	Weight    json.Uint64 `json:"weight"`
 	StartTime json.Uint64 `json:"startTime"`
-	BaseL1Validator
 }
 
 // BaseL1Validator is the representation of a base L1 validator without the common parts with a staker.
@@ -72,6 +74,7 @@ type BaseL1Validator struct {
 type PermissionlessValidator struct {
 	Staker
 	BaseL1Validator
+
 	// The owner of the rewards from the validation period, if applicable.
 	ValidationRewardOwner *Owner `json:"validationRewardOwner,omitempty"`
 	// The owner of the rewards from delegations during the validation period,

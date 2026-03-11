@@ -36,6 +36,7 @@ func (db *limitIterationDB) NewIteratorWithStartAndPrefix(start, prefix []byte) 
 
 type limitIterationIterator struct {
 	database.Iterator
+
 	exhausted bool
 }
 

@@ -24,6 +24,7 @@ var (
 
 type preForkBlock struct {
 	snowman.Block
+
 	vm *VM
 }
 

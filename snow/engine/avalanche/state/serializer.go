@@ -36,6 +36,7 @@ var _ vertex.Manager = (*Serializer)(nil)
 // Serializer manages the state of multiple vertices
 type Serializer struct {
 	SerializerConfig
+
 	versionDB *versiondb.Database
 	state     *prefixedState
 	edge      set.Set[ids.ID]

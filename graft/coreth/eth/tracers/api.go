@@ -180,6 +180,7 @@ func (api *baseAPI) blockByNumberAndHash(ctx context.Context, number rpc.BlockNu
 // TraceConfig holds extra parameters to trace functions.
 type TraceConfig struct {
 	*logger.Config
+
 	Tracer  *string
 	Timeout *string
 	Reexec  *uint64
@@ -192,6 +193,7 @@ type TraceConfig struct {
 // field to override the state for tracing.
 type TraceCallConfig struct {
 	TraceConfig
+
 	StateOverrides *ethapi.StateOverride
 	BlockOverrides *ethapi.BlockOverrides
 	TxIndex        *hexutil.Uint
@@ -200,6 +202,7 @@ type TraceCallConfig struct {
 // StdTraceConfig holds extra parameters to standard-json trace functions.
 type StdTraceConfig struct {
 	logger.Config
+
 	Reexec *uint64
 	TxHash common.Hash
 }

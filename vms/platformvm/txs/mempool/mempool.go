@@ -35,6 +35,7 @@ var (
 
 type meteredTx struct {
 	*txs.Tx
+
 	// gasPrice is the amount of AVAX burned per unit of gas used by this tx
 	gasPrice float64
 	gasUsed  gas.Gas

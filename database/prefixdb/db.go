@@ -255,6 +255,7 @@ func (db *Database) prefix(key []byte) *[]byte {
 // Batch of database operations
 type batch struct {
 	database.Batch
+
 	db *Database
 
 	// Each key is prepended with the database's prefix.
@@ -338,6 +339,7 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 
 type iterator struct {
 	database.Iterator
+
 	db *Database
 
 	key, val []byte

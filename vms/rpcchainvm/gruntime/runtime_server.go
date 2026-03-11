@@ -18,6 +18,7 @@ var _ pb.RuntimeServer = (*Server)(nil)
 // Server is a VM runtime initializer controlled by RPC.
 type Server struct {
 	pb.UnsafeRuntimeServer
+
 	runtime runtime.Initializer
 }
 

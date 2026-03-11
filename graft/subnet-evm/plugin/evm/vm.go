@@ -174,15 +174,22 @@ var legacyAPINames = map[string]string{
 
 // VM implements the snowman.ChainVM interface
 type VM struct {
+	// *chain.State helps to implement the VM interface by wrapping blocks
+	// with an efficient caching layer.
+	*chain.State
+
+	network.Network
+
+	// State sync server and client
+	engine.Server
+	engine.Client
+
 	ctx *snow.Context
 	// contextLock is used to coordinate global VM operations.
 	// This can be used safely instead of snow.Context.Lock which is deprecated and should not be used in rpcchainvm.
 	vmLock sync.RWMutex
 	// [cancel] may be nil until [snow.NormalOp] starts
 	cancel context.CancelFunc
-	// *chain.State helps to implement the VM interface by wrapping blocks
-	// with an efficient caching layer.
-	*chain.State
 
 	config config.Config
 
@@ -236,7 +243,6 @@ type VM struct {
 	// Continuous Profiler
 	profiler profiler.ContinuousProfiler
 
-	network.Network
 	networkCodec codec.Manager
 
 	// Metrics
@@ -247,9 +253,6 @@ type VM struct {
 	stateSyncDone chan struct{}
 
 	logger subnetevmlog.Logger
-	// State sync server and client
-	engine.Server
-	engine.Client
 
 	// Avalanche Warp Messaging backend
 	// Used to serve BLS signatures of warp messages over RPC

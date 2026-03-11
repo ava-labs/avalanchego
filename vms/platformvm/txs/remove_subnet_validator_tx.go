@@ -21,6 +21,7 @@ var (
 // Removes a validator from a subnet.
 type RemoveSubnetValidatorTx struct {
 	BaseTx `serialize:"true"`
+
 	// The node to remove from the subnet.
 	NodeID ids.NodeID `serialize:"true" json:"nodeID"`
 	// The subnet to remove the node from.

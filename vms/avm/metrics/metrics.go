@@ -34,11 +34,11 @@ type Metrics interface {
 }
 
 type metrics struct {
+	metric.APIInterceptor
+
 	txMetrics *txMetrics
 
 	numTxRefreshes, numTxRefreshHits, numTxRefreshMisses prometheus.Counter
-
-	metric.APIInterceptor
 }
 
 func (m *metrics) IncTxRefreshes() {
