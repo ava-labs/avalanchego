@@ -18,16 +18,19 @@ use firewood_storage::logger::{trace, warn};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use typed_builder::TypedBuilder;
 
+use crate::db::UseParallel;
 use crate::merkle::Merkle;
+use crate::merkle::parallel::ParallelMerkle;
 use crate::persist_worker::{PersistError, PersistWorker};
 use crate::root_store::RootStore;
+use crate::v2::api::{self, BatchOp, IntoBatchIter};
 use crate::v2::api::{ArcDynDbView, HashKey, OptionalHashKeyExt};
 
 use firewood_metrics::{firewood_increment, firewood_set};
 pub use firewood_storage::CacheReadStrategy;
 use firewood_storage::{
     BranchNode, Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal,
-    NodeHashAlgorithm, NodeStore, NodeStoreHeader, TrieHash,
+    MutableProposal, NodeHashAlgorithm, NodeStore, NodeStoreHeader, TrieHash,
 };
 
 pub(crate) const DB_FILE_NAME: &str = "firewood.db";
@@ -474,6 +477,50 @@ impl RevisionManager {
                 .build()
                 .expect("Error in creating threadpool")
         })
+    }
+
+    /// Returns whether a batch should use parallel application based on configuration.
+    #[inline]
+    fn should_parallelize<I>(use_parallel: &UseParallel, batch_iter: &I) -> bool
+    where
+        I: Iterator,
+    {
+        let batch_size_lower_bound = batch_iter.size_hint().0;
+        match use_parallel {
+            UseParallel::Never => false,
+            UseParallel::Always => true,
+            UseParallel::BatchSize(required_size) => batch_size_lower_bound >= *required_size,
+        }
+    }
+
+    /// Applies a batch to a mutable nodestore using the configured parallel policy.
+    pub fn apply_batch(
+        &self,
+        use_parallel: &UseParallel,
+        mutable_nodestore: NodeStore<MutableProposal, FileBacked>,
+        batch: impl IntoBatchIter,
+    ) -> Result<NodeStore<MutableProposal, FileBacked>, api::Error> {
+        let batch = batch.into_iter();
+        if Self::should_parallelize(use_parallel, &batch) {
+            let mut parallel_merkle = ParallelMerkle::default();
+            Ok(parallel_merkle.apply(mutable_nodestore, batch, self.threadpool())?)
+        } else {
+            let mut merkle = Merkle::from(mutable_nodestore);
+            for res in batch.into_batch_iter::<api::Error>() {
+                match res? {
+                    BatchOp::Put { key, value } => {
+                        merkle.insert(key.as_ref(), value.as_ref().into())?;
+                    }
+                    BatchOp::Delete { key } => {
+                        merkle.remove(key.as_ref())?;
+                    }
+                    BatchOp::DeleteRange { prefix } => {
+                        merkle.remove_prefix(prefix.as_ref())?;
+                    }
+                }
+            }
+            Ok(merkle.into_inner())
+        }
     }
 
     /// Checks if the `PersistWorker` has errored.

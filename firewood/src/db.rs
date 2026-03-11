@@ -30,8 +30,6 @@ use std::sync::Arc;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
-use crate::merkle::parallel::ParallelMerkle;
-
 #[derive(Error, Debug)]
 #[non_exhaustive]
 /// Represents the different types of errors that can occur in the database.
@@ -246,41 +244,12 @@ impl Db {
     ) -> Result<Proposal<'_>, api::Error> {
         // Return immediately if the background thread is no longer running.
         self.manager.check_persist_error()?;
-        // If use_parallel is BatchSize, then perform parallel proposal creation if the batch
-        // size is >= BatchSize.
-        let batch = batch.into_iter();
-        let use_parallel = match self.use_parallel {
-            UseParallel::Never => false,
-            UseParallel::Always => true,
-            UseParallel::BatchSize(required_size) => batch.size_hint().0 >= required_size,
-        };
-        let immutable = if use_parallel {
-            let mut parallel_merkle = ParallelMerkle::default();
-            let _span = fastrace::Span::enter_with_local_parent("parallel_merkle");
-            parallel_merkle.create_proposal(parent, batch, self.manager.threadpool())?
-        } else {
-            let proposal = NodeStore::new(parent)?;
-            let mut merkle = Merkle::from(proposal);
-            let span = fastrace::Span::enter_with_local_parent("merkleops");
-            for res in batch.into_batch_iter::<api::Error>() {
-                match res? {
-                    BatchOp::Put { key, value } => {
-                        merkle.insert(key.as_ref(), value.as_ref().into())?;
-                    }
-                    BatchOp::Delete { key } => {
-                        merkle.remove(key.as_ref())?;
-                    }
-                    BatchOp::DeleteRange { prefix } => {
-                        merkle.remove_prefix(prefix.as_ref())?;
-                    }
-                }
-            }
-
-            drop(span);
-            let _span = fastrace::Span::enter_with_local_parent("freeze");
-            let nodestore = merkle.into_inner();
-            Arc::new(nodestore.try_into()?)
-        };
+        let proposal = NodeStore::new(parent)?;
+        let mutable_nodestore = self
+            .manager
+            .apply_batch(&self.use_parallel, proposal, batch)?;
+        let immutable: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> =
+            Arc::new(mutable_nodestore.try_into()?);
         self.manager.add_proposal(immutable.clone());
 
         self.metrics.proposals.increment(1);
