@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/arr4n/shed/testerr"
+	"github.com/ava-labs/avalanchego/utils"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -90,7 +91,7 @@ func TestDebugTrace(t *testing.T) {
 					Pc:    logPC,
 					Op:    vm.LOG1.String(),
 					Depth: 1,
-					Stack: ptrTo([]string{
+					Stack: utils.PointerTo([]string{
 						escrow.DepositEvent(recv, uint256.NewInt(depositVal)).Topics[0].String(),
 						"0x40", "0x80", // arbitrary memory locations selected by Solidity
 					}),

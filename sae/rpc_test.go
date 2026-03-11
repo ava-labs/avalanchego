@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/arr4n/shed/testerr"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/version"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
@@ -1322,10 +1323,6 @@ func withDebugAPI() sutOption {
 	})
 }
 
-func ptrTo[T any](v T) *T {
-	return &v
-}
-
 func TestResolveBlockNumberOrHash(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(t, 0, opt)
@@ -1364,7 +1361,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "both_num_and_hash",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockNumber: ptrTo(rpc.LatestBlockNumber),
+				BlockNumber: utils.PointerTo(rpc.LatestBlockNumber),
 				BlockHash:   &common.Hash{},
 			},
 			wantErr: errBothNumberAndHash,
@@ -1378,7 +1375,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "canonical_hash_in_memory",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: ptrTo(accepted.Hash()),
+				BlockHash: utils.PointerTo(accepted.Hash()),
 			},
 			wantNum:  accepted.NumberU64(),
 			wantHash: accepted.Hash(),
@@ -1386,7 +1383,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "canonical_hash_on_disk",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: ptrTo(settled.Hash()),
+				BlockHash: utils.PointerTo(settled.Hash()),
 			},
 			wantNum:  settled.NumberU64(),
 			wantHash: settled.Hash(),
@@ -1394,7 +1391,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "non_canonical_when_canonical_not_required",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: ptrTo(nonCanonical.Hash()),
+				BlockHash: utils.PointerTo(nonCanonical.Hash()),
 			},
 			wantNum:  nonCanonical.NumberU64(),
 			wantHash: nonCanonical.Hash(),
@@ -1402,7 +1399,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "non_canonical_when_canonical_required",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash:        ptrTo(nonCanonical.Hash()),
+				BlockHash:        utils.PointerTo(nonCanonical.Hash()),
 				RequireCanonical: true,
 			},
 			wantErr: errNonCanonicalBlock,
