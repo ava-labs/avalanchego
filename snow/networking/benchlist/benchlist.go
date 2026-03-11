@@ -343,7 +343,7 @@ func (b *benchlist) newFailureProbabilityAverager(now time.Time) math.Averager {
 
 // tryMakeRoom checks whether benching nodeID fits within maxPortion.
 // If it fits directly, returns true. If not, it attempts greedy eviction:
-// find the least-failing set of benched nodes whose probability is below
+// find the least-failing set of benched nodes whose probability is strictly below
 // incomingFailureProbability, verify the stake swap fits, unbench the
 // victim, and return true. Returns false if benching is not possible.
 func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability float64) bool {
@@ -371,6 +371,11 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 	// Fast path: benching fits directly without eviction.
 	newBenchedStake, err := math.Add(benchedStake, incomingStake)
 	if err != nil {
+		b.ctx.Log.Error("overflow calculating new benched stake",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint64("benchedStake", benchedStake),
+			zap.Uint64("incomingStake", incomingStake),
+		)
 		return false
 	}
 	if float64(newBenchedStake) <= maxBenchedStake {
@@ -388,7 +393,7 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 	// Scan the currently benched nodes and find all potential eviction candidates.
 	var candidates []*node
 	for _, node := range b.nodes {
-		if !node.isBenched || node.failureProbability.Read() > incomingFailureProbability {
+		if !node.isBenched || node.failureProbability.Read() >= incomingFailureProbability {
 			continue
 		}
 
@@ -419,6 +424,15 @@ func (b *benchlist) tryMakeRoom(nodeID ids.NodeID, incomingFailureProbability fl
 	// If we couldn't evict enough stake to make room for the incoming node, skip
 	// benching it and return early.
 	if evictedStake < targetEvictStake {
+		b.ctx.Log.Debug("not benching node",
+			zap.String("reason", "benched stake would exceed max"),
+			zap.Stringer("nodeID", nodeID),
+			zap.Float64("incomingFailureProbability", incomingFailureProbability),
+			zap.Float64("benchedStake", float64(newBenchedStake)),
+			zap.Float64("maxBenchedStake", maxBenchedStake),
+			zap.Float64("evictableStake", float64(evictedStake)),
+			zap.Float64("targetEvictStake", float64(targetEvictStake)),
+		)
 		return false
 	}
 
