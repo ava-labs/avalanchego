@@ -70,11 +70,9 @@ func TestUnboundedBlockingDequePop(t *testing.T) {
 	)
 
 	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		gotCh, gotOk = deque.PopLeft()
-		wg.Done()
-	}()
+	})
 
 	ok = deque.PushRight(2)
 	require.True(ok)
