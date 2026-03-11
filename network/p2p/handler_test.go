@@ -33,6 +33,10 @@ func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
 	return t.validators.Contains(nodeID)
 }
 
+func (t testValidatorSet) HasValidator(_ context.Context, nodeID ids.NodeID) bool {
+	return t.validators.Contains(nodeID)
+}
+
 func TestValidatorHandlerAppGossip(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	validatorSet := set.Of(nodeID)
