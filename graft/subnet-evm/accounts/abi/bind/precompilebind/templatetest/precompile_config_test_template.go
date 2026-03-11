@@ -14,7 +14,7 @@ package {{.Package}}
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
 
 	"github.com/ava-labs/avalanchego/utils"

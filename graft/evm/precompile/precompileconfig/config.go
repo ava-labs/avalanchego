@@ -7,7 +7,7 @@ package precompileconfig
 import (
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/evm/commontype"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
@@ -66,19 +66,19 @@ type AcceptContext struct {
 
 // Accepter is an optional interface for StatefulPrecompiledContracts to implement.
 // If implemented, Accept will be called for every log with the address of the precompile when the block is accepted.
-// WARNING: If you are implementing a custom precompile, beware that subnet-evm
+// WARNING: If you are implementing a custom precompile, beware that the EVM
 // will not maintain backwards compatibility of this interface and your code should not
-// rely on this. Designed for use only by precompiles that ship with subnet-evm.
+// rely on this. Designed for use only by precompiles that ship with the EVM.
 type Accepter interface {
 	Accept(acceptCtx *AcceptContext, blockHash common.Hash, blockNumber uint64, txHash common.Hash, logIndex int, topics []common.Hash, logData []byte) error
 }
 
-// ChainContext defines an interface that provides information to a stateful precompile
+// ChainConfig defines an interface that provides information to a stateful precompile
 // about the chain configuration. The precompile can access this information to initialize
 // its state.
 type ChainConfig interface {
 	// GetFeeConfig returns the original FeeConfig that was set in the genesis.
-	GetFeeConfig() commontype.FeeConfig
+	GetFeeConfig() *commontype.FeeConfig
 	// AllowedFeeRecipients returns true if fee recipients are allowed in the genesis.
 	AllowedFeeRecipients() bool
 	// IsDurango returns true if the time is after Durango.

@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/graft/evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -100,7 +100,7 @@ var (
 			},
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
-				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
+				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(&commontype.ValidTestFeeConfig)
 				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
 				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
 				return mockChainConfig
@@ -191,7 +191,7 @@ var (
 			},
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
-				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
+				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(&commontype.ValidTestFeeConfig)
 				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
 				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
 				return mockChainConfig
@@ -261,7 +261,7 @@ var (
 			},
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
-				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
+				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(&commontype.ValidTestFeeConfig)
 				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
 				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
 				return mockChainConfig
@@ -464,7 +464,7 @@ var (
 			},
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
-				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
+				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(&commontype.ValidTestFeeConfig)
 				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
 				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
 				return mockChainConfig

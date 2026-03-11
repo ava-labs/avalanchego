@@ -15,8 +15,8 @@ import (
 	reflect "reflect"
 	time "time"
 
+	commontype "github.com/ava-labs/avalanchego/graft/evm/commontype"
 	rpc "github.com/ava-labs/avalanchego/graft/evm/rpc"
-	commontype "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	consensus "github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	core "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"

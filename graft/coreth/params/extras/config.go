@@ -10,6 +10,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/graft/evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 
@@ -106,12 +108,25 @@ type AvalancheContext struct {
 	SnowCtx *snow.Context
 }
 
+var _ precompileconfig.ChainConfig = (*ChainConfig)(nil)
+
 type ChainConfig struct {
 	NetworkUpgrades // Config for timestamps that enable network upgrades.
 
 	AvalancheContext `json:"-"` // Avalanche specific context set during VM initialization. Not serialized.
 
 	UpgradeConfig `json:"-"` // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
+}
+
+// AllowedFeeRecipients always returns false, since this action
+// is not allowed in coreth.
+func (*ChainConfig) AllowedFeeRecipients() bool {
+	return false
+}
+
+// GetFeeConfig returns nil since there are no fee configs in coreth.
+func (*ChainConfig) GetFeeConfig() *commontype.FeeConfig {
+	return nil
 }
 
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
