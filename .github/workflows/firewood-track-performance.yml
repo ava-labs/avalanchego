@@ -116,6 +116,9 @@ jobs:
   benchmark:
     needs: configure-benchmark
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firewood
     permissions:
       contents: write  # Required for github-action-benchmark to push to gh-pages
     steps:
@@ -152,7 +155,7 @@ jobs:
       - name: Determine results location
         id: location
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
             echo "data-dir=bench" >> "$GITHUB_OUTPUT"
           else
             echo "data-dir=dev/bench/$(echo '${{ github.ref_name }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
@@ -164,7 +167,7 @@ jobs:
         with:
           name: C-Chain Reexecution with Firewood
           tool: 'customBiggerIsBetter'
-          output-file-path: ./results/benchmark-output.json
+          output-file-path: firewood/results/benchmark-output.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           summary-always: true
           auto-push: true

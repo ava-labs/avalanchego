@@ -1,11 +1,14 @@
 # Check that the PR title matches the conventional commit format
-name: pr-title
+name: firewood-pr-title
 
 permissions:
   pull-requests: write
 
 on:
   pull_request:
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-pr-title.yml"
     types:
       - edited
       - opened

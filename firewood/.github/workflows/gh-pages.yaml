@@ -3,8 +3,7 @@ name: gh-pages
 on:
   push:
     branches:
-      - "main"
-      - "rkuris/gh-pages"
+      - "master"
   # Rebuild pages after benchmark workflow completes.
   # Currently only scheduled runs (which run on main) trigger this.
   # If we later add feature branch benchmarks, remove `branches` filter -
@@ -24,13 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: main  # Always build docs from main
+          ref: master  # Always build docs from master
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
       # caution: this is the same restore as in ci.yaml
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # @v2 -> v2.8.2
         with:
           save-if: "false"
+          workspaces: "firewood -> target"
       - name: Build
+        working-directory: firewood
         run: cargo doc --document-private-items --no-deps
       - name: Set up _site redirect to firewood
         run: |
@@ -39,8 +40,8 @@ jobs:
           echo "<meta http-equiv=\"refresh\" content=\"0; url=firewood\">" > _site/index.html
       - name: Copy doc files to _site
         run: |
-          cp -rv target/doc/* ./_site
-          cp -rv docs/assets ./_site
+          cp -rv firewood/target/doc/* ./_site
+          cp -rv firewood/docs/assets ./_site
       # GitHub Pages deploys from a single source (overwrites, doesn't merge).
       # Benchmark history lives on benchmark-data branch (for append-only storage).
       # We merge both into _site/ so a single deployment serves docs + benchmarks.
