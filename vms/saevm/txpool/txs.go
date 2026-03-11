@@ -12,28 +12,17 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/setmap"
 )
 
 // Txs stores the transactions inside of the mempool.
-//
-// Transactions in the mempool can be in 1 of 4 statuses:
-//
-//   - Pending: Pending transactions are eligible for the block builder to
-//     attempt to include in the next block being built.
-//   - Current: Current transactions are included inside of a block currently
-//     being built.
-//   - Issued: Issued transactions were included inside of a block built by this
-//     node.
-//   - Discarded: Discarded transactions were previously in the the mempool, but
-//     were then deemed to be invalid. To prevent additional future work, these
-//     transactions may be assumed to be invalid in the future.
 type Txs struct {
 	lock sync.RWMutex
 	// txs is the collection of transactions available to be included into a
 	// block, sorted by gasPrice.
 	txs heap.Map[ids.ID, *Transaction]
-	// utxos maps utxoIDs to the txID consuming them in the mempool.
-	utxos map[ids.ID]ids.ID
+	// utxos maps a txID to the set of utxoIDs it consumes.
+	utxos *setmap.SetMap[ids.ID, ids.ID]
 }
 
 func NewTxs() *Txs {
@@ -41,7 +30,7 @@ func NewTxs() *Txs {
 		txs: heap.NewMap[ids.ID, *Transaction](func(a, b *Transaction) bool {
 			return a.GasPrice.Lt(&b.GasPrice) // Txs is a min-heap
 		}),
-		utxos: make(map[ids.ID]ids.ID),
+		utxos: setmap.New[ids.ID, ids.ID](),
 	}
 }
 
@@ -104,10 +93,7 @@ func (t *Txs) RemoveConflicts(utxos set.Set[ids.ID]) {
 }
 
 func (t *Txs) removeConflicts(utxos set.Set[ids.ID]) {
-	for utxoID := range utxos {
-		if txID, ok := t.utxos[utxoID]; ok {
-			delete(t.utxos, utxoID)
-			t.txs.Remove(txID)
-		}
+	for _, removed := range t.utxos.DeleteOverlapping(utxos) {
+		t.txs.Remove(removed.Key)
 	}
 }

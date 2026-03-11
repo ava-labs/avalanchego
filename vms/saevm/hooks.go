@@ -48,8 +48,12 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saedb.ExecutionResults, erro
 	return saedb.ExecutionResults{HeightIndex: db}, err
 }
 
-func (*hooks) GasTargetAfter(*types.Header) gas.Gas {
-	return 1_000_000
+func (*hooks) GasConfigAfter(*types.Header) (gas.Gas, hook.GasPriceConfig) {
+	return 1_000_000, hook.GasPriceConfig{
+		TargetToExcessScaling: 87,
+		MinPrice:              1,
+		StaticPricing:         false,
+	}
 }
 
 func (*hooks) SubSecondBlockTime(*types.Header) time.Duration {

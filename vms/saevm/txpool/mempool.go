@@ -12,7 +12,10 @@ import (
 
 const maxSize = 4096
 
-var errInsufficientFee = errors.New("insufficient fee")
+var (
+	ErrAlreadyKnown    = errors.New("transaction already in mempool")
+	errInsufficientFee = errors.New("insufficient fee")
+)
 
 // Mempool is a simple mempool for atomic transactions
 type Mempool struct {
@@ -41,8 +44,13 @@ func (m *Mempool) Add(tx *atomic.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	txID := tx.ID()
+	if _, ok := m.txs.Get(txID); ok {
+		return ErrAlreadyKnown
+	}
+
 	for input := range inputs {
-		if conflictID, ok := m.utxos[input]; ok {
+		if conflictID, ok := m.utxos.GetKey(input); ok {
 			conflict, _ := m.txs.Get(conflictID)
 			if gasPrice.Cmp(&conflict.GasPrice) <= 0 {
 				return errInsufficientFee
@@ -59,10 +67,7 @@ func (m *Mempool) Add(tx *atomic.Tx) error {
 		m.removeConflicts(cheap.Inputs)
 	}
 
-	txID := tx.ID()
-	for input := range inputs {
-		m.utxos[input] = txID
-	}
+	m.utxos.Put(txID, inputs)
 	m.txs.Push(txID, &Transaction{
 		Tx:       tx,
 		Inputs:   inputs,

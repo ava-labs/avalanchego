@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	atomicvm "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
@@ -120,22 +121,16 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	{
-		mempool, err := txpool.NewMempool(txs, metrics, func(tx *atomic.Tx) error {
-			// TODO: Implement me
-			return nil
-		})
+		vm.mempool = txpool.New(txs, snowCtx.AVAXAssetID)
+		gossipSet, err := gossip.NewBloomSet(vm.mempool, gossip.BloomSetConfig{})
 		if err != nil {
-			return fmt.Errorf("failed to initialize mempool: %w", err)
+			return fmt.Errorf("failed to create bloom set: %w", err)
 		}
-		vm.mempool = mempool
-	}
-
-	{
 		gossipHandler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
 			snowCtx.NodeID,
 			vm.Network,
 			nil, // TODO: Expose from SAE
-			vm.mempool,
+			gossipSet,
 			&atomic.TxMarshaller{},
 			avalanchegossip.SystemConfig{
 				Log:       snowCtx.Log,
