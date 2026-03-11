@@ -11,8 +11,8 @@ import (
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/graft/evm/precompile/contract"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 )
 
 var _ contract.Configurator = (*configurator)(nil)

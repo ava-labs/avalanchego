@@ -6,8 +6,8 @@ package extras
 import (
 	"encoding/json"
 
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 )
 
 type Precompiles map[string]precompileconfig.Config
