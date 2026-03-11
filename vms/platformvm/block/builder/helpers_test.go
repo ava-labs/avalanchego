@@ -80,7 +80,6 @@ type environment struct {
 	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          *state.State
-	state          *state.State
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
 	backend        txexecutor.Backend
