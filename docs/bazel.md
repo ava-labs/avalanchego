@@ -469,6 +469,16 @@ task bazel-clean-all              # or: bazel clean --expunge
 task bazel-check-metadata
 ```
 
+In CI, the Bazel workflow runs `bazel-check-metadata` before Bazel build
+and test jobs. This makes stale metadata fail with a single actionable
+error instead of surfacing later as multiple downstream Bazel failures.
+This is especially useful for pull requests tested against a moving base
+branch, where the metadata included in the PR may be stale relative to
+the current merge target.
+
+If `check-metadata` fails in CI, rebase or merge the target branch, run
+`task bazel-generate-metadata`, commit the resulting changes, and rerun CI.
+
 ## Adding a New Go Module
 
 When adding a new Go module under `graft/`:

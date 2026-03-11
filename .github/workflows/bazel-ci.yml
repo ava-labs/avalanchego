@@ -20,6 +20,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Check Bazel metadata first so stale generated files fail with one
+  # actionable error instead of cascading into multiple Bazel build/test
+  # failures. This is especially important when PRs are tested against
+  # the current base branch and the metadata included in the PR is stale
+  # relative to it.
   check-metadata:
     runs-on: ubuntu-latest
     steps:
