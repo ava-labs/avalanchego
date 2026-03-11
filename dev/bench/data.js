@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773159450053,
+  "lastUpdate": 1773225639084,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -9587,6 +9587,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_accept_ms/ggas",
             "value": 722.9654056689927,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "yacovm",
+            "username": "yacovm",
+            "email": "yacovm@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "1181249735d9ff44f29c8fbfeeb7bee2e34e9332",
+          "message": "PlatformVM: Support arbitrary validator addition and deletions (#5003)\n\nSigned-off-by: Yacov Manevich <yacov.manevich@avalabs.org>\nSigned-off-by: yacovm <yacovm@users.noreply.github.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2026-03-10T20:05:18Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/1181249735d9ff44f29c8fbfeeb7bee2e34e9332"
+        },
+        "date": 1773225637926,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - mgas/s",
+            "value": 79.66640855564145,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - ms/ggas",
+            "value": 12552.341923403883,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - block_parse_ms/ggas",
+            "value": 69.93827866442996,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - block_verify_ms/ggas",
+            "value": 11895.730063398307,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
+            "value": 584.5737660853584,
             "unit": "block_accept_ms/ggas"
           }
         ]
