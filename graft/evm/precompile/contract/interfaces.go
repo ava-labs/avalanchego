@@ -26,6 +26,10 @@ type StatefulPrecompiledContract interface {
 	Run(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
 }
 
+type StateReader interface {
+	GetState(common.Address, common.Hash, ...stateconf.StateDBStateOption) common.Hash
+}
+
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
 	GetState(common.Address, common.Hash, ...stateconf.StateDBStateOption) common.Hash
@@ -36,15 +40,11 @@ type StateDB interface {
 
 	GetBalance(common.Address) *uint256.Int
 	AddBalance(common.Address, *uint256.Int)
-	GetBalanceMultiCoin(common.Address, common.Hash) *big.Int
-	AddBalanceMultiCoin(common.Address, common.Hash, *big.Int)
-	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
 
 	CreateAccount(common.Address)
 	Exist(common.Address) bool
 
 	AddLog(*ethtypes.Log)
-	Logs() []*ethtypes.Log
 	GetPredicate(address common.Address, index int) (predicate.Predicate, bool)
 
 	TxHash() common.Hash

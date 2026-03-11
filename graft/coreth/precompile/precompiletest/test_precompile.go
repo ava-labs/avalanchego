@@ -16,8 +16,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
@@ -48,7 +48,7 @@ type PrecompileTest struct {
 	// SetupBlockContext sets the expected calls on MockBlockContext for the test execution.
 	SetupBlockContext func(*contract.MockBlockContext)
 	// AfterHook is called after the precompile is called.
-	AfterHook func(t testing.TB, state contract.StateDB)
+	AfterHook func(t testing.TB, state *extstate.StateDB)
 	// ExpectedRes is the expected raw byte result returned by the precompile
 	ExpectedRes []byte
 	// ExpectedErr is the expected error returned by the precompile
@@ -83,7 +83,7 @@ func (test PrecompileTest) Run(t *testing.T, module modules.Module) {
 	}
 
 	if test.AfterHook != nil {
-		test.AfterHook(t, state)
+		test.AfterHook(t, state.StateDB)
 	}
 }
 
@@ -106,7 +106,7 @@ func (test PrecompileTest) Bench(b *testing.B, module modules.Module) {
 	require.Equal(b, test.ExpectedRes, ret)
 
 	if test.AfterHook != nil {
-		test.AfterHook(b, state)
+		test.AfterHook(b, state.StateDB)
 	}
 
 	b.ReportAllocs()
@@ -142,7 +142,7 @@ func (test PrecompileTest) Bench(b *testing.B, module modules.Module) {
 	require.Equal(b, test.ExpectedRes, ret)
 
 	if test.AfterHook != nil {
-		test.AfterHook(b, state)
+		test.AfterHook(b, state.StateDB)
 	}
 }
 
