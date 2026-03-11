@@ -5,7 +5,8 @@ package benchlist
 
 import "github.com/ava-labs/avalanchego/ids"
 
-// Benchable is notified when a validator is benched or unbenched from a given chain
+// Benchable is notified when a validator is benched or unbenched from a given
+// chain
 type Benchable interface {
 	// Mark that [validatorID] has been benched on the given chain
 	Benched(chainID ids.ID, validatorID ids.NodeID)
