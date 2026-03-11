@@ -37,7 +37,7 @@ import (
 	{{- if .Contract.AllowList}}
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	{{- end}}
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/contract"
 
 	_ "embed"
 

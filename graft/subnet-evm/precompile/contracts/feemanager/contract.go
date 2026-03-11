@@ -16,8 +16,8 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/graft/evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 )
 
 const (

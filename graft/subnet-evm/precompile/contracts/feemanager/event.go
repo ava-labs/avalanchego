@@ -11,7 +11,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/evm/commontype"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/contract"
 	"github.com/ava-labs/libevm/common"
 )
 

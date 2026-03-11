@@ -12,8 +12,17 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/contract"
 )
+
+// multiCoinStateDB extends the base StateDB with multi-coin balance operations
+// required by the native asset precompiles.
+type multiCoinStateDB interface {
+	contract.StateDB
+	GetBalanceMultiCoin(common.Address, common.Hash) *big.Int
+	AddBalanceMultiCoin(common.Address, common.Hash, *big.Int)
+	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
+}
 
 // PrecompiledContractsApricot contains the default set of pre-compiled Ethereum
 // contracts used in the Istanbul release and the stateful precompiled contracts
@@ -65,7 +74,7 @@ func (b *NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ com
 		return nil, remainingGas, vm.ErrExecutionReverted
 	}
 
-	res, overflow := uint256.FromBig(accessibleState.GetStateDB().GetBalanceMultiCoin(address, assetID))
+	res, overflow := uint256.FromBig(accessibleState.GetStateDB().(multiCoinStateDB).GetBalanceMultiCoin(address, assetID))
 	if overflow {
 		return nil, remainingGas, vm.ErrExecutionReverted
 	}
@@ -109,7 +118,7 @@ func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller c
 	if !env.UseGas(c.GasCost) {
 		return nil, 0, vm.ErrOutOfGas
 	}
-	ret, err = c.run(env, accessibleState.GetStateDB(), caller, input, readOnly)
+	ret, err = c.run(env, accessibleState.GetStateDB().(multiCoinStateDB), caller, input, readOnly)
 	// This precompile will be wrapped in a libevm `legacy.PrecompiledStatefulContract`, which
 	// allows for the deprecated pattern of returning remaining gas by calling
 	// env.UseGas() on the difference between gas in and gas out. Since we call
@@ -121,7 +130,7 @@ func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller c
 // run implements the contract logic, using `env.Gas()` and `env.UseGas()` in
 // place of `suppliedGas` and returning `remainingGas`, respectively. This
 // avoids mixing gas-accounting patterns when using `env.Call()`.
-func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.StateDB, caller common.Address, input []byte, readOnly bool) (ret []byte, err error) {
+func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB multiCoinStateDB, caller common.Address, input []byte, readOnly bool) (ret []byte, err error) {
 	if readOnly {
 		return nil, vm.ErrExecutionReverted
 	}
