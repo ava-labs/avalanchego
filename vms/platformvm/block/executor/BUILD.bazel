@@ -69,7 +69,6 @@ go_test(
         "//codec",
         "//codec/linearcodec",
         "//database",
-        "//database/databasemock",
         "//database/memdb",
         "//database/prefixdb",
         "//database/versiondb",
