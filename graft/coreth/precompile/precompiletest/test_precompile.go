@@ -16,8 +16,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/evm/precompile/contract"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
