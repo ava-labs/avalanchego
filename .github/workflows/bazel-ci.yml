@@ -20,46 +20,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Bazel metadata
+        uses: ./.github/actions/run-bazel-task
+        with:
+          task: bazel-check-metadata
   unit-main:
+    needs: check-metadata
     runs-on: ubuntu-latest
     steps:
-      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be #v1.3.1
-        with:
-          tool-cache: true
-          docker-images: true
       - uses: actions/checkout@v4
-      # Go is not used by Bazel (it downloads its own SDK via go_sdk.download),
-      # but run_task.sh falls back to `go tool` to run the `task` binary when
-      # it's not installed on the runner.
-      - uses: ./.github/actions/setup-go-for-project
       - name: Run unit tests with Bazel
-        shell: bash
-        run: ./scripts/run_task.sh bazel-test-main
+        uses: ./.github/actions/run-bazel-task
+        with:
+          task: bazel-test-main
   unit-coreth:
+    needs: check-metadata
     runs-on: ubuntu-latest
     steps:
-      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be #v1.3.1
-        with:
-          tool-cache: true
-          docker-images: true
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - name: Run coreth unit tests with Bazel
-        shell: bash
-        run: ./scripts/run_task.sh bazel-test-coreth
+        uses: ./.github/actions/run-bazel-task
+        with:
+          task: bazel-test-coreth
   unit-subnet-evm:
+    needs: check-metadata
     runs-on: ubuntu-latest
     steps:
-      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be #v1.3.1
-        with:
-          tool-cache: true
-          docker-images: true
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - name: Run subnet-evm unit tests with Bazel
-        shell: bash
-        run: ./scripts/run_task.sh bazel-test-subnet-evm
+        uses: ./.github/actions/run-bazel-task
+        with:
+          task: bazel-test-subnet-evm
   e2e:
+    needs: check-metadata
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

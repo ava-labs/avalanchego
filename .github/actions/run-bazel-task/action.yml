@@ -1,0 +1,22 @@
+name: 'Run Bazel task'
+description: 'Prepare the runner for Bazel and run a task command'
+
+inputs:
+  task:
+    description: 'Task to run via scripts/run_task.sh'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be #v1.3.1
+      with:
+        tool-cache: true
+        docker-images: true
+    # Go is not used by Bazel (it downloads its own SDK via go_sdk.download),
+    # but run_task.sh falls back to `go tool` to run the `task` binary when
+    # it's not installed on the runner.
+    - uses: ./.github/actions/setup-go-for-project
+    - name: Run Bazel task
+      shell: bash
+      run: ./scripts/run_task.sh ${{ inputs.task }}

@@ -23,8 +23,8 @@ task bazel-build-opt
 # Run unit tests
 task bazel-test
 
-# Update BUILD.bazel files after changing Go imports
-task bazel-gazelle-generate
+# Update Bazel metadata after changing Go imports
+task bazel-generate-metadata
 
 # Clean build cache
 task bazel-clean
@@ -158,11 +158,11 @@ generates BUILD.bazel files from Go source code.
 
 Gazelle is declared as a `bazel_dep` in `MODULE.bazel`. It is **not**
 provided by Nix. The recommended entrypoint is `task
-bazel-gazelle-generate`, which runs Gazelle for all modules in the repo.
+bazel-generate-metadata`, which regenerates Bazel metadata for the repo.
 
 ### When to Run Gazelle
 
-Run `task bazel-gazelle-generate` after:
+Run `task bazel-generate-metadata` after:
 - Adding new `.go` files
 - Changing import statements
 - Adding new packages/directories
@@ -453,11 +453,8 @@ go_test(
 ### Maintenance
 
 ```bash
-# Update BUILD files
-task bazel-gazelle-generate                 # runs gazelle for all modules
-
-# Format BUILD files
-task bazel-fmt                     # or: buildifier -r .
+# Regenerate Bazel metadata
+task bazel-generate-metadata
 
 # Update MODULE.bazel use_repo calls
 task bazel-mod-tidy               # or: bazel mod tidy
@@ -468,8 +465,8 @@ task bazel-clean                  # or: bazel clean
 # Full cache clean
 task bazel-clean-all              # or: bazel clean --expunge
 
-# CI: verify BUILD files are up-to-date (via gazelle_test)
-task check-bazel-gazelle-generate
+# CI/local: verify Bazel metadata is current
+task bazel-check-metadata
 ```
 
 ## Adding a New Go Module
@@ -487,9 +484,9 @@ When adding a new Go module under `graft/`:
    # gazelle:prefix github.com/ava-labs/avalanchego/graft/newmodule
    ```
 
-3. **Run gazelle** to generate BUILD.bazel files:
+3. **Generate Bazel metadata**:
    ```bash
-   task bazel-gazelle-generate
+   task bazel-generate-metadata
    ```
 
 Dependencies are resolved automatically via `go.work`.
@@ -498,9 +495,9 @@ Dependencies are resolved automatically via `go.work`.
 
 ### "no such package" or import errors
 
-Run gazelle to regenerate BUILD files:
+Regenerate Bazel metadata:
 ```bash
-task bazel-gazelle-generate
+task bazel-generate-metadata
 ```
 
 ### Missing external dependency
