@@ -283,6 +283,11 @@ func (a AvalancheRules) IsGraniteActivated() bool {
 	return a.IsGranite
 }
 
+// IsDurangoActivated returns whether Durango has been activated.
+func (a AvalancheRules) IsDurangoActivated() bool {
+	return a.IsDurango
+}
+
 func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {
 	return AvalancheRules{
 		IsApricotPhase1:     n.IsApricotPhase1(timestamp),

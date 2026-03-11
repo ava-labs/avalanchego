@@ -14,13 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/graft/evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
@@ -163,7 +163,7 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state *tes
 	if test.ChainConfigFn == nil {
 		test.ChainConfigFn = func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 			mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
-			mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
+			mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(&commontype.ValidTestFeeConfig)
 			mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
 			mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(true)
 			return mockChainConfig
