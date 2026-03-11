@@ -1252,8 +1252,6 @@ func TestSender_Single_Request(t *testing.T) {
 			{
 				timeoutManager.EXPECT().IsBenched(destinationNodeID, ctx.ChainID).Return(true)
 
-				timeoutManager.EXPECT().RegisterRequestToUnreachableValidator()
-
 				// Make sure we register requests with the router
 				expectedFailedMsg := tt.failedMsgF(destinationNodeID)
 				router.EXPECT().RegisterRequest(
@@ -1273,14 +1271,18 @@ func TestSender_Single_Request(t *testing.T) {
 					},
 				)
 
+				// Make sure we're expecting the correct outbound message.
+				tt.setMsgCreatorExpect(msgCreator)
+
+				// Make sure we're sending the message to the benched node
+				tt.setExternalSenderExpect(externalSender, set.Set[ids.NodeID]{})
+
 				tt.sendF(require, sender, destinationNodeID)
 			}
 
 			// Case: Node is not myself, not benched and send fails
 			{
 				timeoutManager.EXPECT().IsBenched(destinationNodeID, ctx.ChainID).Return(false)
-
-				timeoutManager.EXPECT().RegisterRequestToUnreachableValidator()
 
 				// Make sure we register requests with the router
 				expectedFailedMsg := tt.failedMsgF(destinationNodeID)

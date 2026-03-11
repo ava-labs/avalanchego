@@ -732,11 +732,11 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			s.SetTimestamp(parentTime)
 			s.SetLastAccepted(parentID)
 
-			onDecisionState, err := state.NewDiff(parentID, backend)
+			onDecisionState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
-			onCommitState, err := state.NewDiff(parentID, backend)
+			onCommitState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
-			onAbortState, err := state.NewDiff(parentID, backend)
+			onAbortState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 			backend.blkIDToState[parentID] = &blockState{
 				timestamp:      test.parentTime,
@@ -835,11 +835,11 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			s.SetTimestamp(parentTime)
 			s.SetLastAccepted(parentID)
 
-			onDecisionState, err := state.NewDiff(parentID, backend)
+			onDecisionState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
-			onCommitState, err := state.NewDiff(parentID, backend)
+			onCommitState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
-			onAbortState, err := state.NewDiff(parentID, backend)
+			onAbortState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 			backend.blkIDToState[parentID] = &blockState{
 				timestamp:      test.parentTime,
@@ -1337,7 +1337,7 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 				require.NoError(s.PutL1Validator(l1Validator))
 			}
 
-			diff, err := state.NewDiffOn(s)
+			diff, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
 
 			config := validatorfee.Config{

@@ -32,7 +32,7 @@ func (nilStateGetter) GetState(ids.ID) (Chain, bool) {
 
 func TestDiffMissingState(t *testing.T) {
 	parentID := ids.GenerateTestID()
-	_, err := NewDiff(parentID, nilStateGetter{})
+	_, err := NewDiff(parentID, nilStateGetter{}, StakerAdditionAfterDeletionAllowed)
 	require.ErrorIs(t, err, ErrMissingParentState)
 }
 
@@ -41,7 +41,7 @@ func TestNewDiffOn(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	assertChainsEqual(t, state, d)
@@ -52,7 +52,7 @@ func TestDiffFeeState(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	initialFeeState := state.GetFeeState()
@@ -73,7 +73,7 @@ func TestDiffL1ValidatorExcess(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	initialExcess := state.GetL1ValidatorExcess()
@@ -91,7 +91,7 @@ func TestDiffAccruedFees(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	initialAccruedFees := state.GetAccruedFees()
@@ -109,7 +109,7 @@ func TestDiffCurrentSupply(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	initialCurrentSupply, err := d.GetCurrentSupply(constants.PrimaryNetworkID)
@@ -227,7 +227,7 @@ func TestDiffExpiry(t *testing.T) {
 				state.PutExpiry(expiry)
 			}
 
-			d, err := NewDiffOn(state)
+			d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
 
 			var (
@@ -358,7 +358,7 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 			l1Validator.EndAccumulatedFee = test.initialEndAccumulatedFee
 			require.NoError(state.PutL1Validator(l1Validator))
 
-			d, err := NewDiffOn(state)
+			d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
 
 			// Initialize subnetID, weight, and endAccumulatedFee as they are
@@ -380,7 +380,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a current validator
@@ -409,7 +409,7 @@ func TestDiffPendingValidator(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a pending validator
@@ -444,7 +444,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a current delegator
@@ -478,7 +478,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a pending delegator
@@ -525,7 +525,7 @@ func TestDiffSubnet(t *testing.T) {
 		subnetIDs,
 	)
 
-	diff, err := NewDiffOn(state)
+	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a subnet
@@ -575,7 +575,7 @@ func TestDiffChain(t *testing.T) {
 		chains,
 	)
 
-	diff, err := NewDiffOn(state)
+	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a chain
@@ -606,7 +606,7 @@ func TestDiffTx(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a tx
@@ -671,7 +671,7 @@ func TestDiffRewardUTXO(t *testing.T) {
 		rewardUTXOs,
 	)
 
-	diff, err := NewDiffOn(state)
+	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a reward UTXO
@@ -700,7 +700,7 @@ func TestDiffUTXO(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a UTXO
@@ -833,7 +833,7 @@ func TestDiffSubnetOwner(t *testing.T) {
 	require.Equal(owner1, owner)
 
 	// Create diff and verify that subnet owner returns correctly
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	owner, err = d.GetSubnetOwner(subnetID)
@@ -874,7 +874,7 @@ func TestDiffSubnetToL1Conversion(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Zero(actualConversion)
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	actualConversion, err = d.GetSubnetToL1Conversion(subnetID)
@@ -932,7 +932,7 @@ func TestDiffStacking(t *testing.T) {
 	require.Equal(owner1, owner)
 
 	// Create first diff and verify that subnet owner returns correctly
-	statesDiff, err := NewDiffOn(state)
+	statesDiff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	owner, err = statesDiff.GetSubnetOwner(subnetID)
@@ -950,7 +950,7 @@ func TestDiffStacking(t *testing.T) {
 	require.Equal(owner1, owner)
 
 	// Create a second diff on first diff and verify that subnet owner returns correctly
-	stackedDiff, err := NewDiffOn(statesDiff)
+	stackedDiff, err := NewDiffOn(statesDiff, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	owner, err = stackedDiff.GetSubnetOwner(subnetID)
 	require.NoError(err)
@@ -991,7 +991,7 @@ func TestDiffStacking(t *testing.T) {
 func TestDiffStakingInfo(t *testing.T) {
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(t, err)
 
 	// Get falls through to parent when not set in diff

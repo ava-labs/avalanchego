@@ -470,7 +470,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 	type test struct {
 		name                 string
 		timestamp            time.Time
-		stateF               func(*testing.T) state.Chain
+		state                *state.State
 		expectedTxID         ids.ID
 		expectedShouldReward bool
 		expectedErr          error
@@ -478,34 +478,30 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 	tests := []test{
 		{
-			name:      "end of time",
-			timestamp: mockable.MaxTime,
-			stateF: func(t *testing.T) state.Chain {
-				return statetest.New(t, statetest.Config{})
-			},
+			name:        "end of time",
+			timestamp:   mockable.MaxTime,
+			state:       statetest.New(t, statetest.Config{}),
 			expectedErr: ErrEndOfTime,
 		},
 		{
 			name:      "no stakers",
 			timestamp: now,
-			stateF: func(t *testing.T) state.Chain {
+			state: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
-
-				currentStakerIterator, err := s.GetCurrentStakerIterator()
-				require.NoError(t, err)
-				defer currentStakerIterator.Release()
 				// statetest.New initializes the state with a genesis that contains validators.
 				// To test the case where there are no stakers, we need to delete the genesis validators.
+				currentStakerIterator, err := s.GetCurrentStakerIterator()
+				require.NoError(t, err)
 				for _, staker := range iterator.ToSlice(currentStakerIterator) {
 					s.DeleteCurrentValidator(staker)
 				}
 				return s
-			},
+			}(),
 		},
 		{
 			name:      "expired subnet validator/delegator",
 			timestamp: now,
-			stateF: func(t *testing.T) state.Chain {
+			state: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
 				staker1 := &state.Staker{
 					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
@@ -516,19 +512,19 @@ func TestGetNextStakerToReward(t *testing.T) {
 					TxID:     txID,
 					Priority: txs.SubnetPermissionlessDelegatorCurrentPriority,
 					EndTime:  now,
-					NodeID:   ids.GenerateTestNodeID(),
+					NodeID:   staker1.NodeID,
 				}
 				require.NoError(t, s.PutCurrentValidator(staker1))
 				s.PutCurrentDelegator(staker2)
 				return s
-			},
+			}(),
 			expectedTxID:         txID,
 			expectedShouldReward: true,
 		},
 		{
 			name:      "expired primary network validator after subnet expired subnet validator",
 			timestamp: now,
-			stateF: func(t *testing.T) state.Chain {
+			state: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
 				staker1 := &state.Staker{
 					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
@@ -544,14 +540,14 @@ func TestGetNextStakerToReward(t *testing.T) {
 				require.NoError(t, s.PutCurrentValidator(staker1))
 				require.NoError(t, s.PutCurrentValidator(staker2))
 				return s
-			},
+			}(),
 			expectedTxID:         txID,
 			expectedShouldReward: true,
 		},
 		{
 			name:      "expired primary network delegator after subnet expired subnet validator",
 			timestamp: now,
-			stateF: func(t *testing.T) state.Chain {
+			state: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
 				staker1 := &state.Staker{
 					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
@@ -562,45 +558,43 @@ func TestGetNextStakerToReward(t *testing.T) {
 					TxID:     txID,
 					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					EndTime:  now,
-					NodeID:   ids.GenerateTestNodeID(),
+					NodeID:   staker1.NodeID,
 				}
 				require.NoError(t, s.PutCurrentValidator(staker1))
 				s.PutCurrentDelegator(staker2)
 				return s
-			},
+			}(),
 			expectedTxID:         txID,
 			expectedShouldReward: true,
 		},
 		{
 			name:      "non-expired primary network delegator",
 			timestamp: now,
-			stateF: func(t *testing.T) state.Chain {
+			state: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
-				staker1 := &state.Staker{
+				s.PutCurrentDelegator(&state.Staker{
 					TxID:     txID,
 					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					EndTime:  now.Add(time.Second),
-				}
-				s.PutCurrentDelegator(staker1)
+				})
 				return s
-			},
+			}(),
 			expectedTxID:         txID,
 			expectedShouldReward: false,
 		},
 		{
 			name:      "non-expired primary network validator",
 			timestamp: now,
-			stateF: func(t *testing.T) state.Chain {
+			state: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
-				staker1 := &state.Staker{
+				require.NoError(t, s.PutCurrentValidator(&state.Staker{
 					TxID:     txID,
 					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now.Add(time.Second),
 					NodeID:   ids.GenerateTestNodeID(),
-				}
-				require.NoError(t, s.PutCurrentValidator(staker1))
+				}))
 				return s
-			},
+			}(),
 			expectedTxID:         txID,
 			expectedShouldReward: false,
 		},
@@ -610,8 +604,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			state := tt.stateF(t)
-			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, state)
+			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, tt.state)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
 				return
