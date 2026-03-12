@@ -5,124 +5,55 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/config"
 	"github.com/ava-labs/avalanchego/utils/constants"
+
+	evmutils "github.com/ava-labs/avalanchego/graft/evm/utils"
 )
 
 func TestUnmarshalConfig(t *testing.T) {
-	tests := []struct {
-		name        string
-		givenJSON   []byte
-		expected    Config
-		expectedErr bool
-	}{
-		{
-			"string durations parsed",
-			[]byte(`{"api-max-duration": "1m", "continuous-profiler-frequency": "2m"}`),
-			Config{APIMaxDuration: Duration{1 * time.Minute}, ContinuousProfilerFrequency: Duration{2 * time.Minute}},
-			false,
-		},
-		{
-			"integer durations parsed",
-			[]byte(fmt.Sprintf(`{"api-max-duration": "%v", "continuous-profiler-frequency": "%v"}`, 1*time.Minute, 2*time.Minute)),
-			Config{APIMaxDuration: Duration{1 * time.Minute}, ContinuousProfilerFrequency: Duration{2 * time.Minute}},
-			false,
-		},
-		{
-			"nanosecond durations parsed",
-			[]byte(`{"api-max-duration": 5000000000, "continuous-profiler-frequency": 5000000000}`),
-			Config{APIMaxDuration: Duration{5 * time.Second}, ContinuousProfilerFrequency: Duration{5 * time.Second}},
-			false,
-		},
-		{
-			"bad durations",
-			[]byte(`{"api-max-duration": "bad-duration"}`),
-			Config{},
-			true,
-		},
-
-		{
-			"tx pool configurations",
-			[]byte(`{"tx-pool-price-limit": 1, "tx-pool-price-bump": 2, "tx-pool-account-slots": 3, "tx-pool-global-slots": 4, "tx-pool-account-queue": 5, "tx-pool-global-queue": 6}`),
-			Config{
-				TxPoolPriceLimit:   1,
-				TxPoolPriceBump:    2,
-				TxPoolAccountSlots: 3,
-				TxPoolGlobalSlots:  4,
-				TxPoolAccountQueue: 5,
-				TxPoolGlobalQueue:  6,
-			},
-			false,
-		},
-
-		{
-			"state sync enabled",
-			[]byte(`{"state-sync-enabled":true}`),
-			Config{StateSyncEnabled: utils.PointerTo(true)},
-			false,
-		},
-		{
-			"state sync sources",
-			[]byte(`{"state-sync-ids": "NodeID-CaBYJ9kzHvrQFiYWowMkJGAQKGMJqZoat"}`),
-			Config{StateSyncIDs: "NodeID-CaBYJ9kzHvrQFiYWowMkJGAQKGMJqZoat"},
-			false,
-		},
-		{
-			"empty transaction history ",
-			[]byte(`{}`),
-			Config{TransactionHistory: 0},
-			false,
-		},
-		{
-			"zero transaction history",
-			[]byte(`{"transaction-history": 0}`),
-			func() Config {
-				return Config{TransactionHistory: 0}
-			}(),
-			false,
-		},
-		{
-			"1 transaction history",
-			[]byte(`{"transaction-history": 1}`),
-			func() Config {
-				return Config{TransactionHistory: 1}
-			}(),
-			false,
-		},
-		{
-			"-1 transaction history",
-			[]byte(`{"transaction-history": -1}`),
-			Config{},
-			true,
-		},
-		{
-			"allow unprotected tx hashes",
-			[]byte(`{"allow-unprotected-tx-hashes": ["0x803351deb6d745e91545a6a3e1c0ea3e9a6a02a1a4193b70edfcd2f40f71a01c"]}`),
-			Config{AllowUnprotectedTxHashes: []common.Hash{common.HexToHash("0x803351deb6d745e91545a6a3e1c0ea3e9a6a02a1a4193b70edfcd2f40f71a01c")}},
-			false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var tmp Config
-			err := json.Unmarshal(tt.givenJSON, &tmp)
-			if tt.expectedErr {
-				require.Error(t, err) //nolint:forbidigo // uses standard library
-			} else {
-				require.NoError(t, err)
-				tmp.deprecate()
-				require.Equal(t, tt.expected, tmp)
-			}
+	// Test common base config fields
+	commonTests := config.CommonUnmarshalTests(func(c config.BaseConfig) Config {
+		return Config{BaseConfig: c}
+	})
+	for _, tt := range commonTests {
+		t.Run(tt.Name, func(t *testing.T) {
+			var got Config
+			err := json.Unmarshal(tt.GivenJSON, &got)
+			require.NoError(t, err)
+			require.Equal(t, tt.Want, got)
 		})
 	}
+
+	// Test C-Chain specific fields
+	t.Run("price option configurations", func(t *testing.T) {
+		var got Config
+		err := json.Unmarshal([]byte(`{"price-options-slow-fee-percentage": 85, "price-options-fast-fee-percentage": 115, "price-options-max-tip": 5000000000}`), &got)
+		require.NoError(t, err)
+		require.Equal(t, uint64(85), got.PriceOptionSlowFeePercentage)
+		require.Equal(t, uint64(115), got.PriceOptionFastFeePercentage)
+		require.Equal(t, uint64(5000000000), got.PriceOptionMaxTip)
+	})
+}
+
+func TestUnmarshalConfigErrors(t *testing.T) {
+	t.Run("bad durations", func(t *testing.T) {
+		var got Config
+		err := json.Unmarshal([]byte(`{"api-max-duration": "bad-duration"}`), &got)
+		require.ErrorIs(t, err, config.ErrInvalidDuration)
+	})
+
+	t.Run("negative transaction history", func(t *testing.T) {
+		var got Config
+		err := json.Unmarshal([]byte(`{"transaction-history": -1}`), &got)
+		var target *json.UnmarshalTypeError
+		require.ErrorAs(t, err, &target)
+	})
 }
 
 func TestGetConfig(t *testing.T) {
@@ -130,45 +61,122 @@ func TestGetConfig(t *testing.T) {
 		name       string
 		configJSON []byte
 		networkID  uint32
-		expected   func(*testing.T, Config)
+		check      func(*testing.T, Config)
 	}{
 		{
 			name:       "custom config values",
-			configJSON: []byte(`{"rpc-tx-fee-cap": 11,"eth-apis": ["debug"]}`),
+			configJSON: []byte(`{"rpc-tx-fee-cap": 11, "eth-apis": ["debug"], "price-options-max-tip": 50000000000}`),
 			networkID:  constants.TestnetID,
-			expected: func(t *testing.T, config Config) {
-				require.Equal(t, float64(11), config.RPCTxFeeCap, "Tx Fee Cap should be set")
-				require.Equal(t, []string{"debug"}, config.EthAPIs(), "EnabledEthAPIs should be set")
+			check: func(t *testing.T, got Config) {
+				require.Equal(t, float64(11), got.RPCTxFeeCap)
+				require.Equal(t, []string{"debug"}, got.EnabledEthAPIs)
+				require.Equal(t, uint64(50000000000), got.PriceOptionMaxTip)
 			},
 		},
 		{
 			name:       "partial config with defaults",
-			configJSON: []byte(`{"rpc-tx-fee-cap": 11,"eth-apis": ["debug"], "tx-pool-price-limit": 100}`),
+			configJSON: []byte(`{"rpc-tx-fee-cap": 11, "eth-apis": ["debug"], "tx-pool-price-limit": 100}`),
 			networkID:  constants.TestnetID,
-			expected: func(t *testing.T, config Config) {
-				defaultConfig := NewDefaultConfig()
-				require.Equal(t, defaultConfig.PriceOptionMaxTip, config.PriceOptionMaxTip)
-				require.Equal(t, float64(11), config.RPCTxFeeCap)
-				require.Equal(t, []string{"debug"}, config.EthAPIs())
-				require.Equal(t, uint64(100), config.TxPoolPriceLimit)
+			check: func(t *testing.T, got Config) {
+				require.Equal(t, float64(11), got.RPCTxFeeCap)
+				require.Equal(t, []string{"debug"}, got.EnabledEthAPIs)
+				require.Equal(t, uint64(100), got.TxPoolPriceLimit)
+				require.Equal(t, uint64(20*evmutils.GWei), got.PriceOptionMaxTip)
+				require.Equal(t, uint64(95), got.PriceOptionSlowFeePercentage)
+				require.Equal(t, uint64(105), got.PriceOptionFastFeePercentage)
 			},
 		},
 		{
 			name:       "nil config uses defaults",
 			configJSON: nil,
 			networkID:  constants.TestnetID,
-			expected: func(t *testing.T, config Config) {
-				defaultConfig := NewDefaultConfig()
-				require.Equal(t, defaultConfig, config)
+			check: func(t *testing.T, got Config) {
+				require.Equal(t, uint64(20*evmutils.GWei), got.PriceOptionMaxTip)
+				require.Equal(t, uint64(95), got.PriceOptionSlowFeePercentage)
+				require.Equal(t, uint64(105), got.PriceOptionFastFeePercentage)
+				require.Equal(t, float64(100), got.RPCTxFeeCap)
+				require.Equal(t, uint64(50_000_000), got.RPCGasCap)
+			},
+		},
+		{
+			name:       "user values override defaults",
+			configJSON: []byte(`{"price-options-max-tip": 1, "price-options-slow-fee-percentage": 50, "rpc-tx-fee-cap": 5}`),
+			networkID:  constants.TestnetID,
+			check: func(t *testing.T, got Config) {
+				require.Equal(t, uint64(1), got.PriceOptionMaxTip)
+				require.Equal(t, uint64(50), got.PriceOptionSlowFeePercentage)
+				require.Equal(t, float64(5), got.RPCTxFeeCap)
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config, _, err := GetConfig(tt.configJSON, tt.networkID)
+			got, _, err := GetConfig(tt.configJSON, tt.networkID)
 			require.NoError(t, err)
-			tt.expected(t, config)
+			tt.check(t, got)
 		})
 	}
+}
+
+func TestGetConfigValidation(t *testing.T) {
+	t.Run("production network rejects custom commit interval", func(t *testing.T) {
+		_, _, err := GetConfig([]byte(`{"commit-interval": 100}`), constants.MainnetID)
+		require.ErrorIs(t, err, ErrNonLocalCommitInterval)
+	})
+
+	t.Run("local network allows custom commit interval", func(t *testing.T) {
+		_, _, err := GetConfig([]byte(`{"commit-interval": 100}`), constants.LocalID)
+		require.NoError(t, err)
+	})
+
+	t.Run("negative transaction history rejected", func(t *testing.T) {
+		_, _, err := GetConfig([]byte(`{"transaction-history": -1}`), constants.LocalID)
+		var target *json.UnmarshalTypeError
+		require.ErrorAs(t, err, &target)
+	})
+}
+
+func TestStateSyncEnabledPointer(t *testing.T) {
+	t.Run("nil defaults to genesis activation", func(t *testing.T) {
+		got, _, err := GetConfig([]byte(`{}`), constants.TestnetID)
+		require.NoError(t, err)
+		require.Nil(t, got.StateSyncEnabled)
+	})
+
+	t.Run("explicitly enabled", func(t *testing.T) {
+		got, _, err := GetConfig([]byte(`{"state-sync-enabled": true}`), constants.TestnetID)
+		require.NoError(t, err)
+		require.NotNil(t, got.StateSyncEnabled)
+		require.True(t, *got.StateSyncEnabled)
+	})
+
+	t.Run("explicitly disabled", func(t *testing.T) {
+		got, _, err := GetConfig([]byte(`{"state-sync-enabled": false}`), constants.TestnetID)
+		require.NoError(t, err)
+		require.NotNil(t, got.StateSyncEnabled)
+		require.False(t, *got.StateSyncEnabled)
+	})
+}
+
+func TestBoolDefaultsWithTrueValue(t *testing.T) {
+	got, _, err := GetConfig(nil, constants.TestnetID)
+	require.NoError(t, err)
+	require.True(t, got.Pruning, "Pruning should default to true")
+	require.True(t, got.MetricsExpensiveEnabled, "MetricsExpensiveEnabled should default to true")
+
+	gotDisabled, _, err := GetConfig([]byte(`{"pruning-enabled": false, "metrics-expensive-enabled": false}`), constants.TestnetID)
+	require.NoError(t, err)
+	require.False(t, gotDisabled.Pruning)
+	require.False(t, gotDisabled.MetricsExpensiveEnabled)
+}
+
+func TestDurationFields(t *testing.T) {
+	got, _, err := GetConfig([]byte(`{"continuous-profiler-frequency": "5m"}`), constants.TestnetID)
+	require.NoError(t, err)
+	require.Equal(t, 5*time.Minute, got.ContinuousProfilerFrequency.Duration)
+
+	gotDefault, _, err := GetConfig(nil, constants.TestnetID)
+	require.NoError(t, err)
+	require.Equal(t, 15*time.Minute, gotDefault.ContinuousProfilerFrequency.Duration)
 }
