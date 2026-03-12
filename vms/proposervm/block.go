@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -452,8 +453,16 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // build an unsigned block
+	case errors.Is(err, validators.ErrUnfinalizedHeight):
+		p.logWarnOrError()("build block failed, validator set not yet finalized",
+			zap.String("reason", "failed to calculate expected proposer"),
+			zap.Uint64("parentPChainHeight", parentPChainHeight),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
+		return false, err
 	case err != nil:
-		p.logWarnOrError()("unexpected build block failure",
+		p.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate expected proposer"),
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),

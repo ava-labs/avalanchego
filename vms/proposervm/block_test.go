@@ -9,7 +9,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"errors"
 	"testing"
 	"time"
 
@@ -566,8 +565,6 @@ func TestPostGraniteBlock_EpochMatches(t *testing.T) {
 }
 
 func TestFailedToCalculateExpectedProposerLogLevel(t *testing.T) {
-	errGetValidatorSet := errors.New("validator set failure")
-
 	testCases := []struct {
 		name          string
 		clockOffset   time.Duration
@@ -621,7 +618,7 @@ func TestFailedToCalculateExpectedProposerLogLevel(t *testing.T) {
 			// Make GetValidatorSetF return an error so that ExpectedProposer
 			// fails, triggering the failure log path.
 			valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-				return nil, errGetValidatorSet
+				return nil, validators.ErrUnfinalizedHeight
 			}
 
 			coreChildBlk := snowmantest.BuildChild(coreParentBlk)
@@ -637,7 +634,7 @@ func TestFailedToCalculateExpectedProposerLogLevel(t *testing.T) {
 				require.False(logged, "expected exactly one log entry")
 				logged = true
 				require.Equal(test.expectedLevel, e.Level)
-				require.Equal("unexpected build block failure", e.Message)
+				require.Equal("build block failed, validator set not yet finalized", e.Message)
 				return nil
 			}))
 
@@ -645,7 +642,7 @@ func TestFailedToCalculateExpectedProposerLogLevel(t *testing.T) {
 			proVM.Set(initTime.Add(test.clockOffset))
 
 			_, err = proVM.BuildBlock(ctx)
-			require.ErrorIs(err, errGetValidatorSet)
+			require.ErrorIs(err, validators.ErrUnfinalizedHeight)
 			require.True(logged, "expected log entry was not emitted")
 		})
 	}
