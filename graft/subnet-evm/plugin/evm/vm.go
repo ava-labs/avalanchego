@@ -82,6 +82,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -1247,7 +1248,7 @@ func (vm *VM) chainConfigExtra() *extras.ChainConfig {
 	return params.GetExtra(vm.chainConfig)
 }
 
-func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
+func (vm *VM) rules(number *big.Int, time uint64) evmextras.Rules {
 	ethrules := vm.chainConfig.Rules(number, params.IsMergeTODO, time)
 	return *params.GetRulesExtra(ethrules)
 }

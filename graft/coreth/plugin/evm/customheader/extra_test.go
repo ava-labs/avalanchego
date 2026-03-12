@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 func TestMain(m *testing.M) {
@@ -504,25 +506,25 @@ func TestVerifyExtraPrefix(t *testing.T) {
 func TestVerifyExtra(t *testing.T) {
 	tests := []struct {
 		name     string
-		rules    extras.AvalancheRules
+		rules    evmextras.AvalancheRules
 		extra    []byte
 		expected error
 	}{
 		{
 			name:     "initial_valid",
-			rules:    extras.AvalancheRules{},
+			rules:    evmextras.AvalancheRules{},
 			extra:    make([]byte, ap0.MaximumExtraDataSize),
 			expected: nil,
 		},
 		{
 			name:     "initial_invalid",
-			rules:    extras.AvalancheRules{},
+			rules:    evmextras.AvalancheRules{},
 			extra:    make([]byte, ap0.MaximumExtraDataSize+1),
 			expected: errInvalidExtraLength,
 		},
 		{
 			name: "ap1_valid",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsApricotPhase1: true,
 			},
 			extra:    nil,
@@ -530,7 +532,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "ap1_invalid",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsApricotPhase1: true,
 			},
 			extra:    make([]byte, 1),
@@ -538,7 +540,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "ap3_valid",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsApricotPhase3: true,
 			},
 			extra:    make([]byte, ap3.WindowSize),
@@ -546,7 +548,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "ap3_invalid_less",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsApricotPhase3: true,
 			},
 			extra:    make([]byte, ap3.WindowSize-1),
@@ -554,7 +556,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "ap3_invalid_more",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsApricotPhase3: true,
 			},
 			extra:    make([]byte, ap3.WindowSize+1),
@@ -562,7 +564,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "durango_valid_min",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsDurango: true,
 			},
 			extra:    make([]byte, ap3.WindowSize),
@@ -570,7 +572,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "durango_valid_extra",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsDurango: true,
 			},
 			extra:    make([]byte, ap3.WindowSize+1),
@@ -578,7 +580,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "durango_invalid",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsDurango: true,
 			},
 			extra:    make([]byte, ap3.WindowSize-1),
@@ -586,7 +588,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_valid_min",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize),
@@ -594,7 +596,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_valid_extra",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize+1),
@@ -602,7 +604,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_invalid",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize-1),
@@ -620,7 +622,7 @@ func TestVerifyExtra(t *testing.T) {
 func TestPredicateBytesFromExtra(t *testing.T) {
 	tests := []struct {
 		name     string
-		rules    extras.AvalancheRules
+		rules    evmextras.AvalancheRules
 		extra    []byte
 		expected []byte
 	}{
@@ -648,7 +650,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_empty_extra",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:    nil,
@@ -656,7 +658,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_too_short",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize-1),
@@ -664,7 +666,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_empty_predicate",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize),
@@ -672,7 +674,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_non_empty_predicate",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra: []byte{
@@ -692,7 +694,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 func TestSetPredicateBytesInExtra(t *testing.T) {
 	tests := []struct {
 		name      string
-		rules     extras.AvalancheRules
+		rules     evmextras.AvalancheRules
 		extra     []byte
 		predicate []byte
 		want      []byte
@@ -703,7 +705,7 @@ func TestSetPredicateBytesInExtra(t *testing.T) {
 		},
 		{
 			name: "empty_extra_predicate_fortuna",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			want: make([]byte, acp176.StateSize),
@@ -719,7 +721,7 @@ func TestSetPredicateBytesInExtra(t *testing.T) {
 		},
 		{
 			name: "extra_too_short_fortuna",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:     []byte{1},
@@ -741,7 +743,7 @@ func TestSetPredicateBytesInExtra(t *testing.T) {
 		},
 		{
 			name: "extra_too_long_fortuna",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra: []byte{
@@ -764,7 +766,7 @@ func TestSetPredicateBytesInExtra(t *testing.T) {
 func TestPredicateBytesExtra(t *testing.T) {
 	tests := []struct {
 		name                   string
-		rules                  extras.AvalancheRules
+		rules                  evmextras.AvalancheRules
 		extra                  []byte
 		predicate              []byte
 		wantExtraWithPredicate []byte
@@ -777,7 +779,7 @@ func TestPredicateBytesExtra(t *testing.T) {
 		},
 		{
 			name: "empty_extra_predicate_fortuna",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:                  nil,
@@ -798,7 +800,7 @@ func TestPredicateBytesExtra(t *testing.T) {
 		},
 		{
 			name: "extra_too_short_fortuna",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra: []byte{

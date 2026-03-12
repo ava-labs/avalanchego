@@ -48,6 +48,7 @@ import (
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
 	atomicstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	atomicsync "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/sync"
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheutils "github.com/ava-labs/avalanchego/utils"
@@ -388,7 +389,7 @@ func (vm *VM) verifyTxAtTip(tx *atomic.Tx) error {
 // for reverting to the correct snapshot after calling this function. If this function is called with a
 // throwaway state, then this is not necessary.
 // TODO: unexport this function
-func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, statedb *state.StateDB, rules extras.Rules) error {
+func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, statedb *state.StateDB, rules evmextras.Rules) error {
 	parent, err := vm.InnerVM.GetExtendedBlock(context.TODO(), ids.ID(parentHash))
 	if err != nil {
 		return fmt.Errorf("failed to get parent block: %w", err)
@@ -403,7 +404,7 @@ func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, 
 
 // verifyTxs verifies that [txs] are valid to be issued into a block with parent block [parentHash]
 // using [rules] as the current rule set.
-func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.Int, height uint64, rules extras.Rules) error {
+func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.Int, height uint64, rules evmextras.Rules) error {
 	// Ensure that the parent was verified and inserted correctly.
 	if !vm.InnerVM.Ethereum().BlockChain().HasBlock(parentHash, height-1) {
 		return errRejectedParent
@@ -724,13 +725,13 @@ func (vm *VM) chainConfigExtra() *extras.ChainConfig {
 	return params.GetExtra(vm.InnerVM.ChainConfig())
 }
 
-func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
+func (vm *VM) rules(number *big.Int, time uint64) evmextras.Rules {
 	ethrules := vm.InnerVM.ChainConfig().Rules(number, params.IsMergeTODO, time)
 	return *params.GetRulesExtra(ethrules)
 }
 
 // CurrentRules returns the chain rules for the current block.
-func (vm *VM) CurrentRules() extras.Rules {
+func (vm *VM) CurrentRules() evmextras.Rules {
 	header := vm.InnerVM.Ethereum().BlockChain().CurrentHeader()
 	return vm.rules(header.Number, header.Time)
 }

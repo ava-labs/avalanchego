@@ -256,7 +256,7 @@ func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types
 	if !utils.BigEqual(blockGasCost, expectedBlockGasCost) {
 		return fmt.Errorf("%w: have %d, want %d", ErrInvalidBlockGasCost, blockGasCost, expectedBlockGasCost)
 	}
-	if config.IsSubnetEVM(timestamp) {
+	if config.IsApricotPhase4(timestamp) {
 		// Verify the block fee was paid.
 		if !eng.consensusMode.ModeSkipBlockFee {
 			if err := customheader.VerifyBlockFee(
@@ -293,7 +293,7 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 		parent,
 		header.Time,
 	)
-	if configExtra.IsSubnetEVM(header.Time) {
+	if configExtra.IsApricotPhase4(header.Time) {
 		// Verify that this block covers the block fee.
 		if !eng.consensusMode.ModeSkipBlockFee {
 			if err := customheader.VerifyBlockFee(

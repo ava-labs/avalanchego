@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 func (s *BlockChainAPI) GetChainConfig(context.Context) *params.ChainConfigWithUpgradesJSON {
@@ -144,7 +146,7 @@ type ActivePrecompilesResult struct {
 
 type ActiveRulesResult struct {
 	EthRules          params.Rules                       `json:"ethRules"`
-	AvalancheRules    extras.AvalancheRules              `json:"avalancheRules"`
+	AvalancheRules    evmextras.AvalancheRules           `json:"avalancheRules"`
 	ActivePrecompiles map[string]ActivePrecompilesResult `json:"precompiles"`
 }
 

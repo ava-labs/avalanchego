@@ -86,6 +86,7 @@ import (
 
 	corethlog "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/log"
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	utilsrpc "github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -1087,7 +1088,7 @@ func (vm *VM) chainConfigExtra() *extras.ChainConfig {
 	return params.GetExtra(vm.chainConfig)
 }
 
-func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
+func (vm *VM) rules(number *big.Int, time uint64) evmextras.Rules {
 	ethrules := vm.chainConfig.Rules(number, params.IsMergeTODO, time)
 	return *params.GetRulesExtra(ethrules)
 }

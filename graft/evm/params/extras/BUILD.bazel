@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "extras",
+    srcs = ["rules.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/params/extras",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/precompile/precompileconfig",
+        "@com_github_ava_labs_libevm//common",
+    ],
+)

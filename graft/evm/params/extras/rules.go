@@ -9,6 +9,41 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 )
 
+var _ precompileconfig.Rules = AvalancheRules{}
+
+// AvalancheRules tracks which Avalanche network upgrades are active at a given
+// block timestamp.
+type AvalancheRules struct {
+	IsApricotPhase1     bool
+	IsApricotPhase2     bool
+	IsApricotPhase3     bool
+	IsApricotPhase4     bool
+	IsApricotPhase5     bool
+	IsApricotPhasePre6  bool
+	IsApricotPhase6     bool
+	IsApricotPhasePost6 bool
+	IsBanff             bool
+	// IsCortina also corresponds to IsSubnetEVM for Subnet-EVM chains.
+	IsCortina bool
+
+	// Shared upgrades
+	IsDurango bool
+	IsEtna    bool
+	IsFortuna bool
+	IsGranite bool
+	IsHelicon bool
+}
+
+// IsGraniteActivated implements precompileconfig.Rules.
+func (a AvalancheRules) IsGraniteActivated() bool {
+	return a.IsGranite
+}
+
+// IsDurangoActivated implements precompileconfig.Rules.
+func (a AvalancheRules) IsDurangoActivated() bool {
+	return a.IsDurango
+}
+
 type Rules struct {
 	// Rules for Avalanche releases
 	AvalancheRules

@@ -12,6 +12,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/subnetevm"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 const (
@@ -31,14 +33,14 @@ func ExtraPrefix(
 	header *types.Header,
 ) ([]byte, error) {
 	switch {
-	case config.IsSubnetEVM(header.Time):
+	case config.IsApricotPhase3(header.Time):
 		window, err := feeWindow(config, parent, header.Time)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate fee window: %w", err)
 		}
 		return window.Bytes(), nil
 	default:
-		// Prior to SubnetEVM there was no expected extra prefix.
+		// Prior to AP3 there was no expected extra prefix.
 		return nil, nil
 	}
 }
@@ -50,7 +52,7 @@ func VerifyExtraPrefix(
 	parent *types.Header,
 	header *types.Header,
 ) error {
-	if !config.IsSubnetEVM(header.Time) {
+	if !config.IsApricotPhase3(header.Time) {
 		return nil
 	}
 
@@ -73,7 +75,7 @@ func VerifyExtraPrefix(
 // rules.
 //
 // TODO: Should this be merged with VerifyExtraPrefix?
-func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
+func VerifyExtra(rules evmextras.AvalancheRules, extra []byte) error {
 	extraLen := len(extra)
 	switch {
 	case rules.IsDurango:
@@ -85,7 +87,7 @@ func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
 				extraLen,
 			)
 		}
-	case rules.IsSubnetEVM:
+	case rules.IsApricotPhase3:
 		if extraLen != subnetevm.WindowSize {
 			return fmt.Errorf(
 				"%w: expected %d but got %d",

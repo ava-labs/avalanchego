@@ -54,6 +54,7 @@ go_library(
         "//graft/evm/constants",
         "//graft/evm/firewood",
         "//graft/evm/message",
+        "//graft/evm/params/extras",
         "//graft/evm/precompile/precompileconfig",
         "//graft/evm/rpc",
         "//graft/evm/sync/client",
