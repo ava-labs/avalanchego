@@ -5,7 +5,6 @@ package api
 
 import (
 	"errors"
-	"fmt"
 )
 
 type Status uint32
@@ -13,22 +12,24 @@ type Status uint32
 const (
 	Unknown Status = iota
 	Accepted
-	invalid
 )
 
+var errInvalidStatus = errors.New("invalid status")
+
 func (s Status) MarshalJSON() ([]byte, error) {
-	if err := s.Valid(); err != nil {
-		return nil, err
+	switch s {
+	case Unknown:
+		return []byte(`"Unknown"`), nil
+	case Accepted:
+		return []byte(`"Accepted"`), nil
+	default:
+		return nil, errInvalidStatus
 	}
-	return []byte(fmt.Sprintf("%q", s)), nil
 }
 
 func (s *Status) UnmarshalJSON(b []byte) error {
-	str := string(b)
-	if str == `null` {
-		return nil
-	}
-	switch str {
+	switch string(b) {
+	case `null`:
 	case `"Unknown"`:
 		*s = Unknown
 	case `"Accepted"`:
@@ -37,24 +38,4 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 		return errInvalidStatus
 	}
 	return nil
-}
-
-var errInvalidStatus = errors.New("invalid status")
-
-func (s Status) Valid() error {
-	if s >= invalid {
-		return errInvalidStatus
-	}
-	return nil
-}
-
-func (s Status) String() string {
-	switch s {
-	case Unknown:
-		return "Unknown"
-	case Accepted:
-		return "Accepted"
-	default:
-		return fmt.Sprintf("Invalid <%d>", s)
-	}
 }
