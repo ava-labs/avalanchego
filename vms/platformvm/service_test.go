@@ -1479,7 +1479,15 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					StartTime: staker.StartTime.Add(-time.Second),
 					Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
 				}
+				service.vm.state.AddTx(&txs.Tx{
+					TxID:     primaryStaker.TxID,
+					Unsigned: &txs.AddValidatorTx{},
+				}, status.Committed)
 				require.NoError(service.vm.state.PutCurrentValidator(primaryStaker))
+				service.vm.state.AddTx(&txs.Tx{
+					TxID:     staker.TxID,
+					Unsigned: &txs.AddSubnetValidatorTx{},
+				}, status.Committed)
 				staker.Priority = txs.SubnetPermissionedValidatorCurrentPriority
 				require.NoError(service.vm.state.PutCurrentValidator(staker))
 

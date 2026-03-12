@@ -82,6 +82,11 @@ type stakerAttributes struct {
 	validationRewardsOwner fx.Owner
 	delegationRewardsOwner fx.Owner
 	proofOfPossession      *signer.ProofOfPossession
+
+	// ACP-236
+	configOwner              fx.Owner
+	period                   uint64
+	autoCompoundRewardShares uint32
 }
 
 // GetHeight returns the height of the last accepted block
@@ -689,6 +694,12 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 			proofOfPossession:      pop,
 		}
 
+		if addAutoRenewedValidatorTx, ok := stakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
+			attr.configOwner = addAutoRenewedValidatorTx.ConfigOwner()
+			attr.period = addAutoRenewedValidatorTx.RenewalPeriod()
+			attr.autoCompoundRewardShares = addAutoRenewedValidatorTx.CompoundRewardShares()
+		}
+
 	case txs.DelegatorTx:
 		attr = &stakerAttributes{
 			rewardsOwner: stakerTx.RewardsOwner(),
@@ -903,6 +914,20 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				DelegationFee:          delegationFee,
 				Signer:                 attr.proofOfPossession,
 			}
+
+			if attr.configOwner != nil {
+				configOwner, ok := attr.configOwner.(*secp256k1fx.OutputOwners)
+				if !ok {
+					return nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", attr.configOwner)
+				}
+				vdr.ConfigOwner, err = s.getAPIOwner(configOwner)
+				if err != nil {
+					return nil, err
+				}
+				vdr.Period = utils.PointerTo(avajson.Uint64(attr.period))
+				vdr.AutoCompoundRewardShares = utils.PointerTo(avajson.Uint32(attr.autoCompoundRewardShares))
+			}
+
 			validators = append(validators, vdr)
 
 		case txs.PrimaryNetworkDelegatorCurrentPriority, txs.SubnetPermissionlessDelegatorCurrentPriority:

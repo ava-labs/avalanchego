@@ -35,6 +35,14 @@ type validatorMetadata struct {
 
 	txID        ids.ID
 	lastUpdated time.Time
+
+	// ACP-236
+	// Weight is computed as: tx.Weight + AccruedRewards + AccruedDelegateeRewards
+	AccruedRewards           uint64 `v2:"true"`
+	AccruedDelegateeRewards  uint64 `v2:"true"`
+	AutoCompoundRewardShares uint32 `v2:"true"`
+	Period                   uint64 `v2:"true"` // Duration in seconds
+	StakerEndTime            uint64 `v2:"true"` // Unix time when the current cycle ends
 }
 
 // Permissioned validators originally wrote their values as nil.
@@ -78,11 +86,23 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 // StakingInfo holds mutable validator data that can be modified.
 type StakingInfo struct {
 	DelegateeReward uint64
+
+	// ACP-236
+	AccruedRewards           uint64
+	AccruedDelegateeRewards  uint64
+	AutoCompoundRewardShares uint32
+	Period                   time.Duration
+	StakerEndTime            uint64
 }
 
 func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
 	return StakingInfo{
-		DelegateeReward: vdrMetadata.PotentialDelegateeReward,
+		DelegateeReward:          vdrMetadata.PotentialDelegateeReward,
+		AccruedRewards:           vdrMetadata.AccruedRewards,
+		AccruedDelegateeRewards:  vdrMetadata.AccruedDelegateeRewards,
+		AutoCompoundRewardShares: vdrMetadata.AutoCompoundRewardShares,
+		Period:                   time.Duration(vdrMetadata.Period) * time.Second,
+		StakerEndTime:            vdrMetadata.StakerEndTime,
 	}
 }
 
@@ -189,6 +209,11 @@ func (vs *validatorState) SetStakingInfo(
 		return database.ErrNotFound
 	}
 	metadata.PotentialDelegateeReward = stakingInfo.DelegateeReward
+	metadata.AccruedRewards = stakingInfo.AccruedRewards
+	metadata.AccruedDelegateeRewards = stakingInfo.AccruedDelegateeRewards
+	metadata.AutoCompoundRewardShares = stakingInfo.AutoCompoundRewardShares
+	metadata.Period = uint64(stakingInfo.Period / time.Second)
+	metadata.StakerEndTime = stakingInfo.StakerEndTime
 
 	vs.addUpdatedTxID(vdrID, subnetID, metadata.txID)
 	return nil

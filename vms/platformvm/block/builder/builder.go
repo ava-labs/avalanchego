@@ -323,7 +323,12 @@ func buildBlock(
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
 	if shouldReward {
-		rewardValidatorTx, err := NewRewardValidatorTx(builder.txExecutorBackend.Ctx, stakerTxID)
+		stakerTx, _, err := parentState.GetTx(stakerTxID)
+		if err != nil {
+			return nil, err
+		}
+
+		rewardValidatorTx, err := NewRewardTxForStaker(builder.txExecutorBackend.Ctx, stakerTx, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
@@ -649,4 +654,21 @@ func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
 		return nil, err
 	}
 	return tx, tx.SyntacticVerify(ctx)
+}
+
+func NewRewardAutoRenewedValidatorTx(ctx *snow.Context, txID ids.ID, timestamp uint64) (*txs.Tx, error) {
+	utx := &txs.RewardAutoRenewedValidatorTx{TxID: txID, Timestamp: timestamp}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(ctx)
+}
+
+func NewRewardTxForStaker(ctx *snow.Context, stakerTx *txs.Tx, timestamp time.Time) (*txs.Tx, error) {
+	if _, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx); ok {
+		return NewRewardAutoRenewedValidatorTx(ctx, stakerTx.ID(), uint64(timestamp.Unix()))
+	}
+
+	return NewRewardValidatorTx(ctx, stakerTx.ID())
 }

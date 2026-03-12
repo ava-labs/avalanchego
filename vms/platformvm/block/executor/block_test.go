@@ -505,6 +505,114 @@ func TestBlockOptions(t *testing.T) {
 			},
 			expectedPreferenceType: &block.BanffAbortBlock{},
 		},
+		{
+			name: "banff proposal block; reward auto-renewed validator; sufficient uptime; prefer commit",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				var (
+					stakerTxID = ids.GenerateTestID()
+					nodeID     = ids.GenerateTestNodeID()
+					stakerTx   = &txs.Tx{
+						Unsigned: &txs.AddAutoRenewedValidatorTx{
+							ValidatorNodeID: nodeID,
+						},
+						TxID: stakerTxID,
+					}
+					primaryNetworkValidatorStartTime = time.Now()
+					staker                           = &state.Staker{
+						StartTime: primaryNetworkValidatorStartTime,
+						NodeID:    nodeID,
+					}
+				)
+
+				state := statetest.New(t, statetest.Config{})
+				state.AddTx(stakerTx, status.Committed)
+				require.NoError(t, state.PutCurrentValidator(staker))
+
+				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(.9, nil)
+
+				manager := &manager{
+					backend: &backend{
+						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: .8,
+						},
+						Uptimes: uptimes,
+					},
+				}
+
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.RewardAutoRenewedValidatorTx{
+									TxID: stakerTxID,
+								},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.BanffCommitBlock{},
+		},
+		{
+			name: "banff proposal block; reward auto-renewed validator; insufficient uptime; prefer abort",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				var (
+					stakerTxID = ids.GenerateTestID()
+					nodeID     = ids.GenerateTestNodeID()
+					stakerTx   = &txs.Tx{
+						Unsigned: &txs.AddAutoRenewedValidatorTx{
+							ValidatorNodeID: nodeID,
+						},
+						TxID: stakerTxID,
+					}
+					primaryNetworkValidatorStartTime = time.Now()
+					staker                           = &state.Staker{
+						StartTime: primaryNetworkValidatorStartTime,
+						NodeID:    nodeID,
+					}
+				)
+
+				state := statetest.New(t, statetest.Config{})
+				state.AddTx(stakerTx, status.Committed)
+				require.NoError(t, state.PutCurrentValidator(staker))
+
+				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(.5, nil)
+
+				manager := &manager{
+					backend: &backend{
+						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: .8,
+						},
+						Uptimes: uptimes,
+					},
+				}
+
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.RewardAutoRenewedValidatorTx{
+									TxID: stakerTxID,
+								},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.BanffAbortBlock{},
+		},
 	}
 
 	for _, tt := range tests {

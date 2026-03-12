@@ -14,11 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -32,6 +34,15 @@ func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
 		return nil, err
 	}
 	return tx, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID))
+}
+
+func newRewardAutoRenewedValidatorTx(t testing.TB, txID ids.ID, timestamp uint64) *txs.Tx {
+	t.Helper()
+
+	utx := &txs.RewardAutoRenewedValidatorTx{TxID: txID, Timestamp: timestamp}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	require.NoError(t, err)
+	return tx
 }
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
@@ -877,4 +888,484 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	newSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(err)
 	require.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
+}
+
+func TestRewardValidatorStakerType(t *testing.T) {
+	var (
+		env           = newEnvironment(t, upgradetest.Fortuna)
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+		wallet        = newWallet(t, env, walletConfig{})
+	)
+
+	addAutoRenewedValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+		ids.GenerateTestNodeID(),
+		env.config.MinValidatorStake,
+		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		reward.PercentDenominator,
+		reward.PercentDenominator,
+		env.config.MinStakeDuration,
+	)
+	require.NoError(t, err)
+	env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
+
+	validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+
+	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
+	duration := time.Duration(validatorTx.Period) * time.Second
+	vdrStaker, err := state.NewStaker(
+		addAutoRenewedValidatorTx.ID(),
+		validatorTx,
+		startTime,
+		startTime.Add(duration),
+		validatorTx.Weight(),
+		uint64(1000000),
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, env.state.PutCurrentValidator(vdrStaker))
+	require.NoError(t, env.state.Commit())
+
+	require.NoError(t, env.state.SetStakingInfo(vdrStaker.SubnetID, vdrStaker.NodeID, state.StakingInfo{
+		Period: time.Duration(validatorTx.Period) * time.Second,
+	}))
+
+	env.state.SetTimestamp(vdrStaker.EndTime)
+
+	err = ProposalTx(
+		&env.backend,
+		feeCalculator,
+		must[*txs.Tx](t)(newRewardValidatorTx(t, addAutoRenewedValidatorTx.ID())),
+		must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
+		must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
+	)
+	require.ErrorIs(t, err, ErrShouldBePermissionlessStaker)
+}
+
+func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
+	var (
+		env           = newEnvironment(t, upgradetest.Fortuna)
+		wallet        = newWallet(t, env, walletConfig{})
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+	)
+
+	vdrTx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				End:    uint64(genesistest.DefaultValidatorStartTime.Add(2 * env.config.MinStakeDuration).Unix()),
+				Wght:   env.config.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		reward.PercentDenominator,
+	)
+	require.NoError(t, err)
+	env.state.AddTx(vdrTx, status.Committed)
+
+	staker, err := state.NewCurrentStaker(
+		vdrTx.ID(),
+		vdrTx.Unsigned.(*txs.AddPermissionlessValidatorTx),
+		time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0),
+		uint64(1000000),
+	)
+	require.NoError(t, err)
+	require.NoError(t, env.state.PutCurrentValidator(staker))
+	env.state.SetTimestamp(staker.EndTime)
+
+	tests := []struct {
+		name                string
+		wantErr             error
+		updateStateAndGetTx func(t testing.TB, state *state.State) *txs.Tx
+	}{
+		{
+			name:    "wrong staker",
+			wantErr: ErrRemoveWrongStaker,
+			updateStateAndGetTx: func(t testing.TB, state *state.State) *txs.Tx {
+				return newRewardAutoRenewedValidatorTx(t, ids.GenerateTestID(), uint64(state.GetTimestamp().Unix()))
+			},
+		},
+		{
+			name:    "invalid timestamp",
+			wantErr: ErrInvalidTimestamp,
+			updateStateAndGetTx: func(t testing.TB, state *state.State) *txs.Tx {
+				return newRewardAutoRenewedValidatorTx(t, staker.TxID, uint64(state.GetTimestamp().Unix())-1)
+			},
+		},
+		{
+			name:    "invalid validator tx",
+			wantErr: ErrShouldBeAutoRenewedStaker,
+			updateStateAndGetTx: func(t testing.TB, state *state.State) *txs.Tx {
+				return newRewardAutoRenewedValidatorTx(t, vdrTx.ID(), uint64(state.GetTimestamp().Unix()))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err = ProposalTx(
+				&env.backend,
+				feeCalculator,
+				tt.updateStateAndGetTx(t, env.state),
+				must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
+				must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
+			)
+
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
+	var (
+		env           = newEnvironment(t, upgradetest.Fortuna)
+		wallet        = newWallet(t, env, walletConfig{})
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+	)
+
+	vdrWeight := env.config.MaxValidatorStake - 500_000
+
+	sValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+		ids.GenerateTestNodeID(),
+		vdrWeight,
+		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{},
+		100_000,
+		400_000,
+		env.config.MinStakeDuration,
+	)
+	require.NoError(t, err)
+	env.state.AddTx(sValidatorTx, status.Committed)
+
+	validatorTx := sValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+	avax.Produce(env.state, sValidatorTx.ID(), validatorTx.Outputs())
+
+	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
+	duration := time.Duration(validatorTx.Period) * time.Second
+	staker, err := state.NewStaker(
+		sValidatorTx.ID(),
+		validatorTx,
+		startTime,
+		startTime.Add(duration),
+		validatorTx.Weight(),
+		10_000_000,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, env.state.PutCurrentValidator(staker))
+	require.NoError(t, env.state.Commit())
+
+	require.NoError(t, env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
+		DelegateeReward:          5_000_000,
+		AccruedRewards:           1_000_000,
+		AccruedDelegateeRewards:  500_000,
+		AutoCompoundRewardShares: validatorTx.AutoCompoundRewardShares,
+		Period:                   0,
+	}))
+
+	env.state.SetTimestamp(staker.EndTime)
+
+	rewardTx := newRewardAutoRenewedValidatorTx(t, sValidatorTx.ID(), uint64(env.state.GetTimestamp().Unix()))
+
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	require.NoError(t, ProposalTx(
+		&env.backend,
+		feeCalculator,
+		rewardTx,
+		onCommitState,
+		onAbortState,
+	))
+
+	commitSupply, err := onCommitState.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+	require.Equal(t, commitSupply, currentSupply)
+
+	abortSupply, err := onAbortState.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+	require.Equal(t, abortSupply, currentSupply-staker.PotentialReward)
+
+	for _, stateTest := range []struct {
+		diff                  state.Diff
+		wantValidationRewards uint64
+	}{
+		{diff: onAbortState, wantValidationRewards: 1_000_000},
+		{diff: onCommitState, wantValidationRewards: 11_000_000},
+	} {
+		_, err = stateTest.diff.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+		require.ErrorIs(t, database.ErrNotFound, err)
+
+		for i, stakeOut := range validatorTx.StakeOuts {
+			utxoID := &avax.UTXOID{
+				TxID:        sValidatorTx.ID(),
+				OutputIndex: uint32(len(validatorTx.Outputs())) + uint32(i),
+			}
+
+			utxo, err := stateTest.diff.GetUTXO(utxoID.InputID())
+			require.NoError(t, err)
+
+			utxoOut := utxo.Out.(*secp256k1fx.TransferOutput)
+			require.Equal(t, stakeOut.Out.Amount(), utxoOut.Amt)
+		}
+
+		rewardUTXOID := &avax.UTXOID{
+			TxID:        rewardTx.ID(),
+			OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())),
+		}
+		rewardUTXO, err := stateTest.diff.GetUTXO(rewardUTXOID.InputID())
+		require.NoError(t, err)
+		require.Equal(t, env.ctx.AVAXAssetID, rewardUTXO.Asset.AssetID())
+		require.Equal(t, stateTest.wantValidationRewards, rewardUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+		require.True(t, validatorTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&rewardUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+
+		delegatingRewardsUTXOID := &avax.UTXOID{
+			TxID:        rewardTx.ID(),
+			OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 1,
+		}
+		delegatingRewardsUTXO, err := stateTest.diff.GetUTXO(delegatingRewardsUTXOID.InputID())
+		require.NoError(t, err)
+		require.Equal(t, env.ctx.AVAXAssetID, delegatingRewardsUTXO.Asset.AssetID())
+		require.Equal(t, uint64(5_500_000), delegatingRewardsUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+		require.True(t, validatorTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&delegatingRewardsUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+
+		// No other UTXOs
+		utxoID := &avax.UTXOID{
+			TxID:        sValidatorTx.ID(),
+			OutputIndex: uint32(len(validatorTx.Outputs()) + len(validatorTx.StakeOuts)),
+		}
+		_, err = stateTest.diff.GetUTXO(utxoID.InputID())
+		require.ErrorIs(t, database.ErrNotFound, err)
+
+		utxoID = &avax.UTXOID{
+			TxID:        rewardTx.ID(),
+			OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 2,
+		}
+		_, err = stateTest.diff.GetUTXO(utxoID.InputID())
+		require.ErrorIs(t, database.ErrNotFound, err)
+	}
+}
+
+func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
+	var (
+		env           = newEnvironment(t, upgradetest.Fortuna)
+		wallet        = newWallet(t, env, walletConfig{})
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+	)
+
+	vdrWeight := env.config.MaxValidatorStake - 2_000_000
+
+	sValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+		ids.GenerateTestNodeID(),
+		vdrWeight,
+		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{},
+		100_000,
+		400_000,
+		env.config.MinStakeDuration,
+	)
+	require.NoError(t, err)
+	env.state.AddTx(sValidatorTx, status.Committed)
+
+	validatorTx := sValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+	avax.Produce(env.state, sValidatorTx.ID(), validatorTx.Outputs())
+
+	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
+	duration := time.Duration(validatorTx.Period) * time.Second
+	staker, err := state.NewStaker(
+		sValidatorTx.ID(),
+		validatorTx,
+		startTime,
+		startTime.Add(duration),
+		validatorTx.Weight(),
+		10_000_000,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, env.state.PutCurrentValidator(staker))
+	require.NoError(t, env.state.Commit())
+
+	require.NoError(t, env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
+		DelegateeReward:          5_000_000,
+		AccruedRewards:           1_000_000,
+		AccruedDelegateeRewards:  500_000,
+		AutoCompoundRewardShares: validatorTx.AutoCompoundRewardShares,
+		Period:                   time.Duration(validatorTx.Period) * time.Second,
+	}))
+
+	env.state.SetTimestamp(staker.EndTime)
+
+	rewardTx := newRewardAutoRenewedValidatorTx(t, sValidatorTx.ID(), uint64(env.state.GetTimestamp().Unix()))
+
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	require.NoError(t, ProposalTx(
+		&env.backend,
+		feeCalculator,
+		rewardTx,
+		onCommitState,
+		onAbortState,
+	))
+
+	// Check onAbortState.
+	{
+		_, err = onAbortState.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+		require.ErrorIs(t, database.ErrNotFound, err)
+
+		for i, stakeOut := range validatorTx.StakeOuts {
+			utxoID := &avax.UTXOID{
+				TxID:        sValidatorTx.ID(),
+				OutputIndex: uint32(len(validatorTx.Outputs())) + uint32(i),
+			}
+
+			utxo, err := onAbortState.GetUTXO(utxoID.InputID())
+			require.NoError(t, err)
+
+			utxoOut := utxo.Out.(*secp256k1fx.TransferOutput)
+			require.Equal(t, stakeOut.Out.Amount(), utxoOut.Amt)
+		}
+
+		rewardUTXOID := &avax.UTXOID{
+			TxID:        rewardTx.ID(),
+			OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())),
+		}
+		rewardUTXO, err := onAbortState.GetUTXO(rewardUTXOID.InputID())
+		require.NoError(t, err)
+		require.Equal(t, env.ctx.AVAXAssetID, rewardUTXO.Asset.AssetID())
+		require.Equal(t, uint64(1_000_000), rewardUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+		require.True(t, validatorTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&rewardUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+
+		delegatingRewardsUTXOID := &avax.UTXOID{
+			TxID:        rewardTx.ID(),
+			OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 1,
+		}
+		delegatingRewardsUTXO, err := onAbortState.GetUTXO(delegatingRewardsUTXOID.InputID())
+		require.NoError(t, err)
+		require.Equal(t, env.ctx.AVAXAssetID, delegatingRewardsUTXO.Asset.AssetID())
+		require.Equal(t, uint64(5_500_000), delegatingRewardsUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+		require.True(t, validatorTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&delegatingRewardsUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+
+		// No other UTXOs
+		utxoID := &avax.UTXOID{
+			TxID:        sValidatorTx.ID(),
+			OutputIndex: uint32(len(validatorTx.Outputs()) + len(validatorTx.StakeOuts)),
+		}
+		_, err = onAbortState.GetUTXO(utxoID.InputID())
+		require.ErrorIs(t, database.ErrNotFound, err)
+
+		utxoID = &avax.UTXOID{
+			TxID:        rewardTx.ID(),
+			OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 2,
+		}
+		_, err = onAbortState.GetUTXO(utxoID.InputID())
+		require.ErrorIs(t, database.ErrNotFound, err)
+
+		abortSupply, err := onAbortState.GetCurrentSupply(constants.PrimaryNetworkID)
+		require.NoError(t, err)
+		require.Equal(t, currentSupply-staker.PotentialReward, abortSupply)
+	}
+
+	// Check onCommitState
+	{
+		validator, err := onCommitState.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+		require.NoError(t, err)
+
+		validatorMutables, err := onCommitState.GetStakingInfo(staker.SubnetID, staker.NodeID)
+		require.NoError(t, err)
+
+		require.Equal(t, env.config.MaxValidatorStake, validator.Weight)
+		require.Equal(t, uint64(2_333_333), validatorMutables.AccruedRewards)
+		require.Equal(t, uint64(1_166_667), validatorMutables.AccruedDelegateeRewards)
+
+		// Check UTXOs for withdraws from auto-restake shares param
+		{
+			withdrawnRewardsUTXOID := &avax.UTXOID{
+				TxID:        rewardTx.ID(),
+				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())),
+			}
+			withdrawRewardsUTXO, err := onCommitState.GetUTXO(withdrawnRewardsUTXOID.InputID())
+			require.NoError(t, err)
+			require.Equal(t, env.ctx.AVAXAssetID, withdrawRewardsUTXO.Asset.AssetID())
+			require.Equal(t, uint64(6_000_000), withdrawRewardsUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+			require.True(t, validatorTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&withdrawRewardsUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+
+			withdrawDelegateeRewardsUTXO := &avax.UTXOID{
+				TxID:        rewardTx.ID(),
+				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 1,
+			}
+			withdrawDelegateeRewards, err := onCommitState.GetUTXO(withdrawDelegateeRewardsUTXO.InputID())
+			require.NoError(t, err)
+			require.Equal(t, env.ctx.AVAXAssetID, withdrawDelegateeRewards.Asset.AssetID())
+			require.Equal(t, uint64(3_000_000), withdrawDelegateeRewards.Out.(*secp256k1fx.TransferOutput).Amount())
+			require.True(t, validatorTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&withdrawDelegateeRewards.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+		}
+
+		// Check UTXOs for excess withdrawn
+		{
+			rewardUTXOID := &avax.UTXOID{
+				TxID:        rewardTx.ID(),
+				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 2,
+			}
+			rewardUTXO, err := onCommitState.GetUTXO(rewardUTXOID.InputID())
+			require.NoError(t, err)
+			require.Equal(t, env.ctx.AVAXAssetID, rewardUTXO.Asset.AssetID())
+			require.Equal(t, uint64(2_666_667), rewardUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+			require.True(t, validatorTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&rewardUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+
+			delegatingRewardsUTXOID := &avax.UTXOID{
+				TxID:        rewardTx.ID(),
+				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 3,
+			}
+			delegatingRewardsUTXO, err := onCommitState.GetUTXO(delegatingRewardsUTXOID.InputID())
+			require.NoError(t, err)
+			require.Equal(t, env.ctx.AVAXAssetID, delegatingRewardsUTXO.Asset.AssetID())
+			require.Equal(t, uint64(1_333_333), delegatingRewardsUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+			require.True(t, validatorTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&delegatingRewardsUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+
+			// No other UTXOs
+			utxoID := &avax.UTXOID{
+				TxID:        rewardTx.ID(),
+				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 4,
+			}
+			_, err = onCommitState.GetUTXO(utxoID.InputID())
+			require.ErrorIs(t, database.ErrNotFound, err)
+
+			utxoID = &avax.UTXOID{
+				TxID:        sValidatorTx.ID(),
+				OutputIndex: uint32(len(validatorTx.Outputs())),
+			}
+			_, err = onCommitState.GetUTXO(utxoID.InputID())
+			require.ErrorIs(t, database.ErrNotFound, err)
+		}
+
+		commitSupply, err := onCommitState.GetCurrentSupply(constants.PrimaryNetworkID)
+		require.NoError(t, err)
+		require.Equal(t, currentSupply+validator.PotentialReward, commitSupply)
+	}
 }

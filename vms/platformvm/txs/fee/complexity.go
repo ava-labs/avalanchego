@@ -223,6 +223,33 @@ var (
 		gas.DBWrite: 6, // write remaining balance utxo + weight diff + deactivated weight diff + public key diff + delete staker + write staker
 	}
 
+	IntrinsicAddAutoRenewedValidatorTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.NodeIDLen + // nodeID
+			wrappers.IntLen + // signer typeID
+			wrappers.IntLen + // num stake outs
+			wrappers.IntLen + // validator rewards typeID
+			wrappers.IntLen + // delegator rewards typeID
+			wrappers.IntLen + // owner typeID
+			wrappers.IntLen + // delegation shares
+			wrappers.LongLen + // weight
+			wrappers.IntLen + // auto compound reward shares
+			wrappers.LongLen, // period
+		gas.DBRead:  2, // check current validator + check pending validator
+		gas.DBWrite: 3, // put staker + write weight diff + write pk diff
+	}
+
+	IntrinsicSetAutoRenewedValidatorConfigTx = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // txID
+			wrappers.IntLen + // auth typeID
+			wrappers.IntLen + // authCredential typeID
+			wrappers.IntLen + // auto compound reward shares
+			wrappers.LongLen, // period
+		gas.DBRead:  2, // read tx + read staker
+		gas.DBWrite: 1, // update staker
+	}
+
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
 	errUnsupportedOwner  = errors.New("unsupported owner type")
@@ -793,6 +820,62 @@ func (c *complexityVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) e
 		&authComplexity,
 	)
 	return err
+}
+
+func (c *complexityVisitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	signerComplexity, err := SignerComplexity(tx.GetSigner())
+	if err != nil {
+		return err
+	}
+	outputsComplexity, err := OutputComplexity(tx.Stake()...)
+	if err != nil {
+		return err
+	}
+	validatorOwnerComplexity, err := OwnerComplexity(tx.ValidationRewardsOwner())
+	if err != nil {
+		return err
+	}
+	delegatorOwnerComplexity, err := OwnerComplexity(tx.DelegationRewardsOwner())
+	if err != nil {
+		return err
+	}
+	configOwnerComplexity, err := OwnerComplexity(tx.ConfigOwner())
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicAddAutoRenewedValidatorTxComplexities.Add(
+		&baseTxComplexity,
+		&signerComplexity,
+		&outputsComplexity,
+		&validatorOwnerComplexity,
+		&delegatorOwnerComplexity,
+		&configOwnerComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenewedValidatorConfigTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.Auth)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicSetAutoRenewedValidatorConfigTx.Add(
+		&baseTxComplexity,
+		&authComplexity,
+	)
+	return err
+}
+
+func (*complexityVisitor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	return ErrUnsupportedTx
 }
 
 func baseTxComplexity(tx *txs.BaseTx) (gas.Dimensions, error) {
