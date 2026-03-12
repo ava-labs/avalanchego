@@ -482,7 +482,7 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 			return nil, fmt.Errorf("failed to create sessioned code syncer: %w", err)
 		}
 
-		stateSyncer, err = evmstate.NewDynamicSyncer(
+		stateSyncer, err = evmstate.NewHashDBDynamicSyncer(
 			c.config.Client, c.config.ChainDB,
 			summary.GetBlockRoot(),
 			codeQueue, c.config.RequestSize,
@@ -502,11 +502,12 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 			return nil, fmt.Errorf("failed to create code syncer: %w", err)
 		}
 
-		stateSyncer, err = evmstate.NewSyncer(
+		stateSyncer, err = evmstate.NewHashDBSyncer(
 			c.config.Client, c.config.ChainDB,
 			summary.GetBlockRoot(),
 			codeQueue, c.config.RequestSize,
 			c.config.LeafsRequestType,
+			evmstate.WithFinalizeCodeQueue(codeQueue.Finalize),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)

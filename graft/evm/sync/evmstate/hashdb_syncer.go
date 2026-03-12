@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )
@@ -36,28 +35,30 @@ const (
 )
 
 var (
-	_                           types.Syncer = (*stateSync)(nil)
+	_                           types.Syncer = (*HashDBSyncer)(nil)
 	errCodeRequestQueueRequired              = errors.New("code request queue is required")
 	errLeafsRequestSizeRequired              = errors.New("leafs request size must be > 0")
+	errPivotRequested                        = errors.New("state syncer: pivot requested")
 )
 
-type codeRequestQueue interface {
+// CodeRequestQueue is the interface for adding code hashes to the download queue
+// and finalizing it when the main trie is done syncing.
+type CodeRequestQueue interface {
 	AddCode(context.Context, []common.Hash) error
 	Finalize() error
 }
 
-// stateSync keeps the state of the entire state sync operation.
-type stateSync struct {
-	db               ethdb.Database            // database we are syncing
-	root             common.Hash               // root of the EVM state we are syncing to
-	trieDB           *triedb.Database          // trieDB on top of db we are syncing. used to restore any existing tries.
-	snapshot         snapshot.SnapshotIterable // used to access the database we are syncing as a snapshot.
-	batchSize        uint                      // write batches when they reach this size
-	leafsRequestType message.LeafsRequestType  // type of leafs request to use (coreth or subnet-evm wire format)
-	segments         chan leaf.SyncTask        // channel of tasks to sync
-	syncer           *leaf.CallbackSyncer      // performs the sync, looping over each task's range and invoking specified callbacks
-	codeQueue        codeRequestQueue          // queue that manages the asynchronous download and batching of code hashes
-	trieQueue        *trieQueue                // manages a persistent list of storage tries we need to sync and any segments that are created for them
+// HashDBSyncer keeps the state of a single-root state sync session.
+type HashDBSyncer struct {
+	db        ethdb.Database            // database we are syncing
+	root      common.Hash               // root of the EVM state we are syncing to
+	trieDB    *triedb.Database          // trieDB on top of db we are syncing. used to restore any existing tries.
+	snapshot  snapshot.SnapshotIterable // used to access the database we are syncing as a snapshot.
+	batchSize uint                      // write batches when they reach this size
+	segments  chan leaf.SyncTask        // channel of tasks to sync
+	syncer    *leaf.CallbackSyncer      // performs the sync, looping over each task's range and invoking specified callbacks
+	codeQueue CodeRequestQueue          // queue that manages the asynchronous download and batching of code hashes
+	trieQueue *trieQueue                // manages a persistent list of storage tries we need to sync and any segments that are created for them
 
 	// track the main account trie specifically to commit its root at the end of the operation
 	mainTrie *trieToSync
@@ -75,87 +76,88 @@ type stateSync struct {
 	// syncCompleted is set to true when the sync completes successfully.
 	// This provides an explicit success signal for Finalize().
 	syncCompleted atomic.Bool
+
+	// finalizeCodeQueue is called when the main trie completes.
+	// No-op by default - set via WithFinalizeCodeQueue.
+	finalizeCodeQueue func() error
 }
 
-// SyncerOption configures the state syncer via functional options.
-type SyncerOption = options.Option[stateSync]
+// HashDBSyncerOption configures the state syncer via functional options.
+type HashDBSyncerOption = options.Option[HashDBSyncer]
 
 // WithBatchSize sets the database batch size for writes.
-func WithBatchSize(n uint) SyncerOption {
-	return options.Func[stateSync](func(s *stateSync) {
+func WithBatchSize(n uint) HashDBSyncerOption {
+	return options.Func[HashDBSyncer](func(s *HashDBSyncer) {
 		if n > 0 {
 			s.batchSize = n
 		}
 	})
 }
 
-func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...SyncerOption) (types.Syncer, error) {
-	return newSyncer(client, db, root, codeQueue, leafsRequestSize, leafsRequestType, opts...)
+// WithFinalizeCodeQueue sets the callback invoked when the main trie completes.
+// Static callers use this to finalize the code queue. If not set, it defaults
+// to a no-op (used by the dynamic wrapper which manages code queue lifecycle).
+func WithFinalizeCodeQueue(fn func() error) HashDBSyncerOption {
+	return options.Func[HashDBSyncer](func(s *HashDBSyncer) {
+		s.finalizeCodeQueue = fn
+	})
 }
 
-// NewDynamicSyncer creates a state syncer wired to a session-aware code queue.
-func NewDynamicSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue *code.SessionedQueue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...SyncerOption) (types.Syncer, error) {
-	return newSyncer(client, db, root, codeQueue, leafsRequestSize, leafsRequestType, opts...)
-}
-
-func newSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue codeRequestQueue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...SyncerOption) (types.Syncer, error) {
+// NewHashDBSyncer creates a single-session state syncer for the given root.
+func NewHashDBSyncer(syncClient client.Client, db ethdb.Database, root common.Hash, codeQueue CodeRequestQueue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...HashDBSyncerOption) (*HashDBSyncer, error) {
 	if leafsRequestSize == 0 {
 		return nil, errLeafsRequestSizeRequired
 	}
-
-	// Construct with defaults, then apply options directly to stateSync.
-	ss := &stateSync{
-		db:               db,
-		root:             root,
-		trieDB:           triedb.NewDatabase(db, nil),
-		snapshot:         snapshot.NewDiskLayer(db),
-		stats:            newTrieSyncStats(),
-		triesInProgress:  make(map[common.Hash]*trieToSync),
-		leafsRequestType: leafsRequestType,
+	if codeQueue == nil {
+		return nil, errCodeRequestQueueRequired
+	}
+	ss := &HashDBSyncer{
+		db:                db,
+		root:              root,
+		trieDB:            triedb.NewDatabase(db, nil),
+		snapshot:          snapshot.NewDiskLayer(db),
+		codeQueue:         codeQueue,
+		batchSize:         ethdb.IdealBatchSize,
+		finalizeCodeQueue: func() error { return nil },
+		stats:             newTrieSyncStats(),
+		triesInProgress:   make(map[common.Hash]*trieToSync),
 
 		// [triesInProgressSem] is used to keep the number of tries syncing
 		// less than or equal to [defaultNumWorkers].
 		triesInProgressSem: make(chan struct{}, defaultNumWorkers),
 
-		// Each [trieToSync] will have a maximum of [numSegments] segments.
+		// Each [trieToSync] will have a maximum of [numStorageTrieSegments] segments.
 		// We set the capacity of [segments] such that [defaultNumWorkers]
 		// storage tries can sync concurrently.
 		segments:         make(chan leaf.SyncTask, defaultNumWorkers*numStorageTrieSegments),
 		mainTrieDone:     make(chan struct{}),
 		storageTriesDone: make(chan struct{}),
-		batchSize:        ethdb.IdealBatchSize,
 	}
 
 	// Apply functional options.
 	options.ApplyTo(ss, opts...)
 
-	ss.syncer = leaf.NewCallbackSyncer(client, ss.segments, &leaf.SyncerConfig{
+	ss.syncer = leaf.NewCallbackSyncer(syncClient, ss.segments, &leaf.SyncerConfig{
 		RequestSize:      leafsRequestSize,
 		NumWorkers:       defaultNumWorkers,
-		LeafsRequestType: ss.leafsRequestType,
+		LeafsRequestType: leafsRequestType,
 	})
 
-	if codeQueue == nil {
-		return nil, errCodeRequestQueueRequired
-	}
-
-	ss.codeQueue = codeQueue
-
 	ss.trieQueue = NewTrieQueue(db)
-	if err := ss.trieQueue.clearIfRootDoesNotMatch(ss.root); err != nil {
+	if err := ss.trieQueue.clearIfRootDoesNotMatch(root); err != nil {
 		return nil, err
 	}
 
-	var err error
 	// create a trieToSync for the main trie and mark it as in progress.
-	ss.mainTrie, err = NewTrieToSync(ss, ss.root, common.Hash{}, NewMainTrieTask(ss))
+	var err error
+	ss.mainTrie, err = NewTrieToSync(ss, root, common.Hash{}, NewMainTrieTask(ss))
 	if err != nil {
 		return nil, err
 	}
-	ss.addTrieInProgress(ss.root, ss.mainTrie)
+	ss.addTrieInProgress(root, ss.mainTrie)
 
 	// Use context.Background() for initialization since we don't have a sync context yet.
-	// This is safe because startSyncing is called before Sync() starts.
+	// This is safe because startSyncing only enqueues segments.
 	if err := ss.mainTrie.startSyncing(context.Background()); err != nil {
 		return nil, err
 	}
@@ -163,23 +165,17 @@ func newSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQu
 }
 
 // Name returns the human-readable name for this sync task.
-func (*stateSync) Name() string {
-	return "EVM State Syncer"
+func (*HashDBSyncer) Name() string {
+	return "HashDB EVM State Syncer (static)"
 }
 
 // ID returns the stable identifier for this sync task.
-func (*stateSync) ID() string {
+func (*HashDBSyncer) ID() string {
 	return StateSyncerID
 }
 
-func (t *stateSync) Sync(ctx context.Context) error {
-	if sq, ok := t.codeQueue.(*code.SessionedQueue); ok {
-		if _, err := sq.Start(t.root); err != nil {
-			return err
-		}
-	}
-
-	// Start the leaf syncer and storage trie producer.
+// Sync runs the single-session sync to completion.
+func (t *HashDBSyncer) Sync(ctx context.Context) error {
 	eg, egCtx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
@@ -189,23 +185,18 @@ func (t *stateSync) Sync(ctx context.Context) error {
 		return t.onSyncComplete()
 	})
 
-	// Note: code fetcher should already be initialized.
 	eg.Go(func() error {
 		return t.storageTrieProducer(egCtx)
 	})
 
-	// The errgroup wait will take care of returning the first error that occurs, or returning
-	// nil if syncing finish without an error.
 	return eg.Wait()
 }
 
-func (*stateSync) UpdateTarget(message.Syncable) error {
-	// Non-functional compatibility scaffolding.
-	return nil
-}
+// UpdateTarget is a no-op for the static syncer.
+func (*HashDBSyncer) UpdateTarget(message.Syncable) error { return nil }
 
 // onStorageTrieFinished is called after a storage trie finishes syncing.
-func (t *stateSync) onStorageTrieFinished(root common.Hash) error {
+func (t *HashDBSyncer) onStorageTrieFinished(root common.Hash) error {
 	<-t.triesInProgressSem // allow another trie to start (release the semaphore)
 	// mark the storage trie as done in trieQueue
 	if err := t.trieQueue.StorageTrieDone(root); err != nil {
@@ -228,8 +219,8 @@ func (t *stateSync) onStorageTrieFinished(root common.Hash) error {
 }
 
 // onMainTrieFinished is called after the main trie finishes syncing.
-func (t *stateSync) onMainTrieFinished() error {
-	if err := t.codeQueue.Finalize(); err != nil {
+func (t *HashDBSyncer) onMainTrieFinished() error {
+	if err := t.finalizeCodeQueue(); err != nil {
 		return err
 	}
 
@@ -250,7 +241,7 @@ func (t *stateSync) onMainTrieFinished() error {
 // all storage tries have completed syncing. We persist
 // [mainTrie]'s batch last to avoid persisting the state
 // root before all storage tries are done syncing.
-func (t *stateSync) onSyncComplete() error {
+func (t *HashDBSyncer) onSyncComplete() error {
 	if err := t.mainTrie.batch.Write(); err != nil {
 		return err
 	}
@@ -263,7 +254,7 @@ func (t *stateSync) onSyncComplete() error {
 // with their corresponding accounts to the segments channel.
 // returns nil if all storage tries were iterated and an
 // error if one occurred or the context expired.
-func (t *stateSync) storageTrieProducer(ctx context.Context) error {
+func (t *HashDBSyncer) storageTrieProducer(ctx context.Context) error {
 	// Wait for main trie to finish to ensure when this thread terminates
 	// there are no more storage tries to sync
 	select {
@@ -321,7 +312,7 @@ func (t *stateSync) storageTrieProducer(ctx context.Context) error {
 }
 
 // addTrieInProgress tracks the root as being currently synced.
-func (t *stateSync) addTrieInProgress(root common.Hash, trie *trieToSync) {
+func (t *HashDBSyncer) addTrieInProgress(root common.Hash, trie *trieToSync) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -330,7 +321,7 @@ func (t *stateSync) addTrieInProgress(root common.Hash, trie *trieToSync) {
 
 // removeTrieInProgress removes root from the set of tracked tries in progress
 // and returns the number of tries in progress after the removal.
-func (t *stateSync) removeTrieInProgress(root common.Hash) (int, error) {
+func (t *HashDBSyncer) removeTrieInProgress(root common.Hash) (int, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -343,7 +334,7 @@ func (t *stateSync) removeTrieInProgress(root common.Hash) (int, error) {
 }
 
 // Finalize flushes in-progress trie batches to disk to preserve progress on failure.
-func (t *stateSync) Finalize() error {
+func (t *HashDBSyncer) Finalize() error {
 	if t.syncCompleted.Load() {
 		return nil
 	}

@@ -37,10 +37,10 @@ type syncTask interface {
 }
 
 type mainTrieTask struct {
-	sync *stateSync
+	sync *HashDBSyncer
 }
 
-func NewMainTrieTask(sync *stateSync) syncTask {
+func NewMainTrieTask(sync *HashDBSyncer) syncTask {
 	return &mainTrieTask{
 		sync: sync,
 	}
@@ -93,12 +93,12 @@ func (m *mainTrieTask) OnLeafs(ctx context.Context, db ethdb.KeyValueWriter, key
 }
 
 type storageTrieTask struct {
-	sync     *stateSync
+	sync     *HashDBSyncer
 	root     common.Hash
 	accounts []common.Hash
 }
 
-func NewStorageTrieTask(sync *stateSync, root common.Hash, accounts []common.Hash) syncTask {
+func NewStorageTrieTask(sync *HashDBSyncer, root common.Hash, accounts []common.Hash) syncTask {
 	return &storageTrieTask{
 		sync:     sync,
 		root:     root,

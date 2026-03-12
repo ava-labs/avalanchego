@@ -4,6 +4,7 @@
 package synctest
 
 import (
+	"bytes"
 	"encoding/binary"
 	"math/rand"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/stateconf"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
@@ -23,6 +25,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 // FillAccountsWithOverlappingStorage adds [numAccounts] randomly generated accounts to the secure trie at [root]
@@ -107,6 +110,7 @@ func FillIndependentTrie(t *testing.T, r *rand.Rand, start, numKeys int, keySize
 //
 // This is only safe for HashDB or PathDB, since Firewood doesn't store trie nodes individually.
 func AssertTrieConsistency(t testing.TB, root common.Hash, a, b *triedb.Database, onLeaf func(key, val []byte) error) {
+	t.Helper()
 	trieA, err := trie.New(trie.TrieID(root), a)
 	require.NoError(t, err)
 	trieB, err := trie.New(trie.TrieID(root), b)
@@ -153,6 +157,102 @@ func CorruptTrie(t *testing.T, diskdb ethdb.Batcher, tr *trie.Trie, n int) {
 	}
 	require.NoError(t, nodeIt.Error())
 	require.NoError(t, batch.Write())
+}
+
+// AssertDBConsistency checks that clientDB and serverDB have the same EVM state trie at root,
+// that clientDB has matching account and storage snapshots, and that all referenced code is
+// present with correct hashes.
+//
+// This is only safe for HashDB, since it relies on trie node iteration.
+func AssertDBConsistency(t testing.TB, root common.Hash, clientDB, serverDB state.Database) {
+	t.Helper()
+	numSnapshotAccounts := countSnapshotAccounts(t, clientDB)
+	trieAccountLeaves := 0
+
+	assertAccountLeaf := func(key, val []byte) error {
+		trieAccountLeaves++
+		accHash := common.BytesToHash(key)
+		acc, err := decodeAndCheckAccountSnapshot(t, clientDB, accHash, val)
+		if err != nil {
+			return err
+		}
+		checkCodeConsistency(t, clientDB, acc)
+		checkStorageConsistency(t, clientDB, serverDB, accHash, acc)
+		return nil
+	}
+	AssertTrieConsistency(t, root, serverDB.TrieDB(), clientDB.TrieDB(), assertAccountLeaf)
+
+	require.Equal(t, trieAccountLeaves, numSnapshotAccounts, "snapshot account count must match trie leaf count")
+}
+
+// countSnapshotAccounts returns the number of account snapshots in the database.
+func countSnapshotAccounts(t testing.TB, db state.Database) int {
+	t.Helper()
+	count := 0
+	it := customrawdb.NewAccountSnapshotsIterator(db.DiskDB())
+	defer it.Release()
+	for it.Next() {
+		if !bytes.HasPrefix(it.Key(), rawdb.SnapshotAccountPrefix) || len(it.Key()) != len(rawdb.SnapshotAccountPrefix)+common.HashLength {
+			continue
+		}
+		count++
+	}
+	require.NoError(t, it.Error(), "error iterating over account snapshots")
+	return count
+}
+
+// decodeAndCheckAccountSnapshot decodes an RLP-encoded account and verifies
+// the client DB has a matching account snapshot entry.
+func decodeAndCheckAccountSnapshot(t testing.TB, clientDB state.Database, accHash common.Hash, val []byte) (types.StateAccount, error) {
+	t.Helper()
+	var acc types.StateAccount
+	if err := rlp.DecodeBytes(val, &acc); err != nil {
+		return acc, err
+	}
+	snapshotVal := rawdb.ReadAccountSnapshot(clientDB.DiskDB(), accHash)
+	wantSnapshotVal := types.SlimAccountRLP(acc)
+	require.Equal(t, wantSnapshotVal, snapshotVal)
+	return acc, nil
+}
+
+// checkCodeConsistency verifies that any code referenced by the account is
+// present in the client DB and has the correct hash.
+func checkCodeConsistency(t testing.TB, clientDB state.Database, acc types.StateAccount) {
+	t.Helper()
+	if bytes.Equal(acc.CodeHash, types.EmptyCodeHash[:]) {
+		return
+	}
+	codeHash := common.BytesToHash(acc.CodeHash)
+	code := rawdb.ReadCode(clientDB.DiskDB(), codeHash)
+	require.NotEmpty(t, code)
+	require.Equal(t, codeHash, crypto.Keccak256Hash(code))
+}
+
+// checkStorageConsistency verifies that the account's storage trie matches
+// between client and server, and that storage snapshot entries match trie leaves.
+func checkStorageConsistency(t testing.TB, clientDB, serverDB state.Database, accHash common.Hash, acc types.StateAccount) {
+	t.Helper()
+	if acc.Root == types.EmptyRootHash {
+		return
+	}
+
+	snapshotStorageKeysCount := 0
+	storageIt := rawdb.IterateStorageSnapshots(clientDB.DiskDB(), accHash)
+	defer storageIt.Release()
+	for storageIt.Next() {
+		snapshotStorageKeysCount++
+	}
+
+	storageTrieLeavesCount := 0
+	assertStorageLeaf := func(key, val []byte) error {
+		storageTrieLeavesCount++
+		snapshotVal := rawdb.ReadStorageSnapshot(clientDB.DiskDB(), accHash, common.BytesToHash(key))
+		require.Equal(t, val, snapshotVal)
+		return nil
+	}
+	AssertTrieConsistency(t, acc.Root, serverDB.TrieDB(), clientDB.TrieDB(), assertStorageLeaf)
+
+	require.Equal(t, storageTrieLeavesCount, snapshotStorageKeysCount)
 }
 
 // FillAccounts adds [numAccounts] randomly generated accounts to the secure trie at [root] and commits it to [trieDB].
