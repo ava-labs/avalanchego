@@ -5,7 +5,6 @@ package validators
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"time"
@@ -41,11 +40,7 @@ const (
 	validatorSetsCacheSize = 64
 )
 
-var (
-	_ validators.State = (*manager)(nil)
-
-	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
-)
+var _ validators.State = (*manager)(nil)
 
 // Manager adds the ability to introduce newly accepted blocks IDs to the State
 // interface.
@@ -308,7 +303,7 @@ func (m *manager) makeAllValidatorSets(
 	}
 	if currentHeight < targetHeight {
 		return nil, fmt.Errorf("%w: current P-chain height (%d) < requested P-Chain height (%d)",
-			errUnfinalizedHeight,
+			validators.ErrUnfinalizedHeight,
 			currentHeight,
 			targetHeight,
 		)
@@ -351,7 +346,7 @@ func (m *manager) makeValidatorSet(
 	}
 	if currentHeight < targetHeight {
 		return nil, 0, fmt.Errorf("%w with SubnetID = %s: current P-chain height (%d) < requested P-Chain height (%d)",
-			errUnfinalizedHeight,
+			validators.ErrUnfinalizedHeight,
 			subnetID,
 			currentHeight,
 			targetHeight,
