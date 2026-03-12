@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -419,6 +420,16 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // block should be unsigned
+	case errors.Is(err, validators.ErrUnfinalizedHeight):
+		// Validator set at this height is not yet finalized locally.
+		// Logged as Warn (not Error) because the condition is transient and
+		// self-resolves, so it should not trigger alerts.
+		p.vm.ctx.Log.Warn("block verification failed, validator set not yet finalized",
+			zap.Uint64("parentPChainHeight", parentPChainHeight),
+			zap.Stringer("blkID", blk.ID()),
+			zap.Error(err),
+		)
+		return false, err
 	case err != nil:
 		p.vm.ctx.Log.Error("unexpected block verification failure",
 			zap.String("reason", "failed to calculate expected proposer"),
@@ -451,6 +462,16 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // build an unsigned block
+	case errors.Is(err, validators.ErrUnfinalizedHeight):
+		// Validator set at this height is not yet finalized locally.
+		// Logged as Warn (not Error) because the condition is transient and
+		// self-resolves, so it should not trigger alerts.
+		p.vm.ctx.Log.Warn("build block failed, validator set not yet finalized",
+			zap.Uint64("parentPChainHeight", parentPChainHeight),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
+		return false, err
 	case err != nil:
 		p.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate expected proposer"),
