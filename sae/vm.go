@@ -49,7 +49,8 @@ import (
 // provide a last-synchronous block, which MAY be the genesis.
 type VM struct {
 	*p2p.Network
-	peers *p2p.Peers
+	Peers          *p2p.Peers
+	ValidatorPeers *p2p.Validators
 
 	hooks   hook.Points
 	config  Config
@@ -299,7 +300,8 @@ func NewVM[T hook.Transaction](
 		}()
 
 		vm.Network = network
-		vm.peers = peers
+		vm.Peers = peers
+		vm.ValidatorPeers = validatorPeers
 		vm.mempool.RegisterPushGossiper(pushGossiper)
 		vm.toClose = append(vm.toClose, closerFunc(func() error {
 			cancel()

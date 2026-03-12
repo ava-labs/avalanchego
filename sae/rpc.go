@@ -76,7 +76,7 @@ func (vm *VM) ethRPCServer() (*rpc.Server, error) {
 		// - net_listening
 		// - net_peerCount
 		// - net_version
-		{"net", newNetAPI(vm.peers, vm.exec.ChainConfig().ChainID.Uint64())},
+		{"net", newNetAPI(vm.Peers, vm.exec.ChainConfig().ChainID.Uint64())},
 		// Geth-specific APIs:
 		// - txpool_content
 		// - txpool_contentFrom
