@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 )
 
 var (
@@ -54,6 +55,14 @@ func NewTestClient(
 		codesHandler:  codesHandler,
 		blocksHandler: blocksHandler,
 	}
+}
+
+func (*TestClient) AddClient(uint64) *p2p.Client {
+	panic("AddClient is not supported in TestClient")
+}
+
+func (*TestClient) StateSyncNodes() []ids.NodeID {
+	return nil
 }
 
 func (ml *TestClient) GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error) {
