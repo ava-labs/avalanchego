@@ -60,7 +60,7 @@ func TestNewExportTx(t *testing.T) {
 			)
 			require.NoError(err)
 
-			stateDiff, err := state.NewDiff(lastAcceptedID, env)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
 			stateDiff.SetTimestamp(tt.timestamp)
