@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/network/peertest"
+	"github.com/ava-labs/avalanchego/graft/evm/network/networktest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -469,7 +469,7 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 func TestHandleInvalidMessages(t *testing.T) {
 	codecManager := buildCodec(t, HelloGossip{}, TestMessage{})
 	nodeID := ids.GenerateTestNodeID()
-	requestID := peertest.TestSDKRequestID
+	requestID := networktest.TestSDKRequestID
 	sender := &enginetest.Sender{
 		SendAppErrorF: func(context.Context, ids.NodeID, uint32, int32, string) error {
 			return nil
@@ -531,7 +531,7 @@ func TestHandleInvalidMessages(t *testing.T) {
 func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	codecManager := buildCodec(t, TestMessage{})
 	nodeID := ids.GenerateTestNodeID()
-	requestID := peertest.TestPeerRequestID
+	requestID := networktest.TestPeerRequestID
 	sender := testAppSender{}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
@@ -576,7 +576,7 @@ func TestNetworkRouting(t *testing.T) {
 		},
 	}
 	protocol := 0
-	requestID := peertest.TestSDKRequestID
+	requestID := networktest.TestSDKRequestID
 	handler := &testSDKHandler{}
 
 	networkCodec := codec.NewManager(0)
