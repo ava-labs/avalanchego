@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
@@ -84,4 +85,9 @@ func (*FirewoodSyncer) ID() string {
 
 func (*FirewoodSyncer) Name() string {
 	return "Firewood EVM State Syncer"
+}
+
+func (*FirewoodSyncer) UpdateTarget(message.Syncable) error {
+	// Non-functional compatibility scaffolding.
+	return nil
 }

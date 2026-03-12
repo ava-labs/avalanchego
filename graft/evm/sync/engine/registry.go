@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/libevm/log"
 	"golang.org/x/sync/errgroup"
@@ -104,6 +105,34 @@ func (r *SyncerRegistry) StartAsync(ctx context.Context, summary message.Syncabl
 	}
 
 	return g
+}
+
+// UpdateSyncTarget updates the sync target for all registered syncers.
+func (r *SyncerRegistry) UpdateSyncTarget(newTarget message.Syncable) error {
+	for _, task := range r.syncers {
+		if err := task.syncer.UpdateTarget(newTarget); err != nil {
+			log.Error("failed updating sync target", "name", task.name, "err", err)
+			return err
+		}
+		log.Info("updated sync target", "name", task.name, "new_target", newTarget.GetBlockHash().Hex(), "height", newTarget.Height())
+	}
+	return nil
+}
+
+// MinTargetHeight returns the minimum target height across all registered syncers
+// that implement [types.TargetReporter]. Syncers that do not implement the interface
+// are skipped. If no syncers report a target, math.MaxUint64 is returned, meaning
+// no additional block preservation is required.
+func (r *SyncerRegistry) MinTargetHeight() uint64 {
+	minHeight := uint64(math.MaxUint64)
+	for _, task := range r.syncers {
+		if reporter, ok := task.syncer.(types.TargetReporter); ok {
+			if h := reporter.TargetHeight(); h < minHeight {
+				minHeight = h
+			}
+		}
+	}
+	return minHeight
 }
 
 // FinalizeAll iterates over all registered syncers and calls Finalize on those that implement the Finalizer interface.

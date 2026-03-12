@@ -25,8 +25,8 @@ func TestMarshalBlockSyncSummary(t *testing.T) {
 		require.Equal(t, uint64(2), blockSyncSummary.Height())
 		require.Equal(t, common.Hash{3}, blockSyncSummary.GetBlockRoot())
 
-		expectedBase64Bytes := "AAAAAAAAAAAAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-		require.Equal(t, expectedBase64Bytes, base64.StdEncoding.EncodeToString(blockSyncSummary.Bytes()))
+		wantBase64Bytes := "AAAAAAAAAAAAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+		require.Equal(t, wantBase64Bytes, base64.StdEncoding.EncodeToString(blockSyncSummary.Bytes()))
 
 		provider := message.NewBlockSyncSummaryProvider(c)
 		called := false

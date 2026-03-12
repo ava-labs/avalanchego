@@ -23,10 +23,10 @@ func TestMarshalSummary(t *testing.T) {
 	require.Equal(t, uint64(2), atomicSummary.Height())
 	require.Equal(t, common.Hash{3}, atomicSummary.GetBlockRoot())
 
-	expectedBase64Bytes := "AAAAAAAAAAAAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
-	require.Equal(t, expectedBase64Bytes, base64.StdEncoding.EncodeToString(atomicSummary.Bytes()))
-	expectedID := ids.FromStringOrPanic("256pj4a3SBG5kervhxKfeKpNRcVR1xk5BzTpkTkybkM8uMPu6Q")
-	require.Equal(t, expectedID, atomicSummary.ID())
+	wantBase64Bytes := "AAAAAAAAAAAAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+	require.Equal(t, wantBase64Bytes, base64.StdEncoding.EncodeToString(atomicSummary.Bytes()))
+	wantID := ids.FromStringOrPanic("256pj4a3SBG5kervhxKfeKpNRcVR1xk5BzTpkTkybkM8uMPu6Q")
+	require.Equal(t, wantID, atomicSummary.ID())
 
 	provider := &SummaryProvider{}
 	called := false

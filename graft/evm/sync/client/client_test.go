@@ -31,8 +31,8 @@ import (
 
 func TestGetCode(t *testing.T) {
 	tests := map[string]struct {
-		setupRequest func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte)
-		expectedErr  error
+		setupRequest func() (requestHashes []common.Hash, testResponse message.CodeResponse, wantCode [][]byte)
+		wantErr      error
 	}{
 		"normal": {
 			setupRequest: func() ([]common.Hash, message.CodeResponse, [][]byte) {
@@ -43,41 +43,41 @@ func TestGetCode(t *testing.T) {
 					Data: codeSlices,
 				}, codeSlices
 			},
-			expectedErr: nil,
+			wantErr: nil,
 		},
 		"unexpected code bytes": {
-			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte) {
+			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, wantCode [][]byte) {
 				return []common.Hash{{1}}, message.CodeResponse{
 					Data: [][]byte{{1}},
 				}, nil
 			},
-			expectedErr: errHashMismatch,
+			wantErr: errHashMismatch,
 		},
 		"too many code elements returned": {
-			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte) {
+			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, wantCode [][]byte) {
 				return []common.Hash{{1}}, message.CodeResponse{
 					Data: [][]byte{{1}, {2}},
 				}, nil
 			},
-			expectedErr: errInvalidCodeResponseLen,
+			wantErr: errInvalidCodeResponseLen,
 		},
 		"too few code elements returned": {
-			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte) {
+			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, wantCode [][]byte) {
 				return []common.Hash{{1}}, message.CodeResponse{
 					Data: [][]byte{},
 				}, nil
 			},
-			expectedErr: errInvalidCodeResponseLen,
+			wantErr: errInvalidCodeResponseLen,
 		},
 		"code size is too large": {
-			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte) {
+			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, wantCode [][]byte) {
 				oversizedCode := make([]byte, ethparams.MaxCodeSize+1)
 				codeHash := crypto.Keccak256Hash(oversizedCode)
 				return []common.Hash{codeHash}, message.CodeResponse{
 					Data: [][]byte{oversizedCode},
 				}, nil
 			},
-			expectedErr: errMaxCodeSizeExceeded,
+			wantErr: errMaxCodeSizeExceeded,
 		},
 	}
 
@@ -94,14 +94,14 @@ func TestGetCode(t *testing.T) {
 				})
 				ctx, cancel := context.WithCancel(t.Context())
 				defer cancel()
-				codeHashes, res, expectedCode := test.setupRequest()
+				codeHashes, res, wantCode := test.setupRequest()
 
 				responseBytes, err := c.Marshal(message.Version, res)
 				require.NoError(t, err)
 				// Dirty hack required because the client will re-request if it encounters
 				// an error.
 				attempted := false
-				if test.expectedErr == nil {
+				if test.wantErr == nil {
 					testNetClient.testResponse(1, nil, responseBytes)
 				} else {
 					testNetClient.testResponse(2, func() {
@@ -114,16 +114,16 @@ func TestGetCode(t *testing.T) {
 				}
 
 				codeBytes, err := stateSyncClient.GetCode(ctx, codeHashes)
-				require.ErrorIs(t, err, test.expectedErr)
+				require.ErrorIs(t, err, test.wantErr)
 				// If we expected an error, verify retry behavior and return
-				if test.expectedErr != nil {
+				if test.wantErr != nil {
 					require.Equal(t, uint(2), testNetClient.numCalls)
 					return
 				}
 				// Otherwise, require that the result is as expected
-				require.Len(t, codeBytes, len(expectedCode))
+				require.Len(t, codeBytes, len(wantCode))
 				for i, code := range codeBytes {
-					require.Equal(t, expectedCode[i], code)
+					require.Equal(t, wantCode[i], code)
 				}
 				require.Equal(t, uint(1), testNetClient.numCalls)
 			})
@@ -153,7 +153,7 @@ func TestGetBlocks(t *testing.T) {
 		request        message.BlockRequest
 		response       func(t *testing.T, c codec.Manager, blocksRequestHandler *handlers.BlockRequestHandler, request message.BlockRequest) []byte
 		assertResponse func(t *testing.T, response []*types.Block)
-		expectedErr    error
+		wantErr        error
 	}{
 		"normal response": {
 			request: message.BlockRequest{
@@ -200,7 +200,7 @@ func TestGetBlocks(t *testing.T) {
 			response: func(_ *testing.T, _ codec.Manager, _ *handlers.BlockRequestHandler, _ message.BlockRequest) []byte {
 				return []byte("gibberish")
 			},
-			expectedErr: errUnmarshalResponse,
+			wantErr: errUnmarshalResponse,
 		},
 		"invalid value replacing block": {
 			request: message.BlockRequest{
@@ -221,7 +221,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return responseBytes
 			},
-			expectedErr: errUnmarshalResponse,
+			wantErr: errUnmarshalResponse,
 		},
 		"incorrect starting point": {
 			request: message.BlockRequest{
@@ -240,7 +240,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return response
 			},
-			expectedErr: errHashMismatch,
+			wantErr: errHashMismatch,
 		},
 		"missing link in between blocks": {
 			request: message.BlockRequest{
@@ -263,7 +263,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return responseBytes
 			},
-			expectedErr: errHashMismatch,
+			wantErr: errHashMismatch,
 		},
 		"no blocks": {
 			request: message.BlockRequest{
@@ -280,7 +280,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return responseBytes
 			},
-			expectedErr: errEmptyResponse,
+			wantErr: errEmptyResponse,
 		},
 		"more than requested blocks": {
 			request: message.BlockRequest{
@@ -299,7 +299,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return responseBytes
 			},
-			expectedErr: errTooManyBlocks,
+			wantErr: errTooManyBlocks,
 		},
 	}
 	for name, test := range tests {
@@ -322,7 +322,7 @@ func TestGetBlocks(t *testing.T) {
 				defer cancel()
 
 				responseBytes := test.response(t, c, blocksRequestHandler, test.request)
-				if test.expectedErr == nil {
+				if test.wantErr == nil {
 					testNetClient.testResponse(1, nil, responseBytes)
 				} else {
 					attempted := false
@@ -335,8 +335,8 @@ func TestGetBlocks(t *testing.T) {
 				}
 
 				blockResponse, err := stateSyncClient.GetBlocks(ctx, test.request.Hash, test.request.Height, test.request.Parents)
-				require.ErrorIs(t, err, test.expectedErr)
-				if test.expectedErr != nil {
+				require.ErrorIs(t, err, test.wantErr)
+				if test.wantErr != nil {
 					return
 				}
 
@@ -374,7 +374,7 @@ func TestGetLeafs(t *testing.T) {
 		request         func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest
 		response        func(t *testing.T, c codec.Manager, handler handlers.LeafRequestHandler, request message.LeafsRequest, leafReqType message.LeafsRequestType) []byte
 		requireResponse func(t *testing.T, response message.LeafsResponse)
-		expectedErr     error
+		wantErr         error
 	}{
 		"full response for small (single request) trie": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
@@ -429,7 +429,7 @@ func TestGetLeafs(t *testing.T) {
 
 				return response
 			},
-			expectedErr: errTooManyLeaves,
+			wantErr: errTooManyLeaves,
 		},
 		"partial response to request for entire trie (full leaf limit)": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
@@ -558,7 +558,7 @@ func TestGetLeafs(t *testing.T) {
 				require.NoError(t, err)
 				return modifiedResponse
 			},
-			expectedErr: errInvalidRangeProof,
+			wantErr: errInvalidRangeProof,
 		},
 		"removed first key in response and replaced proof": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
@@ -592,7 +592,7 @@ func TestGetLeafs(t *testing.T) {
 				require.NoError(t, err)
 				return modifiedResponse
 			},
-			expectedErr: errInvalidRangeProof,
+			wantErr: errInvalidRangeProof,
 		},
 		"removed last key in response": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
@@ -620,7 +620,7 @@ func TestGetLeafs(t *testing.T) {
 				require.NoError(t, err)
 				return modifiedResponse
 			},
-			expectedErr: errInvalidRangeProof,
+			wantErr: errInvalidRangeProof,
 		},
 		"removed key from middle of response": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
@@ -649,7 +649,7 @@ func TestGetLeafs(t *testing.T) {
 				require.NoError(t, err)
 				return modifiedResponse
 			},
-			expectedErr: errInvalidRangeProof,
+			wantErr: errInvalidRangeProof,
 		},
 		"corrupted value in middle of response": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
@@ -677,7 +677,7 @@ func TestGetLeafs(t *testing.T) {
 				require.NoError(t, err)
 				return modifiedResponse
 			},
-			expectedErr: errInvalidRangeProof,
+			wantErr: errInvalidRangeProof,
 		},
 		"all proof keys removed from response": {
 			request: func(t *testing.T, leafReqType message.LeafsRequestType) message.LeafsRequest {
@@ -706,7 +706,7 @@ func TestGetLeafs(t *testing.T) {
 				require.NoError(t, err)
 				return modifiedResponse
 			},
-			expectedErr: errInvalidRangeProof,
+			wantErr: errInvalidRangeProof,
 		},
 	}
 	for name, test := range tests {
@@ -732,8 +732,8 @@ func TestGetLeafs(t *testing.T) {
 				responseBytes := test.response(t, c, handler, request, leafReqType)
 
 				response, _, err := parseLeafsResponse(client.codec, request, responseBytes)
-				require.ErrorIs(t, err, test.expectedErr)
-				if test.expectedErr != nil {
+				require.ErrorIs(t, err, test.wantErr)
+				if test.wantErr != nil {
 					return
 				}
 

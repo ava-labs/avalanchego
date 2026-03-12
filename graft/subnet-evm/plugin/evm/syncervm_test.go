@@ -60,12 +60,52 @@ func TestSkipStateSync(t *testing.T) {
 	testSyncerVM(t, vmSetup, test)
 }
 
-func TestStateSyncFromScratch(t *testing.T) {
+func TestStateSyncFromScratchModes(t *testing.T) {
+	tests := []struct {
+		name                    string
+		syncMode                block.StateSyncMode
+		dynamicStateSyncEnabled bool
+		stateSyncPivotInterval  uint64
+	}{
+		{
+			name:                    "static",
+			syncMode:                block.StateSyncStatic,
+			dynamicStateSyncEnabled: false,
+			stateSyncPivotInterval:  0,
+		},
+		{
+			name:                    "dynamic",
+			syncMode:                block.StateSyncDynamic,
+			dynamicStateSyncEnabled: true,
+			stateSyncPivotInterval:  1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runStateSyncFromScratchModeTest(
+				t,
+				tt.syncMode,
+				tt.dynamicStateSyncEnabled,
+				tt.stateSyncPivotInterval,
+			)
+		})
+	}
+}
+
+func runStateSyncFromScratchModeTest(
+	t *testing.T,
+	syncMode block.StateSyncMode,
+	dynamicStateSyncEnabled bool,
+	stateSyncPivotInterval uint64,
+) {
 	rand.Seed(1)
 	test := syncTest{
-		syncableInterval:   256,
-		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
-		syncMode:           block.StateSyncStatic,
+		syncableInterval:        256,
+		stateSyncMinBlocks:      50, // must be less than [syncableInterval] to perform sync
+		syncMode:                syncMode,
+		dynamicStateSyncEnabled: dynamicStateSyncEnabled,
+		stateSyncPivotInterval:  stateSyncPivotInterval,
 	}
 	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 
@@ -89,8 +129,6 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	// TODO(#4702): flaky test - should be fixed with state sync refactor
 	t.Skip("Flaky test - tracked in #4702")
 
-	rand.New(rand.NewSource(1))
-
 	var lock sync.Mutex
 	reqCount := 0
 	test := syncTest{
@@ -110,7 +148,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 				require.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response))
 			}
 		},
-		expectedErr: context.Canceled,
+		wantErr: context.Canceled,
 	}
 	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 
@@ -119,7 +157,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 
 	test.syncMode = block.StateSyncStatic
 	test.responseIntercept = nil
-	test.expectedErr = nil
+	test.wantErr = nil
 
 	var atomicErr utils.Atomic[error]
 	syncDisabledVM := &VM{}
@@ -250,7 +288,7 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 				require.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response))
 			}
 		},
-		expectedErr: context.Canceled,
+		wantErr: context.Canceled,
 	}
 	vmSetup = createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 	// Perform sync resulting in early termination.
@@ -304,8 +342,8 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	// initialise [syncerVM] with blank genesis state
 	// Match the server's state-sync-commit-interval so parsed summaries are acceptable.
 	stateSyncEnabledJSON := fmt.Sprintf(
-		`{"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "state-sync-commit-interval": %d}`,
-		test.stateSyncMinBlocks, 4, test.syncableInterval,
+		`{"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "state-sync-commit-interval": %d, "state-sync-dynamic-enabled": %t, "state-sync-pivot-interval": %d}`,
+		test.stateSyncMinBlocks, 4, test.syncableInterval, test.dynamicStateSyncEnabled, test.stateSyncPivotInterval,
 	)
 	syncerVM := newVM(t, testVMConfig{
 		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]),
@@ -394,11 +432,13 @@ func (vm *shutdownOnceVM) Shutdown(ctx context.Context) error {
 
 // syncTest contains both the actual VMs as well as the parameters with the expected output.
 type syncTest struct {
-	responseIntercept  func(vm *VM, nodeID ids.NodeID, requestID uint32, response []byte)
-	stateSyncMinBlocks uint64
-	syncableInterval   uint64
-	syncMode           block.StateSyncMode
-	expectedErr        error
+	responseIntercept       func(vm *VM, nodeID ids.NodeID, requestID uint32, response []byte)
+	stateSyncMinBlocks      uint64
+	syncableInterval        uint64
+	syncMode                block.StateSyncMode
+	dynamicStateSyncEnabled bool
+	stateSyncPivotInterval  uint64
+	wantErr                 error
 }
 
 func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
@@ -431,8 +471,8 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 
 	// If the test is expected to error, assert the correct error is returned and finish the test.
 	err = syncerVM.Client.Error()
-	if test.expectedErr != nil {
-		require.ErrorIs(err, test.expectedErr)
+	if test.wantErr != nil {
+		require.ErrorIs(err, test.wantErr)
 		// Note we re-open the database here to avoid a closed error when the test is for a shutdown VM.
 		chaindb := database.New(prefixdb.NewNested(ethDBPrefix, syncerVM.versiondb))
 		requireSyncPerformedHeight(t, chaindb, 0)
@@ -446,8 +486,8 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	require.Equal(serverVM.LastAcceptedBlock().Height(), syncerVM.LastAcceptedBlock().Height(), "block height mismatch between syncer and server")
 	require.Equal(serverVM.LastAcceptedBlock().ID(), syncerVM.LastAcceptedBlock().ID(), "blockID mismatch between syncer and server")
 	require.True(syncerVM.blockChain.HasState(syncerVM.blockChain.LastAcceptedBlock().Root()), "unavailable state for last accepted block")
-	expectedHeight := retrievedSummary.Height()
-	requireSyncPerformedHeight(t, syncerVM.chaindb, expectedHeight)
+	wantHeight := retrievedSummary.Height()
+	requireSyncPerformedHeight(t, syncerVM.chaindb, wantHeight)
 
 	lastNumber := syncerVM.blockChain.LastAcceptedBlock().NumberU64()
 	// check the last block is indexed
@@ -587,9 +627,9 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 
 // requireSyncPerformedHeight iterates over all heights the VM has synced to and
 // verifies it matches [expected].
-func requireSyncPerformedHeight(t *testing.T, db ethdb.Iteratee, expected uint64) {
+func requireSyncPerformedHeight(t *testing.T, db ethdb.Iteratee, want uint64) {
 	t.Helper()
 	latest, err := customrawdb.GetLatestSyncPerformed(db)
 	require.NoError(t, err)
-	require.Equal(t, expected, latest, "sync performed height mismatch")
+	require.Equal(t, want, latest, "sync performed height mismatch")
 }

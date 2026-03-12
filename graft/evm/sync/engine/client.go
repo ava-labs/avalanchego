@@ -50,6 +50,9 @@ var (
 // end of the sync operation.
 type EthBlockWrapper interface {
 	GetEthBlock() *ethtypes.Block
+	Accept(context.Context) error
+	Reject(context.Context) error
+	Verify(context.Context) error
 }
 
 // BloomIndexer provides bloom filter indexing functionality.
@@ -86,6 +89,15 @@ type Acceptor interface {
 type Executor interface {
 	// Execute runs the sync process and blocks until completion or error.
 	Execute(ctx context.Context, summary message.Syncable) error
+
+	// OnBlockAccepted handles a block accepted during sync.
+	OnBlockAccepted(EthBlockWrapper) (bool, error)
+
+	// OnBlockRejected handles a block rejected during sync.
+	OnBlockRejected(EthBlockWrapper) (bool, error)
+
+	// OnBlockVerified handles a block verified during sync.
+	OnBlockVerified(EthBlockWrapper) (bool, error)
 }
 
 var _ Acceptor = (*client)(nil)
@@ -114,6 +126,11 @@ type ClientConfig struct {
 	RequestSize        uint16 // number of key/value pairs to ask peers for per request
 	Enabled            bool
 	SkipResume         bool
+	// DynamicStateSyncEnabled toggles dynamic vs static state sync orchestration.
+	DynamicStateSyncEnabled bool
+
+	// PivotInterval advances the sync target every N blocks in dynamic mode.
+	PivotInterval uint64
 
 	// LeafsRequestType specifies the wire format for leafs requests.
 	// Must be set explicitly by the caller.
@@ -125,7 +142,10 @@ type client struct {
 	resumableSummary message.Syncable
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
+	executorLock     sync.RWMutex
+	executor         Executor
 	err              error
+	stateSyncOnce    sync.Once // ensures completion signaling happens exactly once
 }
 
 func NewClient(config *ClientConfig) Client {
@@ -144,6 +164,15 @@ type Client interface {
 	ClearOngoingSummary() error
 	Shutdown() error
 	Error() error
+	// OnEngineAccept should be called by the engine when a block is accepted.
+	// Returns true if the block was enqueued for deferred processing, false otherwise.
+	OnEngineAccept(EthBlockWrapper) (bool, error)
+	// OnEngineReject should be called by the engine when a block is rejected.
+	// Returns true if the block was enqueued for deferred processing, false otherwise.
+	OnEngineReject(EthBlockWrapper) (bool, error)
+	// OnEngineVerify should be called by the engine when a block is verified.
+	// Returns true if the block was enqueued for deferred processing, false otherwise.
+	OnEngineVerify(EthBlockWrapper) (bool, error)
 }
 
 // StateSyncEnabled returns [client.enabled], which is set in the chain's config file.
@@ -189,24 +218,69 @@ func (c *client) ParseStateSummary(_ context.Context, summaryBytes []byte) (bloc
 	return c.config.SyncSummaryProvider.Parse(summaryBytes, c.acceptSyncSummary)
 }
 
+func (c *client) getExecutor() Executor {
+	c.executorLock.RLock()
+	defer c.executorLock.RUnlock()
+	return c.executor
+}
+
+// OnEngineAccept delegates to the active executor, if any.
+func (c *client) OnEngineAccept(b EthBlockWrapper) (bool, error) {
+	executor := c.getExecutor()
+	if executor == nil {
+		return false, nil
+	}
+	return executor.OnBlockAccepted(b)
+}
+
+// OnEngineReject delegates to the active executor, if any.
+func (c *client) OnEngineReject(b EthBlockWrapper) (bool, error) {
+	executor := c.getExecutor()
+	if executor == nil {
+		return false, nil
+	}
+	return executor.OnBlockRejected(b)
+}
+
+// OnEngineVerify delegates to the active executor, if any.
+func (c *client) OnEngineVerify(b EthBlockWrapper) (bool, error) {
+	executor := c.getExecutor()
+	if executor == nil {
+		return false, nil
+	}
+	return executor.OnBlockVerified(b)
+}
+
 // acceptSyncSummary returns true if sync will be performed and launches the state sync process
 // in a goroutine.
-func (c *client) acceptSyncSummary(summary message.Syncable) (block.StateSyncMode, error) {
-	if err := c.prepareForSync(summary); err != nil {
+func (c *client) acceptSyncSummary(proposedSummary message.Syncable) (block.StateSyncMode, error) {
+	executor := c.getExecutor()
+
+	// If dynamic sync is already running, treat new summaries as target updates.
+	if ds, ok := executor.(*dynamicExecutor); ok && ds.CurrentState() == StateRunning {
+		if err := ds.UpdateSyncTarget(proposedSummary); err != nil {
+			return block.StateSyncSkipped, err
+		}
+		return block.StateSyncDynamic, nil
+	}
+
+	if err := c.prepareForSync(proposedSummary); err != nil {
 		if errors.Is(err, errSkipSync) {
 			return block.StateSyncSkipped, nil
 		}
 		return block.StateSyncSkipped, err
 	}
 
-	registry, err := c.newSyncerRegistry(summary)
+	registry, err := c.newSyncerRegistry(proposedSummary)
 	if err != nil {
 		return block.StateSyncSkipped, fmt.Errorf("failed to create syncer registry: %w", err)
 	}
 
-	executor := newStaticExecutor(registry, c)
+	if c.config.DynamicStateSyncEnabled {
+		return c.startAsync(newDynamicExecutor(registry, c, c.config.PivotInterval), proposedSummary, block.StateSyncDynamic), nil
+	}
 
-	return c.startAsync(executor, summary), nil
+	return c.startAsync(newStaticExecutor(registry, c), proposedSummary, block.StateSyncStatic), nil
 }
 
 // prepareForSync handles resume check and snapshot wipe before sync starts.
@@ -253,39 +327,46 @@ func (c *client) prepareForSync(summary message.Syncable) error {
 }
 
 // startAsync launches the sync executor in a background goroutine.
-func (c *client) startAsync(executor Executor, summary message.Syncable) block.StateSyncMode {
+func (c *client) startAsync(executor Executor, summary message.Syncable, mode block.StateSyncMode) block.StateSyncMode {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
+	c.executorLock.Lock()
+	c.executor = executor
+	c.executorLock.Unlock()
 
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
 		defer cancel()
 
-		if err := executor.Execute(ctx, summary); err != nil {
-			c.err = err
-		}
-		// notify engine regardless of whether err == nil,
-		// this error will be propagated to the engine when it calls
-		// vm.SetState(snow.Bootstrapping)
-		log.Info("state sync completed, notifying engine", "err", c.err)
-		close(c.config.StateSyncDone)
+		err := executor.Execute(ctx, summary)
+		c.signalDone(err)
 	}()
 
-	log.Info("state sync started", "mode", block.StateSyncStatic)
-	return block.StateSyncStatic
+	log.Info("state sync started", "mode", mode.String(), "summary", summary.GetBlockHash().Hex(), "height", summary.Height())
+	return mode
 }
 
 func (c *client) Shutdown() error {
-	if c.cancel != nil {
-		c.cancel()
-	}
-	c.wg.Wait() // wait for the background goroutine to exit
+	c.signalDone(context.Canceled)
+	c.wg.Wait()
 	return nil
 }
 
 // Error returns a non-nil error if one occurred during the sync.
 func (c *client) Error() error { return c.err }
+
+// signalDone sets the terminal error exactly once and signals completion to the engine.
+func (c *client) signalDone(err error) {
+	c.stateSyncOnce.Do(func() {
+		c.err = err
+		if c.cancel != nil {
+			c.cancel()
+		}
+		log.Info("state sync completed, notifying engine", "err", err)
+		close(c.config.StateSyncDone)
+	})
+}
 
 // AcceptSync implements Acceptor. It resets the blockchain to the synced block,
 // preparing it for execution, and updates disk and memory pointers so the VM
@@ -384,24 +465,53 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		return nil, fmt.Errorf("failed to create block syncer: %w", err)
 	}
 
-	codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create code queue: %w", err)
-	}
-
-	codeSyncer, err := code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create code syncer: %w", err)
-	}
-
-	stateSyncer, err := evmstate.NewSyncer(
-		c.config.Client, c.config.ChainDB,
-		summary.GetBlockRoot(),
-		codeQueue, c.config.RequestSize,
-		c.config.LeafsRequestType,
+	var (
+		codeSyncer  types.Syncer
+		stateSyncer types.Syncer
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
+	if c.config.DynamicStateSyncEnabled {
+		// Dynamic mode is wired through session-aware queue/syncer constructors.
+		// This allows pivot/session boundaries to be integrated explicitly.
+		codeQueue, err := code.NewSessionedQueue(c.config.ChainDB, c.config.StateSyncDone)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sessioned code queue: %w", err)
+		}
+
+		codeSyncer, err = code.NewDynamicSyncer(c.config.Client, c.config.ChainDB, codeQueue)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sessioned code syncer: %w", err)
+		}
+
+		stateSyncer, err = evmstate.NewHashDBDynamicSyncer(
+			c.config.Client, c.config.ChainDB,
+			summary.GetBlockRoot(),
+			codeQueue, c.config.RequestSize,
+			c.config.LeafsRequestType,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create dynamic EVM state syncer: %w", err)
+		}
+	} else {
+		codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create code queue: %w", err)
+		}
+
+		codeSyncer, err = code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create code syncer: %w", err)
+		}
+
+		stateSyncer, err = evmstate.NewHashDBSyncer(
+			c.config.Client, c.config.ChainDB,
+			summary.GetBlockRoot(),
+			codeQueue, c.config.RequestSize,
+			c.config.LeafsRequestType,
+			evmstate.WithFinalizeCodeQueue(codeQueue.Finalize),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
+		}
 	}
 
 	syncers := []types.Syncer{blockSyncer, codeSyncer, stateSyncer}

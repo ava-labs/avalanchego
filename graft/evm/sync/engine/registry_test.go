@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -41,6 +42,9 @@ func (m *mockSyncer) Sync(context.Context) error {
 
 func (m *mockSyncer) Name() string { return m.name }
 func (m *mockSyncer) ID() string   { return m.name }
+func (*mockSyncer) UpdateTarget(message.Syncable) error {
+	return nil
+}
 
 // syncerConfig describes a test syncer setup for RunSyncerTasks table tests.
 type syncerConfig struct {
@@ -58,8 +62,7 @@ func TestSyncerRegistry_Register(t *testing.T) {
 	tests := []struct {
 		name          string
 		registrations []*mockSyncer
-		expectedError error
-		expectedCount int
+		wantError     error
 	}{
 		{
 			name: "successful registrations",
@@ -67,7 +70,6 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				newMockSyncer("Syncer1", nil),
 				newMockSyncer("Syncer2", nil),
 			},
-			expectedCount: 2,
 		},
 		{
 			name: "duplicate id registration",
@@ -75,8 +77,7 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				newMockSyncer("Syncer1", nil),
 				newMockSyncer("Syncer1", nil),
 			},
-			expectedError: errSyncerAlreadyRegistered,
-			expectedCount: 1,
+			wantError: errSyncerAlreadyRegistered,
 		},
 		{
 			name: "preserve registration order",
@@ -85,7 +86,6 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				newMockSyncer("Syncer2", nil),
 				newMockSyncer("Syncer3", nil),
 			},
-			expectedCount: 3,
 		},
 	}
 
@@ -93,6 +93,7 @@ func TestSyncerRegistry_Register(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			registry := NewSyncerRegistry()
 			var errLast error
+			successfulRegistrations := 0
 
 			// Perform registrations.
 			for _, reg := range tt.registrations {
@@ -101,16 +102,17 @@ func TestSyncerRegistry_Register(t *testing.T) {
 					errLast = err
 					break
 				}
+				successfulRegistrations++
 			}
 
 			// Check error expectations.
-			require.ErrorIs(t, errLast, tt.expectedError)
+			require.ErrorIs(t, errLast, tt.wantError)
 
 			// Verify registration count.
-			require.Len(t, registry.syncers, tt.expectedCount)
+			require.Len(t, registry.syncers, successfulRegistrations)
 
 			// Verify registration order for successful cases.
-			if tt.expectedError == nil {
+			if tt.wantError == nil {
 				for i, reg := range tt.registrations {
 					require.Equal(t, reg.name, registry.syncers[i].name)
 					require.Equal(t, reg, registry.syncers[i].syncer)
@@ -123,10 +125,10 @@ func TestSyncerRegistry_Register(t *testing.T) {
 func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 	errFoo := errors.New("foo")
 	tests := []struct {
-		name          string
-		syncers       []syncerConfig
-		expectedError error
-		assertState   func(t *testing.T, mockSyncers []*mockSyncer)
+		name        string
+		syncers     []syncerConfig
+		wantError   error
+		assertState func(t *testing.T, mockSyncers []*mockSyncer)
 	}{
 		{
 			name: "successful execution",
@@ -145,7 +147,7 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 				{"Syncer1", errFoo},
 				{"Syncer2", nil},
 			},
-			expectedError: errFoo,
+			wantError: errFoo,
 			assertState: func(t *testing.T, mockSyncers []*mockSyncer) {
 				// First syncer should be started and waited on (but wait failed).
 				require.True(t, mockSyncers[0].started, "First syncer should have been started")
@@ -172,7 +174,7 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 
 				err := registry.RunSyncerTasks(ctx, newTestClientSummary(t, c))
 
-				require.ErrorIs(t, err, tt.expectedError)
+				require.ErrorIs(t, err, tt.wantError)
 
 				// Use custom assertion function for each test case.
 				tt.assertState(t, mockSyncers)
@@ -424,6 +426,27 @@ func TestSyncerRegistry_MixedCancellationAndSuccess(t *testing.T) {
 
 		// Verify that the cancellation error is returned.
 		require.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestSyncerRegistry_MinTargetHeight(t *testing.T) {
+	t.Run("no syncers returns MaxUint64", func(t *testing.T) {
+		registry := NewSyncerRegistry()
+		require.Equal(t, uint64(math.MaxUint64), registry.MinTargetHeight())
+	})
+
+	t.Run("no target reporters returns MaxUint64", func(t *testing.T) {
+		registry := NewSyncerRegistry()
+		require.NoError(t, registry.Register(newMockSyncer("plain", nil)))
+		require.Equal(t, uint64(math.MaxUint64), registry.MinTargetHeight())
+	})
+
+	t.Run("multiple reporters returns minimum", func(t *testing.T) {
+		registry := NewSyncerRegistry()
+		require.NoError(t, registry.Register(NewTargetReporterSyncer("fast", 1000)))
+		require.NoError(t, registry.Register(NewTargetReporterSyncer("slow", 500)))
+		require.NoError(t, registry.Register(newMockSyncer("plain", nil)))
+		require.Equal(t, uint64(500), registry.MinTargetHeight())
 	})
 }
 

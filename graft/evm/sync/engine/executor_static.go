@@ -34,3 +34,12 @@ func (e *staticExecutor) Execute(ctx context.Context, summary message.Syncable) 
 	}
 	return e.acceptor.AcceptSync(ctx, summary)
 }
+
+// OnBlockAccepted is a no-op in static mode.
+func (*staticExecutor) OnBlockAccepted(EthBlockWrapper) (bool, error) { return false, nil }
+
+// OnBlockRejected is a no-op in static mode.
+func (*staticExecutor) OnBlockRejected(EthBlockWrapper) (bool, error) { return false, nil }
+
+// OnBlockVerified is a no-op in static mode.
+func (*staticExecutor) OnBlockVerified(EthBlockWrapper) (bool, error) { return false, nil }

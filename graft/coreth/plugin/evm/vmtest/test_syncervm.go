@@ -68,6 +68,10 @@ var SyncerVMTests = []SyncerVMTest{
 		TestFunc: StateSyncFromScratchTest,
 	},
 	{
+		Name:     "StateSyncFromScratchDynamicTest",
+		TestFunc: StateSyncFromScratchDynamicTest,
+	},
+	{
 		Name:     "StateSyncFromScratchExceedParentTest",
 		TestFunc: StateSyncFromScratchExceedParentTest,
 	},
@@ -93,10 +97,26 @@ func SkipStateSyncTest(t *testing.T, testSetup *SyncTestSetup) {
 }
 
 func StateSyncFromScratchTest(t *testing.T, testSetup *SyncTestSetup) {
+	runStateSyncFromScratchModeTest(t, testSetup, block.StateSyncStatic, false, 0)
+}
+
+func StateSyncFromScratchDynamicTest(t *testing.T, testSetup *SyncTestSetup) {
+	runStateSyncFromScratchModeTest(t, testSetup, block.StateSyncDynamic, true, 1)
+}
+
+func runStateSyncFromScratchModeTest(
+	t *testing.T,
+	testSetup *SyncTestSetup,
+	syncMode block.StateSyncMode,
+	dynamicStateSyncEnabled bool,
+	stateSyncPivotInterval uint64,
+) {
 	test := SyncTestParams{
-		SyncableInterval:   256,
-		StateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
-		SyncMode:           block.StateSyncStatic,
+		SyncableInterval:        256,
+		StateSyncMinBlocks:      50, // must be less than [syncableInterval] to perform sync
+		SyncMode:                syncMode,
+		DynamicStateSyncEnabled: dynamicStateSyncEnabled,
+		StateSyncPivotInterval:  stateSyncPivotInterval,
 	}
 	testSyncVMSetup := initSyncServerAndClientVMs(t, test, engine.BlocksToFetch, testSetup)
 
@@ -346,7 +366,14 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 
 	// initialise [syncerVM] with blank genesis state
 	// we also override [syncerVM]'s commit interval so the atomic trie works correctly.
-	stateSyncEnabledJSON := fmt.Sprintf(`{"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "commit-interval": %d}`, test.StateSyncMinBlocks, 4, test.SyncableInterval)
+	stateSyncEnabledJSON := fmt.Sprintf(
+		`{"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "commit-interval": %d, "state-sync-dynamic-enabled": %t, "state-sync-pivot-interval": %d}`,
+		test.StateSyncMinBlocks,
+		4,
+		test.SyncableInterval,
+		test.DynamicStateSyncEnabled,
+		test.StateSyncPivotInterval,
+	)
 
 	syncerVM, syncerCB := testSetup.NewVM()
 	syncerTest := SetupTestVM(t, syncerVM, TestVMConfig{
@@ -458,11 +485,13 @@ func (vm *shutdownOnceVM) Shutdown(ctx context.Context) error {
 
 // SyncTestParams contains both the actual VMs as well as the parameters with the expected output.
 type SyncTestParams struct {
-	responseIntercept  func(vm extension.InnerVM, nodeID ids.NodeID, requestID uint32, response []byte)
-	StateSyncMinBlocks uint64
-	SyncableInterval   uint64
-	SyncMode           block.StateSyncMode
-	expectedErr        error
+	responseIntercept       func(vm extension.InnerVM, nodeID ids.NodeID, requestID uint32, response []byte)
+	StateSyncMinBlocks      uint64
+	SyncableInterval        uint64
+	SyncMode                block.StateSyncMode
+	DynamicStateSyncEnabled bool
+	StateSyncPivotInterval  uint64
+	expectedErr             error
 }
 
 func testSyncerVM(t *testing.T, testSyncVMSetup *testSyncVMSetup, test SyncTestParams, extraSyncerVMTest func(t *testing.T, syncerVMSetup SyncVMSetup)) {

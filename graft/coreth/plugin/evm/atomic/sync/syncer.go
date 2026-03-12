@@ -31,9 +31,10 @@ const (
 )
 
 var (
-	_ types.Syncer    = (*Syncer)(nil)
-	_ types.Finalizer = (*Syncer)(nil)
-	_ leaf.SyncTask   = (*syncerLeafTask)(nil)
+	_ types.Syncer         = (*Syncer)(nil)
+	_ types.Finalizer      = (*Syncer)(nil)
+	_ types.TargetReporter = (*Syncer)(nil)
+	_ leaf.SyncTask        = (*syncerLeafTask)(nil)
 
 	errTargetHeightRequired = errors.New("target height must be > 0")
 )
@@ -145,6 +146,20 @@ func (*Syncer) ID() string {
 // Sync begins syncing the target atomic root with the configured number of worker goroutines.
 func (s *Syncer) Sync(ctx context.Context) error {
 	return s.syncer.Sync(ctx)
+}
+
+func (*Syncer) UpdateTarget(message.Syncable) error {
+	// The atomic syncer does not pivot. It syncs to the initial target from
+	// the peer summary and relies on batch replay to fill the gap between
+	// its target and the coordinator's commitTarget.
+	return nil
+}
+
+// TargetHeight returns the fixed target height from the initial summary.
+// The coordinator uses this to avoid pruning queued blocks that the atomic
+// syncer needs for gap filling during batch replay.
+func (s *Syncer) TargetHeight() uint64 {
+	return s.targetHeight
 }
 
 // Finalize commits any pending database changes to disk.
