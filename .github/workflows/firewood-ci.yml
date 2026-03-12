@@ -257,6 +257,8 @@ jobs:
   ffi:
     needs: build
     runs-on: ${{ matrix.os }}
+    env:
+      GOWORK: "off"
     defaults:
       run:
         working-directory: firewood
@@ -292,6 +294,8 @@ jobs:
   firewood-ethhash-differential-fuzz:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      GOWORK: "off"
     defaults:
       run:
         working-directory: firewood
@@ -336,6 +340,8 @@ jobs:
   firewood-merkle-differential-fuzz:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      GOWORK: "off"
     defaults:
       run:
         working-directory: firewood
