@@ -900,6 +900,74 @@ mod test {
         update_single_proposal.commit().unwrap();
     }
 
+    /// Test that `DeleteRange` with an empty prefix correctly clears all subtries
+    /// in the parallel merkle implementation, even those without existing workers.
+    ///
+    /// Workers are created lazily — only when a prior operation in the same batch
+    /// targets a subtrie's first nibble. `remove_all_entries` (triggered by
+    /// `DeleteRange { prefix: &[] }`) only sends the delete to existing workers,
+    /// so children in subtries that were never touched by prior operations in the
+    /// batch may survive incorrectly.
+    #[test]
+    fn test_parallel_delete_range_empty_prefix_with_existing_workers() {
+        let parallel_db = TestDb::new_with_config(
+            DbConfig::builder()
+                .use_parallel(UseParallel::Always)
+                .build(),
+        );
+        let single_db =
+            TestDb::new_with_config(DbConfig::builder().use_parallel(UseParallel::Never).build());
+
+        // Insert keys in different subtries (different first nibbles)
+        let setup_keys: Vec<[u8; 1]> = vec![[0x00], [0x10], [0x20]];
+        let setup_vals: Vec<Box<[u8]>> = vec![Box::new([1]), Box::new([2]), Box::new([3])];
+
+        for db in [&parallel_db, &single_db] {
+            let proposal = db
+                .propose(setup_keys.iter().zip(setup_vals.iter()))
+                .unwrap();
+            proposal.commit().unwrap();
+        }
+
+        // Batch: update a key in the 0x0 subtrie, then DeleteRange with empty prefix.
+        // This ensures only the 0x0 worker exists when remove_all_entries runs.
+        let batch: Vec<BatchOp<Vec<u8>, Vec<u8>>> = vec![
+            BatchOp::Put {
+                key: vec![0x00],
+                value: vec![99],
+            },
+            BatchOp::DeleteRange { prefix: vec![] },
+        ];
+
+        for db in [&parallel_db, &single_db] {
+            let proposal = db.propose(batch.iter()).unwrap();
+            proposal.commit().unwrap();
+        }
+
+        // All keys should be deleted in both implementations.
+        // When the trie is completely empty, root_hash() may return None (e.g. without
+        // the ethhash feature). In that case, the trie is empty and all keys are deleted.
+        assert_eq!(
+            parallel_db.root_hash(),
+            single_db.root_hash(),
+            "root hashes should match after delete-all"
+        );
+        if let Some(root_hash) = parallel_db.root_hash() {
+            let parallel_rev = parallel_db.revision(root_hash).unwrap();
+            let single_rev = single_db.revision(single_db.root_hash().unwrap()).unwrap();
+
+            for key in &setup_keys {
+                let parallel_val = parallel_rev.val(key).unwrap();
+                let single_val = single_rev.val(key).unwrap();
+                assert_eq!(
+                    parallel_val, single_val,
+                    "mismatch for key {key:?}: parallel={parallel_val:?}, single={single_val:?}"
+                );
+                assert_eq!(single_val, None, "key {key:?} should be deleted");
+            }
+        }
+    }
+
     /// Test that proposing on a proposal works as expected
     ///
     /// Test creates two batches and proposes them, and verifies that the values are in the correct proposal.

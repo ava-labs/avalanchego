@@ -328,17 +328,23 @@ impl ParallelMerkle {
     /// Removes all of the entries in the trie. For the root entry, the value is removed but the
     /// root itself will remain. An empty root will only be removed during post processing.
     fn remove_all_entries(
-        &self,
+        &mut self,
+        pool: &ThreadPool,
+        proposal: &mut NodeStore<MutableProposal, FileBacked>,
         root_branch: &mut BranchNode,
-    ) -> Result<(), SendError<BatchOp<Key, Value>>> {
-        for worker in self
-            .workers
-            .iter()
-            .filter_map(|(_, worker)| worker.as_ref())
-        {
-            worker.send(BatchOp::DeleteRange {
-                prefix: Box::default(), // Empty prefix
-            })?;
+        response_sender: &Sender<Result<Response, FileIoError>>,
+    ) -> Result<(), CreateProposalError> {
+        for pc in PathComponent::ALL {
+            // Create workers for children that exist but don't have a worker yet,
+            // and also send to workers that already exist (they may have accumulated
+            // data from prior ops in the batch).
+            if root_branch.children.get(pc).is_some() || self.workers.get(pc).is_some() {
+                let worker =
+                    self.worker(pool, proposal, root_branch, pc, response_sender.clone())?;
+                worker.send(BatchOp::DeleteRange {
+                    prefix: Box::default(),
+                })?;
+            }
         }
         // Also set the root value to None but does not delete the root.
         root_branch.value = None;
@@ -414,12 +420,23 @@ impl ParallelMerkle {
                     }
                     BatchOp::DeleteRange { prefix: _ } => {
                         // Calling remove prefix with an empty prefix is equivalent to a remove all.
-                        if let Err(err) = self.remove_all_entries(&mut root_branch) {
-                            // A send error is most likely due to a worker returning to the thread pool
-                            // after it encountered a FileIoError. Try to find the FileIoError in the
-                            // response channel and return that instead.
-                            ParallelMerkle::find_fileio_error(&response_receiver)?;
-                            return Err(err.into());
+                        if let Err(err) = self.remove_all_entries(
+                            pool,
+                            &mut mutable_nodestore,
+                            &mut root_branch,
+                            &response_sender,
+                        ) {
+                            // If the error is a SendError, try to find the underlying
+                            // FileIoError from the response channel first (a SendError
+                            // means a worker died, likely from a FileIoError).
+                            // If it's already a FileIoError (from worker creation), propagate directly.
+                            match err {
+                                CreateProposalError::SendError => {
+                                    ParallelMerkle::find_fileio_error(&response_receiver)?;
+                                    return Err(err);
+                                }
+                                _ => return Err(err),
+                            }
                         }
                     }
                 }
