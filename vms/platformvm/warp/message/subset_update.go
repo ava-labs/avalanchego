@@ -9,14 +9,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// SubsetUpdate is sent by the P-chain.
+// ValidatorSetMetadata is sent by the P-chain.
 //
 // This message reports the validator set of a given blockchain ID
 // at a specific P-Chain height, sharded into consecutive subsets.
 // Each shard hash is the SHA256 of the codec-serialized validators
 // in that shard. This allows large validator sets to be delivered
 // across multiple transactions on the receiving chain.
-type SubsetUpdate struct {
+type ValidatorSetMetadata struct {
 	payload
 
 	BlockchainID    ids.ID   `serialize:"true" json:"blockchainID"`
@@ -25,14 +25,14 @@ type SubsetUpdate struct {
 	ShardHashes     []ids.ID `serialize:"true" json:"shardHashes"`
 }
 
-// NewSubsetUpdate creates a new initialized SubsetUpdate.
-func NewSubsetUpdate(
+// NewValidatorSetMetadata creates a new initialized ValidatorSetMetadata.
+func NewValidatorSetMetadata(
 	blockchainID ids.ID,
 	pChainHeight uint64,
 	pChainTimestamp uint64,
 	shardHashes []ids.ID,
-) (*SubsetUpdate, error) {
-	msg := &SubsetUpdate{
+) (*ValidatorSetMetadata, error) {
+	msg := &ValidatorSetMetadata{
 		BlockchainID:    blockchainID,
 		PChainHeight:    pChainHeight,
 		PChainTimestamp: pChainTimestamp,
@@ -41,13 +41,13 @@ func NewSubsetUpdate(
 	return msg, Initialize(msg)
 }
 
-// ParseSubsetUpdate parses bytes into an initialized SubsetUpdate.
-func ParseSubsetUpdate(b []byte) (*SubsetUpdate, error) {
+// ParseValidatorSetMetadata parses bytes into an initialized ValidatorSetMetadata.
+func ParseValidatorSetMetadata(b []byte) (*ValidatorSetMetadata, error) {
 	payloadIntf, err := Parse(b)
 	if err != nil {
 		return nil, err
 	}
-	payload, ok := payloadIntf.(*SubsetUpdate)
+	payload, ok := payloadIntf.(*ValidatorSetMetadata)
 	if !ok {
 		return nil, fmt.Errorf("%w: %T", ErrWrongType, payloadIntf)
 	}
