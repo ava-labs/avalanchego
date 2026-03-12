@@ -48,7 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth/ethconfig"
 	"github.com/ava-labs/avalanchego/graft/coreth/miner"
-	"github.com/ava-labs/avalanchego/graft/coreth/network"
+	"github.com/ava-labs/avalanchego/graft/evm/network"
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
