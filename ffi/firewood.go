@@ -23,6 +23,24 @@ package ffi
 // #cgo LDFLAGS: -lfirewood_ffi -lm -ldl
 // #include <stdlib.h>
 // #include "firewood.h"
+// #cgo noescape fwd_open_db
+// #cgo nocallback fwd_open_db
+// #cgo noescape fwd_batch
+// #cgo nocallback fwd_batch
+// #cgo noescape fwd_propose_on_db
+// #cgo nocallback fwd_propose_on_db
+// #cgo noescape fwd_get_latest
+// #cgo nocallback fwd_get_latest
+// #cgo noescape fwd_root_hash
+// #cgo nocallback fwd_root_hash
+// #cgo noescape fwd_get_revision
+// #cgo nocallback fwd_get_revision
+// #cgo noescape fwd_close_db
+// #cgo nocallback fwd_close_db
+// #cgo noescape fwd_db_dump
+// #cgo nocallback fwd_db_dump
+// #cgo noescape fwd_block_replay_flush
+// #cgo nocallback fwd_block_replay_flush
 import "C"
 
 import (

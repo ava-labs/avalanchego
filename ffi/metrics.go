@@ -7,6 +7,14 @@ package ffi
 
 // #include <stdlib.h>
 // #include "firewood.h"
+// #cgo noescape fwd_start_metrics
+// #cgo nocallback fwd_start_metrics
+// #cgo noescape fwd_start_metrics_with_exporter
+// #cgo nocallback fwd_start_metrics_with_exporter
+// #cgo noescape fwd_gather
+// #cgo nocallback fwd_gather
+// #cgo noescape fwd_start_logs
+// #cgo nocallback fwd_start_logs
 import "C"
 
 import (

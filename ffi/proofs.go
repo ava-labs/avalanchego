@@ -5,6 +5,48 @@ package ffi
 
 // #include <stdlib.h>
 // #include "firewood.h"
+// #cgo noescape fwd_db_range_proof
+// #cgo nocallback fwd_db_range_proof
+// #cgo noescape fwd_range_proof_verify
+// #cgo nocallback fwd_range_proof_verify
+// #cgo noescape fwd_db_verify_range_proof
+// #cgo nocallback fwd_db_verify_range_proof
+// #cgo noescape fwd_db_verify_and_commit_range_proof
+// #cgo nocallback fwd_db_verify_and_commit_range_proof
+// #cgo noescape fwd_range_proof_find_next_key
+// #cgo nocallback fwd_range_proof_find_next_key
+// #cgo noescape fwd_range_proof_code_hash_iter
+// #cgo nocallback fwd_range_proof_code_hash_iter
+// #cgo noescape fwd_code_hash_iter_next
+// #cgo nocallback fwd_code_hash_iter_next
+// #cgo noescape fwd_code_hash_iter_free
+// #cgo nocallback fwd_code_hash_iter_free
+// #cgo noescape fwd_range_proof_to_bytes
+// #cgo nocallback fwd_range_proof_to_bytes
+// #cgo noescape fwd_range_proof_from_bytes
+// #cgo nocallback fwd_range_proof_from_bytes
+// #cgo noescape fwd_free_range_proof
+// #cgo nocallback fwd_free_range_proof
+// #cgo noescape fwd_db_change_proof
+// #cgo nocallback fwd_db_change_proof
+// #cgo noescape fwd_verify_change_proof
+// #cgo nocallback fwd_verify_change_proof
+// #cgo noescape fwd_db_propose_change_proof
+// #cgo nocallback fwd_db_propose_change_proof
+// #cgo noescape fwd_db_commit_change_proof
+// #cgo nocallback fwd_db_commit_change_proof
+// #cgo noescape fwd_change_proof_find_next_key_proposed
+// #cgo nocallback fwd_change_proof_find_next_key_proposed
+// #cgo noescape fwd_change_proof_to_bytes
+// #cgo nocallback fwd_change_proof_to_bytes
+// #cgo noescape fwd_change_proof_from_bytes
+// #cgo nocallback fwd_change_proof_from_bytes
+// #cgo noescape fwd_free_change_proof
+// #cgo nocallback fwd_free_change_proof
+// #cgo noescape fwd_free_verified_change_proof
+// #cgo nocallback fwd_free_verified_change_proof
+// #cgo noescape fwd_free_proposed_change_proof
+// #cgo nocallback fwd_free_proposed_change_proof
 import "C"
 
 import (

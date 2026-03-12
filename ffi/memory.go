@@ -6,6 +6,12 @@ package ffi
 // // Note that -lm is required on Linux but not on Mac.
 // #include <stdlib.h>
 // #include "firewood.h"
+// #cgo noescape fwd_free_owned_bytes
+// #cgo nocallback fwd_free_owned_bytes
+// #cgo noescape fwd_free_owned_key_value_batch
+// #cgo nocallback fwd_free_owned_key_value_batch
+// #cgo noescape fwd_free_owned_kv_pair
+// #cgo nocallback fwd_free_owned_kv_pair
 import "C"
 
 import (

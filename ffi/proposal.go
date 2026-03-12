@@ -5,6 +5,18 @@ package ffi
 
 // #include <stdlib.h>
 // #include "firewood.h"
+// #cgo noescape fwd_get_from_proposal
+// #cgo nocallback fwd_get_from_proposal
+// #cgo noescape fwd_iter_on_proposal
+// #cgo nocallback fwd_iter_on_proposal
+// #cgo noescape fwd_propose_on_proposal
+// #cgo nocallback fwd_propose_on_proposal
+// #cgo noescape fwd_commit_proposal
+// #cgo nocallback fwd_commit_proposal
+// #cgo noescape fwd_proposal_dump
+// #cgo nocallback fwd_proposal_dump
+// #cgo noescape fwd_free_proposal
+// #cgo nocallback fwd_free_proposal
 import "C"
 
 import (

@@ -5,6 +5,14 @@ package ffi
 
 // #include <stdlib.h>
 // #include "firewood.h"
+// #cgo noescape fwd_get_from_revision
+// #cgo nocallback fwd_get_from_revision
+// #cgo noescape fwd_iter_on_revision
+// #cgo nocallback fwd_iter_on_revision
+// #cgo noescape fwd_revision_dump
+// #cgo nocallback fwd_revision_dump
+// #cgo noescape fwd_free_revision
+// #cgo nocallback fwd_free_revision
 import "C"
 
 import (

@@ -5,6 +5,12 @@ package ffi
 
 // #include <stdlib.h>
 // #include "firewood.h"
+// #cgo noescape fwd_iter_next
+// #cgo nocallback fwd_iter_next
+// #cgo noescape fwd_iter_next_n
+// #cgo nocallback fwd_iter_next_n
+// #cgo noescape fwd_free_iterator
+// #cgo nocallback fwd_free_iterator
 import "C"
 
 import (
