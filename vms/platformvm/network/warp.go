@@ -765,14 +765,13 @@ func (s signatureRequestVerifier) verifySubsetUpdate(
 	s.log.Debug("verifying subset update",
 		zap.Stringer("blockchainID", msg.BlockchainID),
 		zap.Uint64("pChainHeight", msg.PChainHeight),
-		zap.Uint32("shardSize", msg.ShardSize),
 		zap.Int("shardCount", len(msg.ShardHashes)),
 	)
 
-	if msg.ShardSize == 0 {
+	if len(msg.ShardHashes) == 0 {
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: "shard size must be greater than 0",
+			Message: "shard hashes must not be empty",
 		}
 	}
 
@@ -840,22 +839,13 @@ func (s signatureRequestVerifier) verifySubsetUpdate(
 		}
 	}
 
-	// Split into shards of ShardSize and verify each hash.
+	// Derive shard size from the number of validators and provided shard count,
+	// then verify each shard hash.
 	numValidators := len(validators)
-	shardSize := int(msg.ShardSize)
-	expectedShardCount := (numValidators + shardSize - 1) / shardSize
-	if expectedShardCount == 0 {
-		expectedShardCount = 1
-	}
+	shardCount := len(msg.ShardHashes)
+	shardSize := (numValidators + shardCount - 1) / shardCount
 
-	if len(msg.ShardHashes) != expectedShardCount {
-		return &common.AppError{
-			Code:    common.ErrUndefined.Code,
-			Message: fmt.Sprintf("shard count mismatch. provided %d. expected %d", len(msg.ShardHashes), expectedShardCount),
-		}
-	}
-
-	for i := 0; i < expectedShardCount; i++ {
+	for i := 0; i < shardCount; i++ {
 		start := i * shardSize
 		end := start + shardSize
 		if end > numValidators {
@@ -882,8 +872,7 @@ func (s signatureRequestVerifier) verifySubsetUpdate(
 	s.log.Info("subset update verified",
 		zap.Stringer("blockchainID", msg.BlockchainID),
 		zap.Uint64("pChainHeight", msg.PChainHeight),
-		zap.Uint32("shardSize", msg.ShardSize),
-		zap.Int("shardCount", len(msg.ShardHashes)),
+		zap.Int("shardCount", shardCount),
 		zap.Int("validatorCount", numValidators),
 	)
 

@@ -22,7 +22,6 @@ type SubsetUpdate struct {
 	BlockchainID    ids.ID   `serialize:"true" json:"blockchainID"`
 	PChainHeight    uint64   `serialize:"true" json:"pChainHeight"`
 	PChainTimestamp uint64   `serialize:"true" json:"pChainTimestamp"`
-	ShardSize       uint32   `serialize:"true" json:"shardSize"`
 	ShardHashes     []ids.ID `serialize:"true" json:"shardHashes"`
 }
 
@@ -31,14 +30,12 @@ func NewSubsetUpdate(
 	blockchainID ids.ID,
 	pChainHeight uint64,
 	pChainTimestamp uint64,
-	shardSize uint32,
 	shardHashes []ids.ID,
 ) (*SubsetUpdate, error) {
 	msg := &SubsetUpdate{
 		BlockchainID:    blockchainID,
 		PChainHeight:    pChainHeight,
 		PChainTimestamp: pChainTimestamp,
-		ShardSize:       shardSize,
 		ShardHashes:     shardHashes,
 	}
 	return msg, Initialize(msg)
