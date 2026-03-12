@@ -20,7 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )
 
-var _ types.Syncer = (*HashDBDynamicSyncer)(nil)
+var (
+	_ types.Syncer         = (*HashDBDynamicSyncer)(nil)
+	_ types.TargetReporter = (*HashDBDynamicSyncer)(nil)
+)
 
 // HashDBDynamicSyncer wraps a [HashDBSyncer] and adds pivot-anytime support.
 // On each pivot, the inner [HashDBSyncer] is discarded and a fresh one is created
@@ -156,6 +159,13 @@ func (d *HashDBDynamicSyncer) setSessionCancel(cancel context.CancelCauseFunc) {
 	d.targetMu.Lock()
 	defer d.targetMu.Unlock()
 	d.sessionCancel = cancel
+}
+
+// TargetHeight returns the latest desired height this syncer is working toward.
+func (d *HashDBDynamicSyncer) TargetHeight() uint64 {
+	d.targetMu.Lock()
+	defer d.targetMu.Unlock()
+	return d.desiredHeight
 }
 
 // getDesiredRoot returns the current desired root under the target mutex.

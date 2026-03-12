@@ -159,6 +159,34 @@ func TestCoordinator_UpdateSyncTarget_SerializesConcurrentCalls(t *testing.T) {
 	require.False(t, concurrent.Load(), "UpdateTarget calls should be serialized")
 }
 
+func TestCoordinator_UpdateSyncTarget_PreservesBlocksForSlowerSyncers(t *testing.T) {
+	// Simulate the atomic gap scenario: a slow syncer (e.g., atomic) targets
+	// height 500 while the coordinator updates to 1000. Blocks between 500
+	// and 1000 must be preserved for batch replay.
+	registry := NewSyncerRegistry()
+
+	// Register a "slow" syncer that reports a fixed low target (like the atomic syncer).
+	require.NoError(t, registry.Register(NewTargetReporterSyncer("slow-syncer", 500)))
+
+	co := NewCoordinator(registry, Callbacks{}, WithPivotInterval(1))
+	co.state.Store(int32(StateRunning))
+	co.setCommitTarget(newTestSyncTarget(500))
+
+	// Enqueue blocks from 490 to 510.
+	for i := uint64(490); i <= 510; i++ {
+		co.AddBlockOperation(newMockBlock(i), OpAccept)
+	}
+
+	// Update target to 505. Without min-target tracking, blocks 490-504 would
+	// be pruned. With min-target tracking, only blocks below 500 are pruned.
+	require.NoError(t, co.UpdateSyncTarget(newTestSyncTarget(505)))
+
+	batch := co.queue.dequeueBatch()
+	// Blocks 500-510 preserved (11 blocks). Blocks 490-499 pruned.
+	require.Len(t, batch, 11, "blocks between slow syncer target and new target must be preserved")
+	require.Equal(t, uint64(500), batch[0].block.GetEthBlock().NumberU64())
+}
+
 func TestCoordinator_Lifecycle(t *testing.T) {
 	t.Run("completes successfully", func(t *testing.T) {
 		registry := NewSyncerRegistry()
@@ -191,7 +219,6 @@ func TestCoordinator_Start_ReplaysDeferredOperationsAfterFinalize(t *testing.T) 
 	release := make(chan struct{})
 	require.NoError(t, registry.Register(FuncSyncer{
 		name: "barrier",
-		id:   "barrier",
 		fn: func(ctx context.Context) error {
 			close(started)
 			select {

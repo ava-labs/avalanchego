@@ -277,8 +277,15 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 
 	co.setCommitTarget(newTarget)
 	co.targetEpoch.Add(1)
-	// Remove blocks from queue that will never be executed (behind the new target).
-	co.queue.removeBelowHeight(newTarget.Height())
+	// Remove blocks from the queue that will never be executed. Use the minimum
+	// of the new target and the slowest syncer's target to preserve blocks that
+	// slower syncers (e.g., the atomic syncer) still need for gap filling during
+	// batch replay.
+	pruneHeight := newTarget.Height()
+	if minTarget := co.syncerRegistry.MinTargetHeight(); minTarget < pruneHeight {
+		pruneHeight = minTarget
+	}
+	co.queue.removeBelowHeight(pruneHeight)
 	co.pivot.advance()
 	return nil
 }

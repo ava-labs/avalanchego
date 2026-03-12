@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -425,6 +426,27 @@ func TestSyncerRegistry_MixedCancellationAndSuccess(t *testing.T) {
 
 		// Verify that the cancellation error is returned.
 		require.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestSyncerRegistry_MinTargetHeight(t *testing.T) {
+	t.Run("no syncers returns MaxUint64", func(t *testing.T) {
+		registry := NewSyncerRegistry()
+		require.Equal(t, uint64(math.MaxUint64), registry.MinTargetHeight())
+	})
+
+	t.Run("no target reporters returns MaxUint64", func(t *testing.T) {
+		registry := NewSyncerRegistry()
+		require.NoError(t, registry.Register(newMockSyncer("plain", nil)))
+		require.Equal(t, uint64(math.MaxUint64), registry.MinTargetHeight())
+	})
+
+	t.Run("multiple reporters returns minimum", func(t *testing.T) {
+		registry := NewSyncerRegistry()
+		require.NoError(t, registry.Register(NewTargetReporterSyncer("fast", 1000)))
+		require.NoError(t, registry.Register(NewTargetReporterSyncer("slow", 500)))
+		require.NoError(t, registry.Register(newMockSyncer("plain", nil)))
+		require.Equal(t, uint64(500), registry.MinTargetHeight())
 	})
 }
 

@@ -6,6 +6,8 @@ package sync
 import (
 	"fmt"
 
+	"github.com/ava-labs/libevm/log"
+
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
@@ -61,12 +63,28 @@ func (e *Extender) OnFinishBeforeCommit(lastAcceptedHeight uint64, summary messa
 
 // OnFinishAfterCommit implements the sync.Extender interface by applying the atomic trie to the shared memory.
 func (e *Extender) OnFinishAfterCommit(summaryHeight uint64) error {
-	// the chain state is already restored, and, from this point on,
-	// the block synced to is the accepted block. The last operation
-	// is updating shared memory with the atomic trie.
-	// ApplyToSharedMemory does this, and, even if the VM is stopped
-	// (gracefully or ungracefully), since MarkApplyToSharedMemoryCursor
-	// is called, VM will resume ApplyToSharedMemory on Initialize.
+	// Check if the atomic trie has complete data up to summaryHeight.
+	// During dynamic sync the coordinator's commitTarget may be ahead of the
+	// atomic syncer's fixed target. In that case the trie only covers up to
+	// the atomic syncer's target, so we must skip ApplyToSharedMemory and
+	// keep the cursor alive. The gap is filled during batch replay (each
+	// replayed block's Accept applies atomic ops to shared memory inline)
+	// and the cursor is cleaned up on the next VM restart via
+	// NewAtomicBackend -> ApplyToSharedMemory(lastAcceptedHeight).
+	_, lastCommittedHeight := e.trie.LastCommitted()
+	if lastCommittedHeight < summaryHeight {
+		log.Info(
+			"skipping ApplyToSharedMemory: atomic trie has partial data",
+			"lastCommittedHeight", lastCommittedHeight,
+			"summaryHeight", summaryHeight,
+		)
+		return nil
+	}
+
+	// The atomic trie covers the full range. Apply to shared memory now.
+	// Even if the VM is stopped (gracefully or ungracefully), since
+	// MarkApplyToSharedMemoryCursor was called in OnFinishBeforeCommit,
+	// the VM will resume ApplyToSharedMemory on Initialize.
 	if err := e.backend.ApplyToSharedMemory(summaryHeight); err != nil {
 		return fmt.Errorf("failed to apply atomic trie to shared memory after commit: %w", err)
 	}

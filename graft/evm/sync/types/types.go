@@ -38,6 +38,20 @@ type Finalizer interface {
 	Finalize() error
 }
 
+// TargetReporter is an optional interface that syncers can implement to report
+// their current target height. The coordinator uses the minimum reported height
+// across all syncers to avoid pruning queued blocks that slower syncers still
+// need for gap filling during batch replay.
+//
+// Syncers that do not implement this interface are assumed to have no block
+// preservation requirements (effectively infinite target height).
+type TargetReporter interface {
+	// TargetHeight returns the current target height this syncer is working toward.
+	// For static syncers this is the initial target; for dynamic syncers this is
+	// the latest desired height.
+	TargetHeight() uint64
+}
+
 // LeafClient is the interface for fetching leaves from the network.
 // This is defined here to avoid circular dependencies with the leaf package.
 type LeafClient interface {
