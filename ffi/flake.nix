@@ -12,7 +12,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     crane.url = "github:ipetkov/crane";
     flake-utils.url = "github:numtide/flake-utils";
-    golang.url = "github:ava-labs/avalanchego?dir=nix/go&ref=4aa7f05e07636567e956d2c0f0d6146bf8b5d144";
+    golang.url = "github:ava-labs/avalanchego?dir=nix/go&ref=50585cbbdfe1af02a2c11bdc9fa77fca26e6b838";
   };
 
   outputs = { self, nixpkgs, rust-overlay, crane, flake-utils, golang }:
