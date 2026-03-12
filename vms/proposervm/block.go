@@ -11,6 +11,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -430,6 +431,13 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 			zap.Error(err),
 		)
 		return false, err
+	case errors.Is(err, database.ErrClosed):
+		// Warn instead of error since this can be triggered during graceful shutdowns.
+		p.vm.ctx.Log.Warn("block verification failed, database closed",
+			zap.Stringer("blkID", blk.ID()),
+			zap.Error(err),
+		)
+		return false, err
 	case err != nil:
 		p.vm.ctx.Log.Error("unexpected block verification failure",
 			zap.String("reason", "failed to calculate expected proposer"),
@@ -468,6 +476,13 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 		// self-resolves, so it should not trigger alerts.
 		p.vm.ctx.Log.Warn("build block failed, validator set not yet finalized",
 			zap.Uint64("parentPChainHeight", parentPChainHeight),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
+		return false, err
+	case errors.Is(err, database.ErrClosed):
+		// Warn instead of error since this can be triggered during graceful shutdowns.
+		p.vm.ctx.Log.Warn("build block failed, database closed",
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),
 		)
