@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
@@ -19,6 +21,16 @@ import (
 )
 
 func main() {
+	// Handle SIGTERM/SIGINT during init before app.Run takes over with
+	// graceful shutdown. Without this, Go's default handler exits with
+	// code 2, which is not the desired behavior.
+	earlySignals := make(chan os.Signal, 1)
+	signal.Notify(earlySignals, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-earlySignals
+		os.Exit(0)
+	}()
+
 	evm.RegisterAllLibEVMExtras()
 
 	fs := config.BuildFlagSet()
@@ -70,6 +82,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Stop the early handler so app can take over with graceful shutdown.
+	signal.Stop(earlySignals)
 	exitCode := app.Run(nodeApp)
 	os.Exit(exitCode)
 }
