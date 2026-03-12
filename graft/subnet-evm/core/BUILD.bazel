@@ -124,6 +124,7 @@ graft_go_test(
         "//graft/evm/commontype",
         "//graft/evm/core/state/pruner",
         "//graft/evm/firewood",
+        "//graft/evm/params/extras",
         "//graft/evm/precompile/precompileconfig",
         "//graft/evm/triedb/pathdb",
         "//graft/subnet-evm/consensus",

@@ -11,6 +11,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/core/vm/runtime",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/params/extras",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/params",
         "//graft/subnet-evm/params/extras",

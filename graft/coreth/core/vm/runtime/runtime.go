@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -89,11 +90,13 @@ func setDefaults(cfg *Config) {
 				BerlinBlock:         new(big.Int),
 			},
 			&extras.ChainConfig{
-				NetworkUpgrades: extras.NetworkUpgrades{
-					ApricotPhase1BlockTimestamp: new(uint64),
-					ApricotPhase2BlockTimestamp: new(uint64),
-					ApricotPhase3BlockTimestamp: new(uint64),
-					ApricotPhase4BlockTimestamp: new(uint64),
+				NetworkUpgrades: evmextras.NetworkUpgrades{
+					CorethNetworkUpgrades: &evmextras.CorethNetworkUpgrades{
+						ApricotPhase1BlockTimestamp: new(uint64),
+						ApricotPhase2BlockTimestamp: new(uint64),
+						ApricotPhase3BlockTimestamp: new(uint64),
+						ApricotPhase4BlockTimestamp: new(uint64),
+					},
 				},
 			},
 		)

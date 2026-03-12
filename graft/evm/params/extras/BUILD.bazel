@@ -1,12 +1,36 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
 
 go_library(
     name = "extras",
-    srcs = ["rules.go"],
+    srcs = [
+        "coreth_upgrades.go",
+        "network_upgrades.go",
+        "rules.go",
+        "subnetevm_upgrades.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/graft/evm/params/extras",
     visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/precompile/precompileconfig",
+        "//graft/evm/utils",
+        "//upgrade",
+        "//utils",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)
+
+graft_go_test(
+    name = "extras_test",
+    srcs = ["network_upgrades_test.go"],
+    embed = [":extras"],
+    deps = [
+        "//graft/evm/utils",
+        "//upgrade",
+        "//upgrade/upgradetest",
+        "//utils",
+        "//utils/constants",
+        "@com_github_stretchr_testify//require",
     ],
 )

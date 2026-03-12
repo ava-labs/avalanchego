@@ -32,7 +32,7 @@ const (
 func TestExtraPrefix(t *testing.T) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		header   *types.Header
 		want     []byte
@@ -47,8 +47,10 @@ func TestExtraPrefix(t *testing.T) {
 		},
 		{
 			name: "subnet_evm_first_block",
-			upgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+			upgrades: evmextras.NetworkUpgrades{
+				SubnetEVMNetworkUpgrades: &evmextras.SubnetEVMNetworkUpgrades{
+					SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+				},
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -134,7 +136,7 @@ func TestExtraPrefix(t *testing.T) {
 func TestVerifyExtraPrefix(t *testing.T) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		header   *types.Header
 		wantErr  error

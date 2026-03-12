@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/subnetevm"
 
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	avalancheutils "github.com/ava-labs/avalanchego/utils"
 )
 
@@ -35,7 +36,7 @@ func TestBaseFee(t *testing.T) {
 func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		timeMS   uint64
 		want     *big.Int
@@ -49,8 +50,10 @@ func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 		},
 		{
 			name: "subnet_evm_first_block",
-			upgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+			upgrades: evmextras.NetworkUpgrades{
+				SubnetEVMNetworkUpgrades: &evmextras.SubnetEVMNetworkUpgrades{
+					SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](1),
+				},
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -235,7 +238,7 @@ func EstimateNextBaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 	testBaseFee := uint64(225 * utils.GWei)
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		timeMS   uint64
 		want     *big.Int

@@ -15,6 +15,7 @@ go_library(
         "//graft/coreth/params",
         "//graft/coreth/params/extras",
         "//graft/coreth/plugin/evm/upgrade/ap3",
+        "//graft/evm/params/extras",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

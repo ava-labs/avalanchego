@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 const (
@@ -71,6 +73,9 @@ func SetEthUpgrades(c *ChainConfig) error {
 	}
 
 	extra := GetExtra(c)
+	if extra.NetworkUpgrades.SubnetEVMNetworkUpgrades == nil {
+		extra.NetworkUpgrades.SubnetEVMNetworkUpgrades = &evmextras.SubnetEVMNetworkUpgrades{}
+	}
 	// We only mark Eth upgrades as enabled if we have marked them as scheduled.
 	if durango := extra.DurangoTimestamp; durango != nil && *durango < unscheduledActivation {
 		c.ShanghaiTime = utils.PointerTo(*durango)
@@ -94,6 +99,7 @@ func GetExtra(c *ChainConfig) *extras.ChainConfig {
 func Copy(c *ChainConfig) ChainConfig {
 	cpy := *c
 	extraCpy := *GetExtra(c)
+	extraCpy.NetworkUpgrades = extraCpy.NetworkUpgrades.Copy()
 	return *WithExtra(&cpy, &extraCpy)
 }
 
@@ -173,5 +179,5 @@ func ToWithUpgradesJSON(c *ChainConfig) *ChainConfigWithUpgradesJSON {
 }
 
 func SetNetworkUpgradeDefaults(c *ChainConfig) {
-	GetExtra(c).NetworkUpgrades.SetDefaults(GetExtra(c).SnowCtx.NetworkUpgrades)
+	GetExtra(c).NetworkUpgrades.SetSubnetEVMDefaults(GetExtra(c).SnowCtx.NetworkUpgrades)
 }

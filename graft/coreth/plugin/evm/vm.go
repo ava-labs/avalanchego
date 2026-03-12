@@ -484,7 +484,7 @@ func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
 	configExtra.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: ctx,
 	}
-	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
+	configExtra.NetworkUpgrades = evmextras.GetCorethNetworkUpgrades(ctx.NetworkUpgrades)
 
 	// If Durango is scheduled, schedule the Warp Precompile at the same time.
 	if configExtra.DurangoBlockTimestamp != nil {

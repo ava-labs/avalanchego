@@ -128,6 +128,7 @@ graft_go_test(
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/core/state/pruner",
         "//graft/evm/firewood",
+        "//graft/evm/params/extras",
         "//graft/evm/precompile/precompileconfig",
         "//graft/evm/triedb/pathdb",
         "//snow/engine/snowman/block",

@@ -16,12 +16,14 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 func TestBlockGasCost(t *testing.T) {
 	tests := []struct {
 		name       string
-		upgrades   extras.NetworkUpgrades
+		upgrades   evmextras.NetworkUpgrades
 		parentTime uint64
 		parentCost *big.Int
 		timestamp  uint64

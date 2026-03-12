@@ -21,12 +21,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 func TestGasLimit(t *testing.T) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		want     uint64
 		wantErr  error
@@ -83,7 +85,7 @@ func TestGasLimit(t *testing.T) {
 func TestVerifyGasUsed(t *testing.T) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		header   *types.Header
 		want     error
@@ -195,7 +197,7 @@ func TestVerifyGasUsed(t *testing.T) {
 func TestVerifyGasLimit(t *testing.T) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		header   *types.Header
 		want     error
@@ -347,7 +349,7 @@ func TestVerifyGasLimit(t *testing.T) {
 func TestGasCapacity(t *testing.T) {
 	tests := []struct {
 		name      string
-		upgrades  extras.NetworkUpgrades
+		upgrades  evmextras.NetworkUpgrades
 		parent    *types.Header
 		timestamp uint64
 		want      uint64
@@ -424,7 +426,7 @@ func TestGasCapacity(t *testing.T) {
 func TestRemainingAtomicGasCapacity(t *testing.T) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		header   *types.Header
 		want     uint64

@@ -42,6 +42,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 func TestGenesisEthUpgrades(t *testing.T) {
@@ -67,9 +69,11 @@ func TestGenesisEthUpgrades(t *testing.T) {
 			MuirGlacierBlock:    big.NewInt(0),
 		},
 		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp: utils.PointerTo[uint64](0),
-				ApricotPhase2BlockTimestamp: utils.PointerTo[uint64](0),
+			NetworkUpgrades: evmextras.NetworkUpgrades{
+				CorethNetworkUpgrades: &evmextras.CorethNetworkUpgrades{
+					ApricotPhase1BlockTimestamp: utils.PointerTo[uint64](0),
+					ApricotPhase2BlockTimestamp: utils.PointerTo[uint64](0),
+				},
 			},
 		},
 	)

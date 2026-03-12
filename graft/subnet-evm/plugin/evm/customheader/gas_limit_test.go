@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -27,7 +28,7 @@ func TestGasLimit(t *testing.T) {
 func GasLimitTest(t *testing.T, feeConfig commontype.FeeConfig) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		want     uint64
 		wantErr  error
@@ -72,7 +73,7 @@ func TestVerifyGasLimit(t *testing.T) {
 func VerifyGasLimitTest(t *testing.T, feeConfig commontype.FeeConfig) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		header   *types.Header
 		want     error
@@ -159,7 +160,7 @@ func TestGasCapacity(t *testing.T) {
 func GasCapacityTest(t *testing.T, feeConfig commontype.FeeConfig) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		want     uint64
 		wantErr  error

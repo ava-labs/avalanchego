@@ -535,7 +535,7 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, a
 	}
 
 	// Set network upgrade defaults
-	configExtra.SetDefaults(ctx.NetworkUpgrades)
+	configExtra.SetSubnetEVMDefaults(ctx.NetworkUpgrades)
 
 	// Apply upgradeBytes (if any) by unmarshalling them into [chainConfig.UpgradeConfig].
 	// Initializing the chain will verify upgradeBytes are compatible with existing values.

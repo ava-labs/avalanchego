@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 func TestGenesisEthUpgrades(t *testing.T) {
@@ -48,8 +50,10 @@ func TestGenesisEthUpgrades(t *testing.T) {
 			FeeConfig: commontype.FeeConfig{
 				MinBaseFee: big.NewInt(1),
 			},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+			NetworkUpgrades: evmextras.NetworkUpgrades{
+				SubnetEVMNetworkUpgrades: &evmextras.SubnetEVMNetworkUpgrades{
+					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+				},
 			},
 		},
 	)

@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 func TestMain(m *testing.M) {
@@ -153,7 +155,7 @@ func TestSetEthUpgrades(t *testing.T) {
 			require := require.New(t)
 
 			extraConfig := &extras.ChainConfig{
-				NetworkUpgrades: extras.GetNetworkUpgrades(upgradetest.GetConfig(test.fork)),
+				NetworkUpgrades: evmextras.GetCorethNetworkUpgrades(upgradetest.GetConfig(test.fork)),
 			}
 			actual := WithExtra(
 				&ChainConfig{},

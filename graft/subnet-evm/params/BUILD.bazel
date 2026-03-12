@@ -42,6 +42,7 @@ graft_go_test(
     ],
     embed = [":params"],
     deps = [
+        "//graft/evm/params/extras",
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/precompile/contracts/nativeminter",
         "//graft/subnet-evm/precompile/contracts/rewardmanager",

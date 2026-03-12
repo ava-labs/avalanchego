@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -36,21 +37,29 @@ var (
 
 	SubnetEVMDefaultChainConfig = &ChainConfig{
 		FeeConfig:          DefaultFeeConfig,
-		NetworkUpgrades:    GetNetworkUpgrades(upgrade.GetConfig(constants.MainnetID)),
+		NetworkUpgrades:    evmextras.GetSubnetEVMNetworkUpgrades(upgrade.GetConfig(constants.MainnetID)),
 		GenesisPrecompiles: Precompiles{},
 	}
 
 	TestPreSubnetEVMChainConfig = &ChainConfig{
-		FeeConfig:          DefaultFeeConfig,
-		NetworkUpgrades:    NetworkUpgrades{},
+		FeeConfig: DefaultFeeConfig,
+		NetworkUpgrades: evmextras.NetworkUpgrades{
+			SubnetEVMNetworkUpgrades: &evmextras.SubnetEVMNetworkUpgrades{},
+		},
 		GenesisPrecompiles: Precompiles{},
 	}
 
 	TestSubnetEVMChainConfig = copyAndSet(TestPreSubnetEVMChainConfig, func(c *ChainConfig) {
+		if c.NetworkUpgrades.SubnetEVMNetworkUpgrades == nil {
+			c.NetworkUpgrades.SubnetEVMNetworkUpgrades = &evmextras.SubnetEVMNetworkUpgrades{}
+		}
 		c.NetworkUpgrades.SubnetEVMTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestDurangoChainConfig = copyAndSet(TestSubnetEVMChainConfig, func(c *ChainConfig) {
+		if c.NetworkUpgrades.SubnetEVMNetworkUpgrades == nil {
+			c.NetworkUpgrades.SubnetEVMNetworkUpgrades = &evmextras.SubnetEVMNetworkUpgrades{}
+		}
 		c.NetworkUpgrades.DurangoTimestamp = utils.PointerTo[uint64](0)
 	})
 
@@ -75,11 +84,13 @@ var (
 
 func copyConfig(c *ChainConfig) *ChainConfig {
 	newConfig := *c
+	newConfig.NetworkUpgrades = c.NetworkUpgrades.Copy()
 	return &newConfig
 }
 
 func copyAndSet(c *ChainConfig, set func(*ChainConfig)) *ChainConfig {
 	newConfig := *c
+	newConfig.NetworkUpgrades = c.NetworkUpgrades.Copy()
 	set(&newConfig)
 	return &newConfig
 }
@@ -89,7 +100,7 @@ func copyAndSet(c *ChainConfig, set func(*ChainConfig)) *ChainConfig {
 // - Enabling or disabling precompiles as network upgrades.
 type UpgradeConfig struct {
 	// Config for timestamps that enable network upgrades.
-	NetworkUpgradeOverrides *NetworkUpgrades `json:"networkUpgradeOverrides,omitempty"`
+	NetworkUpgradeOverrides *evmextras.NetworkUpgrades `json:"networkUpgradeOverrides,omitempty"`
 
 	// Config for modifying state as a network upgrade.
 	StateUpgrades []StateUpgrade `json:"stateUpgrades,omitempty"`
@@ -106,7 +117,7 @@ type AvalancheContext struct {
 var _ precompileconfig.ChainConfig = (*ChainConfig)(nil)
 
 type ChainConfig struct {
-	NetworkUpgrades // Config for timestamps that enable network upgrades.
+	evmextras.NetworkUpgrades // Config for timestamps that enable network upgrades.
 
 	AvalancheContext `json:"-"` // Avalanche specific context set during VM initialization. Not serialized.
 
@@ -134,7 +145,7 @@ func (c *ChainConfig) CheckConfigCompatible(newConfig *ethparams.ChainConfig, he
 }
 
 func (c *ChainConfig) checkConfigCompatible(newcfg *ChainConfig, _ *big.Int, headTimestamp uint64) *ethparams.ConfigCompatError {
-	if err := c.checkNetworkUpgradesCompatible(&newcfg.NetworkUpgrades, headTimestamp); err != nil {
+	if err := c.CheckNetworkUpgradesCompatible(&newcfg.NetworkUpgrades, headTimestamp); err != nil {
 		return err
 	}
 	// Check that the precompiles on the new config are compatible with the existing precompile config.
@@ -178,12 +189,6 @@ func (c *ChainConfig) Description() string {
 	return banner
 }
 
-// isForkTimestampIncompatible returns true if a fork scheduled at timestamp s1
-// cannot be rescheduled to timestamp s2 because head is already past the fork.
-func isForkTimestampIncompatible(s1, s2 *uint64, head uint64) bool {
-	return (isTimestampForked(s1, head) || isTimestampForked(s2, head)) && !configTimestampEqual(s1, s2)
-}
-
 // isTimestampForked returns whether a fork scheduled at timestamp s is active
 // at the given head timestamp.
 func isTimestampForked(s *uint64, head uint64) bool {
@@ -191,16 +196,6 @@ func isTimestampForked(s *uint64, head uint64) bool {
 		return false
 	}
 	return *s <= head
-}
-
-func configTimestampEqual(x, y *uint64) bool {
-	if x == nil {
-		return y == nil
-	}
-	if y == nil {
-		return x == nil
-	}
-	return *x == *y
 }
 
 // UnmarshalJSON parses the JSON-encoded data and stores the result in the
@@ -251,13 +246,6 @@ func (c *ChainConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
-type fork struct {
-	name      string
-	block     *big.Int // some go-ethereum forks use block numbers
-	timestamp *uint64  // Avalanche forks use timestamps
-	optional  bool     // if true, the fork may be nil and next fork is still allowed
-}
-
 func (c *ChainConfig) CheckConfigForkOrder() error {
 	if c == nil {
 		return nil
@@ -270,45 +258,45 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	// Note: we do not add the precompile configs here because they are optional
 	// and independent, i.e. the order in which they are enabled does not impact
 	// the correctness of the chain config.
-	return checkForks(c.forkOrder())
+	return checkForks(c.ForkOrder())
 }
 
 // checkForks checks that forks are enabled in order and returns an error if not.
 // `blockFork` is true if the fork is a block number fork, false if it is a timestamp fork
-func checkForks(forks []fork) error {
-	lastFork := fork{}
+func checkForks(forks []evmextras.Fork) error {
+	lastFork := evmextras.Fork{}
 	for _, cur := range forks {
-		if lastFork.name != "" {
+		if lastFork.Name != "" {
 			switch {
 			// Non-optional forks must all be present in the chain config up to the last defined fork
-			case lastFork.block == nil && lastFork.timestamp == nil && (cur.block != nil || cur.timestamp != nil):
-				if cur.block != nil {
+			case lastFork.Block == nil && lastFork.Timestamp == nil && (cur.Block != nil || cur.Timestamp != nil):
+				if cur.Block != nil {
 					return fmt.Errorf("%w: %v not enabled, but %v enabled at block %v",
-						errUnsupportedForkOrdering, lastFork.name, cur.name, cur.block)
+						evmextras.ErrUnsupportedForkOrdering, lastFork.Name, cur.Name, cur.Block)
 				} else {
 					return fmt.Errorf("%w: %v not enabled, but %v enabled at timestamp %v",
-						errUnsupportedForkOrdering, lastFork.name, cur.name, cur.timestamp)
+						evmextras.ErrUnsupportedForkOrdering, lastFork.Name, cur.Name, cur.Timestamp)
 				}
 
 			// Fork (whether defined by block or timestamp) must follow the fork definition sequence
-			case (lastFork.block != nil && cur.block != nil) || (lastFork.timestamp != nil && cur.timestamp != nil):
-				if lastFork.block != nil && lastFork.block.Cmp(cur.block) > 0 {
+			case (lastFork.Block != nil && cur.Block != nil) || (lastFork.Timestamp != nil && cur.Timestamp != nil):
+				if lastFork.Block != nil && lastFork.Block.Cmp(cur.Block) > 0 {
 					return fmt.Errorf("%w: %v enabled at block %v, but %v enabled at block %v",
-						errUnsupportedForkOrdering, lastFork.name, lastFork.block, cur.name, cur.block)
-				} else if lastFork.timestamp != nil && *lastFork.timestamp > *cur.timestamp {
+						evmextras.ErrUnsupportedForkOrdering, lastFork.Name, lastFork.Block, cur.Name, cur.Block)
+				} else if lastFork.Timestamp != nil && *lastFork.Timestamp > *cur.Timestamp {
 					return fmt.Errorf("%w: %v enabled at timestamp %v, but %v enabled at timestamp %v",
-						errUnsupportedForkOrdering, lastFork.name, lastFork.timestamp, cur.name, cur.timestamp)
+						evmextras.ErrUnsupportedForkOrdering, lastFork.Name, lastFork.Timestamp, cur.Name, cur.Timestamp)
 				}
 
 				// Timestamp based forks can follow block based ones, but not the other way around
-				if lastFork.timestamp != nil && cur.block != nil {
+				if lastFork.Timestamp != nil && cur.Block != nil {
 					return fmt.Errorf("%w: %v used timestamp ordering, but %v reverted to block ordering",
-						errUnsupportedForkOrdering, lastFork.name, cur.name)
+						evmextras.ErrUnsupportedForkOrdering, lastFork.Name, cur.Name)
 				}
 			}
 		}
 		// If it was optional and not set, then ignore it
-		if !cur.optional || (cur.block != nil || cur.timestamp != nil) {
+		if !cur.Optional || (cur.Block != nil || cur.Timestamp != nil) {
 			lastFork = cur
 		}
 	}
@@ -331,7 +319,7 @@ func (c *ChainConfig) Verify() error {
 	}
 
 	// Verify the network upgrades are internally consistent given the existing chainConfig.
-	if err := c.verifyNetworkUpgrades(c.SnowCtx.NetworkUpgrades); err != nil {
+	if err := c.VerifyNetworkUpgrades(c.SnowCtx.NetworkUpgrades); err != nil {
 		return fmt.Errorf("invalid network upgrades: %w", err)
 	}
 

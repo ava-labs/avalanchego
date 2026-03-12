@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 var (
@@ -60,7 +62,7 @@ func BlockGasCostTest(t *testing.T, feeConfig commontype.FeeConfig) {
 
 	tests := []struct {
 		name       string
-		upgrades   extras.NetworkUpgrades
+		upgrades   evmextras.NetworkUpgrades
 		parentTime uint64
 		parentCost *big.Int
 		timestamp  uint64

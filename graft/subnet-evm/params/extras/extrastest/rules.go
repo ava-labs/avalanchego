@@ -4,14 +4,12 @@
 package extrastest
 
 import (
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-
-	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
-func ForkToAvalancheRules(fork upgradetest.Fork) evmextras.AvalancheRules {
-	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(fork))
+func ForkToAvalancheRules(fork upgradetest.Fork) extras.AvalancheRules {
+	networkUpgrades := extras.GetSubnetEVMNetworkUpgrades(upgradetest.GetConfig(fork))
 	return networkUpgrades.GetAvalancheRules(uint64(upgrade.InitiallyActiveTime.Unix()))
 }

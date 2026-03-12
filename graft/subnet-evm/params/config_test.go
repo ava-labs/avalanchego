@@ -35,6 +35,7 @@ import (
 	"testing"
 	"time"
 
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
@@ -156,8 +157,10 @@ func TestConfigRules(t *testing.T) {
 	c := WithExtra(
 		&ChainConfig{},
 		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](500),
+			NetworkUpgrades: evmextras.NetworkUpgrades{
+				SubnetEVMNetworkUpgrades: &evmextras.SubnetEVMNetworkUpgrades{
+					SubnetEVMTimestamp: utils.PointerTo[uint64](500),
+				},
 			},
 		},
 	)
@@ -284,9 +287,11 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 			&extras.ChainConfig{
 				FeeConfig:          DefaultFeeConfig,
 				AllowFeeRecipients: false,
-				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
-					DurangoTimestamp:   utils.PointerTo[uint64](0),
+				NetworkUpgrades: evmextras.NetworkUpgrades{
+					SubnetEVMNetworkUpgrades: &evmextras.SubnetEVMNetworkUpgrades{
+						SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+						DurangoTimestamp:   utils.PointerTo[uint64](0),
+					},
 				},
 				GenesisPrecompiles: extras.Precompiles{},
 			},

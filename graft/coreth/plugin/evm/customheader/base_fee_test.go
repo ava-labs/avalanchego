@@ -20,12 +20,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 func TestBaseFee(t *testing.T) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		timeMS   uint64
 		want     *big.Int
@@ -39,8 +41,10 @@ func TestBaseFee(t *testing.T) {
 		},
 		{
 			name: "ap3_first_block",
-			upgrades: extras.NetworkUpgrades{
-				ApricotPhase3BlockTimestamp: utils.PointerTo[uint64](1),
+			upgrades: evmextras.NetworkUpgrades{
+				CorethNetworkUpgrades: &evmextras.CorethNetworkUpgrades{
+					ApricotPhase3BlockTimestamp: utils.PointerTo[uint64](1),
+				},
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -346,7 +350,7 @@ func TestBaseFee(t *testing.T) {
 		},
 		{
 			name: "fortuna_first_block",
-			upgrades: extras.NetworkUpgrades{
+			upgrades: evmextras.NetworkUpgrades{
 				FortunaTimestamp: utils.PointerTo[uint64](1),
 			},
 			parent: &types.Header{
@@ -416,7 +420,7 @@ func TestBaseFee(t *testing.T) {
 		},
 		{
 			name: "granite_first_block_with_state",
-			upgrades: extras.NetworkUpgrades{
+			upgrades: evmextras.NetworkUpgrades{
 				FortunaTimestamp: utils.PointerTo[uint64](1),
 				GraniteTimestamp: utils.PointerTo[uint64](1),
 			},
@@ -429,7 +433,7 @@ func TestBaseFee(t *testing.T) {
 		},
 		{
 			name: "granite_first_block_after_fortuna",
-			upgrades: extras.NetworkUpgrades{
+			upgrades: evmextras.NetworkUpgrades{
 				FortunaTimestamp: utils.PointerTo[uint64](0),
 				GraniteTimestamp: utils.PointerTo[uint64](1),
 			},
@@ -528,7 +532,7 @@ func TestBaseFee(t *testing.T) {
 func TestEstimateNextBaseFee(t *testing.T) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		timeMS   uint64
 		want     *big.Int

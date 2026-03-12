@@ -352,7 +352,7 @@ func TestVMEtnaActivatesCancun(t *testing.T) {
 			fork: upgradetest.Etna,
 			upgradeJSON: func() string {
 				upgrade := &extras.UpgradeConfig{
-					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
+					NetworkUpgradeOverrides: &evmextras.NetworkUpgrades{
 						EtnaTimestamp: avalancheutils.PointerTo(defaultEtnaTime + 2),
 					},
 				}

@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -26,6 +25,6 @@ func ForkToRules(fork upgradetest.Fork) *evmextras.Rules {
 }
 
 func ForkToAvalancheRules(fork upgradetest.Fork) evmextras.AvalancheRules {
-	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(fork))
+	networkUpgrades := evmextras.GetCorethNetworkUpgrades(upgradetest.GetConfig(fork))
 	return networkUpgrades.GetAvalancheRules(uint64(upgrade.InitiallyActiveTime.Unix()))
 }

@@ -44,6 +44,7 @@ graft_go_test(
     embed = [":params"],
     deps = [
         "//graft/coreth/params/extras",
+        "//graft/evm/params/extras",
         "//upgrade/upgradetest",
         "//utils",
         "@com_github_ava_labs_libevm//common",

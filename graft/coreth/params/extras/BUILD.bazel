@@ -5,7 +5,6 @@ go_library(
     name = "extras",
     srcs = [
         "config.go",
-        "network_upgrades.go",
         "precompile_upgrade.go",
         "precompiles.go",
     ],
@@ -16,9 +15,7 @@ go_library(
         "//graft/evm/commontype",
         "//graft/evm/params/extras",
         "//graft/evm/precompile/precompileconfig",
-        "//graft/evm/utils",
         "//snow",
-        "//upgrade",
         "//utils",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",

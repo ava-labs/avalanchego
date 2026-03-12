@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 func TestExtraPrefix(t *testing.T) {
 	tests := []struct {
 		name                string
-		upgrades            extras.NetworkUpgrades
+		upgrades            evmextras.NetworkUpgrades
 		parent              *types.Header
 		header              *types.Header
 		desiredTargetExcess *gas.Gas
@@ -48,8 +48,10 @@ func TestExtraPrefix(t *testing.T) {
 		},
 		{
 			name: "ap3_first_block",
-			upgrades: extras.NetworkUpgrades{
-				ApricotPhase3BlockTimestamp: utils.PointerTo[uint64](1),
+			upgrades: evmextras.NetworkUpgrades{
+				CorethNetworkUpgrades: &evmextras.CorethNetworkUpgrades{
+					ApricotPhase3BlockTimestamp: utils.PointerTo[uint64](1),
+				},
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -279,7 +281,7 @@ func TestExtraPrefix(t *testing.T) {
 		},
 		{
 			name: "fortuna_first_block",
-			upgrades: extras.NetworkUpgrades{
+			upgrades: evmextras.NetworkUpgrades{
 				FortunaTimestamp: utils.PointerTo[uint64](1),
 			},
 			parent: &types.Header{
@@ -395,7 +397,7 @@ func TestExtraPrefix(t *testing.T) {
 func TestVerifyExtraPrefix(t *testing.T) {
 	tests := []struct {
 		name     string
-		upgrades extras.NetworkUpgrades
+		upgrades evmextras.NetworkUpgrades
 		parent   *types.Header
 		header   *types.Header
 		wantErr  error

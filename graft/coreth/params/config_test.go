@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	"github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -150,8 +151,10 @@ func TestConfigRules(t *testing.T) {
 	c := WithExtra(
 		&ChainConfig{},
 		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				CortinaBlockTimestamp: utils.PointerTo[uint64](500),
+			NetworkUpgrades: evmextras.NetworkUpgrades{
+				CorethNetworkUpgrades: &evmextras.CorethNetworkUpgrades{
+					CortinaBlockTimestamp: utils.PointerTo[uint64](500),
+				},
 			},
 		},
 	)

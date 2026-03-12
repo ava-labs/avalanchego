@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 const (
@@ -47,6 +49,9 @@ func SetEthUpgrades(c *ChainConfig) error {
 	c.MuirGlacierBlock = big.NewInt(0)
 
 	extra := GetExtra(c)
+	if extra.CorethNetworkUpgrades == nil {
+		extra.CorethNetworkUpgrades = &evmextras.CorethNetworkUpgrades{}
+	}
 	// Because Fuji and Mainnet have already accepted the Berlin and London
 	// blocks, it is assumed that they are scheduled for activation.
 	switch {
@@ -101,6 +106,7 @@ func GetExtra(c *ChainConfig) *extras.ChainConfig {
 func Copy(c *ChainConfig) ChainConfig {
 	cpy := *c
 	extraCpy := *GetExtra(c)
+	extraCpy.NetworkUpgrades = extraCpy.NetworkUpgrades.Copy()
 	return *WithExtra(&cpy, &extraCpy)
 }
 

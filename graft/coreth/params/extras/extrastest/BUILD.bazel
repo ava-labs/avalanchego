@@ -7,7 +7,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/params",
-        "//graft/coreth/params/extras",
         "//graft/coreth/params/paramstest",
         "//graft/evm/params/extras",
         "//upgrade",

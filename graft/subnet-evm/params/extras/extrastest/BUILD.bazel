@@ -7,7 +7,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/params/extras",
-        "//graft/subnet-evm/params/extras",
         "//upgrade",
         "//upgrade/upgradetest",
     ],

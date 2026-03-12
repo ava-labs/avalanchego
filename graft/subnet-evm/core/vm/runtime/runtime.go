@@ -31,6 +31,7 @@ import (
 	"math"
 	"math/big"
 
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
@@ -87,8 +88,10 @@ func setDefaults(cfg *Config) {
 				LondonBlock:         new(big.Int),
 			},
 			&extras.ChainConfig{
-				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: new(uint64),
+				NetworkUpgrades: evmextras.NetworkUpgrades{
+					SubnetEVMNetworkUpgrades: &evmextras.SubnetEVMNetworkUpgrades{
+						SubnetEVMTimestamp: new(uint64),
+					},
 				},
 			},
 		)

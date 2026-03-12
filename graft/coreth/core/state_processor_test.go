@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/cortina"
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
@@ -282,9 +283,11 @@ func TestStateProcessorErrors(t *testing.T) {
 						MuirGlacierBlock:    big.NewInt(0),
 					},
 					&extras.ChainConfig{
-						NetworkUpgrades: extras.NetworkUpgrades{
-							ApricotPhase1BlockTimestamp: utils.PointerTo[uint64](0),
-							ApricotPhase2BlockTimestamp: utils.PointerTo[uint64](0),
+						NetworkUpgrades: evmextras.NetworkUpgrades{
+							CorethNetworkUpgrades: &evmextras.CorethNetworkUpgrades{
+								ApricotPhase1BlockTimestamp: utils.PointerTo[uint64](0),
+								ApricotPhase2BlockTimestamp: utils.PointerTo[uint64](0),
+							},
 						},
 					},
 				),
