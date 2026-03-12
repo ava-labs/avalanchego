@@ -139,6 +139,14 @@ pub enum NBlocks {
     FiftyM = 50_000_000,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ValueEnum)]
+pub enum Config {
+    Firewood,
+    FirewoodArchive,
+    Archive,
+    Default,
+}
+
 impl NBlocks {
     #[must_use]
     pub const fn end_block(self) -> u64 {
@@ -151,6 +159,18 @@ impl NBlocks {
             Self::TenK => "10k",
             Self::OneM => "1m",
             Self::FiftyM => "50m",
+        }
+    }
+}
+
+impl Config {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Firewood => "firewood",
+            Self::FirewoodArchive => "firewood-archive",
+            Self::Archive => "archive",
+            Self::Default => "default",
         }
     }
 }
@@ -270,9 +290,9 @@ pub struct DeployOptions {
     )]
     pub scenario: String,
 
-    /// VM reexecution config (firewood, hashdb, pathdb, etc.)
-    #[arg(long = "config", value_name = "CONFIG", default_value = "firewood")]
-    pub config: String,
+    /// VM reexecution config
+    #[arg(long = "config", value_name = "CONFIG", value_enum, default_value_t = Config::Firewood)]
+    pub config: Config,
 
     /// Override template variables (`KEY=VALUE`). Repeat the flag to set multiple values.
     #[arg(
@@ -728,7 +748,7 @@ fn log_launch_config(opts: &DeployOptions) {
     }
     info!("\t{:24}{}", "Scenario:", opts.scenario_name());
     info!("\t{:24}{}", "Blocks:", opts.nblocks.as_str());
-    info!("\t{:24}{}", "Config:", opts.config);
+    info!("\t{:24}{}", "Config:", opts.config.as_str());
     info!(
         "\t{:24}{}",
         "Variable overrides:",

@@ -60,7 +60,7 @@ impl CloudInitContext {
             args: HashMap::from([
                 ("end_block".into(), end_block),
                 ("nblocks".into(), nblocks),
-                ("config".into(), opts.config.clone()),
+                ("config".into(), opts.config.as_str().to_owned()),
                 ("metrics_server".into(), opts.metrics_server.to_string()),
             ]),
             branches: opts
