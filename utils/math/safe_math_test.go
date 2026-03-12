@@ -115,3 +115,111 @@ func TestAbsDiff(t *testing.T) {
 	require.Zero(AbsDiff(uint64(1), uint64(1)))
 	require.Zero(AbsDiff(uint64(0), uint64(0)))
 }
+
+func TestMulDiv(t *testing.T) {
+	tests := []struct {
+		name    string
+		a       uint64
+		b       uint64
+		c       uint64
+		want    uint64
+		wantErr error
+	}{
+		{
+			name:    "division by zero",
+			a:       100,
+			b:       5,
+			c:       0,
+			wantErr: ErrDivideByZero,
+		},
+		{
+			name: "a is zero",
+			a:    0,
+			b:    4,
+			c:    50,
+			want: 0,
+		},
+		{
+			name: "b is zero",
+			a:    250,
+			b:    0,
+			c:    50,
+			want: 0,
+		},
+		{
+			name: "basic case 1",
+			a:    100,
+			b:    3,
+			c:    10,
+			want: 30,
+		},
+		{
+			name: "basic case 2",
+			a:    250,
+			b:    4,
+			c:    50,
+			want: 20,
+		},
+		{
+			name: "precision",
+			a:    7,
+			b:    3,
+			c:    10,
+			want: 2,
+		},
+		{
+			name:    "overflow",
+			a:       maxUint64,
+			b:       10,
+			c:       2,
+			wantErr: ErrOverflow,
+		},
+		{
+			name: "round down",
+			a:    10,
+			b:    10,
+			c:    30,
+			want: 3,
+		},
+		{
+			name: "round up",
+			a:    20,
+			b:    10,
+			c:    30,
+			want: 7,
+		},
+		{
+			name: "large values without overflow",
+			a:    300_000_000_000,
+			b:    200_000_000_000,
+			c:    400_000_000_000,
+			want: 150_000_000_000,
+		},
+		{
+			name: "small a large c",
+			a:    5,
+			b:    3,
+			c:    10,
+			want: 2,
+		},
+		{
+			name: "maxUint64 * maxUint64 / maxUint64",
+			a:    maxUint64,
+			b:    maxUint64,
+			c:    maxUint64,
+			want: maxUint64,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := MulDiv(tt.a, tt.b, tt.c)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}

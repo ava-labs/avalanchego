@@ -689,6 +689,29 @@ func createPermissionlessDelegatorTx(subnetID ids.ID, delegatorData txs.Validato
 	}
 }
 
+func createStakerAndTx(
+	t testing.TB,
+	subnetID ids.ID,
+	nodeID ids.NodeID,
+	startTime time.Time,
+	endTime time.Time,
+	weight uint64,
+	potentialReward uint64,
+) (*Staker, *txs.Tx) {
+	unsignedTx := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+		NodeID: nodeID,
+		End:    uint64(endTime.Unix()),
+		Wght:   weight,
+	})
+	tx := &txs.Tx{Unsigned: unsignedTx}
+	require.NoError(t, tx.Initialize(txs.Codec))
+
+	staker, err := NewCurrentStaker(tx.ID(), unsignedTx, startTime, potentialReward)
+	require.NoError(t, err)
+
+	return staker, tx
+}
+
 func TestValidatorWeightDiff(t *testing.T) {
 	type op struct {
 		op     func(*ValidatorWeightDiff, uint64) error
@@ -796,38 +819,43 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 	var (
 		numNodes       = 5
 		subnetID       = ids.GenerateTestID()
-		startTime      = time.Now()
+		startTime      = genesistest.DefaultValidatorStartTime
 		endTime        = startTime.Add(24 * time.Hour)
 		primaryStakers = make([]Staker, numNodes)
 		subnetStakers  = make([]Staker, numNodes)
+		primaryTxs     = make([]*txs.Tx, numNodes)
+		subnetTxs      = make([]*txs.Tx, numNodes)
 	)
 	for i := range primaryStakers {
-		sk, err := localsigner.New()
-		require.NoError(err)
-
 		timeOffset := time.Duration(i) * time.Second
-		primaryStakers[i] = Staker{
-			TxID:            ids.GenerateTestID(),
-			NodeID:          ids.GenerateTestNodeID(),
-			PublicKey:       sk.PublicKey(),
-			SubnetID:        constants.PrimaryNetworkID,
-			Weight:          uint64(i + 1),
-			StartTime:       startTime.Add(timeOffset),
-			EndTime:         endTime.Add(timeOffset),
-			PotentialReward: uint64(i + 1),
-		}
+		staker, tx := createStakerAndTx(
+			t, constants.PrimaryNetworkID,
+			ids.GenerateTestNodeID(),
+			startTime.Add(timeOffset),
+			endTime.Add(timeOffset),
+			uint64(i+1),
+			uint64(i+1),
+		)
+		primaryStakers[i] = *staker
+		primaryTxs[i] = tx
 	}
-	for i, primaryStaker := range primaryStakers {
-		subnetStakers[i] = Staker{
-			TxID:            ids.GenerateTestID(),
-			NodeID:          primaryStaker.NodeID,
-			PublicKey:       nil, // Key is inherited from the primary network
-			SubnetID:        subnetID,
-			Weight:          uint64(i + 1),
-			StartTime:       primaryStaker.StartTime,
-			EndTime:         primaryStaker.EndTime,
-			PotentialReward: uint64(i + 1),
-		}
+	for i := range subnetStakers {
+		staker, tx := createStakerAndTx(
+			t, subnetID,
+			primaryStakers[i].NodeID,
+			primaryStakers[i].StartTime,
+			primaryStakers[i].EndTime,
+			uint64(i+1),
+			uint64(i+1),
+		)
+		subnetStakers[i] = *staker
+		subnetTxs[i] = tx
+	}
+
+	// Add all txs to state upfront.
+	for i := range numNodes {
+		state.AddTx(primaryTxs[i], status.Committed)
+		state.AddTx(subnetTxs[i], status.Committed)
 	}
 
 	type diff struct {
@@ -2125,16 +2153,15 @@ func TestL1ValidatorAfterLegacyRemoval(t *testing.T) {
 	db := memdb.New()
 	state := newTestState(t, db)
 
-	legacyStaker := &Staker{
-		TxID:            ids.GenerateTestID(),
-		NodeID:          defaultValidatorNodeID,
-		PublicKey:       nil,
-		SubnetID:        ids.GenerateTestID(),
-		Weight:          1,
-		StartTime:       genesistest.DefaultValidatorStartTime,
-		EndTime:         genesistest.DefaultValidatorEndTime,
-		PotentialReward: 0,
-	}
+	subnetID := ids.GenerateTestID()
+	legacyStaker, legacyTx := createStakerAndTx(
+		t, subnetID, defaultValidatorNodeID,
+		genesistest.DefaultValidatorStartTime,
+		genesistest.DefaultValidatorEndTime,
+		1, 0,
+	)
+
+	state.AddTx(legacyTx, status.Committed)
 	require.NoError(state.PutCurrentValidator(legacyStaker))
 
 	state.SetHeight(1)
@@ -2167,18 +2194,22 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
-	pk := sk.PublicKey()
-	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
+	pkBytes := bls.PublicKeyToUncompressedBytes(sk.PublicKey())
 
 	otherSK, err := localsigner.New()
 	require.NoError(t, err)
-	otherPK := otherSK.PublicKey()
-	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
-	now := time.Now()
+	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherSK.PublicKey())
+	now := genesistest.DefaultValidatorStartTime
+
+	type stakerSpec struct {
+		SubnetID  ids.ID
+		Weight    uint64
+		StartTime time.Time
+	}
 
 	tests := []struct {
 		name         string
-		initial      []*Staker
+		initial      []stakerSpec
 		l1Validators []L1Validator
 	}{
 		{
@@ -2186,44 +2217,16 @@ func TestGetCurrentValidators(t *testing.T) {
 		},
 		{
 			name: "initial stakers in same subnet",
-			initial: []*Staker{
-				{
-					TxID:      ids.GenerateTestID(),
-					SubnetID:  subnetID1,
-					NodeID:    ids.GenerateTestNodeID(),
-					PublicKey: pk,
-					Weight:    1,
-					StartTime: now,
-				},
-				{
-					TxID:      ids.GenerateTestID(),
-					SubnetID:  subnetID1,
-					NodeID:    ids.GenerateTestNodeID(),
-					PublicKey: otherPK,
-					Weight:    1,
-					StartTime: now.Add(1 * time.Second),
-				},
+			initial: []stakerSpec{
+				{SubnetID: subnetID1, Weight: 1, StartTime: now},
+				{SubnetID: subnetID1, Weight: 1, StartTime: now.Add(1 * time.Second)},
 			},
 		},
 		{
 			name: "initial stakers in different subnets",
-			initial: []*Staker{
-				{
-					TxID:      ids.GenerateTestID(),
-					SubnetID:  subnetID1,
-					NodeID:    ids.GenerateTestNodeID(),
-					PublicKey: pk,
-					Weight:    1,
-					StartTime: now,
-				},
-				{
-					TxID:      ids.GenerateTestID(),
-					SubnetID:  subnetID2,
-					NodeID:    ids.GenerateTestNodeID(),
-					PublicKey: otherPK,
-					Weight:    1,
-					StartTime: now.Add(1 * time.Second),
-				},
+			initial: []stakerSpec{
+				{SubnetID: subnetID1, Weight: 1, StartTime: now},
+				{SubnetID: subnetID2, Weight: 1, StartTime: now.Add(1 * time.Second)},
 			},
 		},
 		{
@@ -2270,31 +2273,10 @@ func TestGetCurrentValidators(t *testing.T) {
 		},
 		{
 			name: "initial stakers and L1 validators mixed",
-			initial: []*Staker{
-				{
-					TxID:      ids.GenerateTestID(),
-					SubnetID:  subnetID1,
-					NodeID:    ids.GenerateTestNodeID(),
-					PublicKey: pk,
-					Weight:    123123,
-					StartTime: now,
-				},
-				{
-					TxID:      ids.GenerateTestID(),
-					SubnetID:  subnetID2,
-					NodeID:    ids.GenerateTestNodeID(),
-					PublicKey: pk,
-					Weight:    1,
-					StartTime: now.Add(1 * time.Second),
-				},
-				{
-					TxID:      ids.GenerateTestID(),
-					SubnetID:  subnetID1,
-					NodeID:    ids.GenerateTestNodeID(),
-					PublicKey: otherPK,
-					Weight:    0,
-					StartTime: now.Add(2 * time.Second),
-				},
+			initial: []stakerSpec{
+				{SubnetID: subnetID1, Weight: 123123, StartTime: now},
+				{SubnetID: subnetID2, Weight: 1, StartTime: now.Add(1 * time.Second)},
+				{SubnetID: subnetID1, Weight: 0, StartTime: now.Add(2 * time.Second)},
 			},
 			l1Validators: []L1Validator{
 				{
@@ -2345,23 +2327,31 @@ func TestGetCurrentValidators(t *testing.T) {
 			db := memdb.New()
 			state := newTestState(t, db)
 
+			endTime := now.Add(24 * time.Hour)
+
 			stakersLenBySubnetID := make(map[ids.ID]int)
 			stakersByTxID := make(map[ids.ID]*Staker)
-			for _, staker := range test.initial {
-				primaryStaker := &Staker{
-					TxID:      ids.GenerateTestID(),
-					SubnetID:  constants.PrimaryNetworkID,
-					NodeID:    staker.NodeID,
-					PublicKey: staker.PublicKey,
-					Weight:    5,
-					// start primary network staker 1 second before the subnet staker
-					StartTime: staker.StartTime.Add(-1 * time.Second),
-				}
-				require.NoError(state.PutCurrentValidator(primaryStaker))
-				require.NoError(state.PutCurrentValidator(staker))
+			for _, spec := range test.initial {
+				nodeID := ids.GenerateTestNodeID()
 
-				stakersByTxID[staker.TxID] = staker
-				stakersLenBySubnetID[staker.SubnetID]++
+				// Create backed primary network staker.
+				primaryStaker, primaryTx := createStakerAndTx(
+					t, constants.PrimaryNetworkID, nodeID,
+					spec.StartTime.Add(-1*time.Second), endTime, 5, 0,
+				)
+				state.AddTx(primaryTx, status.Committed)
+				require.NoError(state.PutCurrentValidator(primaryStaker))
+
+				// Create backed subnet staker.
+				subnetStaker, subnetTx := createStakerAndTx(
+					t, spec.SubnetID, nodeID,
+					spec.StartTime, endTime, spec.Weight, 0,
+				)
+				state.AddTx(subnetTx, status.Committed)
+				require.NoError(state.PutCurrentValidator(subnetStaker))
+
+				stakersByTxID[subnetStaker.TxID] = subnetStaker
+				stakersLenBySubnetID[spec.SubnetID]++
 			}
 
 			l1ValidatorsLenBySubnetID := make(map[ids.ID]int)
@@ -2524,61 +2514,32 @@ func TestDiffValidatorReplacement(t *testing.T) {
 
 			state := newTestState(t, memdb.New())
 
-			sk1, err := localsigner.New()
-			require.NoError(err)
-
 			var (
 				nodeID    = ids.GenerateTestNodeID()
 				subnetID  = constants.PrimaryNetworkID
 				startTime = genesistest.DefaultValidatorStartTime
 				endTime   = startTime.Add(24 * time.Hour)
-				pk1       = sk1.PublicKey()
 			)
 
-			pk2 := pk1
-			if tt.useDistinctKeys {
-				sk2, err := localsigner.New()
-				require.NoError(err)
-				pk2 = sk2.PublicKey()
-			}
-
-			original := Staker{
-				TxID:      ids.GenerateTestID(),
-				NodeID:    nodeID,
-				PublicKey: pk1,
-				SubnetID:  subnetID,
-				Weight:    tt.originalWeight,
-				StartTime: startTime,
-				EndTime:   endTime,
-				NextTime:  endTime,
-				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
-			}
+			original, originalTx := createStakerAndTx(t, subnetID, nodeID, startTime, endTime, tt.originalWeight, 0)
+			state.AddTx(originalTx, status.Committed)
 
 			// Block 0: Add the original validator.
 			d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
-			require.NoError(d.PutCurrentValidator(&original))
+			require.NoError(d.PutCurrentValidator(original))
 			require.NoError(d.Apply(state))
 			state.SetHeight(0)
 			require.NoError(state.Commit())
 
 			// Block 1: Replace validator.
-			replacement := Staker{
-				TxID:      ids.GenerateTestID(),
-				NodeID:    nodeID,
-				PublicKey: pk2,
-				SubnetID:  subnetID,
-				Weight:    tt.replacementWeight,
-				StartTime: startTime,
-				EndTime:   endTime.Add(24 * time.Hour),
-				NextTime:  endTime.Add(24 * time.Hour),
-				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
-			}
+			replacement, replacementTx := createStakerAndTx(t, subnetID, nodeID, startTime, endTime.Add(24*time.Hour), tt.replacementWeight, 0)
+			state.AddTx(replacementTx, status.Committed)
 
 			d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
-			require.NoError(d.DeleteCurrentValidator(&original))
-			require.NoError(d.PutCurrentValidator(&replacement))
+			require.NoError(d.DeleteCurrentValidator(original))
+			require.NoError(d.PutCurrentValidator(replacement))
 			require.NoError(d.Apply(state))
 			state.SetHeight(1)
 			require.NoError(state.Commit())
@@ -2587,13 +2548,13 @@ func TestDiffValidatorReplacement(t *testing.T) {
 			got, err := state.GetCurrentValidator(subnetID, nodeID)
 			require.NoError(err)
 			require.Equal(tt.replacementWeight, got.Weight)
-			require.Equal(pk2, got.PublicKey)
+			require.Equal(replacement.PublicKey, got.PublicKey)
 			require.Equal(replacement.TxID, got.TxID)
 
 			// Verify the validator manager.
 			validatorSet := state.validators.GetMap(subnetID)
 			require.Contains(validatorSet, nodeID)
-			require.Equal(pk2, validatorSet[nodeID].PublicKey)
+			require.Equal(replacement.PublicKey, validatorSet[nodeID].PublicKey)
 
 			// Roll back from height 1 to recover height 0 state.
 			historicalVdrs := copyValidatorSet(state.validators.GetMap(subnetID))
@@ -2603,7 +2564,7 @@ func TestDiffValidatorReplacement(t *testing.T) {
 
 			require.Contains(historicalVdrs, nodeID)
 			require.Equal(tt.originalWeight, historicalVdrs[nodeID].Weight)
-			require.Equal(pk1, historicalVdrs[nodeID].PublicKey)
+			require.Equal(original.PublicKey, historicalVdrs[nodeID].PublicKey)
 		})
 	}
 }
@@ -2612,15 +2573,6 @@ func TestDiffMultipleValidatorsSameBlock(t *testing.T) {
 	require := require.New(t)
 
 	state := newTestState(t, memdb.New())
-
-	skA, err := localsigner.New()
-	require.NoError(err)
-	skB, err := localsigner.New()
-	require.NoError(err)
-	skB2, err := localsigner.New()
-	require.NoError(err)
-	skC, err := localsigner.New()
-	require.NoError(err)
 
 	var (
 		nodeA     = ids.GenerateTestNodeID()
@@ -2631,68 +2583,34 @@ func TestDiffMultipleValidatorsSameBlock(t *testing.T) {
 		endTime   = startTime.Add(24 * time.Hour)
 	)
 
-	stakerA := Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    nodeA,
-		PublicKey: skA.PublicKey(),
-		SubnetID:  subnetID,
-		Weight:    10,
-		StartTime: startTime,
-		EndTime:   endTime,
-		NextTime:  endTime,
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
-	}
-	stakerB := Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    nodeB,
-		PublicKey: skB.PublicKey(),
-		SubnetID:  subnetID,
-		Weight:    15,
-		StartTime: startTime.Add(time.Second),
-		EndTime:   endTime.Add(time.Second),
-		NextTime:  endTime.Add(time.Second),
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
-	}
+	stakerA, txA := createStakerAndTx(t, subnetID, nodeA, startTime, endTime, 10, 0)
+	stakerB, txB := createStakerAndTx(t, subnetID, nodeB, startTime.Add(time.Second), endTime.Add(time.Second), 15, 0)
+
+	state.AddTx(txA, status.Committed)
+	state.AddTx(txB, status.Committed)
 
 	// Block 0: Add validators A and B.
 	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
-	require.NoError(d.PutCurrentValidator(&stakerA))
-	require.NoError(d.PutCurrentValidator(&stakerB))
+	require.NoError(d.PutCurrentValidator(stakerA))
+	require.NoError(d.PutCurrentValidator(stakerB))
 	require.NoError(d.Apply(state))
 	state.SetHeight(0)
 	require.NoError(state.Commit())
 
 	// Block 1: Remove A, replace B (new key + different weight), add C.
-	replacementB := Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    nodeB,
-		PublicKey: skB2.PublicKey(),
-		SubnetID:  subnetID,
-		Weight:    25,
-		StartTime: startTime.Add(time.Second),
-		EndTime:   endTime.Add(48 * time.Hour),
-		NextTime:  endTime.Add(48 * time.Hour),
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
-	}
-	stakerC := Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    nodeC,
-		PublicKey: skC.PublicKey(),
-		SubnetID:  subnetID,
-		Weight:    30,
-		StartTime: startTime.Add(2 * time.Second),
-		EndTime:   endTime.Add(2 * time.Second),
-		NextTime:  endTime.Add(2 * time.Second),
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
-	}
+	replacementB, txReplacementB := createStakerAndTx(t, subnetID, nodeB, startTime.Add(time.Second), endTime.Add(48*time.Hour), 25, 0)
+	stakerC, txC := createStakerAndTx(t, subnetID, nodeC, startTime.Add(2*time.Second), endTime.Add(2*time.Second), 30, 0)
+
+	state.AddTx(txReplacementB, status.Committed)
+	state.AddTx(txC, status.Committed)
 
 	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
-	require.NoError(d.DeleteCurrentValidator(&stakerA))
-	require.NoError(d.DeleteCurrentValidator(&stakerB))
-	require.NoError(d.PutCurrentValidator(&replacementB))
-	require.NoError(d.PutCurrentValidator(&stakerC))
+	require.NoError(d.DeleteCurrentValidator(stakerA))
+	require.NoError(d.DeleteCurrentValidator(stakerB))
+	require.NoError(d.PutCurrentValidator(replacementB))
+	require.NoError(d.PutCurrentValidator(stakerC))
 	require.NoError(d.Apply(state))
 	state.SetHeight(1)
 	require.NoError(state.Commit())
@@ -2708,11 +2626,11 @@ func TestDiffMultipleValidatorsSameBlock(t *testing.T) {
 
 	require.Contains(historicalVdrs, nodeA)
 	require.Equal(uint64(10), historicalVdrs[nodeA].Weight)
-	require.Equal(skA.PublicKey(), historicalVdrs[nodeA].PublicKey)
+	require.Equal(stakerA.PublicKey, historicalVdrs[nodeA].PublicKey)
 
 	require.Contains(historicalVdrs, nodeB)
 	require.Equal(uint64(15), historicalVdrs[nodeB].Weight)
-	require.Equal(skB.PublicKey(), historicalVdrs[nodeB].PublicKey)
+	require.Equal(stakerB.PublicKey, historicalVdrs[nodeB].PublicKey)
 
 	require.NotContains(historicalVdrs, nodeC)
 }
@@ -2722,33 +2640,21 @@ func TestDiffRemoveValidatorNoPriorState(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	sk, err := localsigner.New()
-	require.NoError(err)
-
 	var (
 		nodeID    = ids.GenerateTestNodeID()
 		subnetID  = constants.PrimaryNetworkID
 		startTime = genesistest.DefaultValidatorStartTime
 		endTime   = startTime.Add(24 * time.Hour)
-		pk        = sk.PublicKey()
 	)
 
-	staker := Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    nodeID,
-		PublicKey: pk,
-		SubnetID:  subnetID,
-		Weight:    10,
-		StartTime: startTime,
-		EndTime:   endTime,
-		NextTime:  endTime,
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
-	}
+	staker, stakerTx := createStakerAndTx(t, subnetID, nodeID, startTime, endTime, 10, 0)
+	pk := staker.PublicKey
+	state.AddTx(stakerTx, status.Committed)
 
 	// Block 0: Add the validator.
 	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
-	require.NoError(d.PutCurrentValidator(&staker))
+	require.NoError(d.PutCurrentValidator(staker))
 	require.NoError(d.Apply(state))
 	state.SetHeight(0)
 	require.NoError(state.Commit())
@@ -2756,7 +2662,7 @@ func TestDiffRemoveValidatorNoPriorState(t *testing.T) {
 	// Block 1: Remove the validator without replacement.
 	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
-	require.NoError(d.DeleteCurrentValidator(&staker))
+	require.NoError(d.DeleteCurrentValidator(staker))
 	require.NoError(d.Apply(state))
 	state.SetHeight(1)
 	require.NoError(state.Commit())

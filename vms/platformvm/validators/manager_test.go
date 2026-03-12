@@ -18,12 +18,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	. "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
@@ -71,6 +75,12 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 			EndTime:   endTime,
 		}
 	)
+
+	primaryStakerTx := &txs.Tx{TxID: primaryStaker.TxID, Unsigned: &txs.AddValidatorTx{}}
+	subnetStakerTx := &txs.Tx{TxID: subnetStaker.TxID, Unsigned: &txs.AddSubnetValidatorTx{}}
+
+	s.AddTx(primaryStakerTx, status.Committed)
+	s.AddTx(subnetStakerTx, status.Committed)
 
 	// Add a subnet staker during the Etna upgrade
 	{
@@ -151,27 +161,65 @@ func TestGetWarpValidatorSets(t *testing.T) {
 		pk0Bytes, pk1Bytes = pk1Bytes, pk0Bytes
 	}
 
+	primaryStaker0Tx, err := txs.NewSigned(
+		&txs.AddValidatorTx{
+			Validator:    txs.Validator{},
+			StakeOuts:    []*avax.TransferableOutput{},
+			RewardsOwner: &secp256k1fx.OutputOwners{},
+		},
+		txs.Codec,
+		nil,
+	)
+	require.NoError(err)
+	subnetStaker0Tx, err := txs.NewSigned(&txs.AddSubnetValidatorTx{
+		SubnetAuth: &secp256k1fx.Input{},
+	}, txs.Codec, nil)
+	require.NoError(err)
+	primaryStaker1Tx, err := txs.NewSigned(
+		&txs.AddValidatorTx{
+			Validator:    txs.Validator{},
+			StakeOuts:    []*avax.TransferableOutput{},
+			RewardsOwner: &secp256k1fx.OutputOwners{},
+		},
+		txs.Codec,
+		nil,
+	)
+	require.NoError(err)
+	subnetStaker1Tx, err := txs.NewSigned(&txs.AddSubnetValidatorTx{
+		SubnetAuth: &secp256k1fx.Input{},
+	}, txs.Codec, nil)
+	require.NoError(err)
+
+	s.AddTx(primaryStaker0Tx, status.Committed)
+	s.AddTx(subnetStaker0Tx, status.Committed)
+	s.AddTx(primaryStaker1Tx, status.Committed)
+	s.AddTx(subnetStaker1Tx, status.Committed)
+
 	var (
 		subnetID       = ids.GenerateTestID()
 		primaryStaker0 = &state.Staker{
+			TxID:      primaryStaker0Tx.TxID,
 			NodeID:    ids.GenerateTestNodeID(),
 			PublicKey: pk0,
 			SubnetID:  constants.PrimaryNetworkID,
 			Weight:    1,
 		}
 		subnetStaker0 = &state.Staker{
+			TxID:      subnetStaker0Tx.TxID,
 			NodeID:    primaryStaker0.NodeID,
 			PublicKey: nil, // inherited from primaryStaker
 			SubnetID:  subnetID,
 			Weight:    1,
 		}
 		primaryStaker1 = &state.Staker{
+			TxID:      primaryStaker1Tx.TxID,
 			NodeID:    ids.GenerateTestNodeID(),
 			PublicKey: pk1,
 			SubnetID:  constants.PrimaryNetworkID,
 			Weight:    1,
 		}
 		subnetStaker1 = &state.Staker{
+			TxID:      subnetStaker1Tx.TxID,
 			NodeID:    primaryStaker1.NodeID,
 			PublicKey: nil, // inherited from primaryStaker1
 			SubnetID:  subnetID,

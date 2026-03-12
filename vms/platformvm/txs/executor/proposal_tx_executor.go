@@ -36,6 +36,8 @@ var (
 	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
 	ErrInvalidState                  = errors.New("generated output isn't valid state")
 	ErrShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
+	ErrShouldBeAutoRenewedStaker     = errors.New("expected auto renewed staker")
+	ErrInvalidTimestamp              = errors.New("invalid timestamp")
 	ErrWrongTxType                   = errors.New("wrong transaction type")
 	ErrInvalidID                     = errors.New("invalid ID")
 	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
@@ -144,6 +146,14 @@ func (*proposalTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1Validator
 }
 
 func (*proposalTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
 	return ErrWrongTxType
 }
 
@@ -378,6 +388,10 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	//            [txs.ValidatorTx] interface.
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
+		if _, ok := uStakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
+			return ErrShouldBePermissionlessStaker
+		}
+
 		if err := e.rewardValidatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
 		}
@@ -421,6 +435,107 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 	e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
+	return nil
+}
+
+func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRenewedValidatorTx) error {
+	currentStakerIterator, err := e.onCommitState.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+	defer currentStakerIterator.Release()
+
+	if !currentStakerIterator.Next() {
+		return fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
+	}
+
+	stakerToReward := currentStakerIterator.Value()
+	if stakerToReward.TxID != tx.TxID {
+		return fmt.Errorf(
+			"%w: %s != %s",
+			ErrRemoveWrongStaker,
+			stakerToReward.TxID,
+			tx.TxID,
+		)
+	}
+
+	if tx.Timestamp != uint64(e.onCommitState.GetTimestamp().Unix()) {
+		return ErrInvalidTimestamp
+	}
+
+	// Verify that the chain's timestamp is the validator's end time
+	if !stakerToReward.EndTime.Equal(e.onCommitState.GetTimestamp()) {
+		return fmt.Errorf(
+			"%w: TxID = %s with %s < %s",
+			ErrRemoveStakerTooEarly,
+			tx.TxID,
+			e.onCommitState.GetTimestamp(),
+			stakerToReward.EndTime,
+		)
+	}
+
+	stakerTx, _, err := e.onCommitState.GetTx(stakerToReward.TxID)
+	if err != nil {
+		return fmt.Errorf("failed to get next removed staker tx: %w", err)
+	}
+
+	addAutoRenewedValidatorTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+	if !ok {
+		return ErrShouldBeAutoRenewedStaker
+	}
+
+	stakingInfo, err := e.onCommitState.GetStakingInfo(stakerToReward.SubnetID, stakerToReward.NodeID)
+	if err != nil {
+		return fmt.Errorf("failed to get staking info: %w", err)
+	}
+
+	// In onAbortState the staker is always removed.
+	if err := e.onAbortState.DeleteCurrentValidator(stakerToReward); err != nil {
+		return fmt.Errorf("deleting current validator from abort state: %w", err)
+	}
+
+	currentSupply, err := e.onAbortState.GetCurrentSupply(stakerToReward.SubnetID)
+	if err != nil {
+		return err
+	}
+
+	newSupply, err := math.Sub(currentSupply, stakerToReward.PotentialReward)
+	if err != nil {
+		return err
+	}
+
+	e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
+
+	if stakingInfo.Period > 0 {
+		// Running auto-renewed staker: validator will continue to the next cycle.
+		// On commit: restake rewards (based on AutoCompoundRewardShares) and start new cycle.
+		// On abort: return stake + accrued rewards, forfeit current cycle's rewards.
+
+		// Create UTXOs for onAbortState.
+		if err = e.createUTXOsAutoRenewedValidatorOnAbort(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
+			return fmt.Errorf("failed to create UTXO auto-renewed validator on abort: %w", err)
+		}
+
+		// Set onCommitState.
+		if err = e.setOnCommitStateAutoRenewedValidatorRestake(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
+			return err
+		}
+
+		// Early return because we don't need to do anything else.
+		return nil
+	}
+
+	// Graceful exit: validator requested to stop (Period == 0).
+	// Return stake + all rewards on both commit and abort paths.
+	if err := e.createUTXOsAutoRenewedValidatorOnGracefulExit(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
+		return err
+	}
+
+	// Handle staker lifecycle.
+	if err := e.onCommitState.DeleteCurrentValidator(stakerToReward); err != nil {
+		return fmt.Errorf("deleting current validator from commit state: %w", err)
+	}
+
 	return nil
 }
 
@@ -492,7 +607,7 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	}
 
 	delegationRewardsOwner := uValidatorTx.DelegationRewardsOwner()
-	outIntf, err := e.backend.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+	outIntf, err := e.backend.Fx.CreateOutput(stakingInfo.DelegateeReward, delegationRewardsOwner)
 	if err != nil {
 		return fmt.Errorf("failed to create output: %w", err)
 	}
@@ -636,6 +751,11 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	} else {
 		// For any validators who started prior to [CortinaTime], we issue the
 		// [delegateeReward] immediately.
+		vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
+		if !ok {
+			return ErrWrongTxType
+		}
+
 		delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
 		outIntf, err := e.backend.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
 		if err != nil {
@@ -658,4 +778,518 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 		e.onCommitState.AddRewardUTXO(txID, utxo)
 	}
 	return nil
+}
+
+// createUTXOsAutoRenewedValidatorOnAbort creates UTXOs for an auto-renewed validator
+// that failed to meet eligibility requirements.
+//
+// The validator receives:
+//   - Staked tokens (returned via stake outputs)
+//   - Accrued validation rewards (from previous successful periods)
+//   - Accrued delegatee rewards + pending delegatee rewards
+//
+// The validator forfeits potential reward of the ended cycle.
+func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnAbort(
+	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	validator *state.Staker,
+	stakingInfo state.StakingInfo,
+) error {
+	txID := validator.TxID
+	stake := addAutoRenewedValidatorTx.Stake()
+	stakeAsset := stake[0].Asset
+
+	createUTXOsStakeOut(addAutoRenewedValidatorTx, validator, e.onAbortState)
+
+	outputIndexOffset := uint32(len(e.tx.Unsigned.Outputs()))
+	// Create UTXOs for accrued rewards.
+	if stakingInfo.AccruedRewards > 0 {
+		outIntf, err := e.backend.Fx.CreateOutput(stakingInfo.AccruedRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner())
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        e.tx.ID(),
+				OutputIndex: outputIndexOffset,
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+
+		e.onAbortState.AddUTXO(utxo)
+		e.onAbortState.AddRewardUTXO(txID, utxo)
+
+		outputIndexOffset++
+	}
+
+	// Create UTXOs for accrued delegatee rewards.
+	totalDelegateeRewards, err := math.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
+	if err != nil {
+		return err
+	}
+	if totalDelegateeRewards > 0 {
+		outIntf, err := e.backend.Fx.CreateOutput(totalDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner())
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+
+		onAbortUtxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        e.tx.ID(),
+				OutputIndex: outputIndexOffset,
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+
+		e.onAbortState.AddUTXO(onAbortUtxo)
+		e.onAbortState.AddRewardUTXO(txID, onAbortUtxo)
+	}
+
+	return nil
+}
+
+// setOnCommitStateAutoRenewedValidatorRestake processes rewards for a running
+// auto-renewed validator based on their AutoCompoundRewardShares configuration.
+//
+// The function:
+//  1. Splits rewards (validation + delegatee) into restaking and withdrawing portions
+//  2. Creates UTXOs for the withdrawn portion
+//  3. Increases validator weight and accrued rewards by the restaking portion
+//  4. If restaking would exceed MaxValidatorStake, the excess is withdrawn
+//  5. Updates the validator state
+func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
+	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	validator *state.Staker,
+	stakingInfo state.StakingInfo,
+) error {
+	var err error
+
+	outputIndexOffset := uint32(len(e.tx.Unsigned.Outputs()))
+	asset := addAutoRenewedValidatorTx.Stake()[0].Asset
+
+	restakingRewards, withdrawingRewards := reward.Split(validator.PotentialReward, stakingInfo.AutoCompoundRewardShares)
+	restakingDelegateeRewards, withdrawingDelegateeRewards := reward.Split(stakingInfo.DelegateeReward, stakingInfo.AutoCompoundRewardShares)
+
+	if withdrawingRewards > 0 {
+		outIntf, err := e.backend.Fx.CreateOutput(withdrawingRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner())
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+
+		validationRewardUTXO := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        e.tx.ID(),
+				OutputIndex: outputIndexOffset,
+			},
+			Asset: asset,
+			Out:   out,
+		}
+		e.onCommitState.AddUTXO(validationRewardUTXO)
+		e.onCommitState.AddRewardUTXO(e.tx.ID(), validationRewardUTXO)
+
+		outputIndexOffset++
+	}
+
+	if withdrawingDelegateeRewards > 0 {
+		outIntf, err := e.backend.Fx.CreateOutput(withdrawingDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner())
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+
+		delegateeRewardUTXO := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        e.tx.ID(),
+				OutputIndex: outputIndexOffset,
+			},
+			Asset: asset,
+			Out:   out,
+		}
+		e.onCommitState.AddUTXO(delegateeRewardUTXO)
+		e.onCommitState.AddRewardUTXO(e.tx.ID(), delegateeRewardUTXO)
+
+		outputIndexOffset++
+	}
+
+	newAccruedRewards := stakingInfo.AccruedRewards
+	newWeight := validator.Weight
+	if restakingRewards > 0 {
+		newAccruedRewards, err = math.Add(stakingInfo.AccruedRewards, restakingRewards)
+		if err != nil {
+			return err
+		}
+
+		newWeight, err = math.Add(validator.Weight, restakingRewards)
+		if err != nil {
+			return err
+		}
+	}
+
+	newAccruedDelegateeRewards := stakingInfo.AccruedDelegateeRewards
+	if restakingDelegateeRewards > 0 {
+		newAccruedDelegateeRewards, err = math.Add(stakingInfo.AccruedDelegateeRewards, restakingDelegateeRewards)
+		if err != nil {
+			return err
+		}
+
+		newWeight, err = math.Add(newWeight, restakingDelegateeRewards)
+		if err != nil {
+			return err
+		}
+	}
+
+	if newWeight > e.backend.Config.MaxValidatorStake {
+		excessValidationRewards, excessDelegateeRewards, err := e.createOverflowUTXOs(
+			addAutoRenewedValidatorTx,
+			newWeight,
+			restakingDelegateeRewards,
+			restakingRewards,
+			validator.Weight,
+			outputIndexOffset,
+		)
+		if err != nil {
+			return err
+		}
+
+		newAccruedRewards, err = math.Sub(newAccruedRewards, excessValidationRewards)
+		if err != nil {
+			return err
+		}
+
+		newWeight, err = math.Sub(newWeight, excessValidationRewards)
+		if err != nil {
+			return err
+		}
+
+		if excessDelegateeRewards > 0 {
+			newAccruedDelegateeRewards, err = math.Sub(newAccruedDelegateeRewards, excessDelegateeRewards)
+			if err != nil {
+				return err
+			}
+
+			newWeight, err = math.Sub(newWeight, excessDelegateeRewards)
+			if err != nil {
+				return err
+			}
+		}
+
+		// newWeight is equal to e.backend.Config.MaxValidatorStake.
+	}
+
+	rewards, err := GetRewardsCalculator(e.backend, e.onCommitState, validator.SubnetID)
+	if err != nil {
+		return err
+	}
+
+	currentSupply, err := e.onCommitState.GetCurrentSupply(validator.SubnetID)
+	if err != nil {
+		return err
+	}
+
+	potentialReward := rewards.Calculate(
+		stakingInfo.Period,
+		newWeight,
+		currentSupply,
+	)
+
+	newCurrentSupply, err := math.Add(currentSupply, potentialReward)
+	if err != nil {
+		return err
+	}
+
+	e.onCommitState.SetCurrentSupply(validator.SubnetID, newCurrentSupply)
+
+	endTime := validator.EndTime.Add(stakingInfo.Period)
+
+	// Update validator by deleting and putting back.
+	renewedValidator := *validator
+	renewedValidator.StartTime = renewedValidator.EndTime
+	renewedValidator.EndTime = endTime
+	renewedValidator.NextTime = endTime
+	renewedValidator.PotentialReward = potentialReward
+	renewedValidator.Weight = newWeight
+
+	if err := e.onCommitState.DeleteCurrentValidator(validator); err != nil {
+		return fmt.Errorf("failed to delete validator from commit state: %w", err)
+	}
+
+	if err := e.onCommitState.PutCurrentValidator(&renewedValidator); err != nil {
+		return fmt.Errorf("putting renewed validator: %w", err)
+	}
+
+	// Update staking info
+	stakingInfo.DelegateeReward = 0
+	stakingInfo.AccruedRewards = newAccruedRewards
+	stakingInfo.AccruedDelegateeRewards = newAccruedDelegateeRewards
+	stakingInfo.StakerEndTime = uint64(endTime.Unix())
+
+	if err := e.onCommitState.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
+		return fmt.Errorf("setting staking info for validator: %w", err)
+	}
+
+	return nil
+}
+
+// createUTXOsAutoRenewedValidatorOnGracefulExit creates UTXOs for an auto-renewed
+// validator that is stopping gracefully.
+//
+// On commit (validator eligible for rewards):
+//   - Staked tokens (returned via stake outputs)
+//   - All validation rewards (PotentialReward + AccruedRewards)
+//   - All delegatee rewards (AccruedDelegateeRewards + pending delegatee rewards)
+//
+// On abort (validator not eligible for rewards):
+//   - Staked tokens (returned via stake outputs)
+//   - Only accrued validation rewards (AccruedRewards)
+//   - All delegatee rewards (AccruedDelegateeRewards + pending delegatee rewards)
+func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
+	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	validator *state.Staker,
+	stakingInfo state.StakingInfo,
+) error {
+	txID := validator.TxID
+	stake := addAutoRenewedValidatorTx.Stake()
+	stakeAsset := stake[0].Asset
+
+	createUTXOsStakeOut(addAutoRenewedValidatorTx, validator, e.onCommitState, e.onAbortState)
+
+	// Create UTXOs for onAbortState.
+	onAbortUTXOsOffset := uint32(len(e.tx.Unsigned.Outputs()))
+	if stakingInfo.AccruedRewards > 0 {
+		outIntf, err := e.backend.Fx.CreateOutput(stakingInfo.AccruedRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner())
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        e.tx.ID(),
+				OutputIndex: onAbortUTXOsOffset,
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+
+		e.onAbortState.AddUTXO(utxo)
+		e.onAbortState.AddRewardUTXO(txID, utxo)
+
+		onAbortUTXOsOffset++
+	}
+
+	// Create UTXOs for rewards for onCommitState.
+	onCommitUTXOsOffset := uint32(len(e.tx.Unsigned.Outputs()))
+	totalRewards, err := math.Add(validator.PotentialReward, stakingInfo.AccruedRewards)
+	if err != nil {
+		return err
+	}
+	if totalRewards > 0 {
+		outIntf, err := e.backend.Fx.CreateOutput(totalRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner())
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        e.tx.ID(),
+				OutputIndex: onCommitUTXOsOffset,
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+
+		e.onCommitState.AddUTXO(utxo)
+		e.onCommitState.AddRewardUTXO(txID, utxo)
+
+		onCommitUTXOsOffset++
+	}
+
+	// Provide the delegatee rewards from successful delegations here.
+	totalDelegateeRewards, err := math.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
+	if err != nil {
+		return err
+	}
+	if totalDelegateeRewards == 0 {
+		return nil
+	}
+
+	outIntf, err := e.backend.Fx.CreateOutput(totalDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner())
+	if err != nil {
+		return fmt.Errorf("failed to create output: %w", err)
+	}
+	out, ok := outIntf.(verify.State)
+	if !ok {
+		return ErrInvalidState
+	}
+
+	onCommitUtxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        e.tx.ID(),
+			OutputIndex: onCommitUTXOsOffset,
+		},
+		Asset: stakeAsset,
+		Out:   out,
+	}
+	e.onCommitState.AddUTXO(onCommitUtxo)
+	e.onCommitState.AddRewardUTXO(txID, onCommitUtxo)
+
+	onAbortUtxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        e.tx.ID(),
+			OutputIndex: onAbortUTXOsOffset,
+		},
+		Asset: stakeAsset,
+		Out:   out,
+	}
+	e.onAbortState.AddUTXO(onAbortUtxo)
+	e.onAbortState.AddRewardUTXO(txID, onAbortUtxo)
+
+	return nil
+}
+
+// createOverflowUTXOs creates UTXOs for the excess rewards
+// that cannot be restaked because doing so would exceed MaxValidatorStake.
+//
+// When an auto-renewed validator's restaked rewards would push their weight above
+// MaxValidatorStake, the excess is withdrawn.
+//
+// Returns the excess validation and delegatee rewards that were withdrawn.
+func (e *proposalTxExecutor) createOverflowUTXOs(
+	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	newWeight uint64,
+	delegateeReward uint64,
+	rewards uint64,
+	oldWeight uint64,
+	outputIndexOffset uint32,
+) (excessValidationRewards uint64, excessDelegateeRewards uint64, err error) {
+	asset := addAutoRenewedValidatorTx.Stake()[0].Asset
+
+	totalRestakingRewards, err := math.Sub(newWeight, oldWeight)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Calculate how much room we have to grow before hitting max stake.
+	restakingAvailability, err := math.Sub(e.backend.Config.MaxValidatorStake, oldWeight)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Distribute available space proportionally between validation and delegatee rewards.
+	restakingValidationReward, err := math.MulDiv(rewards, restakingAvailability, totalRestakingRewards)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	restakingDelegateeReward, err := math.Sub(restakingAvailability, restakingValidationReward)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// rewards >= restakingValidationReward, but using math package as a defensive check.
+	excessValidationReward, err := math.Sub(rewards, restakingValidationReward)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// delegateeReward >= restakingDelegateeReward, but using math package as a defensive check.
+	excessDelegateeReward, err := math.Sub(delegateeReward, restakingDelegateeReward)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if excessValidationReward > 0 {
+		outIntf, err := e.backend.Fx.CreateOutput(excessValidationReward, addAutoRenewedValidatorTx.ValidationRewardsOwner())
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to create output: %w", err)
+		}
+
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return 0, 0, ErrInvalidState
+		}
+
+		excessValidationRewardUTXO := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        e.tx.ID(),
+				OutputIndex: outputIndexOffset,
+			},
+			Asset: asset,
+			Out:   out,
+		}
+		e.onCommitState.AddUTXO(excessValidationRewardUTXO)
+		e.onCommitState.AddRewardUTXO(e.tx.ID(), excessValidationRewardUTXO)
+
+		outputIndexOffset++
+	}
+
+	if excessDelegateeReward > 0 {
+		outIntf, err := e.backend.Fx.CreateOutput(excessDelegateeReward, addAutoRenewedValidatorTx.DelegationRewardsOwner())
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to create output: %w", err)
+		}
+
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return 0, 0, ErrInvalidState
+		}
+
+		excessDelegateeRewardUTXO := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        e.tx.ID(),
+				OutputIndex: outputIndexOffset,
+			},
+			Asset: asset,
+			Out:   out,
+		}
+		e.onCommitState.AddUTXO(excessDelegateeRewardUTXO)
+		e.onCommitState.AddRewardUTXO(e.tx.ID(), excessDelegateeRewardUTXO)
+	}
+
+	return excessValidationReward, excessDelegateeReward, nil
+}
+
+// createUTXOsStakeOut creates UTXOs to return a validator's staked tokens.
+// The UTXOs are added to all provided state diffs.
+func createUTXOsStakeOut(addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx, validator *state.Staker, states ...state.Diff) {
+	for i, out := range addAutoRenewedValidatorTx.Stake() {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        validator.TxID,
+				OutputIndex: uint32(len(addAutoRenewedValidatorTx.Outputs()) + i),
+			},
+			Asset: out.Asset,
+			Out:   out.Output(),
+		}
+
+		for _, s := range states {
+			s.AddUTXO(utxo)
+		}
+	}
 }
