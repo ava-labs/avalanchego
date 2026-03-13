@@ -98,6 +98,10 @@ tasks:
     desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
     cmd: ./scripts/run_bazel.sh test --config=fast //...
 
+  bazel-test-firewood-ffi:
+    desc: Run firewood FFI tests for both ethhash and MerkleDB variants with Bazel
+    cmd: ./scripts/run_bazel.sh test //firewood/ffi:ffi_test //firewood/ffi/tests/eth:eth_test //firewood/ffi/tests/firewood:firewood_test
+
   bazel-test-main:
     desc: Run main module unit tests with Bazel (excludes graft modules)
     cmd: ./scripts/run_bazel.sh test //... -- -//graft/...
@@ -229,6 +233,10 @@ tasks:
       - ./scripts/check_require_directives_round_trip.sh
       - task: check-clean-branch
 
+  check-rust-version:
+    desc: Checks that Rust version and edition in MODULE.bazel match firewood/Cargo.toml
+    cmd: ./scripts/check_rust_version.sh
+
   create-kind-cluster:
     desc: Creates the default kind cluster
     cmd: bash -x ./scripts/start_kind_cluster.sh {{.CLI_ARGS}}
@@ -320,6 +328,7 @@ tasks:
       - lint-action
       - lint-shell
       - check-go-version
+      - check-rust-version
       - check-require-directives
 
   lint-all-ci:
@@ -330,6 +339,7 @@ tasks:
       - task: lint-shell
       - task: check-go-mod-tidy
       - task: check-go-version
+      - task: check-rust-version
       - task: check-require-directives
       - task: check-require-directives-round-trip
 

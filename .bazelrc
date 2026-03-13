@@ -32,6 +32,12 @@ test:norace --@io_bazel_rules_go//go/config:race=false
 # Coverage: use `bazel coverage //...` instead of `bazel test //...`
 # This matches build_test.sh's -coverprofile/-covermode flags
 
+# Override Bazel's auto-detected ld.gold with the default linker (GNU ld).
+# Bazel's cc_toolchain auto-configuration probes for ld.gold and bakes in
+# -fuse-ld=gold, but gold is deprecated (GNU Binutils 2.44) and has known
+# bugs with Rust (miscompiles SHF_GNU_RETAIN / #[used]).
+build --linkopt=-fuse-ld=bfd
+
 # CGO settings
 # Using action_env rather than --@io_bazel_rules_go//go/config:pure because:
 # 1. CGO_CFLAGS has no native rules_go equivalent - action_env is the only option

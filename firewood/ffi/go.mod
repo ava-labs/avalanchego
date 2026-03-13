@@ -1,6 +1,6 @@
 module github.com/ava-labs/firewood/ffi
 
-go 1.25
+go 1.25.8
 
 // Changes to the toolchain version should be replicated in:
 //   - ffi/go.mod (here)
