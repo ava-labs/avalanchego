@@ -15,6 +15,7 @@ go_library(
         "//graft/coreth/core",
         "//graft/coreth/internal/ethapi",
         "//graft/coreth/params",
+        "//graft/evm/firewood",
         "//graft/evm/rpc",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",

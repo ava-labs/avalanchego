@@ -24,6 +24,7 @@ go_library(
         "//graft/coreth/plugin/evm/extension",
         "//graft/coreth/plugin/evm/upgrade/ap3",
         "//graft/evm/constants",
+        "//graft/evm/firewood",
         "//graft/evm/sync/client",
         "//graft/evm/sync/engine",
         "//graft/evm/sync/synctest",

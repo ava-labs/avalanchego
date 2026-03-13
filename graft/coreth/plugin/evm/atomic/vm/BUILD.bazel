@@ -123,7 +123,6 @@ graft_go_test(
         "//vms/components/avax",
         "//vms/components/chain",
         "//vms/evm/predicate",
-        "//vms/evm/sync/customrawdb",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",

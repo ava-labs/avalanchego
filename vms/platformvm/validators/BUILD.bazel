@@ -15,11 +15,9 @@ go_library(
         "//utils/crypto/bls",
         "//utils/timer/mockable",
         "//utils/window",
-        "//vms/platformvm/block",
         "//vms/platformvm/config",
         "//vms/platformvm/metrics",
         "//vms/platformvm/state",
-        "//vms/platformvm/status",
         "//vms/platformvm/txs",
     ],
 )

@@ -79,6 +79,7 @@ go_library(
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//event",
         "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//libevm/stateconf",
         "@com_github_ava_labs_libevm//log",
         "@com_github_ava_labs_libevm//metrics",

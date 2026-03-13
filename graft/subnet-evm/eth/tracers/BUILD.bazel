@@ -11,6 +11,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/firewood",
         "//graft/evm/rpc",
         "//graft/subnet-evm/consensus",
         "//graft/subnet-evm/core",
