@@ -9,7 +9,7 @@ use crate::nodestore::alloc::FreeAreaWithMetadata;
 use crate::nodestore::primitives::{AreaIndex, area_size_iter};
 use crate::{
     CheckerError, Committed, FileIoError, HashType, HashedNodeReader, IntoHashType, LinearAddress,
-    MutableProposal, Node, NodeReader, NodeStore, Path, ReadableStorage, RootReader,
+    Mutable, Node, NodeReader, NodeStore, Path, Propose, ReadableStorage, RootReader,
     StoredAreaParent, TrieNodeParent, WritableStorage, nodestore::NodeStoreHeader,
 };
 
@@ -588,13 +588,13 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         header: &mut NodeStoreHeader,
         check_report: CheckerReport,
     ) -> Result<FixReport, FileIoError> {
-        let mut proposal = NodeStore::<MutableProposal, S>::new(self)?;
+        let mut proposal = NodeStore::<Mutable<Propose>, S>::new(self)?;
 
         Ok(proposal.fix(header, check_report))
     }
 }
 
-impl<S: WritableStorage> NodeStore<MutableProposal, S> {
+impl<S: WritableStorage> NodeStore<Mutable<Propose>, S> {
     fn fix(&mut self, header: &mut NodeStoreHeader, check_report: CheckerReport) -> FixReport {
         let mut fixed = Vec::new();
         let mut unfixable = Vec::new();
@@ -1168,7 +1168,7 @@ mod test {
         let expected_error_num = errors.len();
 
         // fix the freelist
-        let mut proposal = NodeStore::<MutableProposal, _>::new(&nodestore).unwrap();
+        let mut proposal = NodeStore::<Mutable<Propose>, _>::new(&nodestore).unwrap();
         let fix_report = proposal.fix(
             &mut header,
             CheckerReport {

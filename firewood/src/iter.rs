@@ -622,7 +622,7 @@ impl<I: Iterator<Item = T>, T: KeyValuePair, K: KeyType> Iterator for FilteredKe
 mod tests {
     use super::*;
     use crate::merkle::Merkle;
-    use firewood_storage::{ImmutableProposal, MemStore, MutableProposal, NodeStore};
+    use firewood_storage::{ImmutableProposal, MemStore, Mutable, NodeStore, Propose};
     use std::sync::Arc;
     use test_case::test_case;
 
@@ -636,7 +636,7 @@ mod tests {
         };
     }
 
-    pub(super) fn create_test_merkle() -> Merkle<NodeStore<MutableProposal, MemStore>> {
+    pub(super) fn create_test_merkle() -> Merkle<NodeStore<Mutable<Propose>, MemStore>> {
         let memstore = MemStore::default();
         let memstore = Arc::new(memstore);
         let nodestore = NodeStore::new_empty_proposal(memstore);
@@ -805,7 +805,7 @@ mod tests {
     ///  1   F
     ///
     /// The number next to each branch is the position of the child in the branch's children array.
-    fn created_populated_merkle() -> Merkle<NodeStore<MutableProposal, MemStore>> {
+    fn created_populated_merkle() -> Merkle<NodeStore<Mutable<Propose>, MemStore>> {
         let mut merkle = create_test_merkle();
 
         merkle

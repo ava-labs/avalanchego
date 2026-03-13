@@ -16,7 +16,7 @@ use std::fmt::Write;
 
 use super::*;
 use firewood_storage::{
-    Committed, MemStore, MutableProposal, NodeHashAlgorithm, NodeStore, NodeStoreHeader,
+    Committed, MemStore, Mutable, NodeHashAlgorithm, NodeStore, NodeStoreHeader, Propose,
     RootReader, TrieHash,
 };
 
@@ -182,7 +182,7 @@ fn insert_one() {
     merkle.insert(b"abc", Box::new([])).unwrap();
 }
 
-fn create_in_memory_merkle() -> Merkle<NodeStore<MutableProposal, MemStore>> {
+fn create_in_memory_merkle() -> Merkle<NodeStore<Mutable<Propose>, MemStore>> {
     let memstore = MemStore::default();
 
     let nodestore = NodeStore::new_empty_proposal(memstore.into());
@@ -312,7 +312,7 @@ fn remove_prefix_exact() {
     }
 }
 
-fn two_byte_all_keys() -> Merkle<NodeStore<MutableProposal, MemStore>> {
+fn two_byte_all_keys() -> Merkle<NodeStore<Mutable<Propose>, MemStore>> {
     let mut merkle = create_in_memory_merkle();
     for key_val in u8::MIN..=u8::MAX {
         let key = [key_val, key_val];

@@ -23,12 +23,12 @@
 //!
 //! `T` is one of the following state types:
 //! - [`Committed`] - For a committed revision with no in-memory changes
-//! - [`MutableProposal`] - For a proposal being actively modified with in-memory nodes
+//! - [`Mutable<Propose>`] - For a proposal being actively modified with in-memory nodes
 //! - [`ImmutableProposal`] - For a proposal that has been hashed and assigned addresses
 //!
 //! The nodestore follows a lifecycle pattern:
 //! ```text
-//! Committed -> MutableProposal -> ImmutableProposal -> Committed
+//! Committed -> Mutable<Propose> -> ImmutableProposal -> Committed
 //! ```
 //!
 //! ## Traits
@@ -61,6 +61,28 @@ pub use primitives::{AreaIndex, LinearAddress};
 // Re-export types from header module
 pub use header::NodeStoreHeader;
 
+/// The [`NodeStore`] handles the serialization of nodes and
+/// free space management of nodes in the page store. It lays out the format
+/// of the [`PageStore`]. More specifically, it places a [`FileIdentifyingMagic`]
+/// and a [`FreeSpaceHeader`] at the beginning
+///
+/// Nodestores represent a revision of the trie. There are three types of nodestores:
+/// - `Committed`: A committed revision of the trie. It has no in-memory changes.
+/// - `Mutable<Propose>`: A proposal that is still being modified. It has some nodes in memory, a delete list, and a parent.
+/// - `ImmutableProposal`: A proposal that has been hashed and assigned addresses. It has no in-memory changes.
+///
+/// The general lifecycle of nodestores is as follows:
+/// ```mermaid
+/// flowchart TD
+/// subgraph subgraph["Committed Revisions"]
+/// L("Latest Nodestore&lt;Committed, S&gt;") --- |...|O("Oldest NodeStore&lt;Committed, S&gt;")
+/// end
+/// O --> E("Expire")
+/// L --> |start propose|M("NodeStore&lt;Mutable&lt;Propose&gt;, S&gt;")
+/// M --> |finish propose + hash|I("NodeStore&lt;ProposedImmutable, S&gt;")
+/// I --> |commit|N("New commit NodeStore&lt;Committed, S&gt;")
+/// style E color:#FFFFFF, fill:#AA00FF, stroke:#AA00FF
+/// ```
 use std::mem::take;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -173,7 +195,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 ///
 /// This means that the nodestore can have children.
 /// Only [`ImmutableProposal`] and [Committed] implement this trait.
-/// [`MutableProposal`] does not implement this trait because it is not a valid parent.
+/// [`Mutable<Propose>`] does not implement this trait because it is not a valid parent.
 /// TODO: Maybe this can be renamed to `ImmutableNodestore`
 pub trait Parentable {
     /// Returns the parent of this nodestore.
@@ -232,8 +254,8 @@ impl Parentable for Committed {
     }
 }
 
-impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
-    /// Create a new `MutableProposal` [`NodeStore`] from a parent [`NodeStore`]
+impl<S: ReadableStorage> NodeStore<Mutable<Propose>, S> {
+    /// Create a new proposal [`NodeStore`] from a parent [`NodeStore`].
     ///
     /// # Errors
     ///
@@ -242,15 +264,17 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
         let mut deleted = Vec::default();
         let root = if let Some(ref root) = parent.kind.root() {
             deleted.push(root.clone());
-            let root = root.as_shared_node(parent)?.deref().clone();
+            let root = triomphe::Arc::unwrap_or_clone(root.as_shared_node(parent)?);
             Some(root)
         } else {
             None
         };
-        let kind = MutableProposal {
+        let kind = Mutable {
             root,
-            deleted,
-            parent: parent.kind.as_nodestore_parent(),
+            inner: Propose {
+                deleted,
+                parent: parent.kind.as_nodestore_parent(),
+            },
         };
         Ok(NodeStore {
             kind,
@@ -261,69 +285,77 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
     /// Marks the node at `addr` as deleted in this proposal.
     pub fn delete_node(&mut self, node: MaybePersistedNode) {
         trace!("Pending delete at {node:?}");
-        self.kind.deleted.push(node);
+        self.kind.inner.deleted.push(node);
     }
 
     /// Take the nodes that have been marked as deleted in this proposal.
     pub fn take_deleted_nodes(&mut self) -> Vec<MaybePersistedNode> {
-        take(&mut self.kind.deleted)
+        take(&mut self.kind.inner.deleted)
     }
 
     /// Adds to the nodes deleted in this proposal.
     pub fn delete_nodes(&mut self, nodes: &[MaybePersistedNode]) {
-        self.kind.deleted.extend_from_slice(nodes);
+        self.kind.inner.deleted.extend_from_slice(nodes);
     }
 
-    /// Reads a node for update, marking it as deleted in this proposal.
-    /// We get an arc from cache (reading it from disk if necessary) then
-    /// copy/clone the node and return it.
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`FileIoError`] if the node cannot be read.
-    pub fn read_for_update(&mut self, node: MaybePersistedNode) -> Result<Node, FileIoError> {
-        let arc_wrapped_node = node.as_shared_node(self)?;
-        self.delete_node(node);
-        Ok((*arc_wrapped_node).clone())
-    }
-
-    /// Returns the root of this proposal.
-    pub const fn root_mut(&mut self) -> &mut Option<Node> {
-        &mut self.kind.root
-    }
-}
-
-impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
-    /// Creates a new [`NodeStore`] from a root node.
+    /// Creates a new [`NodeStore`] from a root node, inheriting the parent from another proposal.
     #[must_use]
-    pub fn from_root(parent: &NodeStore<MutableProposal, S>, root: Option<Node>) -> Self {
+    pub fn from_root(parent: &NodeStore<Mutable<Propose>, S>, root: Option<Node>) -> Self {
         NodeStore {
-            kind: MutableProposal {
+            kind: Mutable {
                 root,
-                deleted: Vec::default(),
-                parent: parent.kind.parent.clone(),
+                inner: Propose {
+                    deleted: Vec::default(),
+                    parent: parent.kind.inner.parent.clone(),
+                },
             },
             storage: parent.storage.clone(),
         }
     }
+}
 
-    /// Consumes the `NodeStore` and returns the root of the trie
+impl<K: MutableKind, S: ReadableStorage> NodeStore<Mutable<K>, S> {
+    /// Reads a node for update, marking it as replaced (logically deleted).
+    ///
+    /// Reads the node from cache or disk, then calls [`MutableKind::track_deleted`] on the
+    /// kind-specific inner state. For [`Propose`] this records the node in the delete list;
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the node cannot be read.
+    #[inline]
+    pub fn read_for_update(&mut self, node: MaybePersistedNode) -> Result<Node, FileIoError> {
+        let arc_wrapped_node = node.as_shared_node(self)?;
+        self.kind.inner.track_deleted(node);
+        Ok(triomphe::Arc::unwrap_or_clone(arc_wrapped_node))
+    }
+}
+
+impl<T, S> NodeStore<Mutable<T>, S> {
+    /// Returns the root of this mutable nodestore.
+    pub const fn root_mut(&mut self) -> &mut Option<Node> {
+        &mut self.kind.root
+    }
+
+    /// Consumes the `NodeStore` and returns the root of the trie.
     #[must_use]
     pub fn into_root(self) -> Option<Node> {
         self.kind.root
     }
 }
 
-impl<S: WritableStorage> NodeStore<MutableProposal, S> {
+impl<S: WritableStorage> NodeStore<Mutable<Propose>, S> {
     /// Creates a new, empty, [`NodeStore`].
     /// This is used during testing and during the creation of an in-memory merkle for proofs.
     #[cfg(any(test, feature = "test_utils"))]
     pub fn new_empty_proposal(storage: Arc<S>) -> Self {
         NodeStore {
-            kind: MutableProposal {
+            kind: Mutable {
                 root: None,
-                deleted: Vec::default(),
-                parent: NodeStoreParent::Committed(None),
+                inner: Propose {
+                    deleted: Vec::default(),
+                    parent: NodeStoreParent::Committed(None),
+                },
             },
             storage,
         }
@@ -469,42 +501,58 @@ impl ImmutableProposal {
 /// L("Latest Nodestore&lt;Committed, S&gt;") --- |...|O("Oldest NodeStore&lt;Committed, S&gt;")
 /// end
 /// O --> E("Expire")
-/// L --> |start propose|M("NodeStore&lt;ProposedMutable, S&gt;")
+/// L --> |start propose|M("NodeStore&lt;Mutable&lt;Propose&gt;, S&gt;")
 /// M --> |finish propose + hash|I("NodeStore&lt;ProposedImmutable, S&gt;")
 /// I --> |commit|N("New commit NodeStore&lt;Committed, S&gt;")
 /// style E color:#FFFFFF, fill:#AA00FF, stroke:#AA00FF
 /// ```
+
 #[derive(Debug)]
 pub struct NodeStore<T, S> {
-    /// This is one of [Committed], [`ImmutableProposal`], or [`MutableProposal`].
+    /// This is one of [Committed], [`ImmutableProposal`], or [`Mutable<Propose>`].
     kind: T,
     /// Persisted storage to read nodes from.
     storage: Arc<S>,
 }
 
-/// Contains the state of a proposal that is still being modified.
+/// Proposal-specific fields for a mutable nodestore.
 #[derive(Debug)]
-pub struct MutableProposal {
-    /// The root of the trie in this proposal.
-    root: Option<Node>,
+pub struct Propose {
     /// Nodes that have been deleted in this proposal.
-    deleted: Vec<MaybePersistedNode>,
-    parent: NodeStoreParent,
+    pub(crate) deleted: Vec<MaybePersistedNode>,
+    pub(crate) parent: NodeStoreParent,
 }
 
-impl<T: Into<NodeStoreParent>, S: ReadableStorage> From<NodeStore<T, S>>
-    for NodeStore<MutableProposal, S>
-{
-    fn from(val: NodeStore<T, S>) -> Self {
-        NodeStore {
-            kind: MutableProposal {
-                root: None,
-                deleted: Vec::default(),
-                parent: val.kind.into(),
-            },
-            storage: val.storage,
-        }
+/// Behaviour that differs between proposal mutable nodestores.
+///
+/// Types that implement this trait can be used as the `Kind` parameter of [`Mutable`],
+/// allowing [`NodeStore`] operations such as [`NodeStore::read_for_update`] and
+/// `Merkle` insert/remove to work generically.
+pub trait MutableKind: std::fmt::Debug {
+    /// Record that `node` is being replaced (i.e. logically deleted).
+    ///
+    /// For [`Propose`] this appends the node to the delete list so that its
+    /// storage can be reclaimed when the proposal is committed.
+    fn track_deleted(&mut self, node: MaybePersistedNode);
+}
+
+impl MutableKind for Propose {
+    #[inline]
+    fn track_deleted(&mut self, node: MaybePersistedNode) {
+        trace!("Pending delete at {node:?}");
+        self.deleted.push(node);
     }
+}
+
+/// Contains the state of a nodestore that is still being modified.
+///
+/// The type parameter `Kind` is [`Propose`] (for building proposals,
+/// with a delete list and parent).
+#[derive(Debug)]
+pub struct Mutable<Kind> {
+    /// The root of the trie in this mutable nodestore.
+    pub(crate) root: Option<Node>,
+    pub(crate) inner: Kind,
 }
 
 /// Commit a proposal to a new revision of the trie
@@ -543,24 +591,28 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     }
 }
 
-impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
+impl<S: ReadableStorage> TryFrom<NodeStore<Mutable<Propose>, S>>
     for NodeStore<Arc<ImmutableProposal>, S>
 {
     type Error = FileIoError;
 
-    fn try_from(val: NodeStore<MutableProposal, S>) -> Result<Self, Self::Error> {
+    fn try_from(val: NodeStore<Mutable<Propose>, S>) -> Result<Self, Self::Error> {
         let NodeStore { kind, storage } = val;
+        let Mutable {
+            root,
+            inner: Propose { deleted, parent },
+        } = kind;
 
         let mut nodestore = NodeStore {
             kind: Arc::new(ImmutableProposal {
-                deleted: kind.deleted.into(),
-                parent: Arc::new(parking_lot::Mutex::new(kind.parent)),
+                deleted: deleted.into(),
+                parent: Arc::new(parking_lot::Mutex::new(parent)),
                 root: None,
             }),
             storage,
         };
 
-        let Some(root) = kind.root else {
+        let Some(root) = root else {
             // This trie is now empty. Root address will be set to None during persist.
             return Ok(nodestore);
         };
@@ -569,13 +621,13 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
         #[cfg(feature = "ethhash")]
         let (root, root_hash) = nodestore.hash_helper(root, Path::new())?;
         #[cfg(not(feature = "ethhash"))]
-        let (root, root_hash) = NodeStore::<MutableProposal, S>::hash_helper(root, Path::new())?;
+        let (root, root_hash) = NodeStore::<Mutable<Propose>, S>::hash_helper(root, Path::new())?;
 
         let immutable_proposal =
             Arc::into_inner(nodestore.kind).expect("no other references to the proposal");
         nodestore.kind = Arc::new(ImmutableProposal {
-            deleted: immutable_proposal.deleted.clone(),
-            parent: immutable_proposal.parent.clone(),
+            deleted: immutable_proposal.deleted,
+            parent: immutable_proposal.parent,
             root: Some(Child::MaybePersisted(root, root_hash)),
         });
 
@@ -583,7 +635,32 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
     }
 }
 
-impl<S: ReadableStorage> NodeReader for NodeStore<MutableProposal, S> {
+impl<S: ReadableStorage> From<NodeStore<Arc<ImmutableProposal>, S>>
+    for NodeStore<Mutable<Propose>, S>
+{
+    fn from(val: NodeStore<Arc<ImmutableProposal>, S>) -> Self {
+        let parent = val.kind.as_nodestore_parent();
+        let root = val
+            .kind
+            .root
+            .as_ref()
+            .map(Child::as_maybe_persisted_node)
+            .and_then(|node| node.as_shared_node(&val).ok())
+            .map(triomphe::Arc::unwrap_or_clone);
+        NodeStore {
+            kind: Mutable {
+                root,
+                inner: Propose {
+                    deleted: Vec::default(),
+                    parent,
+                },
+            },
+            storage: val.storage,
+        }
+    }
+}
+
+impl<T, S: ReadableStorage> NodeReader for NodeStore<Mutable<T>, S> {
     fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, FileIoError> {
         self.read_node_from_disk(addr, "write")
     }
@@ -595,7 +672,7 @@ impl<T: Parentable, S: ReadableStorage> NodeReader for NodeStore<T, S> {
     }
 }
 
-impl<S: ReadableStorage> RootReader for NodeStore<MutableProposal, S> {
+impl<T, S: ReadableStorage> RootReader for NodeStore<Mutable<T>, S> {
     fn root_node(&self) -> Option<SharedNode> {
         self.kind.root.as_ref().map(|node| node.clone().into())
     }
@@ -897,7 +974,7 @@ mod tests {
         }
 
         // create an empty r2, check that it's parent is the proposed version r1
-        let r2: NodeStore<MutableProposal, _> = NodeStore::new(&r1).unwrap();
+        let r2: NodeStore<Mutable<Propose>, _> = NodeStore::new(&r1).unwrap();
         let r2: NodeStore<Arc<ImmutableProposal>, _> = r2.try_into().unwrap();
         {
             let parent = r2.kind.parent.lock();

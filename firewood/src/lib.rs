@@ -69,7 +69,7 @@
 //!   There are three states for a nodestore:
 //!    - [`firewood_storage::Committed`] for revisions that are committed
 //!    - [`firewood_storage::ImmutableProposal`] for revisions that are proposals against committed versions
-//!    - [`firewood_storage::MutableProposal`] for revisions where nodes are still being added.
+//!    - [`firewood_storage::Mutable<firewood_storage::Propose>`] for revisions where nodes are still being added.
 //!
 //!  For more information on these node states, see their associated documentation.
 //!
@@ -85,17 +85,17 @@
 //!
 //! In short, a Read-Modify-Write (RMW) style normal operation flow is as follows in Firewood:
 //!
-//! - Create a [`firewood_storage::MutableProposal`] [`firewood_storage::NodeStore`] from the most recent [`firewood_storage::Committed`] one.
+//! - Create a [`firewood_storage::NodeStore`]`<`[`firewood_storage::Mutable`]`<`[`firewood_storage::Propose`]`>, _>` from the most recent [`firewood_storage::Committed`] one.
 //! - Traverse the trie, starting at the root. Make a new root node by duplicating the existing
 //!   root from the committed one and save that in memory. As you continue traversing, make copies
 //!   of each node accessed if they are not already in memory.
 //!
 //! - Make changes to the trie, in memory. Each node you've accessed is currently in memory and is
-//!   owned by the [`firewood_storage::MutableProposal`]. Adding a node simply means adding a reference to it.
+//!   owned by the [`firewood_storage::Mutable`]`<`[`firewood_storage::Propose`]`>` nodestore. Adding a node simply means adding a reference to it.
 //!
 //! - If you delete a node, mark it as deleted in the proposal and remove the child reference to it.
 //!
-//! - After making all mutations, convert the [`firewood_storage::MutableProposal`] to an [`firewood_storage::ImmutableProposal`]. This
+//! - After making all mutations, convert the `Mutable<Propose>` nodestore to an [`firewood_storage::ImmutableProposal`]. This
 //!   involves walking the in-memory trie and converting them to a [`firewood_storage::SharedNode`].
 //!
 //! - Since the root is guaranteed to be new, the new root will reference all of the new revision.

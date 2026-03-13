@@ -8,8 +8,8 @@ use firewood_metrics::{current_metrics_context, set_metrics_context};
 use firewood_storage::logger::error;
 use firewood_storage::{
     BranchNode, Child, Children, FileBacked, FileIoError, ImmutableProposal, LeafNode,
-    MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore, Parentable, Path,
-    PathComponent,
+    MaybePersistedNode, Mutable, NibblesIterator, Node, NodeStore, Parentable, Path, PathComponent,
+    Propose,
 };
 use rayon::ThreadPool;
 use std::iter::once;
@@ -69,7 +69,7 @@ impl ParallelMerkle {
     /// by the worker threads.
     fn force_root(
         &self,
-        proposal: &mut NodeStore<MutableProposal, FileBacked>,
+        proposal: &mut NodeStore<Mutable<Propose>, FileBacked>,
     ) -> Result<Box<BranchNode>, CreateProposalError> {
         // There are 3 different cases to handle depending on the value of the root node.
         //
@@ -114,7 +114,7 @@ impl ParallelMerkle {
     /// In all other cases, the root is already correct.
     fn postprocess_trie(
         &self,
-        nodestore: &mut NodeStore<MutableProposal, FileBacked>,
+        nodestore: &mut NodeStore<Mutable<Propose>, FileBacked>,
         mut branch: Box<BranchNode>,
     ) -> Result<Option<Node>, FileIoError> {
         let mut children_iter = branch
@@ -166,7 +166,7 @@ impl ParallelMerkle {
     /// Call by a worker to processes requests from `child_receiver` and send back a response on
     /// `response_sender` once the main thread closes the child sender.
     fn worker_event_loop(
-        mut merkle: Merkle<NodeStore<MutableProposal, FileBacked>>,
+        mut merkle: Merkle<NodeStore<Mutable<Propose>, FileBacked>>,
         first_path_component: PathComponent,
         child_receiver: Receiver<BatchOp<Key, Value>>,
         response_sender: Sender<Result<Response, FileIoError>>,
@@ -204,10 +204,11 @@ impl ParallelMerkle {
             .take()
             .map(|root| {
                 #[cfg(not(feature = "ethhash"))]
-                let (root_node, root_hash) = NodeStore::<MutableProposal, FileBacked>::hash_helper(
-                    root,
-                    Path::from(&[first_path_component.as_u8()]),
-                )?;
+                let (root_node, root_hash) =
+                    NodeStore::<Mutable<Propose>, FileBacked>::hash_helper(
+                        root,
+                        Path::from(&[first_path_component.as_u8()]),
+                    )?;
                 #[cfg(feature = "ethhash")]
                 let (root_node, root_hash) =
                     nodestore.hash_helper(root, Path::from(&[first_path_component.as_u8()]))?;
@@ -227,7 +228,7 @@ impl ParallelMerkle {
     /// by the value of the `first_path_component`.
     fn create_worker(
         pool: &ThreadPool,
-        proposal: &mut NodeStore<MutableProposal, FileBacked>,
+        proposal: &mut NodeStore<Mutable<Propose>, FileBacked>,
         root_branch: &mut BranchNode,
         first_path_component: PathComponent,
         response_sender: Sender<Result<Response, FileIoError>>,
@@ -278,7 +279,7 @@ impl ParallelMerkle {
     fn merge_children(
         &mut self,
         response_channel: Receiver<Result<Response, FileIoError>>,
-        proposal: &mut NodeStore<MutableProposal, FileBacked>,
+        proposal: &mut NodeStore<Mutable<Propose>, FileBacked>,
         root_branch: &mut BranchNode,
     ) -> Result<(), FileIoError> {
         while let Ok(response) = response_channel.recv() {
@@ -303,7 +304,7 @@ impl ParallelMerkle {
     fn worker(
         &mut self,
         pool: &ThreadPool,
-        proposal: &mut NodeStore<MutableProposal, FileBacked>,
+        proposal: &mut NodeStore<Mutable<Propose>, FileBacked>,
         root_branch: &mut BranchNode,
         first_path_component: PathComponent,
         response_sender: Sender<Result<Response, FileIoError>>,
@@ -330,7 +331,7 @@ impl ParallelMerkle {
     fn remove_all_entries(
         &mut self,
         pool: &ThreadPool,
-        proposal: &mut NodeStore<MutableProposal, FileBacked>,
+        proposal: &mut NodeStore<Mutable<Propose>, FileBacked>,
         root_branch: &mut BranchNode,
         response_sender: &Sender<Result<Response, FileIoError>>,
     ) -> Result<(), CreateProposalError> {
@@ -380,10 +381,10 @@ impl ParallelMerkle {
     /// unable to convert a u8 index into a path component.
     pub fn apply(
         &mut self,
-        mut mutable_nodestore: NodeStore<MutableProposal, FileBacked>,
+        mut mutable_nodestore: NodeStore<Mutable<Propose>, FileBacked>,
         batch: impl IntoBatchIter,
         pool: &ThreadPool,
-    ) -> Result<NodeStore<MutableProposal, FileBacked>, CreateProposalError> {
+    ) -> Result<NodeStore<Mutable<Propose>, FileBacked>, CreateProposalError> {
         // Prepare step: Force the root into a branch with no partial path in preparation for
         // performing parallel modifications to the trie.
         let mut root_branch = self.force_root(&mut mutable_nodestore)?;

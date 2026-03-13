@@ -18,9 +18,9 @@ use crate::{Proof, ProofCollection, ProofError, ProofNode, RangeProof};
 use firewood_metrics::firewood_increment;
 use firewood_storage::{
     BranchNode, Child, Children, FileIoError, HashType, HashedNodeReader, ImmutableProposal,
-    IntoHashType, LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore,
-    Parentable, Path, PathComponent, ReadableStorage, SharedNode, TrieHash, TrieReader,
-    ValueDigest,
+    IntoHashType, LeafNode, MaybePersistedNode, Mutable, MutableKind, NibblesIterator, Node,
+    NodeStore, Parentable, Path, PathComponent, Propose, ReadableStorage, SharedNode, TrieHash,
+    TrieReader, ValueDigest,
 };
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -644,25 +644,24 @@ impl<F: Parentable, S: ReadableStorage> Merkle<NodeStore<F, S>> {
     /// ## Errors
     ///
     /// Returns an error if the nodestore cannot be created. See [`NodeStore::new`].
-    pub fn fork(&self) -> Result<Merkle<NodeStore<MutableProposal, S>>, FileIoError> {
+    pub fn fork(&self) -> Result<Merkle<NodeStore<Mutable<Propose>, S>>, FileIoError> {
         NodeStore::new(&self.nodestore).map(Into::into)
     }
 }
 
-impl<S: ReadableStorage> TryFrom<Merkle<NodeStore<MutableProposal, S>>>
+impl<S: ReadableStorage> TryFrom<Merkle<NodeStore<Mutable<Propose>, S>>>
     for Merkle<NodeStore<Arc<ImmutableProposal>, S>>
 {
     type Error = FileIoError;
-    fn try_from(m: Merkle<NodeStore<MutableProposal, S>>) -> Result<Self, Self::Error> {
+    fn try_from(m: Merkle<NodeStore<Mutable<Propose>, S>>) -> Result<Self, Self::Error> {
         Ok(Merkle {
             nodestore: m.nodestore.try_into()?,
         })
     }
 }
 
-#[expect(clippy::missing_errors_doc)]
-impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
-    /// Convert a merkle backed by an `MutableProposal` into an `ImmutableProposal`
+impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
+    /// Convert a merkle backed by an `Mutable<Propose>` into an `ImmutableProposal`
     ///
     /// This function is only used in benchmarks and tests
     ///
@@ -673,7 +672,10 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     pub fn hash(self) -> Merkle<NodeStore<Arc<ImmutableProposal>, S>> {
         self.try_into().expect("failed to convert")
     }
+}
 
+#[expect(clippy::missing_errors_doc)]
+impl<K: MutableKind, S: ReadableStorage> Merkle<NodeStore<Mutable<K>, S>> {
     fn read_for_update(&mut self, child: Child) -> Result<Node, FileIoError> {
         match child {
             Child::Node(node) => Ok(node),

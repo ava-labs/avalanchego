@@ -310,7 +310,7 @@ mod tests {
         NodeStoreHeader, Path, PathComponent, SharedNode,
         linear::memory::MemStore,
         node::{BranchNode, LeafNode, Node},
-        nodestore::MutableProposal,
+        nodestore::{Mutable, Propose},
     };
     use std::sync::Arc;
 
@@ -324,7 +324,7 @@ mod tests {
     }
 
     /// Helper to create a test node store with a specific root
-    fn create_test_store_with_root(root: Node) -> NodeStore<MutableProposal, MemStore> {
+    fn create_test_store_with_root(root: Node) -> NodeStore<Mutable<Propose>, MemStore> {
         let mem_store = MemStore::default().into();
         let mut store = NodeStore::new_empty_proposal(mem_store);
         store.root_mut().replace(root);

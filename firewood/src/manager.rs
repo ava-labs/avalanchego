@@ -27,8 +27,8 @@ use crate::root_store::RootStore;
 use firewood_metrics::{firewood_increment, firewood_set};
 pub use firewood_storage::CacheReadStrategy;
 use firewood_storage::{
-    BranchNode, Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal,
-    MutableProposal, NodeHashAlgorithm, NodeStore, NodeStoreHeader, TrieHash,
+    BranchNode, Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, Mutable,
+    MutableKind, NodeHashAlgorithm, NodeStore, NodeStoreHeader, Propose, TrieHash,
 };
 
 pub(crate) const DB_FILE_NAME: &str = "firewood.db";
@@ -495,30 +495,38 @@ impl RevisionManager {
     pub fn apply_batch(
         &self,
         use_parallel: &UseParallel,
-        mutable_nodestore: NodeStore<MutableProposal, FileBacked>,
+        mutable_nodestore: NodeStore<Mutable<Propose>, FileBacked>,
         batch: impl IntoBatchIter,
-    ) -> Result<NodeStore<MutableProposal, FileBacked>, api::Error> {
+    ) -> Result<NodeStore<Mutable<Propose>, FileBacked>, api::Error> {
         let batch = batch.into_iter();
         if Self::should_parallelize(use_parallel, &batch) {
             let mut parallel_merkle = ParallelMerkle::default();
             Ok(parallel_merkle.apply(mutable_nodestore, batch, self.threadpool())?)
         } else {
-            let mut merkle = Merkle::from(mutable_nodestore);
-            for res in batch.into_batch_iter::<api::Error>() {
-                match res? {
-                    BatchOp::Put { key, value } => {
-                        merkle.insert(key.as_ref(), value.as_ref().into())?;
-                    }
-                    BatchOp::Delete { key } => {
-                        merkle.remove(key.as_ref())?;
-                    }
-                    BatchOp::DeleteRange { prefix } => {
-                        merkle.remove_prefix(prefix.as_ref())?;
-                    }
+            Self::apply_batch_serial(mutable_nodestore, batch)
+        }
+    }
+
+    /// Serial batch application shared by [`apply_batch`][Self::apply_batch].
+    fn apply_batch_serial<K: MutableKind>(
+        mutable_nodestore: NodeStore<Mutable<K>, FileBacked>,
+        batch: impl IntoBatchIter,
+    ) -> Result<NodeStore<Mutable<K>, FileBacked>, api::Error> {
+        let mut merkle = Merkle::from(mutable_nodestore);
+        for res in batch.into_batch_iter::<api::Error>() {
+            match res? {
+                BatchOp::Put { key, value } => {
+                    merkle.insert(key.as_ref(), value.as_ref().into())?;
+                }
+                BatchOp::Delete { key } => {
+                    merkle.remove(key.as_ref())?;
+                }
+                BatchOp::DeleteRange { prefix } => {
+                    merkle.remove_prefix(prefix.as_ref())?;
                 }
             }
-            Ok(merkle.into_inner())
         }
+        Ok(merkle.into_inner())
     }
 
     /// Checks if the `PersistWorker` has errored.

@@ -55,9 +55,9 @@ pub use linear::{FileIoError, ReadableStorage, WritableStorage};
 pub use node::path::{NibblesIterator, Path};
 pub use node::{BranchNode, Child, Children, ChildrenSlots, LeafNode, Node, PathIterItem};
 pub use nodestore::{
-    AreaIndex, Committed, HashedNodeReader, ImmutableProposal, LinearAddress, MutableProposal,
+    AreaIndex, Committed, HashedNodeReader, ImmutableProposal, LinearAddress, Mutable, MutableKind,
     NodeHashAlgorithm, NodeHashAlgorithmTryFromIntError, NodeReader, NodeStore, NodeStoreHeader,
-    Parentable, RootReader, TrieReader,
+    Parentable, Propose, RootReader, TrieReader,
 };
 pub use path::{
     ComponentIter, IntoSplitPath, JoinedPath, PackedBytes, PackedPathComponents, PackedPathRef,

@@ -698,8 +698,8 @@ mod tests {
     };
 
     use firewood_storage::{
-        Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, MemStore,
-        MutableProposal, NodeStore, SeededRng, TestRecorder, TrieReader,
+        Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, MemStore, Mutable,
+        NodeStore, Propose, SeededRng, TestRecorder, TrieReader,
     };
     use lender::Lender;
     use std::{collections::HashSet, ops::Deref, path::PathBuf, sync::Arc};
@@ -743,14 +743,14 @@ mod tests {
         DiffMerkleNodeStream::new(tree_left.nodestore(), tree_right.nodestore(), start_key)
     }
 
-    fn create_test_merkle() -> Merkle<NodeStore<MutableProposal, MemStore>> {
+    fn create_test_merkle() -> Merkle<NodeStore<Mutable<Propose>, MemStore>> {
         let memstore = MemStore::default();
         let nodestore = NodeStore::new_empty_proposal(Arc::new(memstore));
         Merkle::from(nodestore)
     }
 
     fn populate_merkle(
-        mut merkle: Merkle<NodeStore<MutableProposal, MemStore>>,
+        mut merkle: Merkle<NodeStore<Mutable<Propose>, MemStore>>,
         items: &[(&[u8], &[u8])],
     ) -> Merkle<NodeStore<Arc<ImmutableProposal>, MemStore>> {
         for (key, value) in items {
