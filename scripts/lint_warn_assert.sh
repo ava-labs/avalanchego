@@ -25,7 +25,7 @@ function test_warn_testify_assert {
 
   if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
     # In a PR: fetch base branch and only check new code
-    git fetch origin "${GITHUB_BASE_REF}" --depth=1 2>/dev/null || true
+    git fetch origin "${GITHUB_BASE_REF}" --depth=1 2>/dev/null || true # vcs-ok: CI-only PR base ref fetch for golangci-lint --new-from-rev
     args+=(--new-from-rev="origin/${GITHUB_BASE_REF}")
   elif [[ -z "${WARN_TESTIFY_ASSERT:-}" ]]; then
     echo "Skipping (only runs on CI PRs or with WARN_TESTIFY_ASSERT=1)"
