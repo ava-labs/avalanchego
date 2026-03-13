@@ -18,10 +18,7 @@ const (
 // CreateHandlers returns all VM-specific HTTP handlers to be exposed by the
 // node, keyed by extension.
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	s, err := vm.ethRPCServer()
-	if err != nil {
-		return nil, err
-	}
+	s := vm.rpcProvider.Server()
 	return map[string]http.Handler{
 		rpcHTTPExtensionPath: s,
 		// TODO(StephenButtolph) coreth and subnet-evm have modified the ws

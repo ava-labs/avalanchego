@@ -1,11 +1,12 @@
 // Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sae
+package rpc
 
 import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/strevm/blocks"
@@ -13,15 +14,23 @@ import (
 )
 
 type estimatorBackend struct {
-	*VM
+	chain Chain
 }
 
 var _ gasprice.Backend = (*estimatorBackend)(nil)
 
 func (e *estimatorBackend) BlockByNumber(n rpc.BlockNumber) (*types.Block, error) {
-	return readByNumber(e.VM, n, neverErrs(rawdb.ReadBlock))
+	return readByNumber(e.chain, n, rawdb.ReadBlock)
 }
 
 func (e *estimatorBackend) LastAcceptedBlock() *blocks.Block {
-	return e.last.accepted.Load()
+	return e.chain.LastAccepted()
+}
+
+func (e *estimatorBackend) ResolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
+	return blocks.ResolveRPCNumber(e.chain, bn)
+}
+
+func (e *estimatorBackend) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
+	return e.chain.SubscribeAcceptedBlocks(ch)
 }

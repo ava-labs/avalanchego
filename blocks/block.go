@@ -157,6 +157,16 @@ func (b *Block) CopyAncestorsFrom(c *Block) error {
 	return b.SetAncestors(a.parent, a.lastSettled)
 }
 
+// Signer returns the transaction signer for the block.
+func (b *Block) Signer(c *params.ChainConfig) types.Signer {
+	return Signer(b.EthBlock(), c)
+}
+
+// Signer returns the transaction signer for the block.
+func Signer(b *types.Block, c *params.ChainConfig) types.Signer {
+	return types.MakeSigner(c, b.Number(), b.Time())
+}
+
 type (
 	// A Source returns a [Block] that matches both a hash and number, and a
 	// boolean indicating if such a block was found.

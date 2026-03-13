@@ -21,6 +21,10 @@ import (
 // [types.Block.Root]) have ambiguous interpretation under SAE.
 func (b *Block) EthBlock() *types.Block { return b.b }
 
+// Body is equivalent to calling [types.Block.Body] on the block returned by
+// [Block.EthBlock].
+func (b *Block) Body() *types.Body { return b.b.Body() }
+
 // SettledStateRoot returns the state root after execution of the last block
 // settled by b. It is a convenience wrapper for calling [types.Block.Root] on
 // the wrapped [types.Block].

@@ -179,7 +179,7 @@ func Execute(
 	header := types.CopyHeader(b.Header())
 	header.BaseFee = baseFee.ToBig()
 
-	signer := types.MakeSigner(config, b.Number(), b.BuildTime())
+	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
 	var blockGasConsumed gas.Gas
 

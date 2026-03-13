@@ -1,7 +1,7 @@
 // Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sae
+package rpc
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 // - https://github.com/ava-labs/avalanchego/blob/v1.14.1/graft/coreth/internal/ethapi/api_extra.go
 // - https://github.com/ava-labs/avalanchego/blob/v1.14.1/graft/coreth/internal/ethapi/api.coreth.go
 type customAPI struct {
-	b *apiBackend
+	b *backend
 }
 
 // GetChainConfig returns the chain configuration.

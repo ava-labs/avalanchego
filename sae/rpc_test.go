@@ -656,7 +656,7 @@ func TestGetLogs(t *testing.T) {
 	// Although the FiltersAPI will work without any blocks indexed, such a
 	// scenario would not test the functionality of the bloom indexer.
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		be := sut.rawVM.APIBackend()
+		be := sut.rawVM.GethRPCBackends()
 		_, got := be.BloomStatus()
 		require.Equal(c, uint64(1), got, "%T.BloomStatus() sections", be)
 	}, 5*time.Second, 100*time.Millisecond, "bloom indexer never finished")
@@ -1334,7 +1334,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		b := sut.runConsensusLoop(t)
 		vmTime.advanceToSettle(ctx, t, b)
 	}
-	_, ok := sut.rawVM.blocks.Load(settled.Hash())
+	_, ok := sut.rawVM.consensusCritical.Load(settled.Hash())
 	require.False(t, ok, "settled block still in VM memory")
 
 	accepted := sut.runConsensusLoop(t)
@@ -1356,7 +1356,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 	}{
 		{
 			name:    "neither_num_nor_hash",
-			wantErr: errNeitherNumberNorHash,
+			wantErr: blocks.ErrNeitherNumberNorHash,
 		},
 		{
 			name: "both_num_and_hash",
@@ -1364,7 +1364,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 				BlockNumber: utils.PointerTo(rpc.LatestBlockNumber),
 				BlockHash:   &common.Hash{},
 			},
-			wantErr: errBothNumberAndHash,
+			wantErr: blocks.ErrBothNumberAndHash,
 		},
 		{
 			name:     "named_block",
@@ -1402,15 +1402,15 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 				BlockHash:        utils.PointerTo(nonCanonical.Hash()),
 				RequireCanonical: true,
 			},
-			wantErr: errNonCanonicalBlock,
+			wantErr: blocks.ErrNonCanonicalBlock,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			be := sut.rawVM.apiBackend
-			gotNum, gotHash, err := be.resolveBlockNumberOrHash(tt.nOrH)
-			t.Logf("%T.resolveBlockNumberOrhash(%+v)", be, tt.nOrH) // avoids having to repeat in failure messages
+			chain := sut.rawVM.chain()
+			gotNum, gotHash, err := blocks.ResolveRPCNumberOrHash(chain, tt.nOrH)
+			t.Logf("blocks.ResolveBlockNumberOrhash(%T, %+v)", chain, tt.nOrH) // avoids having to repeat in failure messages
 			require.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.wantNum, gotNum)
 			assert.Equal(t, tt.wantHash, gotHash)

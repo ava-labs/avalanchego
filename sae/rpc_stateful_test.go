@@ -172,7 +172,7 @@ func TestEthCall(t *testing.T) {
 		bb := sut.runConsensusLoop(t)
 		vmTime.advanceToSettle(ctx, t, bb)
 	}
-	_, ok := sut.rawVM.blocks.Load(b.Hash())
+	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
 	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
 
 	tests := []struct {

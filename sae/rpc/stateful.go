@@ -1,7 +1,7 @@
 // Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sae
+package rpc
 
 import (
 	"context"
@@ -36,15 +36,15 @@ type noEndOfBlockOps struct {
 // EndOfBlockOps always returns nil.
 func (noEndOfBlockOps) EndOfBlockOps(*types.Block) ([]hook.Op, error) { return nil, nil }
 
-func (b *apiBackend) RPCEVMTimeout() time.Duration {
-	return b.vm.config.RPCConfig.EVMTimeout
+func (b *backend) RPCEVMTimeout() time.Duration {
+	return b.config.EVMTimeout
 }
 
-func (b *apiBackend) RPCGasCap() uint64 {
-	return b.vm.config.RPCConfig.GasCap
+func (b *backend) RPCGasCap() uint64 {
+	return b.config.GasCap
 }
 
-func (b *apiBackend) Engine() consensus.Engine {
+func (b *backend) Engine() consensus.Engine {
 	return (*coinbaseAsAuthor)(nil)
 }
 
@@ -56,30 +56,30 @@ func (*coinbaseAsAuthor) Author(h *types.Header) (common.Address, error) {
 	return h.Coinbase, nil
 }
 
-func (b *apiBackend) GetEVM(ctx context.Context, msg *core.Message, sdb *state.StateDB, hdr *types.Header, cfg *vm.Config, bCtx *vm.BlockContext) *vm.EVM {
+func (b *backend) GetEVM(ctx context.Context, msg *core.Message, sdb *state.StateDB, hdr *types.Header, cfg *vm.Config, bCtx *vm.BlockContext) *vm.EVM {
 	if bCtx == nil {
 		bCtx = new(vm.BlockContext)
-		*bCtx = core.NewEVMBlockContext(hdr, b.vm.exec.ChainContext(), &hdr.Coinbase)
+		*bCtx = core.NewEVMBlockContext(hdr, b.ChainContext(), &hdr.Coinbase)
 	}
 	txCtx := core.NewEVMTxContext(msg)
 	return vm.NewEVM(*bCtx, txCtx, sdb, b.ChainConfig(), *cfg)
 }
 
 // StateAndHeaderByNumber performs the same faking as
-// [apiBackend.StateAndHeaderByNumberOrHash].
-func (b *apiBackend) StateAndHeaderByNumber(ctx context.Context, num rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
+// [backend.StateAndHeaderByNumberOrHash].
+func (b *backend) StateAndHeaderByNumber(ctx context.Context, num rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
 	return b.StateAndHeaderByNumberOrHash(ctx, rpc.BlockNumberOrHashWithNumber(num))
 }
 
 // StateAndHeaderByNumberOrHash fakes the returned [types.Header] to contain
 // post-execution results, mimicking a synchronous block. The [state.StateDB] is
 // opened at the post-execution root, as carried by the faked header.
-func (b *apiBackend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error) {
+func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error) {
 	if n, ok := numOrHash.Number(); ok && n == rpc.PendingBlockNumber {
 		return nil, nil, errors.New("state not available for pending block")
 	}
 
-	num, hash, err := b.resolveBlockNumberOrHash(numOrHash)
+	num, hash, err := blocks.ResolveRPCNumberOrHash(b, numOrHash)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -91,29 +91,29 @@ func (b *apiBackend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash
 	// TODO(arr4n) the above assumption is brittle under geth/libevm updates;
 	// devise an approach to ensure that it is confirmed on each.
 	var hdr *types.Header
-	if bl, ok := b.vm.blocks.Load(hash); ok {
+	if bl, ok := b.ConsensusCriticalBlock(hash); ok {
 		hdr = bl.Header()
 		hdr.Root = bl.PostExecutionStateRoot()
 		hdr.BaseFee = bl.BaseFee().ToBig()
 	} else {
-		hdr = rawdb.ReadHeader(b.vm.db, hash, num)
+		hdr = rawdb.ReadHeader(b.DB(), hash, num)
 
 		// TODO(arr4n) export [blocks.executionResults] to avoid multiple
 		// database reads and canoto unmarshallings here.
 		var err error
-		hdr.Root, err = blocks.PostExecutionStateRoot(b.vm.xdb, num)
+		hdr.Root, err = blocks.PostExecutionStateRoot(b.XDB(), num)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		bf, err := blocks.ExecutionBaseFee(b.vm.xdb, num)
+		bf, err := blocks.ExecutionBaseFee(b.XDB(), num)
 		if err != nil {
 			return nil, nil, err
 		}
 		hdr.BaseFee = bf.ToBig()
 	}
 
-	sdb, err := state.New(hdr.Root, b.vm.exec.StateCache(), nil)
+	sdb, err := b.StateDB(hdr.Root)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -130,13 +130,13 @@ func (b *apiBackend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash
 // trie data has not been pruned (or requires an archival node for older blocks).
 //
 // Reference: https://geth.ethereum.org/docs/developers/evm-tracing#state-availability
-func (b *apiBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	root, err := b.vm.postExecutionStateRoot(block.Hash(), block.NumberU64())
+func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	root, err := b.postExecutionStateRoot(block.Hash(), block.NumberU64())
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sdb, err := b.exec.StateDB(root)
+	sdb, err := b.StateDB(root)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -151,7 +151,7 @@ func (b *apiBackend) StateAtBlock(ctx context.Context, block *types.Block, reexe
 // Replay calls [saexec.Execute] - the same pipeline used by
 // [saexec.Executor] - with [noEndOfBlockOps] to suppress end-of-block
 // operations and [saexec.NullReceiptStore] to skip receipt broadcasting.
-func (b *apiBackend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
+func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	var bCtx vm.BlockContext
 	if ethB.NumberU64() == 0 {
 		return nil, bCtx, nil, nil, errors.New("no transactions in genesis")
@@ -161,13 +161,13 @@ func (b *apiBackend) StateAtTransaction(ctx context.Context, ethB *types.Block, 
 		return nil, bCtx, nil, nil, fmt.Errorf("transaction index %d out of range [0, %d)", txIndex, len(txs))
 	}
 
-	if b.vm.exec.LastExecuted().NumberU64() < ethB.NumberU64()-1 {
+	if b.LastExecuted().NumberU64() < ethB.NumberU64()-1 {
 		return nil, bCtx, nil, nil, fmt.Errorf("parent of block %d not executed yet", ethB.NumberU64())
 	}
-	parent, err := b.vm.blockBuilder.new(
+	parent, err := b.NewBlock(
 		// The I(E) check above guarantees D(A) of the same block; see
 		// ../docs/invariants.md for details.
-		rawdb.ReadBlock(b.db, ethB.ParentHash(), ethB.NumberU64()-1),
+		rawdb.ReadBlock(b.DB(), ethB.ParentHash(), ethB.NumberU64()-1),
 		// Ancestry is irrelevant for the parent as we just want its
 		// post-execution artefacts.
 		nil, nil,
@@ -175,11 +175,11 @@ func (b *apiBackend) StateAtTransaction(ctx context.Context, ethB *types.Block, 
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing parent block: %v", err)
 	}
-	if err := parent.RestoreExecutionArtefacts(b.vm.db, b.vm.xdb, b.ChainConfig()); err != nil {
+	if err := parent.RestoreExecutionArtefacts(b.DB(), b.XDB(), b.ChainConfig()); err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("parent %T.RestoreExecutionArtefacts(...): %v", parent, err)
 	}
 
-	block, err := b.vm.blockBuilder.new(ethB, parent, nil)
+	block, err := b.NewBlock(ethB, parent, nil)
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
@@ -188,13 +188,13 @@ func (b *apiBackend) StateAtTransaction(ctx context.Context, ethB *types.Block, 
 	// target transaction.
 	result, err := saexec.Execute(
 		block,
-		b.vm.exec,
+		b,
 		txIndex,
-		noEndOfBlockOps{Points: b.vm.hooks},
+		noEndOfBlockOps{Points: b.Hooks()},
 		b.ChainConfig(),
-		b.vm.exec.ChainContext(),
+		b.ChainContext(),
 		&saexec.NullReceiptStore{},
-		b.vm.log(),
+		b.Logger(),
 	)
 	if err != nil {
 		return nil, bCtx, nil, nil, err
@@ -210,10 +210,10 @@ func (b *apiBackend) StateAtTransaction(ctx context.Context, ethB *types.Block, 
 // postExecutionStateRoot returns the post-execution state root for the block
 // identified by hash and number, checking in-memory blocks first, then falling
 // back to disk.
-func (vm *VM) postExecutionStateRoot(hash common.Hash, num uint64) (common.Hash, error) {
-	switch bl, ok := vm.blocks.Load(hash); {
+func (b *backend) postExecutionStateRoot(hash common.Hash, num uint64) (common.Hash, error) {
+	switch bl, ok := b.ConsensusCriticalBlock(hash); {
 	case !ok:
-		return blocks.PostExecutionStateRoot(vm.xdb, num)
+		return blocks.PostExecutionStateRoot(b.XDB(), num)
 	case bl.Executed():
 		return bl.PostExecutionStateRoot(), nil
 	default:

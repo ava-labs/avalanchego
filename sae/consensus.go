@@ -108,10 +108,10 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		if s.Hash() == keep {
 			continue
 		}
-		vm.blocks.Delete(s.Hash())
+		vm.consensusCritical.Delete(s.Hash())
 	}
 	if h := parentLastSettled.Hash(); h != keep { // i.e. `parentLastSettled` was the last block's `keep`
-		vm.blocks.Delete(h)
+		vm.consensusCritical.Delete(h)
 	}
 	return nil
 }
@@ -123,7 +123,7 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 
 // RejectBlock is a no-op in SAE because execution only occurs after acceptance.
 func (vm *VM) RejectBlock(ctx context.Context, b *blocks.Block) error {
-	vm.blocks.Delete(b.Hash())
+	vm.consensusCritical.Delete(b.Hash())
 	return nil
 }
 
