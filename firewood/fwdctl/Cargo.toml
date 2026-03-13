@@ -1,0 +1,83 @@
+[package]
+name = "firewood-fwdctl"
+version = "0.2.0"
+edition.workspace = true
+authors = [
+     "Dan Laine <daniel.laine@avalabs.org>",
+     "Dan Sover <dan.sover@avalabs.org>",
+     "Hao Hao <hao.hao@avalabs.org>",
+     "Richard Pringle <rpring9@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+     "Sam Batschelet <sam.batschelet@avalabs.org>",
+     "xinifinity <113067541+xinifinity@users.noreply.github.com>",
+     "zdf <orientzh1230@gmail.com>",
+]
+description = "Command-line tool for Firewood, an embedded key-value store optimized for blockchain state."
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "fwdctl"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+clap = { workspace = true, features = ["cargo", "string"] }
+env_logger.workspace = true
+firewood.workspace = true
+firewood-replay.workspace = true
+firewood-storage.workspace = true
+hex.workspace = true
+log.workspace = true
+nonzero_ext.workspace = true
+# Regular dependencies
+csv = "1.4.0"
+indicatif = "0.18.4"
+askama = "0.15.4"
+num-format = "0.4.4"
+aws-config = { version = "1.8", optional = true }
+aws-sdk-ec2 = { version = "1.214", optional = true }
+aws-sdk-ssm = { version = "1.106", optional = true }
+aws-sdk-sts = { version = "1.99.0", optional = true }
+aws-smithy-runtime-api = { version = "1.11", optional = true }
+base64 = { version = "0.22", optional = true }
+dirs = { version = "6.0", optional = true }
+rand = { workspace = true, optional = true }
+serde = { version = "1.0.228", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+serde_yaml = { version = "0.10", package = "serde_yaml_ng", optional = true }
+thiserror = { version = "2.0", optional = true }
+tokio = { version = "1.49", features = ["rt-multi-thread", "sync", "time"], optional = true }
+
+[features]
+ethhash = ["firewood/ethhash"]
+logger = ["firewood/logger"]
+launch = [
+    "dep:aws-config",
+    "dep:aws-sdk-ec2",
+    "dep:aws-sdk-ssm",
+    "dep:aws-sdk-sts",
+    "dep:aws-smithy-runtime-api",
+    "dep:base64",
+    "dep:dirs",
+    "dep:rand",
+    "dep:serde",
+    "dep:serde_json",
+    "dep:serde_yaml",
+    "dep:thiserror",
+    "dep:tokio",
+]
+
+[dev-dependencies]
+# Workspace dependencies
+firewood-storage = { workspace = true, features = ["test_utils"] }
+rand.workspace = true
+tempfile.workspace = true
+# Regular dependencies
+assert_cmd = "2.1.2"
+predicates = "3.1.4"
+
+[lints]
+workspace = true
