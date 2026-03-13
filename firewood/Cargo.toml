@@ -1,0 +1,94 @@
+[workspace]
+members = [
+  "benchmark",
+  "ffi",
+  "firewood-macros",
+  "metrics",
+  "firewood",
+  "fwdctl",
+  "replay",
+  "storage",
+  "triehash",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license-file = "LICENSE.md"
+homepage = "https://avalabs.org"
+repository = "https://github.com/ava-labs/firewood"
+readme = "README.md"
+rust-version = "1.91.0"
+
+[profile.release]
+debug = true
+
+[profile.maxperf]
+panic = "abort"
+codegen-units = 1
+lto = "fat"
+debug = false
+inherits = "release"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+indexing_slicing = "warn"
+explicit_deref_methods = "warn"
+missing_const_for_fn = "warn"
+arithmetic_side_effects = "warn"
+undocumented_unsafe_blocks = "deny"
+# lower the priority of pedantic to allow overriding the lints it includes
+pedantic = { level = "warn", priority = -1 }
+# These lints are from pedantic but allowed. They are a bit too pedantic and
+# encourage making backwards incompatible changes.
+needless_pass_by_value = "allow"
+unnecessary_wraps = "allow"
+unused_self = "allow"
+# Ignore interger casts. This is to avoid unnecessary `try_into` calls for usize
+# to u64 and vice versa and should be re-enabled if/when clippy has a separate
+# lint for usize vs non-usize truncation.
+cast_possible_truncation = "allow"
+
+[workspace.dependencies]
+# workspace local packages
+firewood = { path = "firewood", version = "0.2.0" }
+firewood-macros = { path = "firewood-macros", version = "0.1.0" }
+firewood-storage = { path = "storage", version = "0.2.0" }
+firewood-ffi = { path = "ffi", version = "0.2.0" }
+firewood-metrics = { path = "metrics", version = "0.2.0" }
+firewood-replay = { path = "replay", version = "0.2.0" }
+
+# no longer bumping with workspace
+firewood-triehash = { path = "triehash", version = "0.0.16" }
+
+# common dependencies
+aquamarine = "0.6.0"
+bytemuck = { version = "1.25.0", features = ["const_zeroed"] }
+bytemuck_derive = "1.10.2"
+clap = { version = "4.5.60", features = ["derive"] }
+env_logger = "0.11.9"
+fastrace = "0.7.17"
+hex = "0.4.3"
+integer-encoding = "4.1.0"
+log = "0.4.29"
+metrics = "0.24.3"
+metrics-util = "0.20.1"
+nonzero_ext = "0.3.0"
+parking_lot = "0.12.5"
+rand_distr = "0.6.0"
+sha2 = "0.10.9"
+smallvec = { version = "1.15.1", features = ["write", "union", "const_new"] }
+test-case = "3.3.1"
+thiserror = "2.0.18"
+
+# common dev dependencies
+criterion = "0.8.2"
+ethereum-types = "0.16.0"
+hex-literal = "1.1.0"
+pprof = "0.15.0"
+rand = "0.10.0"
+tempfile = "3.26.0"
