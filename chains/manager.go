@@ -287,42 +287,42 @@ type manager struct {
 func New(config *ManagerConfig) (Manager, error) {
 	avalancheGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(avalancheNamespace, avalancheGatherer); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("register metrics namespace %q: %w", avalancheNamespace, err)
 	}
 
 	handlerGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(handlerNamespace, handlerGatherer); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("register metrics namespace %q: %w", handlerNamespace, err)
 	}
 
 	meterChainVMGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(meterchainvmNamespace, meterChainVMGatherer); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("register metrics namespace %q: %w", meterchainvmNamespace, err)
 	}
 
 	meterDAGVMGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(meterdagvmNamespace, meterDAGVMGatherer); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("register metrics namespace %q: %w", meterdagvmNamespace, err)
 	}
 
 	proposervmGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(proposervmNamespace, proposervmGatherer); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("register metrics namespace %q: %w", proposervmNamespace, err)
 	}
 
 	p2pGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(p2pNamespace, p2pGatherer); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("register metrics namespace %q: %w", p2pNamespace, err)
 	}
 
 	snowmanGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(snowmanNamespace, snowmanGatherer); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("register metrics namespace %q: %w", snowmanNamespace, err)
 	}
 
 	stakeGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(stakeNamespace, stakeGatherer); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("register metrics namespace %q: %w", stakeNamespace, err)
 	}
 
 	return &manager{
