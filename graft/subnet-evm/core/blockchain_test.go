@@ -671,7 +671,7 @@ func testUngracefulAsyncShutdown(t *testing.T, scheme string, snapshotEnabled bo
 	}
 	for _, tt := range reexecTests {
 		t.Run(tt.Name, func(t *testing.T) {
-			tt.testFunc(t, create)
+			tt.testFunc(t, create, scheme)
 		})
 	}
 }

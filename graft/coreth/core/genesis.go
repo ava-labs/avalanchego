@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
@@ -158,6 +159,14 @@ func SetupGenesisBlock(
 		hash := genesis.ToBlock().Hash()
 		if hash != stored {
 			return genesis.Config, common.Hash{}, &GenesisMismatchError{stored, hash}
+		}
+		if _, ok := triedb.Backend().(*firewood.TrieDB); ok {
+			// With Firewood's deferred persistence, a crash before the
+			// first persist leaves the trie database empty while LevelDB
+			// already has blocks beyond genesis. In this case, only recommit
+			// genesis state to the trieDB.
+			genesis.toBlock(db, triedb)
+			return genesis.Config, stored, nil
 		}
 		_, err := genesis.Commit(db, triedb)
 		return genesis.Config, common.Hash{}, err
