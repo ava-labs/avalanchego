@@ -1,0 +1,20 @@
+# gazelle:ignore
+# Assembly and build file library for blst
+#
+# assembly.S is #include'd by cgo_assembly.S and in turn
+# #include's platform-specific assembly from elf/, coff/, mach-o/.
+
+cc_library(
+    name = "build_cc",
+    hdrs = ["assembly.S"],
+    includes = ["."],
+    textual_hdrs = glob([
+        "elf/*.s",
+        "elf/*.S",
+        "coff/*.s",
+        "coff/*.S",
+        "mach-o/*.s",
+        "mach-o/*.S",
+    ]),
+    visibility = ["//:__subpackages__"],
+)
