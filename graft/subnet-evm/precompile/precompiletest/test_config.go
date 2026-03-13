@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 )
 
 // ConfigVerifyTest is a test case for verifying a config
@@ -37,7 +37,7 @@ func RunVerifyTests(t *testing.T, tests map[string]ConfigVerifyTest) {
 			if chainConfig == nil {
 				ctrl := gomock.NewController(t)
 				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
-				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
+				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(&commontype.ValidTestFeeConfig)
 				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
 				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(true)
 				chainConfig = mockChainConfig

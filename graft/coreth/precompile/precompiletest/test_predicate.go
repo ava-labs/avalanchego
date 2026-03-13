@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 

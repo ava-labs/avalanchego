@@ -4,13 +4,14 @@
 package feemanager
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 )
 
 var _ contract.Configurator = (*configurator)(nil)
@@ -59,7 +60,11 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 			return fmt.Errorf("cannot configure given initial fee config: %w", err)
 		}
 	} else {
-		if err := StoreFeeConfig(state, chainConfig.GetFeeConfig(), blockContext); err != nil {
+		feeCfg := chainConfig.GetFeeConfig()
+		if feeCfg == nil {
+			return errors.New("chain config does not have fee config")
+		}
+		if err := StoreFeeConfig(state, *feeCfg, blockContext); err != nil {
 			// This should not happen since we already checked the chain config in the genesis creation.
 			return fmt.Errorf("cannot configure fee config in chain config: %w", err)
 		}

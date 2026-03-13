@@ -37,7 +37,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
@@ -45,7 +46,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
