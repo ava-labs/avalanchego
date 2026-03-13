@@ -15,6 +15,8 @@ pub const SPACE_FREED: &str = "space.freed";
 pub const DELETE_NODE: &str = "delete_node";
 /// Time spent flushing nodes.
 pub const FLUSH_NODES: &str = "flush_nodes";
+/// Time spent reaping in milliseconds.
+pub const REAP_NODES: &str = "reap_nodes";
 
 /// Number of node reads.
 pub const READ_NODE: &str = "read_node";
@@ -59,6 +61,7 @@ pub fn register() {
     describe_counter!(SPACE_FREED, "Amount of space freed (bytes)");
     describe_counter!(DELETE_NODE, "Count of deleted nodes");
     describe_counter!(FLUSH_NODES, "Time spent flushing nodes (ms)");
+    describe_counter!(REAP_NODES, "Time spent reaping nodes (ms)");
 
     describe_counter!(READ_NODE, "Number of node reads");
     describe_counter!(CACHE_NODE, "Number of node cache operations");

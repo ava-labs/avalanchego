@@ -35,6 +35,18 @@ pub const ACTIVE_REVISIONS: &str = "active_revisions";
 /// Maximum number of revisions configured.
 pub const MAX_REVISIONS: &str = "max_revisions";
 
+/// Length of the deleted list for committed revisions.
+pub const DELETED_LIST_LEN: &str = "deleted_list_len";
+
+/// Number of persist permits currently available.
+pub const PERMITS_AVAILABLE: &str = "persist.permits_available";
+
+/// Maximum number of persist permits.
+pub const MAX_PERMITS: &str = "persist.max_permits";
+
+/// Number of times commit was blocked.
+pub const COMMIT_BLOCKED: &str = "persist.commit_blocked";
+
 /// Registers all firewood metric descriptions.
 pub fn register() {
     describe_counter!(PROPOSALS, "Number of proposals created");
@@ -59,4 +71,14 @@ pub fn register() {
     describe_counter!(COMMIT_LATENCY_MS, "Commit latency (ms)");
     describe_gauge!(ACTIVE_REVISIONS, "Current number of active revisions");
     describe_gauge!(MAX_REVISIONS, "Maximum number of revisions configured");
+    describe_gauge!(
+        DELETED_LIST_LEN,
+        "Length of deleted list for committed revisions"
+    );
+    describe_gauge!(
+        PERMITS_AVAILABLE,
+        "Number of persist permits currently available"
+    );
+    describe_gauge!(MAX_PERMITS, "Maximum number of persist permits");
+    describe_counter!(COMMIT_BLOCKED, "Number of times commit was blocked");
 }

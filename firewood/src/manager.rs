@@ -300,6 +300,8 @@ impl RevisionManager {
 
         let committed = proposal.as_committed();
 
+        firewood_set!(crate::registry::DELETED_LIST_LEN, committed.deleted_len());
+
         // 3. Revision reaping
         // When we exceed max_revisions, remove the oldest revision from memory
         // and send it to the `PersistWorker`.

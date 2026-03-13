@@ -53,6 +53,7 @@ use firewood_metrics::firewood_increment;
 use smallvec::SmallVec;
 use std::fmt::Debug;
 use std::io::{Error, ErrorKind};
+use std::time::Instant;
 
 // Re-export types from alloc module
 pub use alloc::NodeAllocator;
@@ -179,6 +180,12 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
         );
 
         nodestore
+    }
+
+    /// Returns the length of the deleted list for this `NodeStore`.
+    #[must_use]
+    pub fn deleted_len(&self) -> usize {
+        self.kind.deleted.len()
     }
 }
 
@@ -875,6 +882,8 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     ///
     /// Returns a [`FileIoError`] if a node cannot be deleted.
     pub fn reap_deleted(mut self, header: &mut NodeStoreHeader) -> Result<(), FileIoError> {
+        let reap_start = Instant::now();
+
         self.storage
             .invalidate_cached_nodes(self.kind.deleted.iter());
         trace!("There are {} nodes to reap", self.kind.deleted.len());
@@ -882,6 +891,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         for node in take(&mut self.kind.deleted) {
             allocator.delete_node(node)?;
         }
+
+        let reap_time = reap_start.elapsed().as_millis() as u64;
+        firewood_increment!(crate::registry::REAP_NODES, reap_time);
+
         Ok(())
     }
 }

@@ -43,6 +43,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
+use firewood_metrics::{firewood_increment, firewood_set};
 use firewood_storage::{
     Committed, FileBacked, FileIoError, HashedNodeReader, LinearAddress, NodeStore,
     NodeStoreHeader, TrieHash,
@@ -262,7 +263,10 @@ struct PersistChannel {
 }
 
 impl PersistChannel {
-    const fn new(max_permits: NonZeroU64, persist_threshold: u64) -> Self {
+    fn new(max_permits: NonZeroU64, persist_threshold: u64) -> Self {
+        // Emit once at construction since `max_permits` is constant.
+        firewood_set!(crate::registry::MAX_PERMITS, max_permits.get());
+
         Self {
             state: Mutex::new(PersistChannelState {
                 permits_available: max_permits.get(),
@@ -308,7 +312,10 @@ impl PersistChannel {
     /// Returns an error if the channel has been shut down.
     fn push(&self, revision: CommittedRevision) -> Result<(), PersistError> {
         let mut state = self.state.lock();
+        state.emit_permits();
+
         while state.permits_available == 0 && !state.shutdown {
+            firewood_increment!(crate::registry::COMMIT_BLOCKED, 1);
             self.commit_not_full.wait(&mut state);
         }
 
@@ -414,6 +421,13 @@ struct PersistChannelState {
     pending_reaps: Vec<NodeStore<Committed, FileBacked>>,
     /// The most recent committed revision, replaced on each push.
     latest_committed: Option<CommittedRevision>,
+}
+
+impl PersistChannelState {
+    /// Emits the current permit gauge.
+    fn emit_permits(&self) {
+        firewood_set!(crate::registry::PERMITS_AVAILABLE, self.permits_available);
+    }
 }
 
 /// RAII guard returned by [`PersistChannel::pop`] that carries the data for
