@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
@@ -20,10 +21,8 @@ import (
 
 func TestBaseStakersPruning(t *testing.T) {
 	require := require.New(t)
-	staker := newTestStaker()
-	delegator := newTestStaker()
-	delegator.SubnetID = staker.SubnetID
-	delegator.NodeID = staker.NodeID
+	staker := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+	delegator := newTestStaker(constants.PrimaryNetworkID, staker.NodeID)
 
 	v := newBaseStakers()
 
@@ -71,8 +70,8 @@ func TestBaseStakersPruning(t *testing.T) {
 
 func TestBaseStakersValidator(t *testing.T) {
 	require := require.New(t)
-	staker := newTestStaker()
-	delegator := newTestStaker()
+	staker := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+	delegator := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
 
 	v := newBaseStakers()
 
@@ -120,8 +119,8 @@ func TestBaseStakersValidator(t *testing.T) {
 
 func TestBaseStakersDelegator(t *testing.T) {
 	require := require.New(t)
-	staker := newTestStaker()
-	delegator := newTestStaker()
+	staker := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+	delegator := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
 
 	v := newBaseStakers()
 
@@ -163,7 +162,7 @@ func TestBaseStakersDelegator(t *testing.T) {
 
 func TestDiffStakersAddDeleteAddDeleteValidator(t *testing.T) {
 	require := require.New(t)
-	staker := newTestStaker()
+	staker := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 
 	diff := diffStakers{}
 	require.False(existsInDiff(&diff, staker))
@@ -205,7 +204,7 @@ func TestDiffStakersAddDeleteAddDeleteValidator(t *testing.T) {
 
 func TestDiffStakersUpdateValidator(t *testing.T) {
 	require := require.New(t)
-	staker := newTestStaker()
+	staker := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 
 	endTime := staker.EndTime.Add(genesistest.DefaultValidatorDuration)
 
@@ -231,7 +230,7 @@ func TestDiffStakersUpdateValidator(t *testing.T) {
 
 func TestDiffStakersDeleteAddDeleteValidator(t *testing.T) {
 	require := require.New(t)
-	v1 := newTestStaker()
+	v1 := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 
 	v1Prime := *v1
 	v1Prime.Weight++
@@ -268,7 +267,7 @@ func TestDiffStakersDeleteAddDeleteValidator(t *testing.T) {
 
 func TestDiffStakersDeleteThenReAddSameValidator(t *testing.T) {
 	require := require.New(t)
-	v1 := newTestStaker()
+	v1 := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 
 	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
 
@@ -296,7 +295,7 @@ func TestDiffStakersDeleteThenReAddSameValidator(t *testing.T) {
 
 func TestDiffValidatorWeightDiffAfterDeleteAndAdd(t *testing.T) {
 	require := require.New(t)
-	staker := newTestStaker()
+	staker := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 	staker.Weight = 5
 
 	modifiedStaker := *staker
@@ -325,8 +324,8 @@ func TestDiffValidatorWeightDiffAfterDeleteAndAdd(t *testing.T) {
 
 func TestDiffStakersValidator(t *testing.T) {
 	require := require.New(t)
-	staker := newTestStaker()
-	delegator := newTestStaker()
+	staker := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+	delegator := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
 
 	v := diffStakers{}
 
@@ -372,8 +371,8 @@ func TestDiffStakersValidator(t *testing.T) {
 
 func TestDiffStakersDeleteValidator(t *testing.T) {
 	require := require.New(t)
-	staker := newTestStaker()
-	delegator := newTestStaker()
+	staker := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+	delegator := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
 
 	v := diffStakers{}
 
@@ -389,8 +388,8 @@ func TestDiffStakersDeleteValidator(t *testing.T) {
 
 func TestDiffStakersDelegator(t *testing.T) {
 	require := require.New(t)
-	staker := newTestStaker()
-	delegator := newTestStaker()
+	staker := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+	delegator := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
 
 	v := diffStakers{}
 
@@ -417,13 +416,13 @@ func TestDiffStakersDelegator(t *testing.T) {
 	)
 }
 
-func newTestStaker() *Staker {
-	startTime := time.Now().Round(time.Second)
+func newTestStaker(subnetID ids.ID, nodeID ids.NodeID) *Staker {
+	startTime := time.Time{}
 	endTime := startTime.Add(genesistest.DefaultValidatorDuration)
 	return &Staker{
 		TxID:            ids.GenerateTestID(),
-		NodeID:          ids.GenerateTestNodeID(),
-		SubnetID:        ids.GenerateTestID(),
+		NodeID:          nodeID,
+		SubnetID:        subnetID,
 		Weight:          1,
 		StartTime:       startTime,
 		EndTime:         endTime,
@@ -554,7 +553,7 @@ func TestGetStakerIteratorDeleteAndPut(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			staker := newTestStaker()
+			staker := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 
 			base := newBaseStakers()
 			base.PutValidator(staker)
