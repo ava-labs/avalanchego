@@ -181,3 +181,118 @@ func isBiggerThanHashLen(bigint *big.Int) bool {
 	isBigger := len(buf) > common.HashLength
 	return isBigger
 }
+
+// ACP224FeeConfig specifies the parameters for the ACP-224 dynamic gas limit mechanism.
+// This configuration defines the target gas consumption, minimum gas price,
+// and the time-based price adjustment mechanism.
+type ACP224FeeConfig struct {
+	// ValidatorTargetGas indicates whether the target gas is determined by the validator set.
+	// When true, TargetGas must be 0 and TimeToDouble must be > 0.
+	// When false, TargetGas must be >= 1_000_000.
+	ValidatorTargetGas bool `json:"validatorTargetGas,omitempty"`
+
+	// TargetGas specifies the target gas consumption per second.
+	// Must be 0 when ValidatorTargetGas is true, >= 1_000_000 otherwise.
+	TargetGas *big.Int `json:"targetGas,omitempty"`
+
+	// StaticPricing indicates whether the gas price is static.
+	// When true, TimeToDouble must be 0.
+	// When false, TimeToDouble must be > 0.
+	StaticPricing bool `json:"staticPricing,omitempty"`
+
+	// MinGasPrice sets the minimum gas price in wei. Must be > 0.
+	MinGasPrice *big.Int `json:"minGasPrice,omitempty"`
+
+	// TimeToDouble specifies the time (in seconds) for the gas price to double
+	// when operating at maximum capacity.
+	TimeToDouble *big.Int `json:"timeToDouble,omitempty"`
+}
+
+var (
+	// EmptyACP224FeeConfig represents an empty ACP224 fee config
+	EmptyACP224FeeConfig = ACP224FeeConfig{}
+
+	minTargetGasACP224 = big.NewInt(1_000_000)
+
+	errTargetGasNilACP224                = errors.New("targetGas cannot be nil")
+	errMinGasPriceNil                    = errors.New("minGasPrice cannot be nil")
+	errTimeToDoubleNil                   = errors.New("timeToDouble cannot be nil")
+	errMinGasPriceTooLow                 = errors.New("minGasPrice must be greater than 0")
+	errTargetGasMustBeZero               = errors.New("targetGas must be 0 when validatorTargetGas is true")
+	errTargetGasTooLowACP224             = errors.New("targetGas must be at least 1000000")
+	errTimeToDoubleTooLow                = errors.New("timeToDouble must be greater than 0")
+	errTimeToDoubleMustBeZero            = errors.New("timeToDouble must be 0 when staticPricing is true")
+	errInvalidValidatorTargetStaticCombo = errors.New("validatorTargetGas and staticPricing cannot both be true")
+	errTargetGasExceedsHashLengthACP224  = errors.New("targetGas exceeds hash length")
+	errMinGasPriceExceedsHashLength      = errors.New("minGasPrice exceeds hash length")
+	errTimeToDoubleExceedsHashLength     = errors.New("timeToDouble exceeds hash length")
+)
+
+// Verify checks fields of this ACP224FeeConfig to ensure a valid configuration is provided.
+func (a *ACP224FeeConfig) Verify() error {
+	switch {
+	case a.TargetGas == nil:
+		return errTargetGasNilACP224
+	case a.MinGasPrice == nil:
+		return errMinGasPriceNil
+	case a.TimeToDouble == nil:
+		return errTimeToDoubleNil
+	}
+
+	if a.ValidatorTargetGas && a.StaticPricing {
+		return errInvalidValidatorTargetStaticCombo
+	}
+
+	if a.MinGasPrice.Sign() <= 0 {
+		return errMinGasPriceTooLow
+	}
+
+	if a.ValidatorTargetGas {
+		if a.TargetGas.Sign() != 0 {
+			return errTargetGasMustBeZero
+		}
+	} else {
+		if a.TargetGas.Cmp(minTargetGasACP224) < 0 {
+			return errTargetGasTooLowACP224
+		}
+	}
+
+	if a.StaticPricing {
+		if a.TimeToDouble.Sign() != 0 {
+			return errTimeToDoubleMustBeZero
+		}
+	} else {
+		if a.TimeToDouble.Sign() <= 0 {
+			return errTimeToDoubleTooLow
+		}
+	}
+
+	return a.checkByteLens()
+}
+
+// Equal checks if given [other] is same with this ACP224FeeConfig.
+func (a *ACP224FeeConfig) Equal(other *ACP224FeeConfig) bool {
+	if other == nil {
+		return false
+	}
+
+	return a.ValidatorTargetGas == other.ValidatorTargetGas &&
+		utils.BigEqual(a.TargetGas, other.TargetGas) &&
+		a.StaticPricing == other.StaticPricing &&
+		utils.BigEqual(a.MinGasPrice, other.MinGasPrice) &&
+		utils.BigEqual(a.TimeToDouble, other.TimeToDouble)
+}
+
+// checkByteLens checks byte lengths against common.HashLen (32 bytes) and returns error
+func (a *ACP224FeeConfig) checkByteLens() error {
+	if isBiggerThanHashLen(a.TargetGas) {
+		return fmt.Errorf("%w: %d bytes", errTargetGasExceedsHashLengthACP224, common.HashLength)
+	}
+	if isBiggerThanHashLen(a.MinGasPrice) {
+		return fmt.Errorf("%w: %d bytes", errMinGasPriceExceedsHashLength, common.HashLength)
+	}
+	if isBiggerThanHashLen(a.TimeToDouble) {
+		return fmt.Errorf("%w: %d bytes", errTimeToDoubleExceedsHashLength, common.HashLength)
+	}
+	return nil
+}
