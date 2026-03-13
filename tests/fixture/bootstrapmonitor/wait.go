@@ -82,7 +82,7 @@ func WaitForCompletion(
 		defer cancel()
 
 		// Define common fields for logging
-		diskUsage := getDiskUsage(log, dataDir)
+		diskUsage := getDiskUsage(ctx, log, dataDir)
 		commonFields := []zap.Field{
 			zap.String("diskUsage", diskUsage),
 			zap.Duration("duration", time.Since(testDetails.StartTime)),
@@ -149,8 +149,8 @@ func WaitForCompletion(
 }
 
 // Determines the current disk usage for the specified directory
-func getDiskUsage(log logging.Logger, dir string) string {
-	cmd := exec.Command("du", "-sh", dir)
+func getDiskUsage(ctx context.Context, log logging.Logger, dir string) string {
+	cmd := exec.CommandContext(ctx, "du", "-sh", dir)
 
 	// Create a buffer to capture stderr in case an unexpected error occurs
 	var stderr bytes.Buffer
