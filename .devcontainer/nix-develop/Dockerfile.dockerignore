@@ -1,0 +1,6 @@
+# Override the root .dockerignore which is too restrictive for a dev
+# container (excludes tracked files like .gitignore, *.md, etc.).
+# Exclude .git/ to avoid copying the full history and all branches.
+# The current branch is provided via a git bundle file written to
+# tmp/.git-bundle by the initializeCommand in devcontainer.json.
+.git/

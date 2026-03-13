@@ -203,6 +203,15 @@ jobs:
       - name: Check image build
         shell: bash
         run: ./scripts/run_task.sh test-build-image
+  test_build_devcontainer:
+    name: Devcontainer build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-nix
+      - name: Test devcontainer build
+        shell: bash
+        run: nix develop --command ./scripts/run_task.sh test-build-devcontainer
   test_build_antithesis_avalanchego_images:
     name: Build Antithesis avalanchego images
     runs-on: ubuntu-latest
