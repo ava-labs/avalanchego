@@ -27,20 +27,20 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 )
 
-type Server struct {
+type Service struct {
 	ctx          *snow.Context
 	mempool      *txpool.Mempool
 	pushGossiper *gossip.PushGossiper[*atomic.Tx]
 	acceptedTxs  *state.AtomicRepository
 }
 
-func NewServer(
+func NewService(
 	ctx *snow.Context,
 	mempool *txpool.Mempool,
 	pushGossiper *gossip.PushGossiper[*atomic.Tx],
 	acceptedTxs *state.AtomicRepository,
-) *Server {
-	return &Server{
+) *Service {
+	return &Service{
 		ctx,
 		mempool,
 		pushGossiper,
@@ -48,7 +48,7 @@ func NewServer(
 	}
 }
 
-func (s *Server) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOsReply) error {
+func (s *Service) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOsReply) error {
 	s.ctx.Log.Debug("API called",
 		zap.String("service", "avax"),
 		zap.String("method", "getUTXOs"),
@@ -128,7 +128,7 @@ func (s *Server) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOsR
 	return nil
 }
 
-func (s *Server) parseAddress(str string) (ids.ShortID, error) {
+func (s *Service) parseAddress(str string) (ids.ShortID, error) {
 	if a, err := ids.ShortFromString(str); err == nil {
 		return a, nil
 	}
@@ -152,7 +152,7 @@ func (s *Server) parseAddress(str string) (ids.ShortID, error) {
 	return ids.ToShortID(bytes)
 }
 
-func (s *Server) formatAddress(addr ids.ShortID) (string, error) {
+func (s *Service) formatAddress(addr ids.ShortID) (string, error) {
 	chainAlias, err := s.ctx.BCLookup.PrimaryAlias(s.ctx.ChainID)
 	if err != nil {
 		return "", err
@@ -161,7 +161,7 @@ func (s *Server) formatAddress(addr ids.ShortID) (string, error) {
 	return address.Format(chainAlias, hrp, addr.Bytes())
 }
 
-func (s *Server) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) error {
+func (s *Service) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) error {
 	s.ctx.Log.Debug("API called",
 		zap.String("service", "avax"),
 		zap.String("method", "issueTx"),
@@ -206,7 +206,7 @@ type TxStatus struct {
 	Height *json.Uint64 `json:"blockHeight,omitempty"`
 }
 
-func (s *Server) GetAtomicTxStatus(_ *http.Request, a *api.JSONTxID, r *TxStatus) error {
+func (s *Service) GetAtomicTxStatus(_ *http.Request, a *api.JSONTxID, r *TxStatus) error {
 	s.ctx.Log.Debug("API called",
 		zap.String("service", "avax"),
 		zap.String("method", "getAtomicTxStatus"),
@@ -232,7 +232,7 @@ type Tx struct {
 	Height json.Uint64 `json:"blockHeight"`
 }
 
-func (s *Server) GetAtomicTx(_ *http.Request, a *api.GetTxArgs, r *Tx) error {
+func (s *Service) GetAtomicTx(_ *http.Request, a *api.GetTxArgs, r *Tx) error {
 	s.ctx.Log.Debug("API called",
 		zap.String("service", "avax"),
 		zap.String("method", "getAtomicTx"),

@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/libevm/core"
@@ -22,12 +24,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/saevm/api"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
-	atomicvm "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
@@ -44,6 +46,11 @@ type SinceGenesis struct {
 	mempool      *txpool.Mempool
 	pushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
 	acceptedTxs  *state.AtomicRepository
+
+	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
+	// If a resource depends on another resource, it MUST be added AFTER the
+	// resource it depends on.
+	onClose []func()
 
 	lastWaitForEvent utils.Atomic[time.Time]
 }
@@ -114,39 +121,58 @@ func (vm *SinceGenesis) Initialize(
 	vm.VM = inner
 	vm.hooks = hooks
 	vm.ctx = snowCtx
+	vm.mempool = txpool.New(txs, snowCtx.AVAXAssetID)
 
 	metrics := prometheus.NewRegistry()
 	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {
 		return fmt.Errorf("failed to register metrics: %w", err)
 	}
 
-	{
-		vm.mempool = txpool.New(txs, snowCtx.AVAXAssetID)
+	{ // ==========  P2P Gossip  ==========
 		gossipSet, err := gossip.NewBloomSet(vm.mempool, gossip.BloomSetConfig{})
 		if err != nil {
 			return fmt.Errorf("failed to create bloom set: %w", err)
 		}
-		gossipHandler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
+
+		const pullGossipPeriod = time.Second
+		handler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
 			snowCtx.NodeID,
 			vm.Network,
-			nil, // TODO: Expose from SAE
+			vm.ValidatorPeers,
 			gossipSet,
 			&atomic.TxMarshaller{},
 			avalanchegossip.SystemConfig{
-				Log:       snowCtx.Log,
-				Registry:  metrics,
-				Namespace: "tx_gossip",
-				HandlerID: p2p.AtomicTxGossipHandlerID,
+				Log:           snowCtx.Log,
+				Registry:      metrics,
+				Namespace:     "gossip",
+				HandlerID:     p2p.AtomicTxGossipHandlerID,
+				RequestPeriod: pullGossipPeriod,
 			},
 		)
 		if err != nil {
 			return fmt.Errorf("failed to initialize atomic gossip system: %w", err)
 		}
+		vm.pushGossiper = pushGossiper
 
-		// TODO: Register these
-		_ = gossipHandler
-		_ = pullGossiper
-		_ = pushGossiper
+		if err := inner.AddHandler(p2p.AtomicTxGossipHandlerID, handler); err != nil {
+			return fmt.Errorf("network.AddHandler(...): %v", err)
+		}
+
+		var (
+			gossipCtx, cancel = context.WithCancel(context.Background())
+			wg                sync.WaitGroup
+		)
+		wg.Go(func() {
+			gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, pullGossipPeriod)
+		})
+		wg.Go(func() {
+			const pushGossipPeriod = 100 * time.Millisecond
+			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
+		})
+		vm.onClose = append(vm.onClose, func() {
+			cancel()
+			wg.Wait()
+		})
 	}
 
 	return nil
@@ -171,7 +197,10 @@ func (vm *SinceGenesis) WaitForEvent(ctx context.Context) (common.Message, error
 	}
 }
 
-const avaxHTTPExtensionPath = "/avax"
+const (
+	avaxServiceName       = "avax"
+	avaxHTTPExtensionPath = "/" + avaxServiceName
+)
 
 func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	m, err := vm.VM.CreateHandlers(ctx)
@@ -179,22 +208,21 @@ func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Han
 		return nil, err
 	}
 
-	avaxAPI, err := rpc.NewHandler("avax", &atomicvm.AvaxAPI{
-		Context:      vm.ctx,
-		Mempool:      vm.mempool,
-		PushGossiper: vm.pushGossiper,
-		AcceptedTxs:  vm.acceptedTxs,
-	})
+	service := api.NewService(vm.ctx, vm.mempool, vm.pushGossiper, vm.acceptedTxs)
+	handler, err := rpc.NewHandler(avaxServiceName, service)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
+		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)
 	}
 
-	m[avaxHTTPExtensionPath] = avaxAPI
+	m[avaxHTTPExtensionPath] = handler
 	return m, nil
 }
 
 // Shutdown gracefully closes the VM.
 func (vm *SinceGenesis) Shutdown(ctx context.Context) error {
+	for _, f := range slices.Backward(vm.onClose) {
+		f()
+	}
 	if vm.VM == nil {
 		return nil
 	}
