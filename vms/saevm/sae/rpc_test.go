@@ -1523,14 +1523,14 @@ func (s *SUT) testGetByUnknownNumber(ctx context.Context, t *testing.T) {
 			want:   hexutil.Bytes(nil),
 		},
 		{
-			method:  "debug_getRawBlock",
-			args:    []any{n},
-			wantErr: testerr.Contains("not accepted yet"),
+			method: "debug_getRawBlock",
+			args:   []any{n},
+			want:   hexutil.Bytes(nil),
 		},
 		{
-			method:  "debug_getRawHeader",
-			args:    []any{n},
-			wantErr: testerr.Contains("not accepted yet"),
+			method: "debug_getRawHeader",
+			args:   []any{n},
+			want:   hexutil.Bytes(nil),
 		},
 	}...)
 }
