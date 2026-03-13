@@ -594,33 +594,7 @@ func (t *Tree) AbortGeneration() {
 	defer t.lock.Unlock()
 
 	dl := t.disklayer()
-	dl.abortGeneration()
-}
-
-// abortGeneration sends an abort message to the generate goroutine and waits
-// for it to shutdown before returning (if it is running). This call should not
-// be made concurrently.
-func (dl *diskLayer) abortGeneration() bool {
-	// Store ideal time for abort to get better estimate of load
-	//
-	// Note that we set this time regardless if abortion was skipped otherwise we
-	// will never restart generation (age will always be negative).
-	if dl.abortStarted.IsZero() {
-		dl.abortStarted = time.Now()
-	}
-
-	// If the disk layer is running a snapshot generator, abort it
-	dl.lock.RLock()
-	shouldAbort := dl.genAbort != nil && dl.genStats == nil
-	dl.lock.RUnlock()
-	if shouldAbort {
-		abort := make(chan struct{})
-		dl.genAbort <- abort
-		<-abort
-		return true
-	}
-
-	return false
+	dl.stopGeneration()
 }
 
 // diffToDisk merges a bottom-most diff into the persistent disk layer underneath
@@ -635,7 +609,7 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 	)
 
 	// Attempt to abort generation (if not already aborted)
-	base.abortGeneration()
+	base.stopGeneration()
 
 	// Put the deletion in the batch writer, flush all updates in the final step.
 	customrawdb.DeleteSnapshotBlockHash(batch)
@@ -755,20 +729,31 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 	// If snapshot generation hasn't finished yet, port over all the starts and
 	// continue where the previous round left off.
 	//
-	// Note, the `base.genAbort` comparison is not used normally, it's checked
+	// Note, the `base.genPending` comparison is not used normally, it's checked
 	// to allow the tests to play with the marker without triggering this path.
-	if base.genMarker != nil && base.genAbort != nil {
+	if base.genMarker != nil && base.genPending != nil {
 		res.genMarker = base.genMarker
-		res.genAbort = make(chan chan struct{})
 
 		// If the diskLayer we are about to discard is not very old, we skip
 		// generation on the next layer (assuming generation will just get canceled
 		// before doing meaningful work anyways).
-		diskLayerAge := base.abortStarted.Sub(base.created)
+		//
+		// We use abortStarted if generation was actually running, otherwise
+		// fall back to the current time so we measure the layer's full
+		// lifetime.  Without this guard, a layer that skipped generation
+		// (cancel/done nil -> abortStarted zero) would compute a negative
+		// age and permanently skip generation on every subsequent layer.
+		abortTime := base.abortStarted
+		if abortTime.IsZero() {
+			abortTime = time.Now()
+		}
+		diskLayerAge := abortTime.Sub(base.created)
 		if diskLayerAge < skipGenThreshold {
 			log.Debug("Skipping snapshot generation", "previous disk layer age", diskLayerAge)
 			res.genStats = base.genStats
 		} else {
+			res.cancel = make(chan struct{})
+			res.done = make(chan struct{})
 			go res.generate(base.genStats)
 		}
 	}
@@ -797,14 +782,9 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 		switch layer := layer.(type) {
 		case *diskLayer:
 			// If the base layer is generating, abort it and save
-			if layer.genAbort != nil {
-				abort := make(chan struct{})
-				layer.genAbort <- abort
-				<-abort
-
-				if stats := layer.genStats; stats != nil {
-					wiper = stats.wiping
-				}
+			layer.stopGeneration()
+			if stats := layer.genStats; stats != nil {
+				wiper = stats.wiping
 			}
 			// Layer should be inactive now, mark it as stale
 			layer.lock.Lock()
