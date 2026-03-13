@@ -202,6 +202,7 @@ func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	clear(t.tree.blockHashes)
 	t.tree.blockHashes[blockHash] = struct{}{}
 	t.tree.height = height
+	t.tree.root = common.Hash(t.Firewood.Root())
 }
 
 // Scheme returns the scheme of the database.
@@ -257,10 +258,15 @@ func (t *TrieDB) Close() error {
 	p.byStateRoot = nil
 	t.possible = nil
 
-	// We must provide a context to close since it may hang while waiting for the finalizers to complete.
-	runtime.GC() // encourage finalizers to run before we wait, otherwise the database won't close properly.
+	// encourage finalizers to run before we wait, otherwise the database won't close properly.
+	// N.B.: this is wrapped in a user-defined function as a workaround for
+	// https://github.com/golang/go/issues/78059.
+	// See https://github.com/ava-labs/firewood/issues/1679 for full details.
+	go func() { runtime.GC() }()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	// We must provide a context to close since it may hang while waiting for the finalizers to complete.
 	return t.Firewood.Close(ctx)
 }
 
@@ -429,9 +435,9 @@ func (t *TrieDB) createProposal(parent *proposal, ops []ffi.BatchOp) (*proposal,
 		return nil, fmt.Errorf("create proposal from parent root %s: %w", parent.root.Hex(), err)
 	}
 
-	// Edge case: genesis block
+	// Edge case: we know the genesis block has an empty parent hash.
 	block := parent.height + 1
-	if _, ok := parent.blockHashes[common.Hash{}]; ok && parent.root == types.EmptyRootHash {
+	if _, ok := parent.blockHashes[common.Hash{}]; ok && parent.height == 0 {
 		block = 0
 	}
 

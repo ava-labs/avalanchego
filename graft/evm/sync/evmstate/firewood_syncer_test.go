@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
@@ -30,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
-	statesyncclient "github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 )
 
@@ -147,10 +147,10 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	// so the codec choice only affects the code request handler which is auxiliary to these tests.
 	var (
 		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
-		mockClient         = statesyncclient.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
 		serverDB           = dbFromState(t, serverState)
-		rHandler           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetRangeProofHandler(serverDB))
-		cHandler           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetChangeProofHandler(serverDB))
+		mockClient         = client.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
+		rpClient           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetRangeProofHandler(serverDB))
+		cpClient           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetChangeProofHandler(serverDB))
 	)
 
 	// Create the producer code queue.
@@ -167,8 +167,8 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 		dbFromState(t, clientState),
 		root,
 		codeQueue,
-		rHandler,
-		cHandler,
+		rpClient,
+		cpClient,
 	)
 	require.NoError(t, err, "NewFirewoodSyncer()")
 	return firewoodSyncer, codeSyncer, codeQueue
