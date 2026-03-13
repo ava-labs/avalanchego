@@ -30,6 +30,7 @@ use firewood_metrics::{firewood_increment, firewood_set};
 use lru::LruCache as EntryLruCache;
 use lru_mem::LruCache as MemLruCache;
 
+use crate::linear::ReadableNodeMode;
 use crate::{CacheReadStrategy, CachedNode, LinearAddress, MaybePersistedNode, SharedNode};
 
 use super::{FileIoError, OffsetReader, ReadableStorage, WritableStorage};
@@ -131,10 +132,10 @@ impl ReadableStorage for FileBacked {
             .len())
     }
 
-    fn read_cached_node(&self, addr: LinearAddress, mode: &'static str) -> Option<SharedNode> {
+    fn read_cached_node(&self, addr: LinearAddress, mode: ReadableNodeMode) -> Option<SharedNode> {
         let mut guard = self.cache.lock();
         let cached = guard.get(&addr).map(|cached_node| cached_node.0.clone());
-        firewood_increment!(crate::registry::CACHE_NODE, 1, "mode" => mode, "type" => if cached.is_some() { "hit" } else { "miss" });
+        firewood_increment!(crate::registry::CACHE_NODE, 1, "mode" => mode.as_str(), "type" => if cached.is_some() { "hit" } else { "miss" });
         cached
     }
 

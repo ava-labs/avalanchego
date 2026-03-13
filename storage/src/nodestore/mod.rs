@@ -46,7 +46,7 @@ pub(crate) mod persist;
 pub(crate) mod primitives;
 
 use crate::IntoHashType;
-use crate::linear::OffsetReader;
+use crate::linear::{OffsetReader, ReadableNodeMode};
 use crate::logger::{debug, trace};
 use crate::node::branch::ReadSerializable as _;
 use firewood_metrics::firewood_increment;
@@ -125,7 +125,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
             } else {
                 debug!("No root hash in header; computing from disk");
                 nodestore
-                    .read_node_from_disk(root_address, "open")
+                    .read_node_from_disk(root_address, ReadableNodeMode::Open)
                     .map(|n| hash_node(&n, &Path(SmallVec::default())))?
             };
 
@@ -669,13 +669,13 @@ impl<S: ReadableStorage> From<NodeStore<Arc<ImmutableProposal>, S>>
 
 impl<T, S: ReadableStorage> NodeReader for NodeStore<Mutable<T>, S> {
     fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, FileIoError> {
-        self.read_node_from_disk(addr, "write")
+        self.read_node_from_disk(addr, ReadableNodeMode::Write)
     }
 }
 
 impl<T: Parentable, S: ReadableStorage> NodeReader for NodeStore<T, S> {
     fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, FileIoError> {
-        self.read_node_from_disk(addr, "read")
+        self.read_node_from_disk(addr, ReadableNodeMode::Read)
     }
 }
 
@@ -781,7 +781,7 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
     pub fn read_node_from_disk(
         &self,
         addr: LinearAddress,
-        mode: &'static str,
+        mode: ReadableNodeMode,
     ) -> Result<SharedNode, FileIoError> {
         if let Some(node) = self.storage.read_cached_node(addr, mode) {
             return Ok(node);

@@ -115,6 +115,23 @@ impl Deref for FileIoError {
     }
 }
 
+#[derive(Debug)]
+pub enum ReadableNodeMode {
+    Open,
+    Read,
+    Write,
+}
+
+impl ReadableNodeMode {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            ReadableNodeMode::Open => "open",
+            ReadableNodeMode::Read => "read",
+            ReadableNodeMode::Write => "write",
+        }
+    }
+}
+
 /// Trait for readable storage.
 pub trait ReadableStorage: Debug + Sync + Send {
     /// The node hash algorithm used by this storage.
@@ -135,7 +152,11 @@ pub trait ReadableStorage: Debug + Sync + Send {
     fn size(&self) -> Result<u64, FileIoError>;
 
     /// Read a node from the cache (if any)
-    fn read_cached_node(&self, _addr: LinearAddress, _mode: &'static str) -> Option<SharedNode> {
+    fn read_cached_node(
+        &self,
+        _addr: LinearAddress,
+        _mode: ReadableNodeMode,
+    ) -> Option<SharedNode> {
         None
     }
 
