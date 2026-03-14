@@ -1,0 +1,56 @@
+[package]
+name = "firewood-ffi"
+version = "0.2.0"
+edition.workspace = true
+authors = [
+     "Aaron Buchwald <aaron.buchwald56@gmail.com>",
+     "Arran Schlosberg <519948+ARR4N@users.noreply.github.com>",
+     "Austin Larson <78000745+alarso16@users.noreply.github.com>",
+     "Darioush Jalali <darioush.jalali@avalabs.org>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+]
+description = "C FFI bindings for Firewood, an embedded key-value store optimized for blockchain state."
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+# Workspace dependencies
+coarsetime.workspace = true
+firewood.workspace = true
+firewood-metrics.workspace = true
+firewood-storage.workspace = true
+metrics.workspace = true
+parking_lot.workspace = true
+# Regular dependencies
+oxhttp = "0.3.1"
+tikv-jemallocator = "0.6.1"
+metrics-exporter-prometheus = { version = "0.18.1", default-features = false }
+# Optional dependencies
+rlp = { version = "0.6.1", optional = true }
+env_logger = { workspace = true, optional = true }
+firewood-replay = { workspace = true, optional = true }
+
+[dev-dependencies]
+# Workspace dependencies
+test-case.workspace = true
+
+[features]
+logger = ["dep:env_logger", "firewood/logger"]
+ethhash = ["firewood/ethhash", "rlp"]
+io-uring = ["firewood/io-uring", "firewood-storage/io-uring"]
+block-replay = ["dep:firewood-replay"]
+
+[build-dependencies]
+cbindgen = "0.29.2"
+
+[lints]
+workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["cbindgen", "coarsetime"]
