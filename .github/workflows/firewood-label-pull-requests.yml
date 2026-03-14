@@ -1,6 +1,10 @@
-name: Label pull requests
+name: Firewood Label pull requests
 
-on: pull_request_target
+on:
+  pull_request_target:
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-label-pull-requests.yml"
 
 jobs:
   add_label:

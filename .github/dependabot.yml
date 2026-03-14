@@ -25,6 +25,13 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 0
+  - package-ecosystem: "cargo"
+    directory: "/firewood"
+    schedule:
+      interval: "daily"
+      time: "05:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 0 # Disable non-security version updates
   - package-ecosystem: github-actions
     directory: "/"
     schedule:

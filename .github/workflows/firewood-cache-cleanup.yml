@@ -1,6 +1,9 @@
-name: cleanup caches by a branch
+name: firewood cleanup caches by a branch
 on:
   pull_request:
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-cache-cleanup.yml"
     types:
       - closed
 

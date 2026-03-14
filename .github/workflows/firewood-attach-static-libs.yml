@@ -10,8 +10,11 @@ on:
     tags:
       - "*"
     branches:
-      - "main"
+      - "master"
   pull_request:
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-attach-static-libs.yml"
 
 env:
   CARGO_TERM_COLOR: always
@@ -34,6 +37,9 @@ jobs:
   # them as artifacts to collect and attach in the next job.
   build-firewood-ffi-libs:
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: firewood
     strategy:
       matrix:
         include:
@@ -55,6 +61,7 @@ jobs:
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # @v2 -> v2.8.2
         with:
           shared-key: ${{ matrix.target }}
+          workspaces: "firewood -> target"
 
       - name: Add target for cross-compilation
         run: rustup target add ${{ matrix.target }}
@@ -74,7 +81,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
-          path: target/${{ matrix.target }}/maxperf/libfirewood_ffi.a
+          path: firewood/target/${{ matrix.target }}/maxperf/libfirewood_ffi.a
           if-no-files-found: error
 
       - name: Check if FIREWOOD_GO_GITHUB_TOKEN is set
@@ -110,9 +117,9 @@ jobs:
             export target_branch="${GITHUB_REF#refs/tags/}"
             echo "Using tag name as target_branch: $target_branch"
             echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "main" ]]; then
-            export target_branch="main-ci" # Avoid pushing to main branch of firewood-go-ethhash repo
-            echo "Using main-ci as target branch for push to main: $target_branch"
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "master" ]]; then
+            export target_branch="master-ci" # Avoid pushing to master branch of firewood-go-ethhash repo
+            echo "Using master-ci as target branch for push to master: $target_branch"
             echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             export target_branch="${{ github.event.pull_request.head.ref }}"
@@ -124,8 +131,6 @@ jobs:
           fi
 
       - uses: actions/checkout@v6
-        with:
-          path: firewood
 
       - uses: actions/checkout@v6
         with:

@@ -1,11 +1,14 @@
 # because apparently caches are isolated across branches
-name: default-branch-cache
+name: firewood-default-branch-cache
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - master
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-default-branch-cache.yml"
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,6 +16,10 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: firewood
 
     steps:
       - uses: actions/checkout@v6
@@ -23,6 +30,7 @@ jobs:
         with:
           save-if: "false"
           shared-key: "debug-no-features"
+          workspaces: "firewood -> target"
       - name: Check
         run: cargo check --workspace --all-targets
       - name: Build

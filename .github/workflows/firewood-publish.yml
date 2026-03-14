@@ -1,4 +1,4 @@
-name: publish
+name: firewood-publish
 
 on:
   workflow_dispatch:
@@ -9,6 +9,9 @@ jobs:
   publish-firewood-crate:
     name: firewood-lib
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firewood
     if: startsWith(github.event.release.tag_name, 'v')
     steps:
       - uses: actions/checkout@v6
