@@ -79,7 +79,7 @@ Available tests:
   firewood-33m-40m                  - Blocks 33m-40m with firewood
   firewood-archive-33m-40m          - Blocks 33m-40m with firewood archive
   firewood-40m-41m                  - Blocks 40m-41m with firewood
-  firewood-archive-40m-41m          - Blocks 40m-41m with firewood
+  firewood-archive-40m-41m          - Blocks 40m-41m with firewood archive
 EOF
 }
 
