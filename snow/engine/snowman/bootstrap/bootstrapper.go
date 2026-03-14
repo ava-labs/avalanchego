@@ -41,6 +41,11 @@ const (
 	// outstanding when broadcasting.
 	maxOutstandingBroadcastRequests = 50
 
+	// maxParallelFetches is the maximum number of concurrent GetAncestors requests
+	// allowed at once. Higher values improve throughput when syncing from peers
+	// with high latency or when the node has few peers.
+	maxParallelFetches = 200
+
 	// minimumLogInterval is the minimum time between log entries to avoid noise
 	minimumLogInterval = 5 * time.Second
 
@@ -664,6 +669,23 @@ func (b *Bootstrapper) process(
 // being fetched. After executing all pending blocks it will either restart
 // bootstrapping, or transition into normal operations.
 func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
+	// Dispatch parallel fetch requests to fill the pipeline up to maxParallelFetches.
+	// This allows multiple GetAncestors requests to be in-flight simultaneously,
+	// improving throughput when peers have high latency or when there are few peers.
+	numOutstanding := b.outstandingRequests.Len()
+	if numToFetch := maxParallelFetches - numOutstanding; numToFetch > 0 {
+		fetched := 0
+		for blkID := range b.missingBlockIDs {
+			if fetched >= numToFetch {
+				break
+			}
+			if err := b.fetch(ctx, blkID); err != nil {
+				return err
+			}
+			fetched++
+		}
+	}
+
 	if numMissingBlockIDs := b.missingBlockIDs.Len(); numMissingBlockIDs != 0 {
 		return nil
 	}
