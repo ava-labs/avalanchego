@@ -27,6 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -419,7 +421,16 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.
 
 	// Add the first sample to the EtaTracker to establish an accurate baseline
 	// It's okay to call this a few times if startSyncing is called more than once.
-	b.etaTracker.AddSample(b.initiallyFetched, b.tipHeight-b.startingHeight, b.startTime)
+	totalBlocksToFetch, err := safemath.Sub(b.tipHeight, b.startingHeight)
+	if err != nil {
+		b.Ctx.Log.Warn("startSyncing: tipHeight underflow",
+			zap.Uint64("tipHeight", b.tipHeight),
+			zap.Uint64("startingHeight", b.startingHeight),
+			zap.Error(err),
+		)
+	} else {
+		b.etaTracker.AddSample(b.initiallyFetched, totalBlocksToFetch, b.startTime)
+	}
 
 	// Process received blocks
 	for _, blk := range toProcess {
@@ -623,30 +634,37 @@ func (b *Bootstrapper) process(
 			now.Sub(b.lastProgressUpdateTime) >= minimumLogInterval
 
 		if shouldLog {
-			totalBlocksToFetch := b.tipHeight - b.startingHeight
-
-			etaPtr, progressPercentage := b.etaTracker.AddSample(
-				numFetched,
-				totalBlocksToFetch,
-				now,
-			)
-
-			// Update the last progress update time and previous progress for next iteration
-			b.lastProgressUpdateTime = now
-
-			// Only log if we have a valid ETA estimate
-			if etaPtr != nil {
-				logger := b.Ctx.Log.Info
-				if b.restarted {
-					// Lower log level for restarted bootstrapping.
-					logger = b.Ctx.Log.Debug
-				}
-				logger("fetching blocks",
-					zap.Uint64("numFetchedBlocks", numFetched),
-					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
-					zap.Duration("eta", *etaPtr),
-					zap.Float64("pctComplete", progressPercentage),
+			totalBlocksToFetch, err := safemath.Sub(b.tipHeight, b.startingHeight)
+			if err != nil {
+				b.Ctx.Log.Warn("bootstrap progress: tipHeight underflow",
+					zap.Uint64("tipHeight", b.tipHeight),
+					zap.Uint64("startingHeight", b.startingHeight),
+					zap.Error(err),
 				)
+			} else {
+				etaPtr, progressPercentage := b.etaTracker.AddSample(
+					numFetched,
+					totalBlocksToFetch,
+					now,
+				)
+
+				// Update the last progress update time and previous progress for next iteration
+				b.lastProgressUpdateTime = now
+
+				// Only log if we have a valid ETA estimate
+				if etaPtr != nil {
+					logger := b.Ctx.Log.Info
+					if b.restarted {
+						// Lower log level for restarted bootstrapping.
+						logger = b.Ctx.Log.Debug
+					}
+					logger("fetching blocks",
+						zap.Uint64("numFetchedBlocks", numFetched),
+						zap.Uint64("numTotalBlocks", totalBlocksToFetch),
+						zap.Duration("eta", *etaPtr),
+						zap.Float64("pctComplete", progressPercentage),
+					)
+				}
 			}
 		}
 	}
