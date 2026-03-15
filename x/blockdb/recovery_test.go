@@ -72,7 +72,7 @@ func TestRecovery_Success(t *testing.T) {
 
 				header := indexFileHeader{
 					Version:         indexFileVersion,
-					MaxDataFileSize: 4 * 10 * 1024, // 10KB per file
+					MaxDataFileSize: 10 * 1024, // 10KB per file
 					MinHeight:       0,
 					MaxHeight:       0,
 					NextWriteOffset: firstBlockOffset,

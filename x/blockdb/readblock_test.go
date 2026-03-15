@@ -92,6 +92,22 @@ func TestReadOperations(t *testing.T) {
 			wantErr: ErrCorrupted,
 		},
 		{
+			name:       "index entry compressed size differs from block header",
+			readHeight: 0,
+			setup: func(db *Database) error {
+				entry, err := db.readIndexEntry(0)
+				if err != nil {
+					return err
+				}
+				offset, err := db.indexEntryOffset(0)
+				if err != nil {
+					return err
+				}
+				return db.writeIndexEntryAt(offset, entry.Offset, entry.CompressedSize+1)
+			},
+			wantErr: ErrCorrupted,
+		},
+		{
 			name:       "corrupted checksum in block header",
 			readHeight: 0,
 			setup: func(db *Database) error {
@@ -103,9 +119,12 @@ func TestReadOperations(t *testing.T) {
 				if err != nil {
 					return err
 				}
+				// 12 is the byte offset of the Checksum field within the
+				// serialized blockEntryHeader (8B Height + 4B CompressedSize).
+				const checksumOffset = 12
 				var bad [8]byte
 				binary.LittleEndian.PutUint64(bad[:], 0xDEADBEEF)
-				_, err = dataFile.WriteAt(bad[:], int64(localOffset)+12)
+				_, err = dataFile.WriteAt(bad[:], int64(localOffset)+checksumOffset)
 				return err
 			},
 			wantErr: ErrCorrupted,
