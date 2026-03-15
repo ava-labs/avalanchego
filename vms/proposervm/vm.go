@@ -924,6 +924,17 @@ func (vm *VM) parseInnerBlock(ctx context.Context, outerBlkID ids.ID, innerBlkBy
 	return innerBlk, nil
 }
 
+// logErrorUnlessDBClosed logs at Error level unless the error wraps
+// database.ErrClosed, in which case it logs at Warn since a closed database is
+// expected during graceful shutdown.
+func (vm *VM) logErrorUnlessDBClosed(err error, msg string, fields ...zap.Field) {
+	if errors.Is(err, database.ErrClosed) {
+		vm.ctx.Log.Warn(msg, fields...)
+		return
+	}
+	vm.ctx.Log.Error(msg, fields...)
+}
+
 // Caches proposervm block ID --> inner block if the inner block's height
 // is within [innerBlkCacheSize] of the last accepted block's height.
 func (vm *VM) cacheInnerBlock(outerBlkID ids.ID, innerBlk snowman.Block) {

@@ -142,7 +142,7 @@ func (p *postForkCommonComponents) Verify(
 		// has been synced up to this point yet.
 		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 		if err != nil {
-			p.vm.ctx.Log.Error("block verification failed",
+			p.vm.logErrorUnlessDBClosed(err, "block verification failed",
 				zap.String("reason", "failed to get current P-Chain height"),
 				zap.Stringer("blkID", child.ID()),
 				zap.Error(err),
@@ -216,7 +216,7 @@ func (p *postForkCommonComponents) buildChild(
 	// is at least the parent's P-Chain height
 	pChainHeight, err := p.vm.selectChildPChainHeight(ctx, parentPChainHeight)
 	if err != nil {
-		p.vm.ctx.Log.Error("unexpected build block failure",
+		p.vm.logErrorUnlessDBClosed(err, "unexpected build block failure",
 			zap.String("reason", "failed to calculate optimal P-chain height"),
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),
