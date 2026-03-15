@@ -300,7 +300,7 @@ func (db *Database) Put(height uint64, block []byte) error {
 			zap.Uint64("height", height),
 			zap.Error(err),
 		)
-		return err
+		return fmt.Errorf("put height %d: %w", height, err)
 	}
 
 	blockToWrite, err := db.compressor.Compress(block)
@@ -468,6 +468,9 @@ func (db *Database) Get(height uint64) ([]byte, error) {
 	if bh.Height != height {
 		return nil, fmt.Errorf("%w: requested height %d but block header contains height %d", ErrCorrupted, height, bh.Height)
 	}
+	if bh.CompressedSize != indexEntry.CompressedSize {
+		return nil, fmt.Errorf("%w: compressed size mismatch for height %d: block header has %d, index entry has %d", ErrCorrupted, height, bh.CompressedSize, indexEntry.CompressedSize)
+	}
 	compressedData := buf[int(sizeOfBlockEntryHeader):]
 	decompressed, err := db.compressor.Decompress(compressedData)
 	if err != nil {
@@ -492,10 +495,6 @@ func (db *Database) Has(height uint64) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	return db.hasLocked(height)
-}
-
-func (db *Database) hasLocked(height uint64) (bool, error) {
 	_, err := db.lookupIndexEntry(height)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) || errors.Is(err, ErrInvalidBlockHeight) {
@@ -1068,7 +1067,10 @@ func (db *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block []byt
 	copy(combinedBuf, headerBytes)
 	copy(combinedBuf[sizeOfBlockEntryHeader:], block)
 
-	// Retry up to maxFileRetries if the file handle was closed by another goroutine's LRU cache eviction.
+	// Retry up to maxFileRetries if the file handle was closed by another
+	// goroutine's LRU cache eviction. The retry counter is shared across both
+	// the WriteAt and Sync calls: a successful write followed by a Sync
+	// ErrClosed will re-execute the (idempotent) write on the next iteration.
 	for retries := 0; ; retries++ {
 		dataFile, localOffset, fileIndex, err := db.getDataFileAndOffset(offset)
 		if err != nil {
