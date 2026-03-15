@@ -457,6 +457,11 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 			return vm.ChainVM.WaitForEvent(ctx)
 		}
 
+		if vm.ctx.SubnetID != constants.PrimaryNetworkID && vm.Config.FallbackProposerMaxWaitTime > 0 && vm.Config.FallbackNonValidatorCanPropose {
+			duration = min(duration, vm.Config.FallbackProposerMaxWaitTime)
+			vm.ctx.Log.Debug("Waiting until we should fallback to emergency block proposer", zap.Duration("duration", duration))
+		}
+
 		vm.ctx.Log.Debug("Waiting until we should build a block", zap.Duration("duration", duration))
 
 		// Wait until it is our turn to build a block.
@@ -513,6 +518,10 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 			parentTimestamp,
 		); err == nil {
 			vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
+
+			if vm.shouldFallbackToEmergencyProposer(parentTimestamp) {
+				nextStartTime = parentTimestamp.Add(vm.Config.FallbackProposerMaxWaitTime)
+			}
 		}
 	} else {
 		nextStartTime, err = vm.getPreDurangoSlotTime(
@@ -535,6 +544,44 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 	}
 
 	return nextStartTime, true, nil
+}
+
+func (vm *VM) shouldFallbackToEmergencyProposer(parentTimestamp time.Time) bool {
+	// If we're a VM in the primary network, we cannot fall back to an emergency block proposer
+	if vm.ctx.SubnetID == constants.PrimaryNetworkID {
+		return false
+	}
+
+	// make sure the setting is enabled
+	if !vm.Config.FallbackNonValidatorCanPropose || vm.Config.FallbackProposerMaxWaitTime <= 0 {
+		return false
+	}
+
+	vm.ctx.Log.Debug("checking if we should fallback to emergency block proposer",
+		zap.Time("parent timestamp", parentTimestamp),
+		zap.Duration("fallback proposer max wait time", vm.Config.FallbackProposerMaxWaitTime),
+		zap.Bool("fallback non validator can propose", vm.Config.FallbackNonValidatorCanPropose))
+
+	now := vm.Clock.Time()
+
+	// Sanity check, make sure the parent block's timestamp is earlier than the current time.
+	if !now.After(parentTimestamp) {
+		vm.ctx.Log.Debug("Parent block's timestamp is later than the current time, cannot fallback to emergency block proposer")
+		return false
+	}
+
+	timeSinceLastBlock := now.Sub(parentTimestamp)
+
+	// If not enough time has passed since the last time we have built a block, we should not fall back to
+	// an emergency block proposer.
+	if timeSinceLastBlock < vm.Config.FallbackProposerMaxWaitTime {
+		vm.ctx.Log.Debug("Not enough time has passed since the last time we have built a block, cannot fallback to emergency block proposer")
+		return false
+	}
+
+	vm.ctx.Log.Debug("Enough time has passed since the last time we have built a block, can fallback to emergency block proposer")
+
+	return true
 }
 
 func (vm *VM) getPreDurangoSlotTime(
