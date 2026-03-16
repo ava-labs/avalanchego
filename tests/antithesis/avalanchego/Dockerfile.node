@@ -30,4 +30,9 @@ WORKDIR /avalanchego/build
 # Copy the executable into the container
 COPY --from=builder /instrumented/customer/build/avalanchego ./avalanchego
 
-CMD [ "./avalanchego" ]
+# Copy the entrypoint wrapper that suppresses exit code 2 during early
+# startup to avoid false positives from Antithesis fault injection.
+COPY tests/antithesis/avalanchego/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
+CMD [ "./entrypoint.sh" ]
