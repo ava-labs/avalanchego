@@ -108,12 +108,10 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	txs := txpool.NewTxs()
-	hooks := &hooks{
-		blockBuilder{
-			potentialTxs: txs,
-		},
-		snowCtx.Log,
-	}
+	hooks := &hooks{blockBuilder{
+		log:          snowCtx.Log,
+		potentialTxs: txs,
+	}}
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
 		return err
