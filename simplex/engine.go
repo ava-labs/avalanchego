@@ -140,6 +140,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	}
 
 	return &Engine{
+		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
@@ -148,6 +149,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		PutHandler:                  common.NewNoOpPutHandler(config.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
+		AppHandler:                  common.NewNoOpAppHandler(config.Log),
 		Connector:                   config.VM,
 		vm:                          config.VM,
 

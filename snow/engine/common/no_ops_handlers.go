@@ -383,3 +383,73 @@ func (nop *noOpSimplexHandler) Simplex(_ context.Context, nodeID ids.NodeID, _ *
 	)
 	return nil
 }
+
+var _ AllGetsServer = (*noOpAllGetsServer)(nil)
+
+type noOpAllGetsServer struct {
+	log logging.Logger
+}
+
+func NewNoOpAllGetsServer(log logging.Logger) AllGetsServer {
+	return &noOpAllGetsServer{log: log}
+}
+
+func (nop *noOpAllGetsServer) GetStateSummaryFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetStateSummaryFrontierOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
+func (nop *noOpAllGetsServer) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ set.Set[uint64]) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
+func (nop *noOpAllGetsServer) GetAcceptedFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedFrontierOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
+func (nop *noOpAllGetsServer) GetAccepted(_ context.Context, nodeID ids.NodeID, requestID uint32, _ set.Set[ids.ID]) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
+func (nop *noOpAllGetsServer) GetAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, _ ids.ID) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAncestorsOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
+func (nop *noOpAllGetsServer) Get(_ context.Context, nodeID ids.NodeID, requestID uint32, _ ids.ID) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}

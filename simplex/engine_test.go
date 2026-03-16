@@ -16,7 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
@@ -105,6 +108,68 @@ func TestSimplexEngineShutdown(t *testing.T) {
 	require.NotPanics(t, func() {
 		require.NoError(t, engine.Shutdown(t.Context()))
 	})
+}
+
+func TestEngineInterfaceNoOps(t *testing.T) {
+	engine, _ := setupEngine(t)
+	ctx := t.Context()
+	nodeID := ids.GenerateTestNodeID()
+	containerID := ids.GenerateTestID()
+
+	// common.AllGetsServer
+	require.NoError(t, engine.GetStateSummaryFrontier(ctx, nodeID, 0))
+	require.NoError(t, engine.GetAcceptedStateSummary(ctx, nodeID, 0, set.Set[uint64]{}))
+	require.NoError(t, engine.GetAcceptedFrontier(ctx, nodeID, 0))
+	require.NoError(t, engine.GetAccepted(ctx, nodeID, 0, set.Set[ids.ID]{}))
+	require.NoError(t, engine.GetAncestors(ctx, nodeID, 0, containerID))
+	require.NoError(t, engine.Get(ctx, nodeID, 0, containerID))
+
+	// common.StateSummaryFrontierHandler
+	require.NoError(t, engine.StateSummaryFrontier(ctx, nodeID, 0, nil))
+	require.NoError(t, engine.GetStateSummaryFrontierFailed(ctx, nodeID, 0))
+
+	// common.AcceptedStateSummaryHandler
+	require.NoError(t, engine.AcceptedStateSummary(ctx, nodeID, 0, set.Set[ids.ID]{}))
+	require.NoError(t, engine.GetAcceptedStateSummaryFailed(ctx, nodeID, 0))
+
+	// common.AcceptedFrontierHandler
+	require.NoError(t, engine.AcceptedFrontier(ctx, nodeID, 0, containerID))
+	require.NoError(t, engine.GetAcceptedFrontierFailed(ctx, nodeID, 0))
+
+	// common.AcceptedHandler
+	require.NoError(t, engine.Accepted(ctx, nodeID, 0, set.Set[ids.ID]{}))
+	require.NoError(t, engine.GetAcceptedFailed(ctx, nodeID, 0))
+
+	// common.AncestorsHandler
+	require.NoError(t, engine.Ancestors(ctx, nodeID, 0, nil))
+	require.NoError(t, engine.GetAncestorsFailed(ctx, nodeID, 0))
+
+	// common.PutHandler
+	require.NoError(t, engine.Put(ctx, nodeID, 0, nil))
+	require.NoError(t, engine.GetFailed(ctx, nodeID, 0))
+
+	// common.QueryHandler
+	require.NoError(t, engine.PullQuery(ctx, nodeID, 0, containerID, 0))
+	require.NoError(t, engine.PushQuery(ctx, nodeID, 0, nil, 0))
+
+	// common.ChitsHandler
+	require.NoError(t, engine.Chits(ctx, nodeID, 0, containerID, containerID, containerID, 0))
+	require.NoError(t, engine.QueryFailed(ctx, nodeID, 0))
+
+	// common.AppHandler
+	require.NoError(t, engine.AppRequest(ctx, nodeID, 0, time.Time{}, nil))
+	require.NoError(t, engine.AppResponse(ctx, nodeID, 0, nil))
+	require.NoError(t, engine.AppRequestFailed(ctx, nodeID, 0, &common.AppError{}))
+	require.NoError(t, engine.AppGossip(ctx, nodeID, nil))
+
+	// common.InternalHandler
+	require.NoError(t, engine.Connected(ctx, nodeID, &version.Application{}))
+	require.NoError(t, engine.Disconnected(ctx, nodeID))
+	require.NoError(t, engine.Gossip(ctx))
+	require.NoError(t, engine.Notify(ctx, common.PendingTxs))
+
+	// common.SimplexHandler
+	require.NoError(t, engine.Simplex(ctx, nodeID, &p2p.Simplex{}))
 }
 
 func TestGetTickInterval(t *testing.T) {
