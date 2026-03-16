@@ -149,7 +149,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		PutHandler:                  common.NewNoOpPutHandler(config.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
-		AppHandler:                  common.NewNoOpAppHandler(config.Log),
+		AppHandler:                  config.VM,
 		Connector:                   config.VM,
 		vm:                          config.VM,
 
