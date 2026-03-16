@@ -1,6 +1,9 @@
 # Keep MODULE.bazel.lock up to date automatically
 common --lockfile_mode=update
 
+# Enable platform-specific config sections (build:macos, build:linux, etc.)
+common --enable_platform_specific_config
+
 # Go settings - match scripts/build_test.sh defaults
 
 # Test settings (match scripts/build_test.sh)
@@ -39,6 +42,12 @@ test:norace --@io_bazel_rules_go//go/config:race=false
 # The BLST library requires -D__BLST_PORTABLE__ for portable builds across CPU architectures.
 build --action_env=CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
 build --action_env=CGO_ENABLED=1
+
+# macOS: Prevent nix dev shell env vars from breaking CGO sandbox builds.
+# Bazel discovers Xcode natively; the nix SDK may lack headers like resolv.h.
+build:macos --action_env=DEVELOPER_DIR=
+build:macos --action_env=CC=
+build:macos --action_env=CXX=
 
 # Cache for faster builds
 build --disk_cache=~/.cache/bazel-disk-cache

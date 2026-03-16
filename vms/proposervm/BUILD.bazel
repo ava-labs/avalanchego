@@ -35,6 +35,7 @@ go_library(
         "//snow/consensus/snowman",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
+        "//snow/validators",
         "//staking",
         "//upgrade",
         "//utils/constants",
@@ -115,5 +116,7 @@ go_test(
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
         "@org_uber_go_mock//gomock",
+        "@org_uber_go_zap//:zap",
+        "@org_uber_go_zap//zapcore",
     ],
 )
