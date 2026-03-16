@@ -304,6 +304,10 @@ func (d *Diff) SetStakingInfo(subnetID ids.ID, nodeID ids.NodeID, stakingInfo St
 }
 
 func (d *Diff) GetStakingInfo(subnetID ids.ID, nodeID ids.NodeID) (StakingInfo, error) {
+	if _, err := d.GetCurrentValidator(subnetID, nodeID); err != nil {
+		return StakingInfo{}, err
+	}
+
 	if stakingInfo, ok := d.modifiedStakingInfo[subnetID][nodeID]; ok {
 		return stakingInfo, nil
 	}
@@ -331,6 +335,15 @@ func (d *Diff) PutCurrentValidator(staker *Staker) error {
 func (d *Diff) DeleteCurrentValidator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
 		return fmt.Errorf("getting current validator: %w", err)
+	}
+
+	ok, err := hasDelegators(d, staker.SubnetID, staker.NodeID)
+	if err != nil {
+		return err
+	}
+
+	if ok {
+		return fmt.Errorf("%w: delegators must be deleted before their validator", errDeleteOrder)
 	}
 
 	d.currentStakerDiffs.DeleteValidator(staker)

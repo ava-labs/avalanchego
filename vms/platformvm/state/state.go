@@ -63,6 +63,7 @@ var (
 	errValidatorSetAlreadyPopulated   = errors.New("validator set already populated")
 	errIsNotSubnet                    = errors.New("is not a subnet")
 	errMissingPrimaryNetworkValidator = errors.New("missing primary network validator")
+	errDeleteOrder                    = errors.New("wrong deletion order")
 
 	BlockIDPrefix                           = []byte("blockID")
 	BlockPrefix                             = []byte("block")
@@ -914,8 +915,26 @@ func (s *State) DeleteCurrentValidator(staker *Staker) error {
 		return fmt.Errorf("getting current validator: %w", err)
 	}
 
+	ok, err := hasDelegators(s, staker.SubnetID, staker.NodeID)
+	if err != nil {
+		return err
+	}
+
+	if ok {
+		return fmt.Errorf("%w: delegators must be deleted before their validator", errDeleteOrder)
+	}
+
 	s.currentStakers.DeleteValidator(staker)
 	return nil
+}
+
+func hasDelegators(cs CurrentStakers, subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
+	itr, err := cs.GetCurrentDelegatorIterator(subnetID, nodeID)
+	if err != nil {
+		return false, fmt.Errorf("getting current delegator iterator: %w", err)
+	}
+
+	return itr.Next(), nil
 }
 
 func (s *State) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
