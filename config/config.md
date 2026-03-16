@@ -327,13 +327,14 @@ Sybil protection configuration. These settings affect how the node participates 
 
 ### Benchlist
 
-Peer benchlisting configuration.
+Peer benchlisting configuration using an EWMA (Exponentially Weighted Moving Average) failure probability model.
 
 | Flag | Env Var | Type | Default | Description |
 |--------|--------|------|----|--------------------|
-| `--benchlist-duration` | `AVAGO_BENCHLIST_DURATION` | duration | `15m` | Maximum amount of time a peer is benchlisted after surpassing `--benchlist-fail-threshold`. |
-| `--benchlist-fail-threshold` | `AVAGO_BENCHLIST_FAIL_THRESHOLD` | int | `10` | Number of consecutive failed queries to a node before benching it (assuming all queries to it will fail). |
-| `--benchlist-min-failing-duration` | `AVAGO_BENCHLIST_MIN_FAILING_DURATION` | duration | `150s` | Minimum amount of time queries to a peer must be failing before the peer is benched. |
+| `--benchlist-halflife` | `AVAGO_BENCHLIST_HALFLIFE` | duration | `1m` | Halflife of the EWMA averager used for benchlisting. |
+| `--benchlist-unbench-probability` | `AVAGO_BENCHLIST_UNBENCH_PROBABILITY` | float | `0.2` | EWMA failure probability below which a node is unbenched. |
+| `--benchlist-bench-probability` | `AVAGO_BENCHLIST_BENCH_PROBABILITY` | float | `0.5` | EWMA failure probability above which a node is benched. |
+| `--benchlist-duration` | `AVAGO_BENCHLIST_DURATION` | duration | `5m` | Max amount of time a peer is benchlisted. |
 
 ### Consensus Parameters
 

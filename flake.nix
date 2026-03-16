@@ -34,6 +34,8 @@
           # The Nix packages provided in the environment
           packages = with pkgs; [
             # Build requirements
+            bazelisk
+            (runCommand "bazel" {} ''mkdir -p $out/bin && ln -s ${bazelisk}/bin/bazelisk $out/bin/bazel'')
             git
 
             # Task runner
@@ -57,6 +59,7 @@
 
             # Linters
             shellcheck
+            buildifier
 
             # Protobuf
             buf

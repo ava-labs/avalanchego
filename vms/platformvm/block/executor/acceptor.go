@@ -27,7 +27,7 @@ var (
 type acceptor struct {
 	*backend
 	metrics    metrics.Metrics
-	validators validators.Manager
+	validators *validators.Manager
 }
 
 func (a *acceptor) BanffAbortBlock(b *block.BanffAbortBlock) error {

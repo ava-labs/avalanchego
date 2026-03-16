@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "e2e",
+    srcs = [
+        "apitest.go",
+        "describe.go",
+        "env.go",
+        "flags.go",
+        "ginkgo_test_context.go",
+        "helpers.go",
+        "metrics_link.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tests/fixture/e2e",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//config",
+        "//graft/coreth/ethclient",
+        "//ids",
+        "//tests",
+        "//tests/fixture/tmpnet",
+        "//tests/fixture/tmpnet/flags",
+        "//utils/crypto/secp256k1",
+        "//utils/logging",
+        "//vms/platformvm/txs/fee",
+        "//vms/secp256k1fx",
+        "//wallet/chain/p/builder",
+        "//wallet/subnet/primary",
+        "//wallet/subnet/primary/common",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_spf13_cast//:cast",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+        "@org_uber_go_zap//zapcore",
+    ],
+)

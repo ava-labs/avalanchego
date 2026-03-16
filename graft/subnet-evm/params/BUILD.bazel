@@ -1,0 +1,54 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "params",
+    srcs = [
+        "config.go",
+        "config_extra.go",
+        "config_libevm.go",
+        "denomination.go",
+        "hooks_libevm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/params",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/plugin/evm/customheader",
+        "//graft/subnet-evm/precompile/contract",
+        "//graft/subnet-evm/precompile/contracts/deployerallowlist",
+        "//graft/subnet-evm/precompile/modules",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "//snow",
+        "//upgrade",
+        "//utils",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/legacy",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)
+
+graft_go_test(
+    name = "params_test",
+    srcs = [
+        "config_extra_test.go",
+        "config_test.go",
+        "protocol_params_test.go",
+    ],
+    embed = [":params"],
+    deps = [
+        "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/precompile/contracts/nativeminter",
+        "//graft/subnet-evm/precompile/contracts/rewardmanager",
+        "//graft/subnet-evm/precompile/contracts/txallowlist",
+        "//upgrade/upgradetest",
+        "//utils",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+    ],
+)

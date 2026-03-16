@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "keychain",
+    srcs = ["keychain.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/crypto/keychain",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/set",
+    ],
+)

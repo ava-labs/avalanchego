@@ -59,10 +59,10 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -107,10 +107,10 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	tx, err := newAdvanceTimeTx(t, env.state.GetTimestamp().Add(-time.Second))
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -143,10 +143,10 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime.Add(1*time.Second))
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -173,10 +173,10 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		tx, err := newAdvanceTimeTx(t, genesistest.DefaultValidatorEndTime.Add(1*time.Second))
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -417,10 +417,10 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				tx, err := newAdvanceTimeTx(t, newTime)
 				require.NoError(err)
 
-				onCommitState, err := state.NewDiff(lastAcceptedID, env)
+				onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 				require.NoError(err)
 
-				onAbortState, err := state.NewDiff(lastAcceptedID, env)
+				onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 				require.NoError(err)
 
 				feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -550,10 +550,10 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	tx, err = newAdvanceTimeTx(t, subnetVdr1EndTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -631,10 +631,10 @@ func TestTrackedSubnet(t *testing.T) {
 			tx, err = newAdvanceTimeTx(t, subnetVdr1StartTime)
 			require.NoError(err)
 
-			onCommitState, err := state.NewDiff(lastAcceptedID, env)
+			onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
-			onAbortState, err := state.NewDiff(lastAcceptedID, env)
+			onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
 			feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -680,10 +680,10 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -739,10 +739,10 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	tx, err = newAdvanceTimeTx(t, pendingDelegatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	onCommitState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	onAbortState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	require.NoError(ProposalTx(
@@ -780,10 +780,10 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -838,10 +838,10 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	tx, err = newAdvanceTimeTx(t, pendingDelegatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	onCommitState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	onAbortState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	require.NoError(ProposalTx(
@@ -877,10 +877,10 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	tx, err := newAdvanceTimeTx(t, upgradeTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)

@@ -56,17 +56,17 @@ func (mr *ManagerMockRecorder) Dispatch() *gomock.Call {
 }
 
 // IsBenched mocks base method.
-func (m *Manager) IsBenched(nodeID ids.NodeID, chainID ids.ID) bool {
+func (m *Manager) IsBenched(chainID ids.ID, nodeID ids.NodeID) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsBenched", nodeID, chainID)
+	ret := m.ctrl.Call(m, "IsBenched", chainID, nodeID)
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
 // IsBenched indicates an expected call of IsBenched.
-func (mr *ManagerMockRecorder) IsBenched(nodeID, chainID any) *gomock.Call {
+func (mr *ManagerMockRecorder) IsBenched(chainID, nodeID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsBenched", reflect.TypeOf((*Manager)(nil).IsBenched), nodeID, chainID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsBenched", reflect.TypeOf((*Manager)(nil).IsBenched), chainID, nodeID)
 }
 
 // RegisterChain mocks base method.
