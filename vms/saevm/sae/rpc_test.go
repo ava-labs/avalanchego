@@ -907,9 +907,34 @@ func TestGetReceipts(t *testing.T) {
 			wantRaw: rawReceiptsFrom(unsettled),
 		},
 		{
+			id:      rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //nolint:gosec // Test block heights won't overflow
+			want:    wantOnDisk,
+			wantRaw: rawReceiptsFrom(onDisk),
+		},
+		{
+			id:      rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //nolint:gosec // Test block heights won't overflow
+			want:    wantSettled,
+			wantRaw: rawReceiptsFrom(settled),
+		},
+		{
+			id:      rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //nolint:gosec // Test block heights won't overflow
+			want:    wantUnsettled,
+			wantRaw: rawReceiptsFrom(unsettled),
+		},
+		{
 			id:      rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber),
 			want:    wantUnsettled,
 			wantRaw: rawReceiptsFrom(unsettled),
+		},
+		{
+			id:      rpc.BlockNumberOrHashWithNumber(rpc.SafeBlockNumber),
+			want:    wantSettled,
+			wantRaw: rawReceiptsFrom(settled),
+		},
+		{
+			id:      rpc.BlockNumberOrHashWithNumber(rpc.FinalizedBlockNumber),
+			want:    wantSettled,
+			wantRaw: rawReceiptsFrom(settled),
 		},
 	} {
 		tests = append(tests, rpcTest{
