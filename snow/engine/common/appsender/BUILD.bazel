@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "appsender",
+    srcs = [
+        "appsender_client.go",
+        "appsender_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/common/appsender",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//proto/pb/appsender",
+        "//snow/engine/common",
+        "//utils/set",
+        "@org_golang_google_protobuf//types/known/emptypb",
+    ],
+)

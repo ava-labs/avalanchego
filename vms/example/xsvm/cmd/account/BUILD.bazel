@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "account",
+    srcs = [
+        "cmd.go",
+        "flags.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/account",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//vms/example/xsvm/api",
+        "//wallet/subnet/primary",
+        "@com_github_spf13_cobra//:cobra",
+        "@com_github_spf13_pflag//:pflag",
+    ],
+)

@@ -1,0 +1,8 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "peertest",
+    srcs = ["request_id.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/network/peertest",
+    visibility = ["//visibility:public"],
+)
