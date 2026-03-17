@@ -3612,7 +3612,6 @@ func TestCurrentStakers(t *testing.T) {
 
 			require.Equal(t, []*Staker{genesisValidator}, iterator.ToSlice(itr))
 		})
-
 	}
 }
 
