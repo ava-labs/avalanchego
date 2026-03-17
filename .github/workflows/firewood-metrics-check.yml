@@ -31,7 +31,7 @@ jobs:
           fi
 
           # Check if Grafana dashboard was modified - exit early if so
-          if git diff --name-only $BASE_COMMIT..HEAD | grep -q "firewood/benchmark/Grafana-dashboard.json"; then
+          if git diff --name-only "$BASE_COMMIT"..HEAD | grep -q "firewood/benchmark/Grafana-dashboard.json"; then
             echo "benchmark/Grafana-dashboard.json was modified - skipping metrics check"
             exit 0
           fi
@@ -40,7 +40,7 @@ jobs:
           METRIC_REGEX_PATTERN="(counter!|gauge!|histogram!|#\\[metrics\\])" # ci trigger
 
           # Check for metric-related changes
-          METRIC_CHANGES=$(git diff $BASE_COMMIT..HEAD --unified=0 -- firewood/ | grep -E "$METRIC_REGEX_PATTERN" || true)
+          METRIC_CHANGES=$(git diff "$BASE_COMMIT"..HEAD --unified=0 -- firewood/ | grep -E "$METRIC_REGEX_PATTERN" || true)
 
           if [ -n "$METRIC_CHANGES" ]; then
             echo "⚠️  WARNING: Found metric-related changes, but no dashboard modification:"
@@ -50,10 +50,12 @@ jobs:
           fi
 
           # Set output variables for the comment step
-          echo "metric_changes_found=$([ -n "$METRIC_CHANGES" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-          echo "metric_changes<<EOF" >> $GITHUB_OUTPUT
-          echo "$METRIC_CHANGES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "metric_changes_found=$([ -n "$METRIC_CHANGES" ] && echo "true" || echo "false")"
+            echo "metric_changes<<EOF"
+            echo "$METRIC_CHANGES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Look for previous comment
         if: github.repository == github.event.pull_request.head.repo.full_name && steps.check-metrics.outputs.metric_changes_found == 'true'
