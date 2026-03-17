@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/subnet-evm/precompile/contracts/acp224feemanager",
         "//graft/subnet-evm/precompile/contracts/deployerallowlist",
         "//graft/subnet-evm/precompile/contracts/feemanager",
         "//graft/subnet-evm/precompile/contracts/nativeminter",

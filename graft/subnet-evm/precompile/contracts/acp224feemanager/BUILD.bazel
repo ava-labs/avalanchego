@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "acp224feemanager",
+    srcs = [
+        "config.go",
+        "contract.go",
+        "event.go",
+        "module.go",
+    ],
+    embedsrcs = ["IACP224FeeManager.abi"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/precompile/allowlist",
+        "//graft/subnet-evm/precompile/contract",
+        "//graft/subnet-evm/precompile/modules",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "@com_github_ava_labs_libevm//accounts/abi",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+    ],
+)
