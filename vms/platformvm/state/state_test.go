@@ -3652,7 +3652,6 @@ func TestStateAndDiffIntegration(t *testing.T) {
 
 				validator := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
 				require.NoError(t, diff.PutCurrentValidator(validator))
-				require.NoError(t, err)
 				delegator := newTestStaker(validator.SubnetID, validator.NodeID)
 				require.NoError(t, diff.PutCurrentDelegator(delegator))
 				require.NoError(t, diff.Apply(state))
