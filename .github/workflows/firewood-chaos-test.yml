@@ -96,7 +96,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run chaos test with Firewood
         shell: nix develop --impure --command bash -x {0}
-        run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ matrix.test || '' }}"
+        run: ./scripts/run_task.sh bazel-test-firewood-chaos -- "${{ matrix.test || '' }}"
         env:
           CHAOS_MODE: '1'
           START_BLOCK: ${{ matrix.start-block }}
@@ -106,4 +106,3 @@ jobs:
           CONFIG: ${{ matrix.config }}
           MIN_WAIT_TIME: ${{ matrix.min-wait-time }}
           MAX_WAIT_TIME: ${{ matrix.max-wait-time }}
-

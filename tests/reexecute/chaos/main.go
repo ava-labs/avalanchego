@@ -32,14 +32,15 @@ import (
 )
 
 var (
-	blockDirArg        string
-	currentStateDirArg string
-	startBlockArg      uint64
-	endBlockArg        uint64
-	minWaitTimeArg     time.Duration
-	maxWaitTimeArg     time.Duration
-	configNameArg      string
-	configBytesArg     []byte
+	blockDirArg              string
+	currentStateDirArg       string
+	startBlockArg            uint64
+	endBlockArg              uint64
+	minWaitTimeArg           time.Duration
+	maxWaitTimeArg           time.Duration
+	configNameArg            string
+	reexecutionBinaryPathArg string
+	configBytesArg           []byte
 
 	predefinedConfigs = map[string]string{
 		"firewood": `{
@@ -66,6 +67,7 @@ func init() {
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
 	flag.DurationVar(&minWaitTimeArg, "min-wait-time", 20*time.Second, "Minimum amount of time to wait before crashing.")
 	flag.DurationVar(&maxWaitTimeArg, "max-wait-time", 30*time.Second, "Maximum amount of time to wait before crashing.")
+	flag.StringVar(&reexecutionBinaryPathArg, "reexecution-binary-path", "", "Path to the reexecution binary. If unset, falls back to the legacy go run path.")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
@@ -95,6 +97,7 @@ func main() {
 		startBlockArg,
 		endBlockArg,
 		configNameArg,
+		reexecutionBinaryPathArg,
 		configBytesArg,
 	)
 }
@@ -119,12 +122,13 @@ func run(
 	startBlock uint64,
 	endBlock uint64,
 	configName string,
+	reexecutionBinaryPath string,
 	configBytes []byte,
 ) {
 	r := require.New(tc)
 	log := tc.Log()
 
-	cmd := createReexecutionCmd(blockDir, currentStateDir, startBlock, endBlock, configName)
+	cmd := createReexecutionCmd(reexecutionBinaryPath, blockDir, currentStateDir, startBlock, endBlock, configName)
 	// Set process group ID so we can kill all child processes
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
@@ -202,7 +206,7 @@ func run(
 
 	log.Debug("read VM", zap.Uint64("latest height", lastAcceptedBlock.Height()))
 
-	cmd = createReexecutionCmd(blockDir, currentStateDir, lastAcceptedBlock.Height()+1, endBlock, configName)
+	cmd = createReexecutionCmd(reexecutionBinaryPath, blockDir, currentStateDir, lastAcceptedBlock.Height()+1, endBlock, configName)
 
 	// 5. Restart the reexecution test from the recovered height to verify state consistency
 	r.NoError(cmd.Run())
@@ -233,22 +237,30 @@ func openDB(dbDir string, maxAttempts int) (database.Database, error) {
 
 // createReexecutionCmd constructs a command to run the C-Chain reexecution test.
 func createReexecutionCmd(
+	reexecutionBinaryPath string,
 	blockDir string,
 	currentStateDir string,
 	startBlock uint64,
 	endBlock uint64,
 	configName string,
 ) *exec.Cmd {
-	cmd := exec.Command("go",
-		"run",
-		"github.com/ava-labs/avalanchego/tests/reexecute/c",
-		"--config=firewood",
-		"--block-dir="+blockDir,
-		"--current-state-dir="+currentStateDir,
-		"--start-block="+strconv.Itoa(int(startBlock)),
-		"--end-block="+strconv.Itoa(int(endBlock)),
-		"--config="+configName,
-	)
+	args := []string{
+		"--block-dir=" + blockDir,
+		"--current-state-dir=" + currentStateDir,
+		"--start-block=" + strconv.Itoa(int(startBlock)),
+		"--end-block=" + strconv.Itoa(int(endBlock)),
+		"--config=" + configName,
+	}
+
+	var cmd *exec.Cmd
+	if reexecutionBinaryPath == "" {
+		cmd = exec.Command("go", append([]string{
+			"run",
+			"github.com/ava-labs/avalanchego/tests/reexecute/c",
+		}, args...)...)
+	} else {
+		cmd = exec.Command(reexecutionBinaryPath, args...)
+	}
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

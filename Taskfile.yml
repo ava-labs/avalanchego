@@ -102,6 +102,24 @@ tasks:
     desc: Run firewood FFI tests for both ethhash and MerkleDB variants with Bazel
     cmd: ./scripts/run_bazel.sh test //firewood/ffi:ffi_test //firewood/ffi/tests/eth:eth_test //firewood/ffi/tests/firewood:firewood_test
 
+  bazel-test-firewood-chaos:
+    desc: Run firewood chaos reexecution tests with bazel-built binaries
+    cmds:
+      - cmd: ./scripts/run_bazel.sh build //tests/reexecute/chaos:chaos //tests/reexecute/c:c
+      - cmd: |
+          CHAOS_BINARY_PATH=$(./scripts/run_bazel.sh cquery --output=files //tests/reexecute/chaos:chaos 2>/dev/null) \
+          REEXECUTION_BINARY_PATH=$(./scripts/run_bazel.sh cquery --output=files //tests/reexecute/c:c 2>/dev/null) \
+          ./scripts/benchmark_cchain_range.sh {{.CLI_ARGS}}
+
+  bazel-test-load-firewood:
+    desc: Run load tests with Firewood using a bazel-built avalanchego binary
+    cmds:
+      - task: generate-load-contract-bindings
+      - task: bazel-build
+      - cmd: |
+          AVALANCHEGO_PATH=$(./scripts/run_bazel.sh cquery --output=files //main:avalanchego 2>/dev/null) \
+          ./scripts/run_bazel.sh run //tests/load/main -- --avalanchego-path="${AVALANCHEGO_PATH}" --firewood {{.CLI_ARGS}}
+
   bazel-test-main:
     desc: Run main module unit tests with Bazel (excludes graft modules)
     cmd: ./scripts/run_bazel.sh test //... -- -//graft/...

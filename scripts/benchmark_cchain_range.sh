@@ -245,7 +245,13 @@ echo "CONFIG: ${CONFIG:-default}"
 
 echo "=== Running Test ==="
 if [[ -n "${CHAOS_MODE:-}" ]]; then
-    go run ./tests/reexecute/chaos \
+    if [[ -n "${CHAOS_BINARY_PATH:-}" ]]; then
+        chaos_cmd=("${CHAOS_BINARY_PATH}")
+    else
+        chaos_cmd=(go run ./tests/reexecute/chaos)
+    fi
+
+    chaos_args=(
         --start-block="${START_BLOCK}" \
         --end-block="${END_BLOCK}" \
         --current-state-dir="${CURRENT_STATE_DIR}" \
@@ -253,6 +259,12 @@ if [[ -n "${CHAOS_MODE:-}" ]]; then
         --min-wait-time="${MIN_WAIT_TIME}" \
         --max-wait-time="${MAX_WAIT_TIME}" \
         --config="${CONFIG}"
+    )
+    if [[ -n "${REEXECUTION_BINARY_PATH:-}" ]]; then
+        chaos_args+=(--reexecution-binary-path="${REEXECUTION_BINARY_PATH}")
+    fi
+
+    "${chaos_cmd[@]}" "${chaos_args[@]}"
 else
     go run github.com/ava-labs/avalanchego/tests/reexecute/c \
         --block-dir="${BLOCK_DIR}" \
