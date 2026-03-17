@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/strevm/blocks/blockstest"
 	"github.com/ava-labs/strevm/cmputils"
 	"github.com/ava-labs/strevm/hook/hookstest"
+	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saetest"
 	"github.com/ava-labs/strevm/saexec"
 )
@@ -81,7 +82,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 	chain := blockstest.NewChainBuilder(config, genesis)
 	src := blocks.Source(chain.GetBlock)
 
-	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, nil, hookstest.NewStub(1e6), logger)
+	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, saedb.Config{}, hookstest.NewStub(1e6), logger)
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)

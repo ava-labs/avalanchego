@@ -483,7 +483,7 @@ func (s *SUT) waitUntilExecuted(tb testing.TB, b *blocks.Block) {
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
 	tb.Helper()
-	sdb, err := state.New(root, s.rawVM.exec.StateCache(), nil)
+	sdb, err := s.rawVM.exec.StateDB(root)
 	require.NoErrorf(tb, err, "state.New(%#x, %T.StateCache())", root, s.rawVM.exec)
 	return sdb
 }

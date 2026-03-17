@@ -44,6 +44,7 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 }
 
 func (rec *recovery) lastBlockWithStateRootAvailable() (*blocks.Block, error) {
+	// TODO(alarso16): unless there was an ungraceful shutdown, we can use the last executed block.
 	num := saedb.LastCommittedTrieDBHeight(
 		rawdb.ReadHeadHeader(rec.db).Number.Uint64(),
 	)
@@ -64,7 +65,7 @@ func (rec *recovery) lastBlockWithStateRootAvailable() (*blocks.Block, error) {
 		// fix, which would require trying the root [params.CommitTrieDBEvery]
 		// blocks earlier.
 		root := b.PostExecutionStateRoot()
-		if _, err := state.NewDatabaseWithConfig(rec.db, rec.config.TrieDBConfig).OpenTrie(root); err != nil {
+		if _, err := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig).OpenTrie(root); err != nil {
 			return nil, fmt.Errorf("database corrupted: latest expected state root (block %d / %#x) unavailable: %v", b.NumberU64(), b.Hash(), err)
 		}
 	}

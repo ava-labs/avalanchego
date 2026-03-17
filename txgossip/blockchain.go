@@ -63,5 +63,5 @@ func (bc *blockchain) GetBlock(hash common.Hash, number uint64) *types.Block {
 }
 
 func (bc *blockchain) StateAt(common.Hash) (*state.StateDB, error) {
-	return state.New(bc.LastExecuted().PostExecutionStateRoot(), bc.StateCache(), nil)
+	return bc.StateDB(bc.LastExecuted().PostExecutionStateRoot())
 }

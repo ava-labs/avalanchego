@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saetest"
-	"github.com/ava-labs/strevm/saexec"
 )
 
 func BenchmarkApplyTxWithSnapshot(b *testing.B) {
@@ -34,7 +34,7 @@ func BenchmarkApplyTxWithSnapshot(b *testing.B) {
 			snaps, err := snapshot.New(
 				snapshot.Config{
 					AsyncBuild: false,
-					CacheSize:  saexec.SnapshotCacheSizeMB,
+					CacheSize:  saedb.SnapshotCacheSizeMB,
 				},
 				sut.db, sut.stateCache.TrieDB(), sut.genesis.PostExecutionStateRoot(),
 			)
@@ -56,7 +56,8 @@ func BenchmarkApplyTxWithSnapshot(b *testing.B) {
 				b.Run(tt.name, func(b *testing.B) {
 					b.StopTimer()
 					for range b.N {
-						s, err := NewState(sut.hooks, sut.config, sut.stateCache, sut.genesis, tt.snaps)
+						opener := saetest.NewStateDBOpener(sut.stateCache, tt.snaps)
+						s, err := NewState(sut.hooks, sut.config, sut.genesis, opener)
 						require.NoError(b, err, "NewState()")
 						require.NoError(b, s.StartBlock(hdr), "StartBlock()")
 

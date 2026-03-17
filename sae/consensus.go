@@ -103,15 +103,21 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 
 	// Same rationale as the invariant described in [blocks.Block]. Praised be
 	// the GC!
+	// The executor's [saedb.Tracker] handles removing state roots once the reference
+	// count is 0. Since on execution, each root has a reference added,
+	// this count is decremented once the block's state is no longer needed by
+	// consensus.
 	keep := b.LastSettled().Hash()
 	for _, s := range settles {
 		if s.Hash() == keep {
 			continue
 		}
 		vm.consensusCritical.Delete(s.Hash())
+		vm.exec.Untrack(s.PostExecutionStateRoot())
 	}
 	if h := parentLastSettled.Hash(); h != keep { // i.e. `parentLastSettled` was the last block's `keep`
 		vm.consensusCritical.Delete(h)
+		vm.exec.Untrack(parentLastSettled.PostExecutionStateRoot())
 	}
 	return nil
 }

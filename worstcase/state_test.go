@@ -65,7 +65,7 @@ func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
 		blockstest.WithGasExcess(initialExcess),
 	)
 	hooks := hookstest.NewStub(initialGasTarget)
-	s, err := NewState(hooks, config, cache, genesis, nil)
+	s, err := NewState(hooks, config, genesis, saetest.NewStateDBOpener(cache, nil))
 	require.NoError(tb, err, "NewState()")
 
 	return SUT{

@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state"
-	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
@@ -27,6 +26,7 @@ import (
 	"github.com/ava-labs/strevm/gastime"
 	"github.com/ava-labs/strevm/hook"
 	saeparams "github.com/ava-labs/strevm/params"
+	"github.com/ava-labs/strevm/saedb"
 )
 
 // State tracks the worst-case gas price and account state as operations are
@@ -66,15 +66,14 @@ var errSettledBlockNotExecuted = errors.New("block marked for settling has not f
 func NewState(
 	hooks hook.Points,
 	config *params.ChainConfig,
-	stateCache state.Database,
 	settled *blocks.Block,
-	snaps *snapshot.Tree,
+	opener saedb.StateDBOpener,
 ) (*State, error) {
 	if !settled.Executed() {
 		return nil, errSettledBlockNotExecuted
 	}
 
-	db, err := state.New(settled.PostExecutionStateRoot(), stateCache, snaps)
+	db, err := opener.StateDB(settled.PostExecutionStateRoot())
 	if err != nil {
 		return nil, err
 	}

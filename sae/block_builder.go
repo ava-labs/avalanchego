@@ -183,7 +183,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		zap.Stringer("last_settled_hash", lastSettled.Hash()),
 	)
 
-	state, err := worstcase.NewState(b.hooks, b.exec.ChainConfig(), b.exec.StateCache(), lastSettled, b.exec.SnapshotTree())
+	state, err := worstcase.NewState(b.hooks, b.exec.ChainConfig(), lastSettled, b.exec)
 	if err != nil {
 		log.Warn("Worst-case state not able to be created",
 			zap.Error(err),
