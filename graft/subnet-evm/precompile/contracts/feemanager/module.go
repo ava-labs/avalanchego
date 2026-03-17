@@ -46,6 +46,8 @@ func (*configurator) MakeConfig() precompileconfig.Config {
 	return new(Config)
 }
 
+var errNoFeeConfig = errors.New("chain config does not have a fee config")
+
 // Configure configures [state] with the given [cfg] precompileconfig.
 // This function is called by the EVM once per precompile contract activation.
 func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.ConfigurationBlockContext) error {
@@ -62,7 +64,7 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 	} else {
 		feeCfg := chainConfig.GetFeeConfig()
 		if feeCfg == nil {
-			return errors.New("chain config does not have fee config")
+			return errNoFeeConfig
 		}
 		if err := StoreFeeConfig(state, *feeCfg, blockContext); err != nil {
 			// This should not happen since we already checked the chain config in the genesis creation.
