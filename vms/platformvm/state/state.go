@@ -919,6 +919,7 @@ func (s *State) PutCurrentValidator(staker *Staker) error {
 	}
 
 	s.currentStakers.PutValidator(staker)
+
 	return nil
 }
 
@@ -2838,7 +2839,6 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 			if validatorDiff.removed != nil {
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 			}
-
 			if validatorDiff.added != nil {
 				staker := validatorDiff.added
 
