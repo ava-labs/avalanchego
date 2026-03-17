@@ -737,17 +737,7 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 		// If the diskLayer we are about to discard is not very old, we skip
 		// generation on the next layer (assuming generation will just get canceled
 		// before doing meaningful work anyways).
-		//
-		// We use abortStarted if generation was actually running, otherwise
-		// fall back to the current time so we measure the layer's full
-		// lifetime.  Without this guard, a layer that skipped generation
-		// (cancel/done nil -> abortStarted zero) would compute a negative
-		// age and permanently skip generation on every subsequent layer.
-		abortTime := base.abortStarted
-		if abortTime.IsZero() {
-			abortTime = time.Now()
-		}
-		diskLayerAge := abortTime.Sub(base.created)
+		diskLayerAge := base.abortStarted.Sub(base.created)
 		if diskLayerAge < skipGenThreshold {
 			log.Debug("Skipping snapshot generation", "previous disk layer age", diskLayerAge)
 			res.genStats = base.genStats

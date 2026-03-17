@@ -221,24 +221,20 @@ func (dl *diskLayer) Update(blockHash, blockRoot common.Hash, destructs map[comm
 //   - The generator goroutine has terminated
 //   - It is safe to proceed with cleanup operations (e.g. closing databases)
 func (dl *diskLayer) stopGeneration() {
-	cancel := dl.cancel
-	done := dl.done
-	if cancel == nil || done == nil {
-		// Generation was skipped for this layer so there is nothing to stop.
-		// Note: abortStarted remains zero, which diffToDisk accounts for
-		// by falling back to time.Now() when computing disk layer age.
-		return
-	}
-
-	// Store ideal time for abort to get better estimate of load
-	//
-	// Note that we set this time regardless if abortion was skipped otherwise we
-	// will never restart generation (age will always be negative).
+	// Record abort time on first call so diffToDisk can measure disk layer
+	// age regardless of whether generation was running.
 	dl.lock.Lock()
 	if dl.abortStarted.IsZero() {
 		dl.abortStarted = time.Now()
 	}
 	dl.lock.Unlock()
+
+	cancel := dl.cancel
+	done := dl.done
+	if cancel == nil || done == nil {
+		// Generation was skipped for this layer so there is nothing to stop.
+		return
+	}
 
 	dl.cancelOnce.Do(func() {
 		close(cancel)
