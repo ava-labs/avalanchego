@@ -3332,7 +3332,8 @@ func TestCurrentStakers(t *testing.T) {
 				d := newTestStaker(v.SubnetID, v.NodeID)
 				require.NoError(t, cs.PutCurrentDelegator(d))
 
-				require.ErrorIs(t, cs.DeleteCurrentValidator(v), errDeleteOrder)
+				err := cs.DeleteCurrentValidator(v)
+				require.ErrorIs(t, err, errDeleteOrder)
 			})
 		})
 
@@ -3369,11 +3370,8 @@ func TestCurrentStakers(t *testing.T) {
 			t.Run("validator does not exist", func(t *testing.T) {
 				cs := tt.csF()
 
-				require.ErrorIs(
-					t,
-					cs.SetStakingInfo(ids.GenerateTestID(), ids.GenerateTestNodeID(), StakingInfo{DelegateeReward: 123}),
-					database.ErrNotFound,
-				)
+				err := cs.SetStakingInfo(ids.GenerateTestID(), ids.GenerateTestNodeID(), StakingInfo{DelegateeReward: 123})
+				require.ErrorIs(t, err, database.ErrNotFound)
 			})
 
 			t.Run("staking info updated", func(t *testing.T) {
