@@ -9,8 +9,102 @@
 
 version: '3'
 
+includes:
+  packaging:
+    taskfile: .github/packaging/Taskfile.yml
+
 tasks:
   default: ./scripts/run_task.sh --list
+
+  # All bazel invocations are to ./scripts/run_bazel.sh which will invoke bazelisk without a
+  # dependency on being in a nix shell.
+
+  bazel-build:
+    desc: Build avalanchego with Bazel
+    cmd: ./scripts/run_bazel.sh build //main:avalanchego
+
+  bazel-build-race:
+    desc: Build avalanchego with Bazel (race detection)
+    cmd: ./scripts/run_bazel.sh build --config=race //main:avalanchego
+
+  bazel-build-opt:
+    desc: Build avalanchego with Bazel (optimized)
+    cmd: ./scripts/run_bazel.sh build --compilation_mode=opt //main:avalanchego
+
+  bazel-check-metadata:
+    desc: Checks Bazel metadata is current (requires clean git tree)
+    cmd: ./scripts/check_bazel_metadata.sh
+
+  bazel-clean:
+    desc: Clean Bazel cache
+    cmd: ./scripts/run_bazel.sh clean
+
+  bazel-clean-all:
+    desc: Clean Bazel cache (full expunge)
+    cmd: ./scripts/run_bazel.sh clean --expunge
+
+  bazel-fmt:
+    desc: Format BUILD.bazel files with buildifier
+    cmd: buildifier -r .
+
+  bazel-generate-metadata:
+    desc: Regenerate Bazel metadata for this source tree
+    cmds:
+      - task: bazel-gazelle-generate
+      - task: bazel-fmt
+      - task: bazel-generate-patches
+
+  bazel-generate-patches:
+    desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
+    cmd: ./scripts/generate_bazel_patches.sh
+
+  bazel-gazelle-generate:
+    desc: Regenerate BUILD files with Gazelle (all modules)
+    cmd: ./scripts/run_bazel.sh run //:gazelle
+
+  bazel-mod-tidy:
+    desc: Update use_repo() in MODULE.bazel from go.mod
+    cmd: ./scripts/run_bazel.sh mod tidy
+
+  bazel-test:
+    desc: Run unit tests with Bazel (shuffle on, race on)
+    cmd: ./scripts/run_bazel.sh test //...
+
+  bazel-test-coreth:
+    desc: Run coreth/evm unit tests with Bazel
+    cmd: ./scripts/run_bazel.sh test //graft/coreth/... //graft/evm/...
+
+  bazel-test-e2e:
+    desc: Run E2E tests with bazel-built binary
+    cmds:
+      - task: bazel-build
+      - task: build-xsvm
+      - cmd: |
+          AVALANCHEGO_PATH=$(./scripts/run_bazel.sh cquery --output=files //main:avalanchego 2>/dev/null) \
+          bash -x ./scripts/tests.e2e.existing.sh
+
+  bazel-test-e2e-ci:
+    desc: Run E2E tests with bazel-built binary [serially with race detection]
+    env:
+      E2E_SERIAL: 1
+    cmds:
+      - task: bazel-build-race
+      - task: build-xsvm
+      - cmd: |
+          AVALANCHEGO_PATH=$(./scripts/run_bazel.sh cquery --output=files //main:avalanchego 2>/dev/null) \
+          bash -x ./scripts/tests.e2e.existing.sh
+
+  bazel-test-fast:
+    desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
+    cmd: ./scripts/run_bazel.sh test --config=fast //...
+
+  bazel-test-main:
+    desc: Run main module unit tests with Bazel (excludes graft modules)
+    cmd: ./scripts/run_bazel.sh test //... -- -//graft/...
+
+  bazel-test-subnet-evm:
+    desc: Run subnet-evm unit tests with Bazel
+    cmd: ./scripts/run_bazel.sh test //graft/subnet-evm/...
 
   build:
     desc: Builds avalanchego
@@ -24,7 +118,8 @@ tasks:
 
   build-antithesis-images-subnet-evm:
     desc: Builds docker images for antithesis for the subnet-evm test setup
-    dir: graft/subnet-evm
+    env:
+      TEST_SETUP: subnet-evm
     cmd: bash -x ./scripts/build_antithesis_images.sh
 
   build-antithesis-images-xsvm:
@@ -49,6 +144,10 @@ tasks:
     desc: Builds avalanchego with race detection enabled
     cmd: ./scripts/build.sh -r
 
+  build-subnet-evm:
+    desc: Builds subnet-evm plugin
+    cmd: ./graft/subnet-evm/scripts/build.sh
+
   build-subnet-evm-image:
     desc: Builds docker image for subnet-evm
     dir: graft/subnet-evm
@@ -65,6 +164,22 @@ tasks:
   build-xsvm-image:
     desc: Builds xsvm image
     cmd: ./scripts/build_xsvm_image.sh
+
+  check-bazel-fmt:
+    desc: Check that BUILD.bazel files are formatted with buildifier
+    cmds:
+      - task: bazel-fmt
+      - task: check-clean-branch
+
+  check-bazel-generate-patches:
+    desc: Checks that generated patches are up-to-date (requires a clean working tree)
+    cmds:
+      - task: bazel-generate-patches
+      - task: check-clean-branch
+
+  check-bazel-gazelle-generate:
+    desc: Check that generated BUILD files are up-to-date
+    cmd: ./scripts/run_bazel.sh test //:gazelle_test
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
@@ -103,6 +218,16 @@ tasks:
   check-go-version:
     desc: Checks that go version directives are consistent across all modules
     cmd: ./scripts/check_go_version.sh
+
+  check-require-directives:
+    desc: Checks that internal module require directives reference the same version
+    cmd: ./scripts/check_require_directives.sh
+
+  check-require-directives-round-trip:
+    desc: Validates that update_require_directives.sh is idempotent (requires a clean git working tree)
+    cmds:
+      - ./scripts/check_require_directives_round_trip.sh
+      - task: check-clean-branch
 
   create-kind-cluster:
     desc: Creates the default kind cluster
@@ -162,6 +287,8 @@ tasks:
       - cmd: cd graft/coreth && GOWORK=off go mod tidy
       - cmd: cd graft/subnet-evm && GOWORK=off go mod tidy
       - task: sync-go-work
+      # Update use_repo() in MODULE.bazel to match go.mod dependencies
+      - cmd: ./scripts/run_bazel.sh mod tidy
 
   install-nix:
     desc: Installs nix with an OS-appropriate installer
@@ -176,13 +303,24 @@ tasks:
     cmd: ./scripts/actionlint.sh
 
   lint-all:
-    desc: Runs all lint checks in parallel
+    desc: Runs all lint checks
+    cmds:
+      # Phase 1: Read-only checks (safe to parallelize)
+      - task: _lint-readonly
+      # Phase 2: Tree-mutating checks (must be sequential to avoid
+      # git index and bazel server contention)
+      - task: check-go-mod-tidy
+      - task: check-require-directives-round-trip
+      - task: bazel-check-metadata
+
+  _lint-readonly:
+    internal: true
     deps:
       - lint
       - lint-action
       - lint-shell
-      - check-go-mod-tidy
       - check-go-version
+      - check-require-directives
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -192,6 +330,8 @@ tasks:
       - task: lint-shell
       - task: check-go-mod-tidy
       - task: check-go-version
+      - task: check-require-directives
+      - task: check-require-directives-round-trip
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
@@ -227,6 +367,16 @@ tasks:
     cmds:
       - task: build-race
       - cmd: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=120s
+      - cmd: bash -x ./scripts/tests.build_antithesis_images.sh
+
+  test-build-antithesis-images-subnet-evm:
+    desc: Tests the build of antithesis images for the subnet-evm test setup
+    env:
+      TEST_SETUP: subnet-evm
+    cmds:
+      - task: build-race
+      - task: build-subnet-evm
+      - cmd: cd graft/subnet-evm && go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --plugin-dir=../../build/plugins --duration=120s
       - cmd: bash -x ./scripts/tests.build_antithesis_images.sh
 
   test-build-antithesis-images-xsvm:
@@ -287,14 +437,15 @@ tasks:
     cmds:
       - cmd: bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}
 
-  # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
+  # test-fuzz targets a single package as a smoke test for fuzz infrastructure.
+  # For comprehensive fuzzing, use test-fuzz-long FUZZTIME=[value in seconds].
   # A value of `-1` will run until it encounters a failing output.
 
   test-fuzz:
-    desc: Runs each fuzz test for 10 seconds
+    desc: Smoke tests fuzz infrastructure with a quick package
     vars:
       FUZZTIME: '{{.FUZZTIME| default "10"}}'
-    cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}}
+    cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}} ./utils/cb58
 
   test-fuzz-long:
     desc: Runs each fuzz test for 180 seconds
@@ -349,6 +500,27 @@ tasks:
       NO_RACE: TRUE    # Tests are much faster without race detection
     cmd: bash ./scripts/build_test.sh
 
+  tags-create:
+    desc: Creates tags for avalanchego and submodules
+    cmd: ./scripts/create_tags.sh {{.CLI_ARGS}}
+
+  tags-push:
+    desc: Pushes tags for avalanchego and submodules and verifies delivery
+    cmds:
+      - ./scripts/push_tags.sh {{.CLI_ARGS}}
+      - ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}
+
+  tags-update-require-directives:
+    desc: Updates require directives for avalanchego modules
+    cmds:
+      - ./scripts/update_require_directives.sh {{.CLI_ARGS}}
+      - task: go-mod-tidy
+      - task: check-require-directives
+
+  tags-verify-remote:
+    desc: Verifies tags for avalanchego and submodules exist on the remote
+    cmd: ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}
+
   test-upgrade:
     desc: Runs upgrade tests
     cmds:
@@ -356,7 +528,7 @@ tasks:
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
 
   update-go-version:
-    desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.24.12)"
+    desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"
     cmds:
       - cmd: ./scripts/set_go_version.sh {{.CLI_ARGS}}
       - task: go-mod-tidy

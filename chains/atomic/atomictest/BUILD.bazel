@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "atomictest",
+    srcs = ["shared_memory.go"],
+    importpath = "github.com/ava-labs/avalanchego/chains/atomic/atomictest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chains/atomic",
+        "//database",
+        "//ids",
+        "//utils/units",
+        "@com_github_stretchr_testify//require",
+    ],
+)

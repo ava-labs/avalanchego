@@ -3,6 +3,8 @@
 set -euo pipefail
 
 # Updates go version directives across all go.mod and go.work files.
+# MODULE.bazel reads the version from go.work via go_sdk.from_file(),
+# so it doesn't need separate updating.
 # Does NOT update nix/go/default.nix (requires SHA changes).
 
 if ! [[ "$0" =~ scripts/set_go_version.sh ]]; then
@@ -12,7 +14,7 @@ fi
 
 if [[ $# -ne 1 ]]; then
   echo "Usage: $0 <go-version>"
-  echo "Example: $0 1.24.12"
+  echo "Example: $0 1.25.7"
   exit 1
 fi
 

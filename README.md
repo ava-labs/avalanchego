@@ -23,7 +23,7 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 
 If you plan to build AvalancheGo from source, you will also need the following software:
 
-- [Go](https://golang.org/doc/install) version >= 1.24.12
+- [Go](https://golang.org/doc/install) version >= 1.25.8
 - [gcc](https://gcc.gnu.org/)
 - g++
 
@@ -203,6 +203,8 @@ AvalancheGo is first and foremost a client for the Avalanche network. The versio
 ### Library Compatibility Guarantees
 
 Because AvalancheGo's version denotes the network version, it is expected that interfaces exported by AvalancheGo's packages may change in `Patch` version updates.
+
+AvalancheGo is organized as multiple Go modules that must be consumed together at matching versions. For guidance on depending on these modules in your Go projects, see [Depending on AvalancheGo Modules](docs/external_consumption.md).
 
 ### API Compatibility Guarantees
 
