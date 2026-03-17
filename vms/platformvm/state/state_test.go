@@ -3376,20 +3376,16 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("staking info updated", func(t *testing.T) {
-					// TODO -- this behavior is different across base and diff. Currently base does not
-					// allow us to update mutable data associated with a validator before it has been
-					// written.
-					t.Skip("TODO: different behavior across implementations")
-
 					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
-					require.NoError(t, cs.SetStakingInfo(v.SubnetID, v.NodeID, StakingInfo{DelegateeReward: 123}))
+					want := StakingInfo{DelegateeReward: 123}
+					require.NoError(t, cs.SetStakingInfo(v.SubnetID, v.NodeID, want))
 
 					got, err := cs.GetStakingInfo(v.SubnetID, v.NodeID)
 					require.NoError(t, err)
-					require.Equal(t, uint64(123), got)
+					require.Equal(t, want, got)
 				})
 			})
 
@@ -3672,6 +3668,56 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				itr, err := state.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
 				require.NoError(t, err)
 				require.Empty(t, iterator.ToSlice(itr))
+			})
+
+			t.Run("replace a validator", func(t *testing.T) {
+				state := newTestState(t, memdb.New())
+
+				// Add a validator in a prior diff
+				diff, err := NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				want := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
+				require.NoError(t, diff.PutCurrentValidator(want))
+				require.NoError(t, diff.Apply(state))
+
+				// In the next diff remove and re-add it
+				diff, err = NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				require.NoError(t, diff.DeleteCurrentValidator(want))
+				require.NoError(t, diff.PutCurrentValidator(want))
+				require.NoError(t, diff.Apply(state))
+
+				got, err := diff.GetCurrentValidator(want.SubnetID, want.NodeID)
+				require.NoError(t, err)
+				require.Equal(t, want, got)
+			})
+
+			t.Run("replace a validator and set staking info", func(t *testing.T) {
+				state := newTestState(t, memdb.New())
+
+				// Add a validator in a prior diff
+				diff, err := NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				validator := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
+				require.NoError(t, diff.PutCurrentValidator(validator))
+				require.NoError(t, diff.Apply(state))
+
+				// In the next diff remove and re-add it and set its staking info
+				diff, err = NewDiffOn(state, true)
+				require.NoError(t, err)
+				require.NoError(t, diff.DeleteCurrentValidator(validator))
+				require.NoError(t, diff.PutCurrentValidator(validator))
+
+				want := StakingInfo{DelegateeReward: 123}
+				require.NoError(t, diff.SetStakingInfo(validator.SubnetID, validator.NodeID, want))
+				require.NoError(t, diff.Apply(state))
+
+				got, err := diff.GetStakingInfo(validator.SubnetID, validator.NodeID)
+				require.NoError(t, err)
+				require.Equal(t, want, got)
 			})
 		})
 	}

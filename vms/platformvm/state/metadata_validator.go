@@ -123,9 +123,15 @@ func (vs *validatorState) AddValidatorMetadata(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
 	vm *validatorMetadata,
-) {
+) error {
 	vs.LoadValidatorMetadata(vdrID, subnetID, vm)
+	if err := vs.SetStakingInfo(subnetID, vdrID, stakingInfoFromMetadata(vm)); err != nil {
+		return err
+	}
+
 	vs.addUpdatedTxID(vdrID, subnetID, vm.txID)
+
+	return nil
 }
 
 // GetUptime returns the current uptime measurements of `vdrID` on
@@ -176,7 +182,6 @@ func (vs *validatorState) GetStakingInfo(
 }
 
 // SetStakingInfo updates the mutable staking info of `vdrID` on `subnetID`.
-// Unless deleted first, the next call to [WriteValidatorMetadata] will write this update to disk.
 //
 // This is called by execution layer to update mutable staking info.
 func (vs *validatorState) SetStakingInfo(
@@ -249,6 +254,7 @@ func (vs *validatorState) WriteValidatorMetadata(
 	return nil
 }
 
+// addUpdatedTxID marks a validator's metadata as being updated in the current diff
 func (vs *validatorState) addUpdatedTxID(vdrID ids.NodeID, subnetID ids.ID, txID ids.ID) {
 	subnet, ok := vs.updatedMetadata[vdrID]
 	if !ok {

@@ -742,15 +742,28 @@ func (s *State) GetStakingInfo(subnetID ids.ID, vdrID ids.NodeID) (StakingInfo, 
 		return StakingInfo{}, fmt.Errorf("getting current validator: %w", err)
 	}
 
+	// Check if this was modified in the current diff.
+	if v := s.currentStakers.getOrCreateValidatorDiff(subnetID, vdrID); v.stakingInfo != nil {
+		return *v.stakingInfo, nil
+	}
+
+	// Otherwise return whatever was previously committed.
 	return s.validatorState.GetStakingInfo(subnetID, vdrID)
 }
 
 func (s *State) SetStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo StakingInfo) error {
-	if _, err := s.GetCurrentValidator(subnetID, vdrID); err != nil {
+	validator, err := s.GetCurrentValidator(subnetID, vdrID)
+	if err != nil {
 		return fmt.Errorf("getting current validator: %w", err)
 	}
 
-	return s.validatorState.SetStakingInfo(subnetID, vdrID, stakingInfo)
+	// Add this to the current diff
+	diff := s.currentStakers.getOrCreateValidatorDiff(subnetID, vdrID)
+	diff.stakingInfo = &stakingInfo
+
+	// Mark this validator as requiring a update on disk
+	s.validatorState.addUpdatedTxID(validator.NodeID, validator.SubnetID, validator.TxID)
+	return nil
 }
 
 func (s *State) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
@@ -906,7 +919,6 @@ func (s *State) PutCurrentValidator(staker *Staker) error {
 	}
 
 	s.currentStakers.PutValidator(staker)
-
 	return nil
 }
 
@@ -2826,6 +2838,7 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 			if validatorDiff.removed != nil {
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 			}
+
 			if validatorDiff.added != nil {
 				staker := validatorDiff.added
 
@@ -2845,7 +2858,15 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 					PotentialDelegateeReward: 0,
 				}
 
-				s.validatorState.AddValidatorMetadata(nodeID, subnetID, metadata)
+				if err := s.validatorState.AddValidatorMetadata(nodeID, subnetID, metadata); err != nil {
+					return fmt.Errorf("adding validator metadata: %w", err)
+				}
+			}
+
+			if validatorDiff.stakingInfo != nil {
+				if err := s.validatorState.SetStakingInfo(subnetID, nodeID, *(validatorDiff.stakingInfo)); err != nil {
+					return fmt.Errorf("setting staking info: %w", err)
+				}
 			}
 
 			err := writeCurrentDelegatorDiff(
