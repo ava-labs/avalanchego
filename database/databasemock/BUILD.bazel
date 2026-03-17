@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "databasemock",
+    srcs = [
+        "batch.go",
+        "iterator.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/database/databasemock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "@org_uber_go_mock//gomock",
+    ],
+)

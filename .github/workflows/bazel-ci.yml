@@ -1,0 +1,94 @@
+name: Bazel Tests
+
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Check Bazel metadata first so stale generated files fail with one
+  # actionable error instead of cascading into multiple Bazel build/test
+  # failures. This is especially important when PRs are tested against
+  # the current base branch and the metadata included in the PR is stale
+  # relative to it.
+  check-metadata-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Bazel metadata
+        uses: ./.github/actions/run-bazel-task
+        with:
+          prune_runner_disk: 'false'
+          task: bazel-check-metadata
+  # Not a dependency of other jobs but intended to ensure that
+  # developers on macos are able to maintain bazel metadata.
+  check-metadata-darwin:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Bazel metadata
+        uses: ./.github/actions/run-bazel-task
+        with:
+          prune_runner_disk: 'false'
+          task: bazel-check-metadata
+  unit-main:
+    needs: check-metadata-linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unit tests with Bazel
+        uses: ./.github/actions/run-bazel-task
+        with:
+          task: bazel-test-main
+  unit-coreth:
+    needs: check-metadata-linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run coreth unit tests with Bazel
+        uses: ./.github/actions/run-bazel-task
+        with:
+          prune_runner_disk: 'false'
+          task: bazel-test-coreth
+  unit-subnet-evm:
+    needs: check-metadata-linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run subnet-evm unit tests with Bazel
+        uses: ./.github/actions/run-bazel-task
+        with:
+          task: bazel-test-subnet-evm
+  e2e:
+    needs: check-metadata-linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run e2e tests with Bazel-built binary
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh bazel-test-e2e-ci
+          artifact_prefix: e2e-bazel
+          filter_by_owner: avalanchego-e2e
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}

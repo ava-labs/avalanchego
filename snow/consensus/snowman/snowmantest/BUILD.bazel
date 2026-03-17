@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "snowmantest",
+    srcs = [
+        "block.go",
+        "engine.go",
+        "require.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow/snowtest",
+        "//upgrade",
+        "//utils",
+        "@com_github_stretchr_testify//require",
+    ],
+)
