@@ -3322,6 +3322,18 @@ func TestCurrentStakers(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, want, got)
 			})
+
+			t.Run("deleting validator with delegators", func(t *testing.T) {
+				cs := tt.csF()
+
+				v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
+				require.NoError(t, cs.PutCurrentValidator(v))
+
+				d := newTestStaker(v.SubnetID, v.NodeID)
+				require.NoError(t, cs.PutCurrentDelegator(d))
+
+				require.ErrorIs(t, cs.DeleteCurrentValidator(v), errDeleteOrder)
+			})
 		})
 
 		t.Run("get staking info", func(t *testing.T) {
@@ -3447,16 +3459,15 @@ func TestCurrentStakers(t *testing.T) {
 				require.Empty(t, iterator.ToSlice(itr))
 			})
 
-			t.Run("deleting validator with delegators", func(t *testing.T) {
+			t.Run("validator deleted", func(t *testing.T) {
 				cs := tt.csF()
 
-				v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
-				require.NoError(t, cs.PutCurrentValidator(v))
+				require.NoError(t, cs.DeleteCurrentValidator(genesisValidator))
 
-				d := newTestStaker(v.SubnetID, v.NodeID)
-				require.NoError(t, cs.PutCurrentDelegator(d))
+				itr, err := cs.GetCurrentDelegatorIterator(genesisValidator.SubnetID, genesisValidator.NodeID)
+				require.NoError(t, err)
 
-				require.ErrorIs(t, cs.DeleteCurrentValidator(v), errDeleteOrder)
+				require.Empty(t, iterator.ToSlice(itr))
 			})
 		})
 
