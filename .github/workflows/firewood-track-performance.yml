@@ -60,6 +60,7 @@ jobs:
       - name: Resolve benchmark config
         id: resolve
         run: |
+          # shellcheck disable=SC2129
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
             # Common config for all scheduled runs
             echo "config=firewood" >> "$GITHUB_OUTPUT"
