@@ -199,8 +199,8 @@ func TestAddValidatorMetadataWrite(t *testing.T) {
 			txID := ids.GenerateTestID()
 			require.NoError(state.AddValidatorMetadata(ids.GenerateTestNodeID(), tt.subnetID,
 				&validatorMetadata{
-				txID:            txID,
-				PotentialReward: 100,
+					txID:            txID,
+					PotentialReward: 100,
 				}))
 			require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
 
