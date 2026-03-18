@@ -126,7 +126,6 @@ func TestVerify(t *testing.T) {
 				MinGasPrice:        big.NewInt(1),
 				TimeToDouble:       big.NewInt(0),
 			}),
-			ExpectedError: commontype.ErrInvalidValidatorTargetStaticCombo,
 		},
 		// Hash length exceeded tests
 		"targetGas exceeds hash length": {

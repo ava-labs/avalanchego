@@ -221,9 +221,8 @@ var (
 	ErrTargetGasMustBeZero               = errors.New("targetGas must be 0 when validatorTargetGas is true")
 	ErrTargetGasTooLowACP224             = errors.New("targetGas must be at least 1000000")
 	ErrTimeToDoubleTooLow                = errors.New("timeToDouble must be greater than 0")
-	ErrTimeToDoubleMustBeZero            = errors.New("timeToDouble must be 0 when staticPricing is true")
-	ErrInvalidValidatorTargetStaticCombo = errors.New("validatorTargetGas and staticPricing cannot both be true")
-	ErrTargetGasExceedsHashLengthACP224  = errors.New("targetGas exceeds hash length")
+	ErrTimeToDoubleMustBeZero           = errors.New("timeToDouble must be 0 when staticPricing is true")
+	ErrTargetGasExceedsHashLengthACP224 = errors.New("targetGas exceeds hash length")
 	ErrMinGasPriceExceedsHashLength      = errors.New("minGasPrice exceeds hash length")
 	ErrTimeToDoubleExceedsHashLength     = errors.New("timeToDouble exceeds hash length")
 )
@@ -237,10 +236,6 @@ func (a *ACP224FeeConfig) Verify() error {
 		return ErrMinGasPriceNil
 	case a.TimeToDouble == nil:
 		return ErrTimeToDoubleNil
-	}
-
-	if a.ValidatorTargetGas && a.StaticPricing {
-		return ErrInvalidValidatorTargetStaticCombo
 	}
 
 	if a.MinGasPrice.Sign() <= 0 {
