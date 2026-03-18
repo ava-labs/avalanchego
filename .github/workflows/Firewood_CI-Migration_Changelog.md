@@ -40,3 +40,23 @@
 - **rust-cache**: Added `workspaces: "firewood -> target"` to `Swatinem/rust-cache`
 - **Artifact paths**: Prefixed `upload-artifact` paths with `firewood/`
 - **GOWORK=off**: Set on FFI and fuzz jobs to isolate firewood Go modules from monorepo workspace
+
+## Post-migration Fixes
+
+| File | Change | Reason |
+|------|--------|--------|
+| `bazel-ci.yml`, `c-chain-reexecution-benchmark-container.yml`, `c-chain-reexecution-benchmark-gh-native.yml` | Added `paths-ignore: ["firewood/**"]` | Don't trigger avalanchego-only workflows for firewood changes |
+| `firewood/.github/check-license-headers.yaml` | Exempted `BUILD.bazel` files | Bazel build files don't carry firewood license headers |
+| `firewood-cache-cleanup.yml`, `firewood-metrics-check.yml` | Fixed shellcheck warnings | Lint compliance with avalanchego's CI |
+| `firewood-track-performance.yml` | Suppressed shellcheck SC2129 | Lint compliance |
+| `firewood/ffi/go.mod` | Removed stale dependencies | Tidied go.mod after monorepo integration |
+| `firewood-attach-static-libs.yml` | `ubuntu-22.04-arm` → `custom-arm64-jammy` | Use avalanchego's registered ARM runner label |
+| `firewood-attach-static-libs.yml` | Pass `github.event.pull_request.head.ref` through env var | Fix actionlint script injection warning |
+| `firewood-track-performance.yml` | Removed `timeout-minutes` from `workflow_dispatch` inputs | GitHub Actions limits `workflow_dispatch` to 10 inputs; default 12h for manual dispatch |
+| `scripts/actionlint.sh` | Skip `firewood-*` workflows in `run_task.sh` enforcement check | Firewood workflows use their own script conventions |
+
+## Known Issues
+
+| Workflow | Issue | Resolution |
+|----------|-------|------------|
+| `firewood-attach-static-libs.yml` | `push-firewood-ffi-libs`, `test-firewood-ffi-libs`, `remove-if-pr-only` jobs skipped | `FIREWOOD_GO_GITHUB_TOKEN` secret not configured in avalanchego repo; requires repo-admin setup |
