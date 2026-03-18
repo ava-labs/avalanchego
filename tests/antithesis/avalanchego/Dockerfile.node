@@ -30,9 +30,7 @@ WORKDIR /avalanchego/build
 # Copy the executable into the container
 COPY --from=builder /instrumented/customer/build/avalanchego ./avalanchego
 
-# Wrap the binary with an entrypoint script that suppresses exit code 2
-# during early startup. See entrypoint.sh for details.
 COPY tests/antithesis/avalanchego/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
-CMD [ "./entrypoint.sh" ]
+ENTRYPOINT ["./entrypoint.sh"]
