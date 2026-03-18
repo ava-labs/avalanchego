@@ -70,7 +70,9 @@ var (
 			"state-scheme": "firewood",
 			"snapshot-cache": 0,
 			"pruning-enabled": true,
-			"state-sync-enabled": false
+			"state-sync-enabled": false,
+			"commit-interval": 4096,
+			"state-history": 8192
 		}`,
 		"firewood-archive": `{
 			"state-scheme": "firewood",
