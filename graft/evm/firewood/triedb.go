@@ -101,19 +101,24 @@ type TrieDBConfig struct {
 	RevisionsInMemory uint // must be >= 2
 	CacheStrategy     ffi.CacheStrategy
 	Archive           bool
+	// DeferredCommitInterval must be < RevisionsInMemory as otherwise, it's
+	// possible to reap the latest persisted revision.
+	DeferredCommitInterval uint64
 }
 
 // DefaultConfig returns a sensible TrieDBConfig with the given directory.
 // The default config is:
 //   - CacheSizeBytes: 1MB
-//   - RevisionsInMemory: 100
+//   - RevisionsInMemory: 128
 //   - CacheStrategy: [ffi.CacheAllReads]
+//   - DeferredCommitInterval: 64
 func DefaultConfig(dir string) TrieDBConfig {
 	return TrieDBConfig{
-		DatabaseDir:       dir,
-		CacheSizeBytes:    1024 * 1024, // 1MB
-		RevisionsInMemory: 100,
-		CacheStrategy:     ffi.CacheAllReads,
+		DatabaseDir:            dir,
+		CacheSizeBytes:         1024 * 1024, // 1MB
+		RevisionsInMemory:      128,
+		CacheStrategy:          ffi.CacheAllReads,
+		DeferredCommitInterval: 64,
 	}
 }
 
@@ -130,16 +135,31 @@ func (c TrieDBConfig) BackendConstructor(ethdb.Database) triedb.DBOverride {
 
 // New creates a new Firewood database with the given configuration.
 // The database will not be opened on error.
+//
+// If config.DeferredCommitInterval >= config.RevisionsInMemory, then
+// config.DeferredCommitInterval is set to config.RevisionsInMemory - 1 to
+// uphold the invariant that DeferredCommitInterval < RevisionsInMemory.
 func New(config TrieDBConfig) (*TrieDB, error) {
 	if err := validateDir(config.DatabaseDir); err != nil {
 		return nil, err
 	}
 	path := filepath.Join(config.DatabaseDir, firewoodDir)
+
+	commitCount := uint64(1)
+	// Persist every N revisions only if not an archival node. Archive nodes must
+	// persist every commit so that all roots are recorded in RootStore and remain
+	// queryable after eviction from memory.
+	if !config.Archive {
+		// The Firewood constructor will check that commitCount is nonzero.
+		minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)
+		commitCount = min(config.DeferredCommitInterval, minDeferredPersistenceCommitCount)
+	}
+
 	options := []ffi.Option{
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithReadCacheStrategy(config.CacheStrategy),
-		ffi.WithDeferredPersistenceCommitCount(1),
+		ffi.WithDeferredPersistenceCommitCount(commitCount),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())
