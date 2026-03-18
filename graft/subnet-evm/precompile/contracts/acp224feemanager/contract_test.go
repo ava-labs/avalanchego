@@ -248,10 +248,27 @@ func init() {
 				lastChangedAt := acp224feemanager.GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testBlockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
 
-				// Verify event was emitted
+				// Verify event was emitted with correct topics and data
 				logs := state.Logs()
 				require.Len(t, logs, 1, "expected one log to be emitted")
-				require.Equal(t, acp224feemanager.ContractAddress, logs[0].Address, "expected log address to be precompile address")
+				log := logs[0]
+				require.Equal(t, acp224feemanager.ContractAddress, log.Address, "log address")
+
+				// Topic[0] is the event signature hash, Topic[1] is the indexed sender
+				require.Len(t, log.Topics, 2, "expected 2 topics (event sig + indexed sender)")
+				wantTopics, _, err := acp224feemanager.PackFeeConfigUpdatedEvent(
+					allowlisttest.TestEnabledAddr,
+					zeroFeeConfig, // old config is zero since no prior config was stored
+					testFeeConfig,
+				)
+				require.NoError(t, err, "PackFeeConfigUpdatedEvent()")
+				require.Equal(t, wantTopics, log.Topics, "event topics")
+
+				// Verify non-indexed event data round-trips correctly
+				unpacked, err := acp224feemanager.UnpackFeeConfigUpdatedEventData(log.Data)
+				require.NoError(t, err, "UnpackFeeConfigUpdatedEventData()")
+				require.Equal(t, zeroFeeConfig, unpacked.OldFeeConfig, "old fee config in event")
+				require.Equal(t, testFeeConfig, unpacked.NewFeeConfig, "new fee config in event")
 			},
 		},
 	)
@@ -272,6 +289,13 @@ func TestStoreFeeConfig(t *testing.T) {
 
 	lastChangedAt := acp224feemanager.GetFeeConfigLastChangedAt(state)
 	require.Equal(t, testBlockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
+}
+
+func TestStoreFeeConfigNilBlockNumber(t *testing.T) {
+	state := newTestStateDB()
+
+	err := acp224feemanager.StoreFeeConfig(state, testFeeConfig, nil)
+	require.ErrorIs(t, err, acp224feemanager.ErrNilBlockNumber, "StoreFeeConfig(testFeeConfig, nil)")
 }
 
 func newTestStateDB() *extstate.StateDB {

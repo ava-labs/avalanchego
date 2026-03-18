@@ -51,9 +51,10 @@ var (
 	timeToDoubleStorageKey       = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'd'}
 	feeConfigLastChangedAtKey    = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
 
-	ErrCannotSetFeeConfig  = errors.New("non-enabled cannot call setFeeConfig")
-	ErrUint64Overflow      = errors.New("value overflows uint64")
-	ErrNilBlockNumber      = errors.New("block number cannot be nil")
+	ErrCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
+	ErrUint64Overflow     = errors.New("value overflows uint64")
+	ErrNilBigInt          = errors.New("nil big.Int value")
+	ErrNilBlockNumber     = errors.New("block number cannot be nil")
 
 	// IACP224FeeManagerRawABI contains the raw ABI of ACP224FeeManager contract.
 	//go:embed IACP224FeeManager.abi
@@ -93,6 +94,9 @@ func fromABIFeeConfig(c abiFeeConfig) (commontype.ACP224FeeConfig, error) {
 		{"minGasPrice", c.MinGasPrice},
 		{"timeToDouble", c.TimeToDouble},
 	} {
+		if field.val == nil {
+			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrNilBigInt, field.name)
+		}
 		if field.val.Sign() < 0 || field.val.Cmp(maxUint64) > 0 {
 			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrUint64Overflow, field.name)
 		}
