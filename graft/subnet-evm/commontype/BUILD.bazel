@@ -4,6 +4,7 @@ load("//.bazel:defs.bzl", "graft_go_test")
 go_library(
     name = "commontype",
     srcs = [
+        "acp224_fee_config.go",
         "fee_config.go",
         "test_fee_config.go",
     ],
