@@ -33,4 +33,4 @@ COPY --from=builder /instrumented/customer/build/avalanchego ./avalanchego
 COPY tests/antithesis/avalanchego/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
-ENTRYPOINT ["./entrypoint.sh"]
+CMD ["./entrypoint.sh"]
