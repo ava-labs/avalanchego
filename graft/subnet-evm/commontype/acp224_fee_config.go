@@ -3,17 +3,14 @@
 
 package commontype
 
-import (
-	"errors"
-	"fmt"
-)
+import "errors"
 
 const MinTargetGasACP224 uint64 = 1_000_000
 
 var (
 	ErrMinGasPriceTooLow      = errors.New("minGasPrice must be greater than 0")
 	ErrTargetGasMustBeZero    = errors.New("targetGas must be 0 when validatorTargetGas is true")
-	ErrTargetGasTooLowACP224  = fmt.Errorf("targetGas must be at least %d", MinTargetGasACP224)
+	ErrTargetGasTooLowACP224  = errors.New("targetGas must be at least MinTargetGasACP224")
 	ErrTimeToDoubleTooLow     = errors.New("timeToDouble must be greater than 0")
 	ErrTimeToDoubleMustBeZero = errors.New("timeToDouble must be 0 when staticPricing is true")
 )

@@ -298,35 +298,51 @@ func TestACP224FeeManagerRun(t *testing.T) {
 }
 
 func TestStoreFeeConfig(t *testing.T) {
-	state := newTestStateDB()
-
-	err := acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber)
-	require.NoError(t, err, "StoreFeeConfig()")
-
-	got := acp224feemanager.GetStoredFeeConfig(state)
-	require.Equal(t, testFeeConfig, got, "GetStoredFeeConfig()")
-
-	lastChangedAt := acp224feemanager.GetFeeConfigLastChangedAt(state)
-	require.Equal(t, testBlockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
-}
-
-func TestStoreFeeConfigNilBlockNumber(t *testing.T) {
-	state := newTestStateDB()
-
-	err := acp224feemanager.StoreFeeConfig(state, testFeeConfig, nil)
-	require.ErrorIs(t, err, acp224feemanager.ErrNilBlockNumber, "StoreFeeConfig(testFeeConfig, nil)")
-}
-
-func TestStoreFeeConfigInvalidConfig(t *testing.T) {
-	state := newTestStateDB()
-
-	invalidConfig := commontype.ACP224FeeConfig{
-		TargetGas:    commontype.MinTargetGasACP224,
-		MinGasPrice:  0, // invalid: must be > 0
-		TimeToDouble: 60,
+	tests := []struct {
+		name        string
+		config      commontype.ACP224FeeConfig
+		blockNumber *big.Int
+		wantErr     error
+	}{
+		{
+			name:        "valid config",
+			config:      testFeeConfig,
+			blockNumber: testBlockNumber,
+		},
+		{
+			name:        "nil block number",
+			config:      testFeeConfig,
+			blockNumber: nil,
+			wantErr:     acp224feemanager.ErrNilBlockNumber,
+		},
+		{
+			name: "invalid config",
+			config: commontype.ACP224FeeConfig{
+				TargetGas:    commontype.MinTargetGasACP224,
+				MinGasPrice:  0, // invalid: must be > 0
+				TimeToDouble: 60,
+			},
+			blockNumber: testBlockNumber,
+			wantErr:     commontype.ErrMinGasPriceTooLow,
+		},
 	}
-	err := acp224feemanager.StoreFeeConfig(state, invalidConfig, testBlockNumber)
-	require.ErrorIs(t, err, commontype.ErrMinGasPriceTooLow, "StoreFeeConfig(invalidConfig, testBlockNumber)")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newTestStateDB()
+			err := acp224feemanager.StoreFeeConfig(s, tt.config, tt.blockNumber)
+			require.ErrorIs(t, err, tt.wantErr, "StoreFeeConfig()")
+			if tt.wantErr != nil {
+				return
+			}
+
+			got := acp224feemanager.GetStoredFeeConfig(s)
+			require.Equal(t, tt.config, got, "GetStoredFeeConfig()")
+
+			lastChangedAt := acp224feemanager.GetFeeConfigLastChangedAt(s)
+			require.Equal(t, tt.blockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
+		})
+	}
 }
 
 func newTestStateDB() *extstate.StateDB {

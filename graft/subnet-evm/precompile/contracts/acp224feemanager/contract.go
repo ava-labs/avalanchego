@@ -202,7 +202,7 @@ func getFeeConfig(
 		return nil, remainingGas, err
 	}
 
-	return output, remainingGas, err
+	return output, remainingGas, nil
 }
 
 // PackGetFeeConfigLastChangedAt packs the calldata including the 4-byte selector.
@@ -243,7 +243,7 @@ func getFeeConfigLastChangedAt(
 		return nil, remainingGas, err
 	}
 
-	return packedOutput, remainingGas, err
+	return packedOutput, remainingGas, nil
 }
 
 // PackSetFeeConfig packs [config] into ABI-encoded calldata including the 4-byte selector.
@@ -284,20 +284,19 @@ func setFeeConfig(
 		return nil, remainingGas, vm.ErrWriteProtection
 	}
 
+	stateDB := accessibleState.GetStateDB()
+	callerStatus := GetACP224FeeManagerAllowListStatus(stateDB, caller)
+	if !callerStatus.IsEnabled() {
+		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotSetFeeConfig, caller)
+	}
+
 	feeConfig, err := UnpackSetFeeConfigInput(input)
 	if err != nil {
 		return nil, remainingGas, err
 	}
 
-	// Validate before any side effects (event emission, storage writes).
 	if err := feeConfig.Verify(); err != nil {
 		return nil, remainingGas, err
-	}
-
-	stateDB := accessibleState.GetStateDB()
-	callerStatus := GetACP224FeeManagerAllowListStatus(stateDB, caller)
-	if !callerStatus.IsEnabled() {
-		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotSetFeeConfig, caller)
 	}
 
 	oldConfig := GetStoredFeeConfig(stateDB)
