@@ -4,6 +4,8 @@
 package acp224feemanager
 
 import (
+	"errors"
+
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
@@ -11,7 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 )
 
-var _ precompileconfig.Config = (*Config)(nil)
+var (
+	_ precompileconfig.Config = (*Config)(nil)
+
+	ErrInitialFeeConfigRequired = errors.New("initialFeeConfig is required when enabling the ACP-224 fee manager")
+)
 
 // Config holds the ACP-224 fee manager precompile configuration.
 type Config struct {
@@ -70,8 +76,12 @@ func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	if err := c.AllowListConfig.Verify(chainConfig, c.Upgrade); err != nil {
 		return err
 	}
-	if c.InitialFeeConfig == nil {
+	// When disabling, no fee config is needed.
+	if c.Disable {
 		return nil
+	}
+	if c.InitialFeeConfig == nil {
+		return ErrInitialFeeConfigRequired
 	}
 
 	return c.InitialFeeConfig.Verify()
