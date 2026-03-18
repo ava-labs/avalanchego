@@ -9,12 +9,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// ValidatorChange represents a single validator addition, removal, or modification
+// ValidatorChange represents a single validator addition, removal, or modification.
+// Weight is the current weight (0 for removals).
 type ValidatorChange struct {
-	NodeID                     ids.NodeID `serialize:"true" json:"nodeID"`
-	UncompressedPublicKeyBytes [96]byte   `serialize:"true" json:"publicKey"`
-	PreviousWeight             uint64     `serialize:"true" json:"previousWeight"` // 0 for additions
-	CurrentWeight              uint64     `serialize:"true" json:"currentWeight"`  // 0 for removals
+	UncompressedPublicKeyBytes [96]byte `serialize:"true" json:"publicKey"`
+	Weight                     uint64   `serialize:"true" json:"weight"`
 }
 
 // ValidatorSetDiff is sent by the P-chain.
@@ -24,28 +23,35 @@ type ValidatorChange struct {
 // their validator sets by applying only the changes rather than receiving the
 // complete validator set.
 //
-// The message includes cryptographic commitments (hashes) to both the previous
-// and current validator sets, allowing recipients to verify state continuity
-// and detect tampering.
+// Changes is a sorted (by public key) flat list of additions, removals, and
+// modifications. Removals have Weight == 0. NumAdded counts how many entries
+// in Changes are newly added validators (as opposed to weight modifications).
+//
+// Wire format (linearcodec, type ID 5):
+//
+//	[2]  codec version  (0x0000)
+//	[4]  type ID        (5)
+//	[32] BlockchainID
+//	[8]  PreviousHeight
+//	[8]  PreviousTimestamp
+//	[8]  CurrentHeight
+//	[8]  CurrentTimestamp
+//	[4]  len(Changes)   — numChanges
+//	per change:
+//	  [96] UncompressedPublicKeyBytes
+//	  [8]  Weight
+//	[4]  NumAdded
 type ValidatorSetDiff struct {
 	payload
 
-	BlockchainID ids.ID `serialize:"true" json:"blockchainID"`
+	BlockchainID      ids.ID `serialize:"true" json:"blockchainID"`
+	PreviousHeight    uint64 `serialize:"true" json:"previousHeight"`
+	PreviousTimestamp uint64 `serialize:"true" json:"previousTimestamp"`
+	CurrentHeight     uint64 `serialize:"true" json:"currentHeight"`
+	CurrentTimestamp   uint64 `serialize:"true" json:"currentTimestamp"`
 
-	// Previous state (starting point for the diff)
-	PreviousHeight           uint64 `serialize:"true" json:"previousHeight"`
-	PreviousTimestamp        uint64 `serialize:"true" json:"previousTimestamp"`
-	PreviousValidatorSetHash ids.ID `serialize:"true" json:"previousValidatorSetHash"`
-
-	// Current state (ending point for the diff)
-	CurrentHeight           uint64 `serialize:"true" json:"currentHeight"`
-	CurrentTimestamp        uint64 `serialize:"true" json:"currentTimestamp"`
-	CurrentValidatorSetHash ids.ID `serialize:"true" json:"currentValidatorSetHash"`
-
-	// The actual changes
-	Added    []ValidatorChange `serialize:"true" json:"added"`
-	Removed  []ValidatorChange `serialize:"true" json:"removed"`
-	Modified []ValidatorChange `serialize:"true" json:"modified"`
+	Changes  []ValidatorChange `serialize:"true" json:"changes"`
+	NumAdded uint32            `serialize:"true" json:"numAdded"`
 }
 
 // NewValidatorSetDiff creates a new initialized ValidatorSetDiff.
@@ -53,25 +59,19 @@ func NewValidatorSetDiff(
 	blockchainID ids.ID,
 	previousHeight uint64,
 	previousTimestamp uint64,
-	previousValidatorSetHash ids.ID,
 	currentHeight uint64,
 	currentTimestamp uint64,
-	currentValidatorSetHash ids.ID,
-	added []ValidatorChange,
-	removed []ValidatorChange,
-	modified []ValidatorChange,
+	changes []ValidatorChange,
+	numAdded uint32,
 ) (*ValidatorSetDiff, error) {
 	msg := &ValidatorSetDiff{
-		BlockchainID:             blockchainID,
-		PreviousHeight:           previousHeight,
-		PreviousTimestamp:        previousTimestamp,
-		PreviousValidatorSetHash: previousValidatorSetHash,
-		CurrentHeight:            currentHeight,
-		CurrentTimestamp:         currentTimestamp,
-		CurrentValidatorSetHash:  currentValidatorSetHash,
-		Added:                    added,
-		Removed:                  removed,
-		Modified:                 modified,
+		BlockchainID:      blockchainID,
+		PreviousHeight:    previousHeight,
+		PreviousTimestamp: previousTimestamp,
+		CurrentHeight:     currentHeight,
+		CurrentTimestamp:   currentTimestamp,
+		Changes:           changes,
+		NumAdded:          numAdded,
 	}
 	return msg, Initialize(msg)
 }
