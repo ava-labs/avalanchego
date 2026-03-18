@@ -130,11 +130,19 @@ func PackSetFeeConfig(config commontype.ACP224FeeConfig) ([]byte, error) {
 // UnpackSetFeeConfigInput attempts to unpack [input] into the commontype.ACP224FeeConfig type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
-	feeConfig := commontype.ACP224FeeConfig{}
-	err := ACP224FeeManagerABI.UnpackInputIntoInterface(&feeConfig, "setFeeConfig", input)
+	// Note: UnpackInputIntoInterface doesn't work here because setFeeConfig has a single
+	// tuple argument. Internally it routes through copyAtomic which tries to assign the
+	// entire unpacked tuple to the first struct field (a bool), causing a type mismatch.
+	// Instead, we unpack via the method's Inputs and use abi.ConvertType.
+	method, ok := ACP224FeeManagerABI.Methods["setFeeConfig"]
+	if !ok {
+		return commontype.ACP224FeeConfig{}, errors.New("method setFeeConfig not found")
+	}
+	res, err := method.Inputs.Unpack(input)
 	if err != nil {
 		return commontype.ACP224FeeConfig{}, err
 	}
+	feeConfig := *abi.ConvertType(res[0], new(commontype.ACP224FeeConfig)).(*commontype.ACP224FeeConfig)
 	return feeConfig, nil
 }
 
@@ -206,11 +214,13 @@ func PackGetFeeConfigOutput(config commontype.ACP224FeeConfig) ([]byte, error) {
 // UnpackGetFeeConfigOutput attempts to unpack given [output] into the commontype.ACP224FeeConfig type output
 // assumes that [output] does not include selector (omits first 4 func signature bytes)
 func UnpackGetFeeConfigOutput(output []byte) (commontype.ACP224FeeConfig, error) {
-	feeConfig := commontype.ACP224FeeConfig{}
-	err := ACP224FeeManagerABI.UnpackIntoInterface(&feeConfig, "getFeeConfig", output)
+	// Use Unpack + ConvertType instead of UnpackIntoInterface to avoid the
+	// copyAtomic bug with single tuple returns (same issue as UnpackSetFeeConfigInput).
+	res, err := ACP224FeeManagerABI.Unpack("getFeeConfig", output)
 	if err != nil {
 		return commontype.ACP224FeeConfig{}, err
 	}
+	feeConfig := *abi.ConvertType(res[0], new(commontype.ACP224FeeConfig)).(*commontype.ACP224FeeConfig)
 	return feeConfig, nil
 }
 
