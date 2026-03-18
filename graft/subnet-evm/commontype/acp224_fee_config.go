@@ -10,6 +10,14 @@ import (
 
 const MinTargetGasACP224 uint64 = 1_000_000
 
+var (
+	ErrMinGasPriceTooLow      = errors.New("minGasPrice must be greater than 0")
+	ErrTargetGasMustBeZero    = errors.New("targetGas must be 0 when validatorTargetGas is true")
+	ErrTargetGasTooLowACP224  = fmt.Errorf("targetGas must be at least %d", MinTargetGasACP224)
+	ErrTimeToDoubleTooLow     = errors.New("timeToDouble must be greater than 0")
+	ErrTimeToDoubleMustBeZero = errors.New("timeToDouble must be 0 when staticPricing is true")
+)
+
 // ACP224FeeConfig specifies the parameters for the ACP-224 dynamic gas limit mechanism.
 // See Verify() for validation constraints between fields.
 type ACP224FeeConfig struct {
@@ -19,14 +27,6 @@ type ACP224FeeConfig struct {
 	MinGasPrice        uint64 `json:"minGasPrice"`                  // minimum gas price in wei
 	TimeToDouble       uint64 `json:"timeToDouble"`                 // seconds for gas price to double at max capacity
 }
-
-var (
-	ErrMinGasPriceTooLow      = errors.New("minGasPrice must be greater than 0")
-	ErrTargetGasMustBeZero    = errors.New("targetGas must be 0 when validatorTargetGas is true")
-	ErrTargetGasTooLowACP224  = fmt.Errorf("targetGas must be at least %d", MinTargetGasACP224)
-	ErrTimeToDoubleTooLow     = errors.New("timeToDouble must be greater than 0")
-	ErrTimeToDoubleMustBeZero = errors.New("timeToDouble must be 0 when staticPricing is true")
-)
 
 // Verify returns an error if the config violates any field constraints.
 func (a *ACP224FeeConfig) Verify() error {
