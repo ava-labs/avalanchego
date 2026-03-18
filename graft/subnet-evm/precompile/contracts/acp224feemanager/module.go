@@ -15,13 +15,11 @@ import (
 
 var _ contract.Configurator = (*configurator)(nil)
 
-// ConfigKey is the key used in json config files to specify this precompile config.
-// must be unique across all precompiles.
+// ConfigKey must be unique across all precompiles.
 const ConfigKey = "acp224FeeManagerConfig"
 
 var ContractAddress = common.HexToAddress("0x0200000000000000000000000000000000000006")
 
-// Module is the precompile module. It is used to register the precompile contract.
 var Module = modules.Module{
 	ConfigKey:    ConfigKey,
 	Address:      ContractAddress,
@@ -38,20 +36,17 @@ type configurator struct{}
 // 	}
 // }
 
-// MakeConfig returns a new precompile config instance.
-// This is required to Marshal/Unmarshal the precompile config.
+// MakeConfig is required for Marshal/Unmarshal of the precompile config.
 func (*configurator) MakeConfig() precompileconfig.Config {
 	return new(Config)
 }
 
-// Configure configures [state] with the given [cfg] precompileconfig.
-// This function is called by the EVM once per precompile contract activation.
+// Configure is called by the EVM once per precompile contract activation.
 func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.ConfigurationBlockContext) error {
 	config, ok := cfg.(*Config)
 	if !ok {
 		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)
 	}
-	// Store the initial fee config into the state when the fee manager activates.
 	if config.InitialFeeConfig != nil {
 		if err := StoreFeeConfig(state, *config.InitialFeeConfig, blockContext.Number()); err != nil {
 			// This should not happen since we already checked this config with Verify()

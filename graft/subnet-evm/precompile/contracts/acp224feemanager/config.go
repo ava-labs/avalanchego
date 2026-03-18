@@ -13,16 +13,14 @@ import (
 
 var _ precompileconfig.Config = (*Config)(nil)
 
-// Config holds the ACP-224 fee manager precompile configuration.
+// Config is the ACP-224 fee manager precompile configuration.
 type Config struct {
-	allowlist.AllowListConfig // Config for the fee config manager allow list
+	allowlist.AllowListConfig
 	precompileconfig.Upgrade
-	InitialFeeConfig *commontype.ACP224FeeConfig `json:"initialFeeConfig,omitempty"` // initial fee config to be immediately activated
+	InitialFeeConfig *commontype.ACP224FeeConfig `json:"initialFeeConfig,omitempty"` // activated immediately on precompile enable
 }
 
-// NewConfig returns a config for a network upgrade at [blockTimestamp] that enables
-// ACP224FeeManager with the given [admins], [enableds] and [managers] as members of the
-// allowlist with [initialConfig] as initial fee config if specified.
+// NewConfig returns a config that enables ACP224FeeManager at [blockTimestamp].
 func NewConfig(blockTimestamp *uint64, admins []common.Address, enableds []common.Address, managers []common.Address, initialConfig *commontype.ACP224FeeConfig) *Config {
 	return &Config{
 		AllowListConfig: allowlist.AllowListConfig{
@@ -35,8 +33,7 @@ func NewConfig(blockTimestamp *uint64, admins []common.Address, enableds []commo
 	}
 }
 
-// NewDisableConfig returns config for a network upgrade at [blockTimestamp]
-// that disables ACP224FeeManager.
+// NewDisableConfig returns a config that disables ACP224FeeManager at [blockTimestamp].
 func NewDisableConfig(blockTimestamp *uint64) *Config {
 	return &Config{
 		Upgrade: precompileconfig.Upgrade{
@@ -46,13 +43,11 @@ func NewDisableConfig(blockTimestamp *uint64) *Config {
 	}
 }
 
-// Key returns the key for the ACP224FeeManager precompileconfig.
-// This should be the same key as used in the precompile module.
+// Key must match ConfigKey used in the precompile module.
 func (*Config) Key() string { return ConfigKey }
 
-// Equal returns true if [cfg] is a [*Config] and it has been configured identical to [c].
+// Equal returns true if [cfg] is a *Config identical to [c].
 func (c *Config) Equal(cfg precompileconfig.Config) bool {
-	// typecast before comparison
 	other, ok := (cfg).(*Config)
 	if !ok {
 		return false
@@ -65,7 +60,7 @@ func (c *Config) Equal(cfg precompileconfig.Config) bool {
 	return c.InitialFeeConfig.Equal(other.InitialFeeConfig)
 }
 
-// Verify tries to verify Config and returns an error accordingly.
+// Verify validates the allow list config and, if set, the initial fee config.
 func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	if err := c.AllowListConfig.Verify(chainConfig, c.Upgrade); err != nil {
 		return err

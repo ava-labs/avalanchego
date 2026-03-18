@@ -202,8 +202,9 @@ func init() {
 
 	tests = append(tests,
 		precompiletest.PrecompileTest{
-			Name:   "readOnly_setFeeConfig_should_fail",
-			Caller: allowlisttest.TestEnabledAddr,
+			Name:       "readOnly_setFeeConfig_should_fail",
+			Caller:     allowlisttest.TestEnabledAddr,
+			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
 				input, err := acp224feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
@@ -224,6 +225,24 @@ func init() {
 			SuppliedGas: acp224feemanager.SetFeeConfigGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
+		},
+		precompiletest.PrecompileTest{
+			Name:       "setFeeConfig_with_invalid_config_should_fail",
+			Caller:     allowlisttest.TestEnabledAddr,
+			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				invalidConfig := commontype.ACP224FeeConfig{
+					TargetGas:    commontype.MinTargetGasACP224,
+					MinGasPrice:  0, // invalid: must be > 0
+					TimeToDouble: 60,
+				}
+				input, err := acp224feemanager.PackSetFeeConfig(invalidConfig)
+				require.NoError(t, err)
+				return input
+			},
+			SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
+			ReadOnly:    false,
+			ExpectedErr: commontype.ErrMinGasPriceTooLow,
 		},
 		precompiletest.PrecompileTest{
 			Name:       "set_config_emits_event_with_correct_data",

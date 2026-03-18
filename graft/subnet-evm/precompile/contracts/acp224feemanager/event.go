@@ -9,25 +9,23 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 )
 
-// FeeConfigUpdatedEventData represents a FeeConfigUpdated non-indexed event data raised by the ACP224FeeManager contract.
+// FeeConfigUpdatedEventData holds the non-indexed data from a FeeConfigUpdated event.
 type FeeConfigUpdatedEventData struct {
 	OldFeeConfig commontype.ACP224FeeConfig
 	NewFeeConfig commontype.ACP224FeeConfig
 }
 
-// abiFeeConfigUpdatedEventData is the ABI-compatible representation using *big.Int fields.
 type abiFeeConfigUpdatedEventData struct {
 	OldFeeConfig abiFeeConfig
 	NewFeeConfig abiFeeConfig
 }
 
-// PackFeeConfigUpdatedEvent packs the event into the appropriate arguments for FeeConfigUpdated.
-// It returns topic hashes and the encoded non-indexed data.
+// PackFeeConfigUpdatedEvent returns topic hashes and ABI-encoded non-indexed data.
 func PackFeeConfigUpdatedEvent(sender common.Address, oldConfig commontype.ACP224FeeConfig, newConfig commontype.ACP224FeeConfig) ([]common.Hash, []byte, error) {
 	return ACP224FeeManagerABI.PackEvent("FeeConfigUpdated", sender, toABIFeeConfig(oldConfig), toABIFeeConfig(newConfig))
 }
 
-// UnpackFeeConfigUpdatedEventData attempts to unpack non-indexed [dataBytes].
+// UnpackFeeConfigUpdatedEventData decodes the non-indexed portion of a FeeConfigUpdated log.
 func UnpackFeeConfigUpdatedEventData(dataBytes []byte) (FeeConfigUpdatedEventData, error) {
 	abiData := abiFeeConfigUpdatedEventData{}
 	err := ACP224FeeManagerABI.UnpackIntoInterface(&abiData, "FeeConfigUpdated", dataBytes)
