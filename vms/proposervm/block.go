@@ -11,6 +11,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -142,7 +143,7 @@ func (p *postForkCommonComponents) Verify(
 		// has been synced up to this point yet.
 		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 		if err != nil {
-			p.vm.ctx.Log.Error("block verification failed",
+			p.logErrorUnlessDBClosed(err, "block verification failed",
 				zap.String("reason", "failed to get current P-Chain height"),
 				zap.Stringer("blkID", child.ID()),
 				zap.Error(err),
@@ -216,7 +217,7 @@ func (p *postForkCommonComponents) buildChild(
 	// is at least the parent's P-Chain height
 	pChainHeight, err := p.vm.selectChildPChainHeight(ctx, parentPChainHeight)
 	if err != nil {
-		p.vm.ctx.Log.Error("unexpected build block failure",
+		p.logErrorUnlessDBClosed(err, "unexpected build block failure",
 			zap.String("reason", "failed to calculate optimal P-chain height"),
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),
@@ -422,7 +423,7 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // block should be unsigned
 	case err != nil:
-		p.vm.ctx.Log.Error("unexpected block verification failure",
+		p.logErrorUnlessDBClosed(err, "unexpected block verification failure",
 			zap.String("reason", "failed to calculate expected proposer"),
 			zap.Stringer("blkID", blk.ID()),
 			zap.Error(err),
@@ -462,7 +463,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 		)
 		return false, err
 	case err != nil:
-		p.vm.ctx.Log.Error("unexpected build block failure",
+		p.logErrorUnlessDBClosed(err, "unexpected build block failure",
 			zap.String("reason", "failed to calculate expected proposer"),
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),
@@ -531,4 +532,15 @@ func (p *postForkCommonComponents) logWarnOrError() func(msg string, fields ...z
 		return p.vm.ctx.Log.Warn
 	}
 	return p.vm.ctx.Log.Error
+}
+
+// logErrorUnlessDBClosed logs at Error unless err wraps database.ErrClosed,
+// in which case it logs at Warn. A closed database is expected during
+// graceful shutdown when the P-chain tears down before the C-chain.
+func (p *postForkCommonComponents) logErrorUnlessDBClosed(err error, msg string, fields ...zap.Field) {
+	if errors.Is(err, database.ErrClosed) {
+		p.vm.ctx.Log.Warn(msg, fields...)
+		return
+	}
+	p.vm.ctx.Log.Error(msg, fields...)
 }
