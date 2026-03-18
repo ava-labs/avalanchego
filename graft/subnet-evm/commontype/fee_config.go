@@ -224,45 +224,27 @@ var (
 	ErrTimeToDoubleMustBeZero           = errors.New("timeToDouble must be 0 when staticPricing is true")
 	ErrTargetGasExceedsHashLengthACP224 = errors.New("targetGas exceeds hash length")
 	ErrMinGasPriceExceedsHashLength      = errors.New("minGasPrice exceeds hash length")
-	ErrTimeToDoubleExceedsHashLength     = errors.New("timeToDouble exceeds hash length")
-)
-
-// Verify checks fields of this ACP224FeeConfig to ensure a valid configuration is provided.
 func (a *ACP224FeeConfig) Verify() error {
 	switch {
 	case a.TargetGas == nil:
-		return ErrTargetGasNilACP224
+		return errTargetGasNilACP224
 	case a.MinGasPrice == nil:
-		return ErrMinGasPriceNil
+		return errMinGasPriceNil
 	case a.TimeToDouble == nil:
-		return ErrTimeToDoubleNil
+		return errTimeToDoubleNil
+	case a.MinGasPrice.Sign() <= 0:
+		return errMinGasPriceTooLow
+	case a.ValidatorTargetGas && a.TargetGas.Sign() != 0:
+		return errTargetGasMustBeZero
+	case !a.ValidatorTargetGas && a.TargetGas.Cmp(minTargetGasACP224) < 0:
+		return errTargetGasTooLowACP224
+	case a.StaticPricing && a.TimeToDouble.Sign() != 0:
+		return errTimeToDoubleMustBeZero
+	case !a.StaticPricing && a.TimeToDouble.Sign() <= 0:
+		return errTimeToDoubleTooLow
+	default:
+		return a.checkByteLens()
 	}
-
-	if a.MinGasPrice.Sign() <= 0 {
-		return ErrMinGasPriceTooLow
-	}
-
-	if a.ValidatorTargetGas {
-		if a.TargetGas.Sign() != 0 {
-			return ErrTargetGasMustBeZero
-		}
-	} else {
-		if a.TargetGas.Cmp(minTargetGasACP224) < 0 {
-			return ErrTargetGasTooLowACP224
-		}
-	}
-
-	if a.StaticPricing {
-		if a.TimeToDouble.Sign() != 0 {
-			return ErrTimeToDoubleMustBeZero
-		}
-	} else {
-		if a.TimeToDouble.Sign() <= 0 {
-			return ErrTimeToDoubleTooLow
-		}
-	}
-
-	return a.checkByteLens()
 }
 
 // Equal checks if given [other] is same with this ACP224FeeConfig.
