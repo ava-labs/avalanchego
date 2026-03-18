@@ -298,6 +298,18 @@ func TestStoreFeeConfigNilBlockNumber(t *testing.T) {
 	require.ErrorIs(t, err, acp224feemanager.ErrNilBlockNumber, "StoreFeeConfig(testFeeConfig, nil)")
 }
 
+func TestStoreFeeConfigInvalidConfig(t *testing.T) {
+	state := newTestStateDB()
+
+	invalidConfig := commontype.ACP224FeeConfig{
+		TargetGas:    commontype.MinTargetGasACP224,
+		MinGasPrice:  0, // invalid: must be > 0
+		TimeToDouble: 60,
+	}
+	err := acp224feemanager.StoreFeeConfig(state, invalidConfig, testBlockNumber)
+	require.ErrorIs(t, err, commontype.ErrMinGasPriceTooLow, "StoreFeeConfig(invalidConfig, testBlockNumber)")
+}
+
 func newTestStateDB() *extstate.StateDB {
 	db := rawdb.NewMemoryDatabase()
 	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)

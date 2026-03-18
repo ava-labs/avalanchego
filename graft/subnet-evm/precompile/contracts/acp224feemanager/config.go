@@ -62,10 +62,6 @@ func (c *Config) Equal(cfg precompileconfig.Config) bool {
 		return false
 	}
 
-	if c.InitialFeeConfig == nil {
-		return other.InitialFeeConfig == nil
-	}
-
 	return c.InitialFeeConfig.Equal(other.InitialFeeConfig)
 }
 

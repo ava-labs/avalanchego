@@ -52,7 +52,7 @@ var (
 	feeConfigLastChangedAtKey    = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
 
 	ErrCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
-	ErrUint64Overflow     = errors.New("value overflows uint64")
+	ErrInvalidUint64      = errors.New("value is not a valid uint64")
 	ErrNilBigInt          = errors.New("nil big.Int value")
 	ErrNilBlockNumber     = errors.New("block number cannot be nil")
 
@@ -98,7 +98,7 @@ func fromABIFeeConfig(c abiFeeConfig) (commontype.ACP224FeeConfig, error) {
 			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrNilBigInt, field.name)
 		}
 		if field.val.Sign() < 0 || field.val.Cmp(maxUint64) > 0 {
-			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrUint64Overflow, field.name)
+			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrInvalidUint64, field.name)
 		}
 	}
 	return commontype.ACP224FeeConfig{
