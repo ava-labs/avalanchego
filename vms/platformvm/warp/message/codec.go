@@ -25,8 +25,8 @@ func init() {
 		lc.RegisterType(&L1ValidatorRegistration{}),
 		lc.RegisterType(&L1ValidatorWeight{}),
 		lc.RegisterType(&ValidatorSetMetadata{}),
-		lc.RegisterType(&ValidatorSetState{}),
 		lc.RegisterType(&ValidatorSetDiff{}),
+		lc.RegisterType(&ValidatorSetState{}),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {
