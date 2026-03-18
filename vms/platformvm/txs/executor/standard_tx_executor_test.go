@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
@@ -1196,7 +1197,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 func TestDurangoMemoField(t *testing.T) {
 	type test struct {
 		name      string
-		setupTest func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff)
+		setupTest func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff)
 	}
 
 	owners := &secp256k1fx.OutputOwners{
@@ -1207,7 +1208,7 @@ func TestDurangoMemoField(t *testing.T) {
 	tests := []test{
 		{
 			name: "AddSubnetValidatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				var primaryValidator *state.Staker
@@ -1248,7 +1249,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "CreateChainTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				subnetID := testSubnet1.ID()
@@ -1273,7 +1274,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "CreateSubnetTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				wallet := newWallet(t, env, walletConfig{})
@@ -1290,7 +1291,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "ImportTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				var (
@@ -1329,7 +1330,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "ExportTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				wallet := newWallet(t, env, walletConfig{})
@@ -1353,7 +1354,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "RemoveSubnetValidatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				var primaryValidator *state.Staker
@@ -1411,7 +1412,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "TransformSubnetTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				subnetID := testSubnet1.ID()
@@ -1445,7 +1446,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "AddPermissionlessValidatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 				var (
 					nodeID    = ids.GenerateTestNodeID()
@@ -1484,7 +1485,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "AddPermissionlessDelegatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				var primaryValidator *state.Staker
@@ -1524,7 +1525,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "TransferSubnetOwnershipTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				subnetID := testSubnet1.ID()
@@ -1546,7 +1547,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			name: "BaseTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, state.Diff) {
+			setupTest: func(t *testing.T, env *environment, memoField []byte) (*txs.Tx, *state.Diff) {
 				require := require.New(t)
 
 				wallet := newWallet(t, env, walletConfig{})
@@ -1699,8 +1700,23 @@ type removeSubnetValidatorTxVerifyEnv struct {
 	flowChecker    *utxomock.Verifier
 	unsignedTx     *txs.RemoveSubnetValidatorTx
 	tx             *txs.Tx
-	state          *state.MockDiff
+	state          *state.Diff
+	stateChain     *state.MockChain
 	staker         *state.Staker
+}
+
+// newMockDiffFromChain creates a *state.Diff backed by a MockChain with creation-time expectations set.
+func newMockDiffFromChain(t *testing.T, ctrl *gomock.Controller, latestForkTime time.Time) (*state.MockChain, *state.Diff) {
+	t.Helper()
+	chain := state.NewMockChain(ctrl)
+	chain.EXPECT().GetTimestamp().Return(latestForkTime).AnyTimes()
+	chain.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
+	chain.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
+	chain.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	chain.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
+	d, err := state.NewDiffOn(chain, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(t, err)
+	return chain, d
 }
 
 // Returns mock implementations that can be used in tests
@@ -1712,14 +1728,15 @@ func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Control
 	mockFx := fxmock.NewFx(ctrl)
 	mockFlowChecker := utxomock.NewVerifier(ctrl)
 	unsignedTx, tx := newRemoveSubnetValidatorTx(t)
-	mockState := state.NewMockDiff(ctrl)
+	mockChain, stateDiff := newMockDiffFromChain(t, ctrl, now)
 	return removeSubnetValidatorTxVerifyEnv{
 		latestForkTime: now,
 		fx:             mockFx,
 		flowChecker:    mockFlowChecker,
 		unsignedTx:     unsignedTx,
 		tx:             tx,
-		state:          mockState,
+		state:          stateDiff,
+		stateChain:     mockChain,
 		staker: &state.Staker{
 			TxID:     ids.GenerateTestID(),
 			NodeID:   ids.GenerateTestNodeID(),
@@ -1740,24 +1757,20 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "valid tx",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-
+				env.state.SetTimestamp(env.latestForkTime)
 				// Set dependency expectations.
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
+				env.stateChain.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
 				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
+				env.stateChain.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 				env.flowChecker.EXPECT().VerifySpend(
 					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
 				).Return(nil).Times(1)
-				env.state.EXPECT().DeleteCurrentValidator(env.staker)
-				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
-				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
 				// This isn't actually called, but is added here as a regression
 				// test to ensure that converted subnets can still remove
 				// permissioned validators.
-				env.state.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
+				env.stateChain.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
 					state.SubnetToL1Conversion{
 						ConversionID: ids.GenerateTestID(),
 						ChainID:      ids.GenerateTestID(),
@@ -1792,8 +1805,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				// Setting the subnet ID to the Primary Network ID makes the tx fail syntactic verification
 				env.tx.Unsigned.(*txs.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+				_, localState := newMockDiffFromChain(t, ctrl, env.latestForkTime)
+				env.state = localState
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -1819,10 +1832,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "node isn't a validator of the subnet",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
-				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
+				localChain, localState := newMockDiffFromChain(t, ctrl, env.latestForkTime)
+				localChain.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
+				localChain.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
+				env.state = localState
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -1853,8 +1866,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				staker.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
 
 				// Set dependency expectations.
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
+				env.state.SetTimestamp(env.latestForkTime)
+				env.stateChain.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -1880,10 +1893,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "can't find subnet",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
+				localChain, localState := newMockDiffFromChain(t, ctrl, env.latestForkTime)
+				localChain.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				localChain.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
+				env.state = localState
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -1911,11 +1924,11 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				// Remove credentials
 				env.tx.Creds = nil
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				localChain, localState := newMockDiffFromChain(t, ctrl, env.latestForkTime)
+				localChain.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).AnyTimes()
+				localChain.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).AnyTimes()
+				env.state = localState
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -1941,12 +1954,12 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "no permission to remove validator",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				localChain, localState := newMockDiffFromChain(t, ctrl, env.latestForkTime)
+				localChain.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
+				localChain.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
+				env.state = localState
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -1972,15 +1985,15 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "flow checker failed",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				localChain, localState := newMockDiffFromChain(t, ctrl, env.latestForkTime)
+				localChain.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
+				localChain.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(errTest)
+				env.state = localState
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -2096,7 +2109,8 @@ type transformSubnetTxVerifyEnv struct {
 	flowChecker    *utxomock.Verifier
 	unsignedTx     *txs.TransformSubnetTx
 	tx             *txs.Tx
-	state          *state.MockDiff
+	state          *state.Diff
+	stateChain     *state.MockChain
 }
 
 // Returns mock implementations that can be used in tests
@@ -2108,14 +2122,15 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 	mockFx := fxmock.NewFx(ctrl)
 	mockFlowChecker := utxomock.NewVerifier(ctrl)
 	unsignedTx, tx := newTransformSubnetTx(t)
-	mockState := state.NewMockDiff(ctrl)
+	mockChain, state := newMockDiffFromChain(t, ctrl, now)
 	return transformSubnetTxVerifyEnv{
 		latestForkTime: now,
 		fx:             mockFx,
 		flowChecker:    mockFlowChecker,
 		unsignedTx:     unsignedTx,
 		tx:             tx,
-		state:          mockState,
+		state:          state,
+		stateChain:     mockChain,
 	}
 }
 
@@ -2133,8 +2148,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				// Setting the tx to nil makes the tx fail syntactic verification
 				env.tx.Unsigned = (*txs.TransformSubnetTx)(nil)
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+				localChain, localState := newMockDiffFromChain(t, ctrl, env.latestForkTime)
+				_ = localChain
+				env.state = localState
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -2161,8 +2177,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *standardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				env.unsignedTx.MaxStakeDuration = math.MaxUint32
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+				localChain, localState := newMockDiffFromChain(t, ctrl, env.latestForkTime)
+				_ = localChain
+				env.state = localState
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -2190,10 +2207,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				// Remove credentials
 				env.tx.Creds = nil
-				env.state = state.NewMockDiff(ctrl)
+				localChain, localState := newMockDiffFromChain(t, ctrl, env.latestForkTime)
 				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).AnyTimes()
+				localChain.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).AnyTimes()
+				env.state = localState
 
 				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -2221,19 +2238,19 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			name: "flow checker failed",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *standardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
-				env.state = state.NewMockDiff(ctrl)
+				localChain, localState := newMockDiffFromChain(t, ctrl, env.latestForkTime)
 				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
-				env.state.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
+				localChain.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
+				localChain.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
 					state.SubnetToL1Conversion{},
 					database.ErrNotFound,
 				).Times(1)
-				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
+				localChain.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(ErrFlowCheckFailed)
+				env.state = localState
 
 				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -2264,9 +2281,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 				// Set dependency expectations.
 				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
-				env.state.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
+				env.stateChain.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
+				env.stateChain.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
 					state.SubnetToL1Conversion{
 						ConversionID: ids.GenerateTestID(),
 						ChainID:      ids.GenerateTestID(),
@@ -2274,7 +2290,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					},
 					nil,
 				)
-				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
+				env.stateChain.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 
 				cfg := &config.Internal{
@@ -2305,21 +2321,16 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 				// Set dependency expectations.
 				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
-				env.state.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
+				env.stateChain.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
+				env.stateChain.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
 					state.SubnetToL1Conversion{},
 					database.ErrNotFound,
 				).Times(1)
-				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
+				env.stateChain.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 				env.flowChecker.EXPECT().VerifySpend(
 					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
 				).Return(nil).Times(1)
-				env.state.EXPECT().AddSubnetTransformation(env.tx)
-				env.state.EXPECT().SetCurrentSupply(env.unsignedTx.Subnet, env.unsignedTx.InitialSupply)
-				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
-				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
 				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
