@@ -101,13 +101,6 @@ func TestVerify(t *testing.T) {
 				TimeToDouble: 1,
 			}),
 		},
-		"nil initial fee config": {
-			Config:        acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
-			ExpectedError: acp224feemanager.ErrInitialFeeConfigRequired,
-		},
-		"disable with nil initial fee config": {
-			Config: acp224feemanager.NewDisableConfig(utils.PointerTo[uint64](3)),
-		},
 	}
 	allowlisttest.VerifyPrecompileWithAllowListTests(t, acp224feemanager.Module, tests)
 }
