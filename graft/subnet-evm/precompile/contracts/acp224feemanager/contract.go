@@ -6,6 +6,7 @@ package acp224feemanager
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/ava-labs/libevm/accounts/abi"
@@ -38,7 +39,7 @@ const (
 
 var (
 	// Singleton StatefulPrecompiledContract for setting fee configs by permissioned callers.
-	ACP224FeeManagerPrecompile contract.StatefulPrecompiledContract = createACP224FeeManagerPrecompile()
+	ACP224FeeManagerPrecompile = createACP224FeeManagerPrecompile()
 
 	// Storage layout uses namespaced keys to prevent collisions with allowlist and other precompile state.
 	// AllowList uses common.BytesToHash(address.Bytes()) (zero-left-padded addresses) for role storage,
@@ -50,7 +51,9 @@ var (
 	timeToDoubleStorageKey       = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'd'}
 	feeConfigLastChangedAtKey    = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
 
-	ErrCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
+	ErrCannotSetFeeConfig  = errors.New("non-enabled cannot call setFeeConfig")
+	ErrUint64Overflow      = errors.New("value overflows uint64")
+	ErrNilBlockNumber      = errors.New("block number cannot be nil")
 
 	// IACP224FeeManagerRawABI contains the raw ABI of ACP224FeeManager contract.
 	//go:embed IACP224FeeManager.abi
@@ -79,14 +82,28 @@ func toABIFeeConfig(c commontype.ACP224FeeConfig) abiFeeConfig {
 	}
 }
 
-func fromABIFeeConfig(c abiFeeConfig) commontype.ACP224FeeConfig {
+var maxUint64 = new(big.Int).SetUint64(math.MaxUint64)
+
+func fromABIFeeConfig(c abiFeeConfig) (commontype.ACP224FeeConfig, error) {
+	for _, field := range []struct {
+		name string
+		val  *big.Int
+	}{
+		{"targetGas", c.TargetGas},
+		{"minGasPrice", c.MinGasPrice},
+		{"timeToDouble", c.TimeToDouble},
+	} {
+		if field.val.Sign() < 0 || field.val.Cmp(maxUint64) > 0 {
+			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrUint64Overflow, field.name)
+		}
+	}
 	return commontype.ACP224FeeConfig{
 		ValidatorTargetGas: c.ValidatorTargetGas,
 		TargetGas:          c.TargetGas.Uint64(),
 		StaticPricing:      c.StaticPricing,
 		MinGasPrice:        c.MinGasPrice.Uint64(),
 		TimeToDouble:       c.TimeToDouble.Uint64(),
-	}
+	}, nil
 }
 
 // GetACP224FeeManagerAllowListStatus returns the role of [address] for the ACP224FeeManager list.
@@ -135,6 +152,9 @@ func GetFeeConfigLastChangedAt(stateDB contract.StateReader) *big.Int {
 // StoreFeeConfig stores given [feeConfig] and [blockNumber] to the [stateDB].
 // A validation on [feeConfig] is done before storing.
 func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.ACP224FeeConfig, blockNumber *big.Int) error {
+	if blockNumber == nil {
+		return ErrNilBlockNumber
+	}
 	if err := feeConfig.Verify(); err != nil {
 		return fmt.Errorf("cannot verify fee config: %w", err)
 	}
@@ -171,7 +191,7 @@ func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
 		return commontype.ACP224FeeConfig{}, err
 	}
 	abiConfig := *abi.ConvertType(res[0], new(abiFeeConfig)).(*abiFeeConfig)
-	return fromABIFeeConfig(abiConfig), nil
+	return fromABIFeeConfig(abiConfig)
 }
 
 func setFeeConfig(
@@ -227,7 +247,7 @@ func setFeeConfig(
 	return []byte{}, remainingGas, nil
 }
 
-// PackGetFeeConfig packs the include selector (first 4 func signature bytes).
+// PackGetFeeConfig packs the input including selector (first 4 func signature bytes).
 // This function is mostly used for tests.
 func PackGetFeeConfig() ([]byte, error) {
 	return ACP224FeeManagerABI.Pack("getFeeConfig")
@@ -249,7 +269,7 @@ func UnpackGetFeeConfigOutput(output []byte) (commontype.ACP224FeeConfig, error)
 		return commontype.ACP224FeeConfig{}, err
 	}
 	abiConfig := *abi.ConvertType(res[0], new(abiFeeConfig)).(*abiFeeConfig)
-	return fromABIFeeConfig(abiConfig), nil
+	return fromABIFeeConfig(abiConfig)
 }
 
 func getFeeConfig(
@@ -275,7 +295,7 @@ func getFeeConfig(
 	return output, remainingGas, err
 }
 
-// PackGetFeeConfigLastChangedAt packs the include selector (first 4 func signature bytes).
+// PackGetFeeConfigLastChangedAt packs the input including selector (first 4 func signature bytes).
 // This function is mostly used for tests.
 func PackGetFeeConfigLastChangedAt() ([]byte, error) {
 	return ACP224FeeManagerABI.Pack("getFeeConfigLastChangedAt")

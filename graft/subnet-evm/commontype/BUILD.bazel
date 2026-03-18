@@ -18,7 +18,10 @@ go_library(
 
 graft_go_test(
     name = "commontype_test",
-    srcs = ["fee_config_test.go"],
+    srcs = [
+        "acp224_fee_config_test.go",
+        "fee_config_test.go",
+    ],
     embed = [":commontype"],
     deps = ["@com_github_stretchr_testify//require"],
 )

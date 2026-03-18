@@ -32,11 +32,23 @@ var (
 
 	testBlockNumber = big.NewInt(7)
 
-	tests = []precompiletest.PrecompileTest{
-		// getFeeConfig tests - all roles should be able to read
-		{
-			Name:       "calling_getFeeConfig_from_NoRole_should_succeed",
-			Caller:     allowlisttest.TestNoRoleAddr,
+	tests []precompiletest.PrecompileTest
+)
+
+func init() {
+	// getFeeConfig tests - all roles should be able to read
+	for _, role := range []struct {
+		name string
+		addr common.Address
+	}{
+		{"NoRole", allowlisttest.TestNoRoleAddr},
+		{"Enabled", allowlisttest.TestEnabledAddr},
+		{"Manager", allowlisttest.TestManagerAddr},
+		{"Admin", allowlisttest.TestAdminAddr},
+	} {
+		tests = append(tests, precompiletest.PrecompileTest{
+			Name:       "calling_getFeeConfig_from_" + role.name + "_should_succeed",
+			Caller:     role.addr,
 			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
 				input, err := acp224feemanager.PackGetFeeConfig()
@@ -52,65 +64,11 @@ var (
 				}
 				return res
 			}(),
-		},
-		{
-			Name:       "calling_getFeeConfig_from_Enabled_should_succeed",
-			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
-			InputFn: func(t testing.TB) []byte {
-				input, err := acp224feemanager.PackGetFeeConfig()
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
-			ReadOnly:    true,
-			ExpectedRes: func() []byte {
-				res, err := acp224feemanager.PackGetFeeConfigOutput(zeroFeeConfig)
-				if err != nil {
-					panic(err)
-				}
-				return res
-			}(),
-		},
-		{
-			Name:       "calling_getFeeConfig_from_Manager_should_succeed",
-			Caller:     allowlisttest.TestManagerAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
-			InputFn: func(t testing.TB) []byte {
-				input, err := acp224feemanager.PackGetFeeConfig()
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
-			ReadOnly:    true,
-			ExpectedRes: func() []byte {
-				res, err := acp224feemanager.PackGetFeeConfigOutput(zeroFeeConfig)
-				if err != nil {
-					panic(err)
-				}
-				return res
-			}(),
-		},
-		{
-			Name:       "calling_getFeeConfig_from_Admin_should_succeed",
-			Caller:     allowlisttest.TestAdminAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
-			InputFn: func(t testing.TB) []byte {
-				input, err := acp224feemanager.PackGetFeeConfig()
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
-			ReadOnly:    true,
-			ExpectedRes: func() []byte {
-				res, err := acp224feemanager.PackGetFeeConfigOutput(zeroFeeConfig)
-				if err != nil {
-					panic(err)
-				}
-				return res
-			}(),
-		},
-		{
+		})
+	}
+
+	tests = append(tests,
+		precompiletest.PrecompileTest{
 			Name:   "get_fee_config_after_setting_returns_new_config",
 			Caller: allowlisttest.TestEnabledAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
@@ -132,7 +90,7 @@ var (
 				return res
 			}(),
 		},
-		{
+		precompiletest.PrecompileTest{
 			Name:   "insufficient_gas_for_getFeeConfig_should_fail",
 			Caller: allowlisttest.TestNoRoleAddr,
 			InputFn: func(t testing.TB) []byte {
@@ -144,10 +102,21 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 		},
-		// getFeeConfigLastChangedAt tests - all roles should be able to read
-		{
-			Name:   "calling_getFeeConfigLastChangedAt_from_NoRole_should_succeed",
-			Caller: allowlisttest.TestNoRoleAddr,
+	)
+
+	// getFeeConfigLastChangedAt tests - all roles should be able to read
+	for _, role := range []struct {
+		name string
+		addr common.Address
+	}{
+		{"NoRole", allowlisttest.TestNoRoleAddr},
+		{"Enabled", allowlisttest.TestEnabledAddr},
+		{"Manager", allowlisttest.TestManagerAddr},
+		{"Admin", allowlisttest.TestAdminAddr},
+	} {
+		tests = append(tests, precompiletest.PrecompileTest{
+			Name:   "calling_getFeeConfigLastChangedAt_from_" + role.name + "_should_succeed",
+			Caller: role.addr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
 				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
@@ -172,120 +141,49 @@ var (
 				lastChangedAt := acp224feemanager.GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testBlockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
 			},
+		})
+	}
+
+	tests = append(tests, precompiletest.PrecompileTest{
+		Name:   "insufficient_gas_for_getFeeConfigLastChangedAt_should_fail",
+		Caller: allowlisttest.TestNoRoleAddr,
+		InputFn: func(t testing.TB) []byte {
+			input, err := acp224feemanager.PackGetFeeConfigLastChangedAt()
+			require.NoError(t, err)
+			return input
 		},
-		{
-			Name:   "calling_getFeeConfigLastChangedAt_from_Enabled_should_succeed",
-			Caller: allowlisttest.TestEnabledAddr,
-			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
-				allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
-				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
-			},
-			InputFn: func(t testing.TB) []byte {
-				input, err := acp224feemanager.PackGetFeeConfigLastChangedAt()
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost,
-			ReadOnly:    true,
-			ExpectedRes: func() []byte {
-				res, err := acp224feemanager.PackGetFeeConfigLastChangedAtOutput(testBlockNumber)
-				if err != nil {
-					panic(err)
-				}
-				return res
-			}(),
-			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := acp224feemanager.GetStoredFeeConfig(state)
-				require.Equal(t, testFeeConfig, feeConfig, "GetStoredFeeConfig()")
-				lastChangedAt := acp224feemanager.GetFeeConfigLastChangedAt(state)
-				require.Equal(t, testBlockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
-			},
+		SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost - 1,
+		ReadOnly:    false,
+		ExpectedErr: vm.ErrOutOfGas,
+	})
+
+	// setFeeConfig tests - NoRole should fail
+	tests = append(tests, precompiletest.PrecompileTest{
+		Name:       "calling_setFeeConfig_from_NoRole_should_fail",
+		Caller:     allowlisttest.TestNoRoleAddr,
+		BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
+		InputFn: func(t testing.TB) []byte {
+			input, err := acp224feemanager.PackSetFeeConfig(testFeeConfig)
+			require.NoError(t, err)
+			return input
 		},
-		{
-			Name:   "calling_getFeeConfigLastChangedAt_from_Manager_should_succeed",
-			Caller: allowlisttest.TestManagerAddr,
-			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
-				allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
-				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
-			},
-			InputFn: func(t testing.TB) []byte {
-				input, err := acp224feemanager.PackGetFeeConfigLastChangedAt()
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost,
-			ReadOnly:    true,
-			ExpectedRes: func() []byte {
-				res, err := acp224feemanager.PackGetFeeConfigLastChangedAtOutput(testBlockNumber)
-				if err != nil {
-					panic(err)
-				}
-				return res
-			}(),
-			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := acp224feemanager.GetStoredFeeConfig(state)
-				require.Equal(t, testFeeConfig, feeConfig, "GetStoredFeeConfig()")
-				lastChangedAt := acp224feemanager.GetFeeConfigLastChangedAt(state)
-				require.Equal(t, testBlockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
-			},
-		},
-		{
-			Name:   "calling_getFeeConfigLastChangedAt_from_Admin_should_succeed",
-			Caller: allowlisttest.TestAdminAddr,
-			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
-				allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
-				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
-			},
-			InputFn: func(t testing.TB) []byte {
-				input, err := acp224feemanager.PackGetFeeConfigLastChangedAt()
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost,
-			ReadOnly:    true,
-			ExpectedRes: func() []byte {
-				res, err := acp224feemanager.PackGetFeeConfigLastChangedAtOutput(testBlockNumber)
-				if err != nil {
-					panic(err)
-				}
-				return res
-			}(),
-			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := acp224feemanager.GetStoredFeeConfig(state)
-				require.Equal(t, testFeeConfig, feeConfig, "GetStoredFeeConfig()")
-				lastChangedAt := acp224feemanager.GetFeeConfigLastChangedAt(state)
-				require.Equal(t, testBlockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
-			},
-		},
-		{
-			Name:   "insufficient_gas_for_getFeeConfigLastChangedAt_should_fail",
-			Caller: allowlisttest.TestNoRoleAddr,
-			InputFn: func(t testing.TB) []byte {
-				input, err := acp224feemanager.PackGetFeeConfigLastChangedAt()
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost - 1,
-			ReadOnly:    false,
-			ExpectedErr: vm.ErrOutOfGas,
-		},
-		// setFeeConfig tests - only Enabled, Manager, and Admin should succeed
-		{
-			Name:       "calling_setFeeConfig_from_NoRole_should_fail",
-			Caller:     allowlisttest.TestNoRoleAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
-			InputFn: func(t testing.TB) []byte {
-				input, err := acp224feemanager.PackSetFeeConfig(testFeeConfig)
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
-			ReadOnly:    false,
-			ExpectedErr: acp224feemanager.ErrCannotSetFeeConfig,
-		},
-		{
-			Name:       "calling_setFeeConfig_from_Enabled_should_succeed",
-			Caller:     allowlisttest.TestEnabledAddr,
+		SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
+		ReadOnly:    false,
+		ExpectedErr: acp224feemanager.ErrCannotSetFeeConfig,
+	})
+
+	// setFeeConfig tests - Enabled, Manager, and Admin should succeed
+	for _, role := range []struct {
+		name string
+		addr common.Address
+	}{
+		{"Enabled", allowlisttest.TestEnabledAddr},
+		{"Manager", allowlisttest.TestManagerAddr},
+		{"Admin", allowlisttest.TestAdminAddr},
+	} {
+		tests = append(tests, precompiletest.PrecompileTest{
+			Name:       "calling_setFeeConfig_from_" + role.name + "_should_succeed",
+			Caller:     role.addr,
 			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
 				input, err := acp224feemanager.PackSetFeeConfig(testFeeConfig)
@@ -299,42 +197,11 @@ var (
 				feeConfig := acp224feemanager.GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig, "GetStoredFeeConfig()")
 			},
-		},
-		{
-			Name:       "calling_setFeeConfig_from_Manager_should_succeed",
-			Caller:     allowlisttest.TestManagerAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
-			InputFn: func(t testing.TB) []byte {
-				input, err := acp224feemanager.PackSetFeeConfig(testFeeConfig)
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
-			ReadOnly:    false,
-			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := acp224feemanager.GetStoredFeeConfig(state)
-				require.Equal(t, testFeeConfig, feeConfig, "GetStoredFeeConfig()")
-			},
-		},
-		{
-			Name:       "calling_setFeeConfig_from_Admin_should_succeed",
-			Caller:     allowlisttest.TestAdminAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
-			InputFn: func(t testing.TB) []byte {
-				input, err := acp224feemanager.PackSetFeeConfig(testFeeConfig)
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
-			ReadOnly:    false,
-			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := acp224feemanager.GetStoredFeeConfig(state)
-				require.Equal(t, testFeeConfig, feeConfig, "GetStoredFeeConfig()")
-			},
-		},
-		{
+		})
+	}
+
+	tests = append(tests,
+		precompiletest.PrecompileTest{
 			Name:   "readOnly_setFeeConfig_should_fail",
 			Caller: allowlisttest.TestEnabledAddr,
 			InputFn: func(t testing.TB) []byte {
@@ -346,7 +213,7 @@ var (
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection,
 		},
-		{
+		precompiletest.PrecompileTest{
 			Name:   "insufficient_gas_for_setFeeConfig_should_fail",
 			Caller: allowlisttest.TestEnabledAddr,
 			InputFn: func(t testing.TB) []byte {
@@ -358,7 +225,7 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 		},
-		{
+		precompiletest.PrecompileTest{
 			Name:       "set_config_emits_event_with_correct_data",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
@@ -387,8 +254,8 @@ var (
 				require.Equal(t, acp224feemanager.ContractAddress, logs[0].Address, "expected log address to be precompile address")
 			},
 		},
-	}
-)
+	)
+}
 
 func TestACP224FeeManagerRun(t *testing.T) {
 	precompiletest.RunPrecompileTests(t, acp224feemanager.Module, tests)

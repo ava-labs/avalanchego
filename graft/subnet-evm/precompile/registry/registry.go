@@ -7,7 +7,8 @@ package registry
 // Force imports of each precompile to ensure each precompile's init function runs and registers itself
 // with the registry.
 import (
-	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager"
+	// TODO(JonathanOppenheimer): Uncomment when acp224feemanager init() registration is enabled.
+	// _ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"

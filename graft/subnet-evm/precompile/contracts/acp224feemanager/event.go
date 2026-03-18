@@ -34,8 +34,16 @@ func UnpackFeeConfigUpdatedEventData(dataBytes []byte) (FeeConfigUpdatedEventDat
 	if err != nil {
 		return FeeConfigUpdatedEventData{}, err
 	}
+	oldConfig, err := fromABIFeeConfig(abiData.OldFeeConfig)
+	if err != nil {
+		return FeeConfigUpdatedEventData{}, err
+	}
+	newConfig, err := fromABIFeeConfig(abiData.NewFeeConfig)
+	if err != nil {
+		return FeeConfigUpdatedEventData{}, err
+	}
 	return FeeConfigUpdatedEventData{
-		OldFeeConfig: fromABIFeeConfig(abiData.OldFeeConfig),
-		NewFeeConfig: fromABIFeeConfig(abiData.NewFeeConfig),
+		OldFeeConfig: oldConfig,
+		NewFeeConfig: newConfig,
 	}, nil
 }

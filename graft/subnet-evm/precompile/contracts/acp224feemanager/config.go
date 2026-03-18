@@ -13,8 +13,7 @@ import (
 
 var _ precompileconfig.Config = (*Config)(nil)
 
-// Config implements the StatefulPrecompileConfig interface while adding in the
-// ACP224FeeManager specific precompile config.
+// Config holds the ACP-224 fee manager precompile configuration.
 type Config struct {
 	allowlist.AllowListConfig // Config for the fee config manager allow list
 	precompileconfig.Upgrade

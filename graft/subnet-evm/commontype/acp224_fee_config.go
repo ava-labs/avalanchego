@@ -64,8 +64,8 @@ func (a *ACP224FeeConfig) Verify() error {
 
 // Equal checks if given [other] is same with this ACP224FeeConfig.
 func (a *ACP224FeeConfig) Equal(other *ACP224FeeConfig) bool {
-	if other == nil {
-		return false
+	if a == nil || other == nil {
+		return a == other
 	}
 
 	return *a == *other
