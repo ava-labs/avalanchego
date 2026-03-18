@@ -39,9 +39,6 @@ on:
       runner:
         description: 'Runner to use in AvalancheGo'
         required: true
-      timeout-minutes:
-        description: 'Timeout in minutes'
-        default: ''
 
 jobs:
   configure-benchmark:
@@ -111,7 +108,7 @@ jobs:
             echo "block-dir-src=${{ inputs.block-dir-src }}" >> "$GITHUB_OUTPUT"
             echo "current-state-dir-src=${{ inputs.current-state-dir-src }}" >> "$GITHUB_OUTPUT"
             echo "runner=${{ inputs.runner }}" >> "$GITHUB_OUTPUT"
-            echo "timeout-minutes=${{ inputs.timeout-minutes }}" >> "$GITHUB_OUTPUT"
+            echo "timeout-minutes=720" >> "$GITHUB_OUTPUT" # Default 12h for manual dispatch
           fi
 
   benchmark:

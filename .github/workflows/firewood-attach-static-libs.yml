@@ -108,6 +108,8 @@ jobs:
     steps:
       - name: Determine branch name
         id: determine_branch
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.create_branch_name }}" ]]; then
             export target_branch="${{ github.event.inputs.create_branch_name }}"
@@ -122,7 +124,7 @@ jobs:
             echo "Using master-ci as target branch for push to master: $target_branch"
             echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            export target_branch="${{ github.event.pull_request.head.ref }}"
+            export target_branch="$PR_HEAD_REF"
             echo "Using PR head name as target branch: $target_branch"
             echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
           else
