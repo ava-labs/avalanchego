@@ -9,7 +9,7 @@ set -uo pipefail
 # After the grace period, the trap is replaced to forward
 # SIGTERM to the child so graceful shutdown works normally.
 
-readonly GRACE_PERIOD=3
+readonly GRACE_PERIOD=1
 
 trap 'exit 0' TERM
 
