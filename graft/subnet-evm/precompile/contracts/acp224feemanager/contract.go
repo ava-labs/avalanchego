@@ -295,10 +295,6 @@ func setFeeConfig(
 		return nil, remainingGas, err
 	}
 
-	if err := feeConfig.Verify(); err != nil {
-		return nil, remainingGas, err
-	}
-
 	oldConfig := GetStoredFeeConfig(stateDB)
 	topics, data, err := PackFeeConfigUpdatedEvent(
 		caller,
