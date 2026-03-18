@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
@@ -24,16 +23,12 @@ import (
 
 var (
 	testFeeConfig = commontype.ACP224FeeConfig{
-		TargetGas:    big.NewInt(10_000_000),
-		MinGasPrice:  common.Big1,
-		TimeToDouble: big.NewInt(60),
+		TargetGas:    10_000_000,
+		MinGasPrice:  1,
+		TimeToDouble: 60,
 	}
 
-	zeroFeeConfig = commontype.ACP224FeeConfig{
-		TargetGas:    new(big.Int),
-		MinGasPrice:  new(big.Int),
-		TimeToDouble: new(big.Int),
-	}
+	zeroFeeConfig = commontype.ACP224FeeConfig{}
 
 	testBlockNumber = big.NewInt(7)
 
@@ -119,10 +114,8 @@ var (
 			Name:   "get_fee_config_after_setting_returns_new_config",
 			Caller: allowlisttest.TestEnabledAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
-				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
-				blockContext.EXPECT().Number().Return(testBlockNumber).Times(1)
 				allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
-				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, blockContext), "StoreFeeConfig()")
+				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
 			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := acp224feemanager.PackGetFeeConfig()
@@ -156,10 +149,8 @@ var (
 			Name:   "calling_getFeeConfigLastChangedAt_from_NoRole_should_succeed",
 			Caller: allowlisttest.TestNoRoleAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
-				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
-				blockContext.EXPECT().Number().Return(testBlockNumber).Times(1)
 				allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
-				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, blockContext), "StoreFeeConfig()")
+				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
 			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := acp224feemanager.PackGetFeeConfigLastChangedAt()
@@ -186,10 +177,8 @@ var (
 			Name:   "calling_getFeeConfigLastChangedAt_from_Enabled_should_succeed",
 			Caller: allowlisttest.TestEnabledAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
-				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
-				blockContext.EXPECT().Number().Return(testBlockNumber).Times(1)
 				allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
-				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, blockContext), "StoreFeeConfig()")
+				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
 			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := acp224feemanager.PackGetFeeConfigLastChangedAt()
@@ -216,10 +205,8 @@ var (
 			Name:   "calling_getFeeConfigLastChangedAt_from_Manager_should_succeed",
 			Caller: allowlisttest.TestManagerAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
-				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
-				blockContext.EXPECT().Number().Return(testBlockNumber).Times(1)
 				allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
-				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, blockContext), "StoreFeeConfig()")
+				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
 			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := acp224feemanager.PackGetFeeConfigLastChangedAt()
@@ -246,10 +233,8 @@ var (
 			Name:   "calling_getFeeConfigLastChangedAt_from_Admin_should_succeed",
 			Caller: allowlisttest.TestAdminAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
-				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
-				blockContext.EXPECT().Number().Return(testBlockNumber).Times(1)
 				allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
-				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, blockContext), "StoreFeeConfig()")
+				require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
 			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := acp224feemanager.PackGetFeeConfigLastChangedAt()
@@ -410,13 +395,9 @@ func TestACP224FeeManagerRun(t *testing.T) {
 }
 
 func TestStoreFeeConfig(t *testing.T) {
-	ctrl := gomock.NewController(t)
 	state := newTestStateDB()
 
-	blockContext := contract.NewMockBlockContext(ctrl)
-	blockContext.EXPECT().Number().Return(testBlockNumber).Times(1)
-
-	err := acp224feemanager.StoreFeeConfig(state, testFeeConfig, blockContext)
+	err := acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber)
 	require.NoError(t, err, "StoreFeeConfig()")
 
 	got := acp224feemanager.GetStoredFeeConfig(state)
@@ -457,14 +438,14 @@ func TestPackUnpackGetFeeConfig(t *testing.T) {
 
 func TestPackUnpackFeeConfigUpdatedEventData(t *testing.T) {
 	oldFeeConfig := commontype.ACP224FeeConfig{
-		TargetGas:    big.NewInt(5_000_000),
-		MinGasPrice:  common.Big1,
-		TimeToDouble: big.NewInt(30),
+		TargetGas:    5_000_000,
+		MinGasPrice:  1,
+		TimeToDouble: 30,
 	}
 	newFeeConfig := commontype.ACP224FeeConfig{
-		TargetGas:    big.NewInt(42_000_000),
-		MinGasPrice:  big.NewInt(42),
-		TimeToDouble: big.NewInt(42),
+		TargetGas:    42_000_000,
+		MinGasPrice:  42,
+		TimeToDouble: 42,
 	}
 
 	_, data, err := acp224feemanager.PackFeeConfigUpdatedEvent(

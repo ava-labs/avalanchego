@@ -15,15 +15,27 @@ type FeeConfigUpdatedEventData struct {
 	NewFeeConfig commontype.ACP224FeeConfig
 }
 
+// abiFeeConfigUpdatedEventData is the ABI-compatible representation using *big.Int fields.
+type abiFeeConfigUpdatedEventData struct {
+	OldFeeConfig abiFeeConfig
+	NewFeeConfig abiFeeConfig
+}
+
 // PackFeeConfigUpdatedEvent packs the event into the appropriate arguments for FeeConfigUpdated.
 // It returns topic hashes and the encoded non-indexed data.
 func PackFeeConfigUpdatedEvent(sender common.Address, oldConfig commontype.ACP224FeeConfig, newConfig commontype.ACP224FeeConfig) ([]common.Hash, []byte, error) {
-	return ACP224FeeManagerABI.PackEvent("FeeConfigUpdated", sender, oldConfig, newConfig)
+	return ACP224FeeManagerABI.PackEvent("FeeConfigUpdated", sender, toABIFeeConfig(oldConfig), toABIFeeConfig(newConfig))
 }
 
 // UnpackFeeConfigUpdatedEventData attempts to unpack non-indexed [dataBytes].
 func UnpackFeeConfigUpdatedEventData(dataBytes []byte) (FeeConfigUpdatedEventData, error) {
-	eventData := FeeConfigUpdatedEventData{}
-	err := ACP224FeeManagerABI.UnpackIntoInterface(&eventData, "FeeConfigUpdated", dataBytes)
-	return eventData, err
+	abiData := abiFeeConfigUpdatedEventData{}
+	err := ACP224FeeManagerABI.UnpackIntoInterface(&abiData, "FeeConfigUpdated", dataBytes)
+	if err != nil {
+		return FeeConfigUpdatedEventData{}, err
+	}
+	return FeeConfigUpdatedEventData{
+		OldFeeConfig: fromABIFeeConfig(abiData.OldFeeConfig),
+		NewFeeConfig: fromABIFeeConfig(abiData.NewFeeConfig),
+	}, nil
 }

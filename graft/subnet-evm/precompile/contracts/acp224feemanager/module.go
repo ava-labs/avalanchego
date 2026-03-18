@@ -31,13 +31,12 @@ var Module = modules.Module{
 
 type configurator struct{}
 
-func init() {
-	// Register the precompile module.
-	// Each precompile contract registers itself through [RegisterModule] function.
-	if err := modules.RegisterModule(Module); err != nil {
-		panic(err)
-	}
-}
+// TODO(JonathanOppenheimer): Register the precompile module when ready.
+// func init() {
+// 	if err := modules.RegisterModule(Module); err != nil {
+// 		panic(err)
+// 	}
+// }
 
 // MakeConfig returns a new precompile config instance.
 // This is required to Marshal/Unmarshal the precompile config.
@@ -54,7 +53,7 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 	}
 	// Store the initial fee config into the state when the fee manager activates.
 	if config.InitialFeeConfig != nil {
-		if err := StoreFeeConfig(state, *config.InitialFeeConfig, blockContext); err != nil {
+		if err := StoreFeeConfig(state, *config.InitialFeeConfig, blockContext.Number()); err != nil {
 			// This should not happen since we already checked this config with Verify()
 			return fmt.Errorf("cannot configure given initial fee config: %w", err)
 		}

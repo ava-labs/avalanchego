@@ -59,6 +59,36 @@ var (
 	ACP224FeeManagerABI = contract.ParseABI(ACP224FeeManagerRawABI)
 )
 
+// abiFeeConfig is the ABI-compatible representation of ACP224FeeConfig using *big.Int
+// fields to match the Solidity uint256 types.
+type abiFeeConfig struct {
+	ValidatorTargetGas bool
+	TargetGas          *big.Int
+	StaticPricing      bool
+	MinGasPrice        *big.Int
+	TimeToDouble       *big.Int
+}
+
+func toABIFeeConfig(c commontype.ACP224FeeConfig) abiFeeConfig {
+	return abiFeeConfig{
+		ValidatorTargetGas: c.ValidatorTargetGas,
+		TargetGas:          new(big.Int).SetUint64(c.TargetGas),
+		StaticPricing:      c.StaticPricing,
+		MinGasPrice:        new(big.Int).SetUint64(c.MinGasPrice),
+		TimeToDouble:       new(big.Int).SetUint64(c.TimeToDouble),
+	}
+}
+
+func fromABIFeeConfig(c abiFeeConfig) commontype.ACP224FeeConfig {
+	return commontype.ACP224FeeConfig{
+		ValidatorTargetGas: c.ValidatorTargetGas,
+		TargetGas:          c.TargetGas.Uint64(),
+		StaticPricing:      c.StaticPricing,
+		MinGasPrice:        c.MinGasPrice.Uint64(),
+		TimeToDouble:       c.TimeToDouble.Uint64(),
+	}
+}
+
 // GetACP224FeeManagerAllowListStatus returns the role of [address] for the ACP224FeeManager list.
 func GetACP224FeeManagerAllowListStatus(stateDB contract.StateReader, address common.Address) allowlist.Role {
 	return allowlist.GetAllowListStatus(stateDB, ContractAddress, address)
@@ -74,14 +104,25 @@ func SetACP224FeeManagerAllowListStatus(stateDB contract.StateDB, address common
 	allowlist.SetAllowListRole(stateDB, ContractAddress, address, role)
 }
 
+func hashToBool(h common.Hash) bool {
+	return h != (common.Hash{})
+}
+
+func boolToHash(b bool) common.Hash {
+	if b {
+		return common.BigToHash(common.Big1)
+	}
+	return common.Hash{}
+}
+
 // GetStoredFeeConfig returns fee config from contract storage in given state
 func GetStoredFeeConfig(stateDB contract.StateReader) commontype.ACP224FeeConfig {
 	return commontype.ACP224FeeConfig{
-		ValidatorTargetGas: stateDB.GetState(ContractAddress, validatorTargetGasStorageKey) != (common.Hash{}),
-		TargetGas:          stateDB.GetState(ContractAddress, targetGasStorageKey).Big(),
-		StaticPricing:      stateDB.GetState(ContractAddress, staticPricingStorageKey) != (common.Hash{}),
-		MinGasPrice:        stateDB.GetState(ContractAddress, minGasPriceStorageKey).Big(),
-		TimeToDouble:       stateDB.GetState(ContractAddress, timeToDoubleStorageKey).Big(),
+		ValidatorTargetGas: hashToBool(stateDB.GetState(ContractAddress, validatorTargetGasStorageKey)),
+		TargetGas:          stateDB.GetState(ContractAddress, targetGasStorageKey).Big().Uint64(),
+		StaticPricing:      hashToBool(stateDB.GetState(ContractAddress, staticPricingStorageKey)),
+		MinGasPrice:        stateDB.GetState(ContractAddress, minGasPriceStorageKey).Big().Uint64(),
+		TimeToDouble:       stateDB.GetState(ContractAddress, timeToDoubleStorageKey).Big().Uint64(),
 	}
 }
 
@@ -91,31 +132,18 @@ func GetFeeConfigLastChangedAt(stateDB contract.StateReader) *big.Int {
 	return val.Big()
 }
 
-// StoreFeeConfig stores given [feeConfig] and block number in the [blockContext] to the [stateDB].
+// StoreFeeConfig stores given [feeConfig] and [blockNumber] to the [stateDB].
 // A validation on [feeConfig] is done before storing.
-func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.ACP224FeeConfig, blockContext contract.ConfigurationBlockContext) error {
+func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.ACP224FeeConfig, blockNumber *big.Int) error {
 	if err := feeConfig.Verify(); err != nil {
 		return fmt.Errorf("cannot verify fee config: %w", err)
 	}
 
-	if feeConfig.ValidatorTargetGas {
-		stateDB.SetState(ContractAddress, validatorTargetGasStorageKey, common.BigToHash(common.Big1))
-	} else {
-		stateDB.SetState(ContractAddress, validatorTargetGasStorageKey, common.Hash{})
-	}
-	stateDB.SetState(ContractAddress, targetGasStorageKey, common.BigToHash(feeConfig.TargetGas))
-	if feeConfig.StaticPricing {
-		stateDB.SetState(ContractAddress, staticPricingStorageKey, common.BigToHash(common.Big1))
-	} else {
-		stateDB.SetState(ContractAddress, staticPricingStorageKey, common.Hash{})
-	}
-	stateDB.SetState(ContractAddress, minGasPriceStorageKey, common.BigToHash(feeConfig.MinGasPrice))
-	stateDB.SetState(ContractAddress, timeToDoubleStorageKey, common.BigToHash(feeConfig.TimeToDouble))
-
-	blockNumber := blockContext.Number()
-	if blockNumber == nil {
-		return errors.New("blockNumber cannot be nil")
-	}
+	stateDB.SetState(ContractAddress, validatorTargetGasStorageKey, boolToHash(feeConfig.ValidatorTargetGas))
+	stateDB.SetState(ContractAddress, targetGasStorageKey, common.BigToHash(new(big.Int).SetUint64(feeConfig.TargetGas)))
+	stateDB.SetState(ContractAddress, staticPricingStorageKey, boolToHash(feeConfig.StaticPricing))
+	stateDB.SetState(ContractAddress, minGasPriceStorageKey, common.BigToHash(new(big.Int).SetUint64(feeConfig.MinGasPrice)))
+	stateDB.SetState(ContractAddress, timeToDoubleStorageKey, common.BigToHash(new(big.Int).SetUint64(feeConfig.TimeToDouble)))
 	stateDB.SetState(ContractAddress, feeConfigLastChangedAtKey, common.BigToHash(blockNumber))
 	return nil
 }
@@ -124,7 +152,7 @@ func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.ACP224FeeConf
 // the packed bytes include selector (first 4 func signature bytes).
 // This function is mostly used for tests.
 func PackSetFeeConfig(config commontype.ACP224FeeConfig) ([]byte, error) {
-	return ACP224FeeManagerABI.Pack("setFeeConfig", config)
+	return ACP224FeeManagerABI.Pack("setFeeConfig", toABIFeeConfig(config))
 }
 
 // UnpackSetFeeConfigInput attempts to unpack [input] into the commontype.ACP224FeeConfig type argument
@@ -142,8 +170,8 @@ func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
 	if err != nil {
 		return commontype.ACP224FeeConfig{}, err
 	}
-	feeConfig := *abi.ConvertType(res[0], new(commontype.ACP224FeeConfig)).(*commontype.ACP224FeeConfig)
-	return feeConfig, nil
+	abiConfig := *abi.ConvertType(res[0], new(abiFeeConfig)).(*abiFeeConfig)
+	return fromABIFeeConfig(abiConfig), nil
 }
 
 func setFeeConfig(
@@ -191,7 +219,7 @@ func setFeeConfig(
 		BlockNumber: accessibleState.GetBlockContext().Number().Uint64(),
 	})
 
-	if err := StoreFeeConfig(stateDB, feeConfig, accessibleState.GetBlockContext()); err != nil {
+	if err := StoreFeeConfig(stateDB, feeConfig, accessibleState.GetBlockContext().Number()); err != nil {
 		return nil, remainingGas, err
 	}
 
@@ -208,7 +236,7 @@ func PackGetFeeConfig() ([]byte, error) {
 // PackGetFeeConfigOutput attempts to pack given config of type commontype.ACP224FeeConfig
 // to conform the ABI outputs.
 func PackGetFeeConfigOutput(config commontype.ACP224FeeConfig) ([]byte, error) {
-	return ACP224FeeManagerABI.PackOutput("getFeeConfig", config)
+	return ACP224FeeManagerABI.PackOutput("getFeeConfig", toABIFeeConfig(config))
 }
 
 // UnpackGetFeeConfigOutput attempts to unpack given [output] into the commontype.ACP224FeeConfig type output
@@ -220,8 +248,8 @@ func UnpackGetFeeConfigOutput(output []byte) (commontype.ACP224FeeConfig, error)
 	if err != nil {
 		return commontype.ACP224FeeConfig{}, err
 	}
-	feeConfig := *abi.ConvertType(res[0], new(commontype.ACP224FeeConfig)).(*commontype.ACP224FeeConfig)
-	return feeConfig, nil
+	abiConfig := *abi.ConvertType(res[0], new(abiFeeConfig)).(*abiFeeConfig)
+	return fromABIFeeConfig(abiConfig), nil
 }
 
 func getFeeConfig(
