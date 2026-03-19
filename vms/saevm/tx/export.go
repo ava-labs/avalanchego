@@ -18,6 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/strevm/hook"
+	"github.com/holiman/uint256"
 )
 
 type Export struct {
@@ -154,4 +157,34 @@ func (e *Export) VerifyCredentials(_ *snow.Context, creds []verify.Verifiable) e
 		}
 	}
 	return nil
+}
+
+var errMultipleNonces = errors.New("multiple inputs for address with different nonces")
+
+func (e *Export) AsOp(avaxAssetID ids.ID) (map[common.Address]hook.AccountDebit, map[common.Address]uint256.Int, error) {
+	burn := make(map[common.Address]hook.AccountDebit)
+	for _, in := range e.Ins {
+		if in.AssetID != avaxAssetID {
+			continue
+		}
+
+		debit, ok := burn[in.Address]
+		if ok && debit.Nonce != in.Nonce {
+			return nil, nil, fmt.Errorf("%w: address %s has nonces %d and %d", errMultipleNonces, in.Address, debit.Nonce, in.Nonce)
+		}
+
+		debit.Nonce = in.Nonce
+
+		var inAmount uint256.Int
+		inAmount.SetUint64(in.Amount)
+		inAmount.Mul(&inAmount, x2cRate)
+
+		if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &inAmount); overflow {
+			return nil, nil, fmt.Errorf("%w: for address %s", errOverflow, in.Address)
+		}
+
+		debit.MinBalance = debit.Amount
+		burn[in.Address] = debit
+	}
+	return burn, nil, nil
 }

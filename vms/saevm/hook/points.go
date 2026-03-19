@@ -4,6 +4,7 @@
 package hook
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -14,7 +15,9 @@ import (
 	"github.com/ava-labs/strevm/saedb"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 )
@@ -55,8 +58,21 @@ func (*points) SubSecondBlockTime(*types.Header) time.Duration {
 	return 0
 }
 
-func (*points) EndOfBlockOps(*types.Block) ([]hook.Op, error) {
-	return nil, nil
+func (p *points) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
+	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract txs of block %s (%d): %v", b.Hash(), b.NumberU64(), err)
+	}
+
+	ops := make([]hook.Op, len(txs))
+	for i, tx := range txs {
+		op, err := tx.AsOp(p.ctx.AVAXAssetID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert tx %d to op for block %s (%d): %v", i, b.Hash(), b.NumberU64(), err)
+		}
+		ops[i] = op
+	}
+	return ops, nil
 }
 
 func (*points) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
@@ -68,21 +84,5 @@ func (*points) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) 
 }
 
 func (*points) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) {
-	//
-
-	// acceptCtx := &precompileconfig.AcceptContext{
-	// 	SnowCtx: b.vm.ctx,
-	// 	Warp:    b.vm.warpBackend,
-	// }
-	// for _, receipt := range receipts {
-	// 	for logIdx, log := range receipt.Logs {
-	// 		accepter, ok := rules.AccepterPrecompiles[log.Address]
-	// 		if !ok {
-	// 			continue
-	// 		}
-	// 		if err := accepter.Accept(acceptCtx, log.BlockHash, log.BlockNumber, log.TxHash, logIdx, log.Topics, log.Data); err != nil {
-	// 			return err
-	// 		}
-	// 	}
-	// }
+	// TODO: Execute atomic ops here
 }

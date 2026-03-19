@@ -15,6 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/strevm/hook"
+	"github.com/holiman/uint256"
 )
 
 type Import struct {
@@ -164,4 +167,26 @@ func (i *Import) VerifyCredentials(snowCtx *snow.Context, creds []verify.Verifia
 		}
 	}
 	return nil
+}
+
+var errOverflow = errors.New("amount overflow")
+
+func (i *Import) AsOp(avaxAssetID ids.ID) (map[common.Address]hook.AccountDebit, map[common.Address]uint256.Int, error) {
+	mint := make(map[common.Address]uint256.Int)
+	for _, out := range i.Outs {
+		if out.AssetID != avaxAssetID {
+			continue
+		}
+
+		var outAmount uint256.Int
+		outAmount.SetUint64(out.Amount)
+		outAmount.Mul(&outAmount, x2cRate)
+
+		amount := mint[out.Address]
+		if _, overflow := amount.AddOverflow(&amount, &outAmount); overflow {
+			return nil, nil, fmt.Errorf("%w: for address %s", errOverflow, out.Address)
+		}
+		mint[out.Address] = amount
+	}
+	return nil, mint, nil
 }

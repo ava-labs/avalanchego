@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/strevm/hook"
 	"github.com/holiman/uint256"
 )
@@ -35,6 +36,14 @@ type Unsigned interface {
 	// VerifyCredentials verifies that the transaction is authorized by the
 	// provided credentials.
 	VerifyCredentials(snowCtx *snow.Context, creds []verify.Verifiable) error
+
+	// AsOp returns the operation that this transaction performs on the EVM
+	// state.
+	AsOp(avaxAssetID ids.ID) (
+		burn map[common.Address]hook.AccountDebit,
+		mint map[common.Address]uint256.Int,
+		err error,
+	)
 }
 
 type Tx struct {
@@ -160,10 +169,17 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 		return hook.Op{}, fmt.Errorf("problem calculating gas price: %w", err)
 	}
 
+	burn, mint, err := t.Unsigned.AsOp(avaxAssetID)
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("problem converting unsigned transaction to operation: %w", err)
+	}
+
 	return hook.Op{
 		ID:        id,
 		Gas:       gas.Gas(gasUsed),
 		GasFeeCap: gasPrice,
+		Burn:      burn,
+		Mint:      mint,
 	}, nil
 }
 
