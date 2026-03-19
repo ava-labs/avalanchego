@@ -13,6 +13,12 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 )
 
+// Taken as the defaults from geth / libevm's `node.DefaultConfig`.
+const (
+	batchLimit           = 1000
+	batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
+)
+
 // Server returns the Provider's [rpc.Server], with all configured JSON-RPC
 // namespace handlers registered.
 func (p *Provider) Server() *rpc.Server {
@@ -162,6 +168,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 	}
 
 	s := rpc.NewServer()
+	s.SetBatchLimits(batchLimit, batchResponseMaxSize)
 	for _, api := range apis {
 		if err := s.RegisterName(api.namespace, api.api); err != nil {
 			return nil, fmt.Errorf("%T.RegisterName(%q, %T): %v", s, api.namespace, api.api, err)
