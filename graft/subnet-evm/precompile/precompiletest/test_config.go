@@ -29,7 +29,18 @@ type ConfigEqualTest struct {
 	Expected bool
 }
 
+func requireUniqueNames(t *testing.T, n int, name func(int) string) {
+	t.Helper()
+	seen := make(map[string]struct{}, n)
+	for i := range n {
+		s := name(i)
+		require.NotContains(t, seen, s, "duplicate test name: %s", s)
+		seen[s] = struct{}{}
+	}
+}
+
 func RunVerifyTests(t *testing.T, tests []ConfigVerifyTest) {
+	requireUniqueNames(t, len(tests), func(i int) string { return tests[i].Name })
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
 			t.Helper()
@@ -51,6 +62,7 @@ func RunVerifyTests(t *testing.T, tests []ConfigVerifyTest) {
 }
 
 func RunEqualTests(t *testing.T, tests []ConfigEqualTest) {
+	requireUniqueNames(t, len(tests), func(i int) string { return tests[i].Name })
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
 			t.Helper()
