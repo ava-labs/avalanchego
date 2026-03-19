@@ -5,7 +5,11 @@ on:
 
 jobs:
   review:
-    if: github.event.pull_request.draft == false
+    # Skip drafts, forks, and external contributors (only org members / collaborators).
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(fromJSON('["MEMBER", "COLLABORATOR", "OWNER"]'), github.event.pull_request.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: read
