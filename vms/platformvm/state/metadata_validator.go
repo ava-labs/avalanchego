@@ -125,10 +125,6 @@ func (vs *validatorState) AddValidatorMetadata(
 	vm *validatorMetadata,
 ) error {
 	vs.LoadValidatorMetadata(vdrID, subnetID, vm)
-	if err := vs.SetStakingInfo(subnetID, vdrID, stakingInfoFromMetadata(vm)); err != nil {
-		return err
-	}
-
 	vs.addUpdatedTxID(vdrID, subnetID, vm.txID)
 
 	return nil
