@@ -197,11 +197,10 @@ func TestAddValidatorMetadataWrite(t *testing.T) {
 			subnetDB := memdb.New()
 
 			txID := ids.GenerateTestID()
-			state.AddValidatorMetadata(ids.GenerateTestNodeID(), tt.subnetID,
-				&validatorMetadata{
-					txID:            txID,
-					PotentialReward: 100,
-				})
+			state.AddValidatorMetadata(ids.GenerateTestNodeID(), tt.subnetID, &validatorMetadata{
+				txID:            txID,
+				PotentialReward: 100,
+			})
 			require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
 
 			hasPrimary, err := primaryDB.Has(txID[:])
