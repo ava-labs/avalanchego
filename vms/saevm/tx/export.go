@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package atomic
+package tx
 
 import (
 	"context"
@@ -11,9 +11,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 type Export struct {
@@ -22,6 +26,18 @@ type Export struct {
 	DestinationChain ids.ID                     `serialize:"true" json:"destinationChain"`
 	Ins              []EVMInput                 `serialize:"true" json:"inputs"`
 	ExportedOutputs  []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
+}
+
+func (e *Export) InputUTXOs() set.Set[ids.ID] {
+	set := set.NewSet[ids.ID](len(e.Ins))
+	for _, in := range e.Ins {
+		var id ids.ID
+		packer := wrappers.Packer{Bytes: id[:]} // 32 bytes long
+		packer.PackLong(in.Nonce)               // add 8 bytes
+		packer.PackBytes(in.Address.Bytes())    // add 24 bytes
+		set.Add(id)
+	}
+	return set
 }
 
 func (e *Export) Burned(assetID ids.ID) (uint64, error) {
@@ -51,7 +67,7 @@ func (e *Export) Burned(assetID ids.ID) (uint64, error) {
 
 var errOutputsNotSorted = errors.New("outputs not sorted")
 
-func (e *Export) Verify(ctx context.Context, snowCtx *snow.Context) error {
+func (e *Export) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 	switch {
 	case e.NetworkID != snowCtx.NetworkID:
 		return fmt.Errorf("%w: expected %d, got %d", errWrongNetworkID, snowCtx.NetworkID, e.NetworkID)
@@ -98,5 +114,44 @@ func (e *Export) Verify(ctx context.Context, snowCtx *snow.Context) error {
 		return errOutputsNotSorted
 	}
 
+	return nil
+}
+
+var (
+	sigCache = secp256k1.NewRecoverCache(1024)
+
+	errIncorrectNumSignatures = errors.New("incorrect number of signatures")
+	errAddressMismatch        = errors.New("address does not match signature")
+)
+
+func (e *Export) VerifyCredentials(_ *snow.Context, creds []verify.Verifiable) error {
+	if len(e.Ins) != len(creds) {
+		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
+	}
+
+	fxTx, err := toFxTx(e)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errConvertingToFxTx, err)
+	}
+	for i, in := range e.Ins {
+		cred, ok := creds[i].(*secp256k1fx.Credential)
+		if !ok {
+			return fmt.Errorf("expected %T but got %T", &secp256k1fx.Credential{}, cred)
+		}
+		if err := cred.Verify(); err != nil {
+			return err
+		}
+		if len(cred.Sigs) != 1 {
+			return fmt.Errorf("%w: expected 1, got %d", errIncorrectNumSignatures, len(cred.Sigs))
+		}
+
+		pk, err := sigCache.RecoverPublicKey(fxTx.Bytes(), cred.Sigs[0][:])
+		if err != nil {
+			return err
+		}
+		if in.Address != pk.EthAddress() {
+			return fmt.Errorf("%w: expected %s, got %s", errAddressMismatch, in.Address, pk.EthAddress())
+		}
+	}
 	return nil
 }

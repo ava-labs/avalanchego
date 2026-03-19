@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package atomic
+package tx
 
 import (
 	"context"
@@ -12,16 +12,26 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/holiman/uint256"
 )
 
 type Unsigned interface {
+	// InputUTXOs returns the UTXOIDs of the inputs of this transaction.
+	InputUTXOs() set.Set[ids.ID]
+
 	// Burned returns the amount of assetID that is consumed but not produced by
 	// this transaction.
 	Burned(assetID ids.ID) (uint64, error)
-	Verify(ctx context.Context, snowCtx *snow.Context) error
+
+	// SanityCheck performs basic validation on the transaction.
+	SanityCheck(ctx context.Context, snowCtx *snow.Context) error
+
+	// VerifyCredentials verifies that the transaction is authorized by the
+	// provided credentials.
+	VerifyCredentials(snowCtx *snow.Context, creds []verify.Verifiable) error
 }
 
 type Tx struct {
@@ -35,6 +45,27 @@ func Parse(b []byte) (*Tx, error) {
 		return nil, fmt.Errorf("%T.Unmarshal(txBytes): %w", c, err)
 	}
 	return tx, nil
+}
+
+var errInefficientSlicePacking = errors.New("inefficient slice packing: empty slices should be packed as nil")
+
+func ParseSlice(b []byte) ([]*Tx, error) {
+	if len(b) == 0 {
+		return nil, nil
+	}
+
+	var txs []*Tx
+	if _, err := c.Unmarshal(b, &txs); err != nil {
+		return nil, err
+	}
+	if len(txs) == 0 {
+		return nil, errInefficientSlicePacking
+	}
+	return txs, nil
+}
+
+func (t *Tx) Bytes() ([]byte, error) {
+	return c.Marshal(codecVersion, t)
 }
 
 const (
@@ -107,8 +138,4 @@ func (t *Tx) GasPrice(avaxAssetID ids.ID) (uint256.Int, error) {
 	gasPrice.Mul(&gasPrice, x2cRate)
 	gasPrice.Div(&gasPrice, &bigGasUsed)
 	return gasPrice, nil
-}
-
-func (t *Tx) Bytes() ([]byte, error) {
-	return c.Marshal(codecVersion, t)
 }

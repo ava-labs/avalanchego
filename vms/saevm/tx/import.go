@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package atomic
+package tx
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -22,6 +23,14 @@ type Import struct {
 	SourceChain    ids.ID                    `serialize:"true" json:"sourceChain"`
 	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 	Outs           []EVMOutput               `serialize:"true" json:"outputs"`
+}
+
+func (i *Import) InputUTXOs() set.Set[ids.ID] {
+	set := set.NewSet[ids.ID](len(i.ImportedInputs))
+	for _, in := range i.ImportedInputs {
+		set.Add(in.InputID())
+	}
+	return set
 }
 
 func (i *Import) Burned(assetID ids.ID) (uint64, error) {
@@ -64,7 +73,7 @@ var (
 	errOutputsNotSortedUnique = errors.New("outputs not sorted and unique")
 )
 
-func (i *Import) Verify(ctx context.Context, snowCtx *snow.Context) error {
+func (i *Import) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 	switch {
 	case i.NetworkID != snowCtx.NetworkID:
 		return fmt.Errorf("%w: expected %d, got %d", errWrongNetworkID, snowCtx.NetworkID, i.NetworkID)
@@ -110,5 +119,49 @@ func (i *Import) Verify(ctx context.Context, snowCtx *snow.Context) error {
 		return errOutputsNotSortedUnique
 	}
 
+	return nil
+}
+
+var (
+	errIncorrectNumCredentials = errors.New("incorrect number of credentials")
+	errFailedToFetchUTXOs      = errors.New("failed to fetch UTXOs")
+	errConvertingToFxTx        = errors.New("converting to fx transaction")
+	errFailedToUnmarshalUTXO   = errors.New("failed to unmarshal UTXO")
+	errMismatchedAssetIDs      = errors.New("mismatched asset IDs")
+	errVerifyTransferFailed    = errors.New("transfer verification failed")
+)
+
+func (i *Import) VerifyCredentials(snowCtx *snow.Context, creds []verify.Verifiable) error {
+	if len(i.ImportedInputs) != len(creds) {
+		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
+	}
+
+	utxoIDs := make([][]byte, len(i.ImportedInputs))
+	for i, in := range i.ImportedInputs {
+		inputID := in.UTXOID.InputID()
+		utxoIDs[i] = inputID[:]
+	}
+
+	utxoBytes, err := snowCtx.SharedMemory.Get(i.SourceChain, utxoIDs)
+	if err != nil {
+		return fmt.Errorf("%w from %s: %v", errFailedToFetchUTXOs, i.SourceChain, err)
+	}
+
+	fxTx, err := toFxTx(i)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errConvertingToFxTx, err)
+	}
+	for i, in := range i.ImportedInputs {
+		utxo := &avax.UTXO{}
+		if _, err := c.Unmarshal(utxoBytes[i], utxo); err != nil {
+			return fmt.Errorf("%w: %v", errFailedToUnmarshalUTXO, err)
+		}
+		if inAssetID, utxoAssetID := in.AssetID(), utxo.AssetID(); utxoAssetID != inAssetID {
+			return fmt.Errorf("%w: input asset ID %s does not match UTXO asset ID %s", errMismatchedAssetIDs, inAssetID, utxoAssetID)
+		}
+		if err := fx.VerifyTransfer(fxTx, in.In, creds[i], utxo.Out); err != nil {
+			return fmt.Errorf("%w: %v", errVerifyTransferFailed, err)
+		}
+	}
 	return nil
 }
