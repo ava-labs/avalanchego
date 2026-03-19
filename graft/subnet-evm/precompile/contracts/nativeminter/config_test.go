@@ -22,43 +22,48 @@ func TestVerify(t *testing.T) {
 	admins := []common.Address{allowlisttest.TestAdminAddr}
 	enableds := []common.Address{allowlisttest.TestEnabledAddr}
 	managers := []common.Address{allowlisttest.TestManagerAddr}
-	tests := map[string]precompiletest.ConfigVerifyTest{
-		"valid config": {
+	tests := []precompiletest.ConfigVerifyTest{
+		{
+			Name:   "valid config",
 			Config: nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers, nil),
 			ChainConfig: func() precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
 				config.EXPECT().IsDurango(gomock.Any()).Return(true).AnyTimes()
 				return config
 			}(),
-			ExpectedError: nil,
 		},
-		"invalid allow list config in native minter allowlisttest": {
+		{
+			Name:          "invalid allow list config in native minter allowlisttest",
 			Config:        nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, admins, nil, nil),
-			ExpectedError: allowlist.ErrAdminAndEnabledAddress,
+			ExpectedErr: allowlist.ErrAdminAndEnabledAddress,
 		},
-		"duplicate admins in config in native minter allowlisttest": {
+		{
+			Name:          "duplicate admins in config in native minter allowlisttest",
 			Config:        nativeminter.NewConfig(utils.PointerTo[uint64](3), append(admins, admins[0]), enableds, managers, nil),
-			ExpectedError: allowlist.ErrDuplicateAdminAddress,
+			ExpectedErr: allowlist.ErrDuplicateAdminAddress,
 		},
-		"duplicate enableds in config in native minter allowlisttest": {
+		{
+			Name:          "duplicate enableds in config in native minter allowlisttest",
 			Config:        nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, append(enableds, enableds[0]), managers, nil),
-			ExpectedError: allowlist.ErrDuplicateEnabledAddress,
+			ExpectedErr: allowlist.ErrDuplicateEnabledAddress,
 		},
-		"nil amount in native minter config": {
+		{
+			Name: "nil amount in native minter config",
 			Config: nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(123),
 					common.HexToAddress("0x02"): nil,
 				}),
-			ExpectedError: nativeminter.ErrInitialMintNilAmount,
+			ExpectedErr: nativeminter.ErrInitialMintNilAmount,
 		},
-		"negative amount in native minter config": {
+		{
+			Name: "negative amount in native minter config",
 			Config: nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(123),
 					common.HexToAddress("0x02"): math.NewHexOrDecimal256(-1),
 				}),
-			ExpectedError: nativeminter.ErrInitialMintInvalidAmount,
+			ExpectedErr: nativeminter.ErrInitialMintInvalidAmount,
 		},
 	}
 	allowlisttest.VerifyPrecompileWithAllowListTests(t, nativeminter.Module, tests)
@@ -68,23 +73,26 @@ func TestEqual(t *testing.T) {
 	admins := []common.Address{allowlisttest.TestAdminAddr}
 	enableds := []common.Address{allowlisttest.TestEnabledAddr}
 	managers := []common.Address{allowlisttest.TestManagerAddr}
-	tests := map[string]precompiletest.ConfigEqualTest{
-		"non-nil config and nil other": {
+	tests := []precompiletest.ConfigEqualTest{
+		{
+			Name:     "non-nil config and nil other",
 			Config:   nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers, nil),
-			Other:    nil,
 			Expected: false,
 		},
-		"different type": {
+		{
+			Name:     "different type",
 			Config:   nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers, nil),
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
-		"different timestamp": {
+		{
+			Name:     "different timestamp",
 			Config:   nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 			Other:    nativeminter.NewConfig(utils.PointerTo[uint64](4), admins, nil, nil, nil),
 			Expected: false,
 		},
-		"different initial mint amounts": {
+		{
+			Name: "different initial mint amounts",
 			Config: nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(1),
@@ -95,7 +103,8 @@ func TestEqual(t *testing.T) {
 				}),
 			Expected: false,
 		},
-		"different initial mint addresses": {
+		{
+			Name: "different initial mint addresses",
 			Config: nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(1),
@@ -106,7 +115,8 @@ func TestEqual(t *testing.T) {
 				}),
 			Expected: false,
 		},
-		"same config": {
+		{
+			Name: "same config",
 			Config: nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(1),

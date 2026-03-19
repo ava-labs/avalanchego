@@ -35,14 +35,16 @@ func TestVerify(t *testing.T) {
 	admins := []common.Address{allowlisttest.TestAdminAddr}
 	invalidFeeConfig := validFeeConfig
 	invalidFeeConfig.GasLimit = big.NewInt(0)
-	tests := map[string]precompiletest.ConfigVerifyTest{
-		"invalid initial fee manager config": {
+	tests := []precompiletest.ConfigVerifyTest{
+		{
+			Name:          "invalid initial fee manager config",
 			Config:        feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &invalidFeeConfig),
-			ExpectedError: commontype.ErrGasLimitTooLow,
+			ExpectedErr: commontype.ErrGasLimitTooLow,
 		},
-		"nil initial fee manager config": {
+		{
+			Name:          "nil initial fee manager config",
 			Config:        feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.FeeConfig{}),
-			ExpectedError: commontype.ErrGasLimitNil,
+			ExpectedErr: commontype.ErrGasLimitNil,
 		},
 	}
 	allowlisttest.VerifyPrecompileWithAllowListTests(t, feemanager.Module, tests)
@@ -51,28 +53,32 @@ func TestVerify(t *testing.T) {
 func TestEqual(t *testing.T) {
 	admins := []common.Address{allowlisttest.TestAdminAddr}
 	enableds := []common.Address{allowlisttest.TestEnabledAddr}
-	tests := map[string]precompiletest.ConfigEqualTest{
-		"non-nil config and nil other": {
+	tests := []precompiletest.ConfigEqualTest{
+		{
+			Name:     "non-nil config and nil other",
 			Config:   feemanager.NewConfig(utils.PointerTo[uint64](3), admins, enableds, nil, nil),
-			Other:    nil,
 			Expected: false,
 		},
-		"different type": {
+		{
+			Name:     "different type",
 			Config:   feemanager.NewConfig(utils.PointerTo[uint64](3), admins, enableds, nil, nil),
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
-		"different timestamp": {
+		{
+			Name:     "different timestamp",
 			Config:   feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 			Other:    feemanager.NewConfig(utils.PointerTo[uint64](4), admins, nil, nil, nil),
 			Expected: false,
 		},
-		"non-nil initial config and nil initial config": {
+		{
+			Name:     "non-nil initial config and nil initial config",
 			Config:   feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
 			Other:    feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 			Expected: false,
 		},
-		"different initial config": {
+		{
+			Name:   "different initial config",
 			Config: feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
 			Other: feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
 				func() *commontype.FeeConfig {
@@ -82,7 +88,8 @@ func TestEqual(t *testing.T) {
 				}()),
 			Expected: false,
 		},
-		"same config": {
+		{
+			Name:     "same config",
 			Config:   feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
 			Other:    feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &validFeeConfig),
 			Expected: true,

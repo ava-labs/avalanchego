@@ -15,21 +15,23 @@ import (
 
 // ConfigVerifyTest is a test case for verifying a config
 type ConfigVerifyTest struct {
+	Name          string
 	Config        precompileconfig.Config
 	ChainConfig   precompileconfig.ChainConfig
-	ExpectedError error
+	ExpectedErr error
 }
 
 // ConfigEqualTest is a test case for comparing two configs
 type ConfigEqualTest struct {
+	Name     string
 	Config   precompileconfig.Config
 	Other    precompileconfig.Config
 	Expected bool
 }
 
-func RunVerifyTests(t *testing.T, tests map[string]ConfigVerifyTest) {
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
+func RunVerifyTests(t *testing.T, tests []ConfigVerifyTest) {
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
 			t.Helper()
 			require := require.New(t)
 
@@ -43,14 +45,14 @@ func RunVerifyTests(t *testing.T, tests map[string]ConfigVerifyTest) {
 				chainConfig = mockChainConfig
 			}
 			err := test.Config.Verify(chainConfig)
-			require.ErrorIs(err, test.ExpectedError)
+			require.ErrorIs(err, test.ExpectedErr)
 		})
 	}
 }
 
-func RunEqualTests(t *testing.T, tests map[string]ConfigEqualTest) {
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
+func RunEqualTests(t *testing.T, tests []ConfigEqualTest) {
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
 			t.Helper()
 			require := require.New(t)
 
