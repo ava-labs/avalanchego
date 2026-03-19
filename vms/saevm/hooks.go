@@ -4,7 +4,6 @@
 package saevm
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"iter"
@@ -25,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -111,9 +109,15 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
 	}
 }
 
-func ancestorUTXOIDs(parent *types.Block, settledHash common.Hash, getBlock blocks.EthBlockSource) (set.Set[ids.ID], error) {
+func ancestorUTXOIDs(header *types.Header, settledHash common.Hash, getBlock blocks.EthBlockSource) (set.Set[ids.ID], error) {
 	var consumedUTXOs set.Set[ids.ID]
-	for block := parent; block.Hash() != settledHash; {
+	for header.ParentHash != settledHash {
+		blockNumber := header.Number.Uint64() - 1
+		block, ok := getBlock(header.ParentHash, blockNumber)
+		if !ok {
+			return nil, fmt.Errorf("missing block %s (%d)", header.ParentHash, blockNumber)
+		}
+
 		txs, err := atomic.ExtractAtomicTxs(
 			customtypes.BlockExtData(block),
 			true, // batch
@@ -126,12 +130,7 @@ func ancestorUTXOIDs(parent *types.Block, settledHash common.Hash, getBlock bloc
 		for _, tx := range txs {
 			consumedUTXOs.Union(tx.InputUTXOs())
 		}
-
-		var ok bool
-		block, ok = getBlock(block.ParentHash(), block.NumberU64()-1)
-		if !ok {
-			break
-		}
+		header = block.Header()
 	}
 	return consumedUTXOs, nil
 }
@@ -140,11 +139,11 @@ func emptyIter(yield func(*txpool.Transaction) bool) {}
 
 func (b *blockBuilder) PotentialEndOfBlockOps() iter.Seq[*txpool.Transaction] {
 	var (
-		parent      *types.Block
+		header      *types.Header
 		settledHash common.Hash
 		getBlock    blocks.EthBlockSource
 	)
-	consumedUTXOs, err := ancestorUTXOIDs(parent, settledHash, getBlock)
+	consumedUTXOs, err := ancestorUTXOIDs(header, settledHash, getBlock)
 	if err != nil {
 		b.log.Error("failed to get ancestor UTXO IDs",
 			zap.Error(err),
@@ -186,12 +185,34 @@ func (*blockBuilder) BuildBlock(
 	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil)), nil
 }
 
-// semanticVerifier is a visitor that checks the semantic validity of atomic transactions.
-type semanticVerifier struct {
-	backend *VerifierBackend
-	tx      *atomic.Tx
-	parent  extension.ExtendedBlock
-	baseFee *big.Int
+type txVerifier struct {
+	ctx         *snow.Context
+	chainConfig *params.ChainConfig
+}
+
+func (v *txVerifier) VerifyTx(h *types.Header, tx *atomic.Tx) error {
+	ethRules := v.chainConfig.Rules(h.Number, true, h.Time)
+	avaRules := *params.GetRulesExtra(ethRules)
+	if err := tx.Verify(v.ctx, avaRules); err != nil {
+		return err
+	}
+	return nil
+}
+
+func verifyFlowCheck(tx *atomic.Tx) error {
+	fc := avax.NewFlowChecker()
+
+	for _, out := range tx.ExportedOutputs {
+		fc.Produce(out.AssetID(), out.Output().Amount())
+	}
+	for _, in := range tx.Ins {
+		fc.Consume(in.AssetID, in.Amount)
+	}
+
+	if err := fc.Verify(); err != nil {
+		return fmt.Errorf("flow check failed: %v", err)
+	}
+	return nil
 }
 
 // ImportTx verifies this transaction is valid.
@@ -206,32 +227,14 @@ func (s *semanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
 
 	// Check the transaction consumes and produces the right amounts
 	fc := avax.NewFlowChecker()
-	switch {
-	// Apply dynamic fees to import transactions as of Apricot Phase 3
-	case rules.IsApricotPhase3:
-		gasUsed, err := stx.GasUsed(rules.IsApricotPhase5)
-		if err != nil {
-			return err
-		}
-		txFee, err := atomic.CalculateDynamicFee(gasUsed, s.baseFee)
-		if err != nil {
-			return err
-		}
-		fc.Produce(ctx.AVAXAssetID, txFee)
-
-	// Apply fees to import transactions as of Apricot Phase 2
-	case rules.IsApricotPhase2:
-		fc.Produce(ctx.AVAXAssetID, ap0.AtomicTxFee)
-	}
 	for _, out := range utx.Outs {
 		fc.Produce(out.AssetID, out.Amount)
 	}
 	for _, in := range utx.ImportedInputs {
 		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
-
 	if err := fc.Verify(); err != nil {
-		return fmt.Errorf("import tx flow check failed due to: %w", err)
+		return fmt.Errorf("flow check failed: %v", err)
 	}
 
 	if len(stx.Creds) != len(utx.ImportedInputs) {
@@ -276,47 +279,6 @@ func (s *semanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
 	}
 
 	return conflicts(backend, utx.InputUTXOs(), s.parent)
-}
-
-// conflicts returns an error if [inputs] conflicts with any of the atomic inputs contained in [ancestor]
-// or any of its ancestor blocks going back to the last accepted block in its ancestry. If [ancestor] is
-// accepted, then nil will be returned immediately.
-// If the ancestry of [ancestor] cannot be fetched, then [errRejectedParent] may be returned.
-func conflicts(backend *VerifierBackend, inputs set.Set[ids.ID], ancestor extension.ExtendedBlock) error {
-	fetcher := backend.BlockFetcher
-	lastAcceptedBlock := fetcher.LastAcceptedExtendedBlock()
-	lastAcceptedHeight := lastAcceptedBlock.Height()
-	for ancestor.Height() > lastAcceptedHeight {
-		ancestorExtIntf := ancestor.GetBlockExtension()
-		ancestorExt, ok := ancestorExtIntf.(atomic.AtomicBlockContext)
-		if !ok {
-			return fmt.Errorf("expected block extension to be AtomicBlockContext but got %T", ancestorExtIntf)
-		}
-		// If any of the atomic transactions in the ancestor conflict with [inputs]
-		// return an error.
-		for _, atomicTx := range ancestorExt.AtomicTxs() {
-			if inputs.Overlaps(atomicTx.InputUTXOs()) {
-				return ErrConflictingAtomicInputs
-			}
-		}
-
-		// Move up the chain.
-		nextAncestorID := ancestor.Parent()
-		// If the ancestor is unknown, then the parent failed
-		// verification when it was called.
-		// If the ancestor is rejected, then this block shouldn't be
-		// inserted into the canonical chain because the parent is
-		// will be missing.
-		// If the ancestor is processing, then the block may have
-		// been verified.
-		nextAncestor, err := fetcher.GetExtendedBlock(context.TODO(), nextAncestorID)
-		if err != nil {
-			return errRejectedParent
-		}
-		ancestor = nextAncestor
-	}
-
-	return nil
 }
 
 // ExportTx verifies this transaction is valid.
