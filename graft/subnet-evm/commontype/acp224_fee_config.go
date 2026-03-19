@@ -7,6 +7,12 @@ import "errors"
 
 const MinTargetGasACP224 uint64 = 1_000_000
 
+var DefaultACP224FeeConfig = ACP224FeeConfig{
+	TargetGas:    15_000_000,
+	MinGasPrice:  25_000_000_000,
+	TimeToDouble: 60,
+}
+
 var (
 	ErrMinGasPriceTooLow      = errors.New("minGasPrice must be greater than 0")
 	ErrTargetGasMustBeZero    = errors.New("targetGas must be 0 when validatorTargetGas is true")

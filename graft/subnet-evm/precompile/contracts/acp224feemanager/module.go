@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
@@ -47,11 +48,12 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 	if !ok {
 		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)
 	}
+	initialFeeConfig := commontype.DefaultACP224FeeConfig
 	if config.InitialFeeConfig != nil {
-		if err := StoreFeeConfig(state, *config.InitialFeeConfig, blockContext.Number()); err != nil {
-			// This should not happen since we already checked this config with Verify()
-			return fmt.Errorf("cannot configure given initial fee config: %w", err)
-		}
+		initialFeeConfig = *config.InitialFeeConfig
+	}
+	if err := StoreFeeConfig(state, initialFeeConfig, blockContext.Number()); err != nil {
+		return fmt.Errorf("cannot configure initial fee config: %w", err)
 	}
 	return config.AllowListConfig.Configure(chainConfig, ContractAddress, state, blockContext)
 }

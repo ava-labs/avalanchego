@@ -6,7 +6,6 @@ package acp224feemanager
 import (
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 
 	"github.com/ava-labs/libevm/accounts/abi"
@@ -67,8 +66,6 @@ type abiFeeConfig struct {
 	TimeToDouble       *big.Int
 }
 
-var maxUint64 = new(big.Int).SetUint64(math.MaxUint64)
-
 func toABIFeeConfig(c commontype.ACP224FeeConfig) abiFeeConfig {
 	return abiFeeConfig{
 		ValidatorTargetGas: c.ValidatorTargetGas,
@@ -91,7 +88,7 @@ func fromABIFeeConfig(c abiFeeConfig) (commontype.ACP224FeeConfig, error) {
 		if field.val == nil {
 			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrNilBigInt, field.name)
 		}
-		if field.val.Sign() < 0 || field.val.Cmp(maxUint64) > 0 {
+		if field.val.IsUint64() {
 			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrInvalidUint64, field.name)
 		}
 	}

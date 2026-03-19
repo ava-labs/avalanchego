@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 
@@ -56,7 +54,6 @@ func init() {
 				return input
 			},
 			SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
-			ReadOnly:    true,
 			ExpectedRes: func() []byte {
 				res, err := acp224feemanager.PackGetFeeConfigOutput(zeroFeeConfig)
 				if err != nil {
@@ -69,7 +66,7 @@ func init() {
 
 	tests = append(tests,
 		precompiletest.PrecompileTest{
-			Name:   "get_fee_config_after_setting_returns_new_config",
+			Name:   "get_fee_config_after_storing_returns_new_config",
 			Caller: allowlisttest.TestEnabledAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
@@ -81,7 +78,6 @@ func init() {
 				return input
 			},
 			SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
-			ReadOnly:    true,
 			ExpectedRes: func() []byte {
 				res, err := acp224feemanager.PackGetFeeConfigOutput(testFeeConfig)
 				if err != nil {
@@ -99,7 +95,6 @@ func init() {
 				return input
 			},
 			SuppliedGas: acp224feemanager.GetFeeConfigGasCost - 1,
-			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 		},
 	)
@@ -127,7 +122,6 @@ func init() {
 				return input
 			},
 			SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost,
-			ReadOnly:    true,
 			ExpectedRes: func() []byte {
 				res, err := acp224feemanager.PackGetFeeConfigLastChangedAtOutput(testBlockNumber)
 				if err != nil {
@@ -135,12 +129,6 @@ func init() {
 				}
 				return res
 			}(),
-			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := acp224feemanager.GetStoredFeeConfig(state)
-				require.Equal(t, testFeeConfig, feeConfig, "GetStoredFeeConfig()")
-				lastChangedAt := acp224feemanager.GetFeeConfigLastChangedAt(state)
-				require.Equal(t, testBlockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
-			},
 		})
 	}
 
@@ -153,7 +141,6 @@ func init() {
 			return input
 		},
 		SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost - 1,
-		ReadOnly:    false,
 		ExpectedErr: vm.ErrOutOfGas,
 	})
 
@@ -168,7 +155,6 @@ func init() {
 			return input
 		},
 		SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
-		ReadOnly:    false,
 		ExpectedErr: acp224feemanager.ErrCannotSetFeeConfig,
 	})
 
@@ -191,12 +177,7 @@ func init() {
 				return input
 			},
 			SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
-			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := acp224feemanager.GetStoredFeeConfig(state)
-				require.Equal(t, testFeeConfig, feeConfig, "GetStoredFeeConfig()")
-			},
 		})
 	}
 
@@ -223,8 +204,23 @@ func init() {
 				return input
 			},
 			SuppliedGas: acp224feemanager.SetFeeConfigGasCost - 1,
-			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
+		},
+		precompiletest.PrecompileTest{
+			Name:       "setFeeConfig_with_nil_block_number_should_fail",
+			Caller:     allowlisttest.TestEnabledAddr,
+			BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				input, err := acp224feemanager.PackSetFeeConfig(testFeeConfig)
+				require.NoError(t, err)
+				return input
+			},
+			SetupBlockContext: func(mbc *contract.MockBlockContext) {
+				mbc.EXPECT().Number().Return((*big.Int)(nil)).AnyTimes()
+				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
+			},
+			SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
+			ExpectedErr: acp224feemanager.ErrNilBlockNumber,
 		},
 		precompiletest.PrecompileTest{
 			Name:       "setFeeConfig_with_invalid_config_should_fail",
@@ -241,7 +237,6 @@ func init() {
 				return input
 			},
 			SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
-			ReadOnly:    false,
 			ExpectedErr: commontype.ErrMinGasPriceTooLow,
 		},
 		precompiletest.PrecompileTest{
@@ -258,7 +253,6 @@ func init() {
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
 			SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
-			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := acp224feemanager.GetStoredFeeConfig(state)
@@ -295,110 +289,4 @@ func init() {
 
 func TestACP224FeeManagerRun(t *testing.T) {
 	precompiletest.RunPrecompileTests(t, acp224feemanager.Module, tests)
-}
-
-func TestStoreFeeConfig(t *testing.T) {
-	tests := []struct {
-		name        string
-		config      commontype.ACP224FeeConfig
-		blockNumber *big.Int
-		wantErr     error
-	}{
-		{
-			name:        "valid config",
-			config:      testFeeConfig,
-			blockNumber: testBlockNumber,
-		},
-		{
-			name:        "nil block number",
-			config:      testFeeConfig,
-			blockNumber: nil,
-			wantErr:     acp224feemanager.ErrNilBlockNumber,
-		},
-		{
-			name: "invalid config",
-			config: commontype.ACP224FeeConfig{
-				TargetGas:    commontype.MinTargetGasACP224,
-				MinGasPrice:  0, // invalid: must be > 0
-				TimeToDouble: 60,
-			},
-			blockNumber: testBlockNumber,
-			wantErr:     commontype.ErrMinGasPriceTooLow,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := newTestStateDB()
-			err := acp224feemanager.StoreFeeConfig(s, tt.config, tt.blockNumber)
-			require.ErrorIs(t, err, tt.wantErr, "StoreFeeConfig()")
-			if tt.wantErr != nil {
-				return
-			}
-
-			got := acp224feemanager.GetStoredFeeConfig(s)
-			require.Equal(t, tt.config, got, "GetStoredFeeConfig()")
-
-			lastChangedAt := acp224feemanager.GetFeeConfigLastChangedAt(s)
-			require.Equal(t, tt.blockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
-		})
-	}
-}
-
-func newTestStateDB() *extstate.StateDB {
-	db := rawdb.NewMemoryDatabase()
-	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
-	if err != nil {
-		panic(err)
-	}
-	return extstate.New(statedb)
-}
-
-func TestPackUnpackSetFeeConfig(t *testing.T) {
-	packed, err := acp224feemanager.PackSetFeeConfig(testFeeConfig)
-	require.NoError(t, err, "PackSetFeeConfig()")
-
-	unpacked, err := acp224feemanager.UnpackSetFeeConfigInput(packed[4:])
-	require.NoError(t, err, "UnpackSetFeeConfigInput()")
-
-	require.Equal(t, testFeeConfig, unpacked, "round-trip pack/unpack setFeeConfig")
-}
-
-func TestPackUnpackGetFeeConfig(t *testing.T) {
-	packed, err := acp224feemanager.PackGetFeeConfigOutput(testFeeConfig)
-	require.NoError(t, err, "PackGetFeeConfigOutput()")
-
-	unpacked, err := acp224feemanager.UnpackGetFeeConfigOutput(packed)
-	require.NoError(t, err, "UnpackGetFeeConfigOutput()")
-
-	require.Equal(t, testFeeConfig, unpacked, "round-trip pack/unpack getFeeConfig")
-}
-
-func TestPackUnpackFeeConfigUpdatedEventData(t *testing.T) {
-	oldFeeConfig := commontype.ACP224FeeConfig{
-		TargetGas:    5_000_000,
-		MinGasPrice:  1,
-		TimeToDouble: 30,
-	}
-	newFeeConfig := commontype.ACP224FeeConfig{
-		TargetGas:    42_000_000,
-		MinGasPrice:  42,
-		TimeToDouble: 42,
-	}
-
-	_, data, err := acp224feemanager.PackFeeConfigUpdatedEvent(
-		allowlisttest.TestEnabledAddr,
-		oldFeeConfig,
-		newFeeConfig,
-	)
-	require.NoError(t, err, "PackFeeConfigUpdatedEvent()")
-
-	unpacked, err := acp224feemanager.UnpackFeeConfigUpdatedEventData(data)
-	require.NoError(t, err, "UnpackFeeConfigUpdatedEventData()")
-
-	want := acp224feemanager.FeeConfigUpdatedEventData{
-		OldFeeConfig: oldFeeConfig,
-		NewFeeConfig: newFeeConfig,
-	}
-	require.Equal(t, want, unpacked, "round-trip pack/unpack FeeConfigUpdatedEvent")
 }
