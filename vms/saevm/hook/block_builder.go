@@ -20,7 +20,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 )
@@ -28,7 +27,6 @@ import (
 var _ hook.BlockBuilder[*txpool.Transaction] = (*blockBuilder)(nil)
 
 type blockBuilder struct {
-	log logging.Logger
 	ctx *snow.Context
 
 	now          func() time.Time
@@ -59,7 +57,7 @@ func (b *blockBuilder) PotentialEndOfBlockOps() iter.Seq[*txpool.Transaction] {
 	return func(yield func(*txpool.Transaction) bool) {
 		consumedUTXOs, err := ancestorUTXOIDs(header, settledHash, getBlock)
 		if err != nil {
-			b.log.Error("failed to get ancestor UTXO IDs",
+			b.ctx.Log.Error("failed to get ancestor UTXO IDs",
 				zap.Error(err),
 			)
 			return
@@ -67,13 +65,13 @@ func (b *blockBuilder) PotentialEndOfBlockOps() iter.Seq[*txpool.Transaction] {
 
 		for tx := range b.potentialTxs.Iter() {
 			if consumedUTXOs.Overlaps(tx.Inputs) {
-				b.log.Debug("tx consumes previously consumed UTXOs",
+				b.ctx.Log.Debug("tx consumes previously consumed UTXOs",
 					zap.Stringer("txID", tx.ID),
 				)
 				continue
 			}
 			if err := tx.Tx.Verify(context.TODO(), b.ctx); err != nil {
-				b.log.Debug("tx failed verification",
+				b.ctx.Log.Debug("tx failed verification",
 					zap.Stringer("txID", tx.ID),
 					zap.Error(err),
 				)

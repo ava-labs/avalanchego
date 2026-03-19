@@ -25,10 +25,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/api"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
 	avadb "github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -39,12 +40,12 @@ import (
 // method that treats the chain as being asynchronous since genesis.
 type SinceGenesis struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
-	hooks   *hooks
+	hooks   *hook.Points
 	config  sae.Config
 
 	ctx          *snow.Context
 	mempool      *txpool.Mempool
-	pushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
+	pushGossiper *avalanchegossip.PushGossiper[*tx.Tx]
 	acceptedTxs  *state.AtomicRepository
 
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
@@ -108,10 +109,7 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	txs := txpool.NewTxs()
-	hooks := &hooks{blockBuilder{
-		log:          snowCtx.Log,
-		potentialTxs: txs,
-	}}
+	hooks := hook.NewPoints(snowCtx, txs)
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
 		return err
@@ -119,7 +117,7 @@ func (vm *SinceGenesis) Initialize(
 	vm.VM = inner
 	vm.hooks = hooks
 	vm.ctx = snowCtx
-	vm.mempool = txpool.New(txs, snowCtx.AVAXAssetID)
+	vm.mempool = txpool.New(txs, snowCtx)
 
 	metrics := prometheus.NewRegistry()
 	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {
@@ -138,7 +136,7 @@ func (vm *SinceGenesis) Initialize(
 			vm.Network,
 			vm.ValidatorPeers,
 			gossipSet,
-			&atomic.TxMarshaller{},
+			tx.Marshaller{},
 			avalanchegossip.SystemConfig{
 				Log:           snowCtx.Log,
 				Registry:      metrics,

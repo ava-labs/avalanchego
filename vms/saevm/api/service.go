@@ -31,14 +31,14 @@ import (
 type Service struct {
 	ctx          *snow.Context
 	mempool      *txpool.Mempool
-	pushGossiper *gossip.PushGossiper[*atomic.Tx]
+	pushGossiper *gossip.PushGossiper[*tx.Tx]
 	acceptedTxs  *state.AtomicRepository
 }
 
 func NewService(
 	ctx *snow.Context,
 	mempool *txpool.Mempool,
-	pushGossiper *gossip.PushGossiper[*atomic.Tx],
+	pushGossiper *gossip.PushGossiper[*tx.Tx],
 	acceptedTxs *state.AtomicRepository,
 ) *Service {
 	return &Service{
@@ -189,9 +189,7 @@ func (s *Service) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) 
 		// If the tx was added to the mempool, or was previously included, we
 		// push it to the network for inclusion. This ensures this node will
 		// push the tx, even if it was previously seen by p2p gossip.
-
-		// TODO: FIXME
-		// s.pushGossiper.Add(tx)
+		s.pushGossiper.Add(tx)
 	}
 
 	r.TxID = txID
