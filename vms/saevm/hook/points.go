@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package saevm
+package hook
 
 import (
 	"time"
@@ -19,13 +19,13 @@ import (
 	"github.com/ava-labs/avalanchego/x/blockdb"
 )
 
-var _ hook.PointsG[*txpool.Transaction] = (*hooks)(nil)
+var _ hook.PointsG[*txpool.Transaction] = (*points)(nil)
 
-type hooks struct {
+type points struct {
 	blockBuilder
 }
 
-func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.Transaction], error) {
+func (h *points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.Transaction], error) {
 	return &blockBuilder{
 		log: h.log,
 		now: func() time.Time {
@@ -35,7 +35,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.Tr
 	}, nil
 }
 
-func (h *hooks) ExecutionResultsDB(dataDir string) (saedb.ExecutionResults, error) {
+func (h *points) ExecutionResultsDB(dataDir string) (saedb.ExecutionResults, error) {
 	db, err := blockdb.New(
 		blockdb.DefaultConfig().WithDir(dataDir),
 		h.log,
@@ -43,7 +43,7 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saedb.ExecutionResults, erro
 	return saedb.ExecutionResults{HeightIndex: db}, err
 }
 
-func (*hooks) GasConfigAfter(*types.Header) (gas.Gas, hook.GasPriceConfig) {
+func (*points) GasConfigAfter(*types.Header) (gas.Gas, hook.GasPriceConfig) {
 	return 1_000_000, hook.GasPriceConfig{
 		TargetToExcessScaling: 87,
 		MinPrice:              1,
@@ -51,23 +51,23 @@ func (*hooks) GasConfigAfter(*types.Header) (gas.Gas, hook.GasPriceConfig) {
 	}
 }
 
-func (*hooks) SubSecondBlockTime(*types.Header) time.Duration {
+func (*points) SubSecondBlockTime(*types.Header) time.Duration {
 	return 0
 }
 
-func (*hooks) EndOfBlockOps(*types.Block) ([]hook.Op, error) {
+func (*points) EndOfBlockOps(*types.Block) ([]hook.Op, error) {
 	return nil, nil
 }
 
-func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
+func (*points) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
 	return nil
 }
 
-func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
+func (*points) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
 	return nil
 }
 
-func (*hooks) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) {
+func (*points) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) {
 	//
 
 	// acceptCtx := &precompileconfig.AcceptContext{
