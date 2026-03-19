@@ -18,29 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
 
-type coordinatorTestSyncer struct {
-	name     string
-	id       string
-	syncFn   func(context.Context) error
-	updateFn func(message.Syncable) error
-}
-
-func (s *coordinatorTestSyncer) Sync(ctx context.Context) error {
-	if s.syncFn == nil {
-		return nil
-	}
-	return s.syncFn(ctx)
-}
-
-func (s *coordinatorTestSyncer) UpdateTarget(target message.Syncable) error {
-	if s.updateFn == nil {
-		return nil
-	}
-	return s.updateFn(target)
-}
-
-func (s *coordinatorTestSyncer) Name() string { return s.name }
-func (s *coordinatorTestSyncer) ID() string   { return s.id }
 
 func TestCoordinator_StateValidation(t *testing.T) {
 	co := NewCoordinator(NewSyncerRegistry(), Callbacks{}, WithPivotInterval(1))
@@ -89,9 +66,8 @@ func TestCoordinator_UpdateSyncTarget_RemovesStaleBlocks(t *testing.T) {
 func TestCoordinator_UpdateSyncTarget_DoesNotPruneOnFailureAndAborts(t *testing.T) {
 	wantErr := errors.New("update failed")
 	registry := NewSyncerRegistry()
-	require.NoError(t, registry.Register(&coordinatorTestSyncer{
+	require.NoError(t, registry.Register(FuncSyncer{
 		name: "update-failing",
-		id:   "update-failing",
 		updateFn: func(message.Syncable) error {
 			return wantErr
 		},
@@ -122,9 +98,8 @@ func TestCoordinator_UpdateSyncTarget_SerializesConcurrentCalls(t *testing.T) {
 	)
 
 	registry := NewSyncerRegistry()
-	require.NoError(t, registry.Register(&coordinatorTestSyncer{
+	require.NoError(t, registry.Register(FuncSyncer{
 		name: "serial-check",
-		id:   "serial-check",
 		updateFn: func(message.Syncable) error {
 			if !inUpdate.CompareAndSwap(0, 1) {
 				concurrent.Store(true)
@@ -159,34 +134,6 @@ func TestCoordinator_UpdateSyncTarget_SerializesConcurrentCalls(t *testing.T) {
 	require.False(t, concurrent.Load(), "UpdateTarget calls should be serialized")
 }
 
-func TestCoordinator_UpdateSyncTarget_PreservesBlocksForSlowerSyncers(t *testing.T) {
-	// Simulate the atomic gap scenario: a slow syncer (e.g., atomic) targets
-	// height 500 while the coordinator updates to 1000. Blocks between 500
-	// and 1000 must be preserved for batch replay.
-	registry := NewSyncerRegistry()
-
-	// Register a "slow" syncer that reports a fixed low target (like the atomic syncer).
-	require.NoError(t, registry.Register(NewTargetReporterSyncer("slow-syncer", 500)))
-
-	co := NewCoordinator(registry, Callbacks{}, WithPivotInterval(1))
-	co.state.Store(int32(StateRunning))
-	co.setCommitTarget(newTestSyncTarget(500))
-
-	// Enqueue blocks from 490 to 510.
-	for i := uint64(490); i <= 510; i++ {
-		co.AddBlockOperation(newMockBlock(i), OpAccept)
-	}
-
-	// Update target to 505. Without min-target tracking, blocks 490-504 would
-	// be pruned. With min-target tracking, only blocks below 500 are pruned.
-	require.NoError(t, co.UpdateSyncTarget(newTestSyncTarget(505)))
-
-	batch := co.queue.dequeueBatch()
-	// Blocks 500-510 preserved (11 blocks). Blocks 490-499 pruned.
-	require.Len(t, batch, 11, "blocks between slow syncer target and new target must be preserved")
-	require.Equal(t, uint64(500), batch[0].block.GetEthBlock().NumberU64())
-}
-
 func TestCoordinator_Lifecycle(t *testing.T) {
 	t.Run("completes successfully", func(t *testing.T) {
 		registry := NewSyncerRegistry()
@@ -213,22 +160,12 @@ func TestCoordinator_Lifecycle(t *testing.T) {
 }
 
 func TestCoordinator_Start_ReplaysDeferredOperationsAfterFinalize(t *testing.T) {
-	registry := NewSyncerRegistry()
-
-	started := make(chan struct{})
+	var started sync.WaitGroup
+	started.Add(1)
 	release := make(chan struct{})
-	require.NoError(t, registry.Register(FuncSyncer{
-		name: "barrier",
-		fn: func(ctx context.Context) error {
-			close(started)
-			select {
-			case <-release:
-				return nil
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		},
-	}))
+
+	registry := NewSyncerRegistry()
+	require.NoError(t, registry.Register(NewBarrierSyncer("barrier", &started, release)))
 
 	done := make(chan error, 1)
 	co := NewCoordinator(registry, Callbacks{
@@ -237,7 +174,7 @@ func TestCoordinator_Start_ReplaysDeferredOperationsAfterFinalize(t *testing.T) 
 	}, WithPivotInterval(1))
 	co.Start(t.Context(), newTestSyncTarget(100))
 
-	<-started
+	started.Wait()
 	block := newMockBlock(100)
 	require.True(t, co.AddBlockOperation(block, OpAccept))
 
@@ -248,23 +185,12 @@ func TestCoordinator_Start_ReplaysDeferredOperationsAfterFinalize(t *testing.T) 
 }
 
 func TestCoordinator_Start_FinalizesWithCommitTarget(t *testing.T) {
-	registry := NewSyncerRegistry()
-
-	started := make(chan struct{})
+	var started sync.WaitGroup
+	started.Add(1)
 	release := make(chan struct{})
-	require.NoError(t, registry.Register(&coordinatorTestSyncer{
-		name: "barrier",
-		id:   "barrier",
-		syncFn: func(ctx context.Context) error {
-			close(started)
-			select {
-			case <-release:
-				return nil
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		},
-	}))
+
+	registry := NewSyncerRegistry()
+	require.NoError(t, registry.Register(NewBarrierSyncer("barrier", &started, release)))
 
 	done := make(chan error, 1)
 	var finalizedTarget message.Syncable
@@ -278,10 +204,9 @@ func TestCoordinator_Start_FinalizesWithCommitTarget(t *testing.T) {
 		},
 	}, WithPivotInterval(1))
 
-	initial := newTestSyncTarget(100)
-	co.Start(t.Context(), initial)
+	co.Start(t.Context(), newTestSyncTarget(100))
 
-	<-started
+	started.Wait()
 	require.NoError(t, co.UpdateSyncTarget(newTestSyncTarget(105)))
 	close(release)
 
@@ -372,6 +297,80 @@ func runCoordinator(t *testing.T, registry *SyncerRegistry, cbs Callbacks) (*Coo
 	wg.Wait()
 
 	return co, errDone
+}
+
+func TestCoordinator_PivotCycleWithSlowSyncer(t *testing.T) {
+	// Simulate the atomic gap scenario end-to-end: a slow syncer targets
+	// height 500 while the coordinator pivots to 505. Blocks between 500
+	// and 510 must survive pruning and be replayed after syncers finish.
+	require := require.New(t)
+
+	var started sync.WaitGroup
+	started.Add(1)
+	release := make(chan struct{})
+
+	registry := NewSyncerRegistry()
+	syncer := NewBarrierSyncer("slow", &started, release)
+	h := uint64(500)
+	syncer.targetHeight = &h
+	require.NoError(registry.Register(syncer))
+
+	done := make(chan error, 1)
+	var finalizedTarget message.Syncable
+	co := NewCoordinator(registry, Callbacks{
+		FinalizeVM: func(_ context.Context, target message.Syncable) error {
+			finalizedTarget = target
+			return nil
+		},
+		OnDone: func(err error) { done <- err },
+	}, WithPivotInterval(1))
+
+	co.Start(t.Context(), newTestSyncTarget(500))
+	started.Wait()
+
+	blocks := enqueueBlockRange(t, co, 490, 510)
+
+	require.NoError(co.UpdateSyncTarget(newTestSyncTarget(505)))
+	require.Equal(uint64(1), co.targetEpoch.Load())
+
+	close(release)
+	require.NoError(<-done)
+
+	require.NotNil(finalizedTarget)
+	require.Equal(uint64(505), finalizedTarget.Height())
+	require.Equal(StateCompleted, co.CurrentState())
+
+	requireBlocksNotReplayed(t, blocks, 490, 499)
+	requireBlocksReplayed(t, blocks, 500, 510)
+}
+
+// enqueueBlockRange creates mock blocks for the inclusive range [lo, hi] and
+// enqueues them as OpAccept on the coordinator. Returns the block map.
+func enqueueBlockRange(t *testing.T, co *Coordinator, lo, hi uint64) map[uint64]*mockEthBlockWrapper {
+	t.Helper()
+	blocks := make(map[uint64]*mockEthBlockWrapper, hi-lo+1)
+	for i := lo; i <= hi; i++ {
+		b := newMockBlock(i)
+		blocks[i] = b
+		require.True(t, co.AddBlockOperation(b, OpAccept))
+	}
+	return blocks
+}
+
+// requireBlocksReplayed asserts that every block in [lo, hi] was accepted exactly once.
+func requireBlocksReplayed(t *testing.T, blocks map[uint64]*mockEthBlockWrapper, lo, hi uint64) {
+	t.Helper()
+	for i := lo; i <= hi; i++ {
+		require.Equal(t, 1, blocks[i].acceptCount, "block %d should have been replayed", i)
+	}
+}
+
+// requireBlocksNotReplayed asserts that every block in [lo, hi] was never accepted.
+func requireBlocksNotReplayed(t *testing.T, blocks map[uint64]*mockEthBlockWrapper, lo, hi uint64) {
+	t.Helper()
+	for i := lo; i <= hi; i++ {
+		require.Equal(t, 0, blocks[i].acceptCount, "block %d should have been pruned", i)
+	}
 }
 
 func newTestSyncTarget(height uint64) message.Syncable {

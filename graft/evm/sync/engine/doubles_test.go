@@ -56,10 +56,12 @@ var _ EthBlockWrapper = (*mockEthBlockWrapper)(nil)
 
 // FuncSyncer adapts a function to the simple Syncer shape used in tests. It is
 // useful for defining small, behavior-driven syncers inline. When targetHeight
-// is set, the syncer also implements [types.TargetReporter].
+// is set, the syncer also implements [types.TargetReporter]. When updateFn is
+// set, it is called on UpdateTarget instead of the default no-op.
 type FuncSyncer struct {
 	name         string
 	fn           func(ctx context.Context) error
+	updateFn     func(message.Syncable) error
 	targetHeight *uint64
 }
 
@@ -67,7 +69,12 @@ type FuncSyncer struct {
 func (f FuncSyncer) Sync(ctx context.Context) error { return f.fn(ctx) }
 func (f FuncSyncer) Name() string                   { return f.name }
 func (f FuncSyncer) ID() string                     { return f.name }
-func (FuncSyncer) UpdateTarget(message.Syncable) error {
+
+// UpdateTarget delegates to updateFn if set, otherwise returns nil.
+func (f FuncSyncer) UpdateTarget(target message.Syncable) error {
+	if f.updateFn != nil {
+		return f.updateFn(target)
+	}
 	return nil
 }
 

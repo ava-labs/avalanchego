@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "importtx",
+    srcs = [
+        "cmd.go",
+        "flags.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/importtx",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/info",
+        "//genesis",
+        "//ids",
+        "//utils/crypto/bls",
+        "//utils/crypto/secp256k1",
+        "//utils/set",
+        "//vms/example/xsvm/api",
+        "//vms/example/xsvm/cmd/issue/status",
+        "//vms/example/xsvm/tx",
+        "//vms/platformvm/warp",
+        "//wallet/subnet/primary",
+        "@com_github_spf13_cobra//:cobra",
+        "@com_github_spf13_pflag//:pflag",
+    ],
+)

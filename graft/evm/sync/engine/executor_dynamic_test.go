@@ -6,6 +6,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,21 +17,6 @@ import (
 type noopAcceptor struct{}
 
 func (noopAcceptor) AcceptSync(context.Context, message.Syncable) error { return nil }
-
-type targetTrackingSyncer struct {
-	name      string
-	id        string
-	updateErr error
-	updates   int
-}
-
-func (*targetTrackingSyncer) Sync(context.Context) error { return nil }
-func (s *targetTrackingSyncer) Name() string             { return s.name }
-func (s *targetTrackingSyncer) ID() string               { return s.id }
-func (s *targetTrackingSyncer) UpdateTarget(message.Syncable) error {
-	s.updates++
-	return s.updateErr
-}
 
 func TestDynamicExecutor_OnBlockAccepted(t *testing.T) {
 	updateErr := errors.New("update failed")
@@ -62,10 +48,13 @@ func TestDynamicExecutor_OnBlockAccepted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			syncer := &targetTrackingSyncer{
-				name:      "target-tracker",
-				id:        "target-tracker",
-				updateErr: tt.updateErr,
+			updates := 0
+			syncer := FuncSyncer{
+				name: "target-tracker",
+				updateFn: func(message.Syncable) error {
+					updates++
+					return tt.updateErr
+				},
 			}
 			registry := NewSyncerRegistry()
 			require.NoError(t, registry.Register(syncer))
@@ -87,7 +76,7 @@ func TestDynamicExecutor_OnBlockAccepted(t *testing.T) {
 				if tt.state == StateRunning {
 					wantUpdates = 1
 				}
-				require.Equal(t, wantUpdates, syncer.updates)
+				require.Equal(t, wantUpdates, updates)
 
 				if tt.updateErr != nil {
 					require.Equal(t, StateAborted, executor.coordinator.CurrentState())
@@ -101,6 +90,53 @@ func TestDynamicExecutor_OnBlockAccepted(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDynamicExecutor_FullPivotCycleWithBlockAcceptance(t *testing.T) {
+	// End-to-end test: blocks arrive via OnBlockAccepted while syncers are
+	// running, triggering a pivot. After syncers finish, batch replay
+	// executes the surviving blocks.
+	require := require.New(t)
+
+	var started sync.WaitGroup
+	started.Add(1)
+	release := make(chan struct{})
+
+	registry := NewSyncerRegistry()
+	require.NoError(registry.Register(NewBarrierSyncer("syncer", &started, release)))
+
+	done := make(chan error, 1)
+	executor := newDynamicExecutor(registry, noopAcceptor{}, 1)
+	go func() {
+		done <- executor.Execute(t.Context(), newTestSyncTarget(100))
+	}()
+
+	started.Wait()
+
+	// Simulate consensus accepting blocks while sync runs.
+	// With pivotInterval=1, every block triggers a pivot, so the final
+	// commit target will be 110 (the last block accepted).
+	blocks := make(map[uint64]*mockEthBlockWrapper)
+	for i := uint64(100); i <= 110; i++ {
+		b := newMockBlock(i)
+		blocks[i] = b
+		deferred, err := executor.OnBlockAccepted(b)
+		require.NoError(err)
+		require.True(deferred, "block %d should be deferred", i)
+	}
+
+	require.Equal(uint64(110), executor.coordinator.getCommitTarget().Height())
+
+	// Release syncers to complete.
+	close(release)
+	require.NoError(<-done)
+
+	require.Equal(StateCompleted, executor.CurrentState())
+
+	// Each pivot pruned blocks below the new target. With pivotInterval=1,
+	// only the last block (110) survives.
+	requireBlocksNotReplayed(t, blocks, 100, 109)
+	requireBlocksReplayed(t, blocks, 110, 110)
 }
 
 func TestDynamicExecutor_OnBlockRejectedAndVerified(t *testing.T) {
@@ -137,7 +173,7 @@ func TestDynamicExecutor_OnBlockRejectedAndVerified(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			registry := NewSyncerRegistry()
-			require.NoError(t, registry.Register(&targetTrackingSyncer{name: "target-tracker", id: "target-tracker"}))
+			require.NoError(t, registry.Register(FuncSyncer{name: "target-tracker"}))
 
 			executor := newDynamicExecutor(registry, noopAcceptor{}, 1)
 			executor.coordinator.state.Store(int32(tt.state))

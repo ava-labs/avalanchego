@@ -308,18 +308,21 @@ func FillAccounts(
 	return newRoot, accounts
 }
 
+// FillAccountsWithStorageAndCode is a helper function that calls [FillAccounts] with an [onAccount] callback that randomly assigns accounts to have code and storage.
+// Approximately half of accounts created will have unrunnable contracts and non-empty storage tries, and the other half will be EOAs.
 func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.Database, root common.Hash, numAccounts int) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
 	return FillAccounts(t, r, serverDB, root, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
-		codeBytes := make([]byte, 256)
-		_, err := r.Read(codeBytes)
-		require.NoError(t, err, "error reading random code bytes")
+		if r.Intn(2) == 0 {
+			codeBytes := make([]byte, 256)
+			_, err := r.Read(codeBytes)
+			require.NoError(t, err, "error reading random code bytes")
 
-		codeHash := crypto.Keccak256Hash(codeBytes)
-		rawdb.WriteCode(serverDB.DiskDB(), codeHash, codeBytes)
-		account.CodeHash = codeHash[:]
+			codeHash := crypto.Keccak256Hash(codeBytes)
+			rawdb.WriteCode(serverDB.DiskDB(), codeHash, codeBytes)
+			account.CodeHash = codeHash[:]
 
-		// now create state trie
-		FillStorageForAccount(t, r, 16, addr, storageTr)
+			FillStorageForAccount(t, r, 16, addr, storageTr)
+		}
 		return account
 	})
 }

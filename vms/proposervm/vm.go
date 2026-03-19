@@ -81,6 +81,7 @@ type VM struct {
 	proposer.Windower
 	tree.Tree
 	mockable.Clock
+	finishedBootstrappingAt time.Time
 
 	ctx *snow.Context
 	db  *versiondb.Database
@@ -316,6 +317,11 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	}
 
 	oldState := vm.consensusState
+
+	if newState == snow.NormalOp && oldState != snow.NormalOp {
+		vm.finishedBootstrappingAt = vm.Clock.Time()
+	}
+
 	vm.consensusState = newState
 	if oldState != snow.StateSyncing {
 		return nil

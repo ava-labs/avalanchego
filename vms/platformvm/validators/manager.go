@@ -18,11 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -47,88 +45,9 @@ var (
 	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
 )
 
-type State interface {
-	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
-
-	GetLastAccepted() ids.ID
-	GetStatelessBlock(blockID ids.ID) (block.Block, error)
-
-	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
-	// block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
-	ApplyValidatorWeightDiffs(
-		ctx context.Context,
-		validators map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-		subnetID ids.ID,
-	) error
-
-	// ApplyAllValidatorWeightDiffs iterates from [startHeight] towards the genesis
-	// block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
-	ApplyAllValidatorWeightDiffs(
-		ctx context.Context,
-		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-	) error
-
-	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
-	// genesis block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
-	ApplyValidatorPublicKeyDiffs(
-		ctx context.Context,
-		validators map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-		subnetID ids.ID,
-	) error
-
-	// ApplyAllValidatorPublicKeyDiffs iterates from [startHeight] towards the
-	// genesis block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
-	ApplyAllValidatorPublicKeyDiffs(
-		ctx context.Context,
-		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-	) error
-
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*state.Staker, []state.L1Validator, uint64, error)
-}
-
 func NewManager(
 	cfg config.Internal,
-	state State,
+	state *state.State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 ) *Manager {
@@ -149,11 +68,12 @@ func NewManager(
 	}
 }
 
+// Manager implements [validators.State] and additionally tracks recently accepted block IDs via OnAcceptedBlockID.
 // TODO: Remove requirement for the P-chain's context lock to be held when
 // calling exported functions.
 type Manager struct {
 	cfg     config.Internal
-	state   State
+	state   *state.State
 	metrics metrics.Metrics
 	clk     *mockable.Clock
 
