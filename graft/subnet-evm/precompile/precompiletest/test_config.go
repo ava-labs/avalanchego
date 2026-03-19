@@ -15,9 +15,9 @@ import (
 
 // ConfigVerifyTest is a test case for verifying a config
 type ConfigVerifyTest struct {
-	Name          string
-	Config        precompileconfig.Config
-	ChainConfig   precompileconfig.ChainConfig
+	Name        string
+	Config      precompileconfig.Config
+	ChainConfig precompileconfig.ChainConfig
 	ExpectedErr error
 }
 

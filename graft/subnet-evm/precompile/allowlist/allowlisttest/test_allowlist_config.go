@@ -111,7 +111,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) []precompil
 			ExpectedErr: allowlist.ErrCannotAddManagersBeforeDurango,
 		},
 		{
-			Name: "nil member allow list config in allowlist",
+			Name:   "nil member allow list config in allowlist",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{}),
 		},
 		{

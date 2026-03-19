@@ -16,13 +16,13 @@ import (
 func TestVerify(t *testing.T) {
 	tests := []precompiletest.ConfigVerifyTest{
 		{
-			Name:          "quorum numerator less than minimum",
-			Config:        NewConfig(utils.PointerTo[uint64](3), WarpQuorumNumeratorMinimum-1, false),
+			Name:        "quorum numerator less than minimum",
+			Config:      NewConfig(utils.PointerTo[uint64](3), WarpQuorumNumeratorMinimum-1, false),
 			ExpectedErr: ErrInvalidQuorumRatio,
 		},
 		{
-			Name:          "quorum numerator greater than quorum denominator",
-			Config:        NewConfig(utils.PointerTo[uint64](3), WarpQuorumDenominator+1, false),
+			Name:        "quorum numerator greater than quorum denominator",
+			Config:      NewConfig(utils.PointerTo[uint64](3), WarpQuorumDenominator+1, false),
 			ExpectedErr: ErrInvalidQuorumRatio,
 		},
 		{

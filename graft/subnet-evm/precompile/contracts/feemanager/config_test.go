@@ -37,13 +37,13 @@ func TestVerify(t *testing.T) {
 	invalidFeeConfig.GasLimit = big.NewInt(0)
 	tests := []precompiletest.ConfigVerifyTest{
 		{
-			Name:          "invalid initial fee manager config",
-			Config:        feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &invalidFeeConfig),
+			Name:        "invalid initial fee manager config",
+			Config:      feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &invalidFeeConfig),
 			ExpectedErr: commontype.ErrGasLimitTooLow,
 		},
 		{
-			Name:          "nil initial fee manager config",
-			Config:        feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.FeeConfig{}),
+			Name:        "nil initial fee manager config",
+			Config:      feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.FeeConfig{}),
 			ExpectedErr: commontype.ErrGasLimitNil,
 		},
 	}

@@ -33,18 +33,18 @@ func TestVerify(t *testing.T) {
 			}(),
 		},
 		{
-			Name:          "invalid allow list config in native minter allowlisttest",
-			Config:        nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, admins, nil, nil),
+			Name:        "invalid allow list config in native minter allowlisttest",
+			Config:      nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, admins, nil, nil),
 			ExpectedErr: allowlist.ErrAdminAndEnabledAddress,
 		},
 		{
-			Name:          "duplicate admins in config in native minter allowlisttest",
-			Config:        nativeminter.NewConfig(utils.PointerTo[uint64](3), append(admins, admins[0]), enableds, managers, nil),
+			Name:        "duplicate admins in config in native minter allowlisttest",
+			Config:      nativeminter.NewConfig(utils.PointerTo[uint64](3), append(admins, admins[0]), enableds, managers, nil),
 			ExpectedErr: allowlist.ErrDuplicateAdminAddress,
 		},
 		{
-			Name:          "duplicate enableds in config in native minter allowlisttest",
-			Config:        nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, append(enableds, enableds[0]), managers, nil),
+			Name:        "duplicate enableds in config in native minter allowlisttest",
+			Config:      nativeminter.NewConfig(utils.PointerTo[uint64](3), admins, append(enableds, enableds[0]), managers, nil),
 			ExpectedErr: allowlist.ErrDuplicateEnabledAddress,
 		},
 		{
