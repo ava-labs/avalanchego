@@ -8,11 +8,11 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
+	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 )
 
 // Txs stores the transactions inside of the mempool.
@@ -50,7 +50,7 @@ func (t *Txs) Iter() iter.Seq[*Transaction] {
 
 // Iterate applies f to all transactions. If f returns false, the iteration
 // stops early.
-func (t *Txs) Iterate(f func(tx *atomic.Tx) bool) {
+func (t *Txs) Iterate(f func(tx *tx.Tx) bool) {
 	for tx := range t.Iter() {
 		if !f(tx.Tx) {
 			return
@@ -76,7 +76,7 @@ func (t *Txs) Has(txID ids.ID) bool {
 }
 
 // GetTx returns the transaction if it is in the mempool.
-func (t *Txs) Get(txID ids.ID) (*atomic.Tx, bool) {
+func (t *Txs) Get(txID ids.ID) (*tx.Tx, bool) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 

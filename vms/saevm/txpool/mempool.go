@@ -6,8 +6,8 @@ package txpool
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 )
 
 const maxSize = 4096
@@ -31,8 +31,8 @@ func New(txs *Txs, avaxAssetID ids.ID) *Mempool {
 	}
 }
 
-func (m *Mempool) Add(tx *atomic.Tx) error {
-	gasPrice, err := atomic.EffectiveGasPrice(tx, m.avaxAssetID, true)
+func (m *Mempool) Add(tx *tx.Tx) error {
+	gasPrice, err := tx.GasPrice(m.avaxAssetID)
 	if err != nil {
 		return err
 	}
@@ -41,10 +41,14 @@ func (m *Mempool) Add(tx *atomic.Tx) error {
 
 	// TODO: Verify tx against the atomic state
 
+	txID, err := tx.ID()
+	if err != nil {
+		return err
+	}
+
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	txID := tx.ID()
 	if _, ok := m.txs.Get(txID); ok {
 		return ErrAlreadyKnown
 	}
@@ -69,6 +73,7 @@ func (m *Mempool) Add(tx *atomic.Tx) error {
 
 	m.utxos.Put(txID, inputs)
 	m.txs.Push(txID, &Transaction{
+		ID:       txID,
 		Tx:       tx,
 		Inputs:   inputs,
 		GasPrice: gasPrice,

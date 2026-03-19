@@ -19,21 +19,21 @@ import (
 func ancestorUTXOIDs(header *types.Header, settledHash common.Hash, getBlock blocks.EthBlockSource) (set.Set[ids.ID], error) {
 	var consumedUTXOs set.Set[ids.ID]
 	for header.ParentHash != settledHash {
-		blockNumber := header.Number.Uint64() - 1
-		block, ok := getBlock(header.ParentHash, blockNumber)
+		parentNumber := header.Number.Uint64() - 1
+		parent, ok := getBlock(header.ParentHash, parentNumber)
 		if !ok {
-			return nil, fmt.Errorf("missing block %s (%d)", header.ParentHash, blockNumber)
+			return nil, fmt.Errorf("missing block %s (%d)", header.ParentHash, parentNumber)
 		}
 
-		txs, err := tx.ParseSlice(customtypes.BlockExtData(block))
+		txs, err := tx.ParseSlice(customtypes.BlockExtData(parent))
 		if err != nil {
-			return nil, fmt.Errorf("failed to extract txs of block %s (%d): %v", block.Hash(), block.NumberU64(), err)
+			return nil, fmt.Errorf("failed to extract txs of block %s (%d): %v", parent.Hash(), parent.NumberU64(), err)
 		}
 
 		for _, tx := range txs {
 			consumedUTXOs.Union(tx.InputUTXOs())
 		}
-		header = block.Header()
+		header = parent.Header()
 	}
 	return consumedUTXOs, nil
 }

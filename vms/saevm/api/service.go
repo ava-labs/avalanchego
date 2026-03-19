@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 )
 
@@ -173,9 +174,14 @@ func (s *Service) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) 
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
-	tx, err := parseTx(txBytes)
+	tx, err := tx.Parse(txBytes)
 	if err != nil {
 		return fmt.Errorf("problem parsing transaction: %w", err)
+	}
+
+	txID, err := tx.ID()
+	if err != nil {
+		return fmt.Errorf("problem getting transaction ID: %w", err)
 	}
 
 	err = s.mempool.Add(tx)
@@ -183,22 +189,13 @@ func (s *Service) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) 
 		// If the tx was added to the mempool, or was previously included, we
 		// push it to the network for inclusion. This ensures this node will
 		// push the tx, even if it was previously seen by p2p gossip.
-		s.pushGossiper.Add(tx)
+
+		// TODO: FIXME
+		// s.pushGossiper.Add(tx)
 	}
 
-	r.TxID = tx.ID()
+	r.TxID = txID
 	return err
-}
-
-func parseTx(txBytes []byte) (*atomic.Tx, error) {
-	tx := &atomic.Tx{}
-	if _, err := atomic.Codec.Unmarshal(txBytes, tx); err != nil {
-		return nil, fmt.Errorf("%T.Unmarshal(): %v", atomic.Codec, err)
-	}
-	if err := tx.Sign(atomic.Codec, nil); err != nil {
-		return nil, fmt.Errorf("%T.Sign(): %v", atomic.Codec, err)
-	}
-	return tx, nil
 }
 
 type TxStatus struct {

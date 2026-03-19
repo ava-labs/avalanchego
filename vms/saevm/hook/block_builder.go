@@ -4,7 +4,9 @@
 package hook
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"iter"
 	"math/big"
 	"time"
@@ -16,9 +18,10 @@ import (
 	"github.com/ava-labs/strevm/hook"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 )
 
@@ -26,6 +29,7 @@ var _ hook.BlockBuilder[*txpool.Transaction] = (*blockBuilder)(nil)
 
 type blockBuilder struct {
 	log logging.Logger
+	ctx *snow.Context
 
 	now          func() time.Time
 	potentialTxs *txpool.Txs
@@ -45,36 +49,39 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
 	}
 }
 
-func emptyIter(yield func(*txpool.Transaction) bool) {}
-
 func (b *blockBuilder) PotentialEndOfBlockOps() iter.Seq[*txpool.Transaction] {
 	var (
 		header      *types.Header
 		settledHash common.Hash
 		getBlock    blocks.EthBlockSource
 	)
-	consumedUTXOs, err := ancestorUTXOIDs(header, settledHash, getBlock)
-	if err != nil {
-		b.log.Error("failed to get ancestor UTXO IDs",
-			zap.Error(err),
-		)
-		return emptyIter
-	}
 
 	return func(yield func(*txpool.Transaction) bool) {
+		consumedUTXOs, err := ancestorUTXOIDs(header, settledHash, getBlock)
+		if err != nil {
+			b.log.Error("failed to get ancestor UTXO IDs",
+				zap.Error(err),
+			)
+			return
+		}
+
 		for tx := range b.potentialTxs.Iter() {
 			if consumedUTXOs.Overlaps(tx.Inputs) {
+				b.log.Debug("tx consumes previously consumed UTXOs",
+					zap.Stringer("txID", tx.ID),
+				)
 				continue
 			}
-
-			if err := tx.Tx.Verify(&snow.Context{}, extras.Rules{}); err != nil {
+			if err := tx.Tx.Verify(context.TODO(), b.ctx); err != nil {
+				b.log.Debug("tx failed verification",
+					zap.Stringer("txID", tx.ID),
+					zap.Error(err),
+				)
 				continue
 			}
-
 			if !yield(tx) {
 				return
 			}
-
 			consumedUTXOs.Union(tx.Inputs)
 		}
 	}
@@ -86,11 +93,28 @@ func (*blockBuilder) BuildBlock(
 	header *types.Header,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
-	atomicTxs []*txpool.Transaction,
+	poolTxs []*txpool.Transaction,
 ) (*types.Block, error) {
-	if len(txs) == 0 && len(atomicTxs) == 0 {
+	if len(txs) == 0 && len(poolTxs) == 0 {
 		return nil, errEmptyBlock
 	}
-	// TODO: Include atomic txs
-	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil)), nil
+
+	atomicTxs := make([]*tx.Tx, len(poolTxs))
+	for i, poolTx := range poolTxs {
+		atomicTxs[i] = poolTx.Tx
+	}
+	extData, err := tx.MarshalSlice(atomicTxs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal atomic transactions: %w", err)
+	}
+
+	return customtypes.NewBlockWithExtData(
+		header,
+		txs,
+		nil, // uncles
+		receipts,
+		trie.NewStackTrie(nil),
+		extData,
+		true, // update [customtypes.HeaderExtra.ExtDataHash]
+	), nil
 }

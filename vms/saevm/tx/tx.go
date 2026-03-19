@@ -11,10 +11,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/strevm/hook"
 	"github.com/holiman/uint256"
 )
 
@@ -47,25 +50,16 @@ func Parse(b []byte) (*Tx, error) {
 	return tx, nil
 }
 
-var errInefficientSlicePacking = errors.New("inefficient slice packing: empty slices should be packed as nil")
-
-func ParseSlice(b []byte) ([]*Tx, error) {
-	if len(b) == 0 {
-		return nil, nil
-	}
-
-	var txs []*Tx
-	if _, err := c.Unmarshal(b, &txs); err != nil {
-		return nil, err
-	}
-	if len(txs) == 0 {
-		return nil, errInefficientSlicePacking
-	}
-	return txs, nil
-}
-
 func (t *Tx) Bytes() ([]byte, error) {
 	return c.Marshal(codecVersion, t)
+}
+
+func (t *Tx) ID() (ids.ID, error) {
+	bytes, err := t.Bytes()
+	if err != nil {
+		return ids.ID{}, err
+	}
+	return hashing.ComputeHash256Array(bytes), nil
 }
 
 const (
@@ -138,4 +132,61 @@ func (t *Tx) GasPrice(avaxAssetID ids.ID) (uint256.Int, error) {
 	gasPrice.Mul(&gasPrice, x2cRate)
 	gasPrice.Div(&gasPrice, &bigGasUsed)
 	return gasPrice, nil
+}
+
+func (t *Tx) Verify(ctx context.Context, snowCtx *snow.Context) error {
+	if err := t.SanityCheck(ctx, snowCtx); err != nil {
+		return fmt.Errorf("failed sanity check: %w", err)
+	}
+	if err := t.VerifyCredentials(snowCtx, t.Creds); err != nil {
+		return fmt.Errorf("failed to verify credentials: %w", err)
+	}
+	return nil
+}
+
+func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
+	id, err := t.ID()
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("problem getting transaction ID: %w", err)
+	}
+
+	gasUsed, err := t.GasUsed()
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("problem calculating gas used: %w", err)
+	}
+
+	gasPrice, err := t.GasPrice(avaxAssetID)
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("problem calculating gas price: %w", err)
+	}
+
+	return hook.Op{
+		ID:        id,
+		Gas:       gas.Gas(gasUsed),
+		GasFeeCap: gasPrice,
+	}, nil
+}
+
+func MarshalSlice(txs []*Tx) ([]byte, error) {
+	if len(txs) == 0 {
+		return nil, nil
+	}
+	return c.Marshal(codecVersion, &txs)
+}
+
+var errInefficientSlicePacking = errors.New("inefficient slice packing: empty slices should be packed as nil")
+
+func ParseSlice(b []byte) ([]*Tx, error) {
+	if len(b) == 0 {
+		return nil, nil
+	}
+
+	var txs []*Tx
+	if _, err := c.Unmarshal(b, &txs); err != nil {
+		return nil, err
+	}
+	if len(txs) == 0 {
+		return nil, errInefficientSlicePacking
+	}
+	return txs, nil
 }

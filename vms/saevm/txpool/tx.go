@@ -6,19 +6,18 @@ package txpool
 import (
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/strevm/hook"
 )
 
 type Transaction struct {
-	Tx       *atomic.Tx
+	ID       ids.ID
+	Tx       *tx.Tx
 	Inputs   set.Set[ids.ID]
 	GasPrice uint256.Int
+	Op       hook.Op
 }
 
-func (t *Transaction) AsOp() hook.Op {
-	// TODO: Implement this
-	return hook.Op{}
-}
+func (t *Transaction) AsOp() hook.Op { return t.Op }
