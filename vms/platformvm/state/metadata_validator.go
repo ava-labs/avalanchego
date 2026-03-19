@@ -176,6 +176,7 @@ func (vs *validatorState) GetStakingInfo(
 }
 
 // SetStakingInfo updates the mutable staking info of `vdrID` on `subnetID`.
+// Unless deleted first, the next call to [WriteValidatorMetadata] will write this update to disk.
 //
 // This is called by execution layer to update mutable staking info.
 func (vs *validatorState) SetStakingInfo(
