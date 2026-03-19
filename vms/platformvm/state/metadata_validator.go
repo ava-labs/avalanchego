@@ -123,11 +123,9 @@ func (vs *validatorState) AddValidatorMetadata(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
 	vm *validatorMetadata,
-) error {
+) {
 	vs.LoadValidatorMetadata(vdrID, subnetID, vm)
 	vs.addUpdatedTxID(vdrID, subnetID, vm.txID)
-
-	return nil
 }
 
 // GetUptime returns the current uptime measurements of `vdrID` on

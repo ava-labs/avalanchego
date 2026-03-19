@@ -2858,9 +2858,7 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 					PotentialDelegateeReward: 0,
 				}
 
-				if err := s.validatorState.AddValidatorMetadata(nodeID, subnetID, metadata); err != nil {
-					return fmt.Errorf("adding validator metadata: %w", err)
-				}
+				s.validatorState.AddValidatorMetadata(nodeID, subnetID, metadata)
 			}
 
 			if validatorDiff.stakingInfo != nil {
