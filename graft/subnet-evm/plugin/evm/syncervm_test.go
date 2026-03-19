@@ -347,7 +347,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	// initialise [syncerVM] with blank genesis state
 	// Match the server's state-sync-commit-interval so parsed summaries are acceptable.
 	stateSyncEnabledJSON := fmt.Sprintf(
-		`{"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "state-sync-commit-interval": %d, "state-sync-dynamic-enabled": %t, "state-sync-pivot-interval": %d}`,
+		`"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "state-sync-commit-interval": %d, "state-sync-dynamic-enabled": %t, "state-sync-pivot-interval": %d`,
 		test.stateSyncMinBlocks, 4, test.syncableInterval, test.dynamicStateSyncEnabled, test.stateSyncPivotInterval,
 	)
 	syncerVM := newVM(t, testVMConfig{

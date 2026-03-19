@@ -5,7 +5,6 @@ package evmstate
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -29,12 +27,15 @@ var (
 type FirewoodSyncer struct {
 	s         *merklesync.Syncer[*syncer.RangeProof, struct{}]
 	cancel    context.CancelFunc
-	codeQueue *code.Queue
-	// finalizeOnce is initialized in the constructor to make Finalize idempotent.
-	finalizeOnce func() error
+	codeQueue types.CodeRequestQueue
+
+	// finalizeCodeQueue guards the single call to codeQueue.Finalize().
+	// Both Sync() (on success) and Finalize() (best-effort cleanup) go through
+	// this to avoid double-finalize errors since Queue.Finalize is not idempotent.
+	finalizeCodeQueue func() error
 }
 
-func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue *code.Queue, rpClient, cpClient *p2p.Client) (*FirewoodSyncer, error) {
+func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue types.CodeRequestQueue, rpClient, cpClient *p2p.Client) (*FirewoodSyncer, error) {
 	s, err := syncer.NewEVM(
 		config,
 		db,
@@ -47,36 +48,30 @@ func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Has
 		return nil, err
 	}
 	f := &FirewoodSyncer{
-		s:         s,
-		cancel:    func() {}, // overwritten in Sync
-		codeQueue: codeQueue,
+		s:                 s,
+		cancel:            func() {}, // overwritten in Sync
+		codeQueue:         codeQueue,
+		finalizeCodeQueue: sync.OnceValue(codeQueue.Finalize),
 	}
-	f.finalizeOnce = sync.OnceValue(f.finish)
 	return f, nil
 }
 
+// Sync runs the firewood state syncer to completion or until the context is
+// cancelled. On successful completion it finalizes the code queue so the code
+// syncer can exit.
 func (f *FirewoodSyncer) Sync(ctx context.Context) error {
 	ctx, f.cancel = context.WithCancel(ctx)
 	if err := f.s.Sync(ctx); err != nil {
 		return err
 	}
-
-	return f.Finalize()
+	return f.finalizeCodeQueue()
 }
 
+// Finalize performs best-effort cleanup: cancels the sync context and finalizes
+// the code queue. It is idempotent and safe to call multiple times.
 func (f *FirewoodSyncer) Finalize() error {
-	return f.finalizeOnce()
-}
-
-// finish performs the finalization logic for the FirewoodSyncer inside a [sync.Once].
-// This is linked to the [sync.Once] in the constructor, and should not be called directly.
-func (f *FirewoodSyncer) finish() error {
-	// Ensure the syncer stops work and the code queue closes on exit.
 	f.cancel()
-	if err := f.codeQueue.Finalize(); err != nil {
-		return fmt.Errorf("finalizing code queue: %w", err)
-	}
-	return nil
+	return f.finalizeCodeQueue()
 }
 
 func (*FirewoodSyncer) ID() string {
@@ -87,7 +82,9 @@ func (*FirewoodSyncer) Name() string {
 	return "Firewood EVM State Syncer"
 }
 
-func (*FirewoodSyncer) UpdateTarget(message.Syncable) error {
-	// Non-functional compatibility scaffolding.
-	return nil
+// UpdateTarget forwards the new target root to the underlying merkle syncer,
+// which re-prioritizes completed work items for re-sync against the new root.
+// It is thread-safe, non-blocking, and safe to call while Sync is running.
+func (f *FirewoodSyncer) UpdateTarget(target message.Syncable) error {
+	return f.s.UpdateSyncTarget(ids.ID(target.GetBlockRoot()))
 }

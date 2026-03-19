@@ -6,6 +6,8 @@ package types
 import (
 	"context"
 
+	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
@@ -50,6 +52,16 @@ type TargetReporter interface {
 	// For static syncers this is the initial target; for dynamic syncers this is
 	// the latest desired height.
 	TargetHeight() uint64
+}
+
+// CodeRequestQueue is the interface for adding code hashes to the download
+// queue and finalizing it when the main trie is done syncing. 
+type CodeRequestQueue interface {
+	// AddCode enqueues code hashes discovered during range proof commits
+	// for the code syncer to fetch from remote peers.
+	AddCode(context.Context, []common.Hash) error
+	// Finalize closes the code queue, signalling the code syncer to exit.
+	Finalize() error
 }
 
 // LeafClient is the interface for fetching leaves from the network.

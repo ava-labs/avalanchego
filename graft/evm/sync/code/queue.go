@@ -21,7 +21,7 @@ import (
 const defaultQueueCapacity = 5000
 
 var (
-	_ types.Finalizer = (*Queue)(nil)
+	_ types.CodeRequestQueue = (*Queue)(nil)
 
 	ErrFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
 	errFailedToFinalizeCodeQueue    = errors.New("failed to finalize code queue")

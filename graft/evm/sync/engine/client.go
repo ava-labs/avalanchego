@@ -471,74 +471,9 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		return nil, fmt.Errorf("failed to create block syncer: %w", err)
 	}
 
-	var (
-		codeSyncer  types.Syncer
-		stateSyncer types.Syncer
-	)
-	if c.config.DynamicStateSyncEnabled {
-		// Dynamic mode is wired through session-aware queue/syncer constructors.
-		// This allows pivot/session boundaries to be integrated explicitly.
-		codeQueue, err := code.NewSessionedQueue(c.config.ChainDB, c.config.StateSyncDone)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create sessioned code queue: %w", err)
-		}
-
-		codeSyncer, err = code.NewDynamicSyncer(c.config.Client, c.config.ChainDB, codeQueue)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create sessioned code syncer: %w", err)
-		}
-
-		stateSyncer, err = evmstate.NewHashDBDynamicSyncer(
-			c.config.Client, c.config.ChainDB,
-			summary.GetBlockRoot(),
-			codeQueue, c.config.RequestSize,
-			c.config.LeafsRequestType,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create dynamic EVM state syncer: %w", err)
-		}
-	} else {
-		codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create code queue: %w", err)
-		}
-
-		codeSyncer, err = code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create code syncer: %w", err)
-		}
-
-		if tdb, ok := c.config.Chain.BlockChain().TrieDB().Backend().(*firewood.TrieDB); ok {
-			registerer, err := metrics.MakeAndRegister(c.config.SnowCtx.Metrics, "sync_firewood")
-			if err != nil {
-				return nil, fmt.Errorf("failed to create firewood syncer metrics registerer: %w", err)
-			}
-			stateSyncer, err = evmstate.NewFirewoodSyncer(
-				syncer.Config{
-					Log:            c.config.SnowCtx.Log,
-					Registerer:     registerer,
-					StateSyncNodes: c.config.Client.StateSyncNodes(),
-				},
-				tdb.Firewood,
-				summary.GetBlockRoot(),
-				codeQueue,
-				c.config.Client.AddClient(p2p.FirewoodRangeProofHandlerID),
-				c.config.Client.AddClient(p2p.FirewoodChangeProofHandlerID),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create firewood syncer: %w", err)
-			}
-		} else {
-			stateSyncer, err = evmstate.NewHashDBSyncer(
-				c.config.Client, c.config.ChainDB,
-				summary.GetBlockRoot(),
-				codeQueue, c.config.RequestSize,
-				c.config.LeafsRequestType,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
-			}
-		}
+	codeSyncer, stateSyncer, err := c.newCodeAndStateSyncers(summary)
+	if err != nil {
+		return nil, err
 	}
 
 	syncers := []types.Syncer{blockSyncer, codeSyncer, stateSyncer}
@@ -558,4 +493,94 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 	}
 
 	return registry, nil
+}
+
+func (c *client) newCodeAndStateSyncers(summary message.Syncable) (types.Syncer, types.Syncer, error) {
+	if tdb, ok := c.config.Chain.BlockChain().TrieDB().Backend().(*firewood.TrieDB); ok {
+		return c.newFirewoodSyncers(summary, tdb)
+	}
+	if c.config.DynamicStateSyncEnabled {
+		return c.newHashDBDynamicSyncers(summary)
+	}
+	return c.newHashDBStaticSyncers(summary)
+}
+
+func (c *client) newFirewoodSyncers(summary message.Syncable, tdb *firewood.TrieDB) (types.Syncer, types.Syncer, error) {
+	codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create code queue: %w", err)
+	}
+
+	codeSyncer, err := code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create code syncer: %w", err)
+	}
+
+	registerer, err := metrics.MakeAndRegister(c.config.SnowCtx.Metrics, "sync_firewood")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create firewood syncer metrics registerer: %w", err)
+	}
+	stateSyncer, err := evmstate.NewFirewoodSyncer(
+		syncer.Config{
+			Log:            c.config.SnowCtx.Log,
+			Registerer:     registerer,
+			StateSyncNodes: c.config.Client.StateSyncNodes(),
+		},
+		tdb.Firewood,
+		summary.GetBlockRoot(),
+		codeQueue,
+		c.config.Client.AddClient(p2p.FirewoodRangeProofHandlerID),
+		c.config.Client.AddClient(p2p.FirewoodChangeProofHandlerID),
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create firewood syncer: %w", err)
+	}
+	return codeSyncer, stateSyncer, nil
+}
+
+func (c *client) newHashDBDynamicSyncers(summary message.Syncable) (types.Syncer, types.Syncer, error) {
+	codeQueue, err := code.NewSessionedQueue(c.config.ChainDB, c.config.StateSyncDone)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create sessioned code queue: %w", err)
+	}
+
+	codeSyncer, err := code.NewDynamicSyncer(c.config.Client, c.config.ChainDB, codeQueue)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create sessioned code syncer: %w", err)
+	}
+
+	stateSyncer, err := evmstate.NewHashDBDynamicSyncer(
+		c.config.Client, c.config.ChainDB,
+		summary.GetBlockRoot(),
+		codeQueue, c.config.RequestSize,
+		c.config.LeafsRequestType,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create dynamic EVM state syncer: %w", err)
+	}
+	return codeSyncer, stateSyncer, nil
+}
+
+func (c *client) newHashDBStaticSyncers(summary message.Syncable) (types.Syncer, types.Syncer, error) {
+	codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create code queue: %w", err)
+	}
+
+	codeSyncer, err := code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create code syncer: %w", err)
+	}
+
+	stateSyncer, err := evmstate.NewHashDBSyncer(
+		c.config.Client, c.config.ChainDB,
+		summary.GetBlockRoot(),
+		codeQueue, c.config.RequestSize,
+		c.config.LeafsRequestType,
+		evmstate.WithFinalizeCodeQueue(codeQueue.Finalize),
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
+	}
+	return codeSyncer, stateSyncer, nil
 }

@@ -15,10 +15,13 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/session"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 var (
+	_ types.CodeRequestQueue = (*SessionedQueue)(nil)
+
 	errSessionedQueueNotStarted     = errors.New("sessioned code queue not started")
 	errSessionedQueueAlreadyStarted = errors.New("sessioned code queue already started")
 	errSessionBoundarySendTimeout   = errors.New("session boundary event send timed out")

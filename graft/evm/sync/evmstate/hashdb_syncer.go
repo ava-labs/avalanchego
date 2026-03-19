@@ -41,13 +41,6 @@ var (
 	errPivotRequested                        = errors.New("state syncer: pivot requested")
 )
 
-// CodeRequestQueue is the interface for adding code hashes to the download queue
-// and finalizing it when the main trie is done syncing.
-type CodeRequestQueue interface {
-	AddCode(context.Context, []common.Hash) error
-	Finalize() error
-}
-
 // HashDBSyncer keeps the state of a single-root state sync session.
 type HashDBSyncer struct {
 	db        ethdb.Database            // database we are syncing
@@ -57,7 +50,7 @@ type HashDBSyncer struct {
 	batchSize uint                      // write batches when they reach this size
 	segments  chan leaf.SyncTask        // channel of tasks to sync
 	syncer    *leaf.CallbackSyncer      // performs the sync, looping over each task's range and invoking specified callbacks
-	codeQueue CodeRequestQueue          // queue that manages the asynchronous download and batching of code hashes
+	codeQueue types.CodeRequestQueue    // queue that manages the asynchronous download and batching of code hashes
 	trieQueue *trieQueue                // manages a persistent list of storage tries we need to sync and any segments that are created for them
 
 	// track the main account trie specifically to commit its root at the end of the operation
@@ -104,7 +97,7 @@ func WithFinalizeCodeQueue(fn func() error) HashDBSyncerOption {
 }
 
 // NewHashDBSyncer creates a single-session state syncer for the given root.
-func NewHashDBSyncer(syncClient client.Client, db ethdb.Database, root common.Hash, codeQueue CodeRequestQueue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...HashDBSyncerOption) (*HashDBSyncer, error) {
+func NewHashDBSyncer(syncClient client.Client, db ethdb.Database, root common.Hash, codeQueue types.CodeRequestQueue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...HashDBSyncerOption) (*HashDBSyncer, error) {
 	if leafsRequestSize == 0 {
 		return nil, errLeafsRequestSizeRequired
 	}
