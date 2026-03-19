@@ -88,7 +88,7 @@ func fromABIFeeConfig(c abiFeeConfig) (commontype.ACP224FeeConfig, error) {
 		if field.val == nil {
 			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrNilBigInt, field.name)
 		}
-		if field.val.IsUint64() {
+		if !field.val.IsUint64() {
 			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrInvalidUint64, field.name)
 		}
 	}
@@ -292,6 +292,11 @@ func setFeeConfig(
 		return nil, remainingGas, err
 	}
 
+	blockNumber := accessibleState.GetBlockContext().Number()
+	if blockNumber == nil {
+		return nil, remainingGas, ErrNilBlockNumber
+	}
+
 	oldConfig := GetStoredFeeConfig(stateDB)
 	topics, data, err := PackFeeConfigUpdatedEvent(
 		caller,
@@ -306,10 +311,10 @@ func setFeeConfig(
 		Address:     ContractAddress,
 		Topics:      topics,
 		Data:        data,
-		BlockNumber: accessibleState.GetBlockContext().Number().Uint64(),
+		BlockNumber: blockNumber.Uint64(),
 	})
 
-	if err := StoreFeeConfig(stateDB, feeConfig, accessibleState.GetBlockContext().Number()); err != nil {
+	if err := StoreFeeConfig(stateDB, feeConfig, blockNumber); err != nil {
 		return nil, remainingGas, err
 	}
 

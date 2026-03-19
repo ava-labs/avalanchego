@@ -41,8 +41,6 @@ graft_go_test(
         "//graft/subnet-evm/precompile/precompiletest",
         "//utils",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//core/rawdb",
-        "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_mock//gomock",
