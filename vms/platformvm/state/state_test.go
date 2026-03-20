@@ -3719,6 +3719,76 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, want, got)
 			})
+
+			t.Run("get staking info defaults to zero on commit", func(t *testing.T) {
+				state := newTestState(t, memdb.New())
+
+				diff, err := NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				validator := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
+				require.NoError(t, diff.PutCurrentValidator(validator))
+				require.NoError(t, diff.Apply(state))
+
+				diff, err = NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				// GetStakingInfo should be set once we prepare to commit changes to disk
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
+
+				got, err := diff.GetStakingInfo(validator.SubnetID, validator.NodeID)
+				require.NoError(t, err)
+				require.Equal(t, StakingInfo{}, got)
+			})
+
+			t.Run("add a validator then set staking info", func(t *testing.T) {
+				state := newTestState(t, memdb.New())
+
+				diff, err := NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				validator := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
+				require.NoError(t, diff.PutCurrentValidator(validator))
+				require.NoError(t, diff.Apply(state))
+
+				diff, err = NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				want := StakingInfo{DelegateeReward: 123}
+				require.NoError(t, diff.SetStakingInfo(validator.SubnetID, validator.NodeID, want))
+
+				// GetStakingInfo should be set once we prepare to commit changes to disk
+				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
+
+				got, err := state.GetStakingInfo(validator.SubnetID, validator.NodeID)
+				require.NoError(t, err)
+				require.Equal(t, want, got)
+			})
+
+			t.Run("add a validator and set staking info in same diff", func(t *testing.T) {
+				state := newTestState(t, memdb.New())
+
+				diff, err := NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				validator := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
+				require.NoError(t, diff.PutCurrentValidator(validator))
+
+				want := StakingInfo{DelegateeReward: 123}
+				require.NoError(t, diff.SetStakingInfo(validator.SubnetID, validator.NodeID, want))
+
+				// GetStakingInfo should be set once we prepare to commit changes to disk
+				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
+
+				got, err := state.GetStakingInfo(validator.SubnetID, validator.NodeID)
+				require.NoError(t, err)
+				require.Equal(t, want, got)
+			})
 		})
 	}
 }
