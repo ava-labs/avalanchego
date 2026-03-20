@@ -303,7 +303,7 @@ export METRICS_COLLECTOR_ENABLED=true
 ./scripts/benchmark_cchain_range.sh hashdb-101-250k
 ```
 
-    You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://avalabs.grafana.net/d/ma424s6/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
+You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://avalabs.grafana.net/d/ma424s6/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
 
 **NOTE: Prometheus credentials are required for collection**
 
