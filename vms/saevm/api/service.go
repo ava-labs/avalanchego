@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -24,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 )
@@ -32,20 +32,20 @@ type Service struct {
 	ctx          *snow.Context
 	mempool      *txpool.Mempool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
-	acceptedTxs  *state.AtomicRepository
+	db           database.KeyValueReader
 }
 
 func NewService(
 	ctx *snow.Context,
 	mempool *txpool.Mempool,
 	pushGossiper *gossip.PushGossiper[*tx.Tx],
-	acceptedTxs *state.AtomicRepository,
+	db database.KeyValueReader,
 ) *Service {
 	return &Service{
 		ctx,
 		mempool,
 		pushGossiper,
-		acceptedTxs,
+		db,
 	}
 }
 
@@ -208,7 +208,7 @@ func (s *Service) GetAtomicTxStatus(_ *http.Request, a *api.JSONTxID, r *TxStatu
 		zap.Stringer("txID", a.TxID),
 	)
 
-	_, height, err := s.acceptedTxs.GetByTxID(a.TxID)
+	_, height, err := state.ReadTxByID(s.db, a.TxID)
 	if errors.Is(err, database.ErrNotFound) {
 		r.Status = Unknown
 		return nil
@@ -235,12 +235,16 @@ func (s *Service) GetAtomicTx(_ *http.Request, a *api.GetTxArgs, r *Tx) error {
 		zap.Stringer("encoding", a.Encoding),
 	)
 
-	tx, height, err := s.acceptedTxs.GetByTxID(a.TxID)
+	tx, height, err := state.ReadTxByID(s.db, a.TxID)
 	if err != nil {
 		return err
 	}
+	txBytes, err := tx.Bytes()
+	if err != nil {
+		return fmt.Errorf("problem getting transaction bytes: %w", err)
+	}
 
-	r.Tx, err = formatting.Encode(a.Encoding, tx.SignedBytes())
+	r.Tx, err = formatting.Encode(a.Encoding, txBytes)
 	if err != nil {
 		return err
 	}

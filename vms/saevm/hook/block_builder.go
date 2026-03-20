@@ -14,20 +14,23 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/hook"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
+
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 var _ hook.BlockBuilder[*txpool.Tx] = (*blockBuilder)(nil)
 
 type blockBuilder struct {
-	ctx *snow.Context
+	ctx            *snow.Context
+	consensusState *utils.Atomic[snow.State]
 
 	now          func() time.Time
 	potentialTxs func() iter.Seq[*txpool.Tx]
@@ -47,15 +50,14 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
 	}
 }
 
-func (b *blockBuilder) PotentialEndOfBlockOps() iter.Seq[*txpool.Tx] {
-	var (
-		header      *types.Header
-		settledHash common.Hash
-		getBlock    blocks.EthBlockSource
-	)
+func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {
+	if b.consensusState.Get() != snow.NormalOp {
+		// Disable verification during bootstrapping.
+		return b.potentialTxs()
+	}
 
 	return func(yield func(*txpool.Tx) bool) {
-		consumedUTXOs, err := ancestorUTXOIDs(header, settledHash, getBlock)
+		consumedUTXOs, err := ancestorUTXOIDs(header, settledHash, source)
 		if err != nil {
 			b.ctx.Log.Error("failed to get ancestor UTXO IDs",
 				zap.Error(err),

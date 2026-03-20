@@ -8,19 +8,20 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/strevm/blocks"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
+
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
-func ancestorUTXOIDs(header *types.Header, settledHash common.Hash, getBlock blocks.EthBlockSource) (set.Set[ids.ID], error) {
+func ancestorUTXOIDs(header *types.Header, settledHash common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {
 	var consumedUTXOs set.Set[ids.ID]
 	for header.ParentHash != settledHash {
 		parentNumber := header.Number.Uint64() - 1
-		parent, ok := getBlock(header.ParentHash, parentNumber)
+		parent, ok := source(header.ParentHash, parentNumber)
 		if !ok {
 			return nil, fmt.Errorf("missing block %s (%d)", header.ParentHash, parentNumber)
 		}

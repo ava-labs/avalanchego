@@ -7,8 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -165,25 +167,23 @@ var errMultipleNonces = errors.New("multiple inputs for address with different n
 func (e *Export) AsOp(avaxAssetID ids.ID) (map[common.Address]hook.AccountDebit, map[common.Address]uint256.Int, error) {
 	burn := make(map[common.Address]hook.AccountDebit)
 	for _, in := range e.Ins {
-		if in.AssetID != avaxAssetID {
-			continue
-		}
-
 		debit, ok := burn[in.Address]
 		if ok && debit.Nonce != in.Nonce {
 			return nil, nil, fmt.Errorf("%w: address %s has nonces %d and %d", errMultipleNonces, in.Address, debit.Nonce, in.Nonce)
 		}
 
-		debit.Nonce = in.Nonce
-
-		var inAmount uint256.Int
-		inAmount.SetUint64(in.Amount)
-		inAmount.Mul(&inAmount, x2cRate)
-
-		if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &inAmount); overflow {
-			return nil, nil, fmt.Errorf("%w: for address %s", errOverflow, in.Address)
+		// Non-AVAX assets are transferred by the [Export.TransferMulticoin].
+		// But we must still increment the nonce here.
+		if in.AssetID == avaxAssetID {
+			var inAmount uint256.Int
+			inAmount.SetUint64(in.Amount)
+			inAmount.Mul(&inAmount, x2cRate)
+			if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &inAmount); overflow {
+				return nil, nil, fmt.Errorf("%w: for address %s", errOverflow, in.Address)
+			}
 		}
 
+		debit.Nonce = in.Nonce
 		debit.MinBalance = debit.Amount
 		burn[in.Address] = debit
 	}
@@ -218,4 +218,26 @@ func (e *Export) AtomicOps(txID ids.ID) (ids.ID, *atomic.Requests, error) {
 		elems[i] = elem
 	}
 	return e.DestinationChain, &atomic.Requests{PutRequests: elems}, nil
+}
+
+var errInsufficientFunds = errors.New("insufficient funds")
+
+func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+	for _, in := range e.Ins {
+		if in.AssetID == avaxAssetID {
+			continue
+		}
+
+		coinID := common.Hash(in.AssetID)
+		amount := new(big.Int).SetUint64(in.Amount)
+		if statedb.GetBalanceMultiCoin(in.Address, coinID).Cmp(amount) < 0 {
+			// Non-AVAX asset transfers are only allowed during bootstrapping,
+			// which should have already verified that this error will not
+			// occur.
+			return errInsufficientFunds
+		}
+		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
+
+	}
+	return nil
 }

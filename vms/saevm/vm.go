@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
 	avadb "github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
@@ -44,10 +43,11 @@ type SinceGenesis struct {
 	hooks   *hook.Points
 	config  sae.Config
 
-	ctx          *snow.Context
-	mempool      *txpool.Mempool
-	pushGossiper *avalanchegossip.PushGossiper[*tx.Tx]
-	acceptedTxs  *state.AtomicRepository
+	ctx            *snow.Context
+	consensusState utils.Atomic[snow.State]
+	db             avadb.Database
+	mempool        *txpool.Mempool
+	pushGossiper   *avalanchegossip.PushGossiper[*tx.Tx]
 
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
@@ -81,7 +81,7 @@ func (vm *SinceGenesis) Initialize(
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
 	db := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
-	tdb := triedb.NewDatabase(db, vm.config.TrieDBConfig)
+	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
 
 	genesis := new(core.Genesis)
 	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
@@ -115,7 +115,7 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	txs := txpool.NewTxs()
-	hooks := hook.NewPoints(snowCtx, txs, avaDB)
+	hooks := hook.NewPoints(snowCtx, &vm.consensusState, txs, avaDB)
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
 		return err
@@ -123,6 +123,7 @@ func (vm *SinceGenesis) Initialize(
 	vm.VM = inner
 	vm.hooks = hooks
 	vm.ctx = snowCtx
+	vm.db = avaDB
 	vm.mempool = txpool.New(txs, snowCtx)
 
 	metrics := prometheus.NewRegistry()
@@ -177,10 +178,12 @@ func (vm *SinceGenesis) Initialize(
 		})
 	}
 
-	{ // ========== Warp P2P  ==========
-	}
-
 	return nil
+}
+
+func (vm *SinceGenesis) SetState(ctx context.Context, state snow.State) error {
+	vm.consensusState.Set(state)
+	return vm.VM.SetState(ctx, state)
 }
 
 // Prevent busy looping when the chain is more advanced than the mempool.
@@ -198,8 +201,27 @@ func (vm *SinceGenesis) WaitForEvent(ctx context.Context) (common.Message, error
 	case <-ctx.Done():
 		return 0, ctx.Err()
 	case <-time.After(timeToWait):
-		return vm.VM.WaitForEvent(ctx)
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	type result struct {
+		msg common.Message
+		err error
+	}
+	results := make(chan result, 2)
+	go func() {
+		defer cancel()
+		msg, err := vm.VM.WaitForEvent(ctx)
+		results <- result{msg, err}
+	}()
+	go func() {
+		defer cancel()
+		err := vm.mempool.Txs.AwaitTxs(ctx)
+		results <- result{common.PendingTxs, err}
+	}()
+
+	r := <-results
+	return r.msg, r.err
 }
 
 const (
@@ -213,7 +235,7 @@ func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Han
 		return nil, err
 	}
 
-	service := api.NewService(vm.ctx, vm.mempool, vm.pushGossiper, vm.acceptedTxs)
+	service := api.NewService(vm.ctx, vm.mempool, vm.pushGossiper, vm.db)
 	handler, err := rpc.NewHandler(avaxServiceName, service)
 	if err != nil {
 		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)

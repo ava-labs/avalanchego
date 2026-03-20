@@ -4,12 +4,14 @@
 package txpool
 
 import (
+	"context"
 	"iter"
 	"slices"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/heap"
+	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
@@ -18,6 +20,8 @@ import (
 // Txs stores the transactions inside of the mempool.
 type Txs struct {
 	lock sync.RWMutex
+	cond *lock.Cond
+
 	// txs is the collection of transactions available to be included into a
 	// block, sorted by gasPrice.
 	txs heap.Map[ids.ID, *Tx]
@@ -26,12 +30,14 @@ type Txs struct {
 }
 
 func NewTxs() *Txs {
-	return &Txs{
+	txs := &Txs{
 		txs: heap.NewMap[ids.ID, *Tx](func(a, b *Tx) bool {
 			return a.GasPrice.Lt(&b.GasPrice) // Txs is a min-heap
 		}),
 		utxos: setmap.New[ids.ID, ids.ID](),
 	}
+	txs.cond = lock.NewCond(txs.lock.RLocker())
+	return txs
 }
 
 // Iter returns an iterator of all transactions sorted by decreasing gas price.
@@ -96,4 +102,17 @@ func (t *Txs) removeConflicts(utxos set.Set[ids.ID]) {
 	for _, removed := range t.utxos.DeleteOverlapping(utxos) {
 		t.txs.Remove(removed.Key)
 	}
+}
+
+func (t *Txs) AwaitTxs(ctx context.Context) error {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	for t.txs.Len() == 0 {
+		if err := t.cond.Wait(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

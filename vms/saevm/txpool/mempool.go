@@ -69,5 +69,6 @@ func (m *Mempool) Add(rawTx *tx.Tx) error {
 
 	m.utxos.Put(tx.ID, tx.Inputs)
 	m.txs.Push(tx.ID, tx)
+	m.cond.Broadcast()
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/strevm/adaptor"
 	"github.com/ava-labs/strevm/sae"
+	"github.com/ava-labs/strevm/saedb"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
@@ -23,7 +24,9 @@ func (*Factory) New(logger logging.Logger) (interface{}, error) {
 	logger.Info("Creating new SAE since genesis")
 	res := adaptor.Convert(NewSinceGenesis(sae.Config{
 		MempoolConfig: mempoolConfig,
-		TrieDBConfig:  triedb.HashDefaults,
+		DBConfig: saedb.Config{
+			TrieDBConfig: triedb.HashDefaults,
+		},
 	}))
 
 	logger.Info("Successfully created new SAE since genesis")

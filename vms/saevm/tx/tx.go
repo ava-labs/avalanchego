@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -49,6 +50,10 @@ type Unsigned interface {
 	// AtomicOps returns the operations that should be applied to shared memory
 	// when this transaction is executed.
 	AtomicOps(txID ids.ID) (chainID ids.ID, requests *atomic.Requests, err error)
+
+	// TransferNonAVAX transfers the non-AVAX balances requested by this
+	// transaction.
+	TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
 }
 
 type Tx struct {

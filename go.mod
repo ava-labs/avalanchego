@@ -28,7 +28,7 @@ require (
 	github.com/ava-labs/avalanchego/graft/evm v0.0.0-initial-consistent-tag
 	github.com/ava-labs/avalanchego/graft/subnet-evm v0.0.0-initial-consistent-tag
 	github.com/ava-labs/libevm v1.13.15-0.20260310192938-d71b6cc8513a
-	github.com/ava-labs/strevm v0.0.0-20260313134634-ab921d51491d
+	github.com/ava-labs/strevm v0.0.0-20260320145943-1b1bf04ca5f5
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593

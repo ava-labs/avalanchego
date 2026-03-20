@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
@@ -40,13 +41,15 @@ type Points struct {
 
 func NewPoints(
 	ctx *snow.Context,
+	consensusState *utils.Atomic[snow.State],
 	pool *txpool.Txs,
 	db database.Database,
 ) *Points {
 	return &Points{
 		blockBuilder{
-			ctx:          ctx,
-			potentialTxs: pool.Iter,
+			ctx:            ctx,
+			consensusState: consensusState,
+			potentialTxs:   pool.Iter,
 		},
 		db,
 	}
@@ -68,7 +71,8 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 	}
 
 	return &blockBuilder{
-		ctx: p.ctx,
+		ctx:            p.ctx,
+		consensusState: p.consensusState,
 		now: func() time.Time {
 			return time.Unix(int64(b.Time()), 0)
 		},
@@ -123,10 +127,21 @@ func (*Points) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) 
 	return nil
 }
 
-func (p *Points) AfterExecutingBlock(_ *state.StateDB, b *types.Block, _ types.Receipts) {
+func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to extract txs of block %s (%d): %v", b.Hash(), b.NumberU64(), err)
+	}
+
+	extstatedb := extstate.New(statedb)
+	for i, tx := range txs {
+		txID, err := tx.ID()
+		if err != nil {
+			return fmt.Errorf("problem getting transaction ID %d for block %s (%d): %w", i, b.Hash(), b.NumberU64(), err)
+		}
+		if err := tx.TransferNonAVAX(p.ctx.AVAXAssetID, extstatedb); err != nil {
+			return fmt.Errorf("failed to transfer non-AVAX assets of tx %s in block %s (%d): %v", txID, b.Hash(), b.NumberU64(), err)
+		}
 	}
 
 	height := b.NumberU64()
@@ -137,12 +152,12 @@ func (p *Points) AfterExecutingBlock(_ *state.StateDB, b *types.Block, _ types.R
 		writeTxs = saestate.WriteBonusTxs
 	}
 	if err := writeTxs(p.db, height, txs); err != nil {
-		panic(fmt.Errorf("failed to write txs of block %s (%d) to db: %v", b.Hash(), height, err))
+		return fmt.Errorf("failed to write txs of block %s (%d) to db: %v", b.Hash(), height, err)
 	}
 
 	ops, err := atomicOpsOf(txs)
 	if err != nil {
-		panic(fmt.Errorf("failed to extract atomic ops of block %s (%d): %v", b.Hash(), height, err))
+		return fmt.Errorf("failed to extract atomic ops of block %s (%d): %v", b.Hash(), height, err)
 	}
 
 	// TODO: Add ops to the atomic trie.
@@ -238,12 +253,12 @@ func (p *Points) AfterExecutingBlock(_ *state.StateDB, b *types.Block, _ types.R
 			zap.Stringer("block_hash", b.Hash()),
 			zap.Uint64("block_height", height),
 		)
-		return
+		return nil
 	}
 
 	lastAppliedHeight, err := saestate.ReadLastAppliedHeight(p.db)
 	if err != nil {
-		panic(fmt.Errorf("failed to read last applied height from db: %v", err))
+		return fmt.Errorf("failed to read last applied height from db: %v", err)
 	}
 
 	// SAE may re-execute blocks on startup. If the atomic ops were already
@@ -254,16 +269,17 @@ func (p *Points) AfterExecutingBlock(_ *state.StateDB, b *types.Block, _ types.R
 			zap.Uint64("block_height", height),
 			zap.Uint64("last_applied_height", lastAppliedHeight),
 		)
-		return
+		return nil
 	}
 
 	batch := p.db.NewBatch()
 	if err := saestate.WriteLastAppliedHeight(batch, height); err != nil {
-		panic(fmt.Errorf("failed to write last applied height of block %s (%d) to db: %v", b.Hash(), height, err))
+		return fmt.Errorf("failed to write last applied height of block %s (%d) to db: %v", b.Hash(), height, err)
 	}
 	if err := p.ctx.SharedMemory.Apply(ops, batch); err != nil {
-		panic(fmt.Errorf("failed to apply atomic ops of block %s (%d) to shared memory: %v", b.Hash(), height, err))
+		return fmt.Errorf("failed to apply atomic ops of block %s (%d) to shared memory: %v", b.Hash(), height, err)
 	}
+	return nil
 }
 
 // atomicOpsOf returns the union of all atomic requests contained in txs.
