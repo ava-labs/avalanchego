@@ -171,7 +171,7 @@ func newTokenContract(
 	client := deployer.Client
 	txOpts, err := bind.NewKeyedTransactorWithChainID(deployer.PrivKey, chainID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("bind.NewKeyedTransactorWithChainID: %w", err)
 	}
 
 	var (
@@ -183,11 +183,11 @@ func newTokenContract(
 
 	_, tx, contract, err := contracts.DeployERC20(txOpts, client, totalSupply)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("contracts.DeployERC20: %w", err)
 	}
 
 	if _, err := bind.WaitDeployed(ctx, client, tx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("bind.WaitDeployed: %w", err)
 	}
 
 	deployer.Nonce++
@@ -195,12 +195,12 @@ func newTokenContract(
 	for _, recipient := range recipients {
 		tx, err := contract.Transfer(txOpts, crypto.PubkeyToAddress(recipient.PrivKey.PublicKey), recipientAmount)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("contract.Transfer: %w", err)
 		}
 
 		receipt, err := bind.WaitMined(ctx, client, tx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("bind.WaitMined: %w", err)
 		}
 
 		deployer.Nonce++
