@@ -912,6 +912,140 @@ func TestGetReceipts(t *testing.T) {
 	sut.testRPC(ctx, t, tests...)
 }
 
+func TestGetTransactionCount(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+	addr := sut.wallet.Addresses()[0]
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_getTransactionCount",
+		args:   []any{addr, "pending"},
+		want:   hexutil.Uint64(0),
+	})
+
+	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	sut.mustSendTx(t, tx)
+	sut.requireInMempool(t, tx.Hash())
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_getTransactionCount",
+		args:   []any{addr, "pending"},
+		want:   hexutil.Uint64(1),
+	})
+}
+
+// eth_fillTransaction fills defaults (nonce, gas price) without signing,
+// so it succeeds without a keystore.
+func TestFillTransaction(t *testing.T) {
+	const chainID = 42
+	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+		cfg := *c.genesis.Config
+		cfg.ChainID = big.NewInt(chainID)
+		c.genesis.Config = &cfg
+	}))
+
+	b := sut.runConsensusLoop(t)
+	require.NoError(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+
+	to := common.Address{'b', 'o', 'b'}
+	const (
+		gas   = 56_789
+		value = 12_345
+	)
+
+	want := func(t *testing.T, nonce uint64) ethapi.SignTransactionResult {
+		t.Helper()
+
+		// libevm's internal setDefaults fills: nonce from pool, ChainID from config, and
+		// London fee fields from SuggestGasTipCap (MinSuggestedTip=1 wei) and
+		// the last block's base fee. geth sets maxFeePerGas to 2*baseFee + tip
+		// as "slack" to avoid invalidation if the base fee is rising.
+		tip := big.NewInt(1)
+		feeCap := new(big.Int).Add(
+			tip,
+			new(big.Int).Mul(b.Header().BaseFee, big.NewInt(2)),
+		)
+
+		tx := types.NewTx(&types.DynamicFeeTx{
+			ChainID:   big.NewInt(chainID),
+			Nonce:     nonce,
+			To:        &to,
+			GasTipCap: tip,
+			GasFeeCap: feeCap,
+			Gas:       gas,
+			Value:     big.NewInt(value),
+		})
+		raw, err := tx.MarshalBinary()
+		require.NoError(t, err, "tx.MarshalBinary()")
+		return ethapi.SignTransactionResult{Raw: raw, Tx: tx}
+	}
+
+	args := map[string]any{
+		"from":  sut.wallet.Addresses()[0],
+		"to":    to,
+		"gas":   hexutil.Uint64(gas),
+		"value": hexBig(value),
+	}
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_fillTransaction",
+		args:   []any{args},
+		want:   want(t, 0),
+	})
+
+	// Placing a transaction in the mempool to confirm that the filled nonce is
+	// incremented accordingly.
+	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	sut.mustSendTx(t, tx)
+	sut.requireInMempool(t, tx.Hash())
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_fillTransaction",
+		args:   []any{args},
+		want:   want(t, 1),
+	})
+}
+
+// eth_resend replaces a pending transaction with updated gas parameters.
+// Resend re-signs the replacement transaction server-side, which requires a
+// keystore, which SAE does not support, so signing is as far as we can get
+// and we verify that the RPC fails in an expected way.
+func TestResend(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+
+	// Submit a pending tx so Resend can find it in the pool.
+	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	sut.mustSendTx(t, tx)
+	sut.requireInMempool(t, tx.Hash())
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_resend",
+		args: []any{
+			map[string]any{
+				"from":                 sut.wallet.Addresses()[0],
+				"nonce":                hexutil.Uint64(tx.Nonce()),
+				"to":                   tx.To(),
+				"gas":                  hexutil.Uint64(tx.Gas()),
+				"maxFeePerGas":         (*hexutil.Big)(tx.GasFeeCap()),
+				"maxPriorityFeePerGas": (*hexutil.Big)(tx.GasTipCap()),
+			},
+			hexBig(2), // arbitrary
+		},
+		wantErr: testerr.Contains("unknown account"),
+	})
+}
+
 // SAE doesn't really support APIs that require a key on the node, as there is
 // no way to add keys. But, we want to ensure the methods error gracefully.
 func TestEthSigningAPIs(t *testing.T) {

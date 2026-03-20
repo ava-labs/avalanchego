@@ -4,10 +4,16 @@
 package rpc
 
 import (
+	"context"
+
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
 )
+
+func (b *backend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
+	return b.Set.Pool.Nonce(addr), nil
+}
 
 func (b *backend) Stats() (pending int, queued int) {
 	return b.Set.Pool.Stats()

@@ -7,14 +7,7 @@ package rpc
 // interim identifiers needed for development over multiple PRs.
 
 import (
-	"context"
 	"errors"
-
-	"github.com/ava-labs/libevm/common"
 )
 
 var errUnimplemented = errors.New("unimplemented")
-
-func (b *backend) GetPoolNonce(context.Context, common.Address) (uint64, error) {
-	panic(errUnimplemented)
-}
