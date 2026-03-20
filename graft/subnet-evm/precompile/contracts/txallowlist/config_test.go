@@ -24,26 +24,23 @@ func TestEqual(t *testing.T) {
 	admins := []common.Address{allowlisttest.TestAdminAddr}
 	enableds := []common.Address{allowlisttest.TestEnabledAddr}
 	managers := []common.Address{allowlisttest.TestManagerAddr}
-	tests := []precompiletest.ConfigEqualTest{
-		{
-			Name:     "non-nil config and nil other",
+	tests := map[string]precompiletest.ConfigEqualTest{
+		"non-nil config and nil other": {
 			Config:   txallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
+			Other:    nil,
 			Expected: false,
 		},
-		{
-			Name:     "different type",
+		"different type": {
 			Config:   txallowlist.NewConfig(nil, nil, nil, nil),
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
-		{
-			Name:     "different timestamp",
+		"different timestamp": {
 			Config:   txallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
 			Other:    txallowlist.NewConfig(utils.PointerTo[uint64](4), admins, enableds, managers),
 			Expected: false,
 		},
-		{
-			Name:     "same config",
+		"same config": {
 			Config:   txallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
 			Other:    txallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
 			Expected: true,

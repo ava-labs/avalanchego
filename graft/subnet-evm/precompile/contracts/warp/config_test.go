@@ -14,76 +14,70 @@ import (
 )
 
 func TestVerify(t *testing.T) {
-	tests := []precompiletest.ConfigVerifyTest{
-		{
-			Name:          "quorum numerator less than minimum",
+	tests := map[string]precompiletest.ConfigVerifyTest{
+		"quorum numerator less than minimum": {
 			Config:        NewConfig(utils.PointerTo[uint64](3), WarpQuorumNumeratorMinimum-1, false),
-			ExpectedErr: ErrInvalidQuorumRatio,
+			ExpectedError: ErrInvalidQuorumRatio,
 		},
-		{
-			Name:          "quorum numerator greater than quorum denominator",
+		"quorum numerator greater than quorum denominator": {
 			Config:        NewConfig(utils.PointerTo[uint64](3), WarpQuorumDenominator+1, false),
-			ExpectedErr: ErrInvalidQuorumRatio,
+			ExpectedError: ErrInvalidQuorumRatio,
 		},
-		{
-			Name:   "default quorum numerator",
+		"default quorum numerator": {
 			Config: NewDefaultConfig(utils.PointerTo[uint64](3)),
 		},
-		{
-			Name:   "valid quorum numerator 1 less than denominator",
+		"valid quorum numerator 1 less than denominator": {
 			Config: NewConfig(utils.PointerTo[uint64](3), WarpQuorumDenominator-1, false),
 		},
-		{
-			Name:   "valid quorum numerator 1 more than minimum",
+		"valid quorum numerator 1 more than minimum": {
 			Config: NewConfig(utils.PointerTo[uint64](3), WarpQuorumNumeratorMinimum+1, false),
 		},
-		{
-			Name:   "invalid cannot activated before Durango activation",
+		"invalid cannot activated before Durango activation": {
 			Config: NewConfig(utils.PointerTo[uint64](3), 0, false),
 			ChainConfig: func() precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
 				config.EXPECT().IsDurango(gomock.Any()).Return(false)
 				return config
 			}(),
-			ExpectedErr: errWarpCannotBeActivated,
+			ExpectedError: errWarpCannotBeActivated,
 		},
 	}
 	precompiletest.RunVerifyTests(t, tests)
 }
 
 func TestEqualWarpConfig(t *testing.T) {
-	tests := []precompiletest.ConfigEqualTest{
-		{
-			Name:     "non-nil config and nil other",
+	tests := map[string]precompiletest.ConfigEqualTest{
+		"non-nil config and nil other": {
 			Config:   NewDefaultConfig(utils.PointerTo[uint64](3)),
+			Other:    nil,
 			Expected: false,
 		},
-		{
-			Name:     "different type",
+
+		"different type": {
 			Config:   NewDefaultConfig(utils.PointerTo[uint64](3)),
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
-		{
-			Name:     "different timestamp",
+
+		"different timestamp": {
 			Config:   NewDefaultConfig(utils.PointerTo[uint64](3)),
 			Other:    NewDefaultConfig(utils.PointerTo[uint64](4)),
 			Expected: false,
 		},
-		{
-			Name:     "different quorum numerator",
+
+		"different quorum numerator": {
 			Config:   NewConfig(utils.PointerTo[uint64](3), WarpQuorumNumeratorMinimum+1, false),
 			Other:    NewConfig(utils.PointerTo[uint64](3), WarpQuorumNumeratorMinimum+2, false),
 			Expected: false,
 		},
-		{
-			Name:     "same default config",
+
+		"same default config": {
 			Config:   NewDefaultConfig(utils.PointerTo[uint64](3)),
 			Other:    NewDefaultConfig(utils.PointerTo[uint64](3)),
 			Expected: true,
 		},
-		{
-			Name:     "same non-default config",
+
+		"same non-default config": {
 			Config:   NewConfig(utils.PointerTo[uint64](3), WarpQuorumNumeratorMinimum+5, false),
 			Other:    NewConfig(utils.PointerTo[uint64](3), WarpQuorumNumeratorMinimum+5, false),
 			Expected: true,
