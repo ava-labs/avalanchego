@@ -3211,3 +3211,55 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 		})
 	}
 }
+
+// TestStateAndDiffIntegration tests integration across State and Diff
+func TestStateAndDiffIntegration(t *testing.T) {
+	tests := []struct {
+		name     string
+		subnetID ids.ID
+	}{
+		{
+			name:     "primary network",
+			subnetID: constants.PrimaryNetworkID,
+		},
+		{
+			name:     "subnet",
+			subnetID: ids.GenerateTestID(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Run("delete validator and its delegator", func(t *testing.T) {
+				state := newTestState(t, memdb.New())
+
+				diff, err := NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				validator := newTestStaker2(tt.subnetID, ids.GenerateTestNodeID())
+				require.NoError(t, diff.PutCurrentValidator(validator))
+				delegator := newTestStaker2(validator.SubnetID, validator.NodeID)
+				diff.PutCurrentDelegator(delegator)
+				require.NoError(t, diff.Apply(state))
+
+				diff, err = NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				diff.DeleteCurrentDelegator(delegator)
+				diff.DeleteCurrentValidator(validator)
+				require.NoError(t, diff.Apply(state))
+
+				// This fails because updates to the validator manager weren't flushed yet -- so it doesn't
+				// know about the validator to deduct the removed stake weight from.
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
+
+				_, err = state.GetCurrentValidator(validator.SubnetID, validator.NodeID)
+				require.ErrorIs(t, err, database.ErrNotFound)
+				itr, err := state.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+				require.NoError(t, err)
+				require.Empty(t, iterator.ToSlice(itr))
+			})
+		})
+	}
+}

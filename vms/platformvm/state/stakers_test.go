@@ -434,6 +434,23 @@ func newTestStaker() *Staker {
 	}
 }
 
+func newTestStaker2(subnetID ids.ID, nodeID ids.NodeID) *Staker {
+	startTime := time.Now().Round(time.Second)
+	endTime := startTime.Add(genesistest.DefaultValidatorDuration)
+	return &Staker{
+		TxID:            ids.GenerateTestID(),
+		NodeID:          nodeID,
+		SubnetID:        subnetID,
+		Weight:          1,
+		StartTime:       startTime,
+		EndTime:         endTime,
+		PotentialReward: 1,
+
+		NextTime: endTime,
+		Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
+	}
+}
+
 func TestStakerEquals(t *testing.T) {
 	// If this constant is wrong, a field was likely added to Staker without
 	// updating the Equals method. Update Equals to compare the new field,
