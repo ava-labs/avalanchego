@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "api",
+    srcs = [
+        "service.go",
+        "status.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/api",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api",
+        "//database",
+        "//graft/coreth/plugin/evm/atomic",
+        "//ids",
+        "//network/p2p/gossip",
+        "//snow",
+        "//utils/constants",
+        "//utils/formatting",
+        "//utils/formatting/address",
+        "//utils/json",
+        "//utils/logging",
+        "//utils/set",
+        "//vms/components/avax",
+        "//vms/saevm/state",
+        "//vms/saevm/tx",
+        "//vms/saevm/txpool",
+        "@org_uber_go_zap//:zap",
+    ],
+)

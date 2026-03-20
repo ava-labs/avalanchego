@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "saevm",
+    srcs = [
+        "factory.go",
+        "vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/prefixdb",
+        "//graft/evm/utils/rpc",
+        "//network/p2p",
+        "//network/p2p/gossip",
+        "//snow",
+        "//snow/engine/common",
+        "//utils",
+        "//utils/logging",
+        "//vms",
+        "//vms/evm/database",
+        "//vms/saevm/api",
+        "//vms/saevm/hook",
+        "//vms/saevm/tx",
+        "//vms/saevm/txpool",
+        "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/txpool/legacypool",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_ava_labs_strevm//adaptor",
+        "@com_github_ava_labs_strevm//sae",
+        "@com_github_ava_labs_strevm//saedb",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
