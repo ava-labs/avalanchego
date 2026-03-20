@@ -756,18 +756,30 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 	if head == (common.Hash{}) {
 		return errors.New("could not read head block hash")
 	}
-	// Make sure the entire head block is available
+	// Make sure the entire head block is available, including receipts.
+	// With deferred block writes (header/body/receipts written on Accept),
+	// the head pointer is set during verification but block data is only
+	// written to disk during acceptance. If the node crashes during Accept,
+	// the head pointer may reference a block with incomplete data (e.g.,
+	// body written but receipts missing). In this case, fall back to the
+	// last accepted block which is guaranteed to have complete data.
 	headBlock := bc.GetBlockByHash(head)
 	if headBlock == nil {
 		log.Info(
-			"Head block is missing when loading last state, falling back to the last accepted block",
+			"Head block missing, falling back to the last accepted block",
 			"hash", lastAcceptedBlock.Hash(),
 			"number", lastAcceptedBlock.Number(),
 		)
-
-		// ReadHeadBlockHash stores the hash of the last inserted/verified block.
-		// This means it can be missing if the blockchain crashed before the block
-		// was accepted. If this happens, we set the head block to the last accepted block.
+		headBlock = lastAcceptedBlock
+		bc.writeHeadBlock(headBlock)
+	} else if !rawdb.HasReceipts(bc.db, head, headBlock.NumberU64()) {
+		log.Info(
+			"Head block receipts missing, falling back to the last accepted block",
+			"headHash", head,
+			"headNumber", headBlock.NumberU64(),
+			"lastAcceptedHash", lastAcceptedBlock.Hash(),
+			"lastAcceptedNumber", lastAcceptedBlock.Number(),
+		)
 		headBlock = lastAcceptedBlock
 		bc.writeHeadBlock(headBlock)
 	}
