@@ -1899,7 +1899,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				require.NoError(t, env.state.PutCurrentValidator(env.staker))
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
-				env.state = env.state
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -2171,7 +2170,6 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.tx.Creds = nil
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
-				env.state = env.state
 
 				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
