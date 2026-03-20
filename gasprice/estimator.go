@@ -227,9 +227,8 @@ func (e *Estimator) SuggestGasTipCap(ctx context.Context) (tip *big.Int, _ error
 }
 
 var (
-	errHistoryDepthExhausted  = errors.New("requested block is too far behind accepted head")
-	errMissingBlock           = errors.New("missing block")
-	errMissingWorstCaseBounds = errors.New("head block does not have worst-case bounds")
+	errHistoryDepthExhausted = errors.New("requested block is too far behind accepted head")
+	errMissingBlock          = errors.New("missing block")
 )
 
 // FeeHistory returns data relevant for fee estimation based on the specified
@@ -310,9 +309,10 @@ func (e *Estimator) FeeHistory(
 	if last == lastAcceptedNumber {
 		bounds := lastAccepted.WorstCaseBounds()
 		if bounds == nil {
-			return nil, nil, nil, nil, errMissingWorstCaseBounds
+			baseFee = append(baseFee, lastAccepted.BaseFee().ToBig())
+		} else {
+			baseFee = append(baseFee, bounds.LatestEndTime.BaseFee().ToBig())
 		}
-		baseFee = append(baseFee, bounds.LatestEndTime.BaseFee().ToBig())
 	} else if b := e.blockCache.getBlock(last + 1); b != nil {
 		baseFee = append(baseFee, b.baseFee)
 	} else {

@@ -367,14 +367,20 @@ func TestFeeHistory(t *testing.T) {
 			},
 		},
 		{
-			name: "missing_worst_case_bounds",
+			name: "no_worst_case_bounds",
 			args: args{
 				numBlocks: 1,
 				lastBlock: rpc.LatestBlockNumber,
 			},
 			want: results{
-				height: nil,
-				err:    errMissingWorstCaseBounds,
+				height: common.Big0,
+				baseFees: []*big.Int{
+					big.NewInt(params.InitialBaseFee),
+					big.NewInt(params.InitialBaseFee), // fallback to current base fee
+				},
+				portionFull: []float64{
+					0,
+				},
 			},
 		},
 		{

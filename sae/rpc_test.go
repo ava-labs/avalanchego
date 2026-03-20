@@ -58,6 +58,10 @@ func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
 	t.Helper()
 	opts := []cmp.Option{
 		cmputils.NilSlicesAreEmpty[hexutil.Bytes](),
+		cmputils.IfIn[params.ChainConfig](cmp.Options{
+			cmputils.BigInts(),
+			cmpopts.IgnoreUnexported(params.ChainConfig{}),
+		}),
 		cmputils.Headers(),
 		cmputils.HexutilBigs(),
 		cmputils.TransactionsByHash(),
