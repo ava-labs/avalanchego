@@ -3680,6 +3680,8 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				want := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
 				require.NoError(t, diff.PutCurrentValidator(want))
 				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
 
 				// In the next diff remove and re-add it
 				diff, err = NewDiffOn(state, true)
@@ -3688,8 +3690,10 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				require.NoError(t, diff.DeleteCurrentValidator(want))
 				require.NoError(t, diff.PutCurrentValidator(want))
 				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
 
-				got, err := diff.GetCurrentValidator(want.SubnetID, want.NodeID)
+				got, err := state.GetCurrentValidator(want.SubnetID, want.NodeID)
 				require.NoError(t, err)
 				require.Equal(t, want, got)
 			})
@@ -3704,6 +3708,8 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				validator := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
 				require.NoError(t, diff.PutCurrentValidator(validator))
 				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
 
 				// In the next diff remove and re-add it and set its staking info
 				diff, err = NewDiffOn(state, true)
@@ -3714,8 +3720,10 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				want := StakingInfo{DelegateeReward: 123}
 				require.NoError(t, diff.SetStakingInfo(validator.SubnetID, validator.NodeID, want))
 				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
 
-				got, err := diff.GetStakingInfo(validator.SubnetID, validator.NodeID)
+				got, err := state.GetStakingInfo(validator.SubnetID, validator.NodeID)
 				require.NoError(t, err)
 				require.Equal(t, want, got)
 			})
@@ -3728,16 +3736,13 @@ func TestStateAndDiffIntegration(t *testing.T) {
 
 				validator := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
 				require.NoError(t, diff.PutCurrentValidator(validator))
-				require.NoError(t, diff.Apply(state))
-
-				diff, err = NewDiffOn(state, true)
-				require.NoError(t, err)
 
 				// GetStakingInfo should be set once we prepare to commit changes to disk
+				require.NoError(t, diff.Apply(state))
 				_, err = state.CommitBatch()
 				require.NoError(t, err)
 
-				got, err := diff.GetStakingInfo(validator.SubnetID, validator.NodeID)
+				got, err := state.GetStakingInfo(validator.SubnetID, validator.NodeID)
 				require.NoError(t, err)
 				require.Equal(t, StakingInfo{}, got)
 			})
@@ -3751,6 +3756,8 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				validator := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
 				require.NoError(t, diff.PutCurrentValidator(validator))
 				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
 
 				diff, err = NewDiffOn(state, true)
 				require.NoError(t, err)
@@ -3768,7 +3775,7 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				require.Equal(t, want, got)
 			})
 
-			t.Run("add a validator and set staking info in same diff", func(t *testing.T) {
+			t.Run("set staking info then delete validator", func(t *testing.T) {
 				state := newTestState(t, memdb.New())
 
 				diff, err := NewDiffOn(state, true)
@@ -3776,18 +3783,26 @@ func TestStateAndDiffIntegration(t *testing.T) {
 
 				validator := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
 				require.NoError(t, diff.PutCurrentValidator(validator))
-
-				want := StakingInfo{DelegateeReward: 123}
-				require.NoError(t, diff.SetStakingInfo(validator.SubnetID, validator.NodeID, want))
-
-				// GetStakingInfo should be set once we prepare to commit changes to disk
 				require.NoError(t, diff.Apply(state))
 				_, err = state.CommitBatch()
 				require.NoError(t, err)
 
-				got, err := state.GetStakingInfo(validator.SubnetID, validator.NodeID)
+				diff, err = NewDiffOn(state, true)
 				require.NoError(t, err)
-				require.Equal(t, want, got)
+				want := StakingInfo{DelegateeReward: 123}
+				require.NoError(t, diff.SetStakingInfo(validator.SubnetID, validator.NodeID, want))
+				require.NoError(t, diff.DeleteCurrentValidator(validator))
+
+				_, err = diff.GetStakingInfo(validator.SubnetID, validator.NodeID)
+				require.ErrorIs(t, err, database.ErrNotFound)
+
+				// Flush changes
+				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
+
+				_, err = state.GetStakingInfo(validator.SubnetID, validator.NodeID)
+				require.ErrorIs(t, err, database.ErrNotFound)
 			})
 		})
 	}
