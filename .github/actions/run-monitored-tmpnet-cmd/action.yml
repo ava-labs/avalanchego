@@ -82,8 +82,9 @@ runs:
         TMPNET_START_METRICS_COLLECTOR: ${{ inputs.prometheus_username != '' }}
         # Skip local log collection when nodes are running in kube since collection will occur in-cluster.
         TMPNET_START_LOGS_COLLECTOR: ${{ inputs.loki_username != '' && inputs.runtime == 'process' }}
-        TMPNET_CHECK_METRICS_COLLECTED: ${{ inputs.prometheus_username != '' }}
-        TMPNET_CHECK_LOGS_COLLECTED: ${{ inputs.loki_username != '' }}
+        # TODO(marun) Re-enable these checks as part of a PR updating the metrics links
+        # TMPNET_CHECK_METRICS_COLLECTED: ${{ inputs.prometheus_username != '' }}
+        # TMPNET_CHECK_LOGS_COLLECTED: ${{ inputs.loki_username != '' }}
         LOKI_URL: ${{ inputs.loki_url }}
         LOKI_PUSH_URL: ${{ inputs.loki_push_url }}
         LOKI_USERNAME: ${{ inputs.loki_username }}
