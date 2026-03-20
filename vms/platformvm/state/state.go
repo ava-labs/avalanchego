@@ -752,8 +752,7 @@ func (s *State) GetStakingInfo(subnetID ids.ID, vdrID ids.NodeID) (StakingInfo, 
 }
 
 func (s *State) SetStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo StakingInfo) error {
-	_, err := s.GetCurrentValidator(subnetID, vdrID)
-	if err != nil {
+	if _, err := s.GetCurrentValidator(subnetID, vdrID); err != nil {
 		return fmt.Errorf("getting current validator: %w", err)
 	}
 
