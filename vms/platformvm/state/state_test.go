@@ -3655,6 +3655,8 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				delegator := newTestStaker(validator.SubnetID, validator.NodeID)
 				require.NoError(t, diff.PutCurrentDelegator(delegator))
 				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
 
 				diff, err = NewDiffOn(state, true)
 				require.NoError(t, err)
@@ -3662,6 +3664,14 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				require.NoError(t, diff.DeleteCurrentDelegator(delegator))
 				require.NoError(t, diff.DeleteCurrentValidator(validator))
 				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
+
+				_, err = state.GetCurrentValidator(validator.SubnetID, validator.NodeID)
+				require.ErrorIs(t, err, database.ErrNotFound)
+				itr, err := state.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+				require.NoError(t, err)
+				require.Empty(t, iterator.ToSlice(itr))
 			})
 		})
 	}
