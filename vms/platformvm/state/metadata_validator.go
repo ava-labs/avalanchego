@@ -98,8 +98,8 @@ type validatorState struct {
 
 func newValidatorState() *validatorState {
 	return &validatorState{
-		metadata:        make(map[ids.NodeID]map[ids.ID]*validatorMetadata),
-		updatedMetadata: make(map[ids.NodeID]map[ids.ID]set.Set[ids.ID]),
+		metadata:            make(map[ids.NodeID]map[ids.ID]*validatorMetadata),
+		updatedMetadata:     make(map[ids.NodeID]map[ids.ID]set.Set[ids.ID]),
 		modifiedStakingInfo: make(map[ids.ID]map[ids.NodeID]StakingInfo),
 	}
 }
