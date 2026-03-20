@@ -64,6 +64,7 @@ use_repo(
     "com_github_ava_labs_firewood_go_ethhash_ffi",
     "com_github_ava_labs_libevm",
     "com_github_ava_labs_simplex",
+    "com_github_ava_labs_strevm",
     "com_github_btcsuite_btcd_btcutil",
     "com_github_cespare_xxhash_v2",
     "com_github_cockroachdb_pebble",
