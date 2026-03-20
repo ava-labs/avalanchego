@@ -3,9 +3,7 @@
 
 package api
 
-import (
-	"errors"
-)
+import "errors"
 
 type Status uint32
 

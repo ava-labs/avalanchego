@@ -6,10 +6,10 @@ package state
 import (
 	"encoding/json"
 
+	_ "embed"
+
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-
-	_ "embed"
 )
 
 var (

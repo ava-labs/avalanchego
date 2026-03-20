@@ -22,32 +22,30 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/api"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
 	avadb "github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
-	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
-	"github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
 // SinceGenesis is a harness around an [sae.VM], providing an `Initialize`
 // method that treats the chain as being asynchronous since genesis.
 type SinceGenesis struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
-	hooks   *hook.Points
 	config  sae.Config
 
 	ctx            *snow.Context
 	consensusState utils.Atomic[snow.State]
 	db             avadb.Database
 	mempool        *txpool.Mempool
-	pushGossiper   *avalanchegossip.PushGossiper[*tx.Tx]
+	pushGossiper   *gossip.PushGossiper[*tx.Tx]
 
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
@@ -121,7 +119,6 @@ func (vm *SinceGenesis) Initialize(
 		return err
 	}
 	vm.VM = inner
-	vm.hooks = hooks
 	vm.ctx = snowCtx
 	vm.db = avaDB
 	vm.mempool = txpool.New(txs, snowCtx)
@@ -138,13 +135,13 @@ func (vm *SinceGenesis) Initialize(
 		}
 
 		const pullGossipPeriod = time.Second
-		handler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
+		handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 			snowCtx.NodeID,
 			vm.Network,
 			vm.ValidatorPeers,
 			gossipSet,
 			tx.Marshaller{},
-			avalanchegossip.SystemConfig{
+			gossip.SystemConfig{
 				Log:           snowCtx.Log,
 				Registry:      metrics,
 				Namespace:     "gossip",
@@ -158,7 +155,7 @@ func (vm *SinceGenesis) Initialize(
 		vm.pushGossiper = pushGossiper
 
 		if err := inner.AddHandler(p2p.AtomicTxGossipHandlerID, handler); err != nil {
-			return fmt.Errorf("network.AddHandler(...): %v", err)
+			return fmt.Errorf("network.AddHandler(...): %w", err)
 		}
 
 		var (

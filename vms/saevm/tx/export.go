@@ -9,6 +9,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/strevm/hook"
+	"github.com/holiman/uint256"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,9 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/holiman/uint256"
 )
 
 type Export struct {
@@ -86,13 +87,13 @@ func (e *Export) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 	}
 
 	if err := verify.SameSubnet(ctx, snowCtx, e.DestinationChain); err != nil {
-		return fmt.Errorf("%w: %v", errNotSameSubnet, err)
+		return fmt.Errorf("%w: %w", errNotSameSubnet, err)
 	}
 
 	fc := avax.NewFlowChecker()
 	for i, in := range e.Ins {
 		if err := in.Verify(); err != nil {
-			return fmt.Errorf("%w (%d): %v", errInvalidInput, i, err)
+			return fmt.Errorf("%w (%d): %w", errInvalidInput, i, err)
 		}
 		if in.AssetID != snowCtx.AVAXAssetID {
 			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, i, snowCtx.AVAXAssetID, in.AssetID)
@@ -101,7 +102,7 @@ func (e *Export) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 	}
 	for i, out := range e.ExportedOutputs {
 		if err := out.Verify(); err != nil {
-			return fmt.Errorf("%w (%d): %v", errInvalidOutput, i, err)
+			return fmt.Errorf("%w (%d): %w", errInvalidOutput, i, err)
 		}
 		if assetID := out.AssetID(); assetID != snowCtx.AVAXAssetID {
 			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXOutput, i, snowCtx.AVAXAssetID, assetID)
@@ -109,7 +110,7 @@ func (e *Export) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 		fc.Produce(snowCtx.AVAXAssetID, out.Out.Amount())
 	}
 	if err := fc.Verify(); err != nil {
-		return fmt.Errorf("%w: %v", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
 	}
 
 	if !utils.IsSortedAndUnique(e.Ins) {
@@ -137,7 +138,7 @@ func (e *Export) VerifyCredentials(_ *snow.Context, creds []verify.Verifiable) e
 
 	fxTx, err := toFxTx(e)
 	if err != nil {
-		return fmt.Errorf("%w: %v", errConvertingToFxTx, err)
+		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
 	}
 	for i, in := range e.Ins {
 		cred, ok := creds[i].(*secp256k1fx.Credential)
@@ -237,7 +238,6 @@ func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 			return errInsufficientFunds
 		}
 		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
-
 	}
 	return nil
 }

@@ -9,6 +9,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/strevm/hook"
+	"github.com/holiman/uint256"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,9 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/holiman/uint256"
 )
 
 type Import struct {
@@ -92,13 +93,13 @@ func (i *Import) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 	}
 
 	if err := verify.SameSubnet(ctx, snowCtx, i.SourceChain); err != nil {
-		return fmt.Errorf("%w: %v", errNotSameSubnet, err)
+		return fmt.Errorf("%w: %w", errNotSameSubnet, err)
 	}
 
 	fc := avax.NewFlowChecker()
 	for i, in := range i.ImportedInputs {
 		if err := in.Verify(); err != nil {
-			return fmt.Errorf("%w (%d): %v", errInvalidInput, i, err)
+			return fmt.Errorf("%w (%d): %w", errInvalidInput, i, err)
 		}
 		if assetID := in.AssetID(); assetID != snowCtx.AVAXAssetID {
 			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, i, snowCtx.AVAXAssetID, assetID)
@@ -107,7 +108,7 @@ func (i *Import) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 	}
 	for i, out := range i.Outs {
 		if err := out.Verify(); err != nil {
-			return fmt.Errorf("%w (%d): %v", errInvalidOutput, i, err)
+			return fmt.Errorf("%w (%d): %w", errInvalidOutput, i, err)
 		}
 		if out.AssetID != snowCtx.AVAXAssetID {
 			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXOutput, i, snowCtx.AVAXAssetID, out.AssetID)
@@ -115,7 +116,7 @@ func (i *Import) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 		fc.Produce(snowCtx.AVAXAssetID, out.Amount)
 	}
 	if err := fc.Verify(); err != nil {
-		return fmt.Errorf("%w: %v", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
 	}
 
 	if !utils.IsSortedAndUnique(i.ImportedInputs) {
@@ -150,23 +151,23 @@ func (i *Import) VerifyCredentials(snowCtx *snow.Context, creds []verify.Verifia
 
 	utxoBytes, err := snowCtx.SharedMemory.Get(i.SourceChain, utxoIDs)
 	if err != nil {
-		return fmt.Errorf("%w from %s: %v", errFailedToFetchUTXOs, i.SourceChain, err)
+		return fmt.Errorf("%w from %s: %w", errFailedToFetchUTXOs, i.SourceChain, err)
 	}
 
 	fxTx, err := toFxTx(i)
 	if err != nil {
-		return fmt.Errorf("%w: %v", errConvertingToFxTx, err)
+		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
 	}
 	for i, in := range i.ImportedInputs {
 		utxo := &avax.UTXO{}
 		if _, err := c.Unmarshal(utxoBytes[i], utxo); err != nil {
-			return fmt.Errorf("%w: %v", errFailedToUnmarshalUTXO, err)
+			return fmt.Errorf("%w: %w", errFailedToUnmarshalUTXO, err)
 		}
 		if inAssetID, utxoAssetID := in.AssetID(), utxo.AssetID(); utxoAssetID != inAssetID {
 			return fmt.Errorf("%w: input asset ID %s does not match UTXO asset ID %s", errMismatchedAssetIDs, inAssetID, utxoAssetID)
 		}
 		if err := fx.VerifyTransfer(fxTx, in.In, creds[i], utxo.Out); err != nil {
-			return fmt.Errorf("%w: %v", errVerifyTransferFailed, err)
+			return fmt.Errorf("%w: %w", errVerifyTransferFailed, err)
 		}
 	}
 	return nil

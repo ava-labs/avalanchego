@@ -3,9 +3,7 @@
 
 package tx
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 func (t *Tx) GossipID() ids.ID {
 	id, err := t.ID()

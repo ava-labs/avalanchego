@@ -28,7 +28,7 @@ func ancestorUTXOIDs(header *types.Header, settledHash common.Hash, source saety
 
 		txs, err := tx.ParseSlice(customtypes.BlockExtData(parent))
 		if err != nil {
-			return nil, fmt.Errorf("failed to extract txs of block %s (%d): %v", parent.Hash(), parent.NumberU64(), err)
+			return nil, fmt.Errorf("failed to extract txs of block %s (%d): %w", parent.Hash(), parent.NumberU64(), err)
 		}
 
 		for _, tx := range txs {

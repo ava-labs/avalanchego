@@ -71,7 +71,7 @@ func (s *Service) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOs
 	for _, str := range a.Addresses {
 		addr, err := s.parseAddress(str)
 		if err != nil {
-			return fmt.Errorf("couldn't parse address %q: %w", s, err)
+			return fmt.Errorf("couldn't parse address %q: %w", str, err)
 		}
 		addrs.Add(addr)
 	}

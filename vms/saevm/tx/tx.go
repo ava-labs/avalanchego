@@ -8,6 +8,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/strevm/hook"
+	"github.com/holiman/uint256"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
@@ -19,9 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/holiman/uint256"
 )
 
 type Unsigned interface {

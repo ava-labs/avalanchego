@@ -26,10 +26,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	saestate "github.com/ava-labs/avalanchego/vms/saevm/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 	"github.com/ava-labs/avalanchego/x/blockdb"
+
+	saestate "github.com/ava-labs/avalanchego/vms/saevm/state"
 )
 
 var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
@@ -58,14 +59,14 @@ func NewPoints(
 func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.Tx], error) {
 	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract txs of block %s (%d): %v", b.Hash(), b.NumberU64(), err)
+		return nil, fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
 
 	txs := make([]*txpool.Tx, len(rawTxs))
 	for i, rawTx := range rawTxs {
 		tx, err := txpool.NewTx(rawTx, p.ctx.AVAXAssetID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert tx %d for block %s (%d): %v", i, b.Hash(), b.NumberU64(), err)
+			return nil, fmt.Errorf("failed to convert tx %d for block %s (%d): %w", i, b.Hash(), b.NumberU64(), err)
 		}
 		txs[i] = tx
 	}
@@ -105,14 +106,14 @@ func (*Points) SubSecondBlockTime(*types.Header) time.Duration {
 func (p *Points) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract txs of block %s (%d): %v", b.Hash(), b.NumberU64(), err)
+		return nil, fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
 
 	ops := make([]hook.Op, len(txs))
 	for i, tx := range txs {
 		op, err := tx.AsOp(p.ctx.AVAXAssetID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert tx %d to op for block %s (%d): %v", i, b.Hash(), b.NumberU64(), err)
+			return nil, fmt.Errorf("failed to convert tx %d to op for block %s (%d): %w", i, b.Hash(), b.NumberU64(), err)
 		}
 		ops[i] = op
 	}
@@ -130,7 +131,7 @@ func (*Points) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) 
 func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
-		return fmt.Errorf("failed to extract txs of block %s (%d): %v", b.Hash(), b.NumberU64(), err)
+		return fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
 
 	extstatedb := extstate.New(statedb)
@@ -140,7 +141,7 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 			return fmt.Errorf("problem getting transaction ID %d for block %s (%d): %w", i, b.Hash(), b.NumberU64(), err)
 		}
 		if err := tx.TransferNonAVAX(p.ctx.AVAXAssetID, extstatedb); err != nil {
-			return fmt.Errorf("failed to transfer non-AVAX assets of tx %s in block %s (%d): %v", txID, b.Hash(), b.NumberU64(), err)
+			return fmt.Errorf("failed to transfer non-AVAX assets of tx %s in block %s (%d): %w", txID, b.Hash(), b.NumberU64(), err)
 		}
 	}
 
@@ -152,12 +153,12 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 		writeTxs = saestate.WriteBonusTxs
 	}
 	if err := writeTxs(p.db, height, txs); err != nil {
-		return fmt.Errorf("failed to write txs of block %s (%d) to db: %v", b.Hash(), height, err)
+		return fmt.Errorf("failed to write txs of block %s (%d) to db: %w", b.Hash(), height, err)
 	}
 
 	ops, err := atomicOpsOf(txs)
 	if err != nil {
-		return fmt.Errorf("failed to extract atomic ops of block %s (%d): %v", b.Hash(), height, err)
+		return fmt.Errorf("failed to extract atomic ops of block %s (%d): %w", b.Hash(), height, err)
 	}
 
 	/*
@@ -246,7 +247,7 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 
 	lastAppliedHeight, err := saestate.ReadLastAppliedHeight(p.db)
 	if err != nil {
-		return fmt.Errorf("failed to read last applied height from db: %v", err)
+		return fmt.Errorf("failed to read last applied height from db: %w", err)
 	}
 
 	// SAE may re-execute blocks on startup. If the atomic ops were already
@@ -261,10 +262,10 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 	}
 
 	if err := saestate.WriteLastAppliedHeight(batch, height); err != nil {
-		return fmt.Errorf("failed to write last applied height of block %s (%d) to db: %v", b.Hash(), height, err)
+		return fmt.Errorf("failed to write last applied height of block %s (%d) to db: %w", b.Hash(), height, err)
 	}
 	if err := p.ctx.SharedMemory.Apply(ops, batch); err != nil {
-		return fmt.Errorf("failed to apply atomic ops of block %s (%d) to shared memory: %v", b.Hash(), height, err)
+		return fmt.Errorf("failed to apply atomic ops of block %s (%d) to shared memory: %w", b.Hash(), height, err)
 	}
 	return nil
 }
