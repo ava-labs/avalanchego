@@ -160,91 +160,79 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 		return fmt.Errorf("failed to extract atomic ops of block %s (%d): %v", b.Hash(), height, err)
 	}
 
-	// TODO: Add ops to the atomic trie.
-
-	// // Insert the operations into the atomic trie
-	// //
-	// // Note: The atomic trie canonically contains the duplicate operations from
-	// // any bonus blocks.
-	// atomicOps, err := mergeAtomicOps(txs)
-	// if err != nil {
-	// 	return common.Hash{}, err
-	// }
-	// if err := a.atomicTrie.UpdateTrie(tr, blockHeight, atomicOps); err != nil {
-	// 	return common.Hash{}, err
-	// }
-
-	// // If block hash is not provided, we do not pin the atomic state in memory and can return early
-	// if blockHash == (common.Hash{}) {
-	// 	return tr.Hash(), nil
-	// }
-
-	// // get the new root and pin the atomic trie changes in memory.
-	// root, nodes, err := tr.Commit(false)
-	// if err != nil {
-	// 	return common.Hash{}, err
-	// }
-	// if err := a.atomicTrie.InsertTrie(nodes, root); err != nil {
-	// 	return common.Hash{}, err
-	// }
-	// // track this block so further blocks can be inserted on top
-	// // of this block
-	// a.verifiedRoots[blockHash] = &atomicState{
-	// 	backend:     a,
-	// 	blockHash:   blockHash,
-	// 	blockHeight: blockHeight,
-	// 	txs:         txs,
-	// 	atomicOps:   atomicOps,
-	// 	atomicRoot:  root,
-	// }
-	// return root, nil
-
 	/*
-			// Accept writes the atomic operations to the database and
-		// updates the last accepted block in the atomic backend.
-		// It also commits the `commitBatch` to the shared memory.
-		func (a *atomicState) Accept(commitBatch database.Batch) error {
-			isBonus := a.backend.IsBonus(a.blockHeight, a.blockHash)
-			// Update the atomic tx repository. Note it is necessary to invoke
-			// the correct method taking bonus blocks into consideration.
-			if isBonus {
-				if err := a.backend.repo.WriteBonus(a.blockHeight, a.txs); err != nil {
-					return err
-				}
-			} else {
-				if err := a.backend.repo.Write(a.blockHeight, a.txs); err != nil {
-					return err
-				}
+
+		var previousRoot common.Hash
+		trieDB := saestate.NewTrieDB(p.db)
+		tr, err := trie.New(trie.TrieID(previousRoot), trieDB)
+		if err != nil {
+			return fmt.Errorf("failed to create new trie: %v", err)
+		}
+
+		for chainID, requests := range ops {
+			requestBytes, err := tx.MarshalAtomicRequests(requests)
+			if err != nil {
+				return fmt.Errorf("failed to marshal atomic requests for chain %s: %v", chainID, err)
 			}
 
-			// Accept the root of this atomic trie (will be persisted if at a commit interval)
-			if _, err := a.backend.atomicTrie.AcceptTrie(a.blockHeight, a.atomicRoot); err != nil {
+			// key is [height]+[blockchainID]
+			const keyLength = wrappers.LongLen + ids.IDLen
+			p := wrappers.Packer{Bytes: make([]byte, keyLength)}
+			p.PackLong(height)
+			p.PackFixedBytes(chainID[:])
+			if err := tr.Update(p.Bytes, requestBytes); err != nil {
 				return err
 			}
-			// Update the last accepted block to this block and remove it from
-			// the map tracking undecided blocks.
-			a.backend.lastAcceptedHash = a.blockHash
-			delete(a.backend.verifiedRoots, a.blockHash)
+		}
 
-			// get changes from the atomic trie and repository in a batch
-			// to be committed atomically with [commitBatch] and shared memory.
-			atomicChangesBatch, err := a.backend.repo.db.CommitBatch()
-			if err != nil {
-				return fmt.Errorf("could not create commit batch in atomicState accept: %w", err)
+		root, nodes, err := tr.Commit(false)
+		if err != nil {
+			return err
+		}
+		if nodes != nil {
+			if err := trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
+				return err
 			}
+		}
+		if err := trieDB.Reference(root, common.Hash{}); err != nil {
+			return err
+		}
 
-			// If this is a bonus block, write [commitBatch] without applying atomic ops
-			// to shared memory.
-			if isBonus {
-				log.Info("skipping atomic tx acceptance on bonus block", "block", a.blockHash)
-				return avalancheatomic.WriteAll(commitBatch, atomicChangesBatch)
+		// Avoid OOM in-case there are a ton of atomic ops issued between DB
+		// commits.
+		const (
+			capTrigger = 64 * units.MiB
+			capLimit   = capTrigger - ethdb.IdealBatchSize
+		)
+		if _, nodeSize, _ := trieDB.Size(); nodeSize > capTrigger {
+			if err := trieDB.Cap(capLimit); err != nil {
+				return fmt.Errorf("failed to cap atomic trie for root %s: %w", root, err)
 			}
+		}
 
-			// Otherwise, atomically commit pending changes in the version db with
-			// atomic ops to shared memory.
-			return a.backend.sharedMemory.Apply(a.atomicOps, commitBatch, atomicChangesBatch)
+		batch := p.db.NewBatch()
+
+		const commitInterval = 4096
+		if height%commitInterval == 0 {
+			if err := trieDB.Commit(root, false); err != nil {
+				return err
+			}
+			if err := saestate.WriteCommittedRoot(batch, height, root); err != nil {
+				return err
+			}
+		}
+
+		// The following dereferences, if any, the previously inserted root.
+		// This one can be dereferenced whether it has been:
+		// - committed, in which case the dereference is a no-op
+		// - not committed, in which case the current root we are inserting contains
+		//   references to all the relevant data from the previous root.
+		if err := trieDB.Dereference(previousRoot); err != nil {
+			return err
 		}
 	*/
+
+	batch := p.db.NewBatch()
 
 	// If this is a bonus block, write [commitBatch] without applying atomic ops
 	// to shared memory.
@@ -253,7 +241,7 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 			zap.Stringer("block_hash", b.Hash()),
 			zap.Uint64("block_height", height),
 		)
-		return nil
+		return batch.Write()
 	}
 
 	lastAppliedHeight, err := saestate.ReadLastAppliedHeight(p.db)
@@ -269,10 +257,9 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 			zap.Uint64("block_height", height),
 			zap.Uint64("last_applied_height", lastAppliedHeight),
 		)
-		return nil
+		return batch.Write()
 	}
 
-	batch := p.db.NewBatch()
 	if err := saestate.WriteLastAppliedHeight(batch, height); err != nil {
 		return fmt.Errorf("failed to write last applied height of block %s (%d) to db: %v", b.Hash(), height, err)
 	}

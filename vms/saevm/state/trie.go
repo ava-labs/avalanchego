@@ -8,15 +8,22 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
+	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/triedb"
 )
 
 var (
 	trieMetadataPrefix     = prefixdb.MakePrefix([]byte("atomicTrieMetaDB"))
 	lastCommittedHeightKey = prefixdb.PrefixKey(trieMetadataPrefix, []byte("atomicTrieLastCommittedBlock"))
 	lastAppliedHeightKey   = prefixdb.PrefixKey(trieMetadataPrefix, []byte("atomicTrieLastAppliedBlock"))
+
+	trieStoragePrefix = []byte("atomicTrieDB")
 )
 
 func trieMetadataHeightKey(height uint64) []byte {
@@ -83,4 +90,15 @@ func ReadLastAppliedHeight(db database.KeyValueReader) (uint64, error) {
 // WriteLastAppliedHeight stores the last applied height.
 func WriteLastAppliedHeight(db database.KeyValueWriter, height uint64) error {
 	return database.PutUInt64(db, lastAppliedHeightKey, height)
+}
+
+func NewTrieDB(avaDB database.Database) *triedb.Database {
+	return triedb.NewDatabase(
+		rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(trieStoragePrefix, avaDB))),
+		&triedb.Config{
+			DBOverride: hashdb.Config{
+				CleanCacheSize: 64 * units.MiB, // Allocate 64MB of memory for clean cache
+			}.BackendConstructor,
+		},
+	)
 }

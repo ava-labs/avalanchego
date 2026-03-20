@@ -4,6 +4,7 @@
 package tx
 
 import (
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -43,4 +44,8 @@ func init() {
 	if errs.Errored() {
 		panic(errs.Err)
 	}
+}
+
+func MarshalAtomicRequests(r *atomic.Requests) ([]byte, error) {
+	return c.Marshal(codecVersion, r)
 }
