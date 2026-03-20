@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -189,4 +190,13 @@ func (i *Import) AsOp(avaxAssetID ids.ID) (map[common.Address]hook.AccountDebit,
 		mint[out.Address] = amount
 	}
 	return nil, mint, nil
+}
+
+func (i *Import) AtomicOps(ids.ID) (ids.ID, *atomic.Requests, error) {
+	utxoIDs := make([][]byte, len(i.ImportedInputs))
+	for j, in := range i.ImportedInputs {
+		inputID := in.InputID()
+		utxoIDs[j] = inputID[:]
+	}
+	return i.SourceChain, &atomic.Requests{RemoveRequests: utxoIDs}, nil
 }

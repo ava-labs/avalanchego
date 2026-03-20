@@ -24,13 +24,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 )
 
-var _ hook.BlockBuilder[*txpool.Transaction] = (*blockBuilder)(nil)
+var _ hook.BlockBuilder[*txpool.Tx] = (*blockBuilder)(nil)
 
 type blockBuilder struct {
 	ctx *snow.Context
 
 	now          func() time.Time
-	potentialTxs *txpool.Txs
+	potentialTxs func() iter.Seq[*txpool.Tx]
 }
 
 func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
@@ -47,14 +47,14 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
 	}
 }
 
-func (b *blockBuilder) PotentialEndOfBlockOps() iter.Seq[*txpool.Transaction] {
+func (b *blockBuilder) PotentialEndOfBlockOps() iter.Seq[*txpool.Tx] {
 	var (
 		header      *types.Header
 		settledHash common.Hash
 		getBlock    blocks.EthBlockSource
 	)
 
-	return func(yield func(*txpool.Transaction) bool) {
+	return func(yield func(*txpool.Tx) bool) {
 		consumedUTXOs, err := ancestorUTXOIDs(header, settledHash, getBlock)
 		if err != nil {
 			b.ctx.Log.Error("failed to get ancestor UTXO IDs",
@@ -63,7 +63,7 @@ func (b *blockBuilder) PotentialEndOfBlockOps() iter.Seq[*txpool.Transaction] {
 			return
 		}
 
-		for tx := range b.potentialTxs.Iter() {
+		for tx := range b.potentialTxs() {
 			if consumedUTXOs.Overlaps(tx.Inputs) {
 				b.ctx.Log.Debug("tx consumes previously consumed UTXOs",
 					zap.Stringer("txID", tx.ID),
@@ -91,7 +91,7 @@ func (*blockBuilder) BuildBlock(
 	header *types.Header,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
-	poolTxs []*txpool.Transaction,
+	poolTxs []*txpool.Tx,
 ) (*types.Block, error) {
 	if len(txs) == 0 && len(poolTxs) == 0 {
 		return nil, errEmptyBlock

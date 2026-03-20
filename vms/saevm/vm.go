@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/strevm/sae"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -33,7 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
-	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
+	"github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
 // SinceGenesis is a harness around an [sae.VM], providing an `Initialize`
@@ -63,6 +64,8 @@ func NewSinceGenesis(c sae.Config) *SinceGenesis {
 	}
 }
 
+var ethDBPrefix = []byte("ethdb")
+
 // Initialize initializes the VM.
 func (vm *SinceGenesis) Initialize(
 	ctx context.Context,
@@ -74,7 +77,10 @@ func (vm *SinceGenesis) Initialize(
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	db := rawdb.NewDatabase(evmdb.New(avaDB))
+	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
+	// This meant that the database's prefix was not compacted, because the
+	// provided database was wrapped by the rpcchainvm.
+	db := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
 	tdb := triedb.NewDatabase(db, vm.config.TrieDBConfig)
 
 	genesis := new(core.Genesis)
@@ -109,7 +115,7 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	txs := txpool.NewTxs()
-	hooks := hook.NewPoints(snowCtx, txs)
+	hooks := hook.NewPoints(snowCtx, txs, avaDB)
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
 		return err

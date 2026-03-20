@@ -20,14 +20,14 @@ type Txs struct {
 	lock sync.RWMutex
 	// txs is the collection of transactions available to be included into a
 	// block, sorted by gasPrice.
-	txs heap.Map[ids.ID, *Transaction]
+	txs heap.Map[ids.ID, *Tx]
 	// utxos maps a txID to the set of utxoIDs it consumes.
 	utxos *setmap.SetMap[ids.ID, ids.ID]
 }
 
 func NewTxs() *Txs {
 	return &Txs{
-		txs: heap.NewMap[ids.ID, *Transaction](func(a, b *Transaction) bool {
+		txs: heap.NewMap[ids.ID, *Tx](func(a, b *Tx) bool {
 			return a.GasPrice.Lt(&b.GasPrice) // Txs is a min-heap
 		}),
 		utxos: setmap.New[ids.ID, ids.ID](),
@@ -35,13 +35,13 @@ func NewTxs() *Txs {
 }
 
 // Iter returns an iterator of all transactions sorted by decreasing gas price.
-func (t *Txs) Iter() iter.Seq[*Transaction] {
+func (t *Txs) Iter() iter.Seq[*Tx] {
 	t.lock.RLock()
 	values := heap.MapValues(t.txs)
 	t.lock.RUnlock()
 
 	// Sort by decreasing gas price
-	slices.SortFunc(values, func(a, b *Transaction) int {
+	slices.SortFunc(values, func(a, b *Tx) int {
 		return -a.GasPrice.Cmp(&b.GasPrice)
 	})
 

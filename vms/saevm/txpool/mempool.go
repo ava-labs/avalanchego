@@ -32,48 +32,42 @@ func New(txs *Txs, ctx *snow.Context) *Mempool {
 	}
 }
 
-func (m *Mempool) Add(tx *tx.Tx) error {
-	if err := tx.Verify(context.TODO(), m.ctx); err != nil {
+func (m *Mempool) Add(rawTx *tx.Tx) error {
+	if err := rawTx.Verify(context.TODO(), m.ctx); err != nil {
 		return err
 	}
-	op, err := tx.AsOp(m.ctx.AVAXAssetID)
+
+	tx, err := NewTx(rawTx, m.ctx.AVAXAssetID)
 	if err != nil {
 		return err
 	}
-	inputs := tx.InputUTXOs()
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if _, ok := m.txs.Get(op.ID); ok {
+	if _, ok := m.txs.Get(tx.ID); ok {
 		return ErrAlreadyKnown
 	}
 
-	for input := range inputs {
+	for input := range tx.Inputs {
 		if conflictID, ok := m.utxos.GetKey(input); ok {
 			conflict, _ := m.txs.Get(conflictID)
-			if op.GasFeeCap.Cmp(&conflict.GasPrice) <= 0 {
+			if tx.GasPrice.Cmp(&conflict.GasPrice) <= 0 {
 				return errInsufficientFee
 			}
 		}
 	}
-	m.removeConflicts(inputs)
+	m.removeConflicts(tx.Inputs)
 
 	if m.txs.Len() >= maxSize {
 		_, cheap, _ := m.txs.Peek()
-		if op.GasFeeCap.Cmp(&cheap.GasPrice) <= 0 {
+		if tx.GasPrice.Cmp(&cheap.GasPrice) <= 0 {
 			return errInsufficientFee
 		}
 		m.removeConflicts(cheap.Inputs)
 	}
 
-	m.utxos.Put(op.ID, inputs)
-	m.txs.Push(op.ID, &Transaction{
-		ID:       op.ID,
-		Tx:       tx,
-		Inputs:   inputs,
-		GasPrice: op.GasFeeCap,
-		Op:       op,
-	})
+	m.utxos.Put(tx.ID, tx.Inputs)
+	m.txs.Push(tx.ID, tx)
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -44,6 +45,10 @@ type Unsigned interface {
 		mint map[common.Address]uint256.Int,
 		err error,
 	)
+
+	// AtomicOps returns the operations that should be applied to shared memory
+	// when this transaction is executed.
+	AtomicOps(txID ids.ID) (chainID ids.ID, requests *atomic.Requests, err error)
 }
 
 type Tx struct {
@@ -69,6 +74,18 @@ func (t *Tx) ID() (ids.ID, error) {
 		return ids.ID{}, err
 	}
 	return hashing.ComputeHash256Array(bytes), nil
+}
+
+func (t *Tx) Compare(o *Tx) int {
+	id, err := t.ID()
+	if err != nil {
+		panic(err)
+	}
+	oID, err := o.ID()
+	if err != nil {
+		panic(err)
+	}
+	return id.Compare(oID)
 }
 
 const (
