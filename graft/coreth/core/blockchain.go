@@ -231,11 +231,12 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 		}
 
 		config.DBOverride = firewood.TrieDBConfig{
-			DatabaseDir:       c.ChainDataDir,
-			CacheSizeBytes:    uint(c.TrieCleanLimit * 1024 * 1024),
-			RevisionsInMemory: uint(c.StateHistory), // must be at least 2
-			CacheStrategy:     ffi.CacheAllReads,
-			Archive:           !c.Pruning,
+			DatabaseDir:            c.ChainDataDir,
+			CacheSizeBytes:         uint(c.TrieCleanLimit * 1024 * 1024),
+			RevisionsInMemory:      uint(c.StateHistory), // must be at least 2
+			CacheStrategy:          ffi.CacheAllReads,
+			Archive:                !c.Pruning,
+			DeferredCommitInterval: c.CommitInterval,
 		}.BackendConstructor
 	}
 	return config
@@ -997,7 +998,7 @@ func (bc *BlockChain) stopWithoutSaving() {
 func (bc *BlockChain) Stop() {
 	bc.stopWithoutSaving()
 
-	// Ensure that the entirety of the state snapshot is journaled to disk.
+	// Stop snapshot generation and release resources
 	if bc.snaps != nil {
 		bc.snaps.Release()
 	}
