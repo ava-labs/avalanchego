@@ -3230,27 +3230,63 @@ func TestStateAndDiffIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Run("delete validator and its delegator", func(t *testing.T) {
+			t.Run("delete validator and its delegator -- separate diffs", func(t *testing.T) {
 				state := newTestState(t, memdb.New())
 
 				diff, err := NewDiffOn(state, true)
 				require.NoError(t, err)
-
 				validator := newTestStaker2(tt.subnetID, ids.GenerateTestNodeID())
 				require.NoError(t, diff.PutCurrentValidator(validator))
+				require.NoError(t, diff.Apply(state))
+
+				diff, err = NewDiffOn(state, true)
+				require.NoError(t, err)
 				delegator := newTestStaker2(validator.SubnetID, validator.NodeID)
 				diff.PutCurrentDelegator(delegator)
 				require.NoError(t, diff.Apply(state))
 
 				diff, err = NewDiffOn(state, true)
 				require.NoError(t, err)
-
 				diff.DeleteCurrentDelegator(delegator)
 				diff.DeleteCurrentValidator(validator)
 				require.NoError(t, diff.Apply(state))
 
 				// This fails because updates to the validator manager weren't flushed yet -- so it doesn't
 				// know about the validator to deduct the removed stake weight from.
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
+
+				_, err = state.GetCurrentValidator(validator.SubnetID, validator.NodeID)
+				require.ErrorIs(t, err, database.ErrNotFound)
+				itr, err := state.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+				require.NoError(t, err)
+				require.Empty(t, iterator.ToSlice(itr))
+			})
+
+			t.Run("delete validator and its delegator -- combined diffs", func(t *testing.T) {
+				state := newTestState(t, memdb.New())
+
+				diff1, err := NewDiffOn(state, true)
+				require.NoError(t, err)
+				validator := newTestStaker2(tt.subnetID, ids.GenerateTestNodeID())
+				require.NoError(t, diff1.PutCurrentValidator(validator))
+
+				diff2, err := NewDiffOn(diff1, true)
+				require.NoError(t, err)
+				delegator := newTestStaker2(validator.SubnetID, validator.NodeID)
+				diff2.PutCurrentDelegator(delegator)
+
+				diff3, err := NewDiffOn(diff2, true)
+				require.NoError(t, err)
+				diff3.DeleteCurrentDelegator(delegator)
+				diff3.DeleteCurrentValidator(validator)
+
+				// Combine diffs
+				require.NoError(t, diff3.Apply(diff2))
+				require.NoError(t, diff2.Apply(diff1))
+				require.NoError(t, diff1.Apply(state))
+
+				// Flush to disk
 				_, err = state.CommitBatch()
 				require.NoError(t, err)
 
