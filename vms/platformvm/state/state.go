@@ -743,8 +743,8 @@ func (s *State) GetStakingInfo(subnetID ids.ID, vdrID ids.NodeID) (StakingInfo, 
 	}
 
 	// Check if this was modified in the current diff.
-	if v := s.currentStakers.getOrCreateValidatorDiff(subnetID, vdrID); v.stakingInfo != nil {
-		return *v.stakingInfo, nil
+	if si, ok := s.validatorState.modifiedStakingInfo[subnetID][vdrID]; ok {
+		return si, nil
 	}
 
 	// Otherwise return whatever was previously committed.
@@ -752,17 +752,19 @@ func (s *State) GetStakingInfo(subnetID ids.ID, vdrID ids.NodeID) (StakingInfo, 
 }
 
 func (s *State) SetStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo StakingInfo) error {
-	validator, err := s.GetCurrentValidator(subnetID, vdrID)
+	_, err := s.GetCurrentValidator(subnetID, vdrID)
 	if err != nil {
 		return fmt.Errorf("getting current validator: %w", err)
 	}
 
-	// Add this to the current diff
-	diff := s.currentStakers.getOrCreateValidatorDiff(subnetID, vdrID)
-	diff.stakingInfo = &stakingInfo
+	nodeIDToStakingInfo, ok := s.validatorState.modifiedStakingInfo[subnetID]
+	if !ok {
+		nodeIDToStakingInfo = make(map[ids.NodeID]StakingInfo)
+		s.validatorState.modifiedStakingInfo[subnetID] = nodeIDToStakingInfo
+	}
 
-	// Mark this validator as requiring a update on disk
-	s.validatorState.addUpdatedTxID(validator.NodeID, validator.SubnetID, validator.TxID)
+	nodeIDToStakingInfo[vdrID] = stakingInfo
+
 	return nil
 }
 
@@ -2861,12 +2863,6 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 				s.validatorState.AddValidatorMetadata(nodeID, subnetID, metadata)
 			}
 
-			if validatorDiff.stakingInfo != nil {
-				if err := s.validatorState.SetStakingInfo(subnetID, nodeID, *(validatorDiff.stakingInfo)); err != nil {
-					return fmt.Errorf("setting staking info: %w", err)
-				}
-			}
-
 			err := writeCurrentDelegatorDiff(
 				delegatorDB,
 				validatorDiff,
@@ -2877,6 +2873,17 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 			}
 		}
 	}
+
+	for subnetID, nodes := range s.validatorState.modifiedStakingInfo {
+		for nodeID, stakingInfo := range nodes {
+			if err := s.validatorState.SetStakingInfo(subnetID, nodeID, stakingInfo); err != nil {
+				return fmt.Errorf("setting staking info: %w", err)
+			}
+		}
+	}
+
+	// Clear the diff now that we have flushed its changes
+	maps.Clear(s.validatorState.modifiedStakingInfo)
 
 	if err := s.validatorState.WriteValidatorMetadata(
 		s.currentValidatorList,
