@@ -253,7 +253,6 @@ func (vs *validatorState) WriteValidatorMetadata(
 	return nil
 }
 
-// addUpdatedTxID marks a validator's metadata as being updated in the current diff
 func (vs *validatorState) addUpdatedTxID(vdrID ids.NodeID, subnetID ids.ID, txID ids.ID) {
 	subnet, ok := vs.updatedMetadata[vdrID]
 	if !ok {
