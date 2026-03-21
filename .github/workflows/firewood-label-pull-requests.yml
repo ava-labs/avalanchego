@@ -2,9 +2,7 @@ name: Firewood Label pull requests
 
 on:
   pull_request_target:
-    paths:
-      - "firewood/**"
-      - ".github/workflows/firewood-label-pull-requests.yml"
+    types: [opened, synchronize]
 
 jobs:
   add_label:
@@ -13,8 +11,21 @@ jobs:
       issues: write
       pull-requests: write
     steps:
+      # paths filter on pull_request_target evaluates against the base branch,
+      # not the PR's changed files. Use dorny/paths-filter to check the actual
+      # changed files via the GitHub API.
+      - name: Check changed files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            firewood:
+              - "firewood/**"
+              - ".github/workflows/firewood-label-pull-requests.yml"
+
       - name: Check if pull request is from a fork
-        id: check_is_form
+        if: steps.filter.outputs.firewood == 'true'
+        id: check_is_fork
         run: |
           if [[ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
             echo "is_fork=true" >> "$GITHUB_OUTPUT"
@@ -23,11 +34,12 @@ jobs:
           fi
 
       - name: Add label to third-party pull request
+        if: steps.filter.outputs.firewood == 'true'
         uses: actions/github-script@v8
         with:
           script: |
             const label = '3rd party contributor';
-            const isFork = ${{ steps.check_is_form.outputs.is_fork }};
+            const isFork = ${{ steps.check_is_fork.outputs.is_fork }};
             const { data: issue } = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
