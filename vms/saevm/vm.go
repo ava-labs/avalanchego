@@ -232,7 +232,7 @@ func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Han
 		return nil, err
 	}
 
-	service := api.NewService(vm.ctx, vm.mempool, vm.pushGossiper, vm.db)
+	service := api.NewService(vm.ctx, vm.GethRPCBackends(), vm.mempool, vm.pushGossiper, vm.db)
 	handler, err := rpc.NewHandler(avaxServiceName, service)
 	if err != nil {
 		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ava-labs/strevm/sae/rpc"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -30,6 +31,7 @@ import (
 
 type Service struct {
 	ctx          *snow.Context
+	backend      rpc.GethBackends
 	mempool      *txpool.Mempool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
 	db           database.KeyValueReader
@@ -37,12 +39,14 @@ type Service struct {
 
 func NewService(
 	ctx *snow.Context,
+	backend rpc.GethBackends,
 	mempool *txpool.Mempool,
 	pushGossiper *gossip.PushGossiper[*tx.Tx],
 	db database.KeyValueReader,
 ) *Service {
 	return &Service{
 		ctx,
+		backend,
 		mempool,
 		pushGossiper,
 		db,
@@ -208,7 +212,7 @@ func (s *Service) GetAtomicTxStatus(_ *http.Request, a *api.JSONTxID, r *TxStatu
 		zap.Stringer("txID", a.TxID),
 	)
 
-	_, height, err := state.ReadTxByID(s.db, a.TxID)
+	_, height, err := s.readTx(a.TxID)
 	if errors.Is(err, database.ErrNotFound) {
 		r.Status = Unknown
 		return nil
@@ -235,7 +239,7 @@ func (s *Service) GetAtomicTx(_ *http.Request, a *api.GetTxArgs, r *Tx) error {
 		zap.Stringer("encoding", a.Encoding),
 	)
 
-	tx, height, err := state.ReadTxByID(s.db, a.TxID)
+	tx, height, err := s.readTx(a.TxID)
 	if err != nil {
 		return err
 	}
@@ -252,4 +256,22 @@ func (s *Service) GetAtomicTx(_ *http.Request, a *api.GetTxArgs, r *Tx) error {
 	r.Encoding = a.Encoding
 	r.Height = json.Uint64(height)
 	return nil
+}
+
+func (s *Service) readTx(txID ids.ID) (*tx.Tx, uint64, error) {
+	tx, height, err := state.ReadTxByID(s.db, txID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Because the transaction is written to disk before the block is finished
+	// executing, it's possible for the transaction to be found in the database,
+	// but the block that includes it to not be fully executed yet. In this
+	// case, we return "unknown" instead of "accepted" until the block is
+	// fully executed.
+	if lastExecuted := s.backend.CurrentHeader(); height > lastExecuted.Number.Uint64() {
+		return nil, 0, database.ErrNotFound
+	}
+
+	return tx, height, nil
 }
