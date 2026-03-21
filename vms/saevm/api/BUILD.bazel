@@ -25,6 +25,7 @@ go_library(
         "//vms/saevm/state",
         "//vms/saevm/tx",
         "//vms/saevm/txpool",
+        "@com_github_ava_labs_strevm//sae/rpc",
         "@org_uber_go_zap//:zap",
     ],
 )
