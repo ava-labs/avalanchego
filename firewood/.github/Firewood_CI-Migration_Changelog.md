@@ -7,7 +7,7 @@
 | `ci.yaml` | `firewood-ci.yml` | Migrated | Main CI |
 | `benchmarks.yaml` | `firewood-benchmarks.yml` | Migrated | Push-to-master benchmarks |
 | `attach-static-libs.yaml` | `firewood-attach-static-libs.yml` | Migrated | Multi-arch static lib builds |
-| `track-performance.yml` | `firewood-track-performance.yml` | Migrated | C-Chain reexecution perf |
+| `track-performance.yml` | `firewood-track-performance.yml` | Deferred | Triggers avalanchego workflow; requires Elvis to perform migration |
 | `release.yaml` | `firewood-release.yml` | Migrated | Draft release on tags |
 | `publish.yaml` | `firewood-publish.yml` | Migrated | crates.io publishing |
 | `label-pull-requests.yaml` | `firewood-label-pull-requests.yml` | Migrated | PR labeling |
@@ -23,9 +23,9 @@
 
 | File | Disposition | Reason |
 |------|-------------|--------|
-| `check-license-headers.yaml` | Kept | Referenced by `firewood-ci.yml` |
+| `check-license-headers.yaml` | Moved to `.github/firewood-check-license-headers.yaml` | Referenced by `firewood-ci.yml`; moved to enable eventual removal of `firewood/.github/` |
 | `license-header.txt` | Kept | Referenced by `firewood-ci.yml` |
-| `.golangci.yaml.patch` | Removed | Patch mechanism obsolete |
+| `.golangci.yaml.patch` | Removed | Firewood FFI Go code now lints against the root `.golangci.yml` directly; if firewood-specific lint augmentations are needed, they should be added as overrides in that file or via a firewood-scoped `.golangci.yml` in `firewood/` |
 | `.gitignore` | Removed | Only gitignored verify script artifacts |
 | `scripts/verify_golangci_yaml_changes.sh` | Removed | Patch mechanism obsolete |
 | `dependabot.yml` | Merged into root | Config merged into `.github/dependabot.yml` |
@@ -45,7 +45,9 @@
 
 | File | Change | Reason |
 |------|--------|--------|
-| `bazel-ci.yml`, `c-chain-reexecution-benchmark-container.yml`, `c-chain-reexecution-benchmark-gh-native.yml` | Added `paths-ignore: ["firewood/**"]` | Don't trigger avalanchego-only workflows for firewood changes |
+| `c-chain-reexecution-benchmark-container.yml`, `c-chain-reexecution-benchmark-gh-native.yml` | Added `paths-ignore: ["firewood/**"]` to `pull_request` | Don't trigger avalanchego-only workflows for firewood changes |
+| `ci.yml`, `coreth-ci.yml`, `evm-ci.yml`, `subnet-evm-ci.yml`, `codeql-analysis.yml` | Added `paths-ignore: ["firewood/**"]` to `push` trigger | Prevent avalanchego CI from running on push to master when only firewood files change |
+| `bazel-ci.yml` | Removed `paths-ignore: ["firewood/**"]` | Bazel CI validates the firewood + avalanchego integration and must run on firewood changes |
 | `firewood/.github/check-license-headers.yaml` | Exempted `BUILD.bazel` files | Bazel build files don't carry firewood license headers |
 | `firewood-cache-cleanup.yml`, `firewood-metrics-check.yml` | Fixed shellcheck warnings | Lint compliance with avalanchego's CI |
 | `firewood-track-performance.yml` | Suppressed shellcheck SC2129 | Lint compliance |
@@ -53,7 +55,13 @@
 | `firewood-attach-static-libs.yml` | `ubuntu-22.04-arm` → `custom-arm64-jammy` | Use avalanchego's registered ARM runner label |
 | `firewood-attach-static-libs.yml` | Pass `github.event.pull_request.head.ref` through env var | Fix actionlint script injection warning |
 | `firewood-track-performance.yml` | Removed `timeout-minutes` from `workflow_dispatch` inputs | GitHub Actions limits `workflow_dispatch` to 10 inputs; default 12h for manual dispatch |
-| `scripts/actionlint.sh` | Skip `firewood-*` workflows in `run_task.sh` enforcement check | Firewood workflows use their own script conventions |
+| `scripts/actionlint.sh` | Skip `firewood-*` workflows in `run_task.sh` enforcement check | Firewood does not use Task; only some jobs use Just |
+| `firewood-label-pull-requests.yml` | Replaced `paths:` filter with `dorny/paths-filter` | `paths:` on `pull_request_target` evaluates the base branch, not the PR's changed files |
+| `firewood-track-performance.yml` | Reverted (removed) | Triggers avalanchego workflow via API; migration requires Elvis |
+| `firewood-attach-static-libs.yml` | Move `create_branch_name` dispatch input to env var | Avoid script injection of `github.event.inputs.*` |
+| `.github/dependabot.yml` | Removed redundant `/firewood` github-actions entry | Root `/` entry already covers all github-actions |
+| `check-license-headers.yaml` | Moved from `firewood/.github/` to `.github/firewood-check-license-headers.yaml` | Enable eventual removal of `firewood/.github/` directory |
+| `Firewood_CI-Migration_Changelog.md` | Moved from `.github/workflows/` to `firewood/.github/` | Co-locate with migrated content for easier cleanup |
 
 ## Known Issues
 
