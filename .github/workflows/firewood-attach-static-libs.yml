@@ -110,9 +110,10 @@ jobs:
         id: determine_branch
         env:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          CREATE_BRANCH_NAME: ${{ github.event.inputs.create_branch_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.create_branch_name }}" ]]; then
-            export target_branch="${{ github.event.inputs.create_branch_name }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "$CREATE_BRANCH_NAME" ]]; then
+            export target_branch="$CREATE_BRANCH_NAME"
             echo "Using workflow input as target branch: $target_branch"
             echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
