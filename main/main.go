@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
+	_ "github.com/ava-labs/avalanchego/utils/earlysignal"
 	"github.com/ava-labs/avalanchego/version"
 )
 

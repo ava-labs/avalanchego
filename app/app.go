@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/earlysignal"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
@@ -90,7 +91,10 @@ func Run(app App) int {
 	// start running the application
 	app.Start()
 
-	// register terminationSignals to kill the application
+	// Disable the early SIGTERM handler before registering the real one.
+	// This ensures there is no gap where SIGTERM has no handler.
+	earlysignal.Disable()
+
 	terminationSignals := make(chan os.Signal, 1)
 	signal.Notify(terminationSignals, syscall.SIGINT, syscall.SIGTERM)
 

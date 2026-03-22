@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -2974,4 +2975,49 @@ func TestBuildBlockWithUnfinalizedPChainHeight(t *testing.T) {
 
 	_, err = proVM.BuildBlock(t.Context())
 	require.NoError(err)
+}
+
+type levelRecordingLogger struct {
+	logging.NoLog
+	lastLevel string
+}
+
+func (l *levelRecordingLogger) Warn(string, ...zap.Field)  { l.lastLevel = "warn" }
+func (l *levelRecordingLogger) Error(string, ...zap.Field) { l.lastLevel = "error" }
+
+func TestLogErrorUnlessDBClosed(t *testing.T) {
+	tests := []struct {
+		name          string
+		err           error
+		expectedLevel string
+	}{
+		{
+			name:          "ErrClosed logs at warn",
+			err:           database.ErrClosed,
+			expectedLevel: "warn",
+		},
+		{
+			name:          "wrapped ErrClosed logs at warn",
+			err:           fmt.Errorf("some context: %w", database.ErrClosed),
+			expectedLevel: "warn",
+		},
+		{
+			name:          "other error logs at error",
+			err:           errors.New("some other error"),
+			expectedLevel: "error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := &levelRecordingLogger{}
+			vm := &VM{
+				ctx: &snow.Context{Log: logger},
+			}
+
+			vm.logErrorUnlessDBClosed(tt.err, "test message")
+
+			require.Equal(t, tt.expectedLevel, logger.lastLevel)
+		})
+	}
 }
