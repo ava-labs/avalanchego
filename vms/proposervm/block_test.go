@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -29,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
 
@@ -558,6 +560,159 @@ func TestPostGraniteBlock_EpochMatches(t *testing.T) {
 
 			err = block.Verify(ctx)
 			require.ErrorIs(err, test.wantErr)
+		})
+	}
+}
+
+func TestDBClosedDuringVerifyLogsWarnNotError(t *testing.T) {
+	tests := []struct {
+		name                   string
+		getCurrentHeightClosed bool
+		expectedProposerClosed bool
+	}{
+		{
+			name:                   "GetCurrentHeight returns ErrClosed",
+			getCurrentHeightClosed: true,
+		},
+		{
+			name:                   "ExpectedProposer returns ErrClosed",
+			expectedProposerClosed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+
+			pChainHeight := uint64(100)
+			parentTimestamp := time.Now().Truncate(time.Second)
+			chainID := ids.GenerateTestID()
+			parentInnerBlkID := ids.GenerateTestID()
+
+			parentInnerBlk := snowmanmock.NewBlock(ctrl)
+			parentInnerBlk.EXPECT().ID().Return(parentInnerBlkID).AnyTimes()
+
+			childInnerBlk := snowmanmock.NewBlock(ctrl)
+			childInnerBlk.EXPECT().Parent().Return(parentInnerBlkID).AnyTimes()
+			childInnerBlk.EXPECT().Height().Return(uint64(10)).AnyTimes()
+
+			upgrades := upgradetest.GetConfig(upgradetest.Latest)
+			childSlb, err := statelessblock.Build(
+				ids.GenerateTestID(),
+				parentTimestamp,
+				pChainHeight,
+				acp181.NewEpoch(upgrades, pChainHeight, statelessblock.Epoch{}, parentTimestamp, parentTimestamp),
+				pTestCert,
+				[]byte{1, 2, 3},
+				chainID,
+				pTestSigner,
+			)
+			require.NoError(err)
+
+			logger := &levelRecordingLogger{}
+			vdrState := validatorsmock.NewState(ctrl)
+			if tt.getCurrentHeightClosed {
+				vdrState.EXPECT().GetCurrentHeight(gomock.Any()).Return(uint64(0), database.ErrClosed)
+			} else {
+				vdrState.EXPECT().GetCurrentHeight(gomock.Any()).Return(pChainHeight, nil)
+			}
+
+			windower := proposermock.NewWindower(ctrl)
+			if tt.expectedProposerClosed {
+				windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(ids.EmptyNodeID, database.ErrClosed)
+			}
+
+			vm := &VM{
+				Config: Config{
+					Upgrades: upgrades,
+				},
+				ctx: &snow.Context{
+					NodeID:         ids.NodeIDFromCert(pTestCert),
+					ValidatorState: vdrState,
+					Log:            logger,
+					ChainID:        chainID,
+				},
+				Windower:       windower,
+				consensusState: snow.NormalOp,
+			}
+			vm.Clock.Set(parentTimestamp.Add(time.Second))
+
+			parent := &postForkCommonComponents{vm: vm, innerBlk: parentInnerBlk}
+			child := &postForkBlock{
+				SignedBlock: childSlb,
+				postForkCommonComponents: postForkCommonComponents{
+					vm:       vm,
+					innerBlk: childInnerBlk,
+				},
+			}
+
+			err = parent.Verify(t.Context(), parentTimestamp, pChainHeight, statelessblock.Epoch{}, child)
+			require.ErrorIs(err, database.ErrClosed)
+			require.Equal("warn", logger.lastLevel, "database.ErrClosed should log at Warn level, not Error")
+		})
+	}
+}
+
+func TestDBClosedDuringBuildChildLogsWarnNotError(t *testing.T) {
+	tests := []struct {
+		name                   string
+		getMinHeightClosed     bool
+		expectedProposerClosed bool
+	}{
+		{
+			name:               "GetMinimumHeight returns ErrClosed",
+			getMinHeightClosed: true,
+		},
+		{
+			name:                   "ExpectedProposer returns ErrClosed",
+			expectedProposerClosed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+
+			pChainHeight := uint64(100)
+			parentTimestamp := time.Now().Truncate(time.Second)
+
+			logger := &levelRecordingLogger{}
+			vdrState := validatorsmock.NewState(ctrl)
+			if tt.getMinHeightClosed {
+				vdrState.EXPECT().GetMinimumHeight(gomock.Any()).Return(uint64(0), database.ErrClosed)
+			} else {
+				vdrState.EXPECT().GetMinimumHeight(gomock.Any()).Return(pChainHeight, nil)
+			}
+
+			windower := proposermock.NewWindower(ctrl)
+			if tt.expectedProposerClosed {
+				windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(ids.EmptyNodeID, database.ErrClosed)
+			}
+
+			innerBlk := snowmanmock.NewBlock(ctrl)
+			innerBlk.EXPECT().Height().Return(uint64(10)).AnyTimes()
+
+			vm := &VM{
+				Config: Config{
+					Upgrades: upgradetest.GetConfig(upgradetest.Latest),
+				},
+				ctx: &snow.Context{
+					NodeID:         ids.NodeIDFromCert(pTestCert),
+					ValidatorState: vdrState,
+					Log:            logger,
+				},
+				Windower: windower,
+			}
+			vm.Clock.Set(parentTimestamp.Add(time.Second))
+
+			blk := &postForkCommonComponents{innerBlk: innerBlk, vm: vm}
+			_, err := blk.buildChild(t.Context(), ids.GenerateTestID(), parentTimestamp, pChainHeight, statelessblock.Epoch{})
+			require.ErrorIs(err, database.ErrClosed)
+			require.Equal("warn", logger.lastLevel, "database.ErrClosed should log at Warn level, not Error")
 		})
 	}
 }
