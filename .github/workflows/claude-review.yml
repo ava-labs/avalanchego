@@ -1,13 +1,12 @@
 name: Claude Auto Review
 on:
   pull_request:
-    types: [opened, ready_for_review]
+    types: [labeled]
 
 jobs:
   review:
-    # Skip drafts, forks, and external contributors (only org members / collaborators).
     if: >-
-      github.event.pull_request.draft == false &&
+      github.event.label.name == 'ai-review' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(fromJSON('["MEMBER", "COLLABORATOR", "OWNER"]'), github.event.pull_request.author_association)
     runs-on: ubuntu-latest

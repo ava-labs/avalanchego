@@ -5,7 +5,7 @@ Skim the PR description for intent. Comment on a gap between what it claims and 
 ## Areas to look at
 
 - **Correctness** — logic, errors and edge cases, invariants, protocol or upgrade-sensitive behavior.
-- **Concurrency** — shared state, synchronization, goroutines, shutdown and cancellation.
+- **Concurrency** — shared state, synchronization, goroutines, data races, shutdown and cancellation.
 - **API surface and PR scope** — exports and public contracts; whether unrelated changes crept in.
 - **Tests** — coverage where behavior is risky or new; tests that reflect real outcomes, not implementation trivia.
 - **Operations** — configuration, defaults, limits, logging/metrics when operators or deployments are affected.
