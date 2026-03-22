@@ -6,7 +6,6 @@ package state
 import (
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -33,7 +32,7 @@ func (nilStateGetter) GetState(ids.ID) (Chain, bool) {
 
 func TestDiffMissingState(t *testing.T) {
 	parentID := ids.GenerateTestID()
-	_, err := NewDiff(parentID, nilStateGetter{})
+	_, err := NewDiff(parentID, nilStateGetter{}, StakerAdditionAfterDeletionAllowed)
 	require.ErrorIs(t, err, ErrMissingParentState)
 }
 
@@ -42,7 +41,7 @@ func TestNewDiffOn(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	assertChainsEqual(t, state, d)
@@ -53,7 +52,7 @@ func TestDiffFeeState(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	initialFeeState := state.GetFeeState()
@@ -74,7 +73,7 @@ func TestDiffL1ValidatorExcess(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	initialExcess := state.GetL1ValidatorExcess()
@@ -92,7 +91,7 @@ func TestDiffAccruedFees(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	initialAccruedFees := state.GetAccruedFees()
@@ -110,7 +109,7 @@ func TestDiffCurrentSupply(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	initialCurrentSupply, err := d.GetCurrentSupply(constants.PrimaryNetworkID)
@@ -228,7 +227,7 @@ func TestDiffExpiry(t *testing.T) {
 				state.PutExpiry(expiry)
 			}
 
-			d, err := NewDiffOn(state)
+			d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
 
 			var (
@@ -359,7 +358,7 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 			l1Validator.EndAccumulatedFee = test.initialEndAccumulatedFee
 			require.NoError(state.PutL1Validator(l1Validator))
 
-			d, err := NewDiffOn(state)
+			d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
 
 			// Initialize subnetID, weight, and endAccumulatedFee as they are
@@ -378,17 +377,10 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 
 func TestDiffCurrentValidator(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	state := NewMockState(ctrl)
-	// Called in NewDiffOn
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
-	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
+	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a current validator
@@ -408,24 +400,16 @@ func TestDiffCurrentValidator(t *testing.T) {
 	d.DeleteCurrentValidator(currentValidator)
 
 	// Make sure the deletion worked
-	state.EXPECT().GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID).Return(nil, database.ErrNotFound).Times(1)
 	_, err = d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestDiffPendingValidator(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	state := NewMockState(ctrl)
-	// Called in NewDiffOn
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
-	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
+	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a pending validator
@@ -445,14 +429,12 @@ func TestDiffPendingValidator(t *testing.T) {
 	d.DeletePendingValidator(pendingValidator)
 
 	// Make sure the deletion worked
-	state.EXPECT().GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID).Return(nil, database.ErrNotFound).Times(1)
 	_, err = d.GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestDiffCurrentDelegator(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	currentDelegator := &Staker{
 		TxID:     ids.GenerateTestID(),
@@ -460,26 +442,15 @@ func TestDiffCurrentDelegator(t *testing.T) {
 		NodeID:   ids.GenerateTestNodeID(),
 	}
 
-	state := NewMockState(ctrl)
-	// Called in NewDiffOn
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
-	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
+	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a current delegator
 	d.PutCurrentDelegator(currentDelegator)
 
 	// Assert that we get the current delegator back
-	// Mock iterator for [state] returns no delegators.
-	state.EXPECT().GetCurrentDelegatorIterator(
-		currentDelegator.SubnetID,
-		currentDelegator.NodeID,
-	).Return(iterator.Empty[*Staker]{}, nil).Times(2)
 	gotCurrentDelegatorIter, err := d.GetCurrentDelegatorIterator(currentDelegator.SubnetID, currentDelegator.NodeID)
 	require.NoError(err)
 	// The iterator should have the 1 delegator we put in [d]
@@ -498,7 +469,6 @@ func TestDiffCurrentDelegator(t *testing.T) {
 
 func TestDiffPendingDelegator(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	pendingDelegator := &Staker{
 		TxID:     ids.GenerateTestID(),
@@ -506,26 +476,15 @@ func TestDiffPendingDelegator(t *testing.T) {
 		NodeID:   ids.GenerateTestNodeID(),
 	}
 
-	state := NewMockState(ctrl)
-	// Called in NewDiffOn
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
-	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
+	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a pending delegator
 	d.PutPendingDelegator(pendingDelegator)
 
 	// Assert that we get the pending delegator back
-	// Mock iterator for [state] returns no delegators.
-	state.EXPECT().GetPendingDelegatorIterator(
-		pendingDelegator.SubnetID,
-		pendingDelegator.NodeID,
-	).Return(iterator.Empty[*Staker]{}, nil).Times(2)
 	gotPendingDelegatorIter, err := d.GetPendingDelegatorIterator(pendingDelegator.SubnetID, pendingDelegator.NodeID)
 	require.NoError(err)
 	// The iterator should have the 1 delegator we put in [d]
@@ -566,7 +525,7 @@ func TestDiffSubnet(t *testing.T) {
 		subnetIDs,
 	)
 
-	diff, err := NewDiffOn(state)
+	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a subnet
@@ -616,7 +575,7 @@ func TestDiffChain(t *testing.T) {
 		chains,
 	)
 
-	diff, err := NewDiffOn(state)
+	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a chain
@@ -644,17 +603,10 @@ func TestDiffChain(t *testing.T) {
 
 func TestDiffTx(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	state := NewMockState(ctrl)
-	// Called in NewDiffOn
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
-	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
+	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a tx
@@ -684,7 +636,8 @@ func TestDiffTx(t *testing.T) {
 			},
 		}
 		parentTx.SetBytes(utils.RandomBytes(16), utils.RandomBytes(16))
-		state.EXPECT().GetTx(parentTx.ID()).Return(parentTx, status.Committed, nil).Times(1)
+		state.AddTx(parentTx, status.Committed)
+
 		gotParentTx, gotStatus, err := d.GetTx(parentTx.ID())
 		require.NoError(err)
 		require.Equal(status.Committed, gotStatus)
@@ -718,7 +671,7 @@ func TestDiffRewardUTXO(t *testing.T) {
 		rewardUTXOs,
 	)
 
-	diff, err := NewDiffOn(state)
+	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a reward UTXO
@@ -744,17 +697,10 @@ func TestDiffRewardUTXO(t *testing.T) {
 
 func TestDiffUTXO(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	state := NewMockState(ctrl)
-	// Called in NewDiffOn
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
-	state.EXPECT().NumActiveL1Validators().Return(0).Times(1)
+	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a UTXO
@@ -776,7 +722,8 @@ func TestDiffUTXO(t *testing.T) {
 		parentUTXO := &avax.UTXO{
 			UTXOID: avax.UTXOID{TxID: ids.GenerateTestID()},
 		}
-		state.EXPECT().GetUTXO(parentUTXO.InputID()).Return(parentUTXO, nil).Times(1)
+
+		state.AddUTXO(parentUTXO)
 		gotParentUTXO, err := d.GetUTXO(parentUTXO.InputID())
 		require.NoError(err)
 		require.Equal(parentUTXO, gotParentUTXO)
@@ -886,7 +833,7 @@ func TestDiffSubnetOwner(t *testing.T) {
 	require.Equal(owner1, owner)
 
 	// Create diff and verify that subnet owner returns correctly
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	owner, err = d.GetSubnetOwner(subnetID)
@@ -927,7 +874,7 @@ func TestDiffSubnetToL1Conversion(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Zero(actualConversion)
 
-	d, err := NewDiffOn(state)
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	actualConversion, err = d.GetSubnetToL1Conversion(subnetID)
@@ -985,7 +932,7 @@ func TestDiffStacking(t *testing.T) {
 	require.Equal(owner1, owner)
 
 	// Create first diff and verify that subnet owner returns correctly
-	statesDiff, err := NewDiffOn(state)
+	statesDiff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	owner, err = statesDiff.GetSubnetOwner(subnetID)
@@ -1003,7 +950,7 @@ func TestDiffStacking(t *testing.T) {
 	require.Equal(owner1, owner)
 
 	// Create a second diff on first diff and verify that subnet owner returns correctly
-	stackedDiff, err := NewDiffOn(statesDiff)
+	stackedDiff, err := NewDiffOn(statesDiff, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	owner, err = stackedDiff.GetSubnetOwner(subnetID)
 	require.NoError(err)
@@ -1039,4 +986,36 @@ func TestDiffStacking(t *testing.T) {
 	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
 	require.Equal(owner3, owner)
+}
+
+func TestDiffStakingInfo(t *testing.T) {
+	state := newTestState(t, memdb.New())
+
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	// Get falls through to parent when not set in diff
+	initialStakingInfo, err := d.GetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+
+	// Set then Get returns the diff value
+	wantStakingInfo := StakingInfo{DelegateeReward: 200}
+	require.NoError(t, d.SetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID, wantStakingInfo))
+
+	gotStakingInfo, err := d.GetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantStakingInfo, gotStakingInfo)
+
+	// Parent state unchanged
+	parentStakingInfo, err := state.GetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+	require.Equal(t, initialStakingInfo, parentStakingInfo)
+
+	// Overwrite works correctly
+	wantStakingInfo = StakingInfo{DelegateeReward: 300}
+	require.NoError(t, d.SetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID, wantStakingInfo))
+
+	gotStakingInfo, err = d.GetStakingInfo(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantStakingInfo, gotStakingInfo)
 }

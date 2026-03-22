@@ -1,0 +1,27 @@
+# gazelle:ignore
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "secp256k1",
+    srcs = glob(
+        [
+            "*.go",
+            "*.h",
+        ],
+        exclude = ["*_test.go"],
+    ),
+    cdeps = ["//crypto/secp256k1/libsecp256k1"],
+    cgo = True,
+    copts = [
+        "-Icrypto/secp256k1/libsecp256k1",
+        "-Icrypto/secp256k1/libsecp256k1/src",
+    ],
+    importpath = "github.com/ava-labs/libevm/crypto/secp256k1",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "secp256k1_test",
+    srcs = glob(["*_test.go"]),
+    embed = [":secp256k1"],
+)

@@ -1,0 +1,8 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "blstest",
+    srcs = ["benchmark.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/crypto/bls/blstest",
+    visibility = ["//visibility:public"],
+)

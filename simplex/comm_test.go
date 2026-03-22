@@ -87,7 +87,7 @@ func TestCommFailsWithoutCurrentNode(t *testing.T) {
 
 	// set the curNode to a different nodeID than the one in the config
 	vdrs := generateTestNodes(t, 3)
-	config.Validators = newTestValidatorInfo(vdrs)
+	config.Params = newSimplexChainParams(vdrs)
 
 	_, err := NewComm(config)
 	require.ErrorIs(t, err, errNodeNotFound)

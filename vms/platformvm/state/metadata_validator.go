@@ -75,6 +75,17 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 	return nil
 }
 
+// StakingInfo holds mutable validator data that can be modified.
+type StakingInfo struct {
+	DelegateeReward uint64
+}
+
+func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
+	return StakingInfo{
+		DelegateeReward: vdrMetadata.PotentialDelegateeReward,
+	}
+}
+
 type validatorState struct {
 	metadata map[ids.NodeID]map[ids.ID]*validatorMetadata // vdrID -> subnetID -> metadata
 	// updatedMetadata tracks (vdrID, subnetID) -> txIDs needing DB sync since the
@@ -133,6 +144,8 @@ func (vs *validatorState) GetUptime(
 // SetUptime updates the uptime measurements of `vdrID` on `subnetID`.
 // Unless these measurements are deleted first, the next call to
 // [WriteValidatorMetadata] will write this update to disk.
+//
+// This is called by the consensus layer to track validator connection times.
 func (vs *validatorState) SetUptime(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
@@ -150,32 +163,32 @@ func (vs *validatorState) SetUptime(
 	return nil
 }
 
-// GetDelegateeReward returns the current rewards accrued to `vdrID` on
-// `subnetID`.
-func (vs *validatorState) GetDelegateeReward(
+// GetStakingInfo returns the mutable staking info for the validator on [subnetID] with [vdrID].
+func (vs *validatorState) GetStakingInfo(
 	subnetID ids.ID,
 	vdrID ids.NodeID,
-) (uint64, error) {
+) (StakingInfo, error) {
 	metadata, exists := vs.metadata[vdrID][subnetID]
 	if !exists {
-		return 0, database.ErrNotFound
+		return StakingInfo{}, database.ErrNotFound
 	}
-	return metadata.PotentialDelegateeReward, nil
+	return stakingInfoFromMetadata(metadata), nil
 }
 
-// SetDelegateeReward updates the rewards accrued to `vdrID` on `subnetID`.
-// Unless these measurements are deleted first, the next call to
-// [WriteValidatorMetadata] will write this update to disk.
-func (vs *validatorState) SetDelegateeReward(
+// SetStakingInfo updates the mutable staking info of `vdrID` on `subnetID`.
+// Unless deleted first, the next call to [WriteValidatorMetadata] will write this update to disk.
+//
+// This is called by execution layer to update mutable staking info.
+func (vs *validatorState) SetStakingInfo(
 	subnetID ids.ID,
 	vdrID ids.NodeID,
-	amount uint64,
+	stakingInfo StakingInfo,
 ) error {
 	metadata, exists := vs.metadata[vdrID][subnetID]
 	if !exists {
 		return database.ErrNotFound
 	}
-	metadata.PotentialDelegateeReward = amount
+	metadata.PotentialDelegateeReward = stakingInfo.DelegateeReward
 
 	vs.addUpdatedTxID(vdrID, subnetID, metadata.txID)
 	return nil
@@ -184,7 +197,7 @@ func (vs *validatorState) SetDelegateeReward(
 // DeleteValidatorMetadata removes in-memory references to the metadata of
 // `vdrID` on `subnetID`. The txID is recorded for deletion from disk on the
 // next [WriteValidatorMetadata]. Any staged updates from [SetUptime] or
-// [SetDelegateeReward] are dropped.
+// [SetStakingInfo] are dropped.
 func (vs *validatorState) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 	subnetMetadata := vs.metadata[vdrID]
 	md, exists := subnetMetadata[subnetID]

@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "backends",
+    srcs = ["simulated.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind/backends",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/accounts/abi/bind",
+        "//graft/coreth/ethclient/simulated",
+        "//graft/coreth/interfaces",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+    ],
+)
