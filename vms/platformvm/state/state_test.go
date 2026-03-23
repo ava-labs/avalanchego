@@ -3851,6 +3851,36 @@ func TestStateAndDiffIntegration(t *testing.T) {
 				_, err = state.GetStakingInfo(validator.SubnetID, validator.NodeID)
 				require.ErrorIs(t, err, database.ErrNotFound)
 			})
+
+			t.Run("delete a validator and add and set a different validator", func(t *testing.T) {
+				state := newTestState(t, memdb.New())
+
+				diff, err := NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				validator1 := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
+				require.NoError(t, diff.PutCurrentValidator(validator1))
+				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
+
+				diff, err = NewDiffOn(state, true)
+				require.NoError(t, err)
+				require.NoError(t, diff.DeleteCurrentValidator(validator1))
+				validator2 := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
+				require.NoError(t, diff.PutCurrentValidator(validator2))
+				want := StakingInfo{DelegateeReward: 123}
+				require.NoError(t, diff.SetStakingInfo(validator2.SubnetID, validator2.NodeID, want))
+				require.NoError(t, diff.Apply(state))
+				_, err = state.CommitBatch()
+				require.NoError(t, err)
+
+				_, err = state.GetCurrentValidator(validator1.SubnetID, validator1.NodeID)
+				require.ErrorIs(t, err, database.ErrNotFound)
+				got, err := state.GetStakingInfo(validator2.SubnetID, validator2.NodeID)
+				require.NoError(t, err)
+				require.Equal(t, want, got)
+			})
 		})
 	}
 }

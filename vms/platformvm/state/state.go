@@ -2841,8 +2841,7 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 
 				nodes := s.validatorState.modifiedStakingInfo[subnetID]
-				maps.Clear(nodes) // TODO bug
-				// delete(nodes, nodeID)
+				delete(nodes, nodeID)
 			}
 			if validatorDiff.added != nil {
 				staker := validatorDiff.added
