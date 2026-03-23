@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
@@ -56,24 +57,20 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
-			Coinbase:         common.Address{},
+			Coinbase:         constants.BlackholeAddr,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
 			Time:             uint64(now.Unix()),
-			Extra:            nil,
-			MixDigest:        common.Hash{},
-			Nonce:            types.BlockNonce{},
-			WithdrawalsHash:  &common.Hash{},
+			Extra:            nil, // TODO: Include warp predicates
 			BlobGasUsed:      utils.PointerTo[uint64](0),
 			ExcessBlobGas:    utils.PointerTo[uint64](0),
 			ParentBeaconRoot: &common.Hash{},
 		},
 		&customtypes.HeaderExtra{
-			ExtDataHash:      common.Hash{},
 			ExtDataGasUsed:   big.NewInt(0),
 			BlockGasCost:     big.NewInt(0),
-			TimeMilliseconds: utils.PointerTo[uint64](0),
-			MinDelayExcess:   utils.PointerTo[acp226.DelayExcess](0),
+			TimeMilliseconds: utils.PointerTo[uint64](0),             // TODO:
+			MinDelayExcess:   utils.PointerTo[acp226.DelayExcess](0), // TODO:
 			TargetExcess:     &te,
 		},
 	)
