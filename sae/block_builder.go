@@ -183,6 +183,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	log = log.With(
 		zap.Uint64("last_settled_height", lastSettled.Height()),
 		zap.Stringer("last_settled_hash", lastSettled.Hash()),
+		zap.Stringer("last_settled_gas_time", lastSettled.ExecutedByGasTime()),
 	)
 
 	state, err := worstcase.NewState(b.hooks, b.exec.ChainConfig(), lastSettled, b.exec)

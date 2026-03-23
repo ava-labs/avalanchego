@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/strevm/blocks"
 	saetypes "github.com/ava-labs/strevm/types"
@@ -90,6 +91,10 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 	// key to the purpose of this method so included here to be defensive. It
 	// also provides a clearer failure message.
 	if reH, verH := rebuilt.Hash(), b.Hash(); reH != verH {
+		vm.log().Debug("block verification failed",
+			zap.Reflect("block", b.Header()),
+			zap.Reflect("rebuilt", rebuilt.Header()),
+		)
 		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", errHashMismatch, reH, verH)
 	}
 	if err := b.CopyAncestorsFrom(rebuilt); err != nil {
