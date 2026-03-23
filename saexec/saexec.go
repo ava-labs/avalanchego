@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/hook"
 	"github.com/ava-labs/strevm/saedb"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 var _ saedb.StateDBOpener = (*Executor)(nil)
@@ -57,7 +58,7 @@ type Executor struct {
 // executed block after shutdown and recovery.
 func New(
 	lastExecuted *blocks.Block,
-	headerSrc blocks.HeaderSource,
+	headerSrc saetypes.HeaderSource,
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
 	xdb saedb.ExecutionResults,

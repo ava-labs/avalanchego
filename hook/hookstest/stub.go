@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/strevm/hook"
 	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saetest"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 // Stub implements [hook.PointsG] parameterized by [Op].
@@ -119,8 +120,9 @@ func (s *Stub) BuildHeader(parent *types.Header) *types.Header {
 	return hdr
 }
 
-// PotentialEndOfBlockOps returns [Stub.Ops] as a sequence.
-func (s *Stub) PotentialEndOfBlockOps() iter.Seq[Op] {
+// PotentialEndOfBlockOps ignores its arguments and returns [Stub.Ops] as a
+// sequence.
+func (s *Stub) PotentialEndOfBlockOps(header *types.Header, lastSettledBlock common.Hash, source saetypes.BlockSource) iter.Seq[Op] {
 	return slices.Values(s.Ops)
 }
 
@@ -215,8 +217,10 @@ func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) er
 	return nil
 }
 
-// AfterExecutingBlock is a no-op.
-func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) {}
+// AfterExecutingBlock is a no-op that always returns nil.
+func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+	return nil
+}
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 

@@ -23,6 +23,7 @@ import (
 
 	"github.com/ava-labs/strevm/proxytime"
 	"github.com/ava-labs/strevm/saedb"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 // A Block extends a [types.Block] to track SAE-defined concepts of async
@@ -167,20 +168,13 @@ func Signer(b *types.Block, c *params.ChainConfig) types.Signer {
 	return types.MakeSigner(c, b.Number(), b.Time())
 }
 
-type (
-	// A Source returns a [Block] that matches both a hash and number, and a
-	// boolean indicating if such a block was found.
-	Source func(hash common.Hash, number uint64) (*Block, bool)
-	// An EthBlockSource is equivalent to a [Source] except that it returns the
-	// raw Ethereum block.
-	EthBlockSource func(hash common.Hash, number uint64) (*types.Block, bool)
-	// A HeaderSource is equivalent to a [Source] except that it only returns
-	// the block header.
-	HeaderSource func(hash common.Hash, number uint64) (*types.Header, bool)
-)
+// A Source returns a [Block] that matches both a hash and number, and a
+// boolean indicating if such a block was found.
+type Source func(hash common.Hash, number uint64) (*Block, bool)
 
-// AsEthBlockSource returns an [EthBlockSource] backed by the original [Source].
-func (s Source) AsEthBlockSource() EthBlockSource {
+// AsEthBlockSource returns a [saetypes.BlockSource] backed by the original
+// [Source].
+func (s Source) AsEthBlockSource() saetypes.BlockSource {
 	return func(h common.Hash, n uint64) (*types.Block, bool) {
 		b, ok := s(h, n)
 		if !ok {
@@ -190,8 +184,9 @@ func (s Source) AsEthBlockSource() EthBlockSource {
 	}
 }
 
-// AsHeaderSource returns a [HeaderSource] backed by the original [Source].
-func (s Source) AsHeaderSource() HeaderSource {
+// AsHeaderSource returns a [saetypes.HeaderSource] backed by the original
+// [Source].
+func (s Source) AsHeaderSource() saetypes.HeaderSource {
 	return func(h common.Hash, n uint64) (*types.Header, bool) {
 		b, ok := s(h, n)
 		if !ok {

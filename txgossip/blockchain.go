@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
 
-	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/saexec"
+	saetypes "github.com/ava-labs/strevm/types"
 
 	// Imported for [core.ChainHeadEvent] comment resolution. Already a
 	// downstream dependency.
@@ -34,7 +34,7 @@ type BlockChain interface {
 // acts only to inform the mempool of some new state, but not which specific
 // root as the event contains a [types.Header] carrying the (ignored)
 // last-settled state root.
-func NewBlockChain(exec *saexec.Executor, blocks blocks.EthBlockSource) BlockChain {
+func NewBlockChain(exec *saexec.Executor, blocks saetypes.BlockSource) BlockChain {
 	return &blockchain{
 		Executor: exec,
 		blocks:   blocks,
@@ -43,7 +43,7 @@ func NewBlockChain(exec *saexec.Executor, blocks blocks.EthBlockSource) BlockCha
 
 type blockchain struct {
 	*saexec.Executor // exposes SubscribeChainHeadEvent()
-	blocks           blocks.EthBlockSource
+	blocks           saetypes.BlockSource
 }
 
 func (bc *blockchain) Config() *params.ChainConfig {

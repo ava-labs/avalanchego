@@ -11,13 +11,13 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/strevm/blocks"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 var _ core.ChainContext = (*chainContext)(nil)
 
 type chainContext struct {
-	headers blocks.HeaderSource
+	headers saetypes.HeaderSource
 	recent  *lru.Cache[uint64, *types.Header]
 	log     logging.Logger
 }

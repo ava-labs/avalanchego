@@ -23,6 +23,7 @@ import (
 	saeparams "github.com/ava-labs/strevm/params"
 	"github.com/ava-labs/strevm/saexec"
 	"github.com/ava-labs/strevm/txgossip"
+	saetypes "github.com/ava-labs/strevm/types"
 	"github.com/ava-labs/strevm/worstcase"
 )
 
@@ -48,6 +49,7 @@ type blockBuilderG[T hook.Transaction] struct {
 	log     logging.Logger
 	exec    *saexec.Executor
 	mempool *txgossip.Set
+	source  saetypes.BlockSource
 }
 
 func (b *blockBuilderG[_]) new(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
@@ -290,7 +292,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		included = append(included, tx)
 	}
 	var includedOps []T
-	for tx := range builder.PotentialEndOfBlockOps() {
+	for tx := range builder.PotentialEndOfBlockOps(hdr, lastSettled.Hash(), b.source) {
 		// TODO(StephenButtolph): Return additional information from
 		// [hook.PointsG.PotentialEndOfBlockOps] to terminate the loop early
 		// when there is insufficient block space remaining.

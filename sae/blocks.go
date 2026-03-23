@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/strevm/blocks"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 // maxFutureBlockDuration is the maximum time from the current time allowed for
@@ -184,8 +185,8 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 }
 
 var (
-	_ blocks.EthBlockSource = (*VM)(nil).ethBlockSource
-	_ blocks.HeaderSource   = (*VM)(nil).headerSource
+	_ saetypes.BlockSource  = (*VM)(nil).ethBlockSource
+	_ saetypes.HeaderSource = (*VM)(nil).headerSource
 )
 
 func (vm *VM) ethBlockSource(hash common.Hash, num uint64) (*types.Block, bool) {

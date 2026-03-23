@@ -246,6 +246,7 @@ func NewVM[T hook.Transaction](
 			snowCtx.Log,
 			vm.exec,
 			vm.mempool,
+			vm.ethBlockSource,
 		}
 	}
 

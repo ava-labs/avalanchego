@@ -248,7 +248,10 @@ func Execute(
 		}
 	}
 
-	hooks.AfterExecutingBlock(stateDB, b.EthBlock(), receipts)
+	if err := hooks.AfterExecutingBlock(stateDB, b.EthBlock(), receipts); err != nil {
+		return nil, fmt.Errorf("after-block hook: %v", err)
+	}
+
 	endTime := time.Now()
 	if err := gasClock.AfterBlock(blockGasConsumed, hooks, b.Header()); err != nil {
 		return nil, fmt.Errorf("after-block gas time update: %w", err)
