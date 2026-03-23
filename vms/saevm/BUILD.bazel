@@ -22,6 +22,7 @@ go_library(
         "//vms/evm/database",
         "//vms/saevm/api",
         "//vms/saevm/hook",
+        "//vms/saevm/hook/acp176",
         "//vms/saevm/tx",
         "//vms/saevm/txpool",
         "@com_github_ava_labs_libevm//core",
