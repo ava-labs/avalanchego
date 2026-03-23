@@ -15,6 +15,7 @@ go_library(
         "//graft/coreth/core/extstate",
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
+        "//graft/evm/constants",
         "//ids",
         "//snow",
         "//utils",
