@@ -49,10 +49,7 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
 		now = time.Now()
 	}
 
-	var te acp176.TargetExcess
-	if pte := customtypes.GetHeaderExtra(parent).TargetExcess; pte != nil {
-		te = *pte
-	}
+	te := targetExcess(parent)
 	if b.desiredTargetExcess != nil {
 		te.UpdateTargetExcess(*b.desiredTargetExcess)
 	}

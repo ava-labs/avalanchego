@@ -65,11 +65,6 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 		return nil, fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
 
-	var te acp176.TargetExcess
-	if pte := customtypes.GetHeaderExtra(b.Header()).TargetExcess; pte != nil {
-		te = *pte
-	}
-
 	txs := make([]*txpool.Tx, len(rawTxs))
 	for i, rawTx := range rawTxs {
 		tx, err := txpool.NewTx(rawTx, p.ctx.AVAXAssetID)
@@ -79,6 +74,7 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 		txs[i] = tx
 	}
 
+	te := targetExcess(b.Header())
 	return &blockBuilder{
 		ctx:            p.ctx,
 		consensusState: p.consensusState,
@@ -101,14 +97,17 @@ func (p *Points) ExecutionResultsDB(dataDir string) (saedb.ExecutionResults, err
 }
 
 func (*Points) GasConfigAfter(h *types.Header) (gas.Gas, hook.GasPriceConfig) {
-	var te acp176.TargetExcess
-	if pte := customtypes.GetHeaderExtra(h).TargetExcess; pte != nil {
-		te = *pte
-	}
-	return te.Target(), hook.GasPriceConfig{
+	return targetExcess(h).Target(), hook.GasPriceConfig{
 		TargetToExcessScaling: acp176.TargetToExcessScaling,
 		MinPrice:              acp176.MinPrice,
 	}
+}
+
+func targetExcess(h *types.Header) acp176.TargetExcess {
+	if te := customtypes.GetHeaderExtra(h).TargetExcess; te != nil {
+		return *te
+	}
+	return 0
 }
 
 func (*Points) SubSecondBlockTime(*types.Header) time.Duration {
