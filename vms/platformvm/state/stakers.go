@@ -287,10 +287,10 @@ type diffStakers struct {
 
 type diffValidator struct {
 	// added represents a validator that was added in this diff, or nil if no
-	// validator was added. Can be non-nil at the same time as removed to represent a replacement.
+	// validator was added. Only one of added or removed can be non-nil at a time.
 	added *Staker
 	// removed represents a validator that was removed in this diff, or nil if no
-	// validator was removed. Can be non-nil at the same time as added to represent a replacement.
+	// validator was removed. Only one of added or removed can be non-nil at a time.
 	removed           *Staker
 	addedDelegators   *btree.BTreeG[*Staker]
 	deletedDelegators map[ids.ID]*Staker

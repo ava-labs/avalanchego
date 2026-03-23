@@ -635,6 +635,7 @@ func (d *diff) Apply(baseState Chain) error {
 			return err
 		}
 	}
+
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			// Delegators must be removed before their respective validators
@@ -644,12 +645,13 @@ func (d *diff) Apply(baseState Chain) error {
 				}
 			}
 
-			// We might have removed the validator and then added it in the same diff.
-			// We therefore first delete and then only after add it.
 			if validatorDiff.removed != nil {
 				if err := baseState.DeleteCurrentValidator(validatorDiff.removed); err != nil {
 					return fmt.Errorf("deleting current validator: %w", err)
 				}
+
+				// We have to clear the modification to avoid updating a deleted validator.
+				delete(d.modifiedStakingInfo[validatorDiff.removed.SubnetID], validatorDiff.removed.NodeID)
 			}
 			if validatorDiff.added != nil {
 				if err := baseState.PutCurrentValidator(validatorDiff.added); err != nil {
@@ -663,13 +665,15 @@ func (d *diff) Apply(baseState Chain) error {
 			}
 		}
 	}
+
 	for subnetID, nodes := range d.modifiedStakingInfo {
 		for nodeID, stakingInfo := range nodes {
 			if err := baseState.SetStakingInfo(subnetID, nodeID, stakingInfo); err != nil {
-				return err
+				return fmt.Errorf("setting staking info: %w", err)
 			}
 		}
 	}
+
 	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			// We might have removed the validator and then added it in the same diff.
