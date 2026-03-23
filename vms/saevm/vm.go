@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/api"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
@@ -112,8 +113,16 @@ func (vm *SinceGenesis) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
+	// TODO: Make a config
+	var desiredTargetExcess acp176.TargetExcess = 100_000_000
 	txs := txpool.NewTxs()
-	hooks := hook.NewPoints(snowCtx, &vm.consensusState, txs, avaDB)
+	hooks := hook.NewPoints(
+		snowCtx,
+		&vm.consensusState,
+		&desiredTargetExcess,
+		txs,
+		avaDB,
+	)
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
 		return err

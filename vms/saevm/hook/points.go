@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 	"github.com/ava-labs/avalanchego/x/blockdb"
@@ -43,14 +44,16 @@ type Points struct {
 func NewPoints(
 	ctx *snow.Context,
 	consensusState *utils.Atomic[snow.State],
+	desiredTargetExcess *acp176.TargetExcess,
 	pool *txpool.Txs,
 	db database.Database,
 ) *Points {
 	return &Points{
 		blockBuilder{
-			ctx:            ctx,
-			consensusState: consensusState,
-			potentialTxs:   pool.Iter,
+			ctx:                 ctx,
+			consensusState:      consensusState,
+			desiredTargetExcess: desiredTargetExcess,
+			potentialTxs:        pool.Iter,
 		},
 		db,
 	}
@@ -71,12 +74,14 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 		txs[i] = tx
 	}
 
+	te := targetExcess(b.Header())
 	return &blockBuilder{
 		ctx:            p.ctx,
 		consensusState: p.consensusState,
 		now: func() time.Time {
 			return time.Unix(int64(b.Time()), 0)
 		},
+		desiredTargetExcess: &te,
 		potentialTxs: func() iter.Seq[*txpool.Tx] {
 			return slices.Values(txs)
 		},
@@ -91,12 +96,18 @@ func (p *Points) ExecutionResultsDB(dataDir string) (saedb.ExecutionResults, err
 	return saedb.ExecutionResults{HeightIndex: db}, err
 }
 
-func (*Points) GasConfigAfter(*types.Header) (gas.Gas, hook.GasPriceConfig) {
-	return 1_000_000, hook.GasPriceConfig{
-		TargetToExcessScaling: 87,
-		MinPrice:              1,
-		StaticPricing:         false,
+func (*Points) GasConfigAfter(h *types.Header) (gas.Gas, hook.GasPriceConfig) {
+	return targetExcess(h).Target(), hook.GasPriceConfig{
+		TargetToExcessScaling: acp176.TargetToExcessScaling,
+		MinPrice:              acp176.MinPrice,
 	}
+}
+
+func targetExcess(h *types.Header) acp176.TargetExcess {
+	if te := customtypes.GetHeaderExtra(h).TargetExcess; te != nil {
+		return *te
+	}
+	return 0
 }
 
 func (*Points) SubSecondBlockTime(*types.Header) time.Duration {

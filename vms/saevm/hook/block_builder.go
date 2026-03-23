@@ -18,8 +18,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
@@ -32,8 +35,11 @@ type blockBuilder struct {
 	ctx            *snow.Context
 	consensusState *utils.Atomic[snow.State]
 
-	now          func() time.Time
-	potentialTxs func() iter.Seq[*txpool.Tx]
+	now func() time.Time
+	// If the gas target is specified, calculate the desired target excess and
+	// use it during block creation.
+	desiredTargetExcess *acp176.TargetExcess
+	potentialTxs        func() iter.Seq[*txpool.Tx]
 }
 
 func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
@@ -43,11 +49,31 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
 	} else {
 		now = time.Now()
 	}
-	return &types.Header{
-		ParentHash: parent.Hash(),
-		Number:     new(big.Int).Add(parent.Number, common.Big1),
-		Time:       uint64(now.Unix()),
+
+	te := targetExcess(parent)
+	if b.desiredTargetExcess != nil {
+		te.UpdateTargetExcess(*b.desiredTargetExcess)
 	}
+	return customtypes.WithHeaderExtra(
+		&types.Header{
+			ParentHash:       parent.Hash(),
+			Coinbase:         constants.BlackholeAddr,
+			Difficulty:       big.NewInt(1),
+			Number:           new(big.Int).Add(parent.Number, common.Big1),
+			Time:             uint64(now.Unix()),
+			Extra:            nil, // TODO: Include warp predicates
+			BlobGasUsed:      utils.PointerTo[uint64](0),
+			ExcessBlobGas:    utils.PointerTo[uint64](0),
+			ParentBeaconRoot: &common.Hash{},
+		},
+		&customtypes.HeaderExtra{
+			ExtDataGasUsed:   big.NewInt(0),
+			BlockGasCost:     big.NewInt(0),
+			TimeMilliseconds: utils.PointerTo[uint64](0),             // TODO:
+			MinDelayExcess:   utils.PointerTo[acp226.DelayExcess](0), // TODO:
+			TargetExcess:     &te,
+		},
+	)
 }
 
 func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {

@@ -16,6 +16,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vms/evm/acp226",
+        "//vms/saevm/hook/acp176",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//core/state",
@@ -40,6 +41,7 @@ graft_go_test(
         "//graft/coreth/params",
         "//utils",
         "//vms/evm/acp226",
+        "//vms/saevm/hook/acp176",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
