@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 )
 
 func TestHeaderRLP(t *testing.T) {
@@ -117,6 +118,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		BlockGasCost:     big.NewInt(23),
 		TimeMilliseconds: utils.PointerTo[uint64](24),
 		MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(25)),
+		TargetExcess:     utils.PointerTo(acp176.TargetExcess(26)),
 	}
 	return WithHeaderExtra(header, extra), extra
 }
@@ -170,6 +172,8 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *acp226.DelayExcess:
 				assertNonZero(t, f)
+			case *acp176.TargetExcess:
+				assertNonZero(t, f)
 			case []uint8, []*types.Header, types.Transactions, []*types.Transaction, types.Withdrawals, []*types.Withdrawal:
 				require.NotEmpty(t, f)
 			default:
@@ -181,7 +185,7 @@ func allFieldsSet[T interface {
 
 func assertNonZero[T interface {
 	common.Hash | common.Address | types.BlockNonce | uint32 | uint64 | types.Bloom |
-		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess
+		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess | *acp176.TargetExcess
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)
