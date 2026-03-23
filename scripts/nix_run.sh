@@ -22,8 +22,20 @@ if [[ -n "${IN_NIX_SHELL-}" ]]; then
   exec "$@"
 fi
 
-if ! command -v nix > /dev/null 2>&1; then
+if command -v nix > /dev/null 2>&1; then
+  exec nix develop "${REPO_ROOT}" --command "$@"
+fi
+
+if command -v "$1" > /dev/null 2>&1; then
   exec "$@"
 fi
 
-exec nix develop "${REPO_ROOT}" --command "$@"
+if [[ "$1" == "bazelisk" ]]; then
+  echo "Error: bazelisk not found on PATH and nix is not installed." >&2
+  echo "Install nix with './scripts/run_task.sh install-nix' or install bazelisk directly; see docs/bazel.md." >&2
+  exit 1
+fi
+
+echo "Error: $1 not found on PATH and nix is not installed." >&2
+echo "Install nix with './scripts/run_task.sh install-nix' or install $1 directly." >&2
+exit 1
