@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
+	"github.com/ava-labs/libevm/ethclient/gethclient"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
@@ -199,7 +200,7 @@ func TestDebugTrace(t *testing.T) {
 	sut.testRPC(ctx, t, tests...)
 }
 
-func TestEthCall(t *testing.T) {
+func TestStatefulRPCs(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(t, 1, opt)
 
@@ -236,6 +237,26 @@ func TestEthCall(t *testing.T) {
 	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
 	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
 
+	// Storage key for balances[recv] at mapping slot 0:
+	// keccak256(abi.encode(address, uint256(0)))
+	storageKey := crypto.Keccak256Hash(
+		common.LeftPadBytes(recv.Bytes(), 32),
+		common.Hash{}.Bytes(),
+	)
+	storageKeyHex := storageKey.Hex()
+
+	callMsg := ethereum.CallMsg{
+		From: sut.wallet.Addresses()[0],
+		To:   &escrowAddr,
+		Data: escrow.CallDataForBalance(recv),
+	}
+
+	gc := gethclient.New(sut.rpcClient)
+
+	wantBig := big.NewInt(val)
+	wantBytes := uint256.NewInt(val).PaddedBytes(32)
+	wantCode := escrow.ByteCode()
+
 	tests := []struct {
 		name string
 		num  rpc.BlockNumber
@@ -251,15 +272,60 @@ func TestEthCall(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			msg := ethereum.CallMsg{
-				To:   &escrowAddr,
-				Data: escrow.CallDataForBalance(recv),
-			}
+			blockNum := big.NewInt(int64(tt.num))
 
-			got, err := sut.CallContract(ctx, msg, big.NewInt(int64(tt.num)))
-			t.Logf("%T.CallContract(%+v, %d)", sut.Client, msg, tt.num) // avoids having to repeat in failure messages
-			require.NoError(t, err)
-			assert.Equal(t, uint256.NewInt(val).PaddedBytes(32), got)
+			t.Run("eth_call", func(t *testing.T) {
+				got, err := sut.CallContract(ctx, callMsg, blockNum)
+				require.NoError(t, err, "CallContract()")
+				assert.Equal(t, wantBytes, got, "CallContract() result")
+			})
+
+			t.Run("eth_getBalance", func(t *testing.T) {
+				got, err := sut.BalanceAt(ctx, escrowAddr, blockNum)
+				require.NoError(t, err, "BalanceAt()")
+				require.Zero(t, wantBig.Cmp(got), "BalanceAt(): want %d, got %s", val, got)
+			})
+
+			t.Run("eth_getCode", func(t *testing.T) {
+				got, err := sut.CodeAt(ctx, escrowAddr, blockNum)
+				require.NoError(t, err, "CodeAt()")
+				assert.Equal(t, wantCode, got, "CodeAt() result")
+			})
+
+			t.Run("eth_getStorageAt", func(t *testing.T) {
+				got, err := sut.StorageAt(ctx, escrowAddr, storageKey, blockNum)
+				require.NoError(t, err, "StorageAt()")
+				assert.Equal(t, wantBytes, got, "StorageAt() result")
+			})
+
+			t.Run("eth_getProof", func(t *testing.T) {
+				got, err := gc.GetProof(ctx, escrowAddr, []string{storageKeyHex}, blockNum)
+				require.NoError(t, err, "GetProof()")
+				require.NotNil(t, got, "GetProof() result")
+
+				assert.NotEmpty(t, got.AccountProof, "GetProof() accountProof")
+				require.Zero(t, wantBig.Cmp(got.Balance), "GetProof() balance: want %d, got %s", val, got.Balance)
+
+				require.Len(t, got.StorageProof, 1, "GetProof() storageProof length")
+				assert.NotEmpty(t, got.StorageProof[0].Proof, "GetProof() storageProof[0].Proof")
+				require.Zero(t, wantBig.Cmp(got.StorageProof[0].Value), "GetProof() storageProof[0].Value: want %d, got %s", val, got.StorageProof[0].Value)
+			})
 		})
 	}
+
+	// eth_estimateGas and eth_createAccessList don't accept a block number
+	// parameter via ethclient/gethclient, so they always run against latest.
+	t.Run("eth_estimateGas", func(t *testing.T) {
+		got, err := sut.EstimateGas(ctx, callMsg)
+		require.NoError(t, err, "EstimateGas()")
+		assert.Positive(t, got, "EstimateGas() result")
+	})
+
+	t.Run("eth_createAccessList", func(t *testing.T) {
+		al, gas, errMsg, err := gc.CreateAccessList(ctx, callMsg)
+		require.NoError(t, err, "CreateAccessList()")
+		assert.Empty(t, errMsg, "CreateAccessList() error message")
+		assert.NotNil(t, al, "CreateAccessList() access list")
+		assert.Positive(t, gas, "CreateAccessList() gasUsed")
+	})
 }
