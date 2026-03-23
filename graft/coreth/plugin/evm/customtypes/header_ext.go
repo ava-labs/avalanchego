@@ -7,11 +7,12 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
+
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
