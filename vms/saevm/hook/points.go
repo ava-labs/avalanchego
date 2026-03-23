@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 	"github.com/ava-labs/avalanchego/x/blockdb"
@@ -43,14 +44,16 @@ type Points struct {
 func NewPoints(
 	ctx *snow.Context,
 	consensusState *utils.Atomic[snow.State],
+	desiredTargetExcess *acp176.TargetExcess,
 	pool *txpool.Txs,
 	db database.Database,
 ) *Points {
 	return &Points{
 		blockBuilder{
-			ctx:            ctx,
-			consensusState: consensusState,
-			potentialTxs:   pool.Iter,
+			ctx:                 ctx,
+			consensusState:      consensusState,
+			desiredTargetExcess: desiredTargetExcess,
+			potentialTxs:        pool.Iter,
 		},
 		db,
 	}
@@ -60,6 +63,11 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
+	}
+
+	var te acp176.TargetExcess
+	if pte := customtypes.GetHeaderExtra(b.Header()).TargetExcess; pte != nil {
+		te = *pte
 	}
 
 	txs := make([]*txpool.Tx, len(rawTxs))
@@ -77,6 +85,7 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 		now: func() time.Time {
 			return time.Unix(int64(b.Time()), 0)
 		},
+		desiredTargetExcess: &te,
 		potentialTxs: func() iter.Seq[*txpool.Tx] {
 			return slices.Values(txs)
 		},
@@ -91,11 +100,14 @@ func (p *Points) ExecutionResultsDB(dataDir string) (saedb.ExecutionResults, err
 	return saedb.ExecutionResults{HeightIndex: db}, err
 }
 
-func (*Points) GasConfigAfter(*types.Header) (gas.Gas, hook.GasPriceConfig) {
-	return 1_000_000, hook.GasPriceConfig{
-		TargetToExcessScaling: 87,
-		MinPrice:              1,
-		StaticPricing:         false,
+func (*Points) GasConfigAfter(h *types.Header) (gas.Gas, hook.GasPriceConfig) {
+	var te acp176.TargetExcess
+	if pte := customtypes.GetHeaderExtra(h).TargetExcess; pte != nil {
+		te = *pte
+	}
+	return te.Target(), hook.GasPriceConfig{
+		TargetToExcessScaling: acp176.TargetToExcessScaling,
+		MinPrice:              acp176.MinPrice,
 	}
 }
 

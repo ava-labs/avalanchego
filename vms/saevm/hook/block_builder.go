@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
@@ -32,8 +33,11 @@ type blockBuilder struct {
 	ctx            *snow.Context
 	consensusState *utils.Atomic[snow.State]
 
-	now          func() time.Time
-	potentialTxs func() iter.Seq[*txpool.Tx]
+	now func() time.Time
+	// If the gas target is specified, calculate the desired target excess and
+	// use it during block creation.
+	desiredTargetExcess *acp176.TargetExcess
+	potentialTxs        func() iter.Seq[*txpool.Tx]
 }
 
 func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
@@ -43,11 +47,24 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
 	} else {
 		now = time.Now()
 	}
-	return &types.Header{
-		ParentHash: parent.Hash(),
-		Number:     new(big.Int).Add(parent.Number, common.Big1),
-		Time:       uint64(now.Unix()),
+
+	var te acp176.TargetExcess
+	if pte := customtypes.GetHeaderExtra(parent).TargetExcess; pte != nil {
+		te = *pte
 	}
+	if b.desiredTargetExcess != nil {
+		te.UpdateTargetExcess(*b.desiredTargetExcess)
+	}
+	return customtypes.WithHeaderExtra(
+		&types.Header{
+			ParentHash: parent.Hash(),
+			Number:     new(big.Int).Add(parent.Number, common.Big1),
+			Time:       uint64(now.Unix()),
+		},
+		&customtypes.HeaderExtra{
+			TargetExcess: &te,
+		},
+	)
 }
 
 func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {
