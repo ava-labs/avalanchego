@@ -7,9 +7,9 @@ avalanchego monorepo.
 
 The `bazel` command is provided by [bazelisk](https://github.com/bazelbuild/bazelisk),
 which automatically downloads the correct Bazel version from `.bazelversion`. All
-Taskfile targets use `./scripts/run_bazel.sh`, which runs bazelisk directly if
-available or via `nix run` if not. In the nix dev shell (`nix develop`), `bazel`
-and `bazelisk` are both on PATH directly.
+Taskfile targets use `./scripts/nix_run.sh bazelisk ...`, which runs in the repo's
+nix dev shell when needed and avoids nesting `nix develop` when already inside it.
+In the nix dev shell (`nix develop`), `bazel` and `bazelisk` are both on PATH directly.
 
 ## Quick Start
 
@@ -632,7 +632,7 @@ internal patch parser is strict about (unlike `git apply`).
 
 1. Edit the BUILD file in `.bazel/patches/build_files/<module>/`
 2. Run `task bazel-generate-patches` to regenerate `.patch` files
-3. Verify: `./scripts/run_bazel.sh build @<module>//<target>`
+3. Verify: `./scripts/nix_run.sh bazelisk build @<module>//<target>`
 4. Commit both the BUILD file and the generated `.patch` file
 
 Patches that modify existing files (e.g., gnark-crypto's `no-sandbox`
