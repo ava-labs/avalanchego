@@ -1734,15 +1734,16 @@ func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Control
 
 func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 	type test struct {
-		name        string
-		newExecutor func(*gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor)
-		expectedErr error
+		name            string
+		newExecutor     func(*gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor, *removeSubnetValidatorTxVerifyEnv)
+		stateAssertions func(*testing.T, *removeSubnetValidatorTxVerifyEnv)
+		expectedErr     error
 	}
 
 	tests := []test{
 		{
 			name: "valid tx",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor, *removeSubnetValidatorTxVerifyEnv) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state.SetTimestamp(env.latestForkTime)
 				require.NoError(t, env.state.PutCurrentValidator(env.staker))
@@ -1777,13 +1778,24 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					tx:            env.tx,
 					state:         env.state,
 				}
-				return env.unsignedTx, e
+				return env.unsignedTx, e, &env
+			},
+			stateAssertions: func(t *testing.T, env *removeSubnetValidatorTxVerifyEnv) {
+				// assert that the validator was removed from the current validator set
+				_, err := env.state.GetCurrentValidator(env.staker.SubnetID, env.staker.NodeID)
+				require.ErrorIs(t, err, database.ErrNotFound)
+
+				// assert the utxos inputs were deleted
+				for _, utxo := range env.unsignedTx.Ins {
+					_, err := env.state.GetUTXO(utxo.InputID())
+					require.ErrorIs(t, err, database.ErrNotFound)
+				}
 			},
 			expectedErr: nil,
 		},
 		{
 			name: "tx fails syntactic verification",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor, *removeSubnetValidatorTxVerifyEnv) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				// Setting the subnet ID to the Primary Network ID makes the tx fail syntactic verification
 				env.tx.Unsigned.(*txs.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
@@ -1804,13 +1816,13 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					tx:            env.tx,
 					state:         env.state,
 				}
-				return env.unsignedTx, e
+				return env.unsignedTx, e, nil
 			},
 			expectedErr: txs.ErrRemovePrimaryNetworkValidator,
 		},
 		{
 			name: "node isn't a validator of the subnet",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor, *removeSubnetValidatorTxVerifyEnv) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				cfg := &config.Internal{
@@ -1829,13 +1841,13 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					tx:            env.tx,
 					state:         env.state,
 				}
-				return env.unsignedTx, e
+				return env.unsignedTx, e, nil
 			},
 			expectedErr: ErrNotValidator,
 		},
 		{
 			name: "validator is permissionless",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor, *removeSubnetValidatorTxVerifyEnv) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				staker := *env.staker
@@ -1860,13 +1872,13 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					tx:            env.tx,
 					state:         env.state,
 				}
-				return env.unsignedTx, e
+				return env.unsignedTx, e, nil
 			},
 			expectedErr: ErrRemovePermissionlessValidator,
 		},
 		{
 			name: "can't find subnet",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor, *removeSubnetValidatorTxVerifyEnv) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				require.NoError(t, env.state.PutCurrentValidator(env.staker))
 
@@ -1886,13 +1898,13 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					tx:            env.tx,
 					state:         env.state,
 				}
-				return env.unsignedTx, e
+				return env.unsignedTx, e, nil
 			},
 			expectedErr: database.ErrNotFound,
 		},
 		{
 			name: "tx has no credentials",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor, *removeSubnetValidatorTxVerifyEnv) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				// Remove credentials
 				env.tx.Creds = nil
@@ -1916,13 +1928,13 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					tx:            env.tx,
 					state:         env.state,
 				}
-				return env.unsignedTx, e
+				return env.unsignedTx, e, nil
 			},
 			expectedErr: errWrongNumberOfCredentials,
 		},
 		{
 			name: "no permission to remove validator",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor, *removeSubnetValidatorTxVerifyEnv) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				require.NoError(t, env.state.PutCurrentValidator(env.staker))
 				subnetOwner := fxmock.NewOwner(ctrl)
@@ -1945,13 +1957,13 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					tx:            env.tx,
 					state:         env.state,
 				}
-				return env.unsignedTx, e
+				return env.unsignedTx, e, nil
 			},
 			expectedErr: errUnauthorizedModification,
 		},
 		{
 			name: "flow checker failed",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor, *removeSubnetValidatorTxVerifyEnv) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				require.NoError(t, env.state.PutCurrentValidator(env.staker))
 				subnetOwner := fxmock.NewOwner(ctrl)
@@ -1977,7 +1989,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					tx:            env.tx,
 					state:         env.state,
 				}
-				return env.unsignedTx, e
+				return env.unsignedTx, e, nil
 			},
 			expectedErr: ErrFlowCheckFailed,
 		},
@@ -1988,9 +2000,13 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			unsignedTx, executor := tt.newExecutor(ctrl)
+			unsignedTx, executor, env := tt.newExecutor(ctrl)
 			err := executor.RemoveSubnetValidatorTx(unsignedTx)
 			require.ErrorIs(err, tt.expectedErr)
+
+			if tt.stateAssertions != nil {
+				tt.stateAssertions(t, env)
+			}
 		})
 	}
 }
