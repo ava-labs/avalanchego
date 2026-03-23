@@ -1,0 +1,17 @@
+# Patches for external dependencies that don't work with Bazel out of the box.
+
+exports_files(glob(["*.patch"]))
+
+# Verify patched dependency tests still pass. Run after updating a patched
+# dependency or modifying a patch:
+#   bazel test //.bazel/patches:external_tests
+test_suite(
+    name = "external_tests",
+    tests = [
+        # TODO(marun) Enable firewood testing as part of migration
+        # "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi_test",
+        "@com_github_ava_labs_libevm//crypto/secp256k1:secp256k1_test",
+        # TODO(marun) Attempt to get this test passing
+        # "@com_github_supranational_blst//bindings/go:go_test",
+    ],
+)

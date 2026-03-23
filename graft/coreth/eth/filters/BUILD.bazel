@@ -1,0 +1,61 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "filters",
+    srcs = [
+        "api.go",
+        "filter.go",
+        "filter_system.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/eth/filters",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/core",
+        "//graft/coreth/internal/ethapi",
+        "//graft/coreth/params",
+        "//graft/evm/rpc",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/bloombits",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//log",
+    ],
+)
+
+graft_go_test(
+    name = "filters_test",
+    srcs = [
+        "api_test.go",
+        "bench_test.go",
+        "filter_system_test.go",
+        "filter_test.go",
+    ],
+    embed = [":filters"],
+    deps = [
+        "//graft/coreth/consensus/dummy",
+        "//graft/coreth/core",
+        "//graft/coreth/internal/ethapi",
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//graft/evm/rpc",
+        "//vms/evm/sync/customrawdb",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//accounts/abi",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/bitutil",
+        "@com_github_ava_labs_libevm//core/bloombits",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

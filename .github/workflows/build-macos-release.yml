@@ -36,7 +36,7 @@ jobs:
 
       - name: Build subnet-evm plugin
         working-directory: ./graft/subnet-evm
-        run: ./scripts/run_task.sh build "${GITHUB_WORKSPACE}/build/subnet-evm"
+        run: ./scripts/run_task.sh build
 
       - name: Try to get tag from git
         if: "${{ github.event.inputs.tag == '' }}"

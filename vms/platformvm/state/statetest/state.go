@@ -41,7 +41,7 @@ type Config struct {
 	Rewards    reward.Calculator
 }
 
-func New(t testing.TB, c Config) state.State {
+func New(t testing.TB, c Config) *state.State {
 	if c.DB == nil {
 		c.DB = memdb.New()
 	}

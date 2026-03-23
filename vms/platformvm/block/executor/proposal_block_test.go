@@ -40,7 +40,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgradetest.ApricotPhase5)
 
 	// create apricotParentBlk. It's a standard one for simplicity
 	parentHeight := uint64(2022)
@@ -107,13 +107,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
-
-	env.mockedState.EXPECT().GetUptime(gomock.Any()).Return(
-		time.Microsecond, /*upDuration*/
-		time.Time{},      /*lastUpdated*/
-		nil,              /*err*/
-	).AnyTimes()
+	onParentAccept.EXPECT().GetStakingInfo(constants.PrimaryNetworkID, utx.NodeID()).Return(state.StakingInfo{}, nil).AnyTimes()
 
 	// wrong height
 	statelessProposalBlock, err := block.NewApricotProposalBlock(
@@ -144,7 +138,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl, upgradetest.Banff)
+	env := newEnvironment(t, upgradetest.Banff)
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := genesistest.DefaultValidatorStartTime
@@ -174,14 +168,8 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		timestamp:      parentTime,
 	}
 	env.blkManager.(*manager).lastAccepted = parentID
-	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
-	env.mockedState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
-		func(blockID ids.ID) (block.Block, error) {
-			if blockID == parentID {
-				return banffParentBlk, nil
-			}
-			return nil, database.ErrNotFound
-		}).AnyTimes()
+	env.state.SetLastAccepted(parentID)
+	env.state.AddStatelessBlock(banffParentBlk)
 
 	// setup state to validate proposal block transaction
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
@@ -221,13 +209,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetActiveL1ValidatorsIterator().Return(iterator.Empty[state.L1Validator]{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
-	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
-
-	env.mockedState.EXPECT().GetUptime(gomock.Any).Return(
-		time.Microsecond, /*upDuration*/
-		time.Time{},      /*lastUpdated*/
-		nil,              /*err*/
-	).AnyTimes()
+	onParentAccept.EXPECT().GetStakingInfo(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(state.StakingInfo{}, nil).AnyTimes()
 
 	// create proposal tx to be included in the proposal block
 	blkTx := &txs.Tx{
@@ -517,7 +499,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, upgradetest.Banff)
+			env := newEnvironment(t, upgradetest.Banff)
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
@@ -683,7 +665,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, upgradetest.Banff)
+	env := newEnvironment(t, upgradetest.Banff)
 
 	subnetID := testSubnet1.ID()
 	wallet := newWallet(t, env, walletConfig{
@@ -835,7 +817,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, upgradetest.Banff)
+			env := newEnvironment(t, upgradetest.Banff)
 
 			subnetID := testSubnet1.ID()
 			if tracked {
@@ -948,7 +930,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, upgradetest.Banff)
+	env := newEnvironment(t, upgradetest.Banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1131,7 +1113,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, upgradetest.Banff)
+	env := newEnvironment(t, upgradetest.Banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1315,7 +1297,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 func TestAddValidatorProposalBlock(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, upgradetest.Durango)
+	env := newEnvironment(t, upgradetest.Durango)
 
 	wallet := newWallet(t, env, walletConfig{})
 

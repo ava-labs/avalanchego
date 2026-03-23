@@ -47,9 +47,15 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 		"disconnectedValidators": h.getDisconnectedValidators(),
 	}
 
-	var err error
 	subnetConfig := h.subnet.Config()
-	minPercentConnected := subnetConfig.ConsensusParameters.MinPercentConnectedHealthy()
+
+	// SnowParameters can be nil if the subnet is configured for Simplex consensus
+	if subnetConfig.SnowParameters == nil {
+		return details, nil
+	}
+
+	var err error
+	minPercentConnected := subnetConfig.SnowParameters.MinPercentConnectedHealthy()
 	if percentConnected < minPercentConnected {
 		err = fmt.Errorf("%w: connected to %f%%; required at least %f%%",
 			ErrNotConnectedEnoughStake,

@@ -8,9 +8,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/leaf"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )
 
 // Extender is the sync extender for the atomic VM.
@@ -28,7 +27,7 @@ func (e *Extender) Initialize(backend *state.AtomicBackend, trie *state.AtomicTr
 }
 
 // CreateSyncer creates the atomic syncer with the given client and verDB.
-func (e *Extender) CreateSyncer(client leaf.Client, verDB *versiondb.Database, summary message.Syncable) (types.Syncer, error) {
+func (e *Extender) CreateSyncer(client types.LeafClient, verDB *versiondb.Database, summary message.Syncable) (types.Syncer, error) {
 	atomicSummary, ok := summary.(*Summary)
 	if !ok {
 		return nil, fmt.Errorf("atomic sync extender: expected *Summary, got %T", summary)
