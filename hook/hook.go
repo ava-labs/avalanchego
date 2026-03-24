@@ -88,7 +88,7 @@ type BlockBuilder[T Transaction] interface {
 	//
 	// SAE always uses this method instead of directly constructing a header, to
 	// ensure any libevm header extras are properly populated.
-	BuildHeader(parent *types.Header) *types.Header
+	BuildHeader(parent *types.Header) (*types.Header, error)
 	// PotentialEndOfBlockOps returns an iterator of custom transactions that
 	// would be valid to include into a block.
 	//

@@ -100,7 +100,7 @@ func (s *Stub) ExecutionResultsDB(dataDir string) (saedb.ExecutionResults, error
 // BuildHeader constructs a header that builds on top of the parent header. The
 // `Extra` field SHOULD NOT be modified as it encodes the sub-second block time
 // and end-of-block ops.
-func (s *Stub) BuildHeader(parent *types.Header) *types.Header {
+func (s *Stub) BuildHeader(parent *types.Header) (*types.Header, error) {
 	var now time.Time
 	if s.Now != nil {
 		now = s.Now()
@@ -117,7 +117,7 @@ func (s *Stub) BuildHeader(parent *types.Header) *types.Header {
 		Time:       uint64(now.Unix()), //nolint:gosec // Known non-negative
 		Extra:      e.MarshalCanoto(),
 	}
-	return hdr
+	return hdr, nil
 }
 
 // PotentialEndOfBlockOps ignores its arguments and returns [Stub.Ops] as a

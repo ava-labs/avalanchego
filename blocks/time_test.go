@@ -38,7 +38,8 @@ func TestGasTime(t *testing.T) {
 	parent := &types.Header{
 		Number: big.NewInt(1),
 	}
-	hdr := hooks.BuildHeader(parent)
+	hdr, err := hooks.BuildHeader(parent)
+	require.NoErrorf(t, err, "%T.BuildHeader()", hooks)
 
 	got := GasTime(hooks, hdr, parent)
 	want := proxytime.New(unix, rate)
@@ -72,7 +73,8 @@ func FuzzTimeExtraction(f *testing.F) {
 		parent := &types.Header{
 			Number: big.NewInt(1),
 		}
-		hdr := hooks.BuildHeader(parent)
+		hdr, err := hooks.BuildHeader(parent)
+		require.NoErrorf(t, err, "%T.BuildHeader()", hooks)
 
 		t.Run("PreciseTime", func(t *testing.T) {
 			got := PreciseTime(hooks, hdr)
