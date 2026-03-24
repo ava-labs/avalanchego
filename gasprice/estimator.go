@@ -309,7 +309,7 @@ func (e *Estimator) FeeHistory(
 	if last == lastAcceptedNumber {
 		bounds := lastAccepted.WorstCaseBounds()
 		if bounds == nil {
-			baseFee = append(baseFee, lastAccepted.BaseFee().ToBig())
+			baseFee = append(baseFee, lastAccepted.EthBlock().BaseFee())
 		} else {
 			baseFee = append(baseFee, bounds.LatestEndTime.BaseFee().ToBig())
 		}

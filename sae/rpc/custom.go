@@ -40,7 +40,7 @@ func (c *customAPI) BaseFee(ctx context.Context) *hexutil.Big {
 func (c *customAPI) estimateNextBaseFee() *big.Int {
 	bounds := c.b.LastAccepted().WorstCaseBounds()
 	if bounds == nil {
-		return c.b.LastAccepted().BaseFee().ToBig()
+		return c.b.LastAccepted().EthBlock().BaseFee()
 	}
 	return bounds.LatestEndTime.BaseFee().ToBig()
 }

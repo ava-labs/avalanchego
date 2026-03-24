@@ -297,8 +297,11 @@ func TestFeeHistory(t *testing.T) {
 		LatestEndTime: gt,
 	}
 	type (
-		blockSpec []*types.Transaction
-		args      struct {
+		blockSpec struct {
+			bounds *blocks.WorstCaseBounds
+			txs    []*types.Transaction
+		}
+		args struct {
 			numBlocks   uint64
 			lastBlock   rpc.BlockNumber
 			percentiles []float64
@@ -367,7 +370,7 @@ func TestFeeHistory(t *testing.T) {
 			},
 		},
 		{
-			name: "no_worst_case_bounds",
+			name: "nil_bounds_genesis_only",
 			args: args{
 				numBlocks: 1,
 				lastBlock: rpc.LatestBlockNumber,
@@ -384,10 +387,33 @@ func TestFeeHistory(t *testing.T) {
 			},
 		},
 		{
+			name: "nil_bounds_with_block",
+			blocks: []blockSpec{
+				{
+					txs: []*types.Transaction{newDynamicFeeTx(21_000, nAVAX)},
+				},
+			},
+			args: args{
+				numBlocks: 1,
+				lastBlock: rpc.LatestBlockNumber,
+			},
+			want: results{
+				height: common.Big1,
+				baseFees: []*big.Int{
+					big.NewInt(1),
+					big.NewInt(1), // no bounds → falls back to header base fee
+				},
+				portionFull: []float64{
+					21_000. / gasLimit,
+				},
+			},
+		},
+		{
 			name: "query_genesis",
 			blocks: []blockSpec{
 				{
-					newDynamicFeeTx(21_000, nAVAX),
+					bounds: bounds,
+					txs:    []*types.Transaction{newDynamicFeeTx(21_000, nAVAX)},
 				},
 			},
 			args: args{
@@ -409,7 +435,8 @@ func TestFeeHistory(t *testing.T) {
 			name: "query_latest",
 			blocks: []blockSpec{
 				{
-					newDynamicFeeTx(21_000, nAVAX),
+					bounds: bounds,
+					txs:    []*types.Transaction{newDynamicFeeTx(21_000, nAVAX)},
 				},
 			},
 			args: args{
@@ -431,10 +458,12 @@ func TestFeeHistory(t *testing.T) {
 			name: "query_too_old_block",
 			blocks: []blockSpec{
 				{
-					newDynamicFeeTx(21_000, nAVAX),
+					bounds: bounds,
+					txs:    []*types.Transaction{newDynamicFeeTx(21_000, nAVAX)},
 				},
 				{
-					newDynamicFeeTx(100_000, nAVAX),
+					bounds: bounds,
+					txs:    []*types.Transaction{newDynamicFeeTx(100_000, nAVAX)},
 				},
 			},
 			args: args{
@@ -449,14 +478,18 @@ func TestFeeHistory(t *testing.T) {
 			name: "query_max_blocks_with_percentiles",
 			blocks: []blockSpec{
 				{
-					newDynamicFeeTx(21_000, nAVAX),
+					bounds: bounds,
+					txs:    []*types.Transaction{newDynamicFeeTx(21_000, nAVAX)},
 				},
 				{
-					newDynamicFeeTx(100_000, nAVAX),
-					newDynamicFeeTx(100_000, 2*nAVAX),
-					newDynamicFeeTx(100_000, 3*nAVAX),
-					newDynamicFeeTx(100_000, 4*nAVAX),
-					newDynamicFeeTx(100_000, 5*nAVAX),
+					bounds: bounds,
+					txs: []*types.Transaction{
+						newDynamicFeeTx(100_000, nAVAX),
+						newDynamicFeeTx(100_000, 2*nAVAX),
+						newDynamicFeeTx(100_000, 3*nAVAX),
+						newDynamicFeeTx(100_000, 4*nAVAX),
+						newDynamicFeeTx(100_000, 5*nAVAX),
+					},
 				},
 			},
 			args: args{
@@ -485,8 +518,8 @@ func TestFeeHistory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sut := newSUT(t, cfg)
-			for _, txSpecs := range tt.blocks {
-				sut.newBlock(t, 0, bounds, txSpecs...)
+			for _, spec := range tt.blocks {
+				sut.newBlock(t, 0, spec.bounds, spec.txs...)
 			}
 
 			a := tt.args
