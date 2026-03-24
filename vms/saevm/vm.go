@@ -253,10 +253,6 @@ func (vm *SinceGenesis) SetState(ctx context.Context, state snow.State) error {
 	return vm.VM.SetState(ctx, state)
 }
 
-// SetPreference updates the VM's currently [preferred block] with the given block context,
-// which MAY be nil.
-//
-// [preferred block]: https://github.com/ava-labs/avalanchego/tree/master/vms#set-preference
 func (vm *SinceGenesis) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
 	b, err := vm.GetBlock(ctx, id)
 	if err != nil {
@@ -352,7 +348,6 @@ func (vm *SinceGenesis) RejectBlock(ctx context.Context, b *blocks.Block) error 
 	return vm.VM.RejectBlock(ctx, b)
 }
 
-// Shutdown gracefully closes the VM.
 func (vm *SinceGenesis) Shutdown(ctx context.Context) error {
 	for _, f := range slices.Backward(vm.onClose) {
 		f()
