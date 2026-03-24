@@ -30,7 +30,7 @@ func TestProgressSubscriptionInitialProgressUnblocksWaiterImmediately(t *testing
 }
 
 func TestProgressSubscriptionWaiterBlocksUntilProgressAdvances(t *testing.T) {
-	ps := NewProgressSubscription[int](0)
+	ps := NewProgressSubscription(0)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -61,7 +61,7 @@ func TestProgressSubscriptionWaiterBlocksUntilProgressAdvances(t *testing.T) {
 }
 
 func TestProgressSubscriptionContextCancellationUnblocksWaiter(t *testing.T) {
-	ps := NewProgressSubscription[int](0)
+	ps := NewProgressSubscription(0)
 
 	ctx, cancel := context.WithCancel(t.Context())
 
@@ -94,7 +94,7 @@ func TestProgressSubscriptionContextCancellationUnblocksWaiter(t *testing.T) {
 }
 
 func TestProgressSubscriptionMultipleWaitersUnblockedBySingleSetProgress(t *testing.T) {
-	ps := NewProgressSubscription[int](0)
+	ps := NewProgressSubscription(0)
 
 	const numWaiters = 5
 
