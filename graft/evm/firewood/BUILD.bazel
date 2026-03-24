@@ -5,6 +5,7 @@ go_library(
     name = "firewood",
     srcs = [
         "account_trie.go",
+        "iterator.go",
         "metrics.go",
         "state.go",
         "storage_trie.go",

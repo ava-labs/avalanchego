@@ -126,6 +126,7 @@ graft_go_test(
         "vm_upgrade_bytes_test.go",
         "vm_uptime_test.go",
         "vm_warp_test.go",
+        "wrapped_block_dynamic_test.go",
     ],
     embed = [":evm"],
     embedsrcs = [

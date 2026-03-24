@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
 
-
 func TestCoordinator_StateValidation(t *testing.T) {
 	co := NewCoordinator(NewSyncerRegistry(), Callbacks{}, WithPivotInterval(1))
 	block := newMockBlock(100)

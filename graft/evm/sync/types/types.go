@@ -55,7 +55,7 @@ type TargetReporter interface {
 }
 
 // CodeRequestQueue is the interface for adding code hashes to the download
-// queue and finalizing it when the main trie is done syncing. 
+// queue and finalizing it when the main trie is done syncing.
 type CodeRequestQueue interface {
 	// AddCode enqueues code hashes discovered during range proof commits
 	// for the code syncer to fetch from remote peers.

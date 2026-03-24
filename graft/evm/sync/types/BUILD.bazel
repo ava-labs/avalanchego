@@ -8,5 +8,6 @@ go_library(
     deps = [
         "//database/versiondb",
         "//graft/evm/message",
+        "@com_github_ava_labs_libevm//common",
     ],
 )
