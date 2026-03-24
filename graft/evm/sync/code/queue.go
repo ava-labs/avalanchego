@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -24,26 +25,28 @@ var (
 	_ types.Finalizer = (*Queue)(nil)
 
 	ErrFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
-	errFailedToFinalizeCodeQueue    = errors.New("failed to finalize code queue")
+	ErrQueueClosed                  = errors.New("code queue is closed")
 )
 
 // Queue implements the producer side of code fetching.
 // It accepts code hashes, persists durable "to-fetch" markers (idempotent per hash),
-// and enqueues the hashes as-is onto an internal channel consumed by the code syncer.
-// The queue does not perform in-memory deduplication or local-code checks - that is
+// and asynchronously enqueues the hashes onto an internal channel consumed by the
+// code syncer. AddCode never blocks the caller because channel sends are performed by
+// background goroutines managed by an internal errgroup.
+//
+// The queue does not perform in-memory deduplication or local-code checks since that is
 // the responsibility of the consumer.
 type Queue struct {
-	db   ethdb.Database
-	quit <-chan struct{}
+	db ethdb.Database
+	ch chan common.Hash
 
-	// `in` and `out` MUST be the same channel. We need to be able to set `in`
-	// to nil after closing, to avoid a send-after-close, but
-	// [CodeQueue.CodeHashes] MUST NOT return a nil channel otherwise consumers
-	// will block permanently.
-	in            chan<- common.Hash // Invariant: open or nil, but never closed
-	out           <-chan common.Hash // Invariant: never nil
-	chanLock      sync.RWMutex
-	closeChanOnce sync.Once // See usage in [CodeQueue.closeOutChannelOnce]
+	eg     *errgroup.Group
+	cancel context.CancelFunc // cancels the errgroup's internal context
+	done   <-chan struct{}    // errgroup context's Done channel — used in AddCode select
+
+	closeMu   sync.RWMutex // closeMu guards closed and prevents eg.Go after eg.Wait.
+	closeOnce sync.Once    // guards close(ch) - called by Finalize or Shutdown
+	closed    bool         // prevents eg.Go after eg.Wait
 
 	capacity int
 }
@@ -60,32 +63,24 @@ func WithCapacity(n int) QueueOption {
 }
 
 // NewQueue creates a new code queue applying optional functional options.
-// The `quit` channel, if non-nil, MUST eventually be closed to avoid leaking a
-// goroutine.
-func NewQueue(db ethdb.Database, quit <-chan struct{}, opts ...QueueOption) (*Queue, error) {
-	// Create with defaults, then apply options.
+// Lifecycle is managed internally: call [Finalize] for normal completion
+// or [Shutdown] for cancellation. Both are safe to call in any order.
+func NewQueue(db ethdb.Database, opts ...QueueOption) (*Queue, error) {
 	q := &Queue{
 		db:       db,
-		quit:     quit,
 		capacity: defaultQueueCapacity,
 	}
 	options.ApplyTo(q, opts...)
 
-	// Initialize the channel with the (potentially overridden) capacity.
-	ch := make(chan common.Hash, q.capacity)
-	q.in = ch
-	q.out = ch
+	q.ch = make(chan common.Hash, q.capacity)
 
-	if quit != nil {
-		// Close the output channel on early shutdown to unblock consumers.
-		go func() {
-			<-q.quit
-			q.closeChannelOnce()
-		}()
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	q.cancel = cancel
+	q.eg, ctx = errgroup.WithContext(ctx)
+	q.done = ctx.Done()
 
-	// Always initialize eagerly.
 	if err := q.init(); err != nil {
+		cancel()
 		return nil, err
 	}
 	return q, nil
@@ -93,43 +88,24 @@ func NewQueue(db ethdb.Database, quit <-chan struct{}, opts ...QueueOption) (*Qu
 
 // CodeHashes returns the receive-only channel of code hashes to consume.
 func (q *Queue) CodeHashes() <-chan common.Hash {
-	return q.out
+	return q.ch
 }
 
-func (q *Queue) closeChannelOnce() bool {
-	var done bool
-	q.closeChanOnce.Do(func() {
-		q.chanLock.Lock()
-		defer q.chanLock.Unlock()
-
-		close(q.in)
-		// [CodeQueue.AddCode] takes a read lock before accessing `in` and we
-		// want it to block instead of allowing a send-after-close. Calling
-		// AddCode() after Finalize() isn't valid, and calling it after `quit`
-		// is closed will be picked up by the `select` so a nil alternative case
-		// is desirable.
-		q.in = nil
-		done = true
-	})
-	return done
-}
-
-// AddCode persists and enqueues new code hashes.
-// Persists idempotent "to-fetch" markers for all inputs and enqueues them as-is.
-// Returns errAddCodeAfterFinalize after a clean finalize and errFailedToAddCodeHashesToQueue on early quit.
+// AddCode persists code hashes as durable disk markers and enqueues them
+// for the consumer. Never blocks the caller because channel sends happen in a
+// background goroutine. Returns [ErrQueueClosed] after [Shutdown] or [Finalize].
 func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
 	}
 
-	// Mark this enqueue as in-flight immediately so shutdown paths wait for us
-	// before closing the output channel.
-	q.chanLock.RLock()
-	defer q.chanLock.RUnlock()
-	if q.in == nil {
-		// Although this will happen anyway once the `select` is reached,
-		// bailing early avoids unnecessary database writes.
-		return ErrFailedToAddCodeHashesToQueue
+	// Shared lock - concurrent AddCode calls are allowed, but stop() blocks
+	// until all in-flight AddCode calls release before proceeding to eg.Wait.
+	q.closeMu.RLock()
+	defer q.closeMu.RUnlock()
+
+	if q.closed {
+		return ErrQueueClosed
 	}
 
 	batch := q.db.NewBatch()
@@ -148,40 +124,69 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 		return fmt.Errorf("failed to write batch of code to fetch markers due to: %w", err)
 	}
 
-	for _, h := range codeHashes {
-		select {
-		case q.in <- h: // guaranteed to be open or nil, but never closed
-		case <-q.quit:
-			return ErrFailedToAddCodeHashesToQueue
-		case <-ctx.Done():
-			return ctx.Err()
+	// Spawn a goroutine to push to the channel.
+	// The goroutine may block on channel send but does NOT block the caller.
+	q.eg.Go(func() error {
+		for _, h := range codeHashes {
+			select {
+			case q.ch <- h:
+			case <-q.done:
+				return nil // cancelled - hashes remain as disk markers
+			}
 		}
-	}
+		return nil
+	})
+
 	return nil
 }
 
-// Finalize signals that no further code hashes will be added.
-// Waits for in-flight enqueues to complete, then closes the output channel.
-// If the queue was already closed due to early quit, returns errFailedToFinalizeCodeQueue.
+// Finalize waits for all sends to complete, then closes the channel.
+// Idempotent with [Shutdown].
 func (q *Queue) Finalize() error {
-	if !q.closeChannelOnce() {
-		return errFailedToFinalizeCodeQueue
-	}
+	q.stop(false)
 	return nil
+}
+
+// Shutdown cancels stuck goroutines, waits for exit, then closes the channel.
+// Idempotent with [Finalize].
+func (q *Queue) Shutdown() {
+	q.stop(true)
+}
+
+// markClosed prevents new AddCode goroutines. Must precede eg.Wait.
+func (q *Queue) markClosed() {
+	q.closeMu.Lock()
+	defer q.closeMu.Unlock()
+	q.closed = true
+}
+
+// stop drains in-flight goroutines and closes the channel.
+// If cancelCtx is true, stuck goroutines are unblocked first.
+func (q *Queue) stop(cancelCtx bool) {
+	q.markClosed()
+	if cancelCtx {
+		q.cancel()
+	}
+	// The errgroup goroutines spawned by AddCode never return errors,
+	// so it is safe to drop the error here.
+	_ = q.eg.Wait()
+	q.closeOnce.Do(func() {
+		close(q.ch)
+	})
 }
 
 // init enqueues any persisted code markers found on disk.
 func (q *Queue) init() error {
 	// Recover any persisted code markers and enqueue them.
-	// Note: dbCodeHashes are already present as "to-fetch" markers. addCode will
+	// Note: dbCodeHashes are already present as "to-fetch" markers. AddCode will
 	// re-persist them, which is a trivial redundancy that happens only on resume
 	// (e.g., after restart). We accept this to keep the code simple.
 	dbCodeHashes, err := recoverUnfetchedCodeHashes(q.db)
 	if err != nil {
 		return fmt.Errorf("unable to recover previous sync state: %w", err)
 	}
-	// Use context.Background() since init() runs during construction before sync starts.
-	// The channel is empty, so sends won't block. Shutdown is handled via q.quit in AddCode.
+	// Use context.Background() since init() runs during construction before
+	// sync starts. The queue is not closed yet, so AddCode will always succeed.
 	if err := q.AddCode(context.Background(), dbCodeHashes); err != nil {
 		return fmt.Errorf("unable to resume previous sync: %w", err)
 	}
