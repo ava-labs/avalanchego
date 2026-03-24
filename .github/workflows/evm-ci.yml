@@ -9,7 +9,7 @@ on:
 
 jobs:
   lint_test:
-    name: Lint
+    name: ev-Lint
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -23,7 +23,7 @@ jobs:
         run: ../../scripts/run_task.sh check-go-mod-tidy
 
   unit_test:
-    name: Unit Tests (${{ matrix.os }})
+    name: ev-Unit Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     defaults:
       run:

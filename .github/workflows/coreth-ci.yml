@@ -9,7 +9,7 @@ on:
 
 jobs:
   lint_test:
-    name: Lint
+    name: ce-Lint
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -23,7 +23,7 @@ jobs:
         run: nix develop --command ./scripts/run_task.sh check-go-mod-tidy
 
   unit_test:
-    name: Unit Tests (${{ matrix.os }})
+    name: ce-Unit Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -39,7 +39,7 @@ jobs:
       - run: ./scripts/run_task.sh coverage
 
   e2e_warp:
-    name: E2E Warp Tests
+    name: ce-E2E Warp Tests
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout

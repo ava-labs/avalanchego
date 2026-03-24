@@ -26,6 +26,7 @@ jobs:
   # the current base branch and the metadata included in the PR is stale
   # relative to it.
   check-metadata-linux:
+    name: av-check-metadata-linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +38,7 @@ jobs:
   # Not a dependency of other jobs but intended to ensure that
   # developers on macos are able to maintain bazel metadata.
   check-metadata-darwin:
+    name: av-check-metadata-darwin
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +48,7 @@ jobs:
           prune_runner_disk: 'false'
           task: bazel-check-metadata
   unit-main:
+    name: av-unit-main
     needs: check-metadata-linux
     runs-on: ubuntu-latest
     steps:
@@ -55,6 +58,7 @@ jobs:
         with:
           task: bazel-test-main
   unit-coreth:
+    name: ce-unit-coreth
     needs: check-metadata-linux
     runs-on: ubuntu-latest
     steps:
@@ -65,6 +69,7 @@ jobs:
           prune_runner_disk: 'false'
           task: bazel-test-coreth
   unit-subnet-evm:
+    name: se-unit-subnet-evm
     needs: check-metadata-linux
     runs-on: ubuntu-latest
     steps:
@@ -74,6 +79,7 @@ jobs:
         with:
           task: bazel-test-subnet-evm
   e2e:
+    name: av-e2e
     needs: check-metadata-linux
     runs-on: ubuntu-latest
     steps:

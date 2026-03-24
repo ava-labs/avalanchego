@@ -21,6 +21,7 @@ concurrency:
 
 jobs:
   Unit:
+    name: av-Unit
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -35,6 +36,7 @@ jobs:
         env:
           TIMEOUT: ${{ env.TIMEOUT }}
   Fuzz:
+    name: av-Fuzz
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +45,7 @@ jobs:
         shell: bash
         run: ./scripts/run_task.sh test-fuzz
   e2e:
+    name: av-e2e
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -65,6 +68,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_post_latest:
+    name: av-e2e_post_latest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +87,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_kube:
+    name: av-e2e_kube
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -101,6 +106,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_existing_network:
+    name: av-e2e_existing_network
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -118,6 +124,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Upgrade:
+    name: av-Upgrade
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -135,6 +142,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Lint:
+    name: av-Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -143,7 +151,7 @@ jobs:
         shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh lint-all-ci
   links-lint:
-    name: Markdown Links Lint
+    name: av-Markdown Links Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -151,7 +159,7 @@ jobs:
         with:
           fail_level: any
   check_generated_protobuf:
-    name: Up-to-date protobuf
+    name: av-Up-to-date protobuf
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -160,7 +168,7 @@ jobs:
       - shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh check-generate-protobuf
   check_mockgen:
-    name: Up-to-date mocks
+    name: av-Up-to-date mocks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -168,7 +176,7 @@ jobs:
       - shell: bash
         run: ./scripts/run_task.sh check-generate-mocks
   check_canotogen:
-    name: Up-to-date canoto
+    name: av-Up-to-date canoto
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -176,7 +184,7 @@ jobs:
       - shell: bash
         run: ./scripts/run_task.sh check-generate-canoto
   check_contract_bindings:
-    name: Up-to-date contract bindings
+    name: av-Up-to-date contract bindings
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -184,7 +192,7 @@ jobs:
       - shell: nix develop --command bash -x {0}
         run: task check-generate-load-contract-bindings
   check_go_mod_tidy:
-    name: Up-to-date go.mod and go.sum
+    name: av-Up-to-date go.mod and go.sum
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -192,7 +200,7 @@ jobs:
       - shell: bash
         run: ./scripts/run_task.sh check-go-mod-tidy
   test_build_image:
-    name: Image build
+    name: av-Image build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -204,7 +212,7 @@ jobs:
         shell: bash
         run: ./scripts/run_task.sh test-build-image
   test_build_antithesis_avalanchego_images:
-    name: Build Antithesis avalanchego images
+    name: av-Build Antithesis avalanchego images
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -213,7 +221,7 @@ jobs:
         shell: bash
         run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
   test_build_antithesis_xsvm_images:
-    name: Build Antithesis xsvm images
+    name: av-Build Antithesis xsvm images
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -222,7 +230,7 @@ jobs:
         shell: bash
         run: ./scripts/run_task.sh test-build-antithesis-images-xsvm
   e2e_bootstrap_monitor:
-    name: Run bootstrap monitor e2e tests
+    name: av-Run bootstrap monitor e2e tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -231,7 +239,7 @@ jobs:
         shell: bash
         run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
   load:
-    name: Run process-based load test
+    name: av-Run process-based load test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -248,7 +256,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   load_kube_kind:
-    name: Run load test on kind cluster
+    name: av-Run load test on kind cluster
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -266,6 +274,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   robustness:
+    name: av-robustness
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

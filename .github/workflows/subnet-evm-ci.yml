@@ -10,7 +10,7 @@ on:
 
 jobs:
   lint_test:
-    name: Lint
+    name: se-Lint
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -24,7 +24,7 @@ jobs:
         run: nix develop --command ./scripts/run_task.sh check-go-mod-tidy
 
   unit_test:
-    name: Unit Tests (${{ matrix.os }})
+    name: se-Unit Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -40,7 +40,7 @@ jobs:
       - run: ./scripts/run_task.sh coverage
 
   e2e_warp:
-    name: e2e warp tests
+    name: se-e2e warp tests
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
@@ -63,7 +63,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e_load:
-    name: e2e load tests
+    name: se-e2e load tests
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
@@ -86,7 +86,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   test_build_image:
-    name: Image build
+    name: se-Image build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -101,7 +101,7 @@ jobs:
         run: ./scripts/run_task.sh test-build-image
 
   test_build_antithesis_images:
-    name: Build Antithesis images
+    name: se-Build Antithesis images
     runs-on: ubuntu-latest
     steps:
       - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be #v1.3.1
