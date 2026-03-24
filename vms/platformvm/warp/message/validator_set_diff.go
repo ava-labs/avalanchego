@@ -27,11 +27,8 @@ type ValidatorChange struct {
 // modifications. Removals have Weight == 0. NumAdded counts how many entries
 // in Changes are newly added validators (as opposed to weight modifications).
 //
-// CurrentValidatorSetHash is the sha256 hash of the serialized resulting
-// validator set after applying the diff. It is used by on-chain verifiers to
-// confirm the diff was applied correctly.
-//
-// Wire format (linearcodec, type ID 5):
+// Wire format (linearcodec, type ID 5) matches EVM contracts (e.g. icm-services
+// ValidatorSets.parseValidatorSetDiff):
 //
 //	[2]  codec version  (0x0000)
 //	[4]  type ID        (5)
@@ -40,7 +37,6 @@ type ValidatorChange struct {
 //	[8]  PreviousTimestamp
 //	[8]  CurrentHeight
 //	[8]  CurrentTimestamp
-//	[32] CurrentValidatorSetHash
 //	[4]  len(Changes)   — numChanges
 //	per change:
 //	  [96] UncompressedPublicKeyBytes
@@ -49,12 +45,11 @@ type ValidatorChange struct {
 type ValidatorSetDiff struct {
 	payload
 
-	BlockchainID            ids.ID `serialize:"true" json:"blockchainID"`
-	PreviousHeight          uint64 `serialize:"true" json:"previousHeight"`
-	PreviousTimestamp       uint64 `serialize:"true" json:"previousTimestamp"`
-	CurrentHeight           uint64 `serialize:"true" json:"currentHeight"`
-	CurrentTimestamp         uint64 `serialize:"true" json:"currentTimestamp"`
-	CurrentValidatorSetHash ids.ID `serialize:"true" json:"currentValidatorSetHash"`
+	BlockchainID      ids.ID `serialize:"true" json:"blockchainID"`
+	PreviousHeight    uint64 `serialize:"true" json:"previousHeight"`
+	PreviousTimestamp uint64 `serialize:"true" json:"previousTimestamp"`
+	CurrentHeight     uint64 `serialize:"true" json:"currentHeight"`
+	CurrentTimestamp  uint64 `serialize:"true" json:"currentTimestamp"`
 
 	Changes  []ValidatorChange `serialize:"true" json:"changes"`
 	NumAdded uint32            `serialize:"true" json:"numAdded"`
@@ -67,19 +62,17 @@ func NewValidatorSetDiff(
 	previousTimestamp uint64,
 	currentHeight uint64,
 	currentTimestamp uint64,
-	currentValidatorSetHash ids.ID,
 	changes []ValidatorChange,
 	numAdded uint32,
 ) (*ValidatorSetDiff, error) {
 	msg := &ValidatorSetDiff{
-		BlockchainID:            blockchainID,
-		PreviousHeight:          previousHeight,
-		PreviousTimestamp:       previousTimestamp,
-		CurrentHeight:           currentHeight,
-		CurrentTimestamp:         currentTimestamp,
-		CurrentValidatorSetHash: currentValidatorSetHash,
-		Changes:                 changes,
-		NumAdded:                numAdded,
+		BlockchainID:      blockchainID,
+		PreviousHeight:    previousHeight,
+		PreviousTimestamp: previousTimestamp,
+		CurrentHeight:     currentHeight,
+		CurrentTimestamp:  currentTimestamp,
+		Changes:           changes,
+		NumAdded:          numAdded,
 	}
 	return msg, Initialize(msg)
 }
