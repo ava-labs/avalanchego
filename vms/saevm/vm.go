@@ -6,26 +6,34 @@ package saevm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/sae"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/api"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -53,6 +61,7 @@ type SinceGenesis struct {
 	// resource it depends on.
 	onClose []func()
 
+	preference       atomic.Pointer[blocks.Block]
 	lastWaitForEvent utils.Atomic[time.Time]
 }
 
@@ -114,11 +123,15 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	// TODO: Make a config
-	var desiredTargetExcess acp176.TargetExcess = 100_000_000
+	var (
+		desiredDelayExcess  acp226.DelayExcess  = 0
+		desiredTargetExcess acp176.TargetExcess = 100_000_000
+	)
 	txs := txpool.NewTxs()
 	hooks := hook.NewPoints(
 		snowCtx,
 		&vm.consensusState,
+		&desiredDelayExcess,
 		&desiredTargetExcess,
 		txs,
 		avaDB,
@@ -187,28 +200,84 @@ func (vm *SinceGenesis) Initialize(
 	return nil
 }
 
+const (
+	avaxServiceName       = "avax"
+	avaxHTTPExtensionPath = "/" + avaxServiceName
+)
+
+func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	m, err := vm.VM.CreateHandlers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	service := api.NewService(vm.ctx, vm.GethRPCBackends(), vm.mempool, vm.pushGossiper, vm.db)
+	handler, err := rpc.NewHandler(avaxServiceName, service)
+	if err != nil {
+		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)
+	}
+
+	m[avaxHTTPExtensionPath] = handler
+	return m, nil
+}
+
 func (vm *SinceGenesis) SetState(ctx context.Context, state snow.State) error {
 	vm.consensusState.Set(state)
 	return vm.VM.SetState(ctx, state)
 }
 
+// SetPreference updates the VM's currently [preferred block] with the given block context,
+// which MAY be nil.
+//
+// [preferred block]: https://github.com/ava-labs/avalanchego/tree/master/vms#set-preference
+func (vm *SinceGenesis) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
+	b, err := vm.GetBlock(ctx, id)
+	if err != nil {
+		return err
+	}
+	vm.preference.Store(b)
+	return vm.VM.SetPreference(ctx, id, bCtx)
+}
+
 // Prevent busy looping when the chain is more advanced than the mempool.
 const waitForEventDelay = 100 * time.Millisecond
 
+var errNoPreference = errors.New("no preferred block")
+
 // WaitForEvent waits for the next event from the VM.
 func (vm *SinceGenesis) WaitForEvent(ctx context.Context) (common.Message, error) {
-	defer func() {
-		vm.lastWaitForEvent.Set(time.Now())
-	}()
+	// Avoid busy looping if we seem like we are ready to build a block, but are
+	// encountering an error.
+	{
+		defer func() {
+			vm.lastWaitForEvent.Set(time.Now())
+		}()
 
-	sinceLastCall := time.Since(vm.lastWaitForEvent.Get())
-	timeToWait := waitForEventDelay - sinceLastCall
-	select {
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	case <-time.After(timeToWait):
+		sinceLastCall := time.Since(vm.lastWaitForEvent.Get())
+		timeToWait := waitForEventDelay - sinceLastCall
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(timeToWait):
+		}
 	}
 
+	// Wait until we are allowed to build a block.
+	{
+		parent := vm.preference.Load()
+		if parent == nil {
+			return 0, errNoPreference
+		}
+
+		minTime := minNextBlockTime(parent.Header())
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(time.Until(minTime)):
+		}
+	}
+
+	// Wait until we want to build a block.
 	ctx, cancel := context.WithCancel(ctx)
 	type result struct {
 		msg common.Message
@@ -230,25 +299,30 @@ func (vm *SinceGenesis) WaitForEvent(ctx context.Context) (common.Message, error
 	return r.msg, r.err
 }
 
-const (
-	avaxServiceName       = "avax"
-	avaxHTTPExtensionPath = "/" + avaxServiceName
-)
-
-func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	m, err := vm.VM.CreateHandlers(ctx)
-	if err != nil {
-		return nil, err
+// minNextBlockTime calculates the minimum next block time based on the header.
+func minNextBlockTime(h *types.Header) time.Time {
+	e := customtypes.GetHeaderExtra(h)
+	// If the parent header has no min delay excess, there is nothing to wait
+	// for, because the rule does not apply to the block to be built.
+	if e.MinDelayExcess == nil {
+		return time.Time{}
 	}
 
-	service := api.NewService(vm.ctx, vm.GethRPCBackends(), vm.mempool, vm.pushGossiper, vm.db)
-	handler, err := rpc.NewHandler(avaxServiceName, service)
-	if err != nil {
-		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)
-	}
+	mde := *e.MinDelayExcess
+	// delay excess is already verified by consensus so this can not overflow.
+	delay := time.Duration(mde.Delay()) * time.Millisecond
+	return customtypes.BlockTime(h).Add(delay)
+}
 
-	m[avaxHTTPExtensionPath] = handler
-	return m, nil
+func (vm *SinceGenesis) RejectBlock(ctx context.Context, b *blocks.Block) error {
+	txs, err := tx.ParseSlice(customtypes.BlockExtData(b.EthBlock()))
+	if err != nil {
+		return fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
+	}
+	for _, tx := range txs {
+		_ = vm.mempool.Add(tx)
+	}
+	return vm.VM.RejectBlock(ctx, b)
 }
 
 // Shutdown gracefully closes the VM.
