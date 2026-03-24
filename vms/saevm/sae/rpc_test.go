@@ -578,37 +578,6 @@ func TestEthGetters(t *testing.T) {
 		})
 	}
 
-	t.Run("mempool_tx", func(t *testing.T) {
-		mempoolTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-			To:        &zeroAddr,
-			Gas:       params.TxGas,
-			GasFeeCap: big.NewInt(1),
-		})
-		sut.mustSendTx(t, mempoolTx)
-		sut.syncMempool(t)
-
-		marshaled, err := mempoolTx.MarshalBinary()
-		require.NoErrorf(t, err, "%T.MarshalBinary()", mempoolTx)
-
-		sut.testRPC(ctx, t, []rpcTest{
-			{
-				method: "eth_getTransactionByHash",
-				args:   []any{mempoolTx.Hash()},
-				want:   mempoolTx,
-			},
-			{
-				method: "eth_getRawTransactionByHash",
-				args:   []any{mempoolTx.Hash()},
-				want:   hexutil.Bytes(marshaled),
-			},
-			{
-				method: "debug_getRawTransaction",
-				args:   []any{mempoolTx.Hash()},
-				want:   hexutil.Bytes(marshaled),
-			},
-		}...)
-	})
-
 	t.Run("named_blocks", func(t *testing.T) {
 		// [ethclient.Client.BlockByNumber] isn't compatible with pending blocks as
 		// the geth RPC server strips fields that the client then expects to find.
@@ -638,6 +607,39 @@ func TestEthGetters(t *testing.T) {
 			want:   hexutil.Uint64(executed.Height()),
 		})
 	})
+}
+
+func TestMempoolTxGetters(t *testing.T) {
+	ctx, sut := newSUT(t, 1, withDebugAPI())
+
+	mempoolTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	sut.mustSendTx(t, mempoolTx)
+	sut.syncMempool(t)
+
+	marshaled, err := mempoolTx.MarshalBinary()
+	require.NoErrorf(t, err, "%T.MarshalBinary()", mempoolTx)
+
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getTransactionByHash",
+			args:   []any{mempoolTx.Hash()},
+			want:   mempoolTx,
+		},
+		{
+			method: "eth_getRawTransactionByHash",
+			args:   []any{mempoolTx.Hash()},
+			want:   hexutil.Bytes(marshaled),
+		},
+		{
+			method: "debug_getRawTransaction",
+			args:   []any{mempoolTx.Hash()},
+			want:   hexutil.Bytes(marshaled),
+		},
+	}...)
 }
 
 func TestGetLogs(t *testing.T) {
@@ -874,10 +876,9 @@ func TestGetReceipts(t *testing.T) {
 		GasPrice: big.NewInt(1),
 	}))
 
-	rawReceiptsFrom := func(b *blocks.Block) []hexutil.Bytes {
-		receipts := b.Receipts()
-		raw := make([]hexutil.Bytes, len(receipts))
-		for i, r := range receipts {
+	marshalReceipts := func(rs []*types.Receipt) []hexutil.Bytes {
+		raw := make([]hexutil.Bytes, len(rs))
+		for i, r := range rs {
 			buf, err := r.MarshalBinary()
 			require.NoErrorf(t, err, "receipts[%d].MarshalBinary()", i)
 			raw[i] = buf
@@ -887,54 +888,44 @@ func TestGetReceipts(t *testing.T) {
 
 	var tests []rpcTest
 	for _, tc := range []struct {
-		id      rpc.BlockNumberOrHash
-		want    []*types.Receipt
-		wantRaw []hexutil.Bytes
+		id   rpc.BlockNumberOrHash
+		want []*types.Receipt
 	}{
 		{
-			id:      rpc.BlockNumberOrHashWithHash(onDisk.Hash(), true),
-			want:    wantOnDisk,
-			wantRaw: rawReceiptsFrom(onDisk),
+			id:   rpc.BlockNumberOrHashWithHash(onDisk.Hash(), true),
+			want: wantOnDisk,
 		},
 		{
-			id:      rpc.BlockNumberOrHashWithHash(settled.Hash(), true),
-			want:    wantSettled,
-			wantRaw: rawReceiptsFrom(settled),
+			id:   rpc.BlockNumberOrHashWithHash(settled.Hash(), true),
+			want: wantSettled,
 		},
 		{
-			id:      rpc.BlockNumberOrHashWithHash(unsettled.Hash(), true),
-			want:    wantUnsettled,
-			wantRaw: rawReceiptsFrom(unsettled),
+			id:   rpc.BlockNumberOrHashWithHash(unsettled.Hash(), true),
+			want: wantUnsettled,
 		},
 		{
-			id:      rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //nolint:gosec // Test block heights won't overflow
-			want:    wantOnDisk,
-			wantRaw: rawReceiptsFrom(onDisk),
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //nolint:gosec // Test block heights won't overflow
+			want: wantOnDisk,
 		},
 		{
-			id:      rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //nolint:gosec // Test block heights won't overflow
-			want:    wantSettled,
-			wantRaw: rawReceiptsFrom(settled),
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //nolint:gosec // Test block heights won't overflow
+			want: wantSettled,
 		},
 		{
-			id:      rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //nolint:gosec // Test block heights won't overflow
-			want:    wantUnsettled,
-			wantRaw: rawReceiptsFrom(unsettled),
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //nolint:gosec // Test block heights won't overflow
+			want: wantUnsettled,
 		},
 		{
-			id:      rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber),
-			want:    wantUnsettled,
-			wantRaw: rawReceiptsFrom(unsettled),
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber),
+			want: wantUnsettled,
 		},
 		{
-			id:      rpc.BlockNumberOrHashWithNumber(rpc.SafeBlockNumber),
-			want:    wantSettled,
-			wantRaw: rawReceiptsFrom(settled),
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.SafeBlockNumber),
+			want: wantSettled,
 		},
 		{
-			id:      rpc.BlockNumberOrHashWithNumber(rpc.FinalizedBlockNumber),
-			want:    wantSettled,
-			wantRaw: rawReceiptsFrom(settled),
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.FinalizedBlockNumber),
+			want: wantSettled,
 		},
 	} {
 		tests = append(tests, rpcTest{
@@ -944,7 +935,7 @@ func TestGetReceipts(t *testing.T) {
 		}, rpcTest{
 			method: "debug_getRawReceipts",
 			args:   []any{tc.id.String()},
-			want:   tc.wantRaw,
+			want:   marshalReceipts(tc.want),
 		})
 	}
 
