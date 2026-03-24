@@ -20,18 +20,19 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	saestate "github.com/ava-labs/avalanchego/vms/saevm/state"
+	gethparams "github.com/ava-labs/libevm/params"
 )
 
 var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
@@ -44,16 +45,20 @@ type Points struct {
 func NewPoints(
 	ctx *snow.Context,
 	consensusState *utils.Atomic[snow.State],
+	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
 	pool *txpool.Txs,
 	db database.Database,
 ) *Points {
 	return &Points{
 		blockBuilder{
-			ctx:                 ctx,
-			consensusState:      consensusState,
-			desiredTargetExcess: desiredTargetExcess,
-			potentialTxs:        pool.Iter,
+			ctx:            ctx,
+			consensusState: consensusState,
+			desired: params{
+				delayExcess:  desiredDelayExcess,
+				targetExcess: desiredTargetExcess,
+			},
+			potentialTxs: pool.Iter,
 		},
 		db,
 	}
@@ -75,7 +80,7 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 	}
 
 	header := b.Header()
-	te := targetExcess(header)
+	headerExtra := customtypes.GetHeaderExtra(header)
 	return &blockBuilder{
 		ctx:            p.ctx,
 		consensusState: p.consensusState,
@@ -85,7 +90,10 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 				int64(p.SubSecondBlockTime(header)),
 			)
 		},
-		desiredTargetExcess: &te,
+		desired: params{
+			delayExcess:  headerExtra.MinDelayExcess,
+			targetExcess: headerExtra.TargetExcess,
+		},
 		potentialTxs: func() iter.Seq[*txpool.Tx] {
 			return slices.Values(txs)
 		},
@@ -142,7 +150,7 @@ func (*Points) CanExecuteTransaction(common.Address, *common.Address, libevm.Sta
 	return nil
 }
 
-func (*Points) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
+func (*Points) BeforeExecutingBlock(gethparams.Rules, *state.StateDB, *types.Block) error {
 	return nil
 }
 

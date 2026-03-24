@@ -31,28 +31,57 @@ import (
 
 var _ hook.BlockBuilder[*txpool.Tx] = (*blockBuilder)(nil)
 
+type params struct {
+	delayExcess  *acp226.DelayExcess
+	targetExcess *acp176.TargetExcess
+}
+
 type blockBuilder struct {
 	ctx            *snow.Context
 	consensusState *utils.Atomic[snow.State]
 
 	now func() time.Time
-	// If the gas target is specified, calculate the desired target excess and
-	// use it during block creation.
-	desiredTargetExcess *acp176.TargetExcess
-	potentialTxs        func() iter.Seq[*txpool.Tx]
+	// When fields in params are set, the block builder will build blocks that
+	// move the network values towards their desired values.
+	desired      params
+	potentialTxs func() iter.Seq[*txpool.Tx]
 }
 
-func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
+func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	var now time.Time
 	if b.now != nil {
 		now = b.now()
 	} else {
 		now = time.Now()
 	}
+	nowMS := uint64(now.UnixMilli())
+
+	mde := acp226.InitialDelayExcess
+	if pmde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pmde != nil {
+		mde = *pmde
+	}
+
+	// Enforce block building separation.
+	{
+		parentTimeMS := customtypes.HeaderTimeMilliseconds(parent)
+		if nowMS < parentTimeMS {
+			return nil, fmt.Errorf("current time is before parent timestamp: now=%d parentTime=%d", nowMS, parentTimeMS)
+		}
+
+		delay := nowMS - parentTimeMS
+		minDelay := mde.Delay()
+		if delay < minDelay {
+			return nil, fmt.Errorf("block building separation not satisfied: delay=%d minDelay=%d", delay, minDelay)
+		}
+	}
+
+	if b.desired.delayExcess != nil {
+		mde.UpdateDelayExcess(*b.desired.delayExcess)
+	}
 
 	te := targetExcess(parent)
-	if b.desiredTargetExcess != nil {
-		te.UpdateTargetExcess(*b.desiredTargetExcess)
+	if b.desired.targetExcess != nil {
+		te.UpdateTargetExcess(*b.desired.targetExcess)
 	}
 	return customtypes.WithHeaderExtra(
 		&types.Header{
@@ -69,11 +98,11 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
 		&customtypes.HeaderExtra{
 			ExtDataGasUsed:   big.NewInt(0),
 			BlockGasCost:     big.NewInt(0),
-			TimeMilliseconds: utils.PointerTo[uint64](uint64(now.UnixMilli())),
-			MinDelayExcess:   utils.PointerTo[acp226.DelayExcess](0), // TODO:
+			TimeMilliseconds: utils.PointerTo[uint64](nowMS),
+			MinDelayExcess:   &mde,
 			TargetExcess:     &te,
 		},
-	)
+	), nil
 }
 
 func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {
