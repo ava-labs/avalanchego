@@ -20,7 +20,7 @@ vars:
   NIX_RUN: '{{printf "%s/scripts/nix_run.sh" .TASKFILE_DIR}}'
 
 tasks:
-  default: '{{.NIX_RUN}} ./scripts/run_task.sh --list'
+  default: './scripts/run_task.sh --list'
 
   bazel-build:
     desc: Build avalanchego with Bazel
