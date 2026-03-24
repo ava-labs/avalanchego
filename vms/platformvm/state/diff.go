@@ -658,7 +658,7 @@ func (d *diff) Apply(baseState Chain) error {
 			}
 
 			// Delegators must be added after validators are added
-			if err := d.addCurrentDelegators(baseState, validatorDiff); err != nil {
+			if err := addCurrentDelegators(baseState, validatorDiff); err != nil {
 				return err
 			}
 		}
@@ -729,7 +729,7 @@ func (d *diff) Apply(baseState Chain) error {
 	return nil
 }
 
-func (d *diff) addCurrentDelegators(baseState Chain, validatorDiff *diffValidator) error {
+func addCurrentDelegators(baseState Chain, validatorDiff *diffValidator) error {
 	addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
 	defer addedDelegatorIterator.Release()
 
