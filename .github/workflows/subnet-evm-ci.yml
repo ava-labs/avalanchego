@@ -55,11 +55,11 @@ jobs:
           artifact_prefix: warp
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e_load:
@@ -78,11 +78,11 @@ jobs:
           artifact_prefix: load
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   test_build_image:
