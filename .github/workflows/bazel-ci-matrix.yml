@@ -1,0 +1,42 @@
+name: Bazel Tests
+
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  define-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      platform_matrix: ${{ steps.set-matrix.outputs.platform_matrix }}
+    steps:
+      - name: Define platform matrix
+        id: set-matrix
+        shell: bash
+        run: |
+          echo 'platform_matrix={"platform":[{"name":"linux-amd64","runner":"ubuntu-latest"},{"name":"linux-arm64","runner":"custom-arm64-noble"},{"name":"darwin-arm64","runner":"macos-14"}]}' >> "$GITHUB_OUTPUT"
+  bazel-ci:
+    needs: define-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.platform_matrix) }}
+    uses: ./.github/workflows/bazel-ci.yml
+    with:
+      platform_name: ${{ matrix.platform.name }}
+      runner: ${{ matrix.platform.runner }}
+    secrets: inherit
