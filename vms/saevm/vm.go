@@ -199,6 +199,27 @@ func (vm *SinceGenesis) Initialize(
 	return nil
 }
 
+const (
+	avaxServiceName       = "avax"
+	avaxHTTPExtensionPath = "/" + avaxServiceName
+)
+
+func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	m, err := vm.VM.CreateHandlers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	service := api.NewService(vm.ctx, vm.GethRPCBackends(), vm.mempool, vm.pushGossiper, vm.db)
+	handler, err := rpc.NewHandler(avaxServiceName, service)
+	if err != nil {
+		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)
+	}
+
+	m[avaxHTTPExtensionPath] = handler
+	return m, nil
+}
+
 func (vm *SinceGenesis) SetState(ctx context.Context, state snow.State) error {
 	vm.consensusState.Set(state)
 	return vm.VM.SetState(ctx, state)
@@ -290,25 +311,15 @@ func minNextBlockTime(h *types.Header) time.Time {
 	return customtypes.BlockTime(h).Add(delay)
 }
 
-const (
-	avaxServiceName       = "avax"
-	avaxHTTPExtensionPath = "/" + avaxServiceName
-)
-
-func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	m, err := vm.VM.CreateHandlers(ctx)
+func (vm *SinceGenesis) RejectBlock(ctx context.Context, b *blocks.Block) error {
+	txs, err := tx.ParseSlice(customtypes.BlockExtData(b.EthBlock()))
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
-
-	service := api.NewService(vm.ctx, vm.GethRPCBackends(), vm.mempool, vm.pushGossiper, vm.db)
-	handler, err := rpc.NewHandler(avaxServiceName, service)
-	if err != nil {
-		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)
+	for _, tx := range txs {
+		_ = vm.mempool.Add(tx)
 	}
-
-	m[avaxHTTPExtensionPath] = handler
-	return m, nil
+	return vm.VM.RejectBlock(ctx, b)
 }
 
 // Shutdown gracefully closes the VM.

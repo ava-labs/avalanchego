@@ -173,6 +173,7 @@ func (t *Tx) Verify(ctx context.Context, snowCtx *snow.Context) error {
 	if err := t.VerifyCredentials(snowCtx, t.Creds); err != nil {
 		return fmt.Errorf("failed to verify credentials: %w", err)
 	}
+	// TODO: Verify export tx nonces.
 	return nil
 }
 

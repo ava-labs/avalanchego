@@ -106,12 +106,14 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 }
 
 func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {
+	seq := b.potentialTxs()
+
 	// During bootstrapping, we may be processing transactions that were
 	// previously valid, but are no longer valid. Additionally, Input UTXOs may
 	// not have been populated by the source chain. Therefore we skip
 	// verification during bootstrapping.
 	if b.consensusState.Get() != snow.NormalOp {
-		return b.potentialTxs()
+		return seq
 	}
 
 	return func(yield func(*txpool.Tx) bool) {
@@ -126,7 +128,7 @@ func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash 
 			return
 		}
 
-		for tx := range b.potentialTxs() {
+		for tx := range seq {
 			if consumedUTXOs.Overlaps(tx.Inputs) {
 				b.ctx.Log.Debug("tx consumes previously consumed UTXOs",
 					zap.Stringer("txID", tx.ID),
@@ -169,7 +171,6 @@ func (*blockBuilder) BuildBlock(
 		return nil, fmt.Errorf("failed to marshal atomic transactions: %w", err)
 	}
 
-	// TODO(StephenButtolph): Should only update the ExtDataHash after AP1.
 	return customtypes.NewBlockWithExtData(
 		header,
 		txs,

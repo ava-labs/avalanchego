@@ -39,7 +39,8 @@ var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
 
 type Points struct {
 	blockBuilder
-	db database.Database
+	db  database.Database
+	txs *txpool.Txs
 }
 
 func NewPoints(
@@ -61,6 +62,7 @@ func NewPoints(
 			potentialTxs: pool.Iter,
 		},
 		db,
+		pool,
 	}
 }
 
@@ -160,6 +162,11 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 		return fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
 
+	// TODO: Remove txs from the mempool whose nonces are no longer correct.
+	for _, tx := range txs {
+		p.txs.RemoveConflicts(tx.InputUTXOs())
+	}
+
 	extstatedb := extstate.New(statedb)
 	for i, tx := range txs {
 		txID, err := tx.ID()
@@ -188,7 +195,6 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 	}
 
 	/*
-
 		var previousRoot common.Hash
 		trieDB := saestate.NewTrieDB(p.db)
 		tr, err := trie.New(trie.TrieID(previousRoot), trieDB)
