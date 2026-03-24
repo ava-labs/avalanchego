@@ -25,20 +25,22 @@ jobs:
   bz-define-matrix:
     runs-on: ubuntu-latest
     outputs:
-      platform_matrix: ${{ steps.set-matrix.outputs.platform_matrix }}
+      platforms: ${{ steps.set-platforms.outputs.platforms }}
     steps:
       - name: Define platform matrix
-        id: set-matrix
+        id: set-platforms
         shell: bash
         run: |
-          echo 'platform_matrix={"platform":[{"name":"linux-amd64","runner":"ubuntu-latest"},{"name":"linux-arm64","runner":"custom-arm64-noble"},{"name":"darwin-arm64","runner":"macos-14"}]}' >> "$GITHUB_OUTPUT"
-  bz-matrix:
+          echo 'platforms=["linux-amd64","linux-arm64","darwin-arm64"]' >> "$GITHUB_OUTPUT"
+  matrix:
     needs: bz-define-matrix
+    name: ${{ matrix.platform }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.bz-define-matrix.outputs.platform_matrix) }}
+      matrix:
+        platform: ${{ fromJSON(needs.bz-define-matrix.outputs.platforms) }}
     uses: ./.github/workflows/bazel-ci.yml
     with:
-      platform_name: ${{ matrix.platform.name }}
-      runner: ${{ matrix.platform.runner }}
+      platform_name: ${{ matrix.platform }}
+      runner: ${{ matrix.platform == 'linux-amd64' && 'ubuntu-latest' || matrix.platform == 'linux-arm64' && 'custom-arm64-noble' || 'macos-14' }}
     secrets: inherit
