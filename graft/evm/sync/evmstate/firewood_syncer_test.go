@@ -136,6 +136,13 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 			// After finalize, the queue should reject new code additions.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
 			require.ErrorIs(t, err, code.ErrQueueClosed)
+
+			if tt.cancel {
+				// Most recent root should be overwritten.
+				fw := clientState.TrieDB().Backend().(*firewood.TrieDB).Firewood
+				root := fw.Root()
+				require.Equalf(t, types.EmptyRootHash, common.Hash(root), "%T.Root(): expected empty root after cancellation", fw)
+			}
 		})
 	}
 }
