@@ -855,7 +855,7 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 			return err
 		}
 		e.onCommitState.AddUTXO(utxo)
-		e.onCommitState.AddRewardUTXO(e.tx.ID(), utxo)
+		e.onCommitState.AddRewardUTXO(validator.TxID, utxo)
 		outputIndexOffset++
 	}
 
@@ -865,7 +865,7 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 			return err
 		}
 		e.onCommitState.AddUTXO(utxo)
-		e.onCommitState.AddRewardUTXO(e.tx.ID(), utxo)
+		e.onCommitState.AddRewardUTXO(validator.TxID, utxo)
 		outputIndexOffset++
 	}
 
@@ -899,6 +899,7 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 	if newWeight > e.backend.Config.MaxValidatorStake {
 		excessValidationRewards, excessDelegateeRewards, err := e.createOverflowUTXOs(
 			addAutoRenewedValidatorTx,
+			validator.TxID,
 			newWeight,
 			restakingDelegateeRewards,
 			restakingRewards,
@@ -1015,7 +1016,7 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 			return err
 		}
 		e.onAbortState.AddUTXO(utxo)
-		e.onAbortState.AddRewardUTXO(utxo.TxID, utxo)
+		e.onAbortState.AddRewardUTXO(validator.TxID, utxo)
 		onAbortUTXOsOffset++
 	}
 
@@ -1031,7 +1032,7 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 			return err
 		}
 		e.onCommitState.AddUTXO(utxo)
-		e.onCommitState.AddRewardUTXO(utxo.TxID, utxo)
+		e.onCommitState.AddRewardUTXO(validator.TxID, utxo)
 		onCommitUTXOsOffset++
 	}
 
@@ -1049,14 +1050,14 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 		return err
 	}
 	e.onCommitState.AddUTXO(onCommitUtxo)
-	e.onCommitState.AddRewardUTXO(onCommitUtxo.TxID, onCommitUtxo)
+	e.onCommitState.AddRewardUTXO(validator.TxID, onCommitUtxo)
 
 	onAbortUtxo, err := e.createRewardUTXO(totalDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner(), e.tx.ID(), onAbortUTXOsOffset)
 	if err != nil {
 		return err
 	}
 	e.onAbortState.AddUTXO(onAbortUtxo)
-	e.onAbortState.AddRewardUTXO(onAbortUtxo.TxID, onAbortUtxo)
+	e.onAbortState.AddRewardUTXO(validator.TxID, onAbortUtxo)
 
 	return nil
 }
@@ -1098,6 +1099,7 @@ func (e *proposalTxExecutor) createRewardUTXO(
 // Returns the excess validation and delegatee rewards that were withdrawn.
 func (e *proposalTxExecutor) createOverflowUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	txID ids.ID,
 	newWeight uint64,
 	delegateeReward uint64,
 	rewards uint64,
@@ -1144,7 +1146,7 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 			return 0, 0, err
 		}
 		e.onCommitState.AddUTXO(utxo)
-		e.onCommitState.AddRewardUTXO(e.tx.ID(), utxo)
+		e.onCommitState.AddRewardUTXO(txID, utxo)
 		outputIndexOffset++
 	}
 
@@ -1154,7 +1156,7 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 			return 0, 0, err
 		}
 		e.onCommitState.AddUTXO(utxo)
-		e.onCommitState.AddRewardUTXO(e.tx.ID(), utxo)
+		e.onCommitState.AddRewardUTXO(txID, utxo)
 	}
 
 	return excessValidationReward, excessDelegateeReward, nil
