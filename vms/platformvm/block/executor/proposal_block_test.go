@@ -164,13 +164,17 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require.NoError(nextStakerTx.Initialize(txs.Codec))
 	nextStakerTxID := nextStakerTx.ID()
 
-	env.state.AddTx(nextStakerTx, status.Processing)
+	env.state.AddTx(nextStakerTx, status.Committed)
 	require.NoError(env.state.PutCurrentValidator(&state.Staker{
-		TxID:     nextStakerTxID,
-		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-		EndTime:  nextStakerTime,
-		NextTime: nextStakerTime,
+		TxID:      nextStakerTxID,
+		NodeID:    unsignedNextStakerTx.NodeID(),
+		SubnetID:  unsignedNextStakerTx.SubnetID(),
+		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+		StartTime: nextStakerTime,
+		EndTime:   nextStakerTime,
+		NextTime:  nextStakerTime,
 	}))
+	require.NoError(env.state.Commit())
 
 	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
