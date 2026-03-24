@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package acp236
+package autorenewedvalidators
 
 import (
 	"time"
@@ -23,9 +23,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ = DescribeACP236("[Reward Eligibility]", func() {
+var _ = e2e.DescribePChain("[Auto Renewed Validators] [Reward Eligibility]", ginkgo.Label("local"), func() {
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
@@ -75,7 +76,7 @@ var _ = DescribeACP236("[Reward Eligibility]", func() {
 			}
 
 			keychain      = env.NewKeychain()
-			walletNodeURI = network.GetNodeURIs()[0] // use another node, because we will stop it later to fail uptime check
+			walletNodeURI = env.GetRandomNodeURI()
 			pWallet       = e2e.NewWallet(tc, keychain, walletNodeURI).P()
 			pContext      = pWallet.Builder().Context()
 			pvmClient     = platformvm.NewClient(walletNodeURI.URI)
@@ -135,8 +136,8 @@ var _ = DescribeACP236("[Reward Eligibility]", func() {
 				},
 				tc.WithDefaultContext(),
 			)
+			require.NoError(err)
 		})
-		require.NoError(err)
 
 		tc.By("retrieving supply before adding delegator1")
 		supplyAtDelegator1Start, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
@@ -146,7 +147,7 @@ var _ = DescribeACP236("[Reward Eligibility]", func() {
 			delegator1Keychain := secp256k1fx.NewKeychain(delegator1FundingKey)
 			delegator1PWallet := e2e.NewWallet(tc, delegator1Keychain, walletNodeURI).P()
 
-			// Get validator's end time so delegator1 delegates for the entire cycle
+			// Get validator's end time to enable configuring delegator1 to delegate for the entire cycle
 			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
 			require.NoError(err)
 			require.Len(validators, 1)
@@ -291,7 +292,8 @@ var _ = DescribeACP236("[Reward Eligibility]", func() {
 		})
 
 		tc.By("retrieving wallet balance before validator exits")
-		fundedKeyBalancesBeforeExit, err := pWallet.Builder().GetBalance()
+		// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
+		fundedKeyBalancesBeforeExit, err := pWallet.Builder().GetBalance(common.WithStakeableLocked())
 		require.NoError(err)
 
 		tc.By("waiting for the second staking cycle to complete", func() {
@@ -330,7 +332,8 @@ var _ = DescribeACP236("[Reward Eligibility]", func() {
 		tc.By("checking stake was returned", func() {
 			// Refresh wallet to get updated UTXOs after validator exit
 			pWallet = e2e.NewWallet(tc, keychain, walletNodeURI).P()
-			fundedKeyBalances, err := pWallet.Builder().GetBalance()
+			// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
+			fundedKeyBalances, err := pWallet.Builder().GetBalance(common.WithStakeableLocked())
 			require.NoError(err)
 
 			require.Equal(fundedKeyBalancesBeforeExit[pContext.AVAXAssetID]+weight, fundedKeyBalances[pContext.AVAXAssetID])
