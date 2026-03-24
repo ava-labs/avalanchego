@@ -53,13 +53,177 @@ export GOWORK=~/src/my-go.work
 
 See the [Go Modules Reference](https://go.dev/ref/mod#workspaces) for full workspace documentation.
 
-## Running tasks
+## Nix
 
-This repo uses the [Task](https://taskfile.dev/) task runner to simplify usage and discoverability of development tasks. To list available tasks:
+This repository uses Nix to provide the pinned development toolchain used by many tasks and scripts.
+
+### Installation
+
+Install Nix with:
 
 ```bash
-./scripts/run_task.sh
+task install-nix
 ```
+
+If `task` is not yet available, use:
+
+```bash
+./scripts/run_task.sh install-nix
+```
+
+Platform-specific behavior:
+
+- macOS: this uses the [Lix installer](https://lix.systems/install/). We prefer it on macOS
+  because it has a cleaner install path, documented uninstall support, and documented support
+  for surviving macOS upgrades. The [Lix installer
+  documentation](https://git.lix.systems/lix-project/lix-installer) also says it installs Lix
+  with flakes enabled by default. We prefer Lix over vendor-backed alternatives because Lix is
+  maintained as an [independent community project](https://lix.systems/about), while
+  Determinate's installer sits within a broader vendor ecosystem that includes
+  [FlakeHub](https://determinate.systems/flakehub), Determinate's platform for publishing
+  flakes.  The Determinate installer it is based on also documents a built-in single-command
+  uninstall: [`/nix/nix-installer
+  uninstall`](https://docs.determinate.systems/guides/migrating-from-upstream-nix/). As of
+  February 27, 2026, upstream Nix's Rust installer also documents uninstall support, but
+  upstream still described that installer as beta in the [Nix 2.34 release
+  notes](https://nix.dev/manual/nix/2.34/release-notes/rl-2.34).
+- Linux: this uses the upstream Nix daemon installer and enables `nix-command flakes` in
+  `~/.config/nix/nix.conf`.
+
+### Using the dev shell
+
+Start the repo's dev shell with:
+
+```bash
+nix develop
+```
+
+This is explicit and works well when you want the full pinned environment for a session.
+
+You do not need to run `nix develop` for every task. Named tasks in the root `Taskfile.yml` use
+`./scripts/nix_run.sh`, which enters the repo's nix dev shell automatically when needed. The
+main exception is bare `task`, which only lists available tasks.
+
+For zsh users, `nix develop` is explicit but disruptive because it starts a `bash` shell rather
+than preserving the normal interactive zsh session.
+
+## direnv
+
+This repository includes a [`.envrc`](./.envrc) for use with [direnv](https://direnv.net/). When
+loaded, it:
+
+- adds repo-local commands from [`bin/`](./bin) to `PATH`
+- sets `AVALANCHEGO_PATH` to the repo-local `avalanchego` binary path
+- creates and sets `AVAGO_PLUGIN_DIR`
+- sets `TMPNET_NETWORK_DIR` to the latest tmpnet deployment by default
+- supports per-user overrides via `.envrc.local`
+- supports shared personal overrides via `GLOBAL_ENVRC`
+- optionally activates the repo's nix flake when `AVALANCHEGO_DIRENV_USE_FLAKE=1` is set
+
+### Setup
+
+To use it:
+
+1. Install [direnv](https://direnv.net/docs/installation.html).
+1. Hook it into your shell:
+   - bash: [`eval "$(direnv hook bash)"`](https://direnv.net/docs/hook.html)
+   - zsh: [`eval "$(direnv hook zsh)"`](https://direnv.net/docs/hook.html)
+1. Allow this repo's `.envrc`:
+
+```bash
+direnv allow
+```
+
+If you trust this repository and want `direnv` to auto-allow `.envrc` files under a directory
+hierarchy, configure a trusted prefix in
+[`direnv.toml`](https://direnv.net/man/direnv.toml.1.html). The `whitelist.prefix` setting marks
+matching directories as trusted.
+
+### Flake activation
+
+By default, the repo's `.envrc` applies the repo-local environment without activating the nix dev
+shell.
+
+If you want `direnv` to activate the repo flake as well, Nix must be installed first. See
+[Nix](#nix).
+
+To enable flake activation, export `AVALANCHEGO_DIRENV_USE_FLAKE=1` before entering the repo, or
+reload `direnv` after setting it.
+
+If you want quieter `direnv` output when using flake activation, set:
+
+```bash
+export DIRENV_LOG_FORMAT=
+```
+
+```bash
+export AVALANCHEGO_DIRENV_USE_FLAKE=1
+direnv reload
+```
+
+For bash users, this is typically the most integrated workflow. For zsh users, it is often less
+desirable; see [Nix](#nix).
+
+## Running tasks
+
+This repo uses the [Task](https://taskfile.dev/) task runner to simplify usage and discoverability
+of development tasks. To list available tasks:
+
+```bash
+task
+```
+
+### Choosing a task execution mode
+
+There are two separate concerns when running tasks in this repository:
+
+- How the `task` runner itself is made available
+- How individual task commands get the repo's pinned toolchain
+
+The `task` command is typically made available in one of these ways:
+
+- From the nix dev shell, where `task` is on `PATH`
+- From repo-local `bin/task`, which is added to `PATH` by `direnv`
+- From the pinned Go tool in `tools/external/go.mod`, which `./scripts/run_task.sh` and `bin/task`
+  use as a fallback when a real `task` binary is not already available
+
+Many task commands also use `./scripts/nix_run.sh` internally so they can enter the repo's nix dev
+shell when required, without requiring you to manually run `nix develop` first.
+
+### Common configurations
+
+#### Bash
+
+- Best: `direnv` with `AVALANCHEGO_DIRENV_USE_FLAKE=1`
+  - Loads the repo flake automatically when you enter the repo.
+  - Best when you want the pinned toolchain available throughout a shell session.
+- Good: `direnv` without `AVALANCHEGO_DIRENV_USE_FLAKE`
+  - Keeps your normal shell environment while letting named tasks enter nix automatically when
+    needed.
+- Explicit: `nix develop`
+  - Best when you want to work inside the full dev shell for a whole shell session.
+
+#### Zsh
+
+- Best: `direnv` without `AVALANCHEGO_DIRENV_USE_FLAKE`
+  - Keeps your normal interactive zsh session while letting named tasks enter nix automatically
+    when needed.
+- Explicit: `nix develop`
+  - Use this when you want the full dev shell for a whole shell session and are fine with the
+    tradeoffs described in [Nix](#nix).
+- Not recommended: `direnv` with `AVALANCHEGO_DIRENV_USE_FLAKE=1`
+  - This activates the repo flake automatically, but it brings the same shell tradeoffs described
+    in [Nix](#nix).
+
+### How task invocation works
+
+- Plain `task` lists available tasks.
+- Named tasks in the root `Taskfile.yml` use `./scripts/nix_run.sh`, so they enter the nix dev
+  shell automatically when they need tools from the pinned flake environment.
+- `./scripts/run_task.sh <task>` is still a valid entrypoint and falls back to the pinned Go `task`
+  tool if a `task` binary is not already available on `PATH`.
+- If you do not use `direnv`, you can still run tasks with either `./scripts/run_task.sh <task>` or
+  `nix develop --command task <task>`.
 
 ## Issues
 

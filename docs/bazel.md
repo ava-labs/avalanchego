@@ -10,6 +10,7 @@ which automatically downloads the correct Bazel version from `.bazelversion`. Al
 Taskfile targets use `./scripts/nix_run.sh bazelisk ...`, which runs in the repo's
 nix dev shell when needed and avoids nesting `nix develop` when already inside it.
 In the nix dev shell (`nix develop`), `bazel` and `bazelisk` are both on PATH directly.
+For Nix installation and repo dev shell setup, see [CONTRIBUTING.md](../CONTRIBUTING.md#nix).
 
 ## Quick Start
 

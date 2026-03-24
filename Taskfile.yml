@@ -1,7 +1,6 @@
 # https://taskfile.dev
 # To run on a system without task installed, `./scripts/run_task.sh` will
-# prefer host task, otherwise use the repo's nix-pinned task when nix is
-# installed, otherwise bootstrap task via `go tool`.
+# prefer a task binary in the PATH and otherwise run task with `go tool`.
 # If in the nix dev shell, repo tasks use the pinned toolchain.
 
 # - Tasks should be simple entrypoints to functionality exposed by scripts or code.
