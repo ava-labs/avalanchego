@@ -17,7 +17,7 @@ fi
 
 if command -v nix > /dev/null 2>&1; then
   # shellcheck disable=SC2016
-  exec nix develop "${AVALANCHE_PATH}" --command bash -lc '
+  exec nix develop "${AVALANCHE_PATH}" --command bash -c '
     set -euo pipefail
     task_bin="$(which -a task | grep -Fvx "$1/bin/task" | head -n1)"
     exec "${task_bin}" "${@:2}"
