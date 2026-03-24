@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package acp236
+package autorenewedvalidators
 
 import (
 	"time"
@@ -24,9 +24,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ = DescribeACP236("[Auto-Renewed Validator]", func() {
+var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", ginkgo.Label("local"), func() {
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
@@ -125,12 +126,15 @@ var _ = DescribeACP236("[Auto-Renewed Validator]", func() {
 		})
 
 		tc.By("funding delegator wallet", func() {
+			stake := delegatorWeight
+			fees := units.Avax
+
 			_, err = pWallet.IssueBaseTx(
 				[]*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{ID: pContext.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
-							Amt: delegatorWeight + units.Avax, // stake + fees
+							Amt: stake + fees,
 							OutputOwners: secp256k1fx.OutputOwners{
 								Threshold: 1,
 								Addrs:     []ids.ShortID{delegatorFundingKey.Address()},
@@ -305,14 +309,16 @@ var _ = DescribeACP236("[Auto-Renewed Validator]", func() {
 			require.NoError(err)
 		})
 
-		var actualDelegator2Period time.Duration
-		tc.By("verifying delegator2 is active and retrieving delegation period", func() {
+		tc.By("verifying delegator2 is active", func() {
 			tc.Eventually(func() bool {
 				validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
 				require.NoError(err)
 				return len(validators) == 1 && len(validators[0].Delegators) == 1
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "delegator2 not active")
+		})
 
+		var actualDelegator2Period time.Duration
+		tc.By("retrieving delegator2 period", func() {
 			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
 			require.NoError(err)
 			require.Len(validators, 1)
@@ -388,7 +394,8 @@ var _ = DescribeACP236("[Auto-Renewed Validator]", func() {
 		})
 
 		tc.By("retrieving wallet balance before exiting")
-		fundedKeyBalancesBeforeExit, err := pWallet.Builder().GetBalance()
+		// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
+		fundedKeyBalancesBeforeExit, err := pWallet.Builder().GetBalance(common.WithStakeableLocked())
 		require.NoError(err)
 
 		tc.By("waiting for the third staking cycle to complete", func() {
@@ -422,7 +429,8 @@ var _ = DescribeACP236("[Auto-Renewed Validator]", func() {
 			// Check delegation reward key balance includes all withdrawn + accrued delegatee rewards
 			delegationKeychain := secp256k1fx.NewKeychain(delegationRewardKey)
 			delegationPWallet := e2e.NewWallet(tc, delegationKeychain, walletNodeURI).P()
-			delegationBalances, err := delegationPWallet.Builder().GetBalance()
+			// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
+			delegationBalances, err := delegationPWallet.Builder().GetBalance(common.WithStakeableLocked())
 			require.NoError(err)
 
 			expectedTotalDelegateeReward := expectedDelegateeReward1 + expectedDelegateeReward2 +
@@ -431,7 +439,8 @@ var _ = DescribeACP236("[Auto-Renewed Validator]", func() {
 
 			// Check that stake was returned to the config owner (funded key)
 			pWallet = e2e.NewWallet(tc, keychain, walletNodeURI).P()
-			fundedKeyBalances, err := pWallet.Builder().GetBalance()
+			// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
+			fundedKeyBalances, err := pWallet.Builder().GetBalance(common.WithStakeableLocked())
 			require.NoError(err)
 
 			// The funded key should have received the original stake back.
