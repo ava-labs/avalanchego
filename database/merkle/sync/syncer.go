@@ -378,31 +378,9 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		BytesLimit:    DefaultRequestByteSizeLimit,
 	}
 
-	requestBytes, err := proto.Marshal(request)
-	if err != nil {
-		s.finishWorkItem()
-		s.setError(err)
-		return
-	}
-
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) {
-		defer s.finishWorkItem()
-
-		if err := s.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, err); err != nil {
-			// TODO log responses
-			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
-			s.retryWork(work)
-			return
-		}
-	}
-
-	if err := s.sendRequest(ctx, s.config.ChangeProofClient, requestBytes, onResponse); err != nil {
-		s.finishWorkItem()
-		s.setError(err)
-		return
-	}
-
-	s.metrics.RequestMade()
+	s.execRequest(ctx, s.config.ChangeProofClient, work, request, func(ctx context.Context, responseBytes []byte, appErr error) error {
+		return s.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr)
+	})
 }
 
 // Fetch and apply the range proof given by [work].
@@ -430,6 +408,30 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		BytesLimit: DefaultRequestByteSizeLimit,
 	}
 
+	s.execRequest(ctx, s.config.RangeProofClient, work, request, func(ctx context.Context, responseBytes []byte, appErr error) error {
+		return s.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr)
+	})
+}
+
+type protoRequest interface {
+	proto.Message
+	fmt.Stringer
+}
+
+var (
+	_ protoRequest = (*pb.GetRangeProofRequest)(nil)
+	_ protoRequest = (*pb.GetChangeProofRequest)(nil)
+)
+
+// execRequest marshals `request` and send it to `client`. Any valid response is
+// handled asynchronously by `handle`.
+func (s *Syncer[_, _]) execRequest(
+	ctx context.Context,
+	client *p2p.Client,
+	work *workItem,
+	request protoRequest,
+	handle func(ctx context.Context, responseBytes []byte, appErr error) error,
+) {
 	requestBytes, err := proto.Marshal(request)
 	if err != nil {
 		s.finishWorkItem()
@@ -438,17 +440,17 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	}
 
 	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
-		defer s.finishWorkItem()
-
-		if err := s.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr); err != nil {
-			// TODO log responses
-			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
-			s.retryWork(work)
-			return
-		}
+		go func() {
+			defer s.finishWorkItem()
+			if err := handle(ctx, responseBytes, appErr); err != nil {
+				// TODO log responses
+				s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
+				s.retryWork(work)
+			}
+		}()
 	}
 
-	if err := s.sendRequest(ctx, s.config.RangeProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, client, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
