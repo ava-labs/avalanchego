@@ -3215,17 +3215,17 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 func TestCurrentStakers(t *testing.T) {
 	tests := []struct {
 		name string
-		csF  func() CurrentStakers
+		csF func(t *testing.T) CurrentStakers
 	}{
 		{
 			name: "base",
-			csF: func() CurrentStakers {
+			csF: func(*testing.T) CurrentStakers {
 				return newTestState(t, memdb.New())
 			},
 		},
 		{
 			name: "diff",
-			csF: func() CurrentStakers {
+			csF: func(t *testing.T) CurrentStakers {
 				d, err := NewDiffOn(newTestState(t, memdb.New()), true)
 				require.NoError(t, err)
 
@@ -3239,7 +3239,7 @@ func TestCurrentStakers(t *testing.T) {
 			// TODO currently the Staker type requires complex and brittle setup due to equality with
 			// Staker.Less being dependent on the tx id which is not exposed, so we get the genesis
 			// validator by reading from state.
-			genesisValidator, err := tt.csF().GetCurrentValidator(
+			genesisValidator, err := tt.csF(t).GetCurrentValidator(
 				constants.PrimaryNetworkID,
 				defaultValidatorNodeID,
 			)
@@ -3247,14 +3247,14 @@ func TestCurrentStakers(t *testing.T) {
 
 			t.Run("get current validator", func(t *testing.T) {
 				t.Run("validator does not exist", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					_, err := cs.GetCurrentValidator(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.ErrorIs(t, err, database.ErrNotFound)
 				})
 
 				t.Run("validator exists", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 					want := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(want))
 
@@ -3266,14 +3266,14 @@ func TestCurrentStakers(t *testing.T) {
 
 			t.Run("put current validator", func(t *testing.T) {
 				t.Run("validator does not exist", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
 				})
 
 				t.Run("duplicate put", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3284,7 +3284,7 @@ func TestCurrentStakers(t *testing.T) {
 
 			t.Run("delete current validator", func(t *testing.T) {
 				t.Run("validator does not exist", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					staker := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					err := cs.DeleteCurrentValidator(staker)
@@ -3292,7 +3292,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("validator deleted", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					require.NoError(t, cs.DeleteCurrentValidator(genesisValidator))
 					_, err := cs.GetCurrentValidator(genesisValidator.SubnetID, genesisValidator.NodeID)
@@ -3300,7 +3300,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("validator added and deleted", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3310,7 +3310,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("deleting subnet validator does not change primary network validator", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 					want := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(want))
 
@@ -3325,7 +3325,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("deleting validator with delegators", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3340,14 +3340,14 @@ func TestCurrentStakers(t *testing.T) {
 
 			t.Run("get staking info", func(t *testing.T) {
 				t.Run("validator does not exist", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					_, err := cs.GetStakingInfo(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.ErrorIs(t, err, database.ErrNotFound)
 				})
 
 				t.Run("default to not found", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3357,7 +3357,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("get staking info for deleted validator", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					require.NoError(t, cs.SetStakingInfo(genesisValidator.SubnetID, genesisValidator.NodeID, StakingInfo{DelegateeReward: 123}))
 					require.NoError(t, cs.DeleteCurrentValidator(genesisValidator))
@@ -3369,7 +3369,7 @@ func TestCurrentStakers(t *testing.T) {
 
 			t.Run("set staking info", func(t *testing.T) {
 				t.Run("validator does not exist", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					err := cs.SetStakingInfo(ids.GenerateTestID(), ids.GenerateTestNodeID(), StakingInfo{DelegateeReward: 123})
 					require.ErrorIs(t, err, database.ErrNotFound)
@@ -3381,7 +3381,7 @@ func TestCurrentStakers(t *testing.T) {
 					// written.
 					t.Skip("TODO: different behavior across implementations")
 
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3395,7 +3395,7 @@ func TestCurrentStakers(t *testing.T) {
 
 			t.Run("get current delegator iterator", func(t *testing.T) {
 				t.Run("validator does not exist", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					got, err := cs.GetCurrentDelegatorIterator(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, err)
@@ -3404,7 +3404,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("no delegators", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3416,7 +3416,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("delegators ordered by increasing next time", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3443,7 +3443,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("delegator deleted", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3459,7 +3459,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("validator deleted", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					require.NoError(t, cs.DeleteCurrentValidator(genesisValidator))
 
@@ -3472,7 +3472,7 @@ func TestCurrentStakers(t *testing.T) {
 
 			t.Run("put current delegator", func(t *testing.T) {
 				t.Run("validator does not exist", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					d := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					err := cs.PutCurrentDelegator(d)
@@ -3480,7 +3480,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("delegator added", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3498,7 +3498,7 @@ func TestCurrentStakers(t *testing.T) {
 					// TODO currently we do not error if a duplicate delegator is added
 					t.Skip("TODO: fix me")
 
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3512,7 +3512,7 @@ func TestCurrentStakers(t *testing.T) {
 
 			t.Run("delete current delegator", func(t *testing.T) {
 				t.Run("validator does not exist", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					err := cs.DeleteCurrentDelegator(newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID()))
 					require.ErrorIs(t, err, database.ErrNotFound)
@@ -3522,7 +3522,7 @@ func TestCurrentStakers(t *testing.T) {
 					// TODO currently we do not error when on deletions on delegators that do not exist
 					t.Skip("TODO: fix me")
 
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3533,7 +3533,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("delegator deleted", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 					require.NoError(t, cs.PutCurrentValidator(v))
@@ -3547,7 +3547,7 @@ func TestCurrentStakers(t *testing.T) {
 
 			t.Run("get current staker iterator", func(t *testing.T) {
 				t.Run("get genesis validator", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					itr, err := cs.GetCurrentStakerIterator()
 					require.NoError(t, err)
@@ -3556,7 +3556,7 @@ func TestCurrentStakers(t *testing.T) {
 				})
 
 				t.Run("sorted by priority", func(t *testing.T) {
-					cs := tt.csF()
+					cs := tt.csF(t)
 
 					require.NoError(t, cs.DeleteCurrentValidator(genesisValidator))
 
@@ -3588,7 +3588,7 @@ func TestCurrentStakers(t *testing.T) {
 			})
 
 			t.Run("delegator deleted", func(t *testing.T) {
-				cs := tt.csF()
+				cs := tt.csF(t)
 
 				require.NoError(t, cs.DeleteCurrentValidator(genesisValidator))
 
@@ -3609,7 +3609,7 @@ func TestCurrentStakers(t *testing.T) {
 			})
 
 			t.Run("validator deleted", func(t *testing.T) {
-				cs := tt.csF()
+				cs := tt.csF(t)
 
 				v := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 				v.Priority = txs.PrimaryNetworkValidatorCurrentPriority

@@ -658,13 +658,9 @@ func (d *diff) Apply(baseState Chain) error {
 			}
 
 			// Delegators must be added after validators are added
-			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
-			for addedDelegatorIterator.Next() {
-				if err := baseState.PutCurrentDelegator(addedDelegatorIterator.Value()); err != nil {
-					return fmt.Errorf("putting current delegator: %w", err)
-				}
+			if err := d.addCurrentDelegators(baseState, validatorDiff); err != nil {
+				return err
 			}
-			addedDelegatorIterator.Release()
 		}
 	}
 	for subnetID, nodes := range d.modifiedStakingInfo {
@@ -730,5 +726,18 @@ func (d *diff) Apply(baseState Chain) error {
 	for subnetID, c := range d.subnetToL1Conversions {
 		baseState.SetSubnetToL1Conversion(subnetID, c)
 	}
+	return nil
+}
+
+func (d *diff) addCurrentDelegators(baseState Chain, validatorDiff *diffValidator) error {
+	addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
+	defer addedDelegatorIterator.Release()
+
+	for addedDelegatorIterator.Next() {
+		if err := baseState.PutCurrentDelegator(addedDelegatorIterator.Value()); err != nil {
+			return fmt.Errorf("putting current delegator: %w", err)
+		}
+	}
+
 	return nil
 }
