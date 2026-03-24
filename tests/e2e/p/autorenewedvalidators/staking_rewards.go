@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", ginkgo.Label("local"), func() {
+var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() {
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
@@ -232,7 +232,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", ginkgo.
 					pBuilder = pWallet.Builder()
 				)
 
-				balances, err := pBuilder.GetBalance()
+				// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
+				balances, err := pBuilder.GetBalance(common.WithStakeableLocked())
 				require.NoError(err)
 				rewardBalances[rewardKey.Address()] = balances[pContext.AVAXAssetID]
 			}
@@ -345,7 +346,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", ginkgo.
 					pBuilder = pWallet.Builder()
 				)
 
-				balances, err := pBuilder.GetBalance()
+				// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
+				balances, err := pBuilder.GetBalance(common.WithStakeableLocked())
 				require.NoError(err)
 				rewardBalances[rewardKey.Address()] = balances[pContext.AVAXAssetID]
 			}
@@ -418,7 +420,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", ginkgo.
 			// Check validation reward key balance includes all withdrawn + accrued validation rewards
 			validationKeychain := secp256k1fx.NewKeychain(validationRewardKey)
 			validationPWallet := e2e.NewWallet(tc, validationKeychain, walletNodeURI).P()
-			validationBalances, err := validationPWallet.Builder().GetBalance()
+			// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
+			validationBalances, err := validationPWallet.Builder().GetBalance(common.WithStakeableLocked())
 			require.NoError(err)
 
 			expectedTotalValidationReward := expectedValidationReward1 + expectedValidationReward2 +
