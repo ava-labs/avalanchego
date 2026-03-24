@@ -6,6 +6,7 @@ package saevm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -241,6 +242,8 @@ func (vm *SinceGenesis) SetPreference(ctx context.Context, id ids.ID, bCtx *bloc
 // Prevent busy looping when the chain is more advanced than the mempool.
 const waitForEventDelay = 100 * time.Millisecond
 
+var errNoPreference = errors.New("no preferred block")
+
 // WaitForEvent waits for the next event from the VM.
 func (vm *SinceGenesis) WaitForEvent(ctx context.Context) (common.Message, error) {
 	// Avoid busy looping if we seem like we are ready to build a block, but are
@@ -263,7 +266,7 @@ func (vm *SinceGenesis) WaitForEvent(ctx context.Context) (common.Message, error
 	{
 		parent := vm.preference.Load()
 		if parent == nil {
-			return 0, fmt.Errorf("no preferred block set")
+			return 0, errNoPreference
 		}
 
 		minTime := minNextBlockTime(parent.Header())
