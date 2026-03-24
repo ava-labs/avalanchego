@@ -347,6 +347,7 @@ github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a h1:idn718Q4
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.3.0/go.mod h1:71C76bo47zlDX9gWnn3p/0QZQXkTQ/GNqUNI6fchvjs=
 github.com/ava-labs/strevm v0.0.0-20260320212327-4a2aeef07880/go.mod h1:ruYR17j8Cc/WzCrhUE3y5kIA2k+qjj+234UKSEz/9qM=
+github.com/ava-labs/strevm v0.0.0-20260323222945-cd6dcc94fd13/go.mod h1:ruYR17j8Cc/WzCrhUE3y5kIA2k+qjj+234UKSEz/9qM=
 github.com/aws/aws-sdk-go-v2 v1.21.2 h1:+LXZ0sgo8quN9UOKXXzAWRT3FWd4NxeXWOZom9pE7GA=
 github.com/aws/aws-sdk-go-v2 v1.21.2/go.mod h1:ErQhvNuEMhJjweavOYhxVkn2RUx7kQXVATHrjKtxIpM=
 github.com/aws/aws-sdk-go-v2/config v1.18.45 h1:Aka9bI7n8ysuwPeFdm77nfbyHCAKQ3z9ghB3S/38zes=
