@@ -193,10 +193,10 @@ task
 
 Common ways to run `task` in this repo include:
 
-- In a nix dev shell, where `task` is on `PATH`
-- Via the repo-local [`bin/task`](./bin/task) wrapper, which `direnv` adds to `PATH`
-- Via [`./scripts/run_task.sh`](./scripts/run_task.sh), which prefers a real `task` binary on
-  `PATH` and otherwise falls back to the pinned Go tool from `tools/external/go.mod`
+- In a nix dev shell where `task` is in the path
+- Via the repo-local [`bin/task`](./bin/task) wrapper which `direnv` adds to the path
+- Via [`./scripts/run_task.sh`](./scripts/run_task.sh) which prefers a `task` binary in the
+  path and otherwise falls back to `go tool` configured by `tools/external/go.mod`
 
 ### How task invocation works
 
@@ -205,8 +205,7 @@ Common ways to run `task` in this repo include:
 - Named tasks in the root [`Taskfile.yml`](./Taskfile.yml) use
   [`./scripts/nix_run.sh`](./scripts/nix_run.sh) to ensure access to nix dependencies without
   requiring invocation from a nix shell. This enables zsh users to keep their normal
-  interactive shell configuration while still getting the pinned nix toolchain for task
-  execution.
+  interactive shell configuration while still using the nix dependencies for task execution.
 
 ## Issues
 
