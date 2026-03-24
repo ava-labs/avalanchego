@@ -905,6 +905,124 @@ func TestDisableL1ValidatorTx(t *testing.T) {
 	}
 }
 
+func TestAddAutoRenewedValidatorTx(t *testing.T) {
+	var utxosOffset uint64 = 2024
+	makeUTXO := func(amount uint64) *avax.UTXO {
+		utxosOffset++
+		return &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(utxosOffset),
+				OutputIndex: uint32(utxosOffset),
+			},
+			Asset: avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          amount,
+				OutputOwners: utxoOwner,
+			},
+		}
+	}
+
+	var (
+		utxos = []*avax.UTXO{
+			makeUTXO(1 * units.NanoAvax), // small UTXO
+			makeUTXO(9 * units.Avax),     // large UTXO
+		}
+
+		require                       = require.New(t)
+		validationRewardsOwner        = rewardsOwner
+		delegationRewardsOwner        = rewardsOwner
+		configOwner                   = rewardsOwner
+		delegationShares       uint32 = reward.PercentDenominator
+		autoCompoundShares     uint32 = 500_000
+		weight                        = 2 * units.Avax
+		period                        = 7 * 24 * time.Hour
+
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+		backend = wallet.NewBackend(chainUTXOs, nil)
+		builder = builder.New(set.Of(utxoAddr, rewardAddr), testContextPostEtna, backend)
+	)
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	utx, err := builder.NewAddAutoRenewedValidatorTx(
+		nodeID,
+		weight,
+		pop,
+		avaxAssetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		configOwner,
+		delegationShares,
+		autoCompoundShares,
+		period,
+	)
+	require.NoError(err)
+	require.Equal(nodeID, utx.ValidatorNodeID)
+	require.Equal(pop, utx.Signer)
+	require.Equal(weight, utx.Wght)
+	require.Len(utx.StakeOuts, 1)
+	require.Equal(
+		map[ids.ID]uint64{
+			avaxAssetID: weight,
+		},
+		addOutputAmounts(utx.StakeOuts),
+	)
+	require.Equal(validationRewardsOwner, utx.ValidatorRewardsOwner)
+	require.Equal(delegationRewardsOwner, utx.DelegatorRewardsOwner)
+	require.Equal(configOwner, utx.Owner)
+	require.Equal(delegationShares, utx.DelegationShares)
+	require.Equal(autoCompoundShares, utx.AutoCompoundRewardShares)
+	require.Equal(uint64(period/time.Second), utx.Period)
+	requireFeeIsCorrect(
+		require,
+		dynamicFeeCalculator,
+		utx,
+		&utx.BaseTx.BaseTx,
+		nil,
+		utx.StakeOuts,
+		nil,
+	)
+}
+
+func TestSetAutoRenewedValidatorConfigTx(t *testing.T) {
+	var (
+		require                   = require.New(t)
+		autoCompoundShares uint32 = 750_000
+		period                    = 14 * 24 * time.Hour
+
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+		backend = wallet.NewBackend(chainUTXOs, validationOwners)
+		builder = builder.New(set.Of(utxoAddr, validationAuthAddr), testContextPostEtna, backend)
+	)
+
+	utx, err := builder.NewSetAutoRenewedValidatorConfigTx(
+		validationID,
+		autoCompoundShares,
+		period,
+	)
+	require.NoError(err)
+	require.Equal(validationID, utx.TxID)
+	require.Equal(autoCompoundShares, utx.AutoCompoundRewardShares)
+	require.Equal(uint64(period/time.Second), utx.Period)
+	requireFeeIsCorrect(
+		require,
+		dynamicFeeCalculator,
+		utx,
+		&utx.BaseTx.BaseTx,
+		nil,
+		nil,
+		nil,
+	)
+}
+
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 	// Note: we avoid ids.GenerateTestNodeID here to make sure that UTXO IDs
 	// won't change run by run. This simplifies checking what utxos are included

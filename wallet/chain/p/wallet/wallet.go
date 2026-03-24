@@ -308,6 +308,26 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
+	// IssueAddAutoRenewedValidatorTx creates, signs, and issues a new
+	// auto-renewed validator on the primary network. Auto-renewed validators
+	// automatically renew at the end of each validation period without
+	// requiring a new transaction.
+	//
+	// - [validatorNodeID] is the node ID of the validator.
+	// - [weight] is the amount of nAVAX to stake.
+	// - [signer] is the BLS key for this validator.
+	// - [assetID] specifies the asset to stake.
+	// - [validationRewardsOwner] specifies the owner of all the validation
+	//   rewards this validator earns.
+	// - [delegationRewardsOwner] specifies the owner of all the rewards this
+	//   validator earns from delegations.
+	// - [configOwner] specifies the owner authorized to modify the validator's
+	//   auto-renewal configuration.
+	// - [delegationShares] specifies the fraction (out of 1,000,000) that this
+	//   validator will take from delegation rewards.
+	// - [autoCompoundRewardShares] specifies the fraction (out of 1,000,000)
+	//   of rewards to automatically restake at the end of each period.
+	// - [period] is the duration of each validation cycle.
 	IssueAddAutoRenewedValidatorTx(
 		validatorNodeID ids.NodeID,
 		weight uint64,
@@ -322,6 +342,16 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
+	// IssueSetAutoRenewedValidatorConfigTx creates, signs, and issues a
+	// transaction to modify the configuration of an existing auto-renewed
+	// validator.
+	//
+	// - [txID] is the transaction ID of the AddAutoRenewedValidatorTx that
+	//   created the validator to modify.
+	// - [autoCompoundRewardShares] specifies the new fraction (out of
+	//   1,000,000) of rewards to automatically restake.
+	// - [period] is the new duration of each validation cycle. Set to 0 to
+	//   stop the validator at the end of the current cycle and unlock funds.
 	IssueSetAutoRenewedValidatorConfigTx(
 		txID ids.ID,
 		autoCompoundRewardShares uint32,
