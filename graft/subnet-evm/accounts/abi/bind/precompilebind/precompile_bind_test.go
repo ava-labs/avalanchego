@@ -523,7 +523,7 @@ var bindTests = []struct {
 		`[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"addressTest","type":"address"},{"indexed":true,"internalType":"uint8","name":"intTest","type":"uint8"},{"indexed":false,"internalType":"bytes","name":"bytesTest","type":"bytes"}],"name":"test","type":"event"},{"inputs":[],"name":"eventTest","outputs":[{"internalType":"string","name":"result","type":"string"}],"stateMutability":"view","type":"function"},{"type":"event","name":"empty","inputs":[]},{"type":"event","name":"indexed","inputs":[{"name":"addr","type":"address","indexed":true},{"name":"num","type":"int8","indexed":true}]},{"type":"event","name":"mixed","inputs":[{"name":"addr","type":"address","indexed":true},{"name":"num","type":"int8"}]},{"type":"event","name":"dynamic","inputs":[{"name":"idxStr","type":"string","indexed":true},{"name":"idxDat","type":"bytes","indexed":true},{"name":"str","type":"string"},{"name":"dat","type":"bytes"}]},{"type":"event","name":"unnamed","inputs":[{"name":"","type":"uint8","indexed":true},{"name":"","type":"uint8","indexed":true}]}]`,
 		`"github.com/stretchr/testify/require"
 		"github.com/ava-labs/libevm/common"
-		"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
+		"github.com/ava-labs/avalanchego/graft/evm/precompile/contract"
 		`,
 		`
 			testAddr := common.Address{1}

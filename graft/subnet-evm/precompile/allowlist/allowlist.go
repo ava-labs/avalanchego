@@ -14,7 +14,7 @@ import (
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/contract"
 )
 
 // AllowList is an abstraction that allows other precompiles to manage

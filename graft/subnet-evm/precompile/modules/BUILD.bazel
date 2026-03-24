@@ -11,8 +11,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/constants",
+        "//graft/evm/precompile/contract",
         "//graft/evm/utils",
-        "//graft/subnet-evm/precompile/contract",
         "@com_github_ava_labs_libevm//common",
     ],
 )

@@ -7,7 +7,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/nativeasset",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/coreth/precompile/contract",
+        "//graft/evm/precompile/contract",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//log",
