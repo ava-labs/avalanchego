@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"time"
 
@@ -17,10 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -665,25 +666,23 @@ func GetAutoRenewedValidatorConfigOwners(
 		return nil, nil
 	}
 
-	requestedIDs := set.Of(txIDs...)
-	validators, err := c.GetCurrentValidators(ctx, constants.PrimaryNetworkID, nil)
-	if err != nil {
-		return nil, err
-	}
-
 	owners := make(map[ids.ID]fx.Owner, len(txIDs))
-	for _, vdr := range validators {
-		if !requestedIDs.Contains(vdr.TxID) {
-			continue
+	for _, txID := range txIDs {
+		txBytes, err := c.GetTx(ctx, txID)
+		if err != nil {
+			return nil, err
 		}
-		if vdr.ConfigOwner == nil {
-			continue
+
+		tx, err := txs.Parse(txs.Codec, txBytes)
+		if err != nil {
+			return nil, err
 		}
-		owners[vdr.TxID] = &secp256k1fx.OutputOwners{
-			Locktime:  vdr.ConfigOwner.Locktime,
-			Threshold: vdr.ConfigOwner.Threshold,
-			Addrs:     vdr.ConfigOwner.Addresses,
+
+		addTx, ok := tx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+		if !ok {
+			return nil, fmt.Errorf("expected AddAutoRenewedValidatorTx but got %T for txID %s", tx.Unsigned, txID)
 		}
+		owners[txID] = addTx.Owner
 	}
 	return owners, nil
 }
