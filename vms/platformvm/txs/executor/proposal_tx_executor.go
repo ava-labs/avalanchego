@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -795,35 +796,18 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnAbort(
 	stakingInfo state.StakingInfo,
 ) error {
 	txID := validator.TxID
-	stake := addAutoRenewedValidatorTx.Stake()
-	stakeAsset := stake[0].Asset
 
 	createUTXOsStakeOut(addAutoRenewedValidatorTx, validator, e.onAbortState)
 
 	outputIndexOffset := uint32(len(e.tx.Unsigned.Outputs()))
 	// Create UTXOs for accrued rewards.
 	if stakingInfo.AccruedRewards > 0 {
-		outIntf, err := e.backend.Fx.CreateOutput(stakingInfo.AccruedRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner())
+		utxo, err := e.createRewardUTXO(stakingInfo.AccruedRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner(), e.tx.ID(), outputIndexOffset)
 		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
+			return err
 		}
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return ErrInvalidState
-		}
-
-		utxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        e.tx.ID(),
-				OutputIndex: outputIndexOffset,
-			},
-			Asset: stakeAsset,
-			Out:   out,
-		}
-
 		e.onAbortState.AddUTXO(utxo)
 		e.onAbortState.AddRewardUTXO(txID, utxo)
-
 		outputIndexOffset++
 	}
 
@@ -833,26 +817,12 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnAbort(
 		return err
 	}
 	if totalDelegateeRewards > 0 {
-		outIntf, err := e.backend.Fx.CreateOutput(totalDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner())
+		utxo, err := e.createRewardUTXO(totalDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner(), e.tx.ID(), outputIndexOffset)
 		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
+			return err
 		}
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return ErrInvalidState
-		}
-
-		onAbortUtxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        e.tx.ID(),
-				OutputIndex: outputIndexOffset,
-			},
-			Asset: stakeAsset,
-			Out:   out,
-		}
-
-		e.onAbortState.AddUTXO(onAbortUtxo)
-		e.onAbortState.AddRewardUTXO(txID, onAbortUtxo)
+		e.onAbortState.AddUTXO(utxo)
+		e.onAbortState.AddRewardUTXO(txID, utxo)
 	}
 
 	return nil
@@ -875,58 +845,27 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 	var err error
 
 	outputIndexOffset := uint32(len(e.tx.Unsigned.Outputs()))
-	asset := addAutoRenewedValidatorTx.Stake()[0].Asset
 
 	restakingRewards, withdrawingRewards := reward.Split(validator.PotentialReward, stakingInfo.AutoCompoundRewardShares)
 	restakingDelegateeRewards, withdrawingDelegateeRewards := reward.Split(stakingInfo.DelegateeReward, stakingInfo.AutoCompoundRewardShares)
 
 	if withdrawingRewards > 0 {
-		outIntf, err := e.backend.Fx.CreateOutput(withdrawingRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner())
+		utxo, err := e.createRewardUTXO(withdrawingRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner(), e.tx.ID(), outputIndexOffset)
 		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
+			return err
 		}
-
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return ErrInvalidState
-		}
-
-		validationRewardUTXO := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        e.tx.ID(),
-				OutputIndex: outputIndexOffset,
-			},
-			Asset: asset,
-			Out:   out,
-		}
-		e.onCommitState.AddUTXO(validationRewardUTXO)
-		e.onCommitState.AddRewardUTXO(e.tx.ID(), validationRewardUTXO)
-
+		e.onCommitState.AddUTXO(utxo)
+		e.onCommitState.AddRewardUTXO(e.tx.ID(), utxo)
 		outputIndexOffset++
 	}
 
 	if withdrawingDelegateeRewards > 0 {
-		outIntf, err := e.backend.Fx.CreateOutput(withdrawingDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner())
+		utxo, err := e.createRewardUTXO(withdrawingDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner(), e.tx.ID(), outputIndexOffset)
 		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
+			return err
 		}
-
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return ErrInvalidState
-		}
-
-		delegateeRewardUTXO := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        e.tx.ID(),
-				OutputIndex: outputIndexOffset,
-			},
-			Asset: asset,
-			Out:   out,
-		}
-		e.onCommitState.AddUTXO(delegateeRewardUTXO)
-		e.onCommitState.AddRewardUTXO(e.tx.ID(), delegateeRewardUTXO)
-
+		e.onCommitState.AddUTXO(utxo)
+		e.onCommitState.AddRewardUTXO(e.tx.ID(), utxo)
 		outputIndexOffset++
 	}
 
@@ -1066,36 +1005,17 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 	validator *state.Staker,
 	stakingInfo state.StakingInfo,
 ) error {
-	txID := validator.TxID
-	stake := addAutoRenewedValidatorTx.Stake()
-	stakeAsset := stake[0].Asset
-
 	createUTXOsStakeOut(addAutoRenewedValidatorTx, validator, e.onCommitState, e.onAbortState)
 
 	// Create UTXOs for onAbortState.
 	onAbortUTXOsOffset := uint32(len(e.tx.Unsigned.Outputs()))
 	if stakingInfo.AccruedRewards > 0 {
-		outIntf, err := e.backend.Fx.CreateOutput(stakingInfo.AccruedRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner())
+		utxo, err := e.createRewardUTXO(stakingInfo.AccruedRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner(), e.tx.ID(), onAbortUTXOsOffset)
 		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
+			return err
 		}
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return ErrInvalidState
-		}
-
-		utxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        e.tx.ID(),
-				OutputIndex: onAbortUTXOsOffset,
-			},
-			Asset: stakeAsset,
-			Out:   out,
-		}
-
 		e.onAbortState.AddUTXO(utxo)
-		e.onAbortState.AddRewardUTXO(txID, utxo)
-
+		e.onAbortState.AddRewardUTXO(utxo.TxID, utxo)
 		onAbortUTXOsOffset++
 	}
 
@@ -1106,27 +1026,12 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 		return err
 	}
 	if totalRewards > 0 {
-		outIntf, err := e.backend.Fx.CreateOutput(totalRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner())
+		utxo, err := e.createRewardUTXO(totalRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner(), e.tx.ID(), onCommitUTXOsOffset)
 		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
+			return err
 		}
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return ErrInvalidState
-		}
-
-		utxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        e.tx.ID(),
-				OutputIndex: onCommitUTXOsOffset,
-			},
-			Asset: stakeAsset,
-			Out:   out,
-		}
-
 		e.onCommitState.AddUTXO(utxo)
-		e.onCommitState.AddRewardUTXO(txID, utxo)
-
+		e.onCommitState.AddRewardUTXO(utxo.TxID, utxo)
 		onCommitUTXOsOffset++
 	}
 
@@ -1139,38 +1044,49 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 		return nil
 	}
 
-	outIntf, err := e.backend.Fx.CreateOutput(totalDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner())
+	onCommitUtxo, err := e.createRewardUTXO(totalDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner(), e.tx.ID(), onCommitUTXOsOffset)
 	if err != nil {
-		return fmt.Errorf("failed to create output: %w", err)
+		return err
+	}
+	e.onCommitState.AddUTXO(onCommitUtxo)
+	e.onCommitState.AddRewardUTXO(onCommitUtxo.TxID, onCommitUtxo)
+
+	onAbortUtxo, err := e.createRewardUTXO(totalDelegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner(), e.tx.ID(), onAbortUTXOsOffset)
+	if err != nil {
+		return err
+	}
+	e.onAbortState.AddUTXO(onAbortUtxo)
+	e.onAbortState.AddRewardUTXO(onAbortUtxo.TxID, onAbortUtxo)
+
+	return nil
+}
+
+// createRewardUTXO creates a reward UTXO with the specified parameters.
+// The caller is responsible for adding the UTXO to the appropriate state(s)
+// via AddUTXO and AddRewardUTXO.
+func (e *proposalTxExecutor) createRewardUTXO(
+	amount uint64,
+	owner fx.Owner,
+	txID ids.ID,
+	outputIndex uint32,
+) (*avax.UTXO, error) {
+	outIntf, err := e.backend.Fx.CreateOutput(amount, owner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create output: %w", err)
 	}
 	out, ok := outIntf.(verify.State)
 	if !ok {
-		return ErrInvalidState
+		return nil, ErrInvalidState
 	}
 
-	onCommitUtxo := &avax.UTXO{
+	return &avax.UTXO{
 		UTXOID: avax.UTXOID{
-			TxID:        e.tx.ID(),
-			OutputIndex: onCommitUTXOsOffset,
+			TxID:        txID,
+			OutputIndex: outputIndex,
 		},
-		Asset: stakeAsset,
+		Asset: avax.Asset{ID: e.backend.Ctx.AVAXAssetID},
 		Out:   out,
-	}
-	e.onCommitState.AddUTXO(onCommitUtxo)
-	e.onCommitState.AddRewardUTXO(txID, onCommitUtxo)
-
-	onAbortUtxo := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID:        e.tx.ID(),
-			OutputIndex: onAbortUTXOsOffset,
-		},
-		Asset: stakeAsset,
-		Out:   out,
-	}
-	e.onAbortState.AddUTXO(onAbortUtxo)
-	e.onAbortState.AddRewardUTXO(txID, onAbortUtxo)
-
-	return nil
+	}, nil
 }
 
 // createOverflowUTXOs creates UTXOs for the excess rewards
@@ -1188,8 +1104,6 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 	oldWeight uint64,
 	outputIndexOffset uint32,
 ) (excessValidationRewards uint64, excessDelegateeRewards uint64, err error) {
-	asset := addAutoRenewedValidatorTx.Stake()[0].Asset
-
 	totalRestakingRewards, err := math.Sub(newWeight, oldWeight)
 	if err != nil {
 		return 0, 0, err
@@ -1225,51 +1139,22 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 	}
 
 	if excessValidationReward > 0 {
-		outIntf, err := e.backend.Fx.CreateOutput(excessValidationReward, addAutoRenewedValidatorTx.ValidationRewardsOwner())
+		utxo, err := e.createRewardUTXO(excessValidationReward, addAutoRenewedValidatorTx.ValidationRewardsOwner(), e.tx.ID(), outputIndexOffset)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to create output: %w", err)
+			return 0, 0, err
 		}
-
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return 0, 0, ErrInvalidState
-		}
-
-		excessValidationRewardUTXO := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        e.tx.ID(),
-				OutputIndex: outputIndexOffset,
-			},
-			Asset: asset,
-			Out:   out,
-		}
-		e.onCommitState.AddUTXO(excessValidationRewardUTXO)
-		e.onCommitState.AddRewardUTXO(e.tx.ID(), excessValidationRewardUTXO)
-
+		e.onCommitState.AddUTXO(utxo)
+		e.onCommitState.AddRewardUTXO(e.tx.ID(), utxo)
 		outputIndexOffset++
 	}
 
 	if excessDelegateeReward > 0 {
-		outIntf, err := e.backend.Fx.CreateOutput(excessDelegateeReward, addAutoRenewedValidatorTx.DelegationRewardsOwner())
+		utxo, err := e.createRewardUTXO(excessDelegateeReward, addAutoRenewedValidatorTx.DelegationRewardsOwner(), e.tx.ID(), outputIndexOffset)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to create output: %w", err)
+			return 0, 0, err
 		}
-
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return 0, 0, ErrInvalidState
-		}
-
-		excessDelegateeRewardUTXO := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        e.tx.ID(),
-				OutputIndex: outputIndexOffset,
-			},
-			Asset: asset,
-			Out:   out,
-		}
-		e.onCommitState.AddUTXO(excessDelegateeRewardUTXO)
-		e.onCommitState.AddRewardUTXO(e.tx.ID(), excessDelegateeRewardUTXO)
+		e.onCommitState.AddUTXO(utxo)
+		e.onCommitState.AddRewardUTXO(e.tx.ID(), utxo)
 	}
 
 	return excessValidationReward, excessDelegateeReward, nil
