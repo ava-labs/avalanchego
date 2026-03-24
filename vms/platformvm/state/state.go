@@ -929,6 +929,8 @@ func verifyNoDelegators(cs CurrentStakers, subnetID ids.ID, nodeID ids.NodeID) e
 		return fmt.Errorf("getting current delegator iterator: %w", err)
 	}
 
+	defer itr.Release()
+
 	if itr.Next() {
 		return fmt.Errorf("%w: delegators must be deleted before their validator", errDeleteOrder)
 	}
