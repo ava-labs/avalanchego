@@ -3,5 +3,4 @@
 
 package state
 
-//go:generate go tool mockgen -package=${GOPACKAGE} -destination=mock_diff.go . Diff
 //go:generate go tool mockgen -package=${GOPACKAGE} -destination=mock_chain.go . Chain
