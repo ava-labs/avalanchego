@@ -618,8 +618,8 @@ func TestGasAccounting(t *testing.T) {
 			if i > 0 {
 				wantBaseFee = steps[i-1].wantPriceAfter
 			}
-			require.Truef(t, b.BaseFee().IsUint64(), "%T.BaseFee().IsUint64()", b)
-			assert.Equalf(t, wantBaseFee, gas.Price(b.BaseFee().Uint64()), "%T.BaseFee().Uint64()", b)
+			require.Truef(t, b.ExecutedBaseFee().IsUint64(), "%T.BaseFee().IsUint64()", b)
+			assert.Equalf(t, wantBaseFee, gas.Price(b.ExecutedBaseFee().Uint64()), "%T.BaseFee().Uint64()", b)
 
 			t.Run("EffectiveGasPrice", func(t *testing.T) {
 				want := uint256.NewInt(uint64(wantBaseFee) + step.gasTipCap)

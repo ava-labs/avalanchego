@@ -87,7 +87,7 @@ func TestMarkExecuted(t *testing.T) {
 			call   func() any
 		}{
 			{"ExecutedByGasTime()", func() any { return b.ExecutedByGasTime() }},
-			{"BaseFee()", func() any { return b.BaseFee() }},
+			{"ExecutedBaseFee()", func() any { return b.ExecutedBaseFee() }},
 			{"Receipts()", func() any { return b.Receipts() }},
 			{"PostExecutionStateRoot()", func() any { return b.PostExecutionStateRoot() }},
 		}
@@ -149,7 +149,7 @@ func TestMarkExecuted(t *testing.T) {
 			require.NoError(t, b.WaitUntilExecuted(context.Background()), "WaitUntilExecuted()")
 
 			assert.Zero(t, b.ExecutedByGasTime().Compare(gasTime.Time), "ExecutedByGasTime().Compare([original input])")
-			assert.Zero(t, b.BaseFee().Cmp(baseFee), "BaseFee().Cmp([original input])")
+			assert.Zero(t, b.ExecutedBaseFee().Cmp(baseFee), "ExecutedBaseFee().Cmp([original input])")
 			assert.Empty(t, cmp.Diff(receipts, b.Receipts(), cmputils.Receipts(), cmputils.NilSlicesAreEmpty[[]*types.Log]()), "Receipts()")
 
 			assert.Equal(t, stateRoot, b.PostExecutionStateRoot(), "PostExecutionStateRoot()") // i.e. this block

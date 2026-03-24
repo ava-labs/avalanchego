@@ -54,7 +54,7 @@ func TestGasPriceAPIs(t *testing.T) {
 
 			b := sut.lastAcceptedBlock(t)
 			require.NoError(t, b.WaitUntilExecuted(ctx), "last-accepted %T.WaitUntilExecuted()", b)
-			baseFee := b.BaseFee()
+			baseFee := b.ExecutedBaseFee()
 			sut.testRPC(ctx, t,
 				rpcTest{
 					method: "eth_maxPriorityFeePerGas",

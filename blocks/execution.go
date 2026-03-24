@@ -227,9 +227,9 @@ func (b *Block) ExecutedByWallTime() time.Time {
 	return executionArtefact(b, "execution (wall) time", (*executionResults).executedByWallTime)
 }
 
-// BaseFee returns the base gas price passed to [Block.MarkExecuted] or nil if
+// ExecutedBaseFee returns the base gas price passed to [Block.MarkExecuted] or nil if
 // no such successful call has been made.
-func (b *Block) BaseFee() *uint256.Int {
+func (b *Block) ExecutedBaseFee() *uint256.Int {
 	return executionArtefact(b, "baseFee", (*executionResults).cloneBaseFee)
 }
 
