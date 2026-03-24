@@ -1,5 +1,7 @@
-name: Bazel CI Platform
+name: Bazel Jobs
 
+# Reusable Bazel CI workflow for one platform. This workflow is called by
+# bazel-ci-matrix.yml with a platform name and runner.
 on:
   workflow_call:
     inputs:
@@ -19,7 +21,7 @@ jobs:
   # failures. This is especially important when PRs are tested against
   # the current base branch and the metadata included in the PR is stale
   # relative to it.
-  check-metadata:
+  bz-check-metadata:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -29,8 +31,8 @@ jobs:
           prune_runner_disk: 'false'
           task: bazel-check-metadata
 
-  unit-main:
-    needs: check-metadata
+  bz-unit-main:
+    needs: bz-check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -39,8 +41,8 @@ jobs:
         with:
           task: bazel-test-main
 
-  unit-coreth:
-    needs: check-metadata
+  bz-unit-coreth:
+    needs: bz-check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -50,8 +52,8 @@ jobs:
           prune_runner_disk: 'false'
           task: bazel-test-coreth
 
-  unit-subnet-evm:
-    needs: check-metadata
+  bz-unit-subnet-evm:
+    needs: bz-check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -60,8 +62,8 @@ jobs:
         with:
           task: bazel-test-subnet-evm
 
-  e2e:
-    needs: check-metadata
+  bz-e2e:
+    needs: bz-check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
