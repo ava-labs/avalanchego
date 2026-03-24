@@ -1654,7 +1654,7 @@ func (b *builder) NewSetAutoRenewedValidatorConfigTx(
 		gas.Bandwidth: uint64(len(memo)),
 	}
 
-	complexity, err := fee.IntrinsicSetAutoRenewedValidatorConfigTx.Add(
+	complexity, err := fee.IntrinsicSetAutoRenewedValidatorConfigTxComplexities.Add(
 		&memoComplexity,
 		&authComplexity,
 	)
