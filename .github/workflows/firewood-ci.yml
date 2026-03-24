@@ -82,7 +82,7 @@ jobs:
         uses: viperproject/check-license-header@e06c65614fa9f32e099838df4dd25440c5344b32 # @v2
         with:
           path: firewood
-          config: .github/firewood-check-license-headers.yaml
+          config: firewood/.github/firewood-check-license-headers.yaml
           strict: true
       - name: Format
         run: cargo fmt -- --check

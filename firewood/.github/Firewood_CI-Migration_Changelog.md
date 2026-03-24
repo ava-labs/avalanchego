@@ -23,7 +23,7 @@
 
 | File | Disposition | Reason |
 |------|-------------|--------|
-| `check-license-headers.yaml` | Moved to `.github/firewood-check-license-headers.yaml` | Referenced by `firewood-ci.yml`; moved to enable eventual removal of `firewood/.github/` |
+| `check-license-headers.yaml` | Renamed to `firewood-check-license-headers.yaml` | Referenced by `firewood-ci.yml`; prefixed with `firewood-` for consistency |
 | `license-header.txt` | Kept | Referenced by `firewood-ci.yml` |
 | `.golangci.yaml.patch` | Removed | Firewood FFI Go code now lints against the root `.golangci.yml` directly; if firewood-specific lint augmentations are needed, they should be added as overrides in that file or via a firewood-scoped `.golangci.yml` in `firewood/` |
 | `.gitignore` | Removed | Only gitignored verify script artifacts |
@@ -60,7 +60,7 @@
 | `firewood-track-performance.yml` | Reverted (removed) | Triggers avalanchego workflow via API; migration requires Elvis |
 | `firewood-attach-static-libs.yml` | Move `create_branch_name` dispatch input to env var | Avoid script injection of `github.event.inputs.*` |
 | `.github/dependabot.yml` | Removed redundant `/firewood` github-actions entry | Root `/` entry already covers all github-actions |
-| `check-license-headers.yaml` | Moved from `firewood/.github/` to `.github/firewood-check-license-headers.yaml` | Enable eventual removal of `firewood/.github/` directory |
+| `check-license-headers.yaml` | Renamed to `firewood/.github/firewood-check-license-headers.yaml` | Prefixed with `firewood-` for consistency |
 | `Firewood_CI-Migration_Changelog.md` | Moved from `.github/workflows/` to `firewood/.github/` | Co-locate with migrated content for easier cleanup |
 
 ## Known Issues
