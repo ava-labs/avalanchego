@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -98,28 +99,33 @@ func TestStateSyncFromScratchExceedParent(t *testing.T) {
 }
 
 func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
-	// TODO(#4702): flaky test - should be fixed with state sync refactor
-	t.Skip("Flaky test - tracked in #4702")
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testStateSyncToggleEnabledToDisabled(t, scheme)
+		})
+	}
+}
 
-	rand.New(rand.NewSource(1))
-
+func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 	var lock sync.Mutex
 	reqCount := 0
 	test := syncTest{
 		syncableInterval:   256,
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		syncMode:           block.StateSyncStatic,
+		stateScheme:        scheme,
 		responseIntercept: func(syncerVM *VM, nodeID ids.NodeID, requestID uint32, response []byte) {
 			lock.Lock()
 			defer lock.Unlock()
 
 			reqCount++
-			// Fail all requests after number 50 to interrupt the sync
-			if reqCount > 50 {
-				require.NoError(t, syncerVM.AppRequestFailed(t.Context(), nodeID, requestID, commonEng.ErrTimeout))
-				require.NoError(t, syncerVM.Client.Shutdown())
-			} else {
-				require.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response))
+			// Fail all requests after number 10 to interrupt the sync
+			// TODO(alarso16): Changing this value may cause the test to fail.
+			// Syncer cannot know whether it failed or not, so it relies on state root matching.
+			if reqCount == 10 {
+				assert.NoError(t, syncerVM.Client.Shutdown(), "Shutdown()")
+			} else if reqCount < 10 {
+				assert.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "AppResponse()")
 			}
 		},
 		expectedErr: context.Canceled,
@@ -128,145 +134,104 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, vmSetup, test)
+	require.NoError(t, vmSetup.shutdownOnceSyncerVM.Shutdown(t.Context()))
 
 	test.syncMode = block.StateSyncStatic
 	test.responseIntercept = nil
 	test.expectedErr = nil
 
-	var atomicErr utils.Atomic[error]
-	syncDisabledVM := &VM{}
-	appSender := &enginetest.Sender{T: t}
-	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
-	appSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
-		nodeID, hasItem := nodeSet.Pop()
-		require.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
-		go func() {
-			if err := vmSetup.serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request); err != nil {
-				atomicErr.Set(err)
-			}
-		}()
-		return nil
-	}
-	// Reset metrics to allow re-initialization
-	vmSetup.syncerVM.ctx.Metrics = metrics.NewPrefixGatherer()
-	stateSyncDisabledConfigJSON := `{"state-sync-enabled":false}`
-	require.NoError(t, syncDisabledVM.Initialize(
-		t.Context(),
-		vmSetup.syncerVM.ctx,
-		vmSetup.syncerDB,
-		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])),
-		nil,
-		[]byte(stateSyncDisabledConfigJSON),
-		[]*commonEng.Fx{},
-		appSender,
-	))
-
-	defer func() {
-		require.NoError(t, syncDisabledVM.Shutdown(t.Context()))
-	}()
-
-	height := syncDisabledVM.LastAcceptedBlockInternal().Height()
-	require.Zero(t, height, "Unexpected last accepted height: %d", height)
-
-	enabled, err := syncDisabledVM.StateSyncEnabled(t.Context())
-	require.NoError(t, err)
-	require.False(t, enabled, "sync should be disabled")
-
-	// Process the first 10 blocks from the serverVM
-	for i := uint64(1); i < 10; i++ {
-		ethBlock := vmSetup.serverVM.blockChain.GetBlockByNumber(i)
-		require.NotNil(t, ethBlock, "VM Server did not have a block available at height %d", i)
-		b, err := rlp.EncodeToBytes(ethBlock)
-		require.NoError(t, err)
-		blk, err := syncDisabledVM.ParseBlock(t.Context(), b)
-		require.NoError(t, err)
-		require.NoError(t, blk.Verify(t.Context()))
-		require.NoError(t, blk.Accept(t.Context()))
-	}
-	// Verify the snapshot disk layer matches the last block root
-	lastRoot := syncDisabledVM.blockChain.CurrentBlock().Root
-	require.NoError(t, syncDisabledVM.blockChain.Snapshots().Verify(lastRoot))
-	syncDisabledVM.blockChain.DrainAcceptorQueue()
-
-	// Create a new VM from the same database with state sync enabled.
-	syncReEnabledVM := &VM{}
-	// Enable state sync in configJSON
-	configJSON := fmt.Sprintf(
-		`{"state-sync-enabled":true, "state-sync-min-blocks":%d}`,
-		test.stateSyncMinBlocks,
-	)
-	// Reset metrics to allow re-initialization
-	vmSetup.syncerVM.ctx.Metrics = metrics.NewPrefixGatherer()
-	require.NoError(t, syncReEnabledVM.Initialize(
-		t.Context(),
-		vmSetup.syncerVM.ctx,
-		vmSetup.syncerDB,
-		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])),
-		nil,
-		[]byte(configJSON),
-		[]*commonEng.Fx{},
-		appSender,
-	))
-
-	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
-	vmSetup.serverAppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
-		if test.responseIntercept == nil {
-			go func() {
-				if err := syncReEnabledVM.AppResponse(ctx, nodeID, requestID, response); err != nil {
-					atomicErr.Set(err)
-				}
-			}()
-		} else {
-			go test.responseIntercept(syncReEnabledVM, nodeID, requestID, response)
+	t.Run("restart with sync disabled", func(t *testing.T) {
+		syncDisabledVM := &VM{}
+		appSender := &enginetest.Sender{
+			T:              t,
+			SendAppGossipF: func(context.Context, commonEng.SendConfig, []byte) error { return nil },
+			SendAppRequestF: func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
+				nodeID, hasItem := nodeSet.Pop()
+				require.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
+				go func() {
+					err := vmSetup.serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request)
+					assert.NoError(t, err, "AppRequest()")
+				}()
+				return nil
+			},
 		}
+		// Reset metrics to allow re-initialization
+		vmSetup.syncerVM.ctx.Metrics = metrics.NewPrefixGatherer()
+		stateSyncDisabledConfigJSON := getConfig(test.stateScheme, `"state-sync-enabled":false`)
+		require.NoError(t, syncDisabledVM.Initialize(
+			t.Context(),
+			vmSetup.syncerVM.ctx,
+			vmSetup.syncerDB,
+			[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])),
+			nil,
+			[]byte(stateSyncDisabledConfigJSON),
+			[]*commonEng.Fx{},
+			appSender,
+		))
 
-		return nil
-	}
+		defer func() {
+			require.NoError(t, syncDisabledVM.Shutdown(t.Context()))
+		}()
 
-	// connect peer to [syncerVM]
-	require.NoError(t, syncReEnabledVM.Connected(
-		t.Context(),
-		vmSetup.serverVM.ctx.NodeID,
-		client.StateSyncVersion,
-	))
+		height := syncDisabledVM.LastAcceptedBlockInternal().Height()
+		require.Zero(t, height, "Unexpected last accepted height: %d", height)
 
-	enabled, err = syncReEnabledVM.StateSyncEnabled(t.Context())
-	require.NoError(t, err)
-	require.True(t, enabled, "sync should be enabled")
+		enabled, err := syncDisabledVM.StateSyncEnabled(t.Context())
+		require.NoError(t, err)
+		require.False(t, enabled, "sync should be disabled")
 
-	vmSetup.syncerVM = syncReEnabledVM
-	testSyncerVM(t, vmSetup, test)
-	require.NoError(t, atomicErr.Get())
+		// Process the first 10 blocks from the serverVM
+		for i := uint64(1); i < 10; i++ {
+			ethBlock := vmSetup.serverVM.blockChain.GetBlockByNumber(i)
+			require.NotNil(t, ethBlock, "VM Server did not have a block available at height %d", i)
+			b, err := rlp.EncodeToBytes(ethBlock)
+			require.NoError(t, err)
+			blk, err := syncDisabledVM.ParseBlock(t.Context(), b)
+			require.NoError(t, err)
+			require.NoError(t, blk.Verify(t.Context()))
+			require.NoError(t, blk.Accept(t.Context()))
+		}
+		// Verify the snapshot disk layer matches the last block root
+		lastRoot := syncDisabledVM.blockChain.CurrentBlock().Root
+		if test.stateScheme != customrawdb.FirewoodScheme {
+			require.NoError(t, syncDisabledVM.blockChain.Snapshots().Verify(lastRoot))
+		}
+		syncDisabledVM.blockChain.DrainAcceptorQueue()
+	})
 }
 
 func TestVMShutdownWhileSyncing(t *testing.T) {
-	var (
-		lock    sync.Mutex
-		vmSetup *syncVMSetup
-	)
-	reqCount := 0
-	test := syncTest{
-		syncableInterval:   256,
-		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
-		syncMode:           block.StateSyncStatic,
-		responseIntercept: func(syncerVM *VM, nodeID ids.NodeID, requestID uint32, response []byte) {
-			lock.Lock()
-			defer lock.Unlock()
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			var (
+				lock    sync.Mutex
+				vmSetup *syncVMSetup
+			)
+			reqCount := 0
+			test := syncTest{
+				syncableInterval:   256,
+				stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
+				syncMode:           block.StateSyncStatic,
+				responseIntercept: func(syncerVM *VM, nodeID ids.NodeID, requestID uint32, response []byte) {
+					lock.Lock()
+					defer lock.Unlock()
 
-			reqCount++
-			// Shutdown the VM after 50 requests to interrupt the sync
-			if reqCount == 50 {
-				// Note this verifies the VM shutdown does not time out while syncing.
-				require.NoError(t, vmSetup.shutdownOnceSyncerVM.Shutdown(t.Context()))
-			} else if reqCount < 50 {
-				require.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response))
+					reqCount++
+					// Shutdown the VM after 50 requests to interrupt the sync
+					if reqCount == 50 {
+						// Note this verifies the VM shutdown does not time out while syncing.
+						assert.NoError(t, vmSetup.shutdownOnceSyncerVM.Shutdown(t.Context()), "Shutdown()")
+					} else if reqCount < 50 {
+						assert.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "AppResponse()")
+					}
+				},
+				expectedErr: context.Canceled,
 			}
-		},
-		expectedErr: context.Canceled,
+			vmSetup = createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
+			// Perform sync resulting in early termination.
+			testSyncerVM(t, vmSetup, test)
+		})
 	}
-	vmSetup = createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
-	// Perform sync resulting in early termination.
-	testSyncerVM(t, vmSetup, test)
 }
 
 func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *syncVMSetup {
@@ -388,7 +353,6 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 
 	return &syncVMSetup{
 		serverVM:             serverVM.vm,
-		serverAppSender:      serverVM.appSender,
 		fundedAccounts:       fundedAccounts,
 		syncerVM:             syncerVM.vm,
 		syncerDB:             syncerVM.db,
@@ -399,8 +363,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 // syncVMSetup contains the required set up for a client VM to perform state sync
 // off of a server VM.
 type syncVMSetup struct {
-	serverVM        *VM
-	serverAppSender *enginetest.Sender
+	serverVM *VM
 
 	fundedAccounts map[*utilstest.Key]*types.StateAccount
 
