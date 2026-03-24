@@ -3215,7 +3215,7 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 func TestCurrentStakers(t *testing.T) {
 	tests := []struct {
 		name string
-		csF func(t *testing.T) CurrentStakers
+		csF  func(t *testing.T) CurrentStakers
 	}{
 		{
 			name: "base",
