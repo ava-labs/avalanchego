@@ -39,6 +39,7 @@ jobs:
       - name: Run unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
+          prune_runner_disk: ${{ inputs.platform_name == 'darwin-arm64' && 'false' || 'true' }}
           task: bazel-test-main
 
   bz-unit-coreth:
@@ -60,6 +61,7 @@ jobs:
       - name: Run subnet-evm unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
+          prune_runner_disk: ${{ inputs.platform_name == 'darwin-arm64' && 'false' || 'true' }}
           task: bazel-test-subnet-evm
 
   bz-e2e:
