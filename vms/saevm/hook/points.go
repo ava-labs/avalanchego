@@ -74,12 +74,16 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 		txs[i] = tx
 	}
 
-	te := targetExcess(b.Header())
+	header := b.Header()
+	te := targetExcess(header)
 	return &blockBuilder{
 		ctx:            p.ctx,
 		consensusState: p.consensusState,
 		now: func() time.Time {
-			return time.Unix(int64(b.Time()), 0)
+			return time.Unix(
+				int64(b.Time()),
+				int64(p.SubSecondBlockTime(header)),
+			)
 		},
 		desiredTargetExcess: &te,
 		potentialTxs: func() iter.Seq[*txpool.Tx] {
@@ -110,7 +114,10 @@ func targetExcess(h *types.Header) acp176.TargetExcess {
 	return 0
 }
 
-func (*Points) SubSecondBlockTime(*types.Header) time.Duration {
+func (*Points) SubSecondBlockTime(h *types.Header) time.Duration {
+	if ms := customtypes.GetHeaderExtra(h).TimeMilliseconds; ms != nil {
+		return time.Duration(*ms%1000) * time.Millisecond
+	}
 	return 0
 }
 

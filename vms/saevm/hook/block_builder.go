@@ -69,7 +69,7 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) *types.Header {
 		&customtypes.HeaderExtra{
 			ExtDataGasUsed:   big.NewInt(0),
 			BlockGasCost:     big.NewInt(0),
-			TimeMilliseconds: utils.PointerTo[uint64](0),             // TODO:
+			TimeMilliseconds: utils.PointerTo[uint64](uint64(now.UnixMilli())),
 			MinDelayExcess:   utils.PointerTo[acp226.DelayExcess](0), // TODO:
 			TargetExcess:     &te,
 		},
