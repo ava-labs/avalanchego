@@ -18,7 +18,7 @@ func TestProgressSubscriptionInitialProgressUnblocksWaiterImmediately(t *testing
 	// Waiting for a value below the initial progress should return immediately.
 	done := make(chan struct{})
 	go func() {
-		ps.WaitForProgress(t.Context(), 5)
+		require.NoError(t, ps.WaitForProgress(t.Context(), 5))
 		close(done)
 	}()
 
@@ -38,7 +38,7 @@ func TestProgressSubscriptionWaiterBlocksUntilProgressAdvances(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer wg.Done()
-		ps.WaitForProgress(t.Context(), 5)
+		require.NoError(t, ps.WaitForProgress(t.Context(), 5))
 		close(done)
 	}()
 
@@ -71,7 +71,8 @@ func TestProgressSubscriptionContextCancellationUnblocksWaiter(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer wg.Done()
-		ps.WaitForProgress(ctx, 5)
+		err := ps.WaitForProgress(ctx, 5)
+		require.ErrorIs(t, err, context.Canceled)
 		close(done)
 	}()
 
@@ -109,7 +110,7 @@ func TestProgressSubscriptionMultipleWaitersUnblockedBySingleSetProgress(t *test
 	for i := range numWaiters {
 		go func() {
 			defer wg.Done()
-			ps.WaitForProgress(t.Context(), i)
+			require.NoError(t, ps.WaitForProgress(t.Context(), i))
 			close(done[i])
 		}()
 	}
@@ -135,7 +136,7 @@ func TestProgressSubscriptionEqualProgressBlocks(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		ps.WaitForProgress(t.Context(), 5)
+		require.NoError(t, ps.WaitForProgress(t.Context(), 5))
 		close(done)
 	}()
 

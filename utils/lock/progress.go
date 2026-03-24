@@ -36,13 +36,14 @@ func (ps *ProgressSubscription[T]) SetProgress(progress T) {
 
 // WaitForProgress blocks until the progress of this ProgressSubscription is above the given value,
 // or until the given context is cancelled.
-func (ps *ProgressSubscription[T]) WaitForProgress(ctx context.Context, pos T) {
+func (ps *ProgressSubscription[T]) WaitForProgress(ctx context.Context, pos T) error {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
 
 	for pos >= ps.progress {
 		if err := ps.signal.Wait(ctx); err != nil {
-			return
+			return err
 		}
 	}
+	return nil
 }

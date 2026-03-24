@@ -1254,7 +1254,7 @@ func (m *manager) createSnowmanChain(
 			return nil, fmt.Errorf("error while getting last accepted height: %w", err)
 		}
 
-		m.pChainProgress = lock.NewProgressSubscription[uint64](lastAcceptedHeight)
+		m.pChainProgress = lock.NewProgressSubscription(lastAcceptedHeight)
 		pchainProgressUpdater = m.pChainProgress
 	}
 
