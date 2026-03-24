@@ -235,18 +235,17 @@ var (
 			wrappers.LongLen + // weight
 			wrappers.IntLen + // auto compound reward shares
 			wrappers.LongLen, // period
-		gas.DBRead:  2, // check current validator + check pending validator
 		gas.DBWrite: 3, // put staker + write weight diff + write pk diff
 	}
 
-	IntrinsicSetAutoRenewedValidatorConfigTx = gas.Dimensions{
+	IntrinsicSetAutoRenewedValidatorConfigTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // txID
 			wrappers.IntLen + // auth typeID
 			wrappers.IntLen + // authCredential typeID
 			wrappers.IntLen + // auto compound reward shares
 			wrappers.LongLen, // period
-		gas.DBRead:  2, // read tx + read staker
+		gas.DBRead:  1, // read tx
 		gas.DBWrite: 1, // update staker
 	}
 
@@ -867,7 +866,7 @@ func (c *complexityVisitor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenew
 	if err != nil {
 		return err
 	}
-	c.output, err = IntrinsicSetAutoRenewedValidatorConfigTx.Add(
+	c.output, err = IntrinsicSetAutoRenewedValidatorConfigTxComplexities.Add(
 		&baseTxComplexity,
 		&authComplexity,
 	)
