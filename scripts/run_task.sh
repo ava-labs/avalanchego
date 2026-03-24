@@ -16,6 +16,7 @@ if [[ -n "${AVALANCHEGO_FLAKE_ACTIVE-}" ]]; then
 fi
 
 if command -v nix > /dev/null 2>&1; then
+  # shellcheck disable=SC2016
   exec nix develop "${AVALANCHE_PATH}" --command bash -lc '
     set -euo pipefail
     task_bin="$(which -a task | grep -Fvx "$1/bin/task" | head -n1)"
