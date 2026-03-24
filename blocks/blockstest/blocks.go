@@ -46,7 +46,7 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 		},
 	}
 	props = options.ApplyTo(props, opts...)
-	block, err := hookstest.BuildBlock(props.header, txs, props.receipts, props.ops)
+	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops)
 	require.NoError(tb, err, "hookstest.BuildBlock()")
 	return block
 }

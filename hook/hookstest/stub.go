@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
@@ -129,17 +130,19 @@ func (s *Stub) PotentialEndOfBlockOps(header *types.Header, lastSettledBlock com
 // BuildBlock calls [BuildBlock] with its arguments.
 func (*Stub) BuildBlock(
 	header *types.Header,
+	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
 ) (*types.Block, error) {
-	return BuildBlock(header, txs, receipts, ops)
+	return BuildBlock(header, blockCtx, txs, receipts, ops)
 }
 
 // BuildBlock encodes ops into [types.Header.Extra] and calls [types.NewBlock]
 // with the other arguments.
 func BuildBlock(
 	header *types.Header,
+	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
