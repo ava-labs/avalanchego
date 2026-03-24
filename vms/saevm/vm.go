@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/api"
@@ -72,6 +73,19 @@ func NewSinceGenesis(c sae.Config) *SinceGenesis {
 	}
 }
 
+type Config struct {
+	// GasTarget is the target gas per second that this node will attempt to use
+	// when creating blocks. If this config is not specified, the node will
+	// default to use the parent block's target gas per second.
+	GasTarget *gas.Gas `json:"gas-target,omitempty"`
+
+	// MinDelayTarget is the minimum delay between blocks (in milliseconds) that
+	// this node will attempt to use when creating blocks. If this config is not
+	// specified, the node will default to use the parent block's target delay
+	// per second.
+	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
+}
+
 var ethDBPrefix = []byte("ethdb")
 
 // Initialize initializes the VM.
@@ -81,7 +95,7 @@ func (vm *SinceGenesis) Initialize(
 	avaDB avadb.Database,
 	genesisBytes []byte,
 	_ []byte,
-	_ []byte,
+	configBytes []byte,
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -122,17 +136,30 @@ func (vm *SinceGenesis) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
-	// TODO: Make a config
-	var (
-		desiredDelayExcess  acp226.DelayExcess  = 0
-		desiredTargetExcess acp176.TargetExcess = 100_000_000
-	)
+	var userConfig Config
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &userConfig); err != nil {
+			return fmt.Errorf("json.Unmarshal(%T): %w", userConfig, err)
+		}
+	}
+
+	var desiredDelayExcess *acp226.DelayExcess
+	if userConfig.MinDelayTarget != nil {
+		desiredDelayExcess = new(acp226.DelayExcess)
+		*desiredDelayExcess = acp226.DesiredDelayExcess(*userConfig.MinDelayTarget)
+	}
+	var desiredTargetExcess *acp176.TargetExcess
+	if userConfig.GasTarget != nil {
+		desiredTargetExcess = new(acp176.TargetExcess)
+		*desiredTargetExcess = acp176.DesiredTargetExcess(*userConfig.GasTarget)
+	}
+
 	txs := txpool.NewTxs()
 	hooks := hook.NewPoints(
 		snowCtx,
 		&vm.consensusState,
-		&desiredDelayExcess,
-		&desiredTargetExcess,
+		desiredDelayExcess,
+		desiredTargetExcess,
 		txs,
 		avaDB,
 	)
