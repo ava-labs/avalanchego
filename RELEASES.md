@@ -26,7 +26,7 @@ The plugin version is updated to `45`; all plugins must update to be compatible.
 
 - Updated Firewood to v0.3.1 (from initial v0.1.0 integration).
 - Enabled Firewood deferred persistence for non-pruning nodes
-- Fixed Firewood metrics to always be registered when Firewood is enabled.
+- Fixed Firewood metrics to always be registered whenever metrics are enabled.
 - Unsupported APIs return an error.
 
 ### Consensus
