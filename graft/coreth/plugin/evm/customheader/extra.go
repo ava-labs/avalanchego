@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 var (
@@ -114,7 +116,7 @@ func VerifyExtraPrefix(
 // rules.
 //
 // TODO: Should this be merged with VerifyExtraPrefix?
-func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
+func VerifyExtra(rules evmextras.AvalancheRules, extra []byte) error {
 	extraLen := len(extra)
 	switch {
 	case rules.IsFortuna:
@@ -167,7 +169,7 @@ func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
 
 // PredicateBytesFromExtra returns the predicate result bytes from the header's
 // extra data. If the extra data is not long enough, an empty slice is returned.
-func PredicateBytesFromExtra(rules extras.AvalancheRules, extra []byte) []byte {
+func PredicateBytesFromExtra(rules evmextras.AvalancheRules, extra []byte) []byte {
 	offset := ap3.WindowSize
 	if rules.IsFortuna {
 		offset = acp176.StateSize
@@ -185,7 +187,7 @@ func PredicateBytesFromExtra(rules extras.AvalancheRules, extra []byte) []byte {
 // SetPredicateBytesInExtra sets the predicate result bytes in the header's extra
 // data. If the extra data is not long enough (i.e., an incomplete header.Extra
 // as built in the miner), it is padded with zeros.
-func SetPredicateBytesInExtra(rules extras.AvalancheRules, extra []byte, predicateBytes []byte) []byte {
+func SetPredicateBytesInExtra(rules evmextras.AvalancheRules, extra []byte, predicateBytes []byte) []byte {
 	offset := ap3.WindowSize
 	if rules.IsFortuna {
 		offset = acp176.StateSize

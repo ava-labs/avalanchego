@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/legacy"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
@@ -24,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -34,11 +34,11 @@ const InvalidateDelegateUnix = 1754107200
 // P256VerifyAddress is the address of the p256 signature verification precompile
 var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
 
-type RulesExtra extras.Rules
+type RulesExtra evmextras.Rules
 
-func GetRulesExtra(r Rules) *extras.Rules {
+func GetRulesExtra(r Rules) *evmextras.Rules {
 	rules := payloads.Rules.GetPointer(&r)
-	return (*extras.Rules)(rules)
+	return (*evmextras.Rules)(rules)
 }
 
 func (RulesExtra) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libevm.StateReader) (uint64, error) {

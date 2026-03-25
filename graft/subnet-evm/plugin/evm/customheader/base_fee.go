@@ -25,10 +25,10 @@ func BaseFee(
 ) (*big.Int, error) {
 	timestamp := timeMS / 1000
 	switch {
-	case config.IsSubnetEVM(timestamp):
+	case config.IsApricotPhase3(timestamp):
 		return baseFeeFromWindow(config, feeConfig, parent, timestamp)
 	default:
-		// Prior to SubnetEVM the expected base fee is nil.
+		// Prior to AP3 the expected base fee is nil.
 		return nil, nil
 	}
 }
@@ -36,8 +36,8 @@ func BaseFee(
 // EstimateNextBaseFee attempts to estimate the base fee of a block built at
 // `timestamp` on top of `parent`.
 //
-// If timestamp is before parent.Time or the SubnetEVM activation time, then timestamp
-// is set to the maximum of parent.Time and the SubnetEVM activation time.
+// If timestamp is before parent.Time or the AP3 activation time, then timestamp
+// is set to the maximum of parent.Time and the AP3 activation time.
 //
 // Warning: This function should only be used in estimation and should not be
 // used when calculating the canonical base fee for a block.

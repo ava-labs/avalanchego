@@ -24,11 +24,11 @@ var (
 	errInvalidTimestamp = errors.New("invalid timestamp")
 )
 
-// baseFeeFromWindow should only be called if `timestamp` >= `config.SubnetEVMTimestamp`
+// baseFeeFromWindow should only be called if `timestamp` >= `config.ApricotPhase3Timestamp`
 func baseFeeFromWindow(config *extras.ChainConfig, feeConfig commontype.FeeConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
-	if !config.IsSubnetEVM(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
+	if !config.IsApricotPhase3(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
 		return big.NewInt(feeConfig.MinBaseFee.Int64()), nil
 	}
 
@@ -114,7 +114,7 @@ func baseFeeFromWindow(config *extras.ChainConfig, feeConfig commontype.FeeConfi
 // feeWindow takes the previous header and the timestamp of its child block and
 // calculates the expected fee window.
 //
-// feeWindow should only be called if timestamp >= config.SubnetEVMTimestamp
+// feeWindow should only be called if timestamp >= config.ApricotPhase3Timestamp
 func feeWindow(
 	config *extras.ChainConfig,
 	parent *types.Header,
@@ -122,7 +122,7 @@ func feeWindow(
 ) (subnetevm.Window, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial window.
-	if !config.IsSubnetEVM(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
+	if !config.IsApricotPhase3(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
 		return subnetevm.Window{}, nil
 	}
 

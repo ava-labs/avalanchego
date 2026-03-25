@@ -38,10 +38,10 @@ graft_go_test(
     ],
     embed = [":warp"],
     deps = [
+        "//graft/evm/params/extras",
         "//graft/evm/precompile/precompileconfig",
         "//graft/evm/utils/utilstest",
         "//graft/subnet-evm/core/extstate",
-        "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/params/extras/extrastest",
         "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/precompiletest",

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
 
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -266,30 +267,8 @@ func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 	}
 }
 
-type AvalancheRules struct {
-	IsApricotPhase1, IsApricotPhase2, IsApricotPhase3, IsApricotPhase4, IsApricotPhase5 bool
-	IsApricotPhasePre6, IsApricotPhase6, IsApricotPhasePost6                            bool
-	IsBanff                                                                             bool
-	IsCortina                                                                           bool
-	IsDurango                                                                           bool
-	IsEtna                                                                              bool
-	IsFortuna                                                                           bool
-	IsGranite                                                                           bool
-	IsHelicon                                                                           bool
-}
-
-// IsGraniteActivated is used by the warp precompile to determine which gas costs to use.
-func (a AvalancheRules) IsGraniteActivated() bool {
-	return a.IsGranite
-}
-
-// IsDurangoActivated returns whether Durango has been activated.
-func (a AvalancheRules) IsDurangoActivated() bool {
-	return a.IsDurango
-}
-
-func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {
-	return AvalancheRules{
+func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) evmextras.AvalancheRules {
+	return evmextras.AvalancheRules{
 		IsApricotPhase1:     n.IsApricotPhase1(timestamp),
 		IsApricotPhase2:     n.IsApricotPhase2(timestamp),
 		IsApricotPhase3:     n.IsApricotPhase3(timestamp),

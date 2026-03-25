@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheutils "github.com/ava-labs/avalanchego/utils"
 )
@@ -157,7 +158,7 @@ func TestNetworkUpgradesOverridden(t *testing.T) {
 
 	// verify initial state
 	require.True(t, tvm.vm.chainConfigExtra().IsGranite(uint64(upgrade.InitiallyActiveTime.Unix())))
-	require.True(t, tvm.vm.currentRules().IsSubnetEVM)
+	require.True(t, tvm.vm.currentRules().IsCortina)
 	require.False(t, tvm.vm.currentRules().IsGranite)
 
 	// restart the vm with overrides
@@ -379,7 +380,7 @@ func TestVMEtnaActivatesCancun(t *testing.T) {
 }
 
 // currentRules returns the chain rules for the current block.
-func (vm *VM) currentRules() extras.Rules {
+func (vm *VM) currentRules() evmextras.Rules {
 	header := vm.eth.APIBackend.CurrentHeader()
 	return vm.rules(header.Number, header.Time)
 }

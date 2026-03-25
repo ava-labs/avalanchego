@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/subnetevm"
 	"github.com/ava-labs/avalanchego/utils"
+
+	evmextras "github.com/ava-labs/avalanchego/graft/evm/params/extras"
 )
 
 func TestMain(m *testing.M) {
@@ -187,49 +189,49 @@ func TestVerifyExtraPrefix(t *testing.T) {
 func TestVerifyExtra(t *testing.T) {
 	tests := []struct {
 		name     string
-		rules    extras.AvalancheRules
+		rules    evmextras.AvalancheRules
 		extra    []byte
 		expected error
 	}{
 		{
 			name:     "initial_valid",
-			rules:    extras.AvalancheRules{},
+			rules:    evmextras.AvalancheRules{},
 			extra:    make([]byte, maximumExtraDataSize),
 			expected: nil,
 		},
 		{
 			name:     "initial_invalid",
-			rules:    extras.AvalancheRules{},
+			rules:    evmextras.AvalancheRules{},
 			extra:    make([]byte, maximumExtraDataSize+1),
 			expected: errInvalidExtraLength,
 		},
 		{
 			name: "subnet_evm_valid",
-			rules: extras.AvalancheRules{
-				IsSubnetEVM: true,
+			rules: evmextras.AvalancheRules{
+				IsApricotPhase3: true,
 			},
 			extra:    make([]byte, subnetevm.WindowSize),
 			expected: nil,
 		},
 		{
 			name: "subnet_evm_invalid_less",
-			rules: extras.AvalancheRules{
-				IsSubnetEVM: true,
+			rules: evmextras.AvalancheRules{
+				IsApricotPhase3: true,
 			},
 			extra:    make([]byte, subnetevm.WindowSize-1),
 			expected: errInvalidExtraLength,
 		},
 		{
 			name: "subnet_evm_invalid_more",
-			rules: extras.AvalancheRules{
-				IsSubnetEVM: true,
+			rules: evmextras.AvalancheRules{
+				IsApricotPhase3: true,
 			},
 			extra:    make([]byte, subnetevm.WindowSize+1),
 			expected: errInvalidExtraLength,
 		},
 		{
 			name: "durango_valid_min",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsDurango: true,
 			},
 			extra:    make([]byte, subnetevm.WindowSize),
@@ -237,7 +239,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "durango_valid_extra",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsDurango: true,
 			},
 			extra:    make([]byte, subnetevm.WindowSize+1),
@@ -245,7 +247,7 @@ func TestVerifyExtra(t *testing.T) {
 		},
 		{
 			name: "durango_invalid",
-			rules: extras.AvalancheRules{
+			rules: evmextras.AvalancheRules{
 				IsDurango: true,
 			},
 			extra:    make([]byte, subnetevm.WindowSize-1),

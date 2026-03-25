@@ -512,7 +512,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if overflow {
 		return nil, ErrGasUintOverflow
 	}
-	gasRefund := st.refundGas(rulesExtra.IsSubnetEVM)
+	gasRefund := st.refundGas(rulesExtra.IsApricotPhase1)
 	fee := new(uint256.Int).SetUint64(st.gasUsed())
 	fee.Mul(fee, price)
 	st.state.AddBalance(st.evm.Context.Coinbase, fee)
