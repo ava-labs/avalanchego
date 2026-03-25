@@ -591,7 +591,7 @@ func TestGasAccounting(t *testing.T) {
 		require.NoError(t, e.Enqueue(ctx, b), "Enqueue()")
 		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 
-		opt := proxytime.CmpOpt[gas.Gas](proxytime.IgnoreRateInvariants)
+		opt := proxytime.CmpOpt[gas.Gas]()
 		if diff := cmp.Diff(step.wantExecutedBy, b.ExecutedByGasTime().Time, opt); diff != "" {
 			t.Errorf("%T.ExecutedByGasTime().Time diff (-want +got):\n%s", b, diff)
 		}

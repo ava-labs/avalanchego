@@ -33,9 +33,7 @@ func (tm *Time) AfterBlock(used gas.Gas, hooks hook.Points, h *types.Header) err
 	// otherwise we'd call [Time.findExcessForPrice] with a different value,
 	// which makes it extremely hard to test.
 	p := tm.Price()
-	if err := tm.SetTarget(target); err != nil {
-		return fmt.Errorf("%T.SetTarget() after block: %w", tm, err)
-	}
+	tm.SetTarget(target)
 
 	cfg, err := newConfig(hookCfg)
 	if err != nil {

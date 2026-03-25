@@ -17,38 +17,28 @@ import (
 	"github.com/ava-labs/strevm/proxytime"
 )
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
 // Time represents an instant in time, its passage measured in [gas.Gas]
 // consumption. It is not thread safe nor is the zero value valid.
 //
 // In addition to the passage of time, it also tracks excess consumption above a
 // target, as described in [ACP-194] as a "continuous" version of [ACP-176].
 //
-// Copying a Time, either directly or by dereferencing a pointer, will result in
-// undefined behaviour. Use [Time.Clone] instead as it reestablishes internal
-// invariants.
+// Copying a Time, either directly or by dereferencing a pointer, can result in
+// undefined behaviour; use [Time.Clone] instead.
 //
 // [ACP-176]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates
 // [ACP-194]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution
+//
+//nolint:tagliatelle // Can't handle embedded field
 type Time struct {
-	TimeMarshaler
-}
+	*proxytime.Time[gas.Gas] `canoto:"pointer,1"`
+	target                   gas.Gas `canoto:"uint,2"`
+	excess                   gas.Gas `canoto:"uint,3"`
+	config                   config  `canoto:"value,4"`
 
-// makeTime is a constructor shared by [New] and [Time.Clone].
-func makeTime(t *proxytime.Time[gas.Gas], target, excess gas.Gas, c config) *Time {
-	tm := &Time{
-		TimeMarshaler: TimeMarshaler{
-			Time:   t,
-			target: target,
-			excess: excess,
-			config: c,
-		},
-	}
-	tm.establishInvariants()
-	return tm
-}
-
-func (tm *Time) establishInvariants() {
-	tm.Time.SetRateInvariants(&tm.target, &tm.excess)
+	canotoData canotoData_Time `canoto:"nocopy"`
 }
 
 // New returns a new [Time], derived from a [time.Time]. The consumption of
@@ -59,12 +49,17 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig hook.GasPr
 	if err != nil {
 		return nil, err
 	}
-	target = clampTarget(target)
+
 	tm := proxytime.Of[gas.Gas](at)
-	// [proxytime.Time.SetRate] is documented as never returning an error when
-	// no invariants have been registered.
-	_ = tm.SetRate(rateOf(target))
-	return makeTime(tm, target, startingExcess, cfg), nil
+	target = clampTarget(target)
+	tm.SetRate(rateOf(target))
+
+	return &Time{
+		Time:   tm,
+		target: target,
+		excess: startingExcess,
+		config: cfg,
+	}, nil
 }
 
 // SubSecond scales the value returned by [hook.Points.SubSecondBlockTime] to
@@ -112,7 +107,6 @@ const MaxTarget = gas.Gas(math.MaxUint64 / TargetToRate)
 
 func rateOf(target gas.Gas) gas.Gas { return target * TargetToRate }
 func clampTarget(t gas.Gas) gas.Gas { return min(max(t, MinTarget), MaxTarget) }
-func roundRate(r gas.Gas) gas.Gas   { return (r / TargetToRate) * TargetToRate }
 
 // SafeRateOfTarget returns the corresponding rate for the given gas target,
 // after clamping it to the allowable range.
@@ -125,9 +119,12 @@ func SafeRateOfTarget(target gas.Gas) gas.Gas {
 
 // Clone returns a deep copy of the time.
 func (tm *Time) Clone() *Time {
-	// [proxytime.Time.Clone] explicitly does NOT clone the rate invariants, so
-	// we reestablish them as if we were constructing a new instance.
-	return makeTime(tm.Time.Clone(), tm.target, tm.excess, tm.config)
+	return &Time{
+		Time:   tm.Time.Clone(),
+		target: tm.target,
+		excess: tm.excess,
+		config: tm.config,
+	}
 }
 
 // Target returns the `T` parameter of ACP-176.
@@ -164,17 +161,28 @@ func (tm *Time) BaseFee() *uint256.Int {
 	return uint256.NewInt(uint64(tm.Price()))
 }
 
-// SetRate changes the gas rate per second, rounding down the argument if it is
-// not a multiple of [TargetToRate]. See [Time.SetTarget] re potential error(s).
-func (tm *Time) SetRate(r gas.Gas) error {
-	return tm.TimeMarshaler.SetRate(roundRate(r))
+// SetRate is equivalent to [Time.SetTarget] after (integer) division of `r` by
+// [TargetToRate].
+func (tm *Time) SetRate(r gas.Gas) {
+	tm.SetTarget(r / TargetToRate)
 }
 
 // SetTarget changes the target gas consumption per second, clamping the
-// argument to the range [[MinTarget], [MaxTarget]]. It returns an error if the
-// scaled [Time.Excess] overflows as a result of the scaling.
-func (tm *Time) SetTarget(t gas.Gas) error {
-	return tm.TimeMarshaler.SetRate(rateOf(clampTarget(t))) // also updates [Time.Target] as it was passed to [proxytime.Time.SetRateInvariants]
+// argument to the range [[MinTarget], [MaxTarget]]. If the [Time.Excess] were
+// to overflow as a result of this scaling then it is silently capped at
+// [math.MaxUint64].
+func (tm *Time) SetTarget(t gas.Gas) {
+	t = clampTarget(t)
+	r := rateOf(t)
+
+	x, err := tm.Scale(tm.excess, r)
+	if err != nil {
+		x = math.MaxUint64
+	}
+
+	tm.Time.SetRate(r)
+	tm.excess = x
+	tm.target = t
 }
 
 // Tick is equivalent to [proxytime.Time.Tick] except that it also updates the

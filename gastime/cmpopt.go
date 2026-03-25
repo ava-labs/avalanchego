@@ -17,8 +17,8 @@ import (
 // tests.
 func CmpOpt() cmp.Option {
 	return cmp.Options{
-		cmp.AllowUnexported(TimeMarshaler{}, config{}),
-		cmpopts.IgnoreTypes(canotoData_TimeMarshaler{}, canotoData_config{}),
-		proxytime.CmpOpt[gas.Gas](proxytime.CmpRateInvariantsByValue),
+		cmp.AllowUnexported(Time{}, config{}),
+		cmpopts.IgnoreTypes(canotoData_Time{}, canotoData_config{}),
+		proxytime.CmpOpt[gas.Gas](),
 	}
 }
