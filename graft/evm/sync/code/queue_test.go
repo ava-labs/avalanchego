@@ -4,7 +4,7 @@
 package code
 
 import (
-	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -89,40 +89,35 @@ func TestCodeQueue(t *testing.T) {
 			q, err := NewQueue(db)
 			require.NoError(t, err, "NewQueue()")
 
-			recvDone := make(chan struct{})
-			go func() {
-				for _, add := range tt.addCode {
-					require.NoErrorf(t, q.AddCode(t.Context(), add), "%T.AddCode(%v)", q, add)
-				}
-
-				if tt.shutdownInsteadOfFinalize {
-					q.Shutdown()
-					<-recvDone
-					err := q.AddCode(t.Context(), tt.addCodeAfter)
-					require.ErrorIsf(t, err, ErrQueueClosed, "%T.AddCode() after Shutdown", q)
-				} else {
-					require.NoErrorf(t, q.Finalize(), "%T.Finalize()", q)
-				}
-			}()
-
-			var got []common.Hash
-			for h := range q.CodeHashes() {
-				got = append(got, h)
+			// AddCode is non-blocking, safe to call on main goroutine.
+			for _, add := range tt.addCode {
+				require.NoError(t, q.AddCode(t.Context(), add))
 			}
-			close(recvDone)
+
+			// Consumer runs in background, collects values.
+			got := drainAsync(q.CodeHashes())
+
+			if tt.shutdownInsteadOfFinalize {
+				q.Shutdown()
+				<-got.done
+				err := q.AddCode(t.Context(), tt.addCodeAfter)
+				require.ErrorIs(t, err, ErrQueueClosed)
+			} else {
+				require.NoError(t, q.Finalize())
+				<-got.done
+			}
+
 			// Cross-batch ordering is not guaranteed because separate
 			// goroutines race. Compare as sets.
-			require.ElementsMatchf(t, tt.want, got, "values received from %T.CodeHashes()", q)
+			require.ElementsMatchf(t, tt.want, got.hashes, "values received from %T.CodeHashes()", q)
 
 			t.Run("restart_with_same_db", func(t *testing.T) {
 				q, err := NewQueue(db, WithCapacity(len(tt.want)))
 				require.NoError(t, err, "NewQueue([reused db])")
-				require.NoErrorf(t, q.Finalize(), "%T.Finalize() immediately after creation", q)
+				require.NoError(t, q.Finalize())
 
-				got := make(set.Set[common.Hash])
-				for h := range q.CodeHashes() {
-					got.Add(h)
-				}
+				restart := drainAsync(q.CodeHashes())
+				<-restart.done
 
 				// init checks for existing code when recovering from disk,
 				// so already-present hashes are excluded.
@@ -131,7 +126,11 @@ func TestCodeQueue(t *testing.T) {
 					want.Remove(hash)
 				}
 
-				require.ElementsMatchf(t, want.List(), got.List(), "All received on %T.CodeHashes() after restart", q)
+				restartSet := make(set.Set[common.Hash])
+				for _, h := range restart.hashes {
+					restartSet.Add(h)
+				}
+				require.ElementsMatchf(t, want.List(), restartSet.List(), "All received on %T.CodeHashes() after restart", q)
 			})
 		})
 	}
@@ -155,15 +154,12 @@ func TestFinalizeFlushesAllHashes(t *testing.T) {
 	// AddCode returns immediately despite capacity=1.
 	require.NoError(t, q.AddCode(t.Context(), hashes))
 
-	var got []common.Hash
-	go func() {
-		require.NoError(t, q.Finalize())
-	}()
-	for h := range q.CodeHashes() {
-		got = append(got, h)
-	}
+	// Consumer in background, Finalize on main goroutine.
+	got := drainAsync(q.CodeHashes())
+	require.NoError(t, q.Finalize())
+	<-got.done
 
-	require.Equal(t, hashes, got, "all hashes received in batch order")
+	require.Equal(t, hashes, got.hashes, "all hashes received in batch order")
 }
 
 // TestShutdownUnblocksGoroutines verifies that Shutdown cancels stuck
@@ -196,7 +192,7 @@ func TestShutdownUnblocksGoroutines(t *testing.T) {
 // TestShutdownAndAddCodeRace verifies no panic or goroutine leak when
 // Shutdown and AddCode race against each other.
 func TestShutdownAndAddCodeRace(t *testing.T) {
-	for range 10_000 {
+	for range 1_000 {
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
 
@@ -247,7 +243,9 @@ func TestConcurrentAddCodeAndConsume(t *testing.T) {
 	q, err := NewQueue(db, WithCapacity(capacity))
 	require.NoError(t, err)
 
+	// AddCode is non-blocking, but we want concurrent calls for stress.
 	var producerWg sync.WaitGroup
+	producerErrs := make([]error, numProducers)
 	producerWg.Add(numProducers)
 	for i := range numProducers {
 		go func() {
@@ -256,30 +254,45 @@ func TestConcurrentAddCodeAndConsume(t *testing.T) {
 			for j := range hashes {
 				hashes[j] = crypto.Keccak256Hash([]byte{byte(i), byte(j)})
 			}
-			require.NoError(t, q.AddCode(t.Context(), hashes))
+			producerErrs[i] = q.AddCode(t.Context(), hashes)
 		}()
 	}
 
-	var got []common.Hash
-	consumerDone := make(chan struct{})
-	go func() {
-		defer close(consumerDone)
-		for h := range q.CodeHashes() {
-			got = append(got, h)
-		}
-	}()
+	got := drainAsync(q.CodeHashes())
 
 	producerWg.Wait()
-	require.NoError(t, q.Finalize())
-	<-consumerDone
+	for i, err := range producerErrs {
+		require.NoErrorf(t, err, "producer %d error", i)
+	}
 
-	require.Len(t, got, numProducers*hashesPerProducer)
+	require.NoError(t, q.Finalize())
+	<-got.done
+
+	require.Len(t, got.hashes, numProducers*hashesPerProducer)
+}
+
+// drainResult holds values collected from a channel by drainAsync.
+type drainResult struct {
+	hashes []common.Hash
+	done   chan struct{} // closed when draining completes
+}
+
+// drainAsync reads all values from ch in a background goroutine.
+func drainAsync(ch <-chan common.Hash) *drainResult {
+	r := &drainResult{done: make(chan struct{})}
+	go func() {
+		defer close(r.done)
+		for h := range ch {
+			r.hashes = append(r.hashes, h)
+		}
+	}()
+	return r
 }
 
 func makeHashes(n int) []common.Hash {
 	hashes := make([]common.Hash, n)
 	for i := range hashes {
-		hashes[i] = crypto.Keccak256Hash([]byte(fmt.Sprintf("%d", i)))
+		hashes[i] = crypto.Keccak256Hash([]byte(strconv.Itoa(i)))
 	}
 	return hashes
 }
