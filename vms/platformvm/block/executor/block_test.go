@@ -5,7 +5,6 @@ package executor
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -18,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
@@ -276,7 +276,7 @@ func TestBlockOptions(t *testing.T) {
 						},
 						TxID: stakerTxID,
 					}
-					primaryNetworkValidatorStartTime = time.Now()
+					primaryNetworkValidatorStartTime = genesistest.DefaultValidatorStartTime
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
@@ -334,7 +334,7 @@ func TestBlockOptions(t *testing.T) {
 						},
 						TxID: stakerTxID,
 					}
-					primaryNetworkValidatorStartTime = time.Now()
+					primaryNetworkValidatorStartTime = genesistest.DefaultValidatorStartTime
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
@@ -391,7 +391,7 @@ func TestBlockOptions(t *testing.T) {
 						},
 						TxID: stakerTxID,
 					}
-					primaryNetworkValidatorStartTime = time.Now()
+					primaryNetworkValidatorStartTime = genesistest.DefaultValidatorStartTime
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
@@ -457,7 +457,7 @@ func TestBlockOptions(t *testing.T) {
 						},
 						TxID: stakerTxID,
 					}
-					primaryNetworkValidatorStartTime = time.Now()
+					primaryNetworkValidatorStartTime = genesistest.DefaultValidatorStartTime
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
@@ -517,7 +517,7 @@ func TestBlockOptions(t *testing.T) {
 						},
 						TxID: stakerTxID,
 					}
-					primaryNetworkValidatorStartTime = time.Now()
+					primaryNetworkValidatorStartTime = genesistest.DefaultValidatorStartTime
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
@@ -571,7 +571,7 @@ func TestBlockOptions(t *testing.T) {
 						},
 						TxID: stakerTxID,
 					}
-					primaryNetworkValidatorStartTime = time.Now()
+					primaryNetworkValidatorStartTime = genesistest.DefaultValidatorStartTime
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,

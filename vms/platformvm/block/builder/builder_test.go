@@ -757,7 +757,7 @@ func TestNewRewardTxForStaker(t *testing.T) {
 					BaseTx: validBaseTx,
 					Validator: txs.Validator{
 						NodeID: ids.GenerateTestNodeID(),
-						End:    uint64(time.Now().Add(time.Hour).Unix()),
+						End:    uint64(genesistest.DefaultValidatorStartTime.Add(time.Hour).Unix()),
 						Wght:   2,
 					},
 					Subnet:                ids.GenerateTestID(),

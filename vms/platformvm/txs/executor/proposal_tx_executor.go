@@ -753,11 +753,6 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	} else {
 		// For any validators who started prior to [CortinaTime], we issue the
 		// [delegateeReward] immediately.
-		vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
-		if !ok {
-			return ErrWrongTxType
-		}
-
 		delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
 		outIntf, err := e.backend.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
 		if err != nil {
