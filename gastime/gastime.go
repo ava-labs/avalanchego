@@ -192,7 +192,7 @@ func (tm *Time) Tick(g gas.Gas) {
 
 	R, T := tm.Rate(), tm.Target()
 	quo, _, _ := intmath.MulDiv(g, R-T, R) // overflow is impossible as (R-T)/R < 1
-	tm.excess += quo
+	tm.excess = intmath.BoundedAdd(tm.excess, quo, math.MaxUint64)
 }
 
 // FastForwardTo is equivalent to [proxytime.Time.FastForwardTo] except that it

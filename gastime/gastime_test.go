@@ -421,3 +421,14 @@ func TestNoExcessOverflow(t *testing.T) {
 	tm.FastForwardTo(1, 0)
 	require.Less(t, tm.Excess(), gas.Gas(math.MaxUint64), "Excess() after capped and then fast-forwarding")
 }
+
+func TestTickExcessOverflow(t *testing.T) {
+	const (
+		shortFall   = 2
+		startExcess = math.MaxUint64 - shortFall
+		tick        = TargetToRate * (1 + shortFall) // increases excess by 1+shortFall -> overflow risk
+	)
+	tm := mustNew(t, time.Unix(0, 0), 1, startExcess, DefaultGasPriceConfig())
+	tm.Tick(tick)
+	require.Greater(t, tm.Excess(), gas.Gas(startExcess), "Excess() must increase after Tick(>1)")
+}

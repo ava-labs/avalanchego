@@ -6,6 +6,7 @@ package intmath
 import (
 	"errors"
 	"math"
+	"math/bits"
 	"math/rand/v2"
 	"testing"
 )
@@ -30,6 +31,48 @@ func TestBoundedSubtract(t *testing.T) {
 			t.Errorf("BoundedSubtract[%T](%[1]d, %d, %d) got %d; want %d", tt.a, tt.b, tt.floor, got, tt.want)
 		}
 	}
+}
+
+func FuzzBoundedAdd(f *testing.F) {
+	test := func(tb testing.TB, a, b, ceil, want uint64) {
+		tb.Helper()
+		if got := BoundedAdd(a, b, ceil); got != want {
+			f.Errorf("BoundedAdd[%T](%[1]d, %d, %d) got %d; want %d", a, b, ceil, got, want)
+		}
+	}
+
+	tests := []struct {
+		a, b, ceil, want uint64
+	}{
+		{a: 0, b: 10, ceil: 0, want: 0},
+		{a: 0, b: 10, ceil: 9, want: 9},
+		{a: 1, b: 10, ceil: 9, want: 9},
+		{a: 1, b: 10, ceil: 10, want: 10},
+		{a: 1, b: 10, ceil: 11, want: 11},
+		{a: 1, b: 10, ceil: 12, want: 11},
+		{a: max, b: 0, ceil: 100, want: 100},
+		{a: max, b: 1, ceil: 100, want: 100},
+		{a: max, b: max, ceil: 0, want: 0},
+	}
+
+	for _, tt := range tests {
+		test(f, tt.a, tt.b, tt.ceil, tt.want)
+		test(f, tt.b, tt.a, tt.ceil, tt.want)
+
+		f.Add(tt.a, tt.b, tt.ceil)
+		f.Add(tt.b, tt.a, tt.ceil)
+	}
+
+	f.Fuzz(func(t *testing.T, a, b, ceil uint64) {
+		// Although similar (there are only so many ways to skin this cat), this
+		// is not an identical inlining of the implementation, especially near
+		// [math.MaxUint64].
+		if _, carry := bits.Add64(a, b, 0); carry == 0 {
+			test(t, a, b, ceil, min(a+b, ceil))
+		} else {
+			test(t, a, b, ceil, min(math.MaxUint64, ceil))
+		}
+	})
 }
 
 func TestBoundedMultiply(t *testing.T) {

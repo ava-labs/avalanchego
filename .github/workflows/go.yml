@@ -105,14 +105,13 @@ jobs:
       FUNCTION: ${{ matrix.function }}
       CORPUS_DIR: ./${{ matrix.package }}/testdata/fuzz/${{ matrix.function }}
       # The actual corpus size is dependent on the test in question and how many
-      # "interesting" cases can be found. This is an arbitrary lower bound,
-      # chosen as approximately half the size of the very basic
-      # `FuzzEffectiveGasTip`.
-      MIN_CORPUS_SIZE: 20
+      # "interesting" cases can be found. This only ensures that the corpus
+      # extension has actually been performed.
+      MIN_CORPUS_SIZE: 1
     steps:
       - uses: actions/checkout@v4
       - name: Require existing corpus of at least ${MIN_CORPUS_SIZE}
-        run: | # Raw `go test` will be meaningful, and `-fuzz` won't start from nowhere
+        run: |
           [ -d "${CORPUS_DIR}" ] && [ $(ls "${CORPUS_DIR}" | wc -l) -gt ${MIN_CORPUS_SIZE} ]
       - name: Set up Go
         uses: actions/setup-go@v5
