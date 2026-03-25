@@ -35,6 +35,7 @@ graft_go_test(
         ":acp224feemanager",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/core/extstate",
+        "//graft/subnet-evm/precompile/allowlist",
         "//graft/subnet-evm/precompile/allowlist/allowlisttest",
         "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/precompileconfig",

@@ -109,7 +109,7 @@ func hashToBool(h common.Hash) bool {
 
 func boolToHash(b bool) common.Hash {
 	if b {
-		return common.BigToHash(common.Big1)
+		return trueHash
 	}
 	return common.Hash{}
 }
