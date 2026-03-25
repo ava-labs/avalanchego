@@ -125,14 +125,19 @@ func SetACP224FeeManagerAllowListStatus(stateDB contract.StateDB, address common
 }
 
 // GetStoredFeeConfig returns the fee config from contract storage.
+// If no config has been stored, it returns DefaultACP224FeeConfig.
 func GetStoredFeeConfig(stateDB contract.StateReader) commontype.ACP224FeeConfig {
-	return commontype.ACP224FeeConfig{
+	config := commontype.ACP224FeeConfig{
 		ValidatorTargetGas: hashToBool(stateDB.GetState(ContractAddress, validatorTargetGasStorageKey)),
 		TargetGas:          stateDB.GetState(ContractAddress, targetGasStorageKey).Big().Uint64(),
 		StaticPricing:      hashToBool(stateDB.GetState(ContractAddress, staticPricingStorageKey)),
 		MinGasPrice:        stateDB.GetState(ContractAddress, minGasPriceStorageKey).Big().Uint64(),
 		TimeToDouble:       stateDB.GetState(ContractAddress, timeToDoubleStorageKey).Big().Uint64(),
 	}
+	if config == (commontype.ACP224FeeConfig{}) {
+		return commontype.DefaultACP224FeeConfig
+	}
+	return config
 }
 
 // GetFeeConfigLastChangedAt returns the block number of the last fee config update.
@@ -143,9 +148,6 @@ func GetFeeConfigLastChangedAt(stateDB contract.StateReader) *big.Int {
 
 // StoreFeeConfig validates and persists [feeConfig] and [blockNumber] to contract storage.
 func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.ACP224FeeConfig, blockNumber *big.Int) error {
-	if blockNumber == nil {
-		return ErrNilBlockNumber
-	}
 	if err := feeConfig.Verify(); err != nil {
 		return fmt.Errorf("cannot verify fee config: %w", err)
 	}

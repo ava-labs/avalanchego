@@ -17,9 +17,3 @@ var ValidTestFeeConfig = FeeConfig{
 	MaxBlockGasCost:  big.NewInt(1_000_000),
 	BlockGasCostStep: big.NewInt(200_000),
 }
-
-var ValidTestACP224FeeConfig = ACP224FeeConfig{
-	TargetGas:    15_000_000,
-	MinGasPrice:  1,
-	TimeToDouble: 60,
-}

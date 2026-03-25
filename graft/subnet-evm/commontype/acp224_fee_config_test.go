@@ -17,7 +17,7 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 	}{
 		{
 			name:   "valid config",
-			config: ValidTestACP224FeeConfig,
+			config: DefaultACP224FeeConfig,
 		},
 		{
 			name: "valid with validatorTargetGas",
@@ -115,9 +115,9 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 	}{
 		{
 			name: "both equal",
-			a:    &ValidTestACP224FeeConfig,
+			a:    &DefaultACP224FeeConfig,
 			b: &ACP224FeeConfig{
-				TargetGas:    15_000_000,
+				TargetGas:    1_000_000,
 				MinGasPrice:  1,
 				TimeToDouble: 60,
 			},
@@ -125,9 +125,9 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 		},
 		{
 			name: "different targetGas",
-			a:    &ValidTestACP224FeeConfig,
+			a:    &DefaultACP224FeeConfig,
 			b: func() *ACP224FeeConfig {
-				c := ValidTestACP224FeeConfig
+				c := DefaultACP224FeeConfig
 				c.TargetGas = 20_000_000
 				return &c
 			}(),
@@ -135,14 +135,14 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 		},
 		{
 			name: "other nil",
-			a:    &ValidTestACP224FeeConfig,
+			a:    &DefaultACP224FeeConfig,
 			b:    nil,
 			want: false,
 		},
 		{
 			name: "receiver nil",
 			a:    nil,
-			b:    &ValidTestACP224FeeConfig,
+			b:    &DefaultACP224FeeConfig,
 			want: false,
 		},
 		{

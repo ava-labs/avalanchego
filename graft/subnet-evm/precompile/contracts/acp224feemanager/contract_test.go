@@ -28,30 +28,29 @@ var (
 	testBlockNumber = big.NewInt(7)
 )
 
-func packGetFeeConfigInput(t testing.TB) []byte {
+func assertPackGetFeeConfigInput(t testing.TB) []byte {
 	t.Helper()
 	input, err := acp224feemanager.PackGetFeeConfig()
 	require.NoError(t, err, "PackGetFeeConfig()")
 	return input
 }
 
-func packGetFeeConfigLastChangedAtInput(t testing.TB) []byte {
+func assertPackGetFeeConfigLastChangedAtInput(t testing.TB) []byte {
 	t.Helper()
 	input, err := acp224feemanager.PackGetFeeConfigLastChangedAt()
 	require.NoError(t, err, "PackGetFeeConfigLastChangedAt()")
 	return input
 }
 
-func packSetFeeConfigInput(t testing.TB, config commontype.ACP224FeeConfig) []byte {
+func assertPackSetFeeConfigInput(t testing.TB, config commontype.ACP224FeeConfig) []byte {
 	t.Helper()
 	input, err := acp224feemanager.PackSetFeeConfig(config)
 	require.NoError(t, err, "PackSetFeeConfig()")
 	return input
 }
 
-func storeTestFeeConfig(t testing.TB, state *extstate.StateDB) {
+func assertStoreTestFeeConfig(t testing.TB, state *extstate.StateDB) {
 	t.Helper()
-	allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address)(t, state)
 	require.NoError(t, acp224feemanager.StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
 }
 
@@ -61,47 +60,56 @@ var tests = []precompiletest.PrecompileTest{
 		Name:        "getFeeConfig_from_NoRole",
 		Caller:      allowlisttest.TestNoRoleAddr,
 		BeforeHook:  allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
-		InputFn:     packGetFeeConfigInput,
+		InputFn:     assertPackGetFeeConfigInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
-		ExpectedRes: mustPackGetFeeConfigOutput(commontype.ACP224FeeConfig{}),
+		ExpectedRes: mustPackGetFeeConfigOutput(commontype.DefaultACP224FeeConfig),
 	},
 	{
 		Name:        "getFeeConfig_from_Enabled",
 		Caller:      allowlisttest.TestEnabledAddr,
 		BeforeHook:  allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
-		InputFn:     packGetFeeConfigInput,
+		InputFn:     assertPackGetFeeConfigInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
-		ExpectedRes: mustPackGetFeeConfigOutput(commontype.ACP224FeeConfig{}),
+		ExpectedRes: mustPackGetFeeConfigOutput(commontype.DefaultACP224FeeConfig),
 	},
 	{
 		Name:        "getFeeConfig_from_Manager",
 		Caller:      allowlisttest.TestManagerAddr,
 		BeforeHook:  allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
-		InputFn:     packGetFeeConfigInput,
+		InputFn:     assertPackGetFeeConfigInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
-		ExpectedRes: mustPackGetFeeConfigOutput(commontype.ACP224FeeConfig{}),
+		ExpectedRes: mustPackGetFeeConfigOutput(commontype.DefaultACP224FeeConfig),
 	},
 	{
 		Name:        "getFeeConfig_from_Admin",
 		Caller:      allowlisttest.TestAdminAddr,
 		BeforeHook:  allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
-		InputFn:     packGetFeeConfigInput,
+		InputFn:     assertPackGetFeeConfigInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
-		ExpectedRes: mustPackGetFeeConfigOutput(commontype.ACP224FeeConfig{}),
+		ExpectedRes: mustPackGetFeeConfigOutput(commontype.DefaultACP224FeeConfig),
 	},
 	{
-		Name:       "getFeeConfig_after_store_returns_new_config",
-		Caller:     allowlisttest.TestEnabledAddr,
-		BeforeHook: storeTestFeeConfig,
-		InputFn:    packGetFeeConfigInput,
-
+		Name:    "getFeeConfig_returns_initialFeeConfig_from_configure",
+		Caller:  allowlisttest.TestNoRoleAddr,
+		InputFn: assertPackGetFeeConfigInput,
+		Config: &acp224feemanager.Config{
+			InitialFeeConfig: &testFeeConfig,
+		},
+		SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
+		ExpectedRes: mustPackGetFeeConfigOutput(testFeeConfig),
+	},
+	{
+		Name:        "getFeeConfig_after_store_returns_new_config",
+		Caller:      allowlisttest.TestEnabledAddr,
+		BeforeHook:  assertStoreTestFeeConfig,
+		InputFn:     assertPackGetFeeConfigInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigGasCost,
 		ExpectedRes: mustPackGetFeeConfigOutput(testFeeConfig),
 	},
 	{
 		Name:        "getFeeConfig_insufficient_gas",
 		Caller:      allowlisttest.TestNoRoleAddr,
-		InputFn:     packGetFeeConfigInput,
+		InputFn:     assertPackGetFeeConfigInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigGasCost - 1,
 		ExpectedErr: vm.ErrOutOfGas,
 	},
@@ -110,39 +118,39 @@ var tests = []precompiletest.PrecompileTest{
 	{
 		Name:        "getFeeConfigLastChangedAt_from_NoRole",
 		Caller:      allowlisttest.TestNoRoleAddr,
-		BeforeHook:  storeTestFeeConfig,
-		InputFn:     packGetFeeConfigLastChangedAtInput,
+		BeforeHook:  assertStoreTestFeeConfig,
+		InputFn:     assertPackGetFeeConfigLastChangedAtInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost,
 		ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(testBlockNumber),
 	},
 	{
 		Name:        "getFeeConfigLastChangedAt_from_Enabled",
 		Caller:      allowlisttest.TestEnabledAddr,
-		BeforeHook:  storeTestFeeConfig,
-		InputFn:     packGetFeeConfigLastChangedAtInput,
+		BeforeHook:  assertStoreTestFeeConfig,
+		InputFn:     assertPackGetFeeConfigLastChangedAtInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost,
 		ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(testBlockNumber),
 	},
 	{
 		Name:        "getFeeConfigLastChangedAt_from_Manager",
 		Caller:      allowlisttest.TestManagerAddr,
-		BeforeHook:  storeTestFeeConfig,
-		InputFn:     packGetFeeConfigLastChangedAtInput,
+		BeforeHook:  assertStoreTestFeeConfig,
+		InputFn:     assertPackGetFeeConfigLastChangedAtInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost,
 		ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(testBlockNumber),
 	},
 	{
 		Name:        "getFeeConfigLastChangedAt_from_Admin",
 		Caller:      allowlisttest.TestAdminAddr,
-		BeforeHook:  storeTestFeeConfig,
-		InputFn:     packGetFeeConfigLastChangedAtInput,
+		BeforeHook:  assertStoreTestFeeConfig,
+		InputFn:     assertPackGetFeeConfigLastChangedAtInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost,
 		ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(testBlockNumber),
 	},
 	{
 		Name:        "getFeeConfigLastChangedAt_insufficient_gas",
 		Caller:      allowlisttest.TestNoRoleAddr,
-		InputFn:     packGetFeeConfigLastChangedAtInput,
+		InputFn:     assertPackGetFeeConfigLastChangedAtInput,
 		SuppliedGas: acp224feemanager.GetFeeConfigLastChangedAtGasCost - 1,
 		ExpectedErr: vm.ErrOutOfGas,
 	},
@@ -153,7 +161,7 @@ var tests = []precompiletest.PrecompileTest{
 		Caller:     allowlisttest.TestNoRoleAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			return packSetFeeConfigInput(t, testFeeConfig)
+			return assertPackSetFeeConfigInput(t, testFeeConfig)
 		},
 		SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
 		ExpectedErr: acp224feemanager.ErrCannotSetFeeConfig,
@@ -163,7 +171,7 @@ var tests = []precompiletest.PrecompileTest{
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			return packSetFeeConfigInput(t, testFeeConfig)
+			return assertPackSetFeeConfigInput(t, testFeeConfig)
 		},
 		SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
 		ExpectedRes: []byte{},
@@ -173,7 +181,7 @@ var tests = []precompiletest.PrecompileTest{
 		Caller:     allowlisttest.TestManagerAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			return packSetFeeConfigInput(t, testFeeConfig)
+			return assertPackSetFeeConfigInput(t, testFeeConfig)
 		},
 		SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
 		ExpectedRes: []byte{},
@@ -183,7 +191,7 @@ var tests = []precompiletest.PrecompileTest{
 		Caller:     allowlisttest.TestAdminAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			return packSetFeeConfigInput(t, testFeeConfig)
+			return assertPackSetFeeConfigInput(t, testFeeConfig)
 		},
 		SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
 		ExpectedRes: []byte{},
@@ -193,7 +201,7 @@ var tests = []precompiletest.PrecompileTest{
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			return packSetFeeConfigInput(t, testFeeConfig)
+			return assertPackSetFeeConfigInput(t, testFeeConfig)
 		},
 		SuppliedGas: acp224feemanager.SetFeeConfigGasCost,
 		ReadOnly:    true,
@@ -203,7 +211,7 @@ var tests = []precompiletest.PrecompileTest{
 		Name:   "setFeeConfig_insufficient_gas",
 		Caller: allowlisttest.TestEnabledAddr,
 		InputFn: func(t testing.TB) []byte {
-			return packSetFeeConfigInput(t, testFeeConfig)
+			return assertPackSetFeeConfigInput(t, testFeeConfig)
 		},
 		SuppliedGas: acp224feemanager.SetFeeConfigGasCost - 1,
 		ExpectedErr: vm.ErrOutOfGas,
@@ -213,7 +221,7 @@ var tests = []precompiletest.PrecompileTest{
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			return packSetFeeConfigInput(t, testFeeConfig)
+			return assertPackSetFeeConfigInput(t, testFeeConfig)
 		},
 		SetupBlockContext: func(mbc *contract.MockBlockContext) {
 			mbc.EXPECT().Number().Return((*big.Int)(nil)).AnyTimes()
@@ -227,7 +235,7 @@ var tests = []precompiletest.PrecompileTest{
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			return packSetFeeConfigInput(t, commontype.ACP224FeeConfig{
+			return assertPackSetFeeConfigInput(t, commontype.ACP224FeeConfig{
 				TargetGas:    commontype.MinTargetGasACP224,
 				TimeToDouble: 60,
 			})
@@ -240,7 +248,7 @@ var tests = []precompiletest.PrecompileTest{
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(acp224feemanager.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			return packSetFeeConfigInput(t, testFeeConfig)
+			return assertPackSetFeeConfigInput(t, testFeeConfig)
 		},
 		SetupBlockContext: func(mbc *contract.MockBlockContext) {
 			mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
@@ -261,10 +269,9 @@ var tests = []precompiletest.PrecompileTest{
 			require.Equal(t, acp224feemanager.ContractAddress, log.Address, "log address")
 
 			require.Len(t, log.Topics, 2, "topics (event sig + indexed sender)")
-			var zeroConfig commontype.ACP224FeeConfig
 			wantTopics, _, err := acp224feemanager.PackFeeConfigUpdatedEvent(
 				allowlisttest.TestEnabledAddr,
-				zeroConfig,
+				commontype.DefaultACP224FeeConfig,
 				testFeeConfig,
 			)
 			require.NoError(t, err, "PackFeeConfigUpdatedEvent()")
@@ -272,7 +279,7 @@ var tests = []precompiletest.PrecompileTest{
 
 			unpacked, err := acp224feemanager.UnpackFeeConfigUpdatedEventData(log.Data)
 			require.NoError(t, err, "UnpackFeeConfigUpdatedEventData()")
-			require.Equal(t, zeroConfig, unpacked.OldFeeConfig, "old fee config in event")
+			require.Equal(t, commontype.DefaultACP224FeeConfig, unpacked.OldFeeConfig, "old fee config in event")
 			require.Equal(t, testFeeConfig, unpacked.NewFeeConfig, "new fee config in event")
 		},
 	},

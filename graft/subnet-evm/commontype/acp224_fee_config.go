@@ -8,8 +8,8 @@ import "errors"
 const MinTargetGasACP224 uint64 = 1_000_000
 
 var DefaultACP224FeeConfig = ACP224FeeConfig{
-	TargetGas:    15_000_000,
-	MinGasPrice:  25_000_000_000,
+	TargetGas:    1_000_000,
+	MinGasPrice:  1,
 	TimeToDouble: 60,
 }
 
