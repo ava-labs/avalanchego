@@ -1,20 +1,52 @@
 # Release Notes
 
-## Pending (v1.14.2)
+## Pending (v1.14.3)
+
+### Breaking Changes
+
+- I am a breaking change that should be updated!
+
+## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
+
+The plugin version is updated to `45`; all plugins must update to be compatible.
 
 ### Breaking Changes
 
 - Removed `graft/subnet-evm/compatibility.json` in favor of using a single source of truth in `version/compatibility.json`. External tools that relied on this file should now use `version/compatibility.json` from the main AvalancheGo repository.
+- Removed `GetWarpValidatorSet` RPC from the ValidatorState service as part of granite cleanup.
+- Replaced `DelegateeReward` API with a generalized reward API.
 
 ### Config
 
 - Removed `pull-gossip-poll-size` from the X-chain and P-chain configs.
 - Removed `proposerMinBlockDelay` from subnet configs.
 
+### Firewood
+
+- Updated Firewood to v0.3.1 (from initial v0.1.0 integration).
+- Added Firewood as a state syncer.
+- Enabled Firewood deferred persistence.
+- Removed `FreeListCache` from Firewood config.
+- Fixed Firewood metrics registration to always register when enabled.
+- Increased Firewood commit interval.
+- Early return unsupported APIs in Firewood.
+
+### Consensus
+
+- Introduced Simplex consensus engine and parameters (experimental).
+- Added histogram for consensus latencies.
+- Added health check failure when average block acceptance times are too high.
+- Improved benchlisting with EWMA logic and greedy eviction of worst offenders at capacity.
+
 ### Fixes
 
 - Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space.
 - Updated minimum go version to `v1.25.8`.
+- Fixed crash in `TraceCall` with `BlockOverrides`.
+- Fixed snapshot generation shutdown race.
+- Improved logging: selectively log warning or error depending on time elapsed since bootstrapping.
+- PlatformVM: Support arbitrary validator additions and deletions.
+- Used clock time instead of `time.Until` in proposerVM for improved accuracy.
 
 ## [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1)
 
