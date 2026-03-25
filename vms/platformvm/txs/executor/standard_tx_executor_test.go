@@ -4438,7 +4438,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		AccruedDelegateeRewards:  0,
 		AutoCompoundRewardShares: 200_000,
 		Period:                   continuationPeriod,
-		StakerEndTime:            uint64(diff.GetTimestamp().Add(continuationPeriod).Unix()),
 	}
 	require.Equal(t, wantStakingInfo, stakingInfo)
 

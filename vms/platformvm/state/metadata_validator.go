@@ -33,16 +33,15 @@ type validatorMetadata struct {
 	PotentialDelegateeReward uint64        `v0:"true"`
 	StakerStartTime          uint64        `          v1:"true"`
 
-	txID        ids.ID
-	lastUpdated time.Time
-
 	// ACP-236
 	// Weight is computed as: tx.Weight + AccruedRewards + AccruedDelegateeRewards
 	AccruedRewards           uint64 `v2:"true"`
 	AccruedDelegateeRewards  uint64 `v2:"true"`
 	AutoCompoundRewardShares uint32 `v2:"true"`
 	Period                   uint64 `v2:"true"` // Duration in seconds
-	StakerEndTime            uint64 `v2:"true"` // Unix time when the current cycle ends
+
+	txID        ids.ID
+	lastUpdated time.Time
 }
 
 // Permissioned validators originally wrote their values as nil.
@@ -102,7 +101,6 @@ func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
 		AccruedDelegateeRewards:  vdrMetadata.AccruedDelegateeRewards,
 		AutoCompoundRewardShares: vdrMetadata.AutoCompoundRewardShares,
 		Period:                   time.Duration(vdrMetadata.Period) * time.Second,
-		StakerEndTime:            vdrMetadata.StakerEndTime,
 	}
 }
 
@@ -217,7 +215,6 @@ func (vs *validatorState) SetStakingInfo(
 	metadata.AccruedDelegateeRewards = stakingInfo.AccruedDelegateeRewards
 	metadata.AutoCompoundRewardShares = stakingInfo.AutoCompoundRewardShares
 	metadata.Period = uint64(stakingInfo.Period / time.Second)
-	metadata.StakerEndTime = stakingInfo.StakerEndTime
 
 	vs.addUpdatedTxID(vdrID, subnetID, metadata.txID)
 	return nil

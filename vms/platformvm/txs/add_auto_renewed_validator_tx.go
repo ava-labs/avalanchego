@@ -83,8 +83,8 @@ func (tx *AddAutoRenewedValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	if err := tx.Signer.Verify(); err != nil {
 		return nil, false, err
 	}
-	key := tx.Signer.Key()
-	return key, key != nil, nil
+
+	return tx.Signer.Key(), true, nil
 }
 
 func (tx *AddAutoRenewedValidatorTx) Weight() uint64 {
@@ -109,22 +109,6 @@ func (tx *AddAutoRenewedValidatorTx) DelegationRewardsOwner() fx.Owner {
 
 func (tx *AddAutoRenewedValidatorTx) Shares() uint32 {
 	return tx.DelegationShares
-}
-
-func (tx *AddAutoRenewedValidatorTx) RenewalPeriod() uint64 {
-	return tx.Period
-}
-
-func (tx *AddAutoRenewedValidatorTx) CompoundRewardShares() uint32 {
-	return tx.AutoCompoundRewardShares
-}
-
-func (tx *AddAutoRenewedValidatorTx) ConfigOwner() fx.Owner {
-	return tx.Owner
-}
-
-func (tx *AddAutoRenewedValidatorTx) GetSigner() signer.Signer {
-	return tx.Signer
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this

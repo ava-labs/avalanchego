@@ -24,10 +24,6 @@ type RewardAutoRenewedValidatorTx struct {
 	unsignedBytes []byte // Unsigned byte representation of this data
 }
 
-func (tx *RewardAutoRenewedValidatorTx) StakerTxID() ids.ID {
-	return tx.TxID
-}
-
 func (tx *RewardAutoRenewedValidatorTx) SetBytes(unsignedBytes []byte) {
 	tx.unsignedBytes = unsignedBytes
 }

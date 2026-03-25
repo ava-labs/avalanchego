@@ -1930,11 +1930,12 @@ func (s *State) loadCurrentValidators() error {
 				return fmt.Errorf("overflow computing weight: %w", err)
 			}
 
+			start := time.Unix(int64(metadata.StakerStartTime), 0)
 			staker, err = NewStaker(
 				txID,
 				stakerTx,
-				time.Unix(int64(metadata.StakerStartTime), 0),
-				time.Unix(int64(metadata.StakerEndTime), 0),
+				start,
+				start.Add(time.Duration(stakerTx.Period)),
 				weight,
 				metadata.PotentialReward,
 			)

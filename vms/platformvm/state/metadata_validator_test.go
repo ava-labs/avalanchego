@@ -459,8 +459,6 @@ func TestParseValidatorMetadata(t *testing.T) {
 				0x00, 0x04, 0x93, 0xE0,
 				// renewal period
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x51, 0x80,
-				// staker end time (400000 = 0x61A80)
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x1A, 0x80,
 			},
 			expected: &validatorMetadata{
 				UpDuration:               6000000,
@@ -473,7 +471,6 @@ func TestParseValidatorMetadata(t *testing.T) {
 				AccruedDelegateeRewards:  500,
 				AutoCompoundRewardShares: 300000,
 				Period:                   86400,
-				StakerEndTime:            400000,
 			},
 			expectedErr: nil,
 		},

@@ -141,17 +141,19 @@ func (*options) ApricotAtomicBlock(*block.ApricotAtomicBlock) error {
 	return snowman.ErrNotOracle
 }
 
-type rewardStakerTx interface {
-	StakerTxID() ids.ID
-}
-
 func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
-	unsignedTx, ok := tx.Unsigned.(rewardStakerTx)
-	if !ok {
+	var rewardTxID ids.ID
+
+	switch utx := tx.Unsigned.(type) {
+	case *txs.RewardValidatorTx:
+		rewardTxID = utx.TxID
+	case *txs.RewardAutoRenewedValidatorTx:
+		rewardTxID = utx.TxID
+	default:
 		return false, fmt.Errorf("%w: %T", errUnexpectedProposalTxType, tx.Unsigned)
 	}
 
-	stakerTx, _, err := o.state.GetTx(unsignedTx.StakerTxID())
+	stakerTx, _, err := o.state.GetTx(rewardTxID)
 	if err != nil {
 		return false, fmt.Errorf("%w: %w", errFailedFetchingStakerTx, err)
 	}

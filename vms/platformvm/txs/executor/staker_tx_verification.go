@@ -898,7 +898,7 @@ func verifyAddAutoRenewedValidatorTx(
 		return nil
 	}
 
-	duration := time.Duration(tx.RenewalPeriod()) * time.Second
+	duration := time.Duration(tx.Period) * time.Second
 
 	switch {
 	case tx.Weight() < backend.Config.MinValidatorStake:
