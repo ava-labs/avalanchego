@@ -4,7 +4,7 @@
 
 ### Breaking Changes
 
-- I am a breaking change that should be updated!
+- None.
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 
