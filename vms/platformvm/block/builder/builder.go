@@ -656,19 +656,19 @@ func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
 	return tx, tx.SyntacticVerify(ctx)
 }
 
-func NewRewardAutoRenewedValidatorTx(ctx *snow.Context, txID ids.ID, timestamp uint64) (*txs.Tx, error) {
+func NewRewardTxForStaker(ctx *snow.Context, stakerTx *txs.Tx, timestamp time.Time) (*txs.Tx, error) {
+	if _, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx); ok {
+		return newRewardAutoRenewedValidatorTx(ctx, stakerTx.ID(), uint64(timestamp.Unix()))
+	}
+
+	return NewRewardValidatorTx(ctx, stakerTx.ID())
+}
+
+func newRewardAutoRenewedValidatorTx(ctx *snow.Context, txID ids.ID, timestamp uint64) (*txs.Tx, error) {
 	utx := &txs.RewardAutoRenewedValidatorTx{TxID: txID, Timestamp: timestamp}
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)
 	if err != nil {
 		return nil, err
 	}
 	return tx, tx.SyntacticVerify(ctx)
-}
-
-func NewRewardTxForStaker(ctx *snow.Context, stakerTx *txs.Tx, timestamp time.Time) (*txs.Tx, error) {
-	if _, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx); ok {
-		return NewRewardAutoRenewedValidatorTx(ctx, stakerTx.ID(), uint64(timestamp.Unix()))
-	}
-
-	return NewRewardValidatorTx(ctx, stakerTx.ID())
 }
