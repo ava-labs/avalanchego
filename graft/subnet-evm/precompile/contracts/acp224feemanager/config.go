@@ -17,7 +17,7 @@ var _ precompileconfig.Config = (*Config)(nil)
 type Config struct {
 	allowlist.AllowListConfig
 	precompileconfig.Upgrade
-	InitialFeeConfig *commontype.ACP224FeeConfig `json:"initialFeeConfig,omitempty"` // activated immediately on precompile enable
+	InitialFeeConfig *commontype.ACP224FeeConfig `json:"initialFeeConfig,omitempty"` // activated immediately on precompile enable if provided
 }
 
 // NewConfig returns a config that enables ACP224FeeManager at [blockTimestamp].
