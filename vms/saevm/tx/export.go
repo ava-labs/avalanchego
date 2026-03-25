@@ -38,13 +38,17 @@ type Export struct {
 func (e *Export) InputUTXOs() set.Set[ids.ID] {
 	set := set.NewSet[ids.ID](len(e.Ins))
 	for _, in := range e.Ins {
-		var id ids.ID
-		packer := wrappers.Packer{Bytes: id[:]} // 32 bytes long
-		packer.PackLong(in.Nonce)               // add 8 bytes
-		packer.PackBytes(in.Address.Bytes())    // add 24 bytes
-		set.Add(id)
+		set.Add(NonceInputID(in.Address, in.Nonce))
 	}
 	return set
+}
+
+func NonceInputID(address common.Address, nonce uint64) ids.ID {
+	var id ids.ID
+	packer := wrappers.Packer{Bytes: id[:]} // 32 bytes long
+	packer.PackLong(nonce)                  // add 8 bytes
+	packer.PackBytes(address.Bytes())       // add 24 bytes
+	return id
 }
 
 func (e *Export) Burned(assetID ids.ID) (uint64, error) {

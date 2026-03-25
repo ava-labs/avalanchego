@@ -157,11 +157,12 @@ func (vm *SinceGenesis) Initialize(
 	txs := txpool.NewTxs()
 	hooks := hook.NewPoints(
 		snowCtx,
+		avaDB,
+		config,
 		&vm.consensusState,
 		desiredDelayExcess,
 		desiredTargetExcess,
 		txs,
-		avaDB,
 	)
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
@@ -338,6 +339,9 @@ func minNextBlockTime(h *types.Header) time.Time {
 }
 
 func (vm *SinceGenesis) RejectBlock(ctx context.Context, b *blocks.Block) error {
+	// If the block is rejected, the transactions might get dropped from the
+	// network. If the transactions are still valid, it is a better UX to add
+	// them into our mempool.
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b.EthBlock()))
 	if err != nil {
 		return fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)

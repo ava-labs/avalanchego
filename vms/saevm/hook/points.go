@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/hook"
 	"github.com/ava-labs/strevm/saedb"
 	"go.uber.org/zap"
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
@@ -39,17 +41,19 @@ var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
 
 type Points struct {
 	blockBuilder
-	db  database.Database
-	txs *txpool.Txs
+	db          database.Database
+	chainConfig *gethparams.ChainConfig
+	txs         *txpool.Txs
 }
 
 func NewPoints(
 	ctx *snow.Context,
+	db database.Database,
+	chainConfig *gethparams.ChainConfig,
 	consensusState *utils.Atomic[snow.State],
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
 	pool *txpool.Txs,
-	db database.Database,
 ) *Points {
 	return &Points{
 		blockBuilder{
@@ -62,6 +66,7 @@ func NewPoints(
 			potentialTxs: pool.Iter,
 		},
 		db,
+		chainConfig,
 		pool,
 	}
 }
@@ -160,11 +165,6 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
-	}
-
-	// TODO: Remove txs from the mempool whose nonces are no longer correct.
-	for _, tx := range txs {
-		p.txs.RemoveConflicts(tx.InputUTXOs())
 	}
 
 	extstatedb := extstate.New(statedb)
@@ -299,6 +299,25 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 	if err := p.ctx.SharedMemory.Apply(ops, batch); err != nil {
 		return fmt.Errorf("failed to apply atomic ops of block %s (%d) to shared memory: %w", b.Hash(), height, err)
 	}
+
+	// Removing the transactions should be done last, so that there isn't a race
+	// between mempool inclusion and block execution.
+	var (
+		signer = blocks.Signer(b, p.chainConfig)
+		inputs set.Set[ids.ID]
+	)
+	for i, t := range b.Transactions() {
+		sender, err := signer.Sender(t)
+		if err != nil {
+			return fmt.Errorf("problem getting sender of tx %s (%d) in block %s (%d): %w", t.Hash(), i, b.Hash(), b.NumberU64(), err)
+		}
+		inputs.Add(tx.NonceInputID(sender, t.Nonce()))
+	}
+	for _, tx := range txs {
+		inputs.Union(tx.InputUTXOs())
+	}
+	// TODO: Guarantee that this can't race with tx inclusion into the mempool.
+	p.txs.RemoveConflicts(inputs)
 	return nil
 }
 
