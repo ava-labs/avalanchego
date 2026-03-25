@@ -24,10 +24,10 @@ The plugin version is updated to `45`; all plugins must update to be compatible.
 
 ### Firewood
 
-- Updated Firewood to v0.3.1 (from initial v0.1.0 integration).
-- Enabled Firewood deferred persistence for non-pruning nodes
+- Updated Firewood to v0.3.1 (from v0.0.18).
+- Enabled Firewood deferred persistence for non-pruning nodes.
 - Fixed Firewood metrics to always be registered whenever metrics are enabled.
-- Unsupported APIs return an error.
+- Unsupported APIs now return an error when Firewood is enabled.
 
 ### Consensus
 
@@ -39,12 +39,10 @@ The plugin version is updated to `45`; all plugins must update to be compatible.
 ### Fixes
 
 - Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space.
-- Updated minimum go version to `v1.25.8`.
+- Updated minimum Go version from 1.24 to `v1.25.8`.
 - Fixed crash in `TraceCall` with `BlockOverrides`.
 - Fixed snapshot generation shutdown race.
 - Improved logging: selectively log warning or error depending on time elapsed since bootstrapping.
-- PlatformVM: Support arbitrary validator additions and deletions.
-- Used clock time instead of `time.Until` in proposerVM for improved accuracy.
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.1...v1.14.2
 
