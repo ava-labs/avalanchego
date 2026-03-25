@@ -33,16 +33,17 @@ const (
 var (
 	_ txs.Visitor = (*proposalTxExecutor)(nil)
 
-	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
-	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
-	ErrInvalidState                  = errors.New("generated output isn't valid state")
-	ErrShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
-	ErrShouldBeAutoRenewedStaker     = errors.New("expected auto renewed staker")
-	ErrInvalidTimestamp              = errors.New("invalid timestamp")
-	ErrWrongTxType                   = errors.New("wrong transaction type")
-	ErrInvalidID                     = errors.New("invalid ID")
-	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
-	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
+	ErrRemoveStakerTooEarly                = errors.New("attempting to remove staker before their end time")
+	ErrRemoveWrongStaker                   = errors.New("attempting to remove wrong staker")
+	ErrInvalidState                        = errors.New("generated output isn't valid state")
+	ErrShouldBePermissionlessStaker        = errors.New("expected permissionless staker")
+	ErrShouldBeAutoRenewedStaker           = errors.New("expected auto renewed staker")
+	ErrShouldUseRewardAutoRenewedValidator = errors.New("auto-renewed validators must be rewarded with RewardAutoRenewedValidatorTx")
+	ErrInvalidTimestamp                    = errors.New("invalid timestamp")
+	ErrWrongTxType                         = errors.New("wrong transaction type")
+	ErrInvalidID                           = errors.New("invalid ID")
+	ErrProposedAddStakerTxAfterBanff       = errors.New("staker transaction proposed after Banff")
+	ErrAdvanceTimeTxIssuedAfterBanff       = errors.New("AdvanceTimeTx issued after Banff")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -390,7 +391,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
 		if _, ok := uStakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
-			return ErrShouldBePermissionlessStaker
+			return ErrShouldUseRewardAutoRenewedValidator
 		}
 
 		if err := e.rewardValidatorTx(uStakerTx, stakerToReward); err != nil {

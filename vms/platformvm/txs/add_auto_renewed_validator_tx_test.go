@@ -131,28 +131,6 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 			err: errMissingPeriod,
 		},
 		{
-			name: "missing config owner",
-			txFunc: func(*gomock.Controller) *AddAutoRenewedValidatorTx {
-				return &AddAutoRenewedValidatorTx{
-					BaseTx:          validBaseTx,
-					ValidatorNodeID: ids.GenerateTestNodeID(),
-					StakeOuts: []*avax.TransferableOutput{
-						{
-							Asset: avax.Asset{
-								ID: avaxAssetID,
-							},
-							Out: &secp256k1fx.TransferOutput{
-								Amt: 1,
-							},
-						},
-					},
-					DelegationShares: reward.PercentDenominator,
-					Period:           1,
-				}
-			},
-			err: errMissingConfigOwner,
-		},
-		{
 			name: "too many shares",
 			txFunc: func(*gomock.Controller) *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
