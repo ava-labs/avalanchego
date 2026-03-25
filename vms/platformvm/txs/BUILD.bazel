@@ -82,7 +82,6 @@ go_test(
         "priorities_test.go",
         "register_l1_validator_tx_test.go",
         "remove_subnet_validator_tx_test.go",
-        "reward_auto_renewed_validator_tx_test.go",
         "set_auto_renewed_validator_config_tx_test.go",
         "set_l1_validator_weight_tx_test.go",
         "subnet_validator_test.go",
