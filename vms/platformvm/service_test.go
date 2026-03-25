@@ -1652,3 +1652,106 @@ func FuzzGetValidatorFeeState(f *testing.F) {
 		require.Equal(expectedReply, reply)
 	})
 }
+
+// TestGetCurrentValidatorsAutoRenewedConfigUpdate verifies that after a
+// SetAutoRenewedValidatorConfigTx, GetCurrentValidators returns the updated
+// Period and AutoCompoundRewardShares from StakingInfo, not the stale values
+// from the original AddAutoRenewedValidatorTx.
+func TestGetCurrentValidatorsAutoRenewedConfigUpdate(t *testing.T) {
+	require := require.New(t)
+	service, _ := defaultService(t)
+
+	service.vm.ctx.Lock.Lock()
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	wallet := newWallet(t, service.vm, walletConfig{})
+
+	const (
+		originalPeriod              = defaultMinStakingDuration
+		originalAutoCompoundShares  = uint32(400_000)
+		updatedAutoCompoundShares   = uint32(100_000)
+	)
+	updatedPeriod := 2 * defaultMinStakingDuration
+
+	// Issue an AddAutoRenewedValidatorTx with known period and autoCompoundRewardShares.
+	nodeID := ids.GenerateTestNodeID()
+	addTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+		nodeID,
+		service.vm.MinValidatorStake,
+		pop,
+		service.vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()}}, // rewards owner
+		100_000, // 10% taken from delegation rewards
+		originalAutoCompoundShares,
+		originalPeriod,
+	)
+	require.NoError(err)
+
+	addUnsigned := addTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+	startTime := service.vm.clock.Time()
+	staker, err := state.NewStaker(
+		addTx.ID(),
+		addUnsigned,
+		startTime,
+		startTime.Add(originalPeriod),
+		addUnsigned.Weight(),
+		0,
+	)
+	require.NoError(err)
+
+	require.NoError(service.vm.state.PutCurrentValidator(staker))
+	service.vm.state.AddTx(addTx, status.Committed)
+	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
+		AutoCompoundRewardShares: originalAutoCompoundShares,
+		Period:                   originalPeriod,
+	}))
+	require.NoError(service.vm.state.Commit())
+
+	service.vm.ctx.Lock.Unlock()
+
+	// Verify the original values are returned.
+	args := GetCurrentValidatorsArgs{
+		SubnetID: constants.PrimaryNetworkID,
+		NodeIDs:  []ids.NodeID{nodeID},
+	}
+	response := GetCurrentValidatorsReply{}
+	require.NoError(service.GetCurrentValidators(nil, &args, &response))
+	require.Len(response.Validators, 1)
+
+	vdr := response.Validators[0].(pchainapi.PermissionlessValidator)
+	require.Equal(avajson.Uint64(originalPeriod/time.Second), *vdr.Period)
+	require.Equal(avajson.Uint32(originalAutoCompoundShares), *vdr.AutoCompoundRewardShares)
+
+	// Now simulate a SetAutoRenewedValidatorConfigTx by directly updating StakingInfo
+	// with new period and autoCompoundRewardShares values.
+	service.vm.ctx.Lock.Lock()
+
+	// Clear the cache so the service re-reads from state (not from cached tx attributes).
+	service.stakerAttributesCache.Flush()
+
+	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
+		AutoCompoundRewardShares: updatedAutoCompoundShares,
+		Period:                   updatedPeriod,
+	}))
+	require.NoError(service.vm.state.Commit())
+
+	service.vm.ctx.Lock.Unlock()
+
+	// After the config update, GetCurrentValidators must return the NEW values.
+	// This test exposes the bug: service reads from the original tx instead of StakingInfo.
+	response = GetCurrentValidatorsReply{}
+	require.NoError(service.GetCurrentValidators(nil, &args, &response))
+	require.Len(response.Validators, 1)
+
+	vdr = response.Validators[0].(pchainapi.PermissionlessValidator)
+	require.Equal(avajson.Uint64(updatedPeriod/time.Second), *vdr.Period,
+		"Period should reflect the value from SetAutoRenewedValidatorConfigTx, not the original tx")
+	require.Equal(avajson.Uint32(updatedAutoCompoundShares), *vdr.AutoCompoundRewardShares,
+		"AutoCompoundRewardShares should reflect the value from SetAutoRenewedValidatorConfigTx, not the original tx")
+}
