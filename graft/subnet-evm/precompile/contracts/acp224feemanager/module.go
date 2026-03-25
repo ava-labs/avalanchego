@@ -48,7 +48,7 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 	if !ok {
 		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)
 	}
-	initialFeeConfig := commontype.DefaultACP224FeeConfig
+	initialFeeConfig := commontype.DefaultACP224FeeConfig()
 	if config.InitialFeeConfig != nil {
 		initialFeeConfig = *config.InitialFeeConfig
 	}

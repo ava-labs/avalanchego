@@ -101,8 +101,10 @@ func fromABIFeeConfig(c abiFeeConfig) (commontype.ACP224FeeConfig, error) {
 	}, nil
 }
 
+var trueHash = common.BigToHash(common.Big1)
+
 func hashToBool(h common.Hash) bool {
-	return h != (common.Hash{})
+	return h == trueHash
 }
 
 func boolToHash(b bool) common.Hash {
@@ -125,19 +127,16 @@ func SetACP224FeeManagerAllowListStatus(stateDB contract.StateDB, address common
 }
 
 // GetStoredFeeConfig returns the fee config from contract storage.
-// If no config has been stored, it returns DefaultACP224FeeConfig.
+// Configure always stores a value during activation, so the caller
+// MUST NOT call this before the precompile has been configured.
 func GetStoredFeeConfig(stateDB contract.StateReader) commontype.ACP224FeeConfig {
-	config := commontype.ACP224FeeConfig{
+	return commontype.ACP224FeeConfig{
 		ValidatorTargetGas: hashToBool(stateDB.GetState(ContractAddress, validatorTargetGasStorageKey)),
 		TargetGas:          stateDB.GetState(ContractAddress, targetGasStorageKey).Big().Uint64(),
 		StaticPricing:      hashToBool(stateDB.GetState(ContractAddress, staticPricingStorageKey)),
 		MinGasPrice:        stateDB.GetState(ContractAddress, minGasPriceStorageKey).Big().Uint64(),
 		TimeToDouble:       stateDB.GetState(ContractAddress, timeToDoubleStorageKey).Big().Uint64(),
 	}
-	if config == (commontype.ACP224FeeConfig{}) {
-		return commontype.DefaultACP224FeeConfig
-	}
-	return config
 }
 
 // GetFeeConfigLastChangedAt returns the block number of the last fee config update.
@@ -218,7 +217,7 @@ func PackGetFeeConfigLastChangedAtOutput(blockNumber *big.Int) ([]byte, error) {
 func UnpackGetFeeConfigLastChangedAtOutput(output []byte) (*big.Int, error) {
 	res, err := ACP224FeeManagerABI.Unpack("getFeeConfigLastChangedAt", output)
 	if err != nil {
-		return new(big.Int), err
+		return nil, err
 	}
 	unpacked := *abi.ConvertType(res[0], new(*big.Int)).(**big.Int)
 	return unpacked, nil

@@ -23,5 +23,8 @@ graft_go_test(
         "fee_config_test.go",
     ],
     embed = [":commontype"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "//utils",
+        "@com_github_stretchr_testify//require",
+    ],
 )

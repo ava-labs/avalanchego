@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestACP224FeeConfigVerify(t *testing.T) {
@@ -17,7 +19,7 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 	}{
 		{
 			name:   "valid config",
-			config: DefaultACP224FeeConfig,
+			config: DefaultACP224FeeConfig(),
 		},
 		{
 			name: "valid with validatorTargetGas",
@@ -115,7 +117,7 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 	}{
 		{
 			name: "both equal",
-			a:    &DefaultACP224FeeConfig,
+			a:    utils.PointerTo(DefaultACP224FeeConfig()),
 			b: &ACP224FeeConfig{
 				TargetGas:    1_000_000,
 				MinGasPrice:  1,
@@ -125,9 +127,9 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 		},
 		{
 			name: "different targetGas",
-			a:    &DefaultACP224FeeConfig,
+			a:    utils.PointerTo(DefaultACP224FeeConfig()),
 			b: func() *ACP224FeeConfig {
-				c := DefaultACP224FeeConfig
+				c := DefaultACP224FeeConfig()
 				c.TargetGas = 20_000_000
 				return &c
 			}(),
@@ -135,14 +137,14 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 		},
 		{
 			name: "other nil",
-			a:    &DefaultACP224FeeConfig,
+			a:    utils.PointerTo(DefaultACP224FeeConfig()),
 			b:    nil,
 			want: false,
 		},
 		{
 			name: "receiver nil",
 			a:    nil,
-			b:    &DefaultACP224FeeConfig,
+			b:    utils.PointerTo(DefaultACP224FeeConfig()),
 			want: false,
 		},
 		{

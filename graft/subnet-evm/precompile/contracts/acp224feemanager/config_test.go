@@ -27,7 +27,7 @@ func TestVerify(t *testing.T) {
 			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 		},
 		"valid initialFeeConfig": {
-			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.DefaultACP224FeeConfig),
+			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultACP224FeeConfig())),
 		},
 		"invalid initialFeeConfig": {
 			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.ACP224FeeConfig{
@@ -60,23 +60,23 @@ func TestEqual(t *testing.T) {
 			Expected: false,
 		},
 		"non-nil initial config and nil initial config": {
-			Config:   acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.DefaultACP224FeeConfig),
+			Config:   acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultACP224FeeConfig())),
 			Other:    acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 			Expected: false,
 		},
 		"different initial config": {
-			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.DefaultACP224FeeConfig),
+			Config: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultACP224FeeConfig())),
 			Other: acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
 				func() *commontype.ACP224FeeConfig {
-					c := commontype.DefaultACP224FeeConfig
+					c := commontype.DefaultACP224FeeConfig()
 					c.TargetGas = 20_000_000
 					return &c
 				}()),
 			Expected: false,
 		},
 		"same config": {
-			Config:   acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.DefaultACP224FeeConfig),
-			Other:    acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.DefaultACP224FeeConfig),
+			Config:   acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultACP224FeeConfig())),
+			Other:    acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultACP224FeeConfig())),
 			Expected: true,
 		},
 	}

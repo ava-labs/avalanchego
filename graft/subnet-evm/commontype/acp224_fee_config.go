@@ -7,10 +7,14 @@ import "errors"
 
 const MinTargetGasACP224 uint64 = 1_000_000
 
-var DefaultACP224FeeConfig = ACP224FeeConfig{
-	TargetGas:    1_000_000,
-	MinGasPrice:  1,
-	TimeToDouble: 60,
+// DefaultACP224FeeConfig returns a fresh copy of the default ACP-224 fee
+// config so callers cannot mutate shared state.
+func DefaultACP224FeeConfig() ACP224FeeConfig {
+	return ACP224FeeConfig{
+		TargetGas:    1_000_000,
+		MinGasPrice:  1,
+		TimeToDouble: 60,
+	}
 }
 
 var (

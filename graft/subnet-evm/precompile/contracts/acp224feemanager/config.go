@@ -48,6 +48,9 @@ func (*Config) Key() string { return ConfigKey }
 
 // Equal returns true if [cfg] is a *Config identical to [c].
 func (c *Config) Equal(cfg precompileconfig.Config) bool {
+	if c == nil {
+		return cfg == nil
+	}
 	other, ok := (cfg).(*Config)
 	if !ok {
 		return false
