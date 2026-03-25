@@ -26,7 +26,6 @@ var _ ValidatorTx = (*AddAutoRenewedValidatorTx)(nil)
 var (
 	errMissingSigner                   = errors.New("missing signer")
 	errMissingPeriod                   = errors.New("missing period")
-	errMissingConfigOwner              = errors.New("missing config owner")
 	errTooManyAutoCompoundRewardShares = fmt.Errorf("a staker can only restake at most %d shares from rewards", reward.PercentDenominator)
 	errInvalidStakedAsset              = errors.New("invalid staked asset")
 )
@@ -157,8 +156,6 @@ func (tx *AddAutoRenewedValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		return errTooManyShares
 	case tx.AutoCompoundRewardShares > reward.PercentDenominator:
 		return errTooManyAutoCompoundRewardShares
-	case tx.Owner == nil:
-		return errMissingConfigOwner
 	case tx.Period == 0:
 		return errMissingPeriod
 	}

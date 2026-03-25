@@ -995,7 +995,11 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
-		return nil, ErrMissingStakerTx
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrMissingStakerTx
+		}
+
+		return nil, fmt.Errorf("error getting staker tx: %w", err)
 	}
 
 	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)

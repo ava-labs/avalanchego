@@ -1924,11 +1924,17 @@ func (s *State) loadCurrentValidators() error {
 			return err
 		}
 
-		// todo: add tests
 		var staker *Staker
 		switch stakerTx := tx.Unsigned.(type) {
 		case *txs.AddAutoRenewedValidatorTx:
-			weight := stakerTx.Weight() + metadata.AccruedRewards + metadata.AccruedDelegateeRewards
+			weight, err := safemath.Add(stakerTx.Weight(), metadata.AccruedRewards)
+			if err != nil {
+				return fmt.Errorf("overflow computing weight: %w", err)
+			}
+			weight, err = safemath.Add(weight, metadata.AccruedDelegateeRewards)
+			if err != nil {
+				return fmt.Errorf("overflow computing weight: %w", err)
+			}
 
 			staker, err = NewStaker(
 				txID,
