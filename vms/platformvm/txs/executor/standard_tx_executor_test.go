@@ -4442,12 +4442,15 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	}
 	require.Equal(t, wantStakingInfo, stakingInfo)
 
-	for utxoID := range addContVdrTx.InputIDs() {
+	inputIDs := addContVdrTx.InputIDs()
+	require.NotEmpty(t, inputIDs)
+	for utxoID := range inputIDs {
 		_, err := diff.GetUTXO(utxoID)
 		require.ErrorIs(t, err, database.ErrNotFound)
 	}
 
 	baseTxOutputUTXOs := addContVdrTx.UTXOs()
+	require.NotEmpty(t, baseTxOutputUTXOs)
 	for _, wantUTXO := range baseTxOutputUTXOs {
 		utxoID := wantUTXO.InputID()
 		utxo, err := diff.GetUTXO(utxoID)
@@ -4639,13 +4642,49 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 		},
 	}
 
+	fundingKey := genesistest.DefaultFundedKeys[0]
+	fundingAddr := fundingKey.Address()
+	existingUTXOIDs, err := env.state.UTXOIDs(fundingAddr[:], ids.Empty, 1)
+	require.NoError(t, err)
+	require.NotEmpty(t, existingUTXOIDs)
+
+	existingUTXO, err := env.state.GetUTXO(existingUTXOIDs[0])
+	require.NoError(t, err)
+
+	utxoOut := existingUTXO.Out.(*secp256k1fx.TransferOutput)
+	utxoAmount := utxoOut.Amt
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setAutoRenewedValidatorConfigTx, err := wallet.IssueSetAutoRenewedValidatorConfigTx(
+			unsignedTx, err := wallet.Builder().NewSetAutoRenewedValidatorConfigTx(
 				addAutoRenewedValidatorTx.TxID,
 				tt.newAutoCompoundRewardShares,
 				tt.newPeriod,
 			)
+			require.NoError(t, err)
+
+			unsignedTx.Ins = append(unsignedTx.Ins, &avax.TransferableInput{
+				UTXOID: existingUTXO.UTXOID,
+				Asset:  existingUTXO.Asset,
+				In: &secp256k1fx.TransferInput{
+					Amt: utxoAmount,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{0},
+					},
+				},
+			})
+			unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+				Asset: existingUTXO.Asset,
+				Out: &secp256k1fx.TransferOutput{
+					Amt:          utxoAmount,
+					OutputOwners: utxoOut.OutputOwners,
+				},
+			})
+
+			setAutoRenewedValidatorConfigTx, err := txs.NewSigned(unsignedTx, txs.Codec, [][]*secp256k1.PrivateKey{
+				{fundingKey}, // credential for the input
+				{},           // credential for the auth (empty owner)
+			})
 			require.NoError(t, err)
 
 			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
@@ -4666,6 +4705,21 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 			require.Equal(t, tt.newAutoCompoundRewardShares, stakingInfo.AutoCompoundRewardShares)
 			require.Equal(t, tt.newPeriod, stakingInfo.Period)
+
+			inputIDs := setAutoRenewedValidatorConfigTx.InputIDs()
+			require.NotEmpty(t, inputIDs)
+			for inputID := range inputIDs {
+				_, err := diff.GetUTXO(inputID)
+				require.ErrorIs(t, err, database.ErrNotFound)
+			}
+
+			outputUTXOs := setAutoRenewedValidatorConfigTx.UTXOs()
+			require.NotEmpty(t, outputUTXOs)
+			for _, wantUTXO := range outputUTXOs {
+				gotUTXO, err := diff.GetUTXO(wantUTXO.InputID())
+				require.NoError(t, err)
+				require.Equal(t, wantUTXO, gotUTXO)
+			}
 		})
 	}
 }
