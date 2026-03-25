@@ -119,8 +119,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	require.NoError(env.state.PutCurrentValidator(&state.Staker{
 		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 		NextTime: nextStakerTime,
-		TxID: ids.GenerateTestID(),
-		NodeID: ids.GenerateTestNodeID(),
+		TxID:     ids.GenerateTestID(),
+		NodeID:   ids.GenerateTestNodeID(),
 	}))
 
 	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
