@@ -46,7 +46,7 @@ The plugin version is updated to `45`; all plugins must update to be compatible.
 - PlatformVM: Support arbitrary validator additions and deletions.
 - Used clock time instead of `time.Until` in proposerVM for improved accuracy.
 
-Full Changelog: https://github.com/ava-labs/avalanchego/compare/v1.14.1...v1.14.2
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.1...v1.14.2
 
 ## [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1)
 
