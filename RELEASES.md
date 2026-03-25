@@ -25,12 +25,9 @@ The plugin version is updated to `45`; all plugins must update to be compatible.
 ### Firewood
 
 - Updated Firewood to v0.3.1 (from initial v0.1.0 integration).
-- Added Firewood as a state syncer.
-- Enabled Firewood deferred persistence.
-- Removed `FreeListCache` from Firewood config.
-- Fixed Firewood metrics registration to always register when enabled.
-- Increased Firewood commit interval.
-- Early return unsupported APIs in Firewood.
+- Enabled Firewood deferred persistence for non-pruning nodes
+- Fixed Firewood metrics to always be registered when Firewood is enabled.
+- Unsupported APIs return an error.
 
 ### Consensus
 
@@ -50,6 +47,7 @@ The plugin version is updated to `45`; all plugins must update to be compatible.
 - Used clock time instead of `time.Until` in proposerVM for improved accuracy.
 
 Full Changelog: https://github.com/ava-labs/avalanchego/compare/v1.14.1...v1.14.2
+
 ## [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1)
 
 This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0). It is optional, but encouraged.
