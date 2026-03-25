@@ -188,9 +188,9 @@ var tests = []precompiletest.PrecompileTest{
 
 	// setFeeConfig — NoRole rejected, Enabled/Manager/Admin succeed
 	{
-		Name:       "setFeeConfig_from_NoRole_rejected",
-		Caller:     allowlisttest.TestNoRoleAddr,
-		Config:     defaultConfig,
+		Name:   "setFeeConfig_from_NoRole_rejected",
+		Caller: allowlisttest.TestNoRoleAddr,
+		Config: defaultConfig,
 		InputFn: func(t testing.TB) []byte {
 			return mustPackSetFeeConfigInput(t, testFeeConfig)
 		},
@@ -198,9 +198,9 @@ var tests = []precompiletest.PrecompileTest{
 		ExpectedErr: acp224feemanager.ErrCannotSetFeeConfig,
 	},
 	{
-		Name:       "setFeeConfig_from_Enabled",
-		Caller:     allowlisttest.TestEnabledAddr,
-		Config:     defaultConfig,
+		Name:   "setFeeConfig_from_Enabled",
+		Caller: allowlisttest.TestEnabledAddr,
+		Config: defaultConfig,
 		InputFn: func(t testing.TB) []byte {
 			return mustPackSetFeeConfigInput(t, testFeeConfig)
 		},
@@ -212,9 +212,9 @@ var tests = []precompiletest.PrecompileTest{
 		},
 	},
 	{
-		Name:       "setFeeConfig_from_Manager",
-		Caller:     allowlisttest.TestManagerAddr,
-		Config:     defaultConfig,
+		Name:   "setFeeConfig_from_Manager",
+		Caller: allowlisttest.TestManagerAddr,
+		Config: defaultConfig,
 		InputFn: func(t testing.TB) []byte {
 			return mustPackSetFeeConfigInput(t, testFeeConfig)
 		},
@@ -222,9 +222,9 @@ var tests = []precompiletest.PrecompileTest{
 		ExpectedRes: []byte{},
 	},
 	{
-		Name:       "setFeeConfig_from_Admin",
-		Caller:     allowlisttest.TestAdminAddr,
-		Config:     defaultConfig,
+		Name:   "setFeeConfig_from_Admin",
+		Caller: allowlisttest.TestAdminAddr,
+		Config: defaultConfig,
 		InputFn: func(t testing.TB) []byte {
 			return mustPackSetFeeConfigInput(t, testFeeConfig)
 		},
@@ -232,9 +232,9 @@ var tests = []precompiletest.PrecompileTest{
 		ExpectedRes: []byte{},
 	},
 	{
-		Name:       "setFeeConfig_readOnly_rejected",
-		Caller:     allowlisttest.TestEnabledAddr,
-		Config:     defaultConfig,
+		Name:   "setFeeConfig_readOnly_rejected",
+		Caller: allowlisttest.TestEnabledAddr,
+		Config: defaultConfig,
 		InputFn: func(t testing.TB) []byte {
 			return mustPackSetFeeConfigInput(t, testFeeConfig)
 		},
@@ -270,9 +270,9 @@ var tests = []precompiletest.PrecompileTest{
 		ExpectedErr: acp224feemanager.ErrNilBlockNumber,
 	},
 	{
-		Name:       "setFeeConfig_invalid_config",
-		Caller:     allowlisttest.TestEnabledAddr,
-		Config:     defaultConfig,
+		Name:   "setFeeConfig_invalid_config",
+		Caller: allowlisttest.TestEnabledAddr,
+		Config: defaultConfig,
 		InputFn: func(t testing.TB) []byte {
 			return mustPackSetFeeConfigInput(t, commontype.ACP224FeeConfig{
 				TargetGas:    commontype.MinTargetGasACP224,
@@ -283,9 +283,9 @@ var tests = []precompiletest.PrecompileTest{
 		ExpectedErr: commontype.ErrMinGasPriceTooLow,
 	},
 	{
-		Name:       "setFeeConfig_emits_event",
-		Caller:     allowlisttest.TestEnabledAddr,
-		Config:     defaultConfig,
+		Name:   "setFeeConfig_emits_event",
+		Caller: allowlisttest.TestEnabledAddr,
+		Config: defaultConfig,
 		InputFn: func(t testing.TB) []byte {
 			return mustPackSetFeeConfigInput(t, testFeeConfig)
 		},
