@@ -8,6 +8,7 @@
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 
+This version is backwards compatible to [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1). It is optional, but encouraged.
 The plugin version is updated to `45`; all plugins must update to be compatible.
 
 ### Breaking Changes
