@@ -32,6 +32,7 @@ go_library(
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_strevm//blocks",
         "@com_github_ava_labs_strevm//hook",
         "@com_github_ava_labs_strevm//saedb",
         "@com_github_ava_labs_strevm//types",

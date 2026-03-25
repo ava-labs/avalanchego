@@ -17,7 +17,9 @@ go_library(
         "//utils/set",
         "//utils/setmap",
         "//vms/saevm/tx",
+        "@com_github_ava_labs_libevm//rpc",
         "@com_github_ava_labs_strevm//hook",
+        "@com_github_ava_labs_strevm//sae/rpc",
         "@com_github_holiman_uint256//:uint256",
     ],
 )

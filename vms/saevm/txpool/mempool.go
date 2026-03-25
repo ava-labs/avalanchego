@@ -8,9 +8,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/strevm/sae/rpc"
+
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
-	"github.com/ava-labs/strevm/sae/rpc"
 
 	gethrpc "github.com/ava-labs/libevm/rpc"
 )

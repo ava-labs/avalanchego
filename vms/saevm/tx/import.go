@@ -174,7 +174,7 @@ func (i *Import) VerifyCredentials(snowCtx *snow.Context, creds []verify.Verifia
 	return nil
 }
 
-func (i *Import) VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) error {
+func (*Import) VerifyState(ids.ID, libevm.StateReader) error {
 	return nil
 }
 
