@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/strevm/hook"
 	"github.com/holiman/uint256"
 
@@ -170,6 +171,10 @@ func (i *Import) VerifyCredentials(snowCtx *snow.Context, creds []verify.Verifia
 			return fmt.Errorf("%w: %w", errVerifyTransferFailed, err)
 		}
 	}
+	return nil
+}
+
+func (i *Import) VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) error {
 	return nil
 }
 

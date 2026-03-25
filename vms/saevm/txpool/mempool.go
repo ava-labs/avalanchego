@@ -6,9 +6,13 @@ package txpool
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
+	"github.com/ava-labs/strevm/sae/rpc"
+
+	gethrpc "github.com/ava-labs/libevm/rpc"
 )
 
 const maxSize = 4096
@@ -22,19 +26,36 @@ var (
 type Mempool struct {
 	*Txs
 
-	ctx *snow.Context
+	ctx      *snow.Context
+	backends rpc.GethBackends
 }
 
-func New(txs *Txs, ctx *snow.Context) *Mempool {
+func New(txs *Txs, ctx *snow.Context, backends rpc.GethBackends) *Mempool {
 	return &Mempool{
-		Txs: txs,
-		ctx: ctx,
+		Txs:      txs,
+		ctx:      ctx,
+		backends: backends,
 	}
 }
 
 func (m *Mempool) Add(rawTx *tx.Tx) error {
-	if err := rawTx.Verify(context.TODO(), m.ctx); err != nil {
-		return err
+	if err := rawTx.SanityCheck(context.TODO(), m.ctx); err != nil {
+		return fmt.Errorf("tx failed sanity check: %w", err)
+	}
+	if err := rawTx.VerifyCredentials(m.ctx, rawTx.Creds); err != nil {
+		return fmt.Errorf("tx failed credential verification: %w", err)
+	}
+	// TODO: Using the rpc backend is gross. We should make something easier to
+	// use for this.
+	// TODO: Is it okay for us to be opening so many state dbs?
+	{
+		state, _, err := m.backends.StateAndHeaderByNumber(context.TODO(), gethrpc.LatestBlockNumber)
+		if err != nil {
+			return fmt.Errorf("problem getting latest state: %w", err)
+		}
+		if err := rawTx.VerifyState(m.ctx.AVAXAssetID, state); err != nil {
+			return fmt.Errorf("tx failed state verification: %w", err)
+		}
 	}
 
 	tx, err := NewTx(rawTx, m.ctx.AVAXAssetID)

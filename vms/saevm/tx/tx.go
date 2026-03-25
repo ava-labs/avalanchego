@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/strevm/hook"
 	"github.com/holiman/uint256"
 
@@ -39,6 +40,10 @@ type Unsigned interface {
 	// VerifyCredentials verifies that the transaction is authorized by the
 	// provided credentials.
 	VerifyCredentials(snowCtx *snow.Context, creds []verify.Verifiable) error
+
+	// VerifyState verifies that the transaction is valid to be issued on the
+	// provided state.
+	VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) error
 
 	// AsOp returns the operation that this transaction performs on the EVM
 	// state.
@@ -164,17 +169,6 @@ func (t *Tx) GasPrice(avaxAssetID ids.ID) (uint256.Int, error) {
 	gasPrice.Mul(&gasPrice, x2cRate)
 	gasPrice.Div(&gasPrice, &bigGasUsed)
 	return gasPrice, nil
-}
-
-func (t *Tx) Verify(ctx context.Context, snowCtx *snow.Context) error {
-	if err := t.SanityCheck(ctx, snowCtx); err != nil {
-		return fmt.Errorf("failed sanity check: %w", err)
-	}
-	if err := t.VerifyCredentials(snowCtx, t.Creds); err != nil {
-		return fmt.Errorf("failed to verify credentials: %w", err)
-	}
-	// TODO: Verify export tx nonces.
-	return nil
 }
 
 func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {

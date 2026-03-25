@@ -135,13 +135,22 @@ func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash 
 				)
 				continue
 			}
-			if err := tx.Tx.Verify(context.TODO(), b.ctx); err != nil {
-				b.ctx.Log.Debug("tx failed verification",
+			if err := tx.Tx.SanityCheck(context.TODO(), b.ctx); err != nil {
+				b.ctx.Log.Debug("tx failed sanity check",
 					zap.Stringer("txID", tx.ID),
 					zap.Error(err),
 				)
 				continue
 			}
+			if err := tx.Tx.VerifyCredentials(b.ctx, tx.Tx.Creds); err != nil {
+				b.ctx.Log.Debug("tx failed credential verification",
+					zap.Stringer("txID", tx.ID),
+					zap.Error(err),
+				)
+				continue
+			}
+			// We don't verify state here. It is verified by the SAE builder.
+
 			if !yield(tx) {
 				return
 			}
