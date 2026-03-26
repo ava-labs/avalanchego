@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774522186704,
+  "lastUpdate": 1774527585715,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -12454,6 +12454,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
             "value": 671.6293566622693,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stylianos Rigas",
+            "username": "stylianosrigas",
+            "email": "stylianosrigas@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "e8ef9712047584ad94191abd3cbcd8fe1a35f1ee",
+          "message": "INFRA-6664: Update fuji boostrappers.json list with new IPs after migration to sa-east-1 from me-south-1 (#5125)\n\nCo-authored-by: yacovm <yacovm@users.noreply.github.com>",
+          "timestamp": "2026-03-26T08:41:38Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/e8ef9712047584ad94191abd3cbcd8fe1a35f1ee"
+        },
+        "date": 1774527584539,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - mgas/s",
+            "value": 44.9417872579279,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - ms/ggas",
+            "value": 22251.006491149194,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_parse_ms/ggas",
+            "value": 65.86329732801148,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_verify_ms/ggas",
+            "value": 22035.59206901293,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
+            "value": 148.46623974465203,
             "unit": "block_accept_ms/ggas"
           }
         ]
