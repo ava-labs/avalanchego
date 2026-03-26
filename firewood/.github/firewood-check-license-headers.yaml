@@ -59,6 +59,7 @@
       "**/tests/compile_*/**",
       "justfile",
       "scripts/**",
+      "**/BUILD.bazel",
     ],
   }
 ]

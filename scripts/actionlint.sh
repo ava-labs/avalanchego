@@ -11,6 +11,10 @@ for file in "${AVALANCHE_PATH}"/.github/workflows/*.{yml,yaml}; do
   # Skip if no matches found (in case one of the extensions doesn't exist)
   [[ -f "$file" ]] || continue
 
+  # Firewood does not yet conform to run_task.sh enforcement: it does not use
+  # Task and only some of its CI jobs use the Just task runner.
+  [[ "$(basename "$file")" == firewood-* ]] && continue
+
   # Search for scripts/* except for scripts/run_task.sh
   MATCHES=$(grep -H -n -P "scripts/(?!run_task\.sh)" "$file" || true)
   if [[ -n "${MATCHES}" ]]; then

@@ -1,9 +1,15 @@
-name: ci
+name: Firewood CI
 
 on:
   pull_request:
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-ci.yml"
   push:
-    branches: [main]
+    branches: [master]
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-ci.yml"
 
 env:
   CARGO_TERM_COLOR: always
@@ -40,6 +46,9 @@ jobs:
           - profile-key: maxperf-ethhash-logger
             profile-args: "--profile maxperf --features ethhash,logger"
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    defaults:
+      run:
+        working-directory: firewood
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -50,6 +59,7 @@ jobs:
           shared-key: ${{ matrix.profile-key }}
           cache-all-crates: true
           cache-workspace-crates: true
+          workspaces: "firewood -> target"
       # Require Cargo.lock to be up to date and ensure the registry cache is populated
       - name: Cargo Fetch (run `cargo generate-lockfile` if this fails)
         run: cargo fetch --locked --verbose
@@ -60,6 +70,9 @@ jobs:
 
   no-rust-cache-lint:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firewood
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -68,8 +81,8 @@ jobs:
       - name: Check license headers
         uses: viperproject/check-license-header@e06c65614fa9f32e099838df4dd25440c5344b32 # @v2
         with:
-          path: .
-          config: .github/check-license-headers.yaml
+          path: firewood
+          config: firewood/.github/firewood-check-license-headers.yaml
           strict: true
       - name: Format
         run: cargo fmt -- --check
@@ -103,6 +116,7 @@ jobs:
         with:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
+          workspaces: "firewood -> target"
       - uses: giraffate/clippy-action@13b9d32482f25d29ead141b79e7e04e7900281e0 # @v1 -> v1.0.1
         with:
           reporter: 'github-pr-check'
@@ -127,6 +141,9 @@ jobs:
           - profile-key: debug-all-features
             profile-args: "--all-features"
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    defaults:
+      run:
+        working-directory: firewood
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -136,6 +153,7 @@ jobs:
         with:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
+          workspaces: "firewood -> target"
       - name: Clippy
         run: cargo clippy --locked ${{ matrix.profile-args }} --workspace --all-targets -- -D warnings
 
@@ -160,6 +178,9 @@ jobs:
           - profile-key: maxperf-ethhash-logger
             profile-args: "--cargo-profile maxperf --features ethhash,logger"
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    defaults:
+      run:
+        working-directory: firewood
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -168,6 +189,7 @@ jobs:
         with:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
+          workspaces: "firewood -> target"
       - name: Run tests with cargo-nextest
         run: cargo nextest run --locked --profile ci --verbose ${{ matrix.profile-args }}
 
@@ -190,6 +212,9 @@ jobs:
           - profile-key: maxperf-ethhash-logger
             profile-args: "--profile maxperf --features ethhash,logger"
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    defaults:
+      run:
+        working-directory: firewood
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -197,6 +222,7 @@ jobs:
         with:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
+          workspaces: "firewood -> target"
       - name: Run benchmark example
         run: cargo run --locked ${{ matrix.profile-args }} --bin benchmark -- --number-of-batches 100 --batch-size 1000 create
       - name: Run insert example
@@ -205,6 +231,9 @@ jobs:
   docs:
     needs: build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firewood
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -212,21 +241,27 @@ jobs:
         with:
           save-if: "false"
           shared-key: "debug-no-features"
+          workspaces: "firewood -> target"
       - name: md check
         uses: DavidAnson/markdownlint-cli2-action@07035fd053f7be764496c0f8d8f9f41f98305101 # @v22.0.0
         with:
           globs: |
-            *.md
-            **/*.md
-            !CHANGELOG.md
-            !target/**
-            !.github/**
+            firewood/*.md
+            firewood/**/*.md
+            !firewood/CHANGELOG.md
+            !firewood/target/**
+            !firewood/.github/**
       - name: doc generation
         run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items --no-deps
 
   ffi:
     needs: build
     runs-on: ${{ matrix.os }}
+    env:
+      GOWORK: "off"
+    defaults:
+      run:
+        working-directory: firewood
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -237,27 +272,33 @@ jobs:
         with:
           save-if: "false"
           shared-key: "debug-no-features"
+          workspaces: "firewood -> target"
       - name: Build Firewood FFI
-        working-directory: ffi
+        working-directory: firewood/ffi
         run: cargo build --locked --release
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: "ffi/go.mod"
-          cache-dependency-path: "ffi/go.sum"
+          go-version-file: "firewood/ffi/go.mod"
+          cache-dependency-path: "firewood/ffi/go.sum"
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # @v7 -> v9.2.0
         with:
           version: latest
-          working-directory: ffi
+          working-directory: firewood/ffi
       - name: Test Go FFI bindings
-        working-directory: ffi
+        working-directory: firewood/ffi
         # cgocheck2 is expensive but provides complete pointer checks
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test -race ./...
 
   firewood-ethhash-differential-fuzz:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      GOWORK: "off"
+    defaults:
+      run:
+        working-directory: firewood
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -265,19 +306,20 @@ jobs:
         with:
           save-if: "false"
           shared-key: "debug-ethhash-logger"
+          workspaces: "firewood -> target"
       - name: Build Firewood FFI (with ethhash)
         run: cargo build --features ethhash,logger
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: "ffi/tests/eth/go.mod"
-          cache-dependency-path: "ffi/tests/eth/go.sum"
+          go-version-file: "firewood/ffi/tests/eth/go.mod"
+          cache-dependency-path: "firewood/ffi/tests/eth/go.sum"
       - name: Test Go FFI bindings
-        working-directory: ffi
+        working-directory: firewood/ffi
         # cgocheck2 is expensive but provides complete pointer checks
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test -race ./...
       - name: Test Firewood <> Ethereum Differential Fuzz
-        working-directory: ffi/tests/eth
+        working-directory: firewood/ffi/tests/eth
         run: |
           # Set memlock to unlimited for the shell invoking the fuzz tests
           ulimit -Sa
@@ -292,12 +334,17 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ethhash-differential-fuzz-testdata
-          path: ffi/tests/eth/testdata
+          path: firewood/ffi/tests/eth/testdata
           retention-days: 30
 
   firewood-merkle-differential-fuzz:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      GOWORK: "off"
+    defaults:
+      run:
+        working-directory: firewood
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -305,15 +352,16 @@ jobs:
         with:
           save-if: "false"
           shared-key: "debug-no-features"
+          workspaces: "firewood -> target"
       - name: Build Firewood FFI
         run: cargo build -p firewood-ffi
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: "ffi/tests/firewood/go.mod"
-          cache-dependency-path: "ffi/tests/firewood/go.sum"
+          go-version-file: "firewood/ffi/tests/firewood/go.mod"
+          cache-dependency-path: "firewood/ffi/tests/firewood/go.sum"
       - name: Test Firewood <> MerkleDB Differential fuzz
-        working-directory: ffi/tests/firewood
+        working-directory: firewood/ffi/tests/firewood
         run: |
           # Set memlock to unlimited for the shell invoking the fuzz tests
           ulimit -Sa
@@ -327,12 +375,15 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: firewood-merkle-differential-fuzz-testdata
-          path: ffi/tests/firewood/testdata
+          path: firewood/ffi/tests/firewood/testdata
           retention-days: 30
 
   stale-deps:
     needs: build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firewood
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -340,6 +391,7 @@ jobs:
         with:
           save-if: "false"
           shared-key: "debug-no-features"
+          workspaces: "firewood -> target"
       - name: Install cargo-machete
         run: cargo install cargo-machete
       - name: Check for stale dependencies
