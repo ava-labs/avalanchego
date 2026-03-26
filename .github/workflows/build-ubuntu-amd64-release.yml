@@ -62,7 +62,7 @@ jobs:
           ARCH: "amd64"
 
       - name: Configure KMS GPG signing
-        run: ./.github/packaging/scripts/setup-kms-gpg.sh
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml setup-kms-gpg
         env:
           PACKAGE_SIGNING_KMS_KEY_ID: ${{ vars.PACKAGE_SIGNING_KMS_KEY_ID }}
           PACKAGE_SIGNING_PUBLIC_KEY_OUTPUT_PATH: /tmp/avalanchego/avalanchego-signing-public.asc
@@ -71,7 +71,7 @@ jobs:
           AWS_KMS_PKCS11_DOWNLOAD_URL: ${{ vars.AWS_KMS_PKCS11_DOWNLOAD_URL }}
 
       - name: Sign debian package
-        run: ./.github/packaging/scripts/sign-deb.sh
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml sign-deb
         env:
           DEB_PATH: /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
 
@@ -79,7 +79,7 @@ jobs:
         run: dpkg-sig --verify /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
 
       - name: Validate debian package in fresh container
-        run: ./.github/packaging/scripts/validate-deb.sh
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml validate-deb
         env:
           DEB_PATH: /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
           PUBLIC_KEY_PATH: /tmp/avalanchego/avalanchego-signing-public.asc
@@ -153,7 +153,7 @@ jobs:
           ARCH: "amd64"
 
       - name: Configure KMS GPG signing
-        run: ./.github/packaging/scripts/setup-kms-gpg.sh
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml setup-kms-gpg
         env:
           PACKAGE_SIGNING_KMS_KEY_ID: ${{ vars.PACKAGE_SIGNING_KMS_KEY_ID }}
           PACKAGE_SIGNING_PUBLIC_KEY_OUTPUT_PATH: /tmp/avalanchego/avalanchego-signing-public.asc
@@ -162,7 +162,7 @@ jobs:
           AWS_KMS_PKCS11_DOWNLOAD_URL: ${{ vars.AWS_KMS_PKCS11_DOWNLOAD_URL }}
 
       - name: Sign debian package
-        run: ./.github/packaging/scripts/sign-deb.sh
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml sign-deb
         env:
           DEB_PATH: /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
 
@@ -170,7 +170,7 @@ jobs:
         run: dpkg-sig --verify /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
 
       - name: Validate debian package in fresh container
-        run: ./.github/packaging/scripts/validate-deb.sh
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml validate-deb
         env:
           DEB_PATH: /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
           PUBLIC_KEY_PATH: /tmp/avalanchego/avalanchego-signing-public.asc

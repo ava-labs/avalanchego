@@ -37,6 +37,21 @@ tasks:
     silent: true
     cmd: task --list | grep packaging
 
+  setup-kms-gpg:
+    desc: Configures KMS-backed GPG for package signing
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/setup-kms-gpg.sh'
+
+  sign-deb:
+    desc: Signs a DEB package with the configured GPG identity
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/sign-deb.sh'
+
+  validate-deb:
+    desc: Validates a DEB package in a fresh container
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-deb.sh'
+
   build-rpms:
     desc: Builds RPMs for both avalanchego and subnet-evm
     cmds:
