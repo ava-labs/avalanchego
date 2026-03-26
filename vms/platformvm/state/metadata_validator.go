@@ -91,16 +91,12 @@ type validatorState struct {
 	// updatedMetadata tracks (vdrID, subnetID) -> txIDs needing DB sync since the
 	// last WriteValidatorMetadata.
 	updatedMetadata map[ids.NodeID]map[ids.ID]set.Set[ids.ID]
-	// modifiedStakingInfo are pending updates that have not been flushed yet to metadata.
-	// An update in this map requires an update in updatedMetadata to flush the change to disk.
-	modifiedStakingInfo map[ids.ID]map[ids.NodeID]StakingInfo
 }
 
 func newValidatorState() *validatorState {
 	return &validatorState{
-		metadata:            make(map[ids.NodeID]map[ids.ID]*validatorMetadata),
-		updatedMetadata:     make(map[ids.NodeID]map[ids.ID]set.Set[ids.ID]),
-		modifiedStakingInfo: make(map[ids.ID]map[ids.NodeID]StakingInfo),
+		metadata:        make(map[ids.NodeID]map[ids.ID]*validatorMetadata),
+		updatedMetadata: make(map[ids.NodeID]map[ids.ID]set.Set[ids.ID]),
 	}
 }
 
