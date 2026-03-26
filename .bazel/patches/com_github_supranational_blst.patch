@@ -2,7 +2,7 @@ diff --git a/bindings/BUILD.bazel b/bindings/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/bindings/BUILD.bazel
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,       9 @@
 +# gazelle:ignore
 +# Header library for blst C bindings
 +
@@ -16,7 +16,7 @@ diff --git a/bindings/go/BUILD.bazel b/bindings/go/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/bindings/go/BUILD.bazel
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,      60 @@
 +# gazelle:ignore
 +# Go bindings for blst library
 +#
@@ -81,7 +81,7 @@ diff --git a/bindings/vectors/BUILD.bazel b/bindings/vectors/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/bindings/vectors/BUILD.bazel
-@@ -0,0 +1,8 @@
+@@ -0,0 +1,       8 @@
 +# gazelle:ignore
 +# Test vectors for blst
 +
@@ -94,7 +94,7 @@ diff --git a/build/BUILD.bazel b/build/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/build/BUILD.bazel
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,      20 @@
 +# gazelle:ignore
 +# Assembly and build file library for blst
 +#
@@ -119,7 +119,7 @@ diff --git a/src/BUILD.bazel b/src/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/src/BUILD.bazel
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,      10 @@
 +# gazelle:ignore
 +# Source library for blst - headers and C files for unity build
 +
