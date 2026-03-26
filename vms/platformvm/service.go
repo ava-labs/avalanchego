@@ -696,8 +696,6 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 
 		if addAutoRenewedValidatorTx, ok := stakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
 			attr.configOwner = addAutoRenewedValidatorTx.ConfigOwner()
-			attr.period = addAutoRenewedValidatorTx.RenewalPeriod()
-			attr.autoCompoundRewardShares = addAutoRenewedValidatorTx.CompoundRewardShares()
 		}
 
 	case txs.DelegatorTx:
@@ -924,8 +922,8 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				if err != nil {
 					return nil, err
 				}
-				vdr.Period = utils.PointerTo(avajson.Uint64(attr.period))
-				vdr.AutoCompoundRewardShares = utils.PointerTo(avajson.Uint32(attr.autoCompoundRewardShares))
+				vdr.Period = utils.PointerTo(avajson.Uint64(stakingInfo.Period / time.Second))
+				vdr.AutoCompoundRewardShares = utils.PointerTo(avajson.Uint32(stakingInfo.AutoCompoundRewardShares))
 			}
 
 			validators = append(validators, vdr)
