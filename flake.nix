@@ -37,6 +37,7 @@
             bazelisk
             (runCommand "bazel" {} ''mkdir -p $out/bin && ln -s ${bazelisk}/bin/bazelisk $out/bin/bazel'')
             git
+            jujutsu
 
             # Task runner
             go-task
