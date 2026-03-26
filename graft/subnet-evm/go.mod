@@ -45,7 +45,7 @@ require (
 	connectrpc.com/grpcreflect v1.3.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/StephenButtolph/canoto v0.17.3 // indirect
+	github.com/StephenButtolph/canoto v0.18.0 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-initial-consistent-tag // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
