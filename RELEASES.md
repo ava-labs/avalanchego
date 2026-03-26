@@ -2,8 +2,6 @@
 
 ## Pending (v1.14.3)
 
-### Breaking Changes
-
 - None.
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
@@ -41,10 +39,10 @@ The plugin version is updated to `45`; all plugins must update to be compatible.
 ### Fixes
 
 - Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space
-- Updated minimum Go version from 1.24 to `v1.25.8`
 - Fixed crash in `TraceCall` with `BlockOverrides`
 - Fixed snapshot generation shutdown race
 - Downgraded flaky `ERROR` log to `WARN` if recently bootstrapped
+- Updated minimum Go version from 1.24 to `v1.25.8`
 
 ### Consensus
 
