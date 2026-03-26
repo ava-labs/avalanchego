@@ -2840,8 +2840,12 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 			if validatorDiff.removed != nil {
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 
-				nodes := s.validatorState.modifiedStakingInfo[subnetID]
-				delete(nodes, nodeID)
+				// If we are not performing a replacement, we should not try to update staking info because
+				// this no longer exists.
+				if validatorDiff.added == nil {
+					nodes := s.validatorState.modifiedStakingInfo[subnetID]
+					delete(nodes, nodeID)
+				}
 			}
 			if validatorDiff.added != nil {
 				staker := validatorDiff.added

@@ -645,13 +645,18 @@ func (d *diff) Apply(baseState Chain) error {
 				}
 			}
 
+			// We might have removed the validator and then added it in the same diff.
+			// We therefore first delete and then only after add it.
 			if validatorDiff.removed != nil {
 				if err := baseState.DeleteCurrentValidator(validatorDiff.removed); err != nil {
 					return fmt.Errorf("deleting current validator: %w", err)
 				}
 
-				// We have to clear the modification to avoid updating a deleted validator.
-				delete(d.modifiedStakingInfo[validatorDiff.removed.SubnetID], validatorDiff.removed.NodeID)
+				// If we are not performing a replacement, we should not try to update staking info because
+				// this no longer exists.
+				if validatorDiff.added == nil {
+					delete(d.modifiedStakingInfo[validatorDiff.removed.SubnetID], validatorDiff.removed.NodeID)
+				}
 			}
 			if validatorDiff.added != nil {
 				if err := baseState.PutCurrentValidator(validatorDiff.added); err != nil {
