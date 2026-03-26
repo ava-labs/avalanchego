@@ -19,11 +19,14 @@ ARG TARGETARCH
 # - git: version detection in build scripts
 RUN dnf install -y \
         curl \
+        'dnf-command(config-manager)' \
         gcc \
         gnupg2 \
-        gnupg-pkcs11-scd \
         git \
         rpm-sign \
+    && dnf config-manager --set-enabled crb \
+    && dnf install -y epel-release \
+    && dnf install -y gnupg-pkcs11-scd \
     && dnf clean all
 
 # Install Go (with SHA256 verification)
