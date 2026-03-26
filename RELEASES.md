@@ -13,36 +13,45 @@ The plugin version is updated to `45`; all plugins must update to be compatible.
 
 ### Breaking Changes
 
-- Removed `graft/subnet-evm/compatibility.json` in favor of using a single source of truth in `version/compatibility.json`. External tools that relied on this file should now use `version/compatibility.json` from the main AvalancheGo repository.
-- Removed `GetWarpValidatorSet` RPC from the ValidatorState service as part of granite cleanup.
-- Replaced `DelegateeReward` API with a generalized reward API.
+- Removed `graft/subnet-evm/compatibility.json` in favor of using a single source of truth in `version/compatibility.json`. External tools that relied on this file should now use `version/compatibility.json` from the main AvalancheGo repository ([#4891](https://github.com/ava-labs/avalanchego/pull/4891)).
+- Removed `GetWarpValidatorSet` RPC from the ValidatorState service as part of granite cleanup ([#4858](https://github.com/ava-labs/avalanchego/pull/4858)).
 
 ### Config
 
-- Removed `pull-gossip-poll-size` from the X-chain and P-chain configs.
-- Removed `proposerMinBlockDelay` from subnet configs.
+- Gossip:
+  - Removed `pull-gossip-poll-size` from the X-chain and P-chain configs ([#4819](https://github.com/ava-labs/avalanchego/pull/4819)).
+- Subnet:
+  - Removed `proposerMinBlockDelay` from subnet configs ([#4824](https://github.com/ava-labs/avalanchego/pull/4824)).
+  - Deprecated `consensusParameters` subnet config in favor of `snowParameters` ([#4870](https://github.com/ava-labs/avalanchego/pull/4870)).
+  - Added `simplexParameters` subnet config with `maxNetworkDelay`, `maxRebroadcastWait`, and `initialValidators` ([#4870](https://github.com/ava-labs/avalanchego/pull/4870)).
+- Simplex:
+  - Added `--simplex-max-network-delay` and `--simplex-max-rebroadcast-wait` flags ([#4870](https://github.com/ava-labs/avalanchego/pull/4870)).
+- Benchlist:
+  - Removed `--benchlist-fail-threshold` and `--benchlist-min-failing-duration` ([#4964](https://github.com/ava-labs/avalanchego/pull/4964)).
+  - Added `--benchlist-halflife`, `--benchlist-unbench-probability`, and `--benchlist-bench-probability` ([#4964](https://github.com/ava-labs/avalanchego/pull/4964)).
+  - Changed `--benchlist-duration` default from `15m` to `5m` ([#5028](https://github.com/ava-labs/avalanchego/pull/5028)).
 
 ### Firewood
 
-- Updated Firewood to v0.3.1 (from v0.0.18).
-- Enabled Firewood deferred persistence for non-pruning nodes.
-- Fixed Firewood metrics to always be registered whenever metrics are enabled.
-- Unsupported APIs now return an error when Firewood is enabled.
+- Updated Firewood to v0.3.1 (from v0.0.18) ([#5107](https://github.com/ava-labs/avalanchego/pull/5107)).
+- Enabled Firewood deferred persistence for non-pruning nodes ([#5022](https://github.com/ava-labs/avalanchego/pull/5022)).
+- Fixed Firewood metrics to always be registered whenever metrics are enabled ([#4793](https://github.com/ava-labs/avalanchego/pull/4793)).
+- Unsupported APIs now return an error when Firewood is enabled ([#5075](https://github.com/ava-labs/avalanchego/pull/5075)).
 
 ### Consensus
 
-- Introduced Simplex consensus engine and parameters (experimental).
-- Added histogram for consensus latencies.
-- Added health check failure when average block acceptance times are too high.
-- Improved benchlisting with EWMA logic and greedy eviction of worst offenders at capacity.
+- Introduced Simplex consensus engine and parameters (experimental) ([#4870](https://github.com/ava-labs/avalanchego/pull/4870), [#4903](https://github.com/ava-labs/avalanchego/pull/4903)).
+- Added `consensus_latencies` histogram metric tracking time from block issuance to acceptance ([#4924](https://github.com/ava-labs/avalanchego/pull/4924)).
+- Added health check failure when average block acceptance times are too high ([#4911](https://github.com/ava-labs/avalanchego/pull/4911)).
+- Improved benchlisting with EWMA logic and greedy eviction of worst offenders at capacity ([#4964](https://github.com/ava-labs/avalanchego/pull/4964), [#5028](https://github.com/ava-labs/avalanchego/pull/5028)).
 
 ### Fixes
 
-- Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space.
-- Updated minimum Go version from 1.24 to `v1.25.8`.
-- Fixed crash in `TraceCall` with `BlockOverrides`.
-- Fixed snapshot generation shutdown race.
-- Improved logging: selectively log warning or error depending on time elapsed since bootstrapping.
+- Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space ([#4822](https://github.com/ava-labs/avalanchego/pull/4822)).
+- Updated minimum Go version from 1.24 to `v1.25.8` ([#5055](https://github.com/ava-labs/avalanchego/pull/5055)).
+- Fixed crash in `TraceCall` with `BlockOverrides` ([#4846](https://github.com/ava-labs/avalanchego/pull/4846)).
+- Fixed snapshot generation shutdown race ([#4816](https://github.com/ava-labs/avalanchego/pull/4816)).
+- Improved logging: selectively log warning or error depending on time elapsed since bootstrapping ([#5082](https://github.com/ava-labs/avalanchego/pull/5082)).
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.1...v1.14.2
 
