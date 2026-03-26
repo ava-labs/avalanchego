@@ -66,6 +66,7 @@ tasks:
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_OUTPUT_DIR}}:/output
           {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
+          {{if .PACKAGE_SIGNING_X509_CERT_PATH}}-v {{.PACKAGE_SIGNING_X509_CERT_PATH}}:{{.PACKAGE_SIGNING_X509_CERT_PATH}}:ro{{end}}
           -e PACKAGE=avalanchego
           -e VERSION={{trimPrefix "v" .RPM_TAG}}
           -e TAG={{.RPM_TAG}}
@@ -74,6 +75,16 @@ tasks:
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
           {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
           {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
+          {{if .PACKAGE_SIGNING_KMS_KEY_ID}}-e PACKAGE_SIGNING_KMS_KEY_ID={{.PACKAGE_SIGNING_KMS_KEY_ID}}{{end}}
+          {{if .PACKAGE_SIGNING_OPENPGP_KEY_SHA1}}-e PACKAGE_SIGNING_OPENPGP_KEY_SHA1={{.PACKAGE_SIGNING_OPENPGP_KEY_SHA1}}{{end}}
+          {{if .PACKAGE_SIGNING_X509_CERT_PATH}}-e PACKAGE_SIGNING_X509_CERT_PATH={{.PACKAGE_SIGNING_X509_CERT_PATH}}{{end}}
+          {{if .PACKAGE_SIGNING_X509_CERT_PEM_BASE64}}-e PACKAGE_SIGNING_X509_CERT_PEM_BASE64={{.PACKAGE_SIGNING_X509_CERT_PEM_BASE64}}{{end}}
+          {{if .AWS_KMS_PKCS11_DOWNLOAD_URL}}-e AWS_KMS_PKCS11_DOWNLOAD_URL={{.AWS_KMS_PKCS11_DOWNLOAD_URL}}{{end}}
+          {{if .AWS_KMS_PKCS11_LIBRARY_PATH}}-e AWS_KMS_PKCS11_LIBRARY_PATH={{.AWS_KMS_PKCS11_LIBRARY_PATH}}{{end}}
+          {{if .AWS_ACCESS_KEY_ID}}-e AWS_ACCESS_KEY_ID={{.AWS_ACCESS_KEY_ID}}{{end}}
+          {{if .AWS_SECRET_ACCESS_KEY}}-e AWS_SECRET_ACCESS_KEY={{.AWS_SECRET_ACCESS_KEY}}{{end}}
+          {{if .AWS_SESSION_TOKEN}}-e AWS_SESSION_TOKEN={{.AWS_SESSION_TOKEN}}{{end}}
+          {{if .AWS_REGION}}-e AWS_REGION={{.AWS_REGION}}{{end}}
           {{.PACKAGING_DOCKER_IMAGE}}
           .github/packaging/scripts/build-rpm.sh
 
@@ -90,6 +101,7 @@ tasks:
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_OUTPUT_DIR}}:/output
           {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
+          {{if .PACKAGE_SIGNING_X509_CERT_PATH}}-v {{.PACKAGE_SIGNING_X509_CERT_PATH}}:{{.PACKAGE_SIGNING_X509_CERT_PATH}}:ro{{end}}
           -e PACKAGE=subnet-evm
           -e VERSION={{trimPrefix "v" .RPM_TAG}}
           -e TAG={{.RPM_TAG}}
@@ -98,6 +110,16 @@ tasks:
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
           {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
           {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
+          {{if .PACKAGE_SIGNING_KMS_KEY_ID}}-e PACKAGE_SIGNING_KMS_KEY_ID={{.PACKAGE_SIGNING_KMS_KEY_ID}}{{end}}
+          {{if .PACKAGE_SIGNING_OPENPGP_KEY_SHA1}}-e PACKAGE_SIGNING_OPENPGP_KEY_SHA1={{.PACKAGE_SIGNING_OPENPGP_KEY_SHA1}}{{end}}
+          {{if .PACKAGE_SIGNING_X509_CERT_PATH}}-e PACKAGE_SIGNING_X509_CERT_PATH={{.PACKAGE_SIGNING_X509_CERT_PATH}}{{end}}
+          {{if .PACKAGE_SIGNING_X509_CERT_PEM_BASE64}}-e PACKAGE_SIGNING_X509_CERT_PEM_BASE64={{.PACKAGE_SIGNING_X509_CERT_PEM_BASE64}}{{end}}
+          {{if .AWS_KMS_PKCS11_DOWNLOAD_URL}}-e AWS_KMS_PKCS11_DOWNLOAD_URL={{.AWS_KMS_PKCS11_DOWNLOAD_URL}}{{end}}
+          {{if .AWS_KMS_PKCS11_LIBRARY_PATH}}-e AWS_KMS_PKCS11_LIBRARY_PATH={{.AWS_KMS_PKCS11_LIBRARY_PATH}}{{end}}
+          {{if .AWS_ACCESS_KEY_ID}}-e AWS_ACCESS_KEY_ID={{.AWS_ACCESS_KEY_ID}}{{end}}
+          {{if .AWS_SECRET_ACCESS_KEY}}-e AWS_SECRET_ACCESS_KEY={{.AWS_SECRET_ACCESS_KEY}}{{end}}
+          {{if .AWS_SESSION_TOKEN}}-e AWS_SESSION_TOKEN={{.AWS_SESSION_TOKEN}}{{end}}
+          {{if .AWS_REGION}}-e AWS_REGION={{.AWS_REGION}}{{end}}
           {{.PACKAGING_DOCKER_IMAGE}}
           .github/packaging/scripts/build-rpm.sh
 
@@ -112,5 +134,6 @@ tasks:
     env:
       TAG: '{{.PACKAGING_TAG}}'
       GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
+      REQUIRE_SIGNATURE: '{{.REQUIRE_SIGNATURE | default "0"}}'
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-rpm.sh'

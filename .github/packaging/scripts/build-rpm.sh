@@ -13,6 +13,7 @@
 #   RPM_GPG_KEY_FILE      - Path to GPG private key for signing
 #   NFPM_RPM_PASSPHRASE   - Passphrase for the GPG key
 #   AVALANCHEGO_COMMIT    - Git commit hash (auto-detected if not set)
+#   PACKAGE_SIGNING_KMS_KEY_ID - AWS KMS key identifier for PKCS#11-backed signing
 
 set -euo pipefail
 
@@ -98,8 +99,26 @@ EOF
 GPG_WORKDIR="${REPO_ROOT}/build/gpg"
 mkdir -p "${GPG_WORKDIR}"
 GPG_PUBLIC_KEY="${OUTPUT_DIR}/RPM-GPG-KEY-avalanchego"
+NFPM_CONFIG="${PACKAGING_DIR}/nfpm/${PACKAGE}.yml"
+KMS_SIGNING_ENABLED=0
 
-if [[ -n "${RPM_GPG_KEY_FILE:-}" ]]; then
+if [[ -n "${PACKAGE_SIGNING_KMS_KEY_ID:-}" ]]; then
+    echo "Using AWS KMS-backed GPG signing"
+    KMS_SIGNING_ENABLED=1
+    export PACKAGE_SIGNING_PUBLIC_KEY_OUTPUT_PATH="${GPG_PUBLIC_KEY}"
+    "${PACKAGING_DIR}/scripts/setup-kms-gpg.sh"
+    PACKAGE_SIGNING_GPG_FINGERPRINT="${PACKAGE_SIGNING_GPG_FINGERPRINT:-$(
+        gpg --batch --with-colons --list-secret-keys 2>/dev/null \
+            | awk -F: '$1 == "fpr" { print $10; exit }'
+    )}"
+    : "${PACKAGE_SIGNING_GPG_FINGERPRINT:?PACKAGE_SIGNING_GPG_FINGERPRINT could not be derived for KMS signing}"
+    cat > "${HOME}/.rpmmacros" <<EOF
+%_signature gpg
+%_gpg_name ${PACKAGE_SIGNING_GPG_FINGERPRINT}
+%__gpg /usr/bin/gpg
+EOF
+    NFPM_CONFIG="${PACKAGING_DIR}/nfpm/${PACKAGE}-unsigned.yml"
+elif [[ -n "${RPM_GPG_KEY_FILE:-}" ]]; then
     echo "Using provided GPG key for signing"
     gpg --batch --import "${RPM_GPG_KEY_FILE}"
     # Copy to well-known path for nfpm config
@@ -129,9 +148,11 @@ GPGEOF
     export NFPM_RPM_PASSPHRASE=""
 fi
 
-# Export public key for verification
-gpg --batch --armor --export "security@avalabs.org" > "${GPG_PUBLIC_KEY}"
-echo "GPG public key exported to: ${GPG_PUBLIC_KEY}"
+if [[ "${KMS_SIGNING_ENABLED}" -eq 0 ]]; then
+    # Export public key for verification
+    gpg --batch --armor --export "security@avalabs.org" > "${GPG_PUBLIC_KEY}"
+    echo "GPG public key exported to: ${GPG_PUBLIC_KEY}"
+fi
 
 # ── Step 4: Package with nfpm ─────────────────────────────────────
 
@@ -149,8 +170,13 @@ export VERSION RPM_ARCH
 
 echo "Packaging ${RPM_FILENAME}..."
 nfpm package \
-    --config "${PACKAGING_DIR}/nfpm/${PACKAGE}.yml" \
+    --config "${NFPM_CONFIG}" \
     --packager rpm \
     --target "${RPM_PATH}"
+
+if [[ "${KMS_SIGNING_ENABLED}" -eq 1 ]]; then
+    echo "Signing ${RPM_FILENAME} with rpmsign..."
+    rpmsign --addsign "${RPM_PATH}"
+fi
 
 echo "RPM built: ${RPM_PATH}"

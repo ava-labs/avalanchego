@@ -27,6 +27,7 @@ jobs:
             rpm_arch: aarch64
     runs-on: ${{ matrix.runner }}
     permissions:
+      id-token: write
       contents: read
 
     steps:
@@ -64,21 +65,23 @@ jobs:
           fi
         shell: bash
 
-      - name: Import GPG key
+      - name: Configure AWS credentials
         if: github.event_name != 'pull_request'
-        run: |
-          GPG_KEY_FILE="$(mktemp)"
-          chmod 600 "${GPG_KEY_FILE}"
-          printf '%s' "${{ secrets.RPM_GPG_PRIVATE_KEY }}" > "${GPG_KEY_FILE}"
-          printf 'GPG_KEY_FILE=%s\n' "${GPG_KEY_FILE}" >> "$GITHUB_ENV"
-        shell: bash
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
+          aws-region: us-east-1
 
       - name: Build and validate RPMs
         run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-rpms
         env:
           PACKAGING_TAG: ${{ env.TAG }}
-          RPM_GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
-          NFPM_RPM_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
+          PACKAGE_SIGNING_KMS_KEY_ID: ${{ github.event_name != 'pull_request' && vars.PACKAGE_SIGNING_KMS_KEY_ID || '' }}
+          PACKAGE_SIGNING_X509_CERT_PEM_BASE64: ${{ github.event_name != 'pull_request' && secrets.PACKAGE_SIGNING_X509_CERT_PEM_BASE64 || '' }}
+          PACKAGE_SIGNING_OPENPGP_KEY_SHA1: ${{ github.event_name != 'pull_request' && vars.PACKAGE_SIGNING_OPENPGP_KEY_SHA1 || '' }}
+          AWS_KMS_PKCS11_DOWNLOAD_URL: ${{ github.event_name != 'pull_request' && vars.AWS_KMS_PKCS11_DOWNLOAD_URL || '' }}
+          REQUIRE_SIGNATURE: ${{ github.event_name != 'pull_request' && '1' || '0' }}
 
       - name: Upload RPMs as artifacts
         if: github.event_name != 'pull_request'
@@ -93,8 +96,5 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          if [[ -n "${GPG_KEY_FILE:-}" ]]; then
-            rm -f "${GPG_KEY_FILE}"
-          fi
           rm -rf build/rpm
         shell: bash

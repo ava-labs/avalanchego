@@ -2,9 +2,10 @@
 
 ## Overview
 
-Ship signed RPM packages for avalanchego and subnet-evm targeting
-RHEL 9.x customers. Packages are built inside a Rocky Linux 9 container
-(glibc 2.34), signed with GPG, and published as GitHub Actions artifacts.
+Ship signed Linux packages for avalanchego and subnet-evm targeting
+RHEL 9.x and Ubuntu customers. RPMs are built inside a Rocky Linux 9
+container (glibc 2.34), DEBs are built on the Ubuntu release runners,
+and release signing is moving to a single AWS KMS-backed GPG identity.
 
 ## Decisions
 
@@ -35,12 +36,24 @@ Rocky Linux 9 container. The build is orchestrated by a Taskfile at
 `.github/packaging/Taskfile.yml`, included from the root Taskfile as
 `packaging:`.
 
-### GPG signing
+### Package signing
 
-RPMs are always signed. In CI, a real GPG key is provided via
-`secrets.RPM_GPG_PRIVATE_KEY`. For local builds, an ephemeral GPG key
-(RSA 4096, no passphrase, 1-day expiry) is generated to exercise the
-signing pipeline without requiring a real key.
+Release signing uses a single AWS KMS-backed GPG identity exposed to CI
+as metadata only (`PACKAGE_SIGNING_KMS_KEY_ID`) plus AWS OIDC-issued
+credentials. The GPG private key never lives in GitHub secrets, runner
+disk, or container volumes.
+
+The bridge from GPG to KMS is:
+- `gnupg-pkcs11-scd`
+- `aws-kms-pkcs11`
+
+DEBs are signed after `dpkg-deb --build` with `dpkg-sig`. RPMs are built
+first and then signed with `rpmsign --addsign` in the Rocky container.
+Both release paths export the public key used for verification and gate
+artifact publication on successful signature verification.
+
+PR RPM builds still use the ephemeral GPG path so the packaging pipeline
+can be exercised without AWS credentials. DEB workflows do not run on PRs.
 
 ### Version smoke test
 
@@ -54,16 +67,29 @@ not the git tag, so it may not match RC tags. The smoke test verifies:
 
 ### CI workflow
 
-`.github/workflows/build-rpm-release.yml` triggers on tag push,
-`workflow_dispatch`, and `pull_request` (for paths under `.github/packaging/`
-and the workflow file itself). On PRs, the full build runs as a smoke test
-with an ephemeral GPG key and synthetic tag. Matrix strategy covers x86_64 and
-aarch64. Steps:
+RPM releases use `.github/workflows/build-rpm-release.yml` and DEB releases
+use `.github/workflows/build-ubuntu-amd64-release.yml` plus
+`.github/workflows/build-ubuntu-arm64-release.yml`.
 
-1. Build and validate RPMs via `scripts/run_task.sh packaging:test-build-rpms`
-   (builds both packages, then validates in a fresh `rockylinux:9`
-   container: signature verification, installation, smoke test)
-2. Upload RPMs and GPG public key as GitHub artifacts
+RPM workflow behavior:
+1. On tag push and `workflow_dispatch`, configure AWS credentials via OIDC
+2. Build RPMs in the Rocky container
+3. Use the KMS-backed GPG bridge to sign finished RPMs
+4. Validate in a fresh `rockylinux:9` container with `rpm -K`, install,
+   and smoke tests
+5. Upload RPMs plus the exported public key as artifacts
+
+On PRs, the same RPM workflow keeps the existing ephemeral signing path and
+synthetic tag so packaging changes still get end-to-end coverage.
+
+DEB workflow behavior:
+1. Build the `.deb` on the matching Ubuntu runner
+2. Configure the KMS-backed GPG bridge on that runner
+3. Sign the finished `.deb` with `dpkg-sig`
+4. Verify on the runner, then verify/install/smoke-test in a fresh Ubuntu
+   container matching the target release
+5. Upload the signed `.deb` plus public key artifact and only then publish
+   to S3
 
 ### Architecture mapping
 
