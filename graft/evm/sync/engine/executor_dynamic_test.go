@@ -96,14 +96,12 @@ func TestDynamicExecutor_FullPivotCycleWithBlockAcceptance(t *testing.T) {
 	// End-to-end test: blocks arrive via OnBlockAccepted while syncers are
 	// running, triggering a pivot. After syncers finish, batch replay
 	// executes the surviving blocks.
-	require := require.New(t)
-
 	var started sync.WaitGroup
 	started.Add(1)
 	release := make(chan struct{})
 
 	registry := NewSyncerRegistry()
-	require.NoError(registry.Register(NewBarrierSyncer("syncer", &started, release)))
+	require.NoError(t, registry.Register(NewBarrierSyncer("syncer", &started, release)))
 
 	done := make(chan error, 1)
 	executor := newDynamicExecutor(registry, noopAcceptor{}, 1)
@@ -121,17 +119,17 @@ func TestDynamicExecutor_FullPivotCycleWithBlockAcceptance(t *testing.T) {
 		b := newMockBlock(i)
 		blocks[i] = b
 		deferred, err := executor.OnBlockAccepted(b)
-		require.NoError(err)
-		require.True(deferred, "block %d should be deferred", i)
+		require.NoError(t, err)
+		require.True(t, deferred, "block %d should be deferred", i)
 	}
 
-	require.Equal(uint64(110), executor.coordinator.getCommitTarget().Height())
+	require.Equal(t, uint64(110), executor.coordinator.getCommitTarget().Height())
 
 	// Release syncers to complete.
 	close(release)
-	require.NoError(<-done)
+	require.NoError(t, <-done)
 
-	require.Equal(StateCompleted, executor.CurrentState())
+	require.Equal(t, StateCompleted, executor.CurrentState())
 
 	// Each pivot pruned blocks below the new target. With pivotInterval=1,
 	// only the last block (110) survives.

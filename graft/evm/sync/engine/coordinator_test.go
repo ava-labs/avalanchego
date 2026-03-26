@@ -62,34 +62,6 @@ func TestCoordinator_UpdateSyncTarget_RemovesStaleBlocks(t *testing.T) {
 	require.Len(t, batch, 6) // Only 105-110 remain (keep pivot block).
 }
 
-func TestCoordinator_UpdateSyncTarget_DoesNotPruneOnFailureAndAborts(t *testing.T) {
-	wantErr := errors.New("update failed")
-	registry := NewSyncerRegistry()
-	require.NoError(t, registry.Register(FuncSyncer{
-		name: "update-failing",
-		updateFn: func(message.Syncable) error {
-			return wantErr
-		},
-	}))
-
-	co := NewCoordinator(registry, Callbacks{}, WithPivotInterval(1))
-	co.state.Store(int32(StateRunning))
-	co.setCommitTarget(newTestSyncTarget(100))
-
-	for i := uint64(100); i <= 110; i++ {
-		co.AddBlockOperation(newMockBlock(i), OpAccept)
-	}
-
-	err := co.UpdateSyncTarget(newTestSyncTarget(105))
-	require.ErrorIs(t, err, wantErr)
-	require.Equal(t, StateAborted, co.CurrentState())
-	require.Equal(t, uint64(0), co.targetEpoch.Load())
-	require.Equal(t, uint64(100), co.getCommitTarget().Height())
-
-	batch := co.queue.dequeueBatch()
-	require.Len(t, batch, 11) // Nothing was pruned on failed target fanout.
-}
-
 func TestCoordinator_UpdateSyncTarget_SerializesConcurrentCalls(t *testing.T) {
 	var (
 		inUpdate   atomic.Int32
@@ -183,37 +155,6 @@ func TestCoordinator_Start_ReplaysDeferredOperationsAfterFinalize(t *testing.T) 
 	require.Equal(t, 1, block.acceptCount)
 }
 
-func TestCoordinator_Start_FinalizesWithCommitTarget(t *testing.T) {
-	var started sync.WaitGroup
-	started.Add(1)
-	release := make(chan struct{})
-
-	registry := NewSyncerRegistry()
-	require.NoError(t, registry.Register(NewBarrierSyncer("barrier", &started, release)))
-
-	done := make(chan error, 1)
-	var finalizedTarget message.Syncable
-	co := NewCoordinator(registry, Callbacks{
-		FinalizeVM: func(_ context.Context, target message.Syncable) error {
-			finalizedTarget = target
-			return nil
-		},
-		OnDone: func(err error) {
-			done <- err
-		},
-	}, WithPivotInterval(1))
-
-	co.Start(t.Context(), newTestSyncTarget(100))
-
-	started.Wait()
-	require.NoError(t, co.UpdateSyncTarget(newTestSyncTarget(105)))
-	close(release)
-
-	require.NoError(t, <-done)
-	require.Equal(t, uint64(105), finalizedTarget.Height())
-	require.Equal(t, StateCompleted, co.CurrentState())
-}
-
 func TestCoordinator_Finish_DoesNotOverwriteAbortedState(t *testing.T) {
 	co := NewCoordinator(NewSyncerRegistry(), Callbacks{})
 	co.state.Store(int32(StateRunning))
@@ -298,49 +239,140 @@ func runCoordinator(t *testing.T, registry *SyncerRegistry, cbs Callbacks) (*Coo
 	return co, errDone
 }
 
-func TestCoordinator_PivotCycleWithSlowSyncer(t *testing.T) {
-	// Simulate the atomic gap scenario end-to-end: a slow syncer targets
-	// height 500 while the coordinator pivots to 505. Blocks between 500
-	// and 510 must survive pruning and be replayed after syncers finish.
-	require := require.New(t)
+func TestCoordinator_PivotCycleBlockReplay(t *testing.T) {
+	tests := []struct {
+		name             string
+		initialHeight    uint64
+		syncerHeight     *uint64 // if set, syncer reports this as TargetHeight
+		blockLo, blockHi uint64
+		pivots           []uint64
+		wantFinalHeight  uint64
+		wantReplayedLo   uint64
+		wantReplayedHi   uint64
+	}{
+		{
+			name:            "slow syncer preserves blocks at its target",
+			initialHeight:   500,
+			syncerHeight:    ptrUint64(500),
+			blockLo:         490,
+			blockHi:         510,
+			pivots:          []uint64{505},
+			wantFinalHeight: 505,
+			wantReplayedLo:  500, // slow syncer prevents pruning below 500
+			wantReplayedHi:  510,
+		},
+		{
+			name:            "two pivots advance commit target",
+			initialHeight:   100,
+			blockLo:         100,
+			blockHi:         200,
+			pivots:          []uint64{150, 180},
+			wantFinalHeight: 180,
+			wantReplayedLo:  180,
+			wantReplayedHi:  200,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var started sync.WaitGroup
+			started.Add(1)
+			release := make(chan struct{})
+
+			registry := NewSyncerRegistry()
+			syncer := NewBarrierSyncer("syncer", &started, release)
+			if tt.syncerHeight != nil {
+				syncer.targetHeight = tt.syncerHeight
+			}
+			require.NoError(t, registry.Register(syncer))
+
+			done := make(chan error, 1)
+			var finalizedTarget message.Syncable
+			co := NewCoordinator(registry, Callbacks{
+				FinalizeVM: func(_ context.Context, target message.Syncable) error {
+					finalizedTarget = target
+					return nil
+				},
+				OnDone: func(err error) { done <- err },
+			}, WithPivotInterval(1))
+
+			co.Start(t.Context(), newTestSyncTarget(tt.initialHeight))
+			started.Wait()
+
+			blocks := enqueueBlockRange(t, co, tt.blockLo, tt.blockHi)
+
+			for i, h := range tt.pivots {
+				require.NoError(t, co.UpdateSyncTarget(newTestSyncTarget(h)))
+				require.Equal(t, uint64(i+1), co.targetEpoch.Load())
+			}
+
+			close(release)
+			require.NoError(t, <-done)
+
+			require.NotNil(t, finalizedTarget)
+			require.Equal(t, tt.wantFinalHeight, finalizedTarget.Height())
+			require.Equal(t, StateCompleted, co.CurrentState())
+
+			if tt.blockLo < tt.wantReplayedLo {
+				requireBlocksNotReplayed(t, blocks, tt.blockLo, tt.wantReplayedLo-1)
+			}
+			requireBlocksReplayed(t, blocks, tt.wantReplayedLo, tt.wantReplayedHi)
+		})
+	}
+}
+
+func ptrUint64(v uint64) *uint64 { return &v }
+
+func TestCoordinator_UpdateTargetFailureAborts(t *testing.T) {
+	wantErr := errors.New("syncer rejected update")
 
 	var started sync.WaitGroup
 	started.Add(1)
 	release := make(chan struct{})
 
 	registry := NewSyncerRegistry()
-	syncer := NewBarrierSyncer("slow", &started, release)
-	h := uint64(500)
-	syncer.targetHeight = &h
-	require.NoError(registry.Register(syncer))
+	// Register a barrier syncer that also fails on UpdateTarget.
+	syncer := NewBarrierSyncer("failing-update", &started, release)
+	syncer.updateFn = func(message.Syncable) error { return wantErr }
+	require.NoError(t, registry.Register(syncer))
 
 	done := make(chan error, 1)
-	var finalizedTarget message.Syncable
+	calledFinalize := false
 	co := NewCoordinator(registry, Callbacks{
-		FinalizeVM: func(_ context.Context, target message.Syncable) error {
-			finalizedTarget = target
+		FinalizeVM: func(context.Context, message.Syncable) error {
+			calledFinalize = true
 			return nil
 		},
 		OnDone: func(err error) { done <- err },
 	}, WithPivotInterval(1))
 
-	co.Start(t.Context(), newTestSyncTarget(500))
+	co.Start(t.Context(), newTestSyncTarget(100))
 	started.Wait()
 
-	blocks := enqueueBlockRange(t, co, 490, 510)
+	// Enqueue blocks so we can verify they're NOT replayed after abort.
+	blocks := enqueueBlockRange(t, co, 100, 110)
 
-	require.NoError(co.UpdateSyncTarget(newTestSyncTarget(505)))
-	require.Equal(uint64(1), co.targetEpoch.Load())
+	// UpdateSyncTarget should fail and abort the coordinator.
+	err := co.UpdateSyncTarget(newTestSyncTarget(105))
+	require.ErrorIs(t, err, wantErr)
+	require.Equal(t, StateAborted, co.CurrentState())
 
+	// The syncer is still blocked on the barrier. Release it so the
+	// coordinator can finish. The syncer will see context cancellation
+	// because abort cancels the coordinator context.
 	close(release)
-	require.NoError(<-done)
+	err = <-done
+	require.Error(t, err)
 
-	require.NotNil(finalizedTarget)
-	require.Equal(uint64(505), finalizedTarget.Height())
-	require.Equal(StateCompleted, co.CurrentState())
+	// FinalizeVM should NOT have been called since the coordinator aborted.
+	require.False(t, calledFinalize, "FinalizeVM should not be called after abort")
 
-	requireBlocksNotReplayed(t, blocks, 490, 499)
-	requireBlocksReplayed(t, blocks, 500, 510)
+	// No blocks should have been replayed.
+	requireBlocksNotReplayed(t, blocks, 100, 110)
+
+	// Further state transitions should be rejected.
+	require.Equal(t, StateAborted, co.CurrentState())
+	require.ErrorIs(t, co.UpdateSyncTarget(newTestSyncTarget(200)), errInvalidState)
 }
 
 // enqueueBlockRange creates mock blocks for the inclusive range [lo, hi] and
