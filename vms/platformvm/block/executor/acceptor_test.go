@@ -5,7 +5,6 @@ package executor
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -117,7 +116,8 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	require.ErrorIs(err, errMissingBlockState)
 
 	// Set [blk]'s state in the map as though it had been verified.
-	onAcceptState := state.NewMockDiff(ctrl)
+	onAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 	childID := ids.GenerateTestID()
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
@@ -129,9 +129,12 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 		},
 	}
 	// Give [blk] a child.
-	childOnAcceptState := state.NewMockDiff(ctrl)
-	childOnAbortState := state.NewMockDiff(ctrl)
-	childOnCommitState := state.NewMockDiff(ctrl)
+	childOnAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	childOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	childOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 	childState := &blockState{
 		onAcceptState: childOnAcceptState,
 		proposalBlockState: proposalBlockState{
@@ -141,7 +144,6 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	}
 	acceptor.backend.blkIDToState[childID] = childState
 
-	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1)
 
 	require.NoError(acceptor.ApricotAtomicBlock(blk))
@@ -196,7 +198,8 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	require.ErrorIs(err, errMissingBlockState)
 
 	// Set [blk]'s state in the map as though it had been verified.
-	onAcceptState := state.NewMockDiff(ctrl)
+	onAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 	childID := ids.GenerateTestID()
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	calledOnAcceptFunc := false
@@ -213,9 +216,12 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		},
 	}
 	// Give [blk] a child.
-	childOnAcceptState := state.NewMockDiff(ctrl)
-	childOnAbortState := state.NewMockDiff(ctrl)
-	childOnCommitState := state.NewMockDiff(ctrl)
+	childOnAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	childOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	childOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 	childState := &blockState{
 		onAcceptState: childOnAcceptState,
 		proposalBlockState: proposalBlockState{
@@ -225,7 +231,6 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	}
 	acceptor.backend.blkIDToState[childID] = childState
 
-	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1)
 
 	require.NoError(acceptor.BanffStandardBlock(blk))
@@ -268,9 +273,12 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	require.ErrorIs(err, state.ErrMissingParentState)
 
 	// Set [blk]'s parent in the state map.
-	parentOnAcceptState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	calledOnAcceptFunc := false
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
@@ -303,8 +311,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	require.Equal(blk.Height()-1, height)
 	require.Equal(parentID, s.GetLastAccepted())
 
-	parentOnCommitState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
-
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
 	acceptor.backend.blkIDToState[blkID] = &blockState{
@@ -328,8 +334,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-
-		parentOnCommitState.EXPECT().Apply(s).Times(1),
 
 		parentStatelessBlk.EXPECT().Bytes().Return([]byte{}).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
@@ -377,9 +381,12 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require.ErrorIs(err, state.ErrMissingParentState)
 
 	// Set [blk]'s parent in the state map.
-	parentOnAcceptState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	calledOnAcceptFunc := false
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
@@ -412,8 +419,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require.Equal(blk.Height()-1, height)
 	require.Equal(parentID, s.GetLastAccepted())
 
-	parentOnAbortState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
-
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
 	acceptor.backend.blkIDToState[blkID] = &blockState{
@@ -437,8 +442,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 
 		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-
-		parentOnAbortState.EXPECT().Apply(s).Times(1),
 
 		// Block commit dependencies
 		parentStatelessBlk.EXPECT().Bytes().Return([]byte{}).Times(1),
