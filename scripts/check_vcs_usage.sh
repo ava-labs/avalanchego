@@ -41,6 +41,9 @@ violations=0
 
 check_files() {
   local -n files=$1
+  # shellcheck disable=SC2094
+  # False positive: shellcheck confuses the loop input redirection with an
+  # in-pipeline read/write hazard here.
 
   for file in "${files[@]}"; do
     # Skip excluded files
@@ -69,6 +72,12 @@ check_files() {
       # Skip pure comment lines (no code before the #)
       local stripped="${line#"${line%%[![:space:]]*}"}"
       if [[ "$stripped" == \#* ]]; then
+        prev_line="$line"
+        continue
+      fi
+
+      # Taskfile descriptions are prose, not executable commands.
+      if [[ "$file" == *Taskfile.yml ]] && [[ "$stripped" == desc:* ]]; then
         prev_line="$line"
         continue
       fi
