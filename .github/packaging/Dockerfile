@@ -18,7 +18,6 @@ ARG TARGETARCH
 # - gnupg2: GPG signing of RPM packages
 # - git: version detection in build scripts
 RUN dnf install -y \
-        curl \
         'dnf-command(config-manager)' \
         gcc \
         gnupg2 \
