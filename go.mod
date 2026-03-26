@@ -22,7 +22,7 @@ require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpcreflect v1.3.0
 	github.com/DataDog/zstd v1.5.2
-	github.com/StephenButtolph/canoto v0.17.3
+	github.com/StephenButtolph/canoto v0.18.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-initial-consistent-tag
 	github.com/ava-labs/avalanchego/graft/subnet-evm v0.0.0-initial-consistent-tag
