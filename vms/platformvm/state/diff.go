@@ -635,7 +635,6 @@ func (d *diff) Apply(baseState Chain) error {
 			return err
 		}
 	}
-
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			// Delegators must be removed before their respective validators
@@ -670,7 +669,6 @@ func (d *diff) Apply(baseState Chain) error {
 			}
 		}
 	}
-
 	for subnetID, nodes := range d.modifiedStakingInfo {
 		for nodeID, stakingInfo := range nodes {
 			if err := baseState.SetStakingInfo(subnetID, nodeID, stakingInfo); err != nil {
@@ -678,7 +676,6 @@ func (d *diff) Apply(baseState Chain) error {
 			}
 		}
 	}
-
 	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			// We might have removed the validator and then added it in the same diff.
