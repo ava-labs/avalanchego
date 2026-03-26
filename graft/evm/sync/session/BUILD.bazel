@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "session",
+    srcs = ["session.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/session",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_ava_labs_libevm//libevm/options"],
+)
+
+graft_go_test(
+    name = "session_test",
+    srcs = ["session_test.go"],
+    embed = [":session"],
+    deps = ["@com_github_stretchr_testify//require"],
+)
