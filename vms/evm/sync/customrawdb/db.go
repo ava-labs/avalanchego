@@ -6,9 +6,10 @@ package customrawdb
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+
+	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 // FirewoodScheme is the scheme for the Firewood storage scheme.
