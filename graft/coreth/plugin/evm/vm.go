@@ -511,7 +511,8 @@ func (vm *VM) initializeMetrics() error {
 	}
 
 	if vm.config.StateScheme == customrawdb.FirewoodScheme {
-		if err := vm.ctx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
+		// Registers and exposes Firewood's internal metrics, which are exposed via FFI
+		if err := vm.ctx.Metrics.Register(customrawdb.FirewoodMetricsPrefix, ffi.Gatherer{}); err != nil {
 			return fmt.Errorf("registering firewood metrics: %w", err)
 		}
 	}
