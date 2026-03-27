@@ -5,7 +5,8 @@ package math
 
 import (
 	"errors"
-	"math/big"
+	"math"
+	"math/bits"
 
 	"golang.org/x/exp/constraints"
 )
@@ -61,7 +62,7 @@ func AbsDiff[T constraints.Unsigned](a, b T) T {
 	return max(a, b) - min(a, b)
 }
 
-// MulDiv computes (a * b) / c with full precision using big.Int arithmetic.
+// MulDiv computes (a * b) / c with full precision.
 // The result is rounded to the nearest integer.
 // Returns errDivideByZero if c is zero, or ErrOverflow if the result exceeds uint64.
 func MulDiv(a, b, c uint64) (uint64, error) {
@@ -69,32 +70,16 @@ func MulDiv(a, b, c uint64) (uint64, error) {
 		return 0, errDivideByZero
 	}
 
-	bigA := new(big.Int).SetUint64(a)
-	bigB := new(big.Int).SetUint64(b)
-	bigC := new(big.Int).SetUint64(c)
-
-	result := new(big.Int).Mul(bigA, bigB)
-	result = divRound(result, bigC)
-
-	if !result.IsUint64() {
+	hi, lo := bits.Mul64(a, b)
+	if c <= hi {
 		return 0, ErrOverflow
 	}
-	return result.Uint64(), nil
-}
-
-// divRound divides a by b and rounds to the nearest integer.
-// Note: This function uses big.Int.DivMod, which has sign-dependent behavior.
-func divRound(a, b *big.Int) *big.Int {
-	quotient := new(big.Int)
-	remainder := new(big.Int)
-
-	quotient.DivMod(a, b, remainder)
-
-	// if 2*remainder >= b → round up
-	doubleRem := new(big.Int).Mul(remainder, big.NewInt(2))
-	if doubleRem.Cmp(b) >= 0 {
-		quotient.Add(quotient, big.NewInt(1))
+	quo, rem := bits.Div64(hi, lo, c)
+	if rem < (1<<63) && 2*rem < c {
+		return quo, nil
 	}
-
-	return quotient
+	if quo == math.MaxUint64 {
+		return 0, ErrOverflow
+	}
+	return quo + 1, nil
 }
