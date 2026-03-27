@@ -172,10 +172,10 @@ func (q *Queue) markClosed() {
 }
 
 // stop drains in-flight goroutines and closes the channel.
-// If cancel is true, stuck goroutines are unblocked first.
-func (q *Queue) stop(cancel bool) {
+// If shouldCancel is true, stuck goroutines are unblocked first.
+func (q *Queue) stop(shouldCancel bool) {
 	q.markClosed()
-	if cancel {
+	if shouldCancel {
 		q.cancel()
 	}
 	// The errgroup goroutines spawned by AddCode never return errors,
