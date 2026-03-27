@@ -650,6 +650,12 @@ func (d *diff) Apply(baseState Chain) error {
 				if err := baseState.DeleteCurrentValidator(validatorDiff.removed); err != nil {
 					return fmt.Errorf("deleting current validator: %w", err)
 				}
+
+				// If we are not performing a replacement, we should not try to update staking info because
+				// this no longer exists.
+				if validatorDiff.added == nil {
+					delete(d.modifiedStakingInfo[validatorDiff.removed.SubnetID], validatorDiff.removed.NodeID)
+				}
 			}
 			if validatorDiff.added != nil {
 				if err := baseState.PutCurrentValidator(validatorDiff.added); err != nil {
@@ -666,7 +672,7 @@ func (d *diff) Apply(baseState Chain) error {
 	for subnetID, nodes := range d.modifiedStakingInfo {
 		for nodeID, stakingInfo := range nodes {
 			if err := baseState.SetStakingInfo(subnetID, nodeID, stakingInfo); err != nil {
-				return err
+				return fmt.Errorf("setting staking info: %w", err)
 			}
 		}
 	}
