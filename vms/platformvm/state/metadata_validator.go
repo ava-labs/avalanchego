@@ -91,7 +91,6 @@ type StakingInfo struct {
 	AccruedDelegateeRewards  uint64
 	AutoCompoundRewardShares uint32
 	Period                   time.Duration
-	StakerEndTime            uint64
 }
 
 func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {

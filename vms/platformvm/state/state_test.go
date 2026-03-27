@@ -3917,7 +3917,6 @@ func TestLoadCurrentValidatorsWeight(t *testing.T) {
 		AccruedRewards:          accruedRewards,
 		AccruedDelegateeRewards: accruedDelRewards,
 		Period:                  time.Duration(period) * time.Second,
-		StakerEndTime:           uint64(endTime.Unix()),
 	}))
 
 	// Commit again so the updated metadata is persisted

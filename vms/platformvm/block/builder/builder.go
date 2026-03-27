@@ -328,7 +328,7 @@ func buildBlock(
 			return nil, err
 		}
 
-		rewardValidatorTx, err := NewRewardTxForStaker(builder.txExecutorBackend.Ctx, stakerTx, timestamp)
+		rewardValidatorTx, err := newRewardTxForStaker(builder.txExecutorBackend.Ctx, stakerTx, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
@@ -656,7 +656,7 @@ func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
 	return tx, tx.SyntacticVerify(ctx)
 }
 
-func NewRewardTxForStaker(ctx *snow.Context, stakerTx *txs.Tx, timestamp time.Time) (*txs.Tx, error) {
+func newRewardTxForStaker(ctx *snow.Context, stakerTx *txs.Tx, timestamp time.Time) (*txs.Tx, error) {
 	if _, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx); ok {
 		return newRewardAutoRenewedValidatorTx(ctx, stakerTx.ID(), uint64(timestamp.Unix()))
 	}
