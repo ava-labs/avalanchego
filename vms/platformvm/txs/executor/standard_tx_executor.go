@@ -1471,7 +1471,7 @@ func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedVa
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
-func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
+func (e *standardTxExecutor) putStaker(stakerTx txs.EndTimeStaker) error {
 	var (
 		chainTime = e.state.GetTimestamp()
 		txID      = e.tx.ID()

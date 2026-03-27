@@ -331,7 +331,7 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("failed setting preference: %w", err)
 	}
 
-	stakerTx := signedTx.Unsigned.(txs.Staker)
+	stakerTx := signedTx.Unsigned.(txs.EndTimeStaker)
 	return vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
 }
 

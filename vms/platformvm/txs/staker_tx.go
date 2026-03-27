@@ -32,17 +32,17 @@ type DelegatorTx interface {
 
 type StakerTx interface {
 	UnsignedTx
-	BaseStaker
+	Staker
 }
 
 type PermissionlessStaker interface {
-	BaseStaker
+	Staker
 
 	Outputs() []*avax.TransferableOutput
 	Stake() []*avax.TransferableOutput
 }
 
-type BaseStaker interface {
+type Staker interface {
 	SubnetID() ids.ID
 	NodeID() ids.NodeID
 	// PublicKey returns the BLS public key registered by this transaction. If
@@ -53,12 +53,12 @@ type BaseStaker interface {
 }
 
 type ScheduledStaker interface {
-	Staker
+	EndTimeStaker
 	StartTime() time.Time
 	PendingPriority() Priority
 }
 
-type Staker interface {
-	BaseStaker
+type EndTimeStaker interface {
+	Staker
 	EndTime() time.Time
 }

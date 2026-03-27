@@ -96,7 +96,7 @@ func (s *Staker) Less(than *Staker) bool {
 
 func NewCurrentStaker(
 	txID ids.ID,
-	staker txs.Staker,
+	staker txs.EndTimeStaker,
 	startTime time.Time,
 	potentialReward uint64,
 ) (*Staker, error) {
@@ -124,7 +124,7 @@ func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) 
 
 func NewStaker(
 	txID ids.ID,
-	staker txs.BaseStaker,
+	staker txs.Staker,
 	startTime time.Time,
 	endTime time.Time,
 	weight uint64, // we need this, because staker.Weight() returns the initial weight (without any accrued rewards)

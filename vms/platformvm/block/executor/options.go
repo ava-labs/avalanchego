@@ -158,7 +158,7 @@ func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
 		return false, fmt.Errorf("%w: %w", errFailedFetchingStakerTx, err)
 	}
 
-	staker, ok := stakerTx.Unsigned.(txs.BaseStaker)
+	staker, ok := stakerTx.Unsigned.(txs.Staker)
 	if !ok {
 		return false, fmt.Errorf("%w: %T", errUnexpectedStakerTxType, stakerTx.Unsigned)
 	}
