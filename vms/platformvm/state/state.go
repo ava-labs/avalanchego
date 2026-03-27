@@ -2849,8 +2849,7 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 				// If we are not performing a replacement, we should not try to update staking info because
 				// this no longer exists.
 				if validatorDiff.added == nil {
-					nodes := s.modifiedStakingInfo[subnetID]
-					delete(nodes, nodeID)
+					delete(s.modifiedStakingInfo[subnetID], nodeID)
 				}
 			}
 			if validatorDiff.added != nil {
