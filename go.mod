@@ -22,10 +22,10 @@ require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpcreflect v1.3.0
 	github.com/DataDog/zstd v1.5.2
-	github.com/StephenButtolph/canoto v0.17.3
+	github.com/StephenButtolph/canoto v0.18.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-initial-consistent-tag
-	github.com/ava-labs/avalanchego/graft/subnet-evm v0.0.0-initial-consistent-tag
+	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
+	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
 	github.com/ava-labs/libevm v1.13.14-0.4.0.rc.2
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
@@ -90,7 +90,7 @@ require (
 )
 
 require (
-	github.com/ava-labs/avalanchego/graft/evm v0.0.0-initial-consistent-tag // indirect
+	github.com/ava-labs/avalanchego/graft/evm v1.14.2 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 )
 
