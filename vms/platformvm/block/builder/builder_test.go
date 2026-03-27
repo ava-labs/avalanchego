@@ -781,7 +781,7 @@ func TestNewRewardTxForStaker(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			stakerTx := tt.stakerTxFunc(t)
 
-			rewardTx, err := NewRewardTxForStaker(ctx, stakerTx, tt.timestamp)
+			rewardTx, err := newRewardTxForStaker(ctx, stakerTx, tt.timestamp)
 			require.NoError(t, err)
 			require.NotNil(t, rewardTx)
 			require.IsType(t, tt.wantTxType, rewardTx.Unsigned)

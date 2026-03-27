@@ -2289,7 +2289,7 @@ func (s *State) resolveValidatorMetadataCodec() uint16 {
 	ts := s.GetTimestamp()
 
 	if s.upgrades.IsHeliconActivated(ts) {
-		return CodecVersion2
+		return codecVersion2
 	}
 
 	if s.upgrades.IsDurangoActivated(ts) {
@@ -2901,6 +2901,7 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 					UpDuration:               0,
 					LastUpdated:              startTime,
 					StakerStartTime:          startTime,
+					StakerEndTime:            uint64(staker.EndTime.Unix()),
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
 				}

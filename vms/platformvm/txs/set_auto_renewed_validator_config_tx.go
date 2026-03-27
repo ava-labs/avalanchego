@@ -4,15 +4,11 @@
 package txs
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
-
-var errMissingTxID = errors.New("missing tx id")
 
 type SetAutoRenewedValidatorConfigTx struct {
 	// Metadata, inputs and outputs

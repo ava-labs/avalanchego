@@ -826,7 +826,7 @@ func (c *complexityVisitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVali
 	if err != nil {
 		return err
 	}
-	signerComplexity, err := SignerComplexity(tx.GetSigner())
+	signerComplexity, err := SignerComplexity(tx.Signer)
 	if err != nil {
 		return err
 	}
@@ -842,7 +842,7 @@ func (c *complexityVisitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVali
 	if err != nil {
 		return err
 	}
-	configOwnerComplexity, err := OwnerComplexity(tx.ConfigOwner())
+	configOwnerComplexity, err := OwnerComplexity(tx.Owner)
 	if err != nil {
 		return err
 	}

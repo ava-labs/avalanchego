@@ -111,22 +111,6 @@ func (tx *AddAutoRenewedValidatorTx) Shares() uint32 {
 	return tx.DelegationShares
 }
 
-func (tx *AddAutoRenewedValidatorTx) RenewalPeriod() uint64 {
-	return tx.Period
-}
-
-func (tx *AddAutoRenewedValidatorTx) CompoundRewardShares() uint32 {
-	return tx.AutoCompoundRewardShares
-}
-
-func (tx *AddAutoRenewedValidatorTx) ConfigOwner() fx.Owner {
-	return tx.Owner
-}
-
-func (tx *AddAutoRenewedValidatorTx) GetSigner() signer.Signer {
-	return tx.Signer
-}
-
 // InitCtx sets the FxID fields in the inputs and outputs of this
 // AddAutoRenewedValidatorTx. Also sets the ctx to the given vm.ctx so
 // that the addresses can be json marshalled into human readable format

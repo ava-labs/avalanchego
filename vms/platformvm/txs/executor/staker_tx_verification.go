@@ -42,10 +42,10 @@ var (
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
-	ErrMissingStakerTx                 = errors.New("missing staker tx")
-	ErrInvalidStakerTxType             = errors.New("invalid staker tx type")
-	ErrInvalidStakerTx                 = errors.New("invalid staker tx")
-	ErrMissingValidator                = errors.New("missing validator")
+	errMissingStakerTx                 = errors.New("missing staker tx")
+	errInvalidStakerTxType             = errors.New("invalid staker tx type")
+	errInvalidStakerTx                 = errors.New("invalid staker tx")
+	errMissingValidator                = errors.New("missing validator")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -898,7 +898,7 @@ func verifyAddAutoRenewedValidatorTx(
 		return nil
 	}
 
-	duration := time.Duration(tx.RenewalPeriod()) * time.Second
+	duration := time.Duration(tx.Period) * time.Second
 
 	switch {
 	case tx.Weight() < backend.Config.MinValidatorStake:
@@ -985,7 +985,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return nil, errHeliconUpgradeNotActive
 	}
 
-	if err := tx.SyntacticVerify(backend.Ctx); err != nil {
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
 		return nil, err
 	}
 
@@ -996,7 +996,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrMissingStakerTx
+			return nil, errMissingStakerTx
 		}
 
 		return nil, fmt.Errorf("error getting staker tx: %w", err)
@@ -1004,13 +1004,13 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
 	if !ok {
-		return nil, fmt.Errorf("%w: %T", ErrInvalidStakerTxType, stakerTx.Unsigned)
+		return nil, fmt.Errorf("%w: %T", errInvalidStakerTxType, stakerTx.Unsigned)
 	}
 
 	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrMissingValidator
+			return nil, errMissingValidator
 		}
 
 		return nil, fmt.Errorf("failed to get validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
@@ -1019,7 +1019,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 	if tx.TxID != validator.TxID {
 		// This can happen if a validator restaked with the same node id.
 		// In this case, TxID should be the latest transaction of the auto-renewed validator.
-		return nil, fmt.Errorf("%w: wrong tx id", ErrInvalidStakerTx)
+		return nil, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)
 	}
 
 	if !backend.Bootstrapped.Get() {
@@ -1094,4 +1094,48 @@ func verifyStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time
 		)
 	}
 	return nil
+}
+
+func verifyRewardTx(chainState state.Chain, sTx *txs.Tx, tx txs.RewardTx) (*txs.Tx, *state.Staker, error) {
+	if len(sTx.Creds) != 0 {
+		return nil, nil, errWrongNumberOfCredentials
+	}
+
+	currentStakerIterator, err := chainState.GetCurrentStakerIterator()
+	if err != nil {
+		return nil, nil, err
+	}
+	if !currentStakerIterator.Next() {
+		return nil, nil, fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
+	}
+	stakerToReward := currentStakerIterator.Value()
+	currentStakerIterator.Release()
+
+	if stakerToReward.TxID != tx.StakerTxID() {
+		return nil, nil, fmt.Errorf(
+			"%w: %s != %s",
+			ErrRemoveWrongStaker,
+			stakerToReward.TxID,
+			tx.StakerTxID(),
+		)
+	}
+
+	// Verify that the chain's timestamp is the validator's end time
+	currentChainTime := chainState.GetTimestamp()
+	if !stakerToReward.EndTime.Equal(currentChainTime) {
+		return nil, nil, fmt.Errorf(
+			"%w: TxID = %s with %s < %s",
+			ErrRemoveStakerTooEarly,
+			tx.StakerTxID(),
+			currentChainTime,
+			stakerToReward.EndTime,
+		)
+	}
+
+	stakerTx, _, err := chainState.GetTx(stakerToReward.TxID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get next removed staker tx: %w", err)
+	}
+
+	return stakerTx, stakerToReward, nil
 }

@@ -942,7 +942,7 @@ func TestRewardValidatorStakerType(t *testing.T) {
 		must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
 		must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
 	)
-	require.ErrorIs(t, err, ErrShouldUseRewardAutoRenewedValidator)
+	require.ErrorIs(t, err, errShouldUseRewardAutoRenewedValidator)
 }
 
 func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
@@ -994,16 +994,25 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name:    "invalid timestamp",
-			wantErr: ErrInvalidTimestamp,
+			wantErr: errInvalidTimestamp,
 			updateStateAndGetTx: func(t testing.TB, state *state.State) *txs.Tx {
 				return newRewardAutoRenewedValidatorTx(t, staker.TxID, uint64(state.GetTimestamp().Unix())-1)
 			},
 		},
 		{
 			name:    "invalid validator tx",
-			wantErr: ErrShouldBeAutoRenewedStaker,
+			wantErr: errShouldBeAutoRenewedStaker,
 			updateStateAndGetTx: func(t testing.TB, state *state.State) *txs.Tx {
 				return newRewardAutoRenewedValidatorTx(t, vdrTx.ID(), uint64(state.GetTimestamp().Unix()))
+			},
+		},
+		{
+			name:    "wrong number of credentials",
+			wantErr: errWrongNumberOfCredentials,
+			updateStateAndGetTx: func(t testing.TB, state *state.State) *txs.Tx {
+				tx := newRewardAutoRenewedValidatorTx(t, staker.TxID, uint64(state.GetTimestamp().Unix()))
+				tx.Creds = append(tx.Creds, &secp256k1fx.Credential{})
+				return tx
 			},
 		},
 	}

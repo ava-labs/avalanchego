@@ -4438,7 +4438,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		AccruedDelegateeRewards:  0,
 		AutoCompoundRewardShares: 200_000,
 		Period:                   continuationPeriod,
-		StakerEndTime:            uint64(diff.GetTimestamp().Add(continuationPeriod).Unix()),
 	}
 	require.Equal(t, wantStakingInfo, stakingInfo)
 
@@ -4815,28 +4814,28 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 					SubnetID: constants.PrimaryNetworkID,
 				}))
 			},
-			wantErr: ErrMissingValidator,
+			wantErr: errMissingValidator,
 		},
 		{
 			name: "missing staker tx",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
 				tx.TxID = ids.GenerateTestID()
 			},
-			wantErr: ErrMissingStakerTx,
+			wantErr: errMissingStakerTx,
 		},
 		{
 			name: "invalid staker tx",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
 				tx.TxID = addPastContValidatorTx.ID()
 			},
-			wantErr: ErrInvalidStakerTx,
+			wantErr: errInvalidStakerTx,
 		},
 		{
 			name: "invalid staker tx type",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
 				tx.TxID = fixedStakerTxID
 			},
-			wantErr: ErrInvalidStakerTxType,
+			wantErr: errInvalidStakerTxType,
 		},
 		{
 			name: "stake too short",

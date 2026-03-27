@@ -4,13 +4,21 @@
 package txs
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var _ UnsignedTx = (*RewardAutoRenewedValidatorTx)(nil)
+var (
+	_ UnsignedTx = (*RewardAutoRenewedValidatorTx)(nil)
+	_ RewardTx   = (*RewardAutoRenewedValidatorTx)(nil)
+
+	errMissingTxID      = errors.New("missing tx id")
+	errMissingTimestamp = errors.New("missing timestamp")
+)
 
 // RewardAutoRenewedValidatorTx is a transaction that represents a proposal to
 // reward/remove an auto-renewed validator that is currently validating from the validator set.
@@ -46,7 +54,16 @@ func (*RewardAutoRenewedValidatorTx) Outputs() []*avax.TransferableOutput {
 	return nil
 }
 
-func (*RewardAutoRenewedValidatorTx) SyntacticVerify(*snow.Context) error {
+func (tx *RewardAutoRenewedValidatorTx) SyntacticVerify(*snow.Context) error {
+	switch {
+	case tx == nil:
+		return ErrNilTx
+	case tx.TxID == ids.Empty:
+		return errMissingTxID
+	case tx.Timestamp == 0:
+		return errMissingTimestamp
+	}
+
 	return nil
 }
 

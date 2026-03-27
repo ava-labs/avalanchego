@@ -9,7 +9,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -141,12 +140,8 @@ func (*options) ApricotAtomicBlock(*block.ApricotAtomicBlock) error {
 	return snowman.ErrNotOracle
 }
 
-type rewardStakerTx interface {
-	StakerTxID() ids.ID
-}
-
 func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
-	unsignedTx, ok := tx.Unsigned.(rewardStakerTx)
+	unsignedTx, ok := tx.Unsigned.(txs.RewardTx)
 	if !ok {
 		return false, fmt.Errorf("%w: %T", errUnexpectedProposalTxType, tx.Unsigned)
 	}

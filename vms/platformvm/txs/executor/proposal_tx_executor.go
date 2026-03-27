@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -37,13 +36,13 @@ var (
 	ErrRemoveWrongStaker                   = errors.New("attempting to remove wrong staker")
 	ErrInvalidState                        = errors.New("generated output isn't valid state")
 	ErrShouldBePermissionlessStaker        = errors.New("expected permissionless staker")
-	ErrShouldBeAutoRenewedStaker           = errors.New("expected auto renewed staker")
-	ErrShouldUseRewardAutoRenewedValidator = errors.New("auto-renewed validators must be rewarded with RewardAutoRenewedValidatorTx")
-	ErrInvalidTimestamp                    = errors.New("invalid timestamp")
 	ErrWrongTxType                         = errors.New("wrong transaction type")
 	ErrInvalidID                           = errors.New("invalid ID")
 	ErrProposedAddStakerTxAfterBanff       = errors.New("staker transaction proposed after Banff")
 	ErrAdvanceTimeTxIssuedAfterBanff       = errors.New("AdvanceTimeTx issued after Banff")
+	errShouldBeAutoRenewedStaker           = errors.New("expected auto renewed staker")
+	errShouldUseRewardAutoRenewedValidator = errors.New("auto-renewed validators must be rewarded with RewardAutoRenewedValidatorTx")
+	errInvalidTimestamp                    = errors.New("invalid timestamp")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -346,44 +345,11 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return txs.ErrNilTx
 	case tx.TxID == ids.Empty:
 		return ErrInvalidID
-	case len(e.tx.Creds) != 0:
-		return errWrongNumberOfCredentials
 	}
 
-	currentStakerIterator, err := e.onCommitState.GetCurrentStakerIterator()
+	stakerTx, stakerToReward, err := verifyRewardTx(e.onCommitState, e.tx, tx)
 	if err != nil {
 		return err
-	}
-	if !currentStakerIterator.Next() {
-		return fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
-	}
-	stakerToReward := currentStakerIterator.Value()
-	currentStakerIterator.Release()
-
-	if stakerToReward.TxID != tx.TxID {
-		return fmt.Errorf(
-			"%w: %s != %s",
-			ErrRemoveWrongStaker,
-			stakerToReward.TxID,
-			tx.TxID,
-		)
-	}
-
-	// Verify that the chain's timestamp is the validator's end time
-	currentChainTime := e.onCommitState.GetTimestamp()
-	if !stakerToReward.EndTime.Equal(currentChainTime) {
-		return fmt.Errorf(
-			"%w: TxID = %s with %s < %s",
-			ErrRemoveStakerTooEarly,
-			tx.TxID,
-			currentChainTime,
-			stakerToReward.EndTime,
-		)
-	}
-
-	stakerTx, _, err := e.onCommitState.GetTx(stakerToReward.TxID)
-	if err != nil {
-		return fmt.Errorf("failed to get next removed staker tx: %w", err)
 	}
 
 	// Invariant: A [txs.DelegatorTx] does not also implement the
@@ -391,7 +357,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
 		if _, ok := uStakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
-			return ErrShouldUseRewardAutoRenewedValidator
+			return errShouldUseRewardAutoRenewedValidator
 		}
 
 		if err := e.rewardValidatorTx(uStakerTx, stakerToReward); err != nil {
@@ -427,63 +393,26 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return ErrShouldBePermissionlessStaker
 	}
 
-	// If the reward is aborted, then the current supply should be decreased.
-	currentSupply, err := e.onAbortState.GetCurrentSupply(stakerToReward.SubnetID)
-	if err != nil {
-		return err
-	}
-	newSupply, err := math.Sub(currentSupply, stakerToReward.PotentialReward)
-	if err != nil {
-		return err
-	}
-	e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
-	return nil
+	return e.decreaseAbortStateCurrentSupply(stakerToReward)
 }
 
 func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRenewedValidatorTx) error {
-	currentStakerIterator, err := e.onCommitState.GetCurrentStakerIterator()
-	if err != nil {
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
-	}
-	defer currentStakerIterator.Release()
-
-	if !currentStakerIterator.Next() {
-		return fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
-	}
-
-	stakerToReward := currentStakerIterator.Value()
-	if stakerToReward.TxID != tx.TxID {
-		return fmt.Errorf(
-			"%w: %s != %s",
-			ErrRemoveWrongStaker,
-			stakerToReward.TxID,
-			tx.TxID,
-		)
 	}
 
 	if tx.Timestamp != uint64(e.onCommitState.GetTimestamp().Unix()) {
-		return ErrInvalidTimestamp
+		return errInvalidTimestamp
 	}
 
-	// Verify that the chain's timestamp is the validator's end time
-	if !stakerToReward.EndTime.Equal(e.onCommitState.GetTimestamp()) {
-		return fmt.Errorf(
-			"%w: TxID = %s with %s < %s",
-			ErrRemoveStakerTooEarly,
-			tx.TxID,
-			e.onCommitState.GetTimestamp(),
-			stakerToReward.EndTime,
-		)
-	}
-
-	stakerTx, _, err := e.onCommitState.GetTx(stakerToReward.TxID)
+	stakerTx, stakerToReward, err := verifyRewardTx(e.onCommitState, e.tx, tx)
 	if err != nil {
-		return fmt.Errorf("failed to get next removed staker tx: %w", err)
+		return err
 	}
 
 	addAutoRenewedValidatorTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
 	if !ok {
-		return ErrShouldBeAutoRenewedStaker
+		return errShouldBeAutoRenewedStaker
 	}
 
 	stakingInfo, err := e.onCommitState.GetStakingInfo(stakerToReward.SubnetID, stakerToReward.NodeID)
@@ -496,17 +425,9 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 		return fmt.Errorf("deleting current validator from abort state: %w", err)
 	}
 
-	currentSupply, err := e.onAbortState.GetCurrentSupply(stakerToReward.SubnetID)
-	if err != nil {
+	if err := e.decreaseAbortStateCurrentSupply(stakerToReward); err != nil {
 		return err
 	}
-
-	newSupply, err := math.Sub(currentSupply, stakerToReward.PotentialReward)
-	if err != nil {
-		return err
-	}
-
-	e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
 
 	if stakingInfo.Period > 0 {
 		// Running auto-renewed staker: validator will continue to the next cycle.
@@ -538,6 +459,20 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 		return fmt.Errorf("deleting current validator from commit state: %w", err)
 	}
 
+	return nil
+}
+
+func (e *proposalTxExecutor) decreaseAbortStateCurrentSupply(stakerToReward *state.Staker) error {
+	// If the reward is aborted, then the current supply should be decreased.
+	currentSupply, err := e.onAbortState.GetCurrentSupply(stakerToReward.SubnetID)
+	if err != nil {
+		return err
+	}
+	newSupply, err := math.Sub(currentSupply, stakerToReward.PotentialReward)
+	if err != nil {
+		return err
+	}
+	e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
 	return nil
 }
 
@@ -985,7 +920,6 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 	stakingInfo.DelegateeReward = 0
 	stakingInfo.AccruedRewards = newAccruedRewards
 	stakingInfo.AccruedDelegateeRewards = newAccruedDelegateeRewards
-	stakingInfo.StakerEndTime = uint64(endTime.Unix())
 
 	if err := e.onCommitState.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
 		return fmt.Errorf("setting staking info for validator: %w", err)
