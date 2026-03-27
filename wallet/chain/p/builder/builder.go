@@ -1606,6 +1606,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 
 	utils.Sort(validationRewardsOwner.Addrs)
 	utils.Sort(delegationRewardsOwner.Addrs)
+	utils.Sort(configOwner.Addrs)
 	tx := &txs.AddAutoRenewedValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,

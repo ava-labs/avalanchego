@@ -898,8 +898,6 @@ func verifyAddAutoRenewedValidatorTx(
 		return nil
 	}
 
-	duration := time.Duration(tx.Period) * time.Second
-
 	switch {
 	case tx.Weight() < backend.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
@@ -913,11 +911,11 @@ func verifyAddAutoRenewedValidatorTx(
 		// Ensure the validator fee is at least the minimum amount
 		return ErrInsufficientDelegationFee
 
-	case duration < backend.Config.MinStakeDuration:
+	case tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
 		// Ensure staking length is not too short
 		return ErrStakeTooShort
 
-	case duration > backend.Config.MaxStakeDuration:
+	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
 		// Ensure staking length is not too long
 		return ErrStakeTooLong
 	}
@@ -943,7 +941,7 @@ func verifyAddAutoRenewedValidatorTx(
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
+		return fmt.Errorf("getting utxos: %w", err)
 	}
 
 	// Verify the flowcheck
@@ -1027,17 +1025,10 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return validator, nil
 	}
 
-	validatorRules, err := getValidatorRules(backend, chainState, constants.PrimaryNetworkID)
-	if err != nil {
-		return nil, fmt.Errorf("getting validator rules %w", err)
-	}
-
-	duration := time.Duration(tx.Period) * time.Second
 	switch {
-	case duration > 0 && duration < validatorRules.minStakeDuration:
+	case tx.Period > 0 && tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
 		return nil, ErrStakeTooShort
-
-	case duration > validatorRules.maxStakeDuration:
+	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
 		return nil, ErrStakeTooLong
 	}
 
