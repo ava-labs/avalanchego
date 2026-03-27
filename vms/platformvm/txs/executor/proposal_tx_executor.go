@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -17,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/database"
 )
 
 const (
@@ -37,9 +37,9 @@ var (
 	ErrRemoveWrongStaker                   = errors.New("attempting to remove wrong staker")
 	ErrInvalidState                        = errors.New("generated output isn't valid state")
 	ErrShouldBePermissionlessStaker        = errors.New("expected permissionless staker")
-	errShouldBeAutoRenewedStaker = errors.New("expected auto renewed staker")
+	errShouldBeAutoRenewedStaker           = errors.New("expected auto renewed staker")
 	errShouldUseRewardAutoRenewedValidator = errors.New("auto-renewed validators must be rewarded with RewardAutoRenewedValidatorTx")
-	errInvalidTimestamp          = errors.New("invalid timestamp")
+	errInvalidTimestamp                    = errors.New("invalid timestamp")
 	ErrWrongTxType                         = errors.New("wrong transaction type")
 	ErrInvalidID                           = errors.New("invalid ID")
 	ErrProposedAddStakerTxAfterBanff       = errors.New("staker transaction proposed after Banff")

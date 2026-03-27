@@ -41,11 +41,11 @@ var (
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
-	ErrAddDelegatorTxPostDurango = errors.New("AddDelegatorTx is not permitted post-Durango")
-	errMissingStakerTx           = errors.New("missing staker tx")
-	errInvalidStakerTxType       = errors.New("invalid staker tx type")
-	errInvalidStakerTx           = errors.New("invalid staker tx")
-	errMissingValidator          = errors.New("missing validator")
+	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
+	errMissingStakerTx                 = errors.New("missing staker tx")
+	errInvalidStakerTxType             = errors.New("invalid staker tx type")
+	errInvalidStakerTx                 = errors.New("invalid staker tx")
+	errMissingValidator                = errors.New("missing validator")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -175,7 +175,6 @@ func verifySpend(
 	outs []*avax.TransferableOutput,
 	producedAVAX uint64,
 ) error {
-
 	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
