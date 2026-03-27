@@ -283,9 +283,13 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	if err != nil {
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", r.StateDB, b.NumberU64(), err)
 	}
-	if err := e.Tracker.Track(root, b.NumberU64()); err != nil {
+	if err := e.Tracker.MaybeCommit(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
 		return err
 	}
+
+	// Responsibility for untracking lies with the VM once it deems this block's
+	// post-execution state to no longer be consensus-critical.
+	e.Tracker.Track(root)
 
 	// The strict ordering of the next 3 calls guarantees invariants that MUST
 	// NOT be broken:

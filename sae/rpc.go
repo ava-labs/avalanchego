@@ -14,9 +14,9 @@ import (
 	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/hook"
 	saerpc "github.com/ava-labs/strevm/sae/rpc"
-	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saexec"
 	"github.com/ava-labs/strevm/txgossip"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 // GethRPCBackends returns the backing infrastructure for geth's implementations
@@ -34,14 +34,14 @@ type chain struct {
 	*saexec.Executor
 }
 
-func (c chain) Logger() logging.Logger      { return c.VM.snowCtx.Log }
-func (c chain) Hooks() hook.Points          { return c.hooks }
-func (c chain) DB() ethdb.Database          { return c.db }
-func (c chain) XDB() saedb.ExecutionResults { return c.xdb }
-func (c chain) Mempool() *txgossip.Set      { return c.mempool }
-func (c chain) Peers() *p2p.Peers           { return c.VM.Peers }
-func (c chain) LastAccepted() *blocks.Block { return c.last.accepted.Load() }
-func (c chain) LastSettled() *blocks.Block  { return c.last.settled.Load() }
+func (c chain) Logger() logging.Logger         { return c.VM.snowCtx.Log }
+func (c chain) Hooks() hook.Points             { return c.hooks }
+func (c chain) DB() ethdb.Database             { return c.db }
+func (c chain) XDB() saetypes.ExecutionResults { return c.xdb }
+func (c chain) Mempool() *txgossip.Set         { return c.mempool }
+func (c chain) Peers() *p2p.Peers              { return c.VM.Peers }
+func (c chain) LastAccepted() *blocks.Block    { return c.last.accepted.Load() }
+func (c chain) LastSettled() *blocks.Block     { return c.last.settled.Load() }
 
 func (c chain) ConsensusCriticalBlock(h common.Hash) (*blocks.Block, bool) {
 	return c.consensusCritical.Load(h)

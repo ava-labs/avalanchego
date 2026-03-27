@@ -47,7 +47,7 @@ type Executor struct {
 	chainContext *chainContext
 	chainConfig  *params.ChainConfig
 	db           ethdb.Database
-	xdb          saedb.ExecutionResults
+	xdb          saetypes.ExecutionResults
 }
 
 // New constructs and starts a new [Executor]. Call [Executor.Close] to release
@@ -61,7 +61,7 @@ func New(
 	headerSrc saetypes.HeaderSource,
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
-	xdb saedb.ExecutionResults,
+	xdb saetypes.ExecutionResults,
 	saedbConfig saedb.Config,
 	hooks hook.Points,
 	log logging.Logger,
@@ -105,7 +105,7 @@ func (e *Executor) Close() error {
 	close(e.quit)
 	<-e.done
 
-	return e.Tracker.Close()
+	return e.Tracker.Close(e.LastExecuted().PostExecutionStateRoot())
 }
 
 // ChainConfig returns the config originally passed to [New].

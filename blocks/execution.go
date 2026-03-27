@@ -24,7 +24,7 @@ import (
 
 	"github.com/ava-labs/strevm/gastime"
 	"github.com/ava-labs/strevm/proxytime"
-	"github.com/ava-labs/strevm/saedb"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 // SetInterimExecutionTime is expected to be called during execution of b's
@@ -84,7 +84,7 @@ func (e *executionResults) setBaseFee(bf *big.Int) error {
 // for metrics only.
 func (b *Block) MarkExecuted(
 	db ethdb.Database,
-	xdb saedb.ExecutionResults,
+	xdb saetypes.ExecutionResults,
 	byGas *gastime.Time,
 	byWall time.Time,
 	baseFee *big.Int,
@@ -132,14 +132,14 @@ var errMarkBlockExecutedAgain = errors.New("block re-marked as executed")
 //
 // The batch is `Write()`n (yeah, it's a word now) after all disk artefacts are
 // persisted.
-func (b *Block) markExecuted(batch ethdb.Batch, xdb saedb.ExecutionResults, e *executionResults, setAsHeadBlock bool, lastExecuted *atomic.Pointer[Block]) error {
+func (b *Block) markExecuted(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults, setAsHeadBlock bool, lastExecuted *atomic.Pointer[Block]) error {
 	if err := b.markExecutedOnDisk(batch, xdb, e, setAsHeadBlock); err != nil {
 		return err
 	}
 	return b.markExecutedAfterDiskArtefacts(e, lastExecuted)
 }
 
-func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saedb.ExecutionResults, e *executionResults, setAsHeadBlock bool) error {
+func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults, setAsHeadBlock bool) error {
 	n := b.NumberU64()
 	if err := xdb.Put(n, e.MarshalCanoto()); err != nil {
 		return err
@@ -248,7 +248,7 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
 // said function was originally called.
-func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saedb.ExecutionResults, chainConfig *params.ChainConfig) error {
+func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
 	e, err := loadExecutionResults(xdb, b.NumberU64())
 	if err != nil {
 		return err
@@ -268,7 +268,7 @@ func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saedb.Execution
 	return b.markExecutedAfterDiskArtefacts(e, nil)
 }
 
-func loadExecutionResults(xdb saedb.ExecutionResults, blockNum uint64) (*executionResults, error) {
+func loadExecutionResults(xdb saetypes.ExecutionResults, blockNum uint64) (*executionResults, error) {
 	buf, err := xdb.Get(blockNum)
 	if err != nil {
 		return nil, err
@@ -280,7 +280,7 @@ func loadExecutionResults(xdb saedb.ExecutionResults, blockNum uint64) (*executi
 	return e, nil
 }
 
-func persistedExecutionArtefact[T any](xdb saedb.ExecutionResults, blockNum uint64, get func(*executionResults) T) (T, error) {
+func persistedExecutionArtefact[T any](xdb saetypes.ExecutionResults, blockNum uint64, get func(*executionResults) T) (T, error) {
 	e, err := loadExecutionResults(xdb, blockNum)
 	if err != nil {
 		var zero T
@@ -292,13 +292,13 @@ func persistedExecutionArtefact[T any](xdb saedb.ExecutionResults, blockNum uint
 // PostExecutionStateRoot mirrors the behaviour of
 // [Block.RestoreExecutionArtefacts], without requiring a full [Block], and only
 // returning the state root after execution.
-func PostExecutionStateRoot(xdb saedb.ExecutionResults, blockNum uint64) (common.Hash, error) {
+func PostExecutionStateRoot(xdb saetypes.ExecutionResults, blockNum uint64) (common.Hash, error) {
 	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).postExecutionStateRoot)
 }
 
 // ExecutionBaseFee mirrors the behaviour of [Block.RestoreExecutionArtefacts],
 // without requiring a full [Block], and only returning the base fee when the
 // block was executed (as against the worst-case prediction).
-func ExecutionBaseFee(xdb saedb.ExecutionResults, blockNum uint64) (*uint256.Int, error) {
+func ExecutionBaseFee(xdb saetypes.ExecutionResults, blockNum uint64) (*uint256.Int, error) {
 	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).cloneBaseFee)
 }

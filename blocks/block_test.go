@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/strevm/hook/hookstest"
-	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saetest"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 func newEthBlock(num, time uint64, parent *types.Block) *types.Block {
@@ -37,7 +37,7 @@ func newBlock(tb testing.TB, eth *types.Block, parent, lastSettled *Block) *Bloc
 	return b
 }
 
-func newChain(tb testing.TB, db ethdb.Database, xdb saedb.ExecutionResults, startHeight, total uint64, lastSettledAtHeight map[uint64]uint64) []*Block {
+func newChain(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults, startHeight, total uint64, lastSettledAtHeight map[uint64]uint64) []*Block {
 	tb.Helper()
 
 	var (

@@ -22,7 +22,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/strevm/proxytime"
-	"github.com/ava-labs/strevm/saedb"
 	saetypes "github.com/ava-labs/strevm/types"
 )
 
@@ -103,7 +102,7 @@ func New(eth *types.Block, parent, lastSettled *Block, log logging.Logger) (*Blo
 // RestoreSettledBlock constructs a new block with [New] and restores it to an
 // settled state before returning it. By definition of being settled, the
 // returned block also includes post-execution artefacts.
-func RestoreSettledBlock(eth *types.Block, log logging.Logger, db ethdb.Database, xdb saedb.ExecutionResults, config *params.ChainConfig) (*Block, error) {
+func RestoreSettledBlock(eth *types.Block, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
 	b, err := New(eth, nil, nil, log)
 	if err != nil {
 		return nil, err

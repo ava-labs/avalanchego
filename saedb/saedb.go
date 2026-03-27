@@ -8,7 +8,6 @@
 package saedb
 
 import (
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 )
@@ -35,11 +34,4 @@ func LastCommittedTrieDBHeight(atOrBefore uint64) uint64 {
 // A StateDBOpener opens a [state.StateDB] at the given root.
 type StateDBOpener interface {
 	StateDB(root common.Hash) (*state.StateDB, error)
-}
-
-// ExecutionResults provides type safety for a [database.HeightIndex], to be
-// used for persistence of SAE-specific execution results, avoiding possible
-// collision with `rawdb` keys.
-type ExecutionResults struct {
-	database.HeightIndex
 }

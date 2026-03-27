@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saexec"
 	"github.com/ava-labs/strevm/txgossip"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
@@ -56,7 +57,7 @@ type VM struct {
 	metrics *prometheus.Registry
 
 	db  ethdb.Database
-	xdb saedb.ExecutionResults
+	xdb saetypes.ExecutionResults
 
 	consensusState utils.Atomic[snow.State]
 
@@ -122,12 +123,11 @@ func NewVM[T hook.Transaction](
 		cfg.Now = time.Now
 	}
 	vm := &VM{
-		hooks:             hooks,
-		config:            cfg,
-		snowCtx:           snowCtx,
-		metrics:           prometheus.NewRegistry(),
-		db:                db,
-		consensusCritical: newSyncMap[common.Hash, *blocks.Block](),
+		hooks:   hooks,
+		config:  cfg,
+		snowCtx: snowCtx,
+		metrics: prometheus.NewRegistry(),
+		db:      db,
 	}
 	defer func() {
 		if retErr != nil {
@@ -164,14 +164,14 @@ func NewVM[T hook.Transaction](
 	}
 
 	rec := &recovery{db, xdb, chainConfig, snowCtx.Log, hooks, cfg, lastSync}
-	{ // ==========  Executor  ==========
-		lastExecuted, unexecuted, err := rec.recoverFromDB()
+	{ // ==========  Block State  ==========
+		lastCommitted, err := rec.lastCommittedBlock()
 		if err != nil {
 			return nil, err
 		}
 
 		exec, err := saexec.New(
-			lastExecuted,
+			lastCommitted,
 			vm.headerSource,
 			chainConfig,
 			db,
@@ -186,30 +186,17 @@ func NewVM[T hook.Transaction](
 		vm.exec = exec
 		vm.toClose = append(vm.toClose, exec)
 
-		last := lastExecuted
-		for b, err := range unexecuted {
-			if err != nil {
-				return nil, err
-			}
-			if err := exec.Enqueue(ctx, b); err != nil {
-				return nil, err
-			}
-			last = b
-		}
-		if err := last.WaitUntilExecuted(ctx); err != nil {
+		if err := rec.executeAllAccepted(ctx, exec); err != nil {
 			return nil, err
 		}
-	}
 
-	{ // ==========  Blocks in memory  ==========
-		head := vm.exec.LastExecuted()
-
-		bMap, lastSettled, err := rec.rebuildBlocksInMemory(head)
+		bMap, lastSettled, err := rec.consensusCriticalBlocks(exec)
 		if err != nil {
 			return nil, err
 		}
 		vm.consensusCritical = bMap
 
+		head := exec.LastExecuted()
 		vm.last.settled.Store(lastSettled)
 		vm.last.accepted.Store(head)
 		vm.preference.Store(head)

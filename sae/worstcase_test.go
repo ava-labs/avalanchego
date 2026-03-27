@@ -110,7 +110,6 @@ func (g *guzzler) guzzle(env vm.PrecompileEnvironment, input []byte) ([]byte, er
 	return nil, nil
 }
 
-//nolint:tparallel // Why should we call t.Parallel at the top level by default?
 func TestWorstCase(t *testing.T) {
 	flags := worstCaseFuzzFlags
 	t.Logf("Flags: %+v", flags)

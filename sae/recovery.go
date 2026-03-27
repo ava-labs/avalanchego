@@ -4,7 +4,7 @@
 package sae
 
 import (
-	"fmt"
+	"context"
 	"iter"
 	"math"
 	"sync/atomic"
@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 
@@ -23,11 +22,12 @@ import (
 	"github.com/ava-labs/strevm/proxytime"
 	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saexec"
+	"github.com/ava-labs/strevm/types"
 )
 
 type recovery struct {
 	db              ethdb.Database
-	xdb             saedb.ExecutionResults
+	xdb             types.ExecutionResults
 	chainConfig     *params.ChainConfig
 	log             logging.Logger
 	hooks           hook.Points
@@ -43,13 +43,15 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	return blocks.New(ethB, parent, nil, rec.log)
 }
 
-func (rec *recovery) lastBlockWithStateRootAvailable() (*blocks.Block, error) {
-	// TODO(alarso16): unless there was an ungraceful shutdown, we can use the last executed block.
-	num := saedb.LastCommittedTrieDBHeight(
-		rawdb.ReadHeadHeader(rec.db).Number.Uint64(),
+func (rec *recovery) lastCommittedBlock() (*blocks.Block, error) {
+	num := saedb.LastHeightWithExecutionRootCommitted(
+		rec.db,
+		rec.config.DBConfig,
+		rec.hooks,
+		rec.lastSynchronous.Height(),
 	)
-	if num <= rec.lastSynchronous.NumberU64() {
-		return rec.lastSynchronous, nil
+	if ls := rec.lastSynchronous; num == ls.Height() {
+		return ls, nil
 	}
 
 	b, err := rec.newCanonicalBlock(num, nil)
@@ -59,44 +61,48 @@ func (rec *recovery) lastBlockWithStateRootAvailable() (*blocks.Block, error) {
 	if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
 		return nil, err
 	}
-	{
-		// TODO(alarso16) This error can only occur once we support Firewood.
-		// Reassess the likelihood of occurrence vs the need for a preemptive
-		// fix, which would require trying the root [params.CommitTrieDBEvery]
-		// blocks earlier.
-		root := b.PostExecutionStateRoot()
-		if _, err := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig).OpenTrie(root); err != nil {
-			return nil, fmt.Errorf("database corrupted: latest expected state root (block %d / %#x) unavailable: %v", b.NumberU64(), b.Hash(), err)
-		}
-	}
 	return b, nil
 }
 
-// recoverFromDB returns the block to be used as the `lastExecuted` argument to
-// [saexec.New], along with an iterator of blocks to pass to
-// [saexec.Executor.Enqueue]. Enqueuing of all blocks and waiting for the last
-// one to be executed will leave the [saexec.Executor] in almost the same state
-// as before shutdown. [VM.rebuildBlocksInMemory] MUST then be called to fully
-// reinstate internal invariants.
-func (rec *recovery) recoverFromDB() (*blocks.Block, iter.Seq2[*blocks.Block, error], error) {
-	var _ = saexec.New // protect the import to allow comment linking
+func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
+	nums, _ := rawdb.ReadAllCanonicalHashes(rec.db, parent.NumberU64()+1, math.MaxUint64, math.MaxInt)
 
-	execAfter, err := rec.lastBlockWithStateRootAvailable()
-	if err != nil {
-		return nil, nil, err
-	}
-	toExecute, _ := rawdb.ReadAllCanonicalHashes(rec.db, execAfter.NumberU64()+1, math.MaxUint64, math.MaxInt)
-
-	return execAfter, func(yield func(*blocks.Block, error) bool) {
-		parent := execAfter
-		for _, num := range toExecute {
+	return func(yield func(*blocks.Block, error) bool) {
+		for _, num := range nums {
 			b, err := rec.newCanonicalBlock(num, parent)
 			if !yield(b, err) || err != nil {
 				return
 			}
 			parent = b
 		}
-	}, nil
+	}
+}
+
+func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Executor) error {
+	after := exec.LastExecuted()
+	last := after
+	for b, err := range rec.canonicalAfter(after) {
+		if err != nil {
+			return err
+		}
+		if err := exec.Enqueue(ctx, b); err != nil {
+			return err
+		}
+		last = b
+	}
+	if err := last.WaitUntilExecuted(ctx); err != nil {
+		return err
+	}
+
+	// Consensus only requires post-execution state after and including the
+	// last-settled block.
+	keepFrom := rec.hooks.SettledHeight(last.Header())
+	for b := last; b.NumberU64() > after.NumberU64(); b = b.ParentBlock() {
+		if b.NumberU64() < keepFrom {
+			exec.Tracker.Untrack(b.PostExecutionStateRoot())
+		}
+	}
+	return nil
 }
 
 // lastOf returns the lastOf element in a slice, which MUST NOT be empty.
@@ -104,11 +110,11 @@ func lastOf[E any](s []E) E {
 	return s[len(s)-1]
 }
 
-// rebuildBlocksInMemory returns a block-hash-keyed map of all blocks from the
-// last executed back to, and including, the block that it settled. It returns
-// said settled block separately, for convenience.
-func (rec *recovery) rebuildBlocksInMemory(lastExecuted *blocks.Block) (_ *syncMap[common.Hash, *blocks.Block], lastSettled *blocks.Block, _ error) {
-	chain := []*blocks.Block{lastExecuted} // reverse height order
+// consensusCriticalBlocks returns a block-hash-keyed map of all blocks from the
+// last executed back to, and including, the block that it settled. Said settled
+// block is returned separately, for convenience.
+func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[common.Hash, *blocks.Block], lastSettled *blocks.Block, _ error) {
+	chain := []*blocks.Block{exec.LastExecuted()} // reverse height order
 	blackhole := new(atomic.Pointer[blocks.Block])
 
 	// extend appends to the chain all the blocks in settler's ancestry up to
@@ -151,11 +157,25 @@ func (rec *recovery) rebuildBlocksInMemory(lastExecuted *blocks.Block) (_ *syncM
 		}
 	}
 
-	if err := extend(lastExecuted); err != nil {
+	if err := extend(exec.LastExecuted()); err != nil {
 		return nil, nil, err
 	}
 	lastSettled = lastOf(chain)
-	bMap := newSyncMap[common.Hash, *blocks.Block]()
+	tr := exec.Tracker
+	bMap := newSyncMap[common.Hash, *blocks.Block](
+		func(b *blocks.Block) {
+			tr.Track(b.SettledStateRoot())
+			// The post-execution root is tracked by the [saexec.Executor] as
+			// soon as it's known. In the case of database recovery, this
+			// occurred in [recovery.executeAllAccepted].
+		},
+		func(b *blocks.Block) {
+			tr.Untrack(b.SettledStateRoot())
+			if b.Executed() { // i.e. deleted due to settlement not rejection
+				tr.Untrack(b.PostExecutionStateRoot())
+			}
+		},
+	)
 	for _, b := range chain {
 		bMap.Store(b.Hash(), b)
 	}

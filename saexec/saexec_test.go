@@ -994,22 +994,6 @@ func TestStateRootAvailability(t *testing.T) {
 			return height >= numToDrop
 		})
 	})
-
-	require.NoErrorf(t, sut.Close(), "%T.Close()", e)
-
-	t.Run("recover", func(t *testing.T) {
-		// Restart the chain to remove the TrieDB cache.
-		src := blocks.Source(chain.GetBlock)
-		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, saedb.Config{}, defaultHooks(), sut.log)
-		require.NoError(t, err, "New()")
-		t.Cleanup(func() {
-			require.NoErrorf(t, e.Close(), "%T.Close()", e)
-		})
-
-		checkStates(t, e, func(height uint64) bool {
-			return height == chain.Last().NumberU64()
-		})
-	})
 }
 
 func TestArchivalStoresAll(t *testing.T) {

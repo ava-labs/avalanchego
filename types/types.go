@@ -9,6 +9,7 @@
 package types
 
 import (
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 )
@@ -21,3 +22,10 @@ type (
 	// returns the block header.
 	HeaderSource func(hash common.Hash, number uint64) (*types.Header, bool)
 )
+
+// ExecutionResults provides type safety for a [database.HeightIndex], to be
+// used for persistence of SAE-specific execution results, avoiding possible
+// collision with `rawdb` keys.
+type ExecutionResults struct {
+	database.HeightIndex
+}

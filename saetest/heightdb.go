@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 
-	"github.com/ava-labs/strevm/saedb"
+	"github.com/ava-labs/strevm/types"
 )
 
 // A ClonableHeightIndex extends [database.HeightIndex] with the ability to
@@ -31,8 +31,8 @@ func NewHeightIndexDB() ClonableHeightIndex {
 }
 
 // NewExecutionResultsDB wraps and returns a [NewHeightIndexDB].
-func NewExecutionResultsDB() saedb.ExecutionResults {
-	return saedb.ExecutionResults{HeightIndex: NewHeightIndexDB()}
+func NewExecutionResultsDB() types.ExecutionResults {
+	return types.ExecutionResults{HeightIndex: NewHeightIndexDB()}
 }
 
 type hIndex struct {

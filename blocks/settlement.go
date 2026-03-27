@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/strevm/gastime"
 	"github.com/ava-labs/strevm/hook"
 	"github.com/ava-labs/strevm/proxytime"
-	"github.com/ava-labs/strevm/saedb"
+	"github.com/ava-labs/strevm/types"
 )
 
 type ancestry struct {
@@ -85,7 +85,7 @@ func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
 // has not yet commenced asynchronous execution.
 //
 // TODO(arr4n) refactor to avoid requiring DB writes.
-func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb saedb.ExecutionResults, excessAfter gas.Gas) error {
+func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.ExecutionResults, excessAfter gas.Gas) error {
 	ethB := b.EthBlock()
 	// Receipts of a synchronous block have already been "settled" by the block
 	// itself. As the only reason to pass receipts here is for later settlement

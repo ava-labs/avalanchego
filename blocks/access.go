@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rpc"
 
-	"github.com/ava-labs/strevm/saedb"
+	"github.com/ava-labs/strevm/types"
 )
 
 type (
@@ -21,7 +21,7 @@ type (
 		ConsensusCritical
 		Frontier
 		DB() ethdb.Database
-		XDB() saedb.ExecutionResults
+		XDB() types.ExecutionResults
 	}
 
 	// ConsensusCritical blocks are currently in use by a consensus mechanism,

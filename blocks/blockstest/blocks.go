@@ -26,8 +26,8 @@ import (
 
 	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/hook/hookstest"
-	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saetest"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 // An EthBlockOption configures the default block properties created by
@@ -44,17 +44,19 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 			BaseFee:       big.NewInt(0),
 			ExcessBlobGas: new(uint64),
 		},
+		settledHeight: parent.NumberU64() + 1, // synchronoous
 	}
 	props = options.ApplyTo(props, opts...)
-	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops)
+	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, props.settledHeight)
 	require.NoError(tb, err, "hookstest.BuildBlock()")
 	return block
 }
 
 type ethBlockProperties struct {
-	header   *types.Header
-	receipts types.Receipts
-	ops      []hookstest.Op
+	header        *types.Header
+	receipts      types.Receipts
+	ops           []hookstest.Op
+	settledHeight uint64
 }
 
 // ModifyHeader returns an option to modify the [types.Header] constructed by
@@ -114,7 +116,7 @@ func WithLogger(l logging.Logger) BlockOption {
 // returns wraps [core.Genesis.ToBlock] with [NewBlock]. It assumes a nil
 // [triedb.Config] unless overridden by a [WithTrieDBConfig]. The block is
 // marked as both executed and synchronous.
-func NewGenesis(tb testing.TB, db ethdb.Database, xdb saedb.ExecutionResults, config *params.ChainConfig, alloc types.GenesisAlloc, opts ...GenesisOption) *blocks.Block {
+func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig, alloc types.GenesisAlloc, opts ...GenesisOption) *blocks.Block {
 	tb.Helper()
 	conf := &genesisConfig{
 		gasTarget: math.MaxUint64,
