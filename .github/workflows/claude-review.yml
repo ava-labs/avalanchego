@@ -1,4 +1,4 @@
-name: Claude Auto Review
+name: Claude Code Review
 on:
   pull_request:
     types: [labeled]
@@ -7,8 +7,7 @@ jobs:
   review:
     if: >-
       github.event.label.name == 'ai-review' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      contains(fromJSON('["MEMBER", "COLLABORATOR", "OWNER"]'), github.event.pull_request.author_association)
+      contains(fromJSON('["MEMBER", "COLLABORATOR", "OWNER", "CONTRIBUTOR"]'), github.event.pull_request.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: read
