@@ -19,8 +19,14 @@ import (
 func newTestDatabase(t *testing.T) state.Database {
 	t.Helper()
 	fwConfig := DefaultConfig(t.TempDir())
+
+	return newTestDatabaseWithConfig(t, fwConfig)
+}
+
+func newTestDatabaseWithConfig(t *testing.T, cfg TrieDBConfig) state.Database {
+	t.Helper()
 	triedbConfig := &triedb.Config{
-		DBOverride: fwConfig.BackendConstructor,
+		DBOverride: cfg.BackendConstructor,
 	}
 	internalState := state.NewDatabaseWithConfig(
 		rawdb.NewMemoryDatabase(),
