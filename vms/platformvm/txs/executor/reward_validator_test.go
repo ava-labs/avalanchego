@@ -994,14 +994,14 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name:    "invalid timestamp",
-			wantErr: ErrInvalidTimestamp,
+			wantErr: errInvalidTimestamp,
 			updateStateAndGetTx: func(t testing.TB, state *state.State) *txs.Tx {
 				return newRewardAutoRenewedValidatorTx(t, staker.TxID, uint64(state.GetTimestamp().Unix())-1)
 			},
 		},
 		{
 			name:    "invalid validator tx",
-			wantErr: ErrShouldBeAutoRenewedStaker,
+			wantErr: errShouldBeAutoRenewedStaker,
 			updateStateAndGetTx: func(t testing.TB, state *state.State) *txs.Tx {
 				return newRewardAutoRenewedValidatorTx(t, vdrTx.ID(), uint64(state.GetTimestamp().Unix()))
 			},

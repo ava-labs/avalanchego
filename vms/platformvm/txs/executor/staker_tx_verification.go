@@ -41,11 +41,11 @@ var (
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
-	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
-	ErrMissingStakerTx                 = errors.New("missing staker tx")
-	ErrInvalidStakerTxType             = errors.New("invalid staker tx type")
-	ErrInvalidStakerTx                 = errors.New("invalid staker tx")
-	ErrMissingValidator                = errors.New("missing validator")
+	ErrAddDelegatorTxPostDurango = errors.New("AddDelegatorTx is not permitted post-Durango")
+	errMissingStakerTx           = errors.New("missing staker tx")
+	errInvalidStakerTxType       = errors.New("invalid staker tx type")
+	errInvalidStakerTx           = errors.New("invalid staker tx")
+	errMissingValidator          = errors.New("missing validator")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -154,31 +154,37 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	_, err = GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-	if err == nil {
-		return nil, fmt.Errorf(
-			"%s is %w of the primary network",
-			tx.Validator.NodeID,
-			ErrAlreadyValidator,
-		)
+	if err := verifyNotPrimaryNetworkValidator(chainState, tx.NodeID()); err != nil {
+		return nil, fmt.Errorf("verifying not a primary network validator: %w", err)
 	}
-	if err != database.ErrNotFound {
-		return nil, fmt.Errorf(
-			"failed to find whether %s is a primary network validator: %w",
-			tx.Validator.NodeID,
-			err,
-		)
+
+	if err := verifySpend(backend, feeCalculator, chainState, sTx, tx, ins, outs, producedAVAX); err != nil {
+		return nil, fmt.Errorf("verifying spend: %w", err)
 	}
+
+	return outs, nil
+}
+
+func verifySpend(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx txs.UnsignedTx,
+	ins []*avax.TransferableInput,
+	outs []*avax.TransferableOutput,
+	producedAVAX uint64,
+) error {
 
 	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
-		return nil, fmt.Errorf("adding fee: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := backend.FlowChecker.VerifySpend(
@@ -191,10 +197,30 @@ func verifyAddValidatorTx(
 			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return outs, nil
+	return nil
+}
+
+func verifyNotPrimaryNetworkValidator(chainState state.Chain, nodeID ids.NodeID) error {
+	_, err := GetValidator(chainState, constants.PrimaryNetworkID, nodeID)
+	if err == nil {
+		return fmt.Errorf(
+			"%s is %w of the primary network",
+			nodeID,
+			ErrAlreadyValidator,
+		)
+	}
+
+	if err != database.ErrNotFound {
+		return fmt.Errorf(
+			"failed to find whether %s is a primary network validator: %w",
+			nodeID,
+			err,
+		)
+	}
+	return nil
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -922,23 +948,8 @@ func verifyAddAutoRenewedValidatorTx(
 		return ErrStakeTooLong
 	}
 
-	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.NodeID())
-	switch {
-	case err == nil:
-		return fmt.Errorf(
-			"%w: %s",
-			ErrDuplicateValidator,
-			tx.NodeID(),
-		)
-	case errors.Is(err, database.ErrNotFound):
-		// OK: validator not found
-
-	default:
-		return fmt.Errorf(
-			"failed to get primary network validator %s: %w",
-			tx.NodeID(),
-			err,
-		)
+	if err := verifyNotPrimaryNetworkValidator(chainState, tx.NodeID()); err != nil {
+		return fmt.Errorf("verifying not a primary network validator: %w", err)
 	}
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
@@ -946,28 +957,8 @@ func verifyAddAutoRenewedValidatorTx(
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return fmt.Errorf("calculating fee: %w", err)
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	if err := verifySpend(backend, feeCalculator, chainState, sTx, tx, ins, outs, producedAVAX); err != nil {
+		return fmt.Errorf("verifying spend: %w", err)
 	}
 
 	return nil
@@ -996,7 +987,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrMissingStakerTx
+			return nil, errMissingStakerTx
 		}
 
 		return nil, fmt.Errorf("error getting staker tx: %w", err)
@@ -1004,13 +995,13 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
 	if !ok {
-		return nil, fmt.Errorf("%w: %T", ErrInvalidStakerTxType, stakerTx.Unsigned)
+		return nil, fmt.Errorf("%w: %T", errInvalidStakerTxType, stakerTx.Unsigned)
 	}
 
 	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrMissingValidator
+			return nil, errMissingValidator
 		}
 
 		return nil, fmt.Errorf("failed to get validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
@@ -1019,7 +1010,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 	if tx.TxID != validator.TxID {
 		// This can happen if a validator restaked with the same node id.
 		// In this case, TxID should be the latest transaction of the auto-renewed validator.
-		return nil, fmt.Errorf("%w: wrong tx id", ErrInvalidStakerTx)
+		return nil, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)
 	}
 
 	if !backend.Bootstrapped.Get() {
