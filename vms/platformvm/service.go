@@ -84,9 +84,7 @@ type stakerAttributes struct {
 	proofOfPossession      *signer.ProofOfPossession
 
 	// ACP-236
-	configOwner              fx.Owner
-	period                   uint64
-	autoCompoundRewardShares uint32
+	configOwner fx.Owner
 }
 
 // GetHeight returns the height of the last accepted block

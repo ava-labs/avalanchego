@@ -613,7 +613,7 @@ func executeTx(
 }
 
 // getNextStakerToReward returns the next staker txID to remove from the staking
-// set with a RewardValidatorTx rather than an AdvanceTimeTx. [chainTimestamp]
+// set with a RewardValidatorTx/RewardAutoRenewedValidatorTx rather than an AdvanceTimeTx. [chainTimestamp]
 // is the timestamp of the chain at the time this validator would be getting
 // removed and is used to calculate [shouldReward].
 // Returns:

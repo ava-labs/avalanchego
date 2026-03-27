@@ -36,13 +36,13 @@ type validatorMetadata struct {
 	txID        ids.ID
 	lastUpdated time.Time
 
-	// ACP-236
+	// ACP-236 fields for auto-renewed validators.
 	// Weight is computed as: tx.Weight + AccruedRewards + AccruedDelegateeRewards
-	AccruedRewards           uint64 `v2:"true"`
-	AccruedDelegateeRewards  uint64 `v2:"true"`
-	AutoCompoundRewardShares uint32 `v2:"true"`
-	Period                   uint64 `v2:"true"` // Duration in seconds
-	StakerEndTime            uint64 `v2:"true"` // Unix time when the current cycle ends
+	AccruedRewards           uint64 `v2:"true"` // the sum of validation rewards restaked from previous cycles.
+	AccruedDelegateeRewards  uint64 `v2:"true"` // the sum of delegatee rewards restaked from previous cycles.
+	AutoCompoundRewardShares uint32 `v2:"true"` // the percentage of rewards to restake at cycle end
+	Period                   uint64 `v2:"true"` // the validation cycle duration in seconds.
+	StakerEndTime            uint64 `v2:"true"` // the Unix timestamp (seconds) when the current cycle ends.
 }
 
 // Permissioned validators originally wrote their values as nil.
