@@ -32,6 +32,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 )
@@ -60,7 +61,14 @@ type TrieDB interface {
 
 func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
 	// Firewood should only be used in pruning mode, but we shouldn't explicitly manage this.
-	if config.Pruning && config.StateScheme != customrawdb.FirewoodScheme {
+	switch {
+	case config.StateScheme == rawdb.PathScheme:
+		return noopWriter{}
+	case config.StateScheme == customrawdb.FirewoodScheme || !config.Pruning:
+		return &noPruningTrieWriter{
+			TrieDB: db,
+		}
+	default:
 		cm := &cappedMemoryTrieWriter{
 			TrieDB:           db,
 			memoryCap:        common.StorageSize(config.TrieDirtyLimit) * 1024 * 1024,
@@ -71,10 +79,6 @@ func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
 		}
 		cm.flushStepSize = (cm.memoryCap - cm.targetCommitSize) / common.StorageSize(flushWindow)
 		return cm
-	} else {
-		return &noPruningTrieWriter{
-			TrieDB: db,
-		}
 	}
 }
 
@@ -189,4 +193,22 @@ func (cm *cappedMemoryTrieWriter) Shutdown() error {
 	// Attempt to commit last item added to [dereferenceQueue] on shutdown to avoid
 	// re-processing the state on the next startup.
 	return cm.TrieDB.Commit(last, true)
+}
+
+type noopWriter struct{}
+
+func (noopWriter) InsertTrie(*types.Block) error {
+	return nil
+}
+
+func (noopWriter) AcceptTrie(*types.Block) error {
+	return nil
+}
+
+func (noopWriter) RejectTrie(*types.Block) error {
+	return nil
+}
+
+func (noopWriter) Shutdown() error {
+	return nil
 }
