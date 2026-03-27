@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/ava-labs/libevm/common"
@@ -128,7 +129,7 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 
 	// Defensive copy: the goroutine outlives the caller and must not share
 	// the backing array.
-	hashesCopy := append([]common.Hash(nil), codeHashes...)
+	hashesCopy := slices.Clone(codeHashes)
 
 	// Spawn a goroutine to push to the channel.
 	// The goroutine may block on channel send but does NOT block the caller.
@@ -171,10 +172,10 @@ func (q *Queue) markClosed() {
 }
 
 // stop drains in-flight goroutines and closes the channel.
-// If cancelCtx is true, stuck goroutines are unblocked first.
-func (q *Queue) stop(cancelCtx bool) {
+// If cancel is true, stuck goroutines are unblocked first.
+func (q *Queue) stop(cancel bool) {
 	q.markClosed()
-	if cancelCtx {
+	if cancel {
 		q.cancel()
 	}
 	// The errgroup goroutines spawned by AddCode never return errors,

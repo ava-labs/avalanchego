@@ -13,10 +13,15 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
+}
 
 func TestCodeQueue(t *testing.T) {
 	hashes := make([]common.Hash, 256)
@@ -76,7 +81,6 @@ func TestCodeQueue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 
 			db := rawdb.NewMemoryDatabase()
 			for hash, code := range tt.alreadyHave {
@@ -139,8 +143,6 @@ func TestCodeQueue(t *testing.T) {
 // TestFinalizeFlushesAllHashes verifies that AddCode is non-blocking and
 // Finalize waits for all background sends to complete.
 func TestFinalizeFlushesAllHashes(t *testing.T) {
-	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
-
 	const (
 		capacity  = 1
 		numHashes = 50
@@ -165,8 +167,6 @@ func TestFinalizeFlushesAllHashes(t *testing.T) {
 // TestShutdownUnblocksGoroutines verifies that Shutdown cancels stuck
 // goroutines, is idempotent with Finalize, and rejects later AddCode calls.
 func TestShutdownUnblocksGoroutines(t *testing.T) {
-	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
-
 	const capacity = 1
 	db := rawdb.NewMemoryDatabase()
 	q, err := NewQueue(db, WithCapacity(capacity))
@@ -200,31 +200,30 @@ func TestShutdownAndAddCodeRace(t *testing.T) {
 			require.NoError(t, err)
 
 			var (
-				ready    sync.WaitGroup
-				finished sync.WaitGroup
+				ready sync.WaitGroup
+				eg    errgroup.Group
 			)
+
 			ready.Add(2)
-			finished.Add(2)
 			start := make(chan struct{})
 
-			go func() {
-				defer finished.Done()
+			eg.Go(func() error {
 				ready.Done()
 				<-start
 				q.Shutdown()
-			}()
-
-			go func() {
-				defer finished.Done()
+				return nil
+			})
+			eg.Go(func() error {
 				ready.Done()
 				<-start
 				// May succeed or return ErrQueueClosed depending on timing.
 				_ = q.AddCode(t.Context(), []common.Hash{{}})
-			}()
+				return nil
+			})
 
 			ready.Wait()
 			close(start)
-			finished.Wait()
+			require.NoError(t, eg.Wait())
 		})
 	}
 }
@@ -232,8 +231,6 @@ func TestShutdownAndAddCodeRace(t *testing.T) {
 // TestConcurrentAddCodeAndConsume stress-tests concurrent producers and a
 // single consumer on a small-capacity channel.
 func TestConcurrentAddCodeAndConsume(t *testing.T) {
-	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
-
 	const (
 		numProducers      = 5
 		hashesPerProducer = 100
@@ -244,27 +241,20 @@ func TestConcurrentAddCodeAndConsume(t *testing.T) {
 	require.NoError(t, err)
 
 	// AddCode is non-blocking, but we want concurrent calls for stress.
-	var producerWg sync.WaitGroup
-	producerErrs := make([]error, numProducers)
-	producerWg.Add(numProducers)
+	var producerEg errgroup.Group
 	for i := range numProducers {
-		go func() {
-			defer producerWg.Done()
+		producerEg.Go(func() error {
 			hashes := make([]common.Hash, hashesPerProducer)
 			for j := range hashes {
 				hashes[j] = crypto.Keccak256Hash([]byte{byte(i), byte(j)})
 			}
-			producerErrs[i] = q.AddCode(t.Context(), hashes)
-		}()
+			return q.AddCode(t.Context(), hashes)
+		})
 	}
 
 	got := drainAsync(q.CodeHashes())
 
-	producerWg.Wait()
-	for i, err := range producerErrs {
-		require.NoErrorf(t, err, "producer %d error", i)
-	}
-
+	require.NoError(t, producerEg.Wait())
 	require.NoError(t, q.Finalize())
 	<-got.done
 
