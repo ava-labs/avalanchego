@@ -2284,7 +2284,7 @@ func (s *State) resolveValidatorMetadataCodec() uint16 {
 	ts := s.GetTimestamp()
 
 	if s.upgrades.IsHeliconActivated(ts) {
-		return CodecVersion2
+		return codecVersion2
 	}
 
 	if s.upgrades.IsDurangoActivated(ts) {

@@ -13,7 +13,7 @@ import (
 var (
 	ErrOverflow     = errors.New("overflow")
 	ErrUnderflow    = errors.New("underflow")
-	ErrDivideByZero = errors.New("divide by zero")
+	errDivideByZero = errors.New("divide by zero")
 
 	// Deprecated: Add64 is deprecated. Use Add[uint64] instead.
 	Add64 = Add[uint64]
@@ -63,10 +63,10 @@ func AbsDiff[T constraints.Unsigned](a, b T) T {
 
 // MulDiv computes (a * b) / c with full precision using big.Int arithmetic.
 // The result is rounded to the nearest integer.
-// Returns ErrDivideByZero if c is zero, or ErrOverflow if the result exceeds uint64.
+// Returns errDivideByZero if c is zero, or ErrOverflow if the result exceeds uint64.
 func MulDiv(a, b, c uint64) (uint64, error) {
 	if c == 0 {
-		return 0, ErrDivideByZero
+		return 0, errDivideByZero
 	}
 
 	bigA := new(big.Int).SetUint64(a)

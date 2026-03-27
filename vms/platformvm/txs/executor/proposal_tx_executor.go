@@ -38,7 +38,7 @@ var (
 	ErrInvalidState                        = errors.New("generated output isn't valid state")
 	ErrShouldBePermissionlessStaker        = errors.New("expected permissionless staker")
 	ErrShouldBeAutoRenewedStaker           = errors.New("expected auto renewed staker")
-	ErrShouldUseRewardAutoRenewedValidator = errors.New("auto-renewed validators must be rewarded with RewardAutoRenewedValidatorTx")
+	errShouldUseRewardAutoRenewedValidator = errors.New("auto-renewed validators must be rewarded with RewardAutoRenewedValidatorTx")
 	ErrInvalidTimestamp                    = errors.New("invalid timestamp")
 	ErrWrongTxType                         = errors.New("wrong transaction type")
 	ErrInvalidID                           = errors.New("invalid ID")
@@ -425,7 +425,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
 		if _, ok := uStakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
-			return ErrShouldUseRewardAutoRenewedValidator
+			return errShouldUseRewardAutoRenewedValidator
 		}
 
 		if err := e.rewardValidatorTx(uStakerTx, stakerToReward); err != nil {

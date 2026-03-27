@@ -36,7 +36,7 @@ func init() {
 			RegisterBanffTypes(c),
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
-			RegisterHeliconTypes(c),
+			registerHeliconTypes(c),
 		)
 	}
 
@@ -88,8 +88,8 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 	return txs.RegisterEtnaTypes(targetCodec)
 }
 
-// RegisterHeliconTypes registers the type information for transactions that
+// registerHeliconTypes registers the type information for transactions that
 // were valid during the Helicon series of upgrades.
-func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
+func registerHeliconTypes(targetCodec linearcodec.Codec) error {
 	return txs.RegisterHeliconTypes(targetCodec)
 }

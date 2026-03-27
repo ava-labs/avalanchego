@@ -942,7 +942,7 @@ func TestRewardValidatorStakerType(t *testing.T) {
 		must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
 		must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
 	)
-	require.ErrorIs(t, err, ErrShouldUseRewardAutoRenewedValidator)
+	require.ErrorIs(t, err, errShouldUseRewardAutoRenewedValidator)
 }
 
 func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
