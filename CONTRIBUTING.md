@@ -4,7 +4,7 @@
 
 To start developing on AvalancheGo, you'll need a few things installed.
 
-- Golang version >= 1.25.7
+- Golang version >= 1.25.8
 - gcc
 - g++
 
@@ -53,13 +53,159 @@ export GOWORK=~/src/my-go.work
 
 See the [Go Modules Reference](https://go.dev/ref/mod#workspaces) for full workspace documentation.
 
-## Running tasks
+## Nix
 
-This repo uses the [Task](https://taskfile.dev/) task runner to simplify usage and discoverability of development tasks. To list available tasks:
+This repository uses Nix to provide the pinned development toolchain used by many tasks and scripts.
+
+### Installation
+
+Install Nix with:
 
 ```bash
-./scripts/run_task.sh
+task install-nix
 ```
+
+If `task` is not yet available, use:
+
+```bash
+./scripts/run_task.sh install-nix
+```
+
+Platform-specific behavior of nix installation:
+
+- macOS: uses the [Lix installer](https://lix.systems/install/). We prefer it on macOS because
+  it has a cleaner install path, uninstall support, and is reputed to better support surviving
+  macOS upgrades compared to the upstream installer. It also enables flakes by default which we
+  require. We prefer Lix to vendor-backed alternatives (e.g. Determinate) because Lix is
+  maintained as an [independent community project](https://lix.systems/about). As of February
+  27, 2026, upstream Nix's Rust installer also documents uninstall support but is still in beta
+  as of the [Nix 2.34 release notes](https://nix.dev/manual/nix/2.34/release-notes/rl-2.34).
+- Linux: this uses the upstream Nix daemon installer and enables `nix-command flakes` in
+  `~/.config/nix/nix.conf`.
+
+### Using the dev shell
+
+Start the repo's dev shell with:
+
+```bash
+nix develop
+```
+
+This is explicit and works well when you want the full pinned environment for a session.
+
+You do not need to run `nix develop` for every task. Named tasks in the root `Taskfile.yml` use
+`./scripts/nix_run.sh`, which enters the repo's nix dev shell automatically when needed. The
+main exception is bare `task`, which only lists available tasks.
+
+For zsh users, `nix develop` can be disruptive. It starts a `bash` shell that lacks the
+customizations of the initiating zsh shell session.
+
+## direnv
+
+This repository includes a [`.envrc`](./.envrc) for use with [direnv](https://direnv.net/). When
+loaded, it:
+
+- adds [`bin/`](./bin) to `PATH` to make available repo-local commands
+- sets `AVALANCHEGO_PATH` to the repo-local `avalanchego` build path
+- sets `AVAGO_PLUGIN_DIR` to the repo-local plugin build path
+- defaults `TMPNET_NETWORK_DIR` to the latest tmpnet deployment
+- supports repo-local overrides via `.envrc.local`
+- supports global overrides via `GLOBAL_ENVRC`
+- optionally activates the repo's nix flake when `AVALANCHEGO_DIRENV_USE_FLAKE=1` is set
+
+### Setup
+
+To use it:
+
+1. Install [direnv](https://direnv.net/docs/installation.html).
+1. Hook it into your shell:
+   - bash: [`eval "$(direnv hook bash)"`](https://direnv.net/docs/hook.html)
+   - zsh: [`eval "$(direnv hook zsh)"`](https://direnv.net/docs/hook.html)
+1. Allow this repo's `.envrc`:
+
+```bash
+direnv allow
+```
+
+If you trust this repository and want `direnv` to auto-allow `.envrc` files under a directory
+hierarchy, configure a trusted prefix in
+[`direnv.toml`](https://direnv.net/man/direnv.toml.1.html). The `whitelist.prefix` setting marks
+matching directories as trusted.
+
+### Flake activation
+
+By default, the repo's `.envrc` applies the repo-local environment without activating the nix dev
+shell.
+
+If you want `direnv` to activate the repo flake as well, Nix must be installed first. See
+[Nix](#nix).
+
+To enable flake activation, export `AVALANCHEGO_DIRENV_USE_FLAKE=1` before entering the repo, or
+reload `direnv` after setting it.
+
+```bash
+export AVALANCHEGO_DIRENV_USE_FLAKE=1
+direnv reload
+```
+
+For bash users, flake activation ensures that a shell for a given repository clone is configured
+for that repository's nix dependencies. This avoids the problem of global dependencies not being
+compatible across repositories (e.g. when using git worktrees or jj workspaces).
+
+For zsh users, flake activation is generally undesirable; see [Nix](#nix).
+
+For quieter `direnv` output when using flake activation, set:
+
+```bash
+export DIRENV_LOG_FORMAT=
+```
+
+### Common configurations
+
+#### Bash
+
+- Best: `direnv` with `AVALANCHEGO_DIRENV_USE_FLAKE=1`
+  - Loads the repo flake automatically when you enter the repo.
+  - Best when you want the pinned toolchain available throughout a shell session.
+- Good: `direnv` without `AVALANCHEGO_DIRENV_USE_FLAKE`
+  - Keeps your normal shell environment while exposing repo-local commands and environment
+    settings.
+
+#### Zsh
+
+- Best: `direnv` without `AVALANCHEGO_DIRENV_USE_FLAKE`
+  - Keeps your normal interactive zsh session while exposing repo-local commands and environment
+    settings.
+- Not recommended: `direnv` with `AVALANCHEGO_DIRENV_USE_FLAKE=1`
+  - This activates the repo flake automatically, but it brings the shell tradeoffs described in
+    [Nix](#nix).
+
+## Running tasks
+
+This repo uses the [Task](https://taskfile.dev/) task runner to simplify usage and discoverability
+of development tasks. To list available tasks:
+
+```bash
+task
+```
+
+### Invoking `task`
+
+Common ways to run `task` in this repo include:
+
+- In a nix dev shell where `task` is in the path
+- Via the repo-local [`bin/task`](./bin/task) wrapper which `direnv` adds to the path
+- Via [`./scripts/run_task.sh`](./scripts/run_task.sh) which prefers a `task` binary in the
+  path and otherwise falls back to `go tool` configured by `tools/external/go.mod`
+
+### How task invocation works
+
+- `task` with no arguments lists available tasks.
+- `task <name>` runs the named task.
+- Named tasks in the root [`Taskfile.yml`](./Taskfile.yml) use
+  [`./scripts/nix_run.sh`](./scripts/nix_run.sh) to ensure access to nix dependencies without
+  requiring invocation from a nix shell. This enables zsh users to keep their normal
+  interactive shell configuration while still using the nix dependencies for task execution.
 
 ## Issues
 

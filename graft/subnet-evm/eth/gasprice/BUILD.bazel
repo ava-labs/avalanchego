@@ -1,0 +1,56 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "gasprice",
+    srcs = [
+        "fee_info_provider.go",
+        "feehistory.go",
+        "gasprice.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/eth/gasprice",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/rpc",
+        "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/customheader",
+        "//graft/subnet-evm/plugin/evm/upgrade/legacy",
+        "//utils/timer/mockable",
+        "//vms/evm/acp176",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/lru",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_hashicorp_golang_lru//:golang-lru",
+        "@org_golang_x_exp//slices",
+    ],
+)
+
+graft_go_test(
+    name = "gasprice_test",
+    srcs = [
+        "fee_info_provider_test.go",
+        "feehistory_test.go",
+        "gasprice_test.go",
+    ],
+    embed = [":gasprice"],
+    deps = [
+        "//graft/evm/rpc",
+        "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/consensus/dummy",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+    ],
+)

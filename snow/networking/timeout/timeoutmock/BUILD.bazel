@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "timeoutmock",
+    srcs = ["manager.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/networking/timeout/timeoutmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//message",
+        "//snow",
+        "@org_uber_go_mock//gomock",
+    ],
+)

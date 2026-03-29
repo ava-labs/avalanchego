@@ -25,7 +25,8 @@ import (
 
 const (
 	// allowable block issuance in the future
-	maxSkew = 10 * time.Second
+	maxSkew                         = 10 * time.Second
+	bootstrappingWarningGracePeriod = 5 * time.Minute
 )
 
 var (
@@ -471,18 +472,9 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // build an unsigned block
 	case errors.Is(err, validators.ErrUnfinalizedHeight):
-		// Validator set at this height is not yet finalized locally.
-		// Logged as Warn (not Error) because the condition is transient and
-		// self-resolves, so it should not trigger alerts.
-		p.vm.ctx.Log.Warn("build block failed, validator set not yet finalized",
+		p.logWarnOrError()("build block failed, validator set not yet finalized",
+			zap.String("reason", "failed to calculate expected proposer"),
 			zap.Uint64("parentPChainHeight", parentPChainHeight),
-			zap.Stringer("parentID", parentID),
-			zap.Error(err),
-		)
-		return false, err
-	case errors.Is(err, database.ErrClosed):
-		// Warn instead of error since this can be triggered during graceful shutdowns.
-		p.vm.ctx.Log.Warn("build block failed, database closed",
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),
 		)
@@ -549,4 +541,12 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 		zap.Time("blockTimestamp", newTimestamp),
 	)
 	return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
+}
+
+func (p *postForkCommonComponents) logWarnOrError() func(msg string, fields ...zap.Field) {
+	timeSinceBootstrapping := p.vm.Clock.Time().Sub(p.vm.finishedBootstrappingAt)
+	if p.vm.finishedBootstrappingAt.IsZero() || timeSinceBootstrapping < bootstrappingWarningGracePeriod {
+		return p.vm.ctx.Log.Warn
+	}
+	return p.vm.ctx.Log.Error
 }

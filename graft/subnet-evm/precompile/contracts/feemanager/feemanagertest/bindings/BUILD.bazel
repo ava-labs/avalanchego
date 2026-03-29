@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "bindings",
+    srcs = [
+        "compile.go",
+        "gen_feemanagertest_binding.go",
+        "gen_ifeemanager_binding.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/feemanagertest/bindings",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/accounts/abi/bind",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//accounts/abi",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//event",
+    ],
+)

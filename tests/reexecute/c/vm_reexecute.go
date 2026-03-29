@@ -70,7 +70,9 @@ var (
 			"state-scheme": "firewood",
 			"snapshot-cache": 0,
 			"pruning-enabled": true,
-			"state-sync-enabled": false
+			"state-sync-enabled": false,
+			"commit-interval": 4096,
+			"state-history": 8192
 		}`,
 		"firewood-archive": `{
 			"state-scheme": "firewood",
@@ -501,6 +503,7 @@ func startCollector(tc tests.TestContext, name string, labels map[string]string,
 		}(),
 		)
 
+		// TODO(marun) Re-enable this check as part of a PR updating the metrics links
 		// r.NoError(tmpnet.CheckMetricsExist(tc.DefaultContext(), logger, networkUUID))
 	})
 

@@ -15,8 +15,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -30,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
 
@@ -564,155 +564,86 @@ func TestPostGraniteBlock_EpochMatches(t *testing.T) {
 	}
 }
 
-func TestDBClosedDuringVerifyLogsWarnNotError(t *testing.T) {
-	tests := []struct {
-		name                   string
-		getCurrentHeightClosed bool
-		expectedProposerClosed bool
+func TestFailedToCalculateExpectedProposerLogLevel(t *testing.T) {
+	testCases := []struct {
+		name          string
+		clockOffset   time.Duration
+		expectedLevel zapcore.Level
 	}{
 		{
-			name:                   "GetCurrentHeight returns ErrClosed",
-			getCurrentHeightClosed: true,
+			name:          "within grace period",
+			clockOffset:   bootstrappingWarningGracePeriod - time.Second,
+			expectedLevel: zapcore.Level(logging.Warn),
 		},
 		{
-			name:                   "ExpectedProposer returns ErrClosed",
-			expectedProposerClosed: true,
+			name:          "past grace period",
+			clockOffset:   bootstrappingWarningGracePeriod + time.Second,
+			expectedLevel: zapcore.Level(logging.Error),
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
+			ctx := t.Context()
 
-			pChainHeight := uint64(100)
-			parentTimestamp := time.Now().Truncate(time.Second)
-			chainID := ids.GenerateTestID()
-			parentInnerBlkID := ids.GenerateTestID()
+			coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+			defer func() {
+				require.NoError(proVM.Shutdown(ctx))
+			}()
 
-			parentInnerBlk := snowmanmock.NewBlock(ctrl)
-			parentInnerBlk.EXPECT().ID().Return(parentInnerBlkID).AnyTimes()
+			initTime := proVM.Time()
 
-			childInnerBlk := snowmanmock.NewBlock(ctrl)
-			childInnerBlk.EXPECT().Parent().Return(parentInnerBlkID).AnyTimes()
-			childInnerBlk.EXPECT().Height().Return(uint64(10)).AnyTimes()
+			coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
+			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+				return coreParentBlk, nil
+			}
+			coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+				switch {
+				case bytes.Equal(b, coreParentBlk.Bytes()):
+					return coreParentBlk, nil
+				case bytes.Equal(b, snowmantest.GenesisBytes):
+					return snowmantest.Genesis, nil
+				default:
+					return nil, errUnknownBlock
+				}
+			}
 
-			upgrades := upgradetest.GetConfig(upgradetest.Latest)
-			childSlb, err := statelessblock.Build(
-				ids.GenerateTestID(),
-				parentTimestamp,
-				pChainHeight,
-				acp181.NewEpoch(upgrades, pChainHeight, statelessblock.Epoch{}, parentTimestamp, parentTimestamp),
-				pTestCert,
-				[]byte{1, 2, 3},
-				chainID,
-				pTestSigner,
-			)
+			parentBlk, err := proVM.BuildBlock(ctx)
 			require.NoError(err)
+			require.NoError(parentBlk.Verify(ctx))
+			require.NoError(parentBlk.Accept(ctx))
+			require.NoError(proVM.SetPreference(ctx, parentBlk.ID()))
 
-			logger := &levelRecordingLogger{}
-			vdrState := validatorsmock.NewState(ctrl)
-			if tt.getCurrentHeightClosed {
-				vdrState.EXPECT().GetCurrentHeight(gomock.Any()).Return(uint64(0), database.ErrClosed)
-			} else {
-				vdrState.EXPECT().GetCurrentHeight(gomock.Any()).Return(pChainHeight, nil)
+			// Make GetValidatorSetF return an error so that ExpectedProposer
+			// fails, triggering the failure log path.
+			valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+				return nil, validators.ErrUnfinalizedHeight
 			}
 
-			windower := proposermock.NewWindower(ctrl)
-			if tt.expectedProposerClosed {
-				windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(ids.EmptyNodeID, database.ErrClosed)
+			coreChildBlk := snowmantest.BuildChild(coreParentBlk)
+			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+				return coreChildBlk, nil
 			}
 
-			vm := &VM{
-				Config: Config{
-					Upgrades: upgrades,
-				},
-				ctx: &snow.Context{
-					NodeID:         ids.NodeIDFromCert(pTestCert),
-					ValidatorState: vdrState,
-					Log:            logger,
-					ChainID:        chainID,
-				},
-				Windower:       windower,
-				consensusState: snow.NormalOp,
-			}
-			vm.Clock.Set(parentTimestamp.Add(time.Second))
+			// Override the logger to assert that the expected log entry is emitted with the expected log level.
+			// We want to confirm that before the grace period expires, we log a warning, and after the grace period expires, we log an error.
+			var logged bool
+			loggingCore := logging.NewWrappedCore(logging.Warn, logging.Discard, logging.Plain.ConsoleEncoder())
+			proVM.ctx.Log = logging.NewLogger("", loggingCore).WithOptions(zap.Hooks(func(e zapcore.Entry) error {
+				require.False(logged, "expected exactly one log entry")
+				logged = true
+				require.Equal(test.expectedLevel, e.Level)
+				require.Equal("build block failed, validator set not yet finalized", e.Message)
+				return nil
+			}))
 
-			parent := &postForkCommonComponents{vm: vm, innerBlk: parentInnerBlk}
-			child := &postForkBlock{
-				SignedBlock: childSlb,
-				postForkCommonComponents: postForkCommonComponents{
-					vm:       vm,
-					innerBlk: childInnerBlk,
-				},
-			}
+			// Advance the clock relative to when bootstrapping finished
+			proVM.Set(initTime.Add(test.clockOffset))
 
-			err = parent.Verify(t.Context(), parentTimestamp, pChainHeight, statelessblock.Epoch{}, child)
-			require.ErrorIs(err, database.ErrClosed)
-			require.Equal("warn", logger.lastLevel, "database.ErrClosed should log at Warn level, not Error")
-		})
-	}
-}
-
-func TestDBClosedDuringBuildChildLogsWarnNotError(t *testing.T) {
-	tests := []struct {
-		name                   string
-		getMinHeightClosed     bool
-		expectedProposerClosed bool
-	}{
-		{
-			name:               "GetMinimumHeight returns ErrClosed",
-			getMinHeightClosed: true,
-		},
-		{
-			name:                   "ExpectedProposer returns ErrClosed",
-			expectedProposerClosed: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			ctrl := gomock.NewController(t)
-
-			pChainHeight := uint64(100)
-			parentTimestamp := time.Now().Truncate(time.Second)
-
-			logger := &levelRecordingLogger{}
-			vdrState := validatorsmock.NewState(ctrl)
-			if tt.getMinHeightClosed {
-				vdrState.EXPECT().GetMinimumHeight(gomock.Any()).Return(uint64(0), database.ErrClosed)
-			} else {
-				vdrState.EXPECT().GetMinimumHeight(gomock.Any()).Return(pChainHeight, nil)
-			}
-
-			windower := proposermock.NewWindower(ctrl)
-			if tt.expectedProposerClosed {
-				windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(ids.EmptyNodeID, database.ErrClosed)
-			}
-
-			innerBlk := snowmanmock.NewBlock(ctrl)
-			innerBlk.EXPECT().Height().Return(uint64(10)).AnyTimes()
-
-			vm := &VM{
-				Config: Config{
-					Upgrades: upgradetest.GetConfig(upgradetest.Latest),
-				},
-				ctx: &snow.Context{
-					NodeID:         ids.NodeIDFromCert(pTestCert),
-					ValidatorState: vdrState,
-					Log:            logger,
-				},
-				Windower: windower,
-			}
-			vm.Clock.Set(parentTimestamp.Add(time.Second))
-
-			blk := &postForkCommonComponents{innerBlk: innerBlk, vm: vm}
-			_, err := blk.buildChild(t.Context(), ids.GenerateTestID(), parentTimestamp, pChainHeight, statelessblock.Epoch{})
-			require.ErrorIs(err, database.ErrClosed)
-			require.Equal("warn", logger.lastLevel, "database.ErrClosed should log at Warn level, not Error")
+			_, err = proVM.BuildBlock(ctx)
+			require.ErrorIs(err, validators.ErrUnfinalizedHeight)
+			require.True(logged, "expected log entry was not emitted")
 		})
 	}
 }

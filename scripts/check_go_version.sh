@@ -3,7 +3,8 @@
 set -euo pipefail
 
 # Checks that go version directives are consistent across all go.mod, go.work,
-# and nix/go/default.nix.
+# and nix/go/default.nix. MODULE.bazel reads the version from go.work via
+# go_sdk.from_file(), so it doesn't need separate checking.
 
 if ! [[ "$0" =~ scripts/check_go_version.sh ]]; then
   echo "must be run from repository root"

@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client/stats"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/version"
 
 	ethparams "github.com/ava-labs/libevm/params"
@@ -54,6 +55,8 @@ var _ Client = (*client)(nil)
 // Network defines the interface for sending sync requests over the network.
 // This interface is implemented by the network layer in coreth and subnet-evm.
 type Network interface {
+	p2p.NodeSampler
+
 	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
 	// node version greater than or equal to minVersion.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
@@ -67,6 +70,9 @@ type Network interface {
 	// TrackBandwidth should be called after receiving a response from a peer to
 	// track performance. This is used to prioritize peers that are more responsive.
 	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
+
+	// P2PNetwork returns the unabstracted [p2p.Network].
+	P2PNetwork() *p2p.Network
 }
 
 // Client synchronously fetches data from the network to fulfill state sync requests.
@@ -82,6 +88,12 @@ type Client interface {
 
 	// GetCode synchronously retrieves code associated with the given hashes
 	GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error)
+
+	// AddClient creates a separate client on the underlying [p2p.Network].
+	AddClient(handlerID uint64) *p2p.Client
+
+	// StateSyncNodes returns the list of nodes provided via config.
+	StateSyncNodes() []ids.NodeID
 }
 
 // parseResponseFn parses given response bytes in context of specified request
@@ -119,6 +131,14 @@ func New(config *Config) *client {
 		stateSyncNodes: config.StateSyncNodeIDs,
 		blockParser:    config.BlockParser,
 	}
+}
+
+func (c *client) AddClient(handlerID uint64) *p2p.Client {
+	return c.network.P2PNetwork().NewClient(handlerID, c.network)
+}
+
+func (c *client) StateSyncNodes() []ids.NodeID {
+	return c.stateSyncNodes
 }
 
 // GetLeafs synchronously retrieves leafs as per given [message.LeafsRequest]

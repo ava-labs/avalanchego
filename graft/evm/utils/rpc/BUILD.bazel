@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "rpc",
+    srcs = ["handler.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/utils/rpc",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/json",
+        "@com_github_gorilla_rpc//v2:rpc",
+    ],
+)
