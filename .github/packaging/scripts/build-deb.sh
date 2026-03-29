@@ -141,9 +141,14 @@ esac
 
 export VERSION PACKAGE_ARCH
 
+# nfpm does not expand env vars in top-level fields (changelog, signature.key_file).
+# Preprocess the config template with envsubst so all ${VAR} references resolve.
+NFPM_CONFIG_RESOLVED="${REPO_ROOT}/build/${PACKAGE}-deb-resolved.yml"
+envsubst < "${PACKAGING_DIR}/nfpm/${PACKAGE}-deb.yml" > "${NFPM_CONFIG_RESOLVED}"
+
 echo "Packaging ${DEB_FILENAME}..."
 nfpm package \
-    --config "${PACKAGING_DIR}/nfpm/${PACKAGE}-deb.yml" \
+    --config "${NFPM_CONFIG_RESOLVED}" \
     --packager deb \
     --target "${DEB_PATH}"
 

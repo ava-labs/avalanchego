@@ -147,9 +147,14 @@ esac
 
 export VERSION RPM_ARCH
 
+# nfpm does not expand env vars in top-level fields (changelog, signature.key_file).
+# Preprocess the config template with envsubst so all ${VAR} references resolve.
+NFPM_CONFIG_RESOLVED="${REPO_ROOT}/build/${PACKAGE}-rpm-resolved.yml"
+envsubst < "${PACKAGING_DIR}/nfpm/${PACKAGE}.yml" > "${NFPM_CONFIG_RESOLVED}"
+
 echo "Packaging ${RPM_FILENAME}..."
 nfpm package \
-    --config "${PACKAGING_DIR}/nfpm/${PACKAGE}.yml" \
+    --config "${NFPM_CONFIG_RESOLVED}" \
     --packager rpm \
     --target "${RPM_PATH}"
 
