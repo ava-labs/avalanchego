@@ -13,6 +13,6 @@ contents:
       mode: 0755
 changelog: "${NFPM_CHANGELOG}"
 deb:
-  compression: zstd
+  compression: gzip
 # DEB signing is performed post-build with dpkg-sig (not nfpm inline)
 # because nfpm's Go openpgp signatures are incompatible with dpkg-sig --verify.
