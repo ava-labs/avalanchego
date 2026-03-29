@@ -139,42 +139,52 @@ func main() {
 		}
 	}
 
-	// Set up C-chain EVM workloads
+	// Set up C-Chain EVM workloads.
 	ewoqECDSAKey := genesis.EWOQKey.ToECDSA()
-	genesisEthClient, err := ethclient.Dial(fmt.Sprintf("%s/ext/bc/C/rpc", c.URIs[0]))
-	require.NoError(err, "failed to dial C-chain RPC")
 
-	genesisCChainWorkload := &cchainWorkload{
-		id:     0,
-		log:    tests.NewDefaultLogger("cchain-worker 0"),
-		client: genesisEthClient,
-		key:    ewoqECDSAKey,
-		uris:   c.URIs,
+	cChainClients := make([]*ethclient.Client, len(c.URIs))
+	for i, uri := range c.URIs {
+		client, err := ethclient.Dial(uri + "/ext/bc/C/rpc")
+		require.NoError(err, "failed to dial C-Chain RPC for "+uri)
+		cChainClients[i] = client
 	}
 
-	cchainWorkloads := make([]*cchainWorkload, NumKeys)
-	cchainWorkloads[0] = genesisCChainWorkload
+	cChainID, err := cChainClients[0].ChainID(ctx)
+	require.NoError(err, "failed to fetch C-Chain chain ID")
 
-	initialCChainAmount := uint64(1_000_000_000_000_000) // 0.001 AVAX per worker for gas
+	// The funder workload uses the pre-funded EWOQ key and is responsible
+	// for funding all other C-Chain workers during setup.
+	funderCChainWorkload := &cChainWorkload{
+		id:            0,
+		log:           tests.NewDefaultLogger("C-Chain worker 0"),
+		chainID:       cChainID,
+		key:           ewoqECDSAKey,
+		uris:          c.URIs,
+		nodeClient:    cChainClients[0],
+		verifyClients: cChainClients,
+	}
+
+	cChainWorkloads := make([]*cChainWorkload, NumKeys)
+	cChainWorkloads[0] = funderCChainWorkload
+	initialCChainAmount := 100 * units.Avax
 	for i := 1; i < NumKeys; i++ {
-		key, err := crypto.ToECDSA(crypto.Keccak256([]byte("cchain-worker"), []byte{uint8(i)}))
-		require.NoError(err, "failed to generate C-chain key")
+		key, err := crypto.ToECDSA(crypto.Keccak256([]byte("C-Chain worker"), []byte{uint8(i)}))
+		require.NoError(err, "failed to generate C-Chain key")
 
 		recipientAddr := crypto.PubkeyToAddress(key.PublicKey)
 		require.NoError(
-			transferCChainFunds(ctx, genesisEthClient, ewoqECDSAKey, recipientAddr, initialCChainAmount, tc.Log()),
-			"failed to fund C-chain worker",
+			funderCChainWorkload.fundCChainWorker(ctx, recipientAddr, initialCChainAmount, tc.Log()),
+			"failed to fund C-Chain worker",
 		)
 
-		client, err := ethclient.Dial(fmt.Sprintf("%s/ext/bc/C/rpc", c.URIs[i%len(c.URIs)]))
-		require.NoError(err, "failed to dial C-chain RPC")
-
-		cchainWorkloads[i] = &cchainWorkload{
-			id:     i,
-			log:    tests.NewDefaultLogger(fmt.Sprintf("cchain-worker %d", i)),
-			client: client,
-			key:    key,
-			uris:   c.URIs,
+		cChainWorkloads[i] = &cChainWorkload{
+			id:            i,
+			log:           tests.NewDefaultLogger(fmt.Sprintf("C-Chain worker %d", i)),
+			chainID:       cChainID,
+			key:           key,
+			uris:          c.URIs,
+			nodeClient:    cChainClients[i%len(cChainClients)],
+			verifyClients: cChainClients,
 		}
 	}
 
@@ -187,7 +197,7 @@ func main() {
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
 	}
-	for _, cw := range cchainWorkloads {
+	for _, cw := range cChainWorkloads {
 		go cw.run(ctx)
 	}
 	genesisWorkload.run(ctx)

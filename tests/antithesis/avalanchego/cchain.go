@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -19,49 +18,58 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	ethereum "github.com/ava-labs/libevm"
-
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	timerpkg "github.com/ava-labs/avalanchego/utils/timer"
+	ethereum "github.com/ava-labs/libevm"
 	ethcommon "github.com/ava-labs/libevm/common"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
 const (
-	cchainTxGasLimit    = 50_000 // gas limit for transactions with data payloads
-	cchainMaxTxDataSize = 64     // max random data bytes per transaction
+	cChainTxGasLimit    = 50_000 // gas limit for transactions with data payloads
+	cChainMaxTxDataSize = 64     // max random data bytes per transaction
 )
 
-// cchainWorkload issues EVM transactions on the C-chain, analogous to the
-// X/P-chain workload in main.go.
-type cchainWorkload struct {
-	id     int
-	log    logging.Logger
-	client *ethclient.Client
-	key    *ecdsa.PrivateKey
-	uris   []string
+// cChainWorkload issues EVM transactions on the C-Chain.
+type cChainWorkload struct {
+	id      int
+	log     logging.Logger
+	chainID *big.Int
+	key     *ecdsa.PrivateKey
+	uris    []string
+	// nodeClient is the ethclient this worker uses to submit transactions.
+	nodeClient *ethclient.Client
+	// verifyClients has one ethclient per URI for cross-node verification.
+	verifyClients []*ethclient.Client
 }
 
-func (w *cchainWorkload) run(ctx context.Context) {
-	timer := timerpkg.StoppedTimer()
-
-	tc := antithesis.NewInstrumentedTestContextWithArgs(
+// newTestContext returns a test context that ensures that log output and
+// assertions are associated with this C-Chain worker.
+func (w *cChainWorkload) newTestContext(ctx context.Context) *tests.SimpleTestContext {
+	return antithesis.NewInstrumentedTestContextWithArgs(
 		ctx,
 		w.log,
 		map[string]any{
-			"cchainWorker": w.id,
+			"cChainWorker": w.id,
 		},
 	)
+}
+
+func (w *cChainWorkload) run(ctx context.Context) {
+	timer := timerpkg.StoppedTimer()
+
+	tc := w.newTestContext(ctx)
 	defer tc.RecoverAndRethrow()
 	require := require.New(tc)
 
-	balance, err := w.client.BalanceAt(ctx, crypto.PubkeyToAddress(w.key.PublicKey), nil)
-	require.NoError(err, "failed to fetch C-chain balance")
-	assert.Reachable("C-chain worker starting", map[string]any{
+	balance, err := w.nodeClient.BalanceAt(ctx, crypto.PubkeyToAddress(w.key.PublicKey), nil)
+	require.NoError(err, "failed to fetch C-Chain balance")
+	assert.Reachable("C-Chain worker starting", map[string]any{
 		"worker":  w.id,
 		"balance": balance,
 	})
@@ -81,24 +89,24 @@ func (w *cchainWorkload) run(ctx context.Context) {
 	}
 }
 
-func (w *cchainWorkload) executeTest(ctx context.Context) {
+func (w *cChainWorkload) executeTest(ctx context.Context) {
+	tc := w.newTestContext(ctx)
+	// Panics will be recovered without being rethrown, ensuring that
+	// test failures are not fatal and the worker continues.
+	defer tc.Recover()
+
 	w.log.Info("executing issueCChainTransfer")
 	w.issueCChainTransfer(ctx)
+
+	// Add more test tx types here...
 }
 
 // issueCChainTransfer sends a self-transfer, waits for acceptance, then
 // verifies the transaction data on all nodes via confirmCChainTx.
-func (w *cchainWorkload) issueCChainTransfer(ctx context.Context) {
+func (w *cChainWorkload) issueCChainTransfer(ctx context.Context) {
 	if ctx.Err() != nil {
 		return
 	}
-
-	randVal, err := rand.Int(rand.Reader, big.NewInt(100_000))
-	if err != nil {
-		w.log.Warn("failed to generate random value", zap.Error(err))
-		return
-	}
-	txAmount := new(big.Int).Add(randVal, big.NewInt(1000))
 
 	// ~50% of transactions include random data to vary block body content.
 	var txData []byte
@@ -108,96 +116,117 @@ func (w *cchainWorkload) issueCChainTransfer(ctx context.Context) {
 		return
 	}
 	if includeData.Int64() == 1 {
-		dataLen, err := rand.Int(rand.Reader, big.NewInt(cchainMaxTxDataSize))
+		dataLen, err := rand.Int(rand.Reader, big.NewInt(cChainMaxTxDataSize))
 		if err != nil {
 			w.log.Warn("failed to generate random data length", zap.Error(err))
 			return
 		}
-		txData = make([]byte, dataLen.Int64()+1) // 1 to cchainMaxTxDataSize bytes
+		txData = make([]byte, dataLen.Int64()+1) // 1 to cChainMaxTxDataSize bytes
 		if _, err := rand.Read(txData); err != nil {
 			w.log.Warn("failed to generate random data", zap.Error(err))
 			return
 		}
 	}
 
-	// Send to self so the worker balance stays funded for continuous testing.
-	recipientAddress := crypto.PubkeyToAddress(w.key.PublicKey)
-
-	chainID, err := w.client.ChainID(ctx)
-	if err != nil {
-		w.log.Warn("failed to fetch chainID", zap.Error(err))
-		return
-	}
-	acceptedNonce, err := w.client.AcceptedNonceAt(ctx, recipientAddress)
-	if err != nil {
-		w.log.Warn("failed to fetch accepted nonce", zap.Error(err))
-		return
-	}
-	gasTipCap, err := w.client.SuggestGasTipCap(ctx)
-	if err != nil {
-		w.log.Warn("failed to fetch suggested gas tip", zap.Error(err))
-		return
-	}
-	gasFeeCap, err := w.client.EstimateBaseFee(ctx)
-	if err != nil {
-		w.log.Warn("failed to fetch estimated base fee", zap.Error(err))
-		return
-	}
-
 	gasLimit := ethparams.TxGas
 	if len(txData) > 0 {
-		gasLimit = cchainTxGasLimit
+		gasLimit = cChainTxGasLimit
 	}
 
-	signer := types.LatestSignerForChainID(chainID)
-	tx, err := types.SignNewTx(w.key, signer, &types.DynamicFeeTx{
-		ChainID:   chainID,
-		Nonce:     acceptedNonce,
-		GasTipCap: gasTipCap,
-		GasFeeCap: gasFeeCap,
-		Gas:       gasLimit,
-		To:        &recipientAddress,
-		Value:     txAmount,
-		Data:      txData,
-	})
+	// Random amount (1000-100999 wei) to vary tx hashes and block content.
+	// Value round-trips since we send to self; only gas is consumed.
+	randVal, err := rand.Int(rand.Reader, big.NewInt(100_000))
 	if err != nil {
-		w.log.Warn("failed to sign C-chain transaction", zap.Error(err))
+		w.log.Warn("failed to generate random value", zap.Error(err))
+		return
+	}
+	txAmount := new(big.Int).Add(randVal, big.NewInt(1000))
+
+	recipientAddr := crypto.PubkeyToAddress(w.key.PublicKey)
+	tx, err := w.sendCChainTx(ctx, w.nodeClient, recipientAddr, txAmount, txData, gasLimit)
+	if err != nil {
+		w.log.Warn("failed to send C-Chain transfer",
+			zap.Error(err),
+		)
 		return
 	}
 
 	startTime := time.Now()
-	if err := w.client.SendTransaction(ctx, tx); err != nil {
-		w.log.Warn("failed to send C-chain transaction",
-			zap.Stringer("txID", tx.Hash()),
-			zap.Error(err),
-		)
-		return
-	}
-
-	w.log.Info("issued C-chain transfer",
+	w.log.Info("issued C-Chain transfer",
 		zap.Stringer("txID", tx.Hash()),
-		zap.Uint64("nonce", acceptedNonce),
+		zap.Uint64("nonce", tx.Nonce()),
 		zap.Stringer("value", txAmount),
 		zap.Int("dataLen", len(txData)),
 	)
 
-	receipt, err := bind.WaitMined(ctx, w.client, tx)
+	receipt, err := bind.WaitMined(ctx, w.nodeClient, tx)
 	if err != nil {
-		w.log.Warn("failed to wait for C-chain transaction receipt",
+		w.log.Warn("failed to wait for C-Chain transaction receipt",
 			zap.Stringer("txID", tx.Hash()),
 			zap.Error(err),
 		)
 		return
 	}
 
-	w.log.Info("accepted C-chain transaction",
+	w.log.Info("accepted C-Chain transaction",
 		zap.Stringer("txID", tx.Hash()),
 		zap.Uint64("gasUsed", receipt.GasUsed),
 		zap.Stringer("blockNumber", receipt.BlockNumber),
 		zap.Duration("duration", time.Since(startTime)),
 	)
 
-	w.confirmCChainTx(ctx, tx)
+	if err := w.confirmCChainTx(ctx, tx); err != nil {
+		w.log.Warn("failed to confirm C-Chain transaction",
+			zap.Stringer("txID", tx.Hash()),
+			zap.Error(err),
+		)
+	}
+}
+
+// sendCChainTx builds, signs, and sends a C-Chain EIP-1559 transaction.
+// It is used both for workload transfers and initial worker funding.
+func (w *cChainWorkload) sendCChainTx(
+	ctx context.Context,
+	client *ethclient.Client,
+	to ethcommon.Address,
+	value *big.Int,
+	data []byte,
+	gasLimit uint64,
+) (*types.Transaction, error) {
+	senderAddr := crypto.PubkeyToAddress(w.key.PublicKey)
+
+	acceptedNonce, err := client.AcceptedNonceAt(ctx, senderAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch accepted nonce: %w", err)
+	}
+	gasTipCap, err := client.SuggestGasTipCap(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch suggested gas tip: %w", err)
+	}
+	gasFeeCap, err := client.EstimateBaseFee(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch estimated base fee: %w", err)
+	}
+
+	signer := types.LatestSignerForChainID(w.chainID)
+	tx, err := types.SignNewTx(w.key, signer, &types.DynamicFeeTx{
+		ChainID:   w.chainID,
+		Nonce:     acceptedNonce,
+		GasTipCap: gasTipCap,
+		GasFeeCap: gasFeeCap,
+		Gas:       gasLimit,
+		To:        &to,
+		Value:     value,
+		Data:      data,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
+	if err := client.SendTransaction(ctx, tx); err != nil {
+		return nil, fmt.Errorf("failed to send transaction: %w", err)
+	}
+	return tx, nil
 }
 
 // awaitCChainTxReceipt polls the node until the transaction receipt is
@@ -221,173 +250,66 @@ func awaitCChainTxReceipt(ctx context.Context, client *ethclient.Client, txHash 
 }
 
 // confirmCChainTx waits for each node to have the transaction, then verifies
-// data integrity across all nodes.
-func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Transaction) {
+// data integrity across all nodes: receipt, tx fields, block structure,
+// account nonce advancement, and balance consistency.
+func (w *cChainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Transaction) error {
 	txHash := sentTx.Hash()
+	senderAddr := crypto.PubkeyToAddress(w.key.PublicKey)
 
-	for _, uri := range w.uris {
-		cchainURI := fmt.Sprintf("%s/ext/bc/C/rpc", uri)
-		client, err := ethclient.Dial(cchainURI)
-		if err != nil {
-			w.log.Warn("failed to dial C-chain RPC for confirmation",
-				zap.String("uri", uri),
-				zap.Error(err),
-			)
-			return
-		}
+	for i, client := range w.verifyClients {
+		uri := w.uris[i]
 
-		// Wait for the transaction receipt on this node.
 		receipt, err := awaitCChainTxReceipt(ctx, client, txHash)
 		if err != nil {
-			w.log.Warn("timed out waiting for C-chain transaction on node",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Error(err),
-			)
-			return
+			return fmt.Errorf("timed out waiting for tx %s on %s: %w", txHash, uri, err)
 		}
 
-		// Verify receipt fields.
 		if receipt.TxHash != txHash {
-			w.log.Error("C-chain receipt tx hash mismatch",
-				zap.String("uri", uri),
-				zap.Stringer("expected", txHash),
-				zap.Stringer("actual", receipt.TxHash),
-			)
-			assert.Unreachable("C-chain receipt tx hash mismatch", map[string]any{
+			assert.Unreachable("C-Chain receipt tx hash mismatch", map[string]any{
 				"worker":   w.id,
 				"uri":      uri,
 				"expected": txHash,
 				"actual":   receipt.TxHash,
 			})
-			return
+			return fmt.Errorf("receipt tx hash mismatch on %s: got %s, want %s", uri, receipt.TxHash, txHash)
 		}
 
 		if receipt.Status != types.ReceiptStatusSuccessful {
-			w.log.Error("C-chain transaction receipt indicates failure",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Uint64("status", receipt.Status),
-			)
-			assert.Unreachable("C-chain transaction receipt indicates failure", map[string]any{
+			assert.Unreachable("C-Chain transaction receipt indicates failure", map[string]any{
 				"worker": w.id,
 				"uri":    uri,
 				"txID":   txHash,
 				"status": receipt.Status,
 			})
-			return
+			return fmt.Errorf("tx %s failed on %s with status %d", txHash, uri, receipt.Status)
 		}
 
-		// Verify transaction data.
+		// Verify transaction fields.
 		fetchedTx, _, err := client.TransactionByHash(ctx, txHash)
 		if err != nil {
-			w.log.Warn("failed to fetch C-chain transaction by hash",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Error(err),
-			)
 			if errors.Is(err, ethereum.NotFound) {
-				assert.Unreachable("C-chain transaction not found after receipt confirmed", map[string]any{
+				assert.Unreachable("C-Chain transaction not found after receipt confirmed", map[string]any{
 					"worker": w.id,
 					"uri":    uri,
 					"txID":   txHash,
 				})
 			}
-			return
+			return fmt.Errorf("failed to fetch tx %s on %s: %w", txHash, uri, err)
 		}
 
 		if fetchedTx.Hash() != sentTx.Hash() {
-			w.log.Error("C-chain transaction hash mismatch",
-				zap.String("uri", uri),
-				zap.Stringer("expected", sentTx.Hash()),
-				zap.Stringer("actual", fetchedTx.Hash()),
-			)
-			assert.Unreachable("C-chain transaction hash mismatch", map[string]any{
+			assert.Unreachable("C-Chain transaction hash mismatch", map[string]any{
 				"worker":   w.id,
 				"uri":      uri,
 				"expected": sentTx.Hash(),
 				"actual":   fetchedTx.Hash(),
 			})
-			return
+			return fmt.Errorf("tx hash mismatch on %s: got %s, want %s", uri, fetchedTx.Hash(), sentTx.Hash())
 		}
 
-		if fetchedTx.Nonce() != sentTx.Nonce() {
-			w.log.Error("C-chain transaction nonce mismatch",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Uint64("expected", sentTx.Nonce()),
-				zap.Uint64("actual", fetchedTx.Nonce()),
-			)
-			assert.Unreachable("C-chain transaction nonce mismatch", map[string]any{
-				"worker":   w.id,
-				"uri":      uri,
-				"txID":     txHash,
-				"expected": sentTx.Nonce(),
-				"actual":   fetchedTx.Nonce(),
-			})
-			return
-		}
-
-		if fetchedTx.Value().Cmp(sentTx.Value()) != 0 {
-			w.log.Error("C-chain transaction value mismatch",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Stringer("expected", sentTx.Value()),
-				zap.Stringer("actual", fetchedTx.Value()),
-			)
-			assert.Unreachable("C-chain transaction value mismatch", map[string]any{
-				"worker":   w.id,
-				"uri":      uri,
-				"txID":     txHash,
-				"expected": sentTx.Value(),
-				"actual":   fetchedTx.Value(),
-			})
-			return
-		}
-
-		if fetchedTx.To() == nil || *fetchedTx.To() != *sentTx.To() {
-			w.log.Error("C-chain transaction recipient mismatch",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Stringer("expected", sentTx.To()),
-				zap.Stringer("actual", fetchedTx.To()),
-			)
-			assert.Unreachable("C-chain transaction recipient mismatch", map[string]any{
-				"worker":   w.id,
-				"uri":      uri,
-				"txID":     txHash,
-				"expected": sentTx.To(),
-				"actual":   fetchedTx.To(),
-			})
-			return
-		}
-
-		if !bytes.Equal(fetchedTx.Data(), sentTx.Data()) {
-			w.log.Error("C-chain transaction data mismatch",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Int("expectedLen", len(sentTx.Data())),
-				zap.Int("actualLen", len(fetchedTx.Data())),
-			)
-			assert.Unreachable("C-chain transaction data mismatch", map[string]any{
-				"worker":      w.id,
-				"uri":         uri,
-				"txID":        txHash,
-				"expectedLen": len(sentTx.Data()),
-				"actualLen":   len(fetchedTx.Data()),
-			})
-			return
-		}
-
-		// Verify block data consistency.
+		// Verify block structure consistency.
 		blockByNum, err := client.BlockByNumber(ctx, receipt.BlockNumber)
 		if err != nil {
-			w.log.Warn("failed to fetch block by number",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Stringer("blockNumber", receipt.BlockNumber),
-				zap.Error(err),
-			)
 			if errors.Is(err, ethereum.NotFound) {
 				assert.Unreachable("block not found by number after receipt confirmed", map[string]any{
 					"worker":      w.id,
@@ -396,17 +318,11 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 					"blockNumber": receipt.BlockNumber,
 				})
 			}
-			return
+			return fmt.Errorf("failed to fetch block %s by number on %s: %w", receipt.BlockNumber, uri, err)
 		}
 
 		blockByHash, err := client.BlockByHash(ctx, receipt.BlockHash)
 		if err != nil {
-			w.log.Warn("failed to fetch block by hash",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Stringer("blockHash", receipt.BlockHash),
-				zap.Error(err),
-			)
 			if errors.Is(err, ethereum.NotFound) {
 				assert.Unreachable("block not found by hash after receipt confirmed", map[string]any{
 					"worker":    w.id,
@@ -415,16 +331,10 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 					"blockHash": receipt.BlockHash,
 				})
 			}
-			return
+			return fmt.Errorf("failed to fetch block %s by hash on %s: %w", receipt.BlockHash, uri, err)
 		}
 
 		if blockByNum.Hash() != blockByHash.Hash() {
-			w.log.Error("block hash mismatch between BlockByNumber and BlockByHash",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Stringer("byNumber", blockByNum.Hash()),
-				zap.Stringer("byHash", blockByHash.Hash()),
-			)
 			assert.Unreachable("block hash mismatch between BlockByNumber and BlockByHash", map[string]any{
 				"worker":   w.id,
 				"uri":      uri,
@@ -432,16 +342,10 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 				"byNumber": blockByNum.Hash(),
 				"byHash":   blockByHash.Hash(),
 			})
-			return
+			return fmt.Errorf("block hash mismatch on %s: byNumber=%s byHash=%s", uri, blockByNum.Hash(), blockByHash.Hash())
 		}
 
 		if blockByNum.Hash() != receipt.BlockHash {
-			w.log.Error("block hash does not match receipt",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Stringer("blockHash", blockByNum.Hash()),
-				zap.Stringer("receiptBlockHash", receipt.BlockHash),
-			)
 			assert.Unreachable("block hash does not match receipt", map[string]any{
 				"worker":           w.id,
 				"uri":              uri,
@@ -449,9 +353,10 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 				"blockHash":        blockByNum.Hash(),
 				"receiptBlockHash": receipt.BlockHash,
 			})
-			return
+			return fmt.Errorf("block hash %s != receipt block hash %s on %s", blockByNum.Hash(), receipt.BlockHash, uri)
 		}
 
+		// Verify transaction is in the block.
 		blockTxs := blockByNum.Transactions()
 		found := false
 		for _, blockTx := range blockTxs {
@@ -461,86 +366,89 @@ func (w *cchainWorkload) confirmCChainTx(ctx context.Context, sentTx *types.Tran
 			}
 		}
 		if !found {
-			w.log.Error("transaction not found in block",
-				zap.String("uri", uri),
-				zap.Stringer("txID", txHash),
-				zap.Stringer("blockNumber", blockByNum.Number()),
-				zap.Stringer("blockHash", blockByNum.Hash()),
-				zap.Int("blockTxCount", len(blockTxs)),
-			)
 			assert.Unreachable("transaction not found in block", map[string]any{
 				"worker":       w.id,
 				"uri":          uri,
 				"txID":         txHash,
 				"blockNumber":  blockByNum.Number(),
-				"blockHash":    blockByNum.Hash(),
 				"blockTxCount": len(blockTxs),
 			})
-			return
+			return fmt.Errorf("tx %s not found in block %s (%d txs) on %s", txHash, blockByNum.Number(), len(blockTxs), uri)
 		}
 
-		w.log.Info("confirmed C-chain transaction",
+		// Verify account nonce advanced.
+		postNonce, err := client.NonceAt(ctx, senderAddr, receipt.BlockNumber)
+		if err == nil {
+			expectedNonce := sentTx.Nonce() + 1
+			if postNonce < expectedNonce {
+				assert.Unreachable("account nonce did not advance after tx", map[string]any{
+					"worker":   w.id,
+					"uri":      uri,
+					"txID":     txHash,
+					"expected": expectedNonce,
+					"actual":   postNonce,
+				})
+				return fmt.Errorf("nonce on %s: got %d, want >= %d", uri, postNonce, expectedNonce)
+			}
+		}
+
+		// Verify balance consistency for self-transfers.
+		preBlockNum := new(big.Int).Sub(receipt.BlockNumber, big.NewInt(1))
+		preBalance, preErr := client.BalanceAt(ctx, senderAddr, preBlockNum)
+		postBalance, postErr := client.BalanceAt(ctx, senderAddr, receipt.BlockNumber)
+		if preErr == nil && postErr == nil && receipt.EffectiveGasPrice != nil {
+			gasCost := new(big.Int).Mul(
+				new(big.Int).SetUint64(receipt.GasUsed),
+				receipt.EffectiveGasPrice,
+			)
+			expectedPostBalance := new(big.Int).Sub(preBalance, gasCost)
+			if postBalance.Cmp(expectedPostBalance) != 0 {
+				assert.Unreachable("C-Chain balance mismatch after self-transfer", map[string]any{
+					"worker":       w.id,
+					"uri":          uri,
+					"txID":         txHash,
+					"preBalance":   preBalance,
+					"postBalance":  postBalance,
+					"expectedPost": expectedPostBalance,
+					"gasCost":      gasCost,
+				})
+				return fmt.Errorf("balance mismatch on %s: post=%s, expected=%s (pre=%s, gas=%s)",
+					uri, postBalance, expectedPostBalance, preBalance, gasCost)
+			}
+		}
+
+		w.log.Info("confirmed C-Chain transaction",
 			zap.Stringer("txID", txHash),
 			zap.String("uri", uri),
 		)
 	}
 
-	w.log.Info("confirmed C-chain transaction on all nodes",
+	w.log.Info("confirmed C-Chain transaction on all nodes",
 		zap.Stringer("txID", txHash),
 	)
-	assert.Reachable("confirmed C-chain transaction on all nodes", map[string]any{
+	assert.Reachable("confirmed C-Chain transaction on all nodes", map[string]any{
 		"worker": w.id,
 		"txID":   txHash,
 	})
+	return nil
 }
 
-// transferCChainFunds sends a simple EVM value transfer to fund a C-chain worker.
-func transferCChainFunds(ctx context.Context, client *ethclient.Client, key *ecdsa.PrivateKey, recipientAddress ethcommon.Address, txAmount uint64, log logging.Logger) error {
-	chainID, err := client.ChainID(ctx)
+func (w *cChainWorkload) fundCChainWorker(ctx context.Context, recipientAddr ethcommon.Address, amount uint64, log logging.Logger) error {
+	tx, err := w.sendCChainTx(ctx, w.nodeClient, recipientAddr, big.NewInt(int64(amount)), nil, ethparams.TxGas)
 	if err != nil {
-		return fmt.Errorf("failed to fetch chainID: %w", err)
-	}
-	acceptedNonce, err := client.AcceptedNonceAt(ctx, crypto.PubkeyToAddress(key.PublicKey))
-	if err != nil {
-		return fmt.Errorf("failed to fetch accepted nonce: %w", err)
-	}
-	gasTipCap, err := client.SuggestGasTipCap(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to fetch suggested gas tip: %w", err)
-	}
-	gasFeeCap, err := client.EstimateBaseFee(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to fetch estimated base fee: %w", err)
-	}
-	signer := types.LatestSignerForChainID(chainID)
-
-	tx, err := types.SignNewTx(key, signer, &types.DynamicFeeTx{
-		ChainID:   chainID,
-		Nonce:     acceptedNonce,
-		GasTipCap: gasTipCap,
-		GasFeeCap: gasFeeCap,
-		Gas:       ethparams.TxGas,
-		To:        &recipientAddress,
-		Value:     big.NewInt(int64(txAmount)),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to sign transaction: %w", err)
+		return fmt.Errorf("failed to send funding tx: %w", err)
 	}
 
-	log.Info("sending C-chain funding transaction",
+	log.Info("sending C-Chain funding transaction",
 		zap.Stringer("txID", tx.Hash()),
-		zap.Uint64("nonce", acceptedNonce),
-	)
-	if err := client.SendTransaction(ctx, tx); err != nil {
-		return fmt.Errorf("failed to send transaction: %w", err)
-	}
-
-	if _, err := bind.WaitMined(ctx, client, tx); err != nil {
-		return fmt.Errorf("failed to wait for receipt: %w", err)
-	}
-	log.Info("confirmed C-chain funding transaction",
-		zap.Stringer("txID", tx.Hash()),
+		zap.Uint64("nonce", tx.Nonce()),
 	)
 
+	if _, err := bind.WaitMined(ctx, w.nodeClient, tx); err != nil {
+		return fmt.Errorf("failed to wait for funding receipt: %w", err)
+	}
+	log.Info("confirmed C-Chain funding transaction",
+		zap.Stringer("txID", tx.Hash()),
+	)
 	return nil
 }
