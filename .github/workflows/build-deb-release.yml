@@ -1,0 +1,132 @@
+name: build-deb-packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build DEBs for'
+        required: true
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - ".github/packaging/**"
+      - ".github/workflows/build-deb-release.yml"
+
+jobs:
+  build-deb:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+            deb_arch: amd64
+          - arch: arm64
+            runner: custom-arm64-jammy
+            deb_arch: arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # When building an older tag via workflow_dispatch, the tag's tree
+      # may not contain the packaging scripts. Overlay them from the
+      # workflow branch so that packaging:test-build-debs is available.
+      - name: Overlay packaging scripts from workflow branch
+        if: github.event.inputs.tag
+        uses: actions/checkout@v4
+        with:
+          path: .packaging-overlay
+          sparse-checkout: .github/packaging
+      - name: Apply packaging overlay
+        if: github.event.inputs.tag
+        run: |
+          cp -r .packaging-overlay/.github/packaging .github/packaging
+          rm -rf .packaging-overlay
+        shell: bash
+
+      - uses: ./.github/actions/setup-go-for-project
+
+      - name: Install nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
+
+      - name: Get tag
+        run: |
+          if [[ -n "${{ github.event.inputs.tag }}" ]]; then
+            echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
+          else
+            # PR builds: synthetic tag for smoke testing the build pipeline
+            echo "TAG=v0.0.0-pr.${GITHUB_SHA::8}" >> "$GITHUB_ENV"
+          fi
+        shell: bash
+
+      - name: Import GPG key
+        if: github.event_name != 'pull_request'
+        run: |
+          GPG_KEY_FILE="$(mktemp)"
+          chmod 600 "${GPG_KEY_FILE}"
+          printf '%s' "${{ secrets.RPM_GPG_PRIVATE_KEY }}" > "${GPG_KEY_FILE}"
+          printf 'GPG_KEY_FILE=%s\n' "${GPG_KEY_FILE}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Build and validate DEBs
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-debs
+        env:
+          PACKAGING_TAG: ${{ env.TAG }}
+          DEB_GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
+          NFPM_DEB_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
+          DEB_ARCH: ${{ matrix.deb_arch }}
+
+      - name: Upload DEBs as artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: debs-${{ matrix.deb_arch }}
+          path: |
+            build/deb/avalanchego-${{ env.TAG }}-${{ matrix.deb_arch }}.deb
+            build/deb/subnet-evm-${{ env.TAG }}-${{ matrix.deb_arch }}.deb
+            build/deb/DEB-GPG-KEY-avalanchego
+
+      - name: Configure AWS credentials
+        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
+          aws-region: us-east-1
+
+      - name: Install aws cli
+        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          if ! command -v aws &>/dev/null; then
+            sudo snap install aws-cli --classic
+          fi
+
+      - name: Upload DEBs to S3
+        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          for release in jammy noble; do
+            aws s3 cp "build/deb/avalanchego-${{ env.TAG }}-${{ matrix.deb_arch }}.deb" \
+              "s3://${{ secrets.BUCKET }}/linux/debs/ubuntu/${release}/${{ matrix.deb_arch }}/"
+            aws s3 cp "build/deb/subnet-evm-${{ env.TAG }}-${{ matrix.deb_arch }}.deb" \
+              "s3://${{ secrets.BUCKET }}/linux/debs/ubuntu/${release}/${{ matrix.deb_arch }}/"
+            aws s3 cp "build/deb/DEB-GPG-KEY-avalanchego" \
+              "s3://${{ secrets.BUCKET }}/linux/debs/ubuntu/${release}/"
+          done
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [[ -n "${GPG_KEY_FILE:-}" ]]; then
+            rm -f "${GPG_KEY_FILE}"
+          fi
+          rm -rf build/deb
+        shell: bash

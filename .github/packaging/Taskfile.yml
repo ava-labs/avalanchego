@@ -22,6 +22,15 @@ vars:
         arm64)  echo "aarch64" ;;
         *)      echo "${arch}" ;;
       esac
+  # Map uname -m to DEB arch names (x86_64 -> amd64).
+  PACKAGING_HOST_DEB_ARCH:
+    sh: |
+      arch=$(uname -m)
+      case "${arch}" in
+        x86_64)        echo "amd64" ;;
+        aarch64|arm64) echo "arm64" ;;
+        *)             echo "${arch}" ;;
+      esac
   # Git commit hash, resolved on host (container may not have .git for worktrees).
   PACKAGING_GIT_COMMIT:
     sh: git rev-parse HEAD
@@ -30,6 +39,7 @@ vars:
     sh: echo "${PACKAGING_TAG:-v0.0.0}"
   PACKAGING_DOCKER_IMAGE: avalanchego-rpm-builder
   PACKAGING_OUTPUT_DIR: '{{.REPO_ROOT}}/build/rpm'
+  PACKAGING_DEB_OUTPUT_DIR: '{{.REPO_ROOT}}/build/deb'
 
 tasks:
   default:
@@ -114,3 +124,61 @@ tasks:
       GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-rpm.sh'
+
+  # ── DEB packaging tasks ──────────────────────────────────────────
+
+  build-debs:
+    desc: Builds DEBs for both avalanchego and subnet-evm
+    cmds:
+      - task: build-avalanchego-deb
+      - task: build-subnet-evm-deb
+
+  build-avalanchego-deb:
+    desc: Builds DEB for avalanchego
+    vars:
+      DEB_ARCH: '{{.DEB_ARCH | default .PACKAGING_HOST_DEB_ARCH}}'
+      DEB_TAG: '{{.PACKAGING_TAG}}'
+    cmds:
+      - cmd: mkdir -p {{.PACKAGING_DEB_OUTPUT_DIR}}
+      - cmd: >-
+          PACKAGE=avalanchego
+          VERSION={{trimPrefix "v" .DEB_TAG}}
+          TAG={{.DEB_TAG}}
+          PACKAGE_ARCH={{.DEB_ARCH}}
+          OUTPUT_DIR={{.PACKAGING_DEB_OUTPUT_DIR}}
+          AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          {{if .DEB_GPG_KEY_FILE}}DEB_GPG_KEY_FILE={{.DEB_GPG_KEY_FILE}}{{end}}
+          {{if .NFPM_DEB_PASSPHRASE}}NFPM_DEB_PASSPHRASE={{.NFPM_DEB_PASSPHRASE}}{{end}}
+          {{.REPO_ROOT}}/.github/packaging/scripts/build-deb.sh
+
+  build-subnet-evm-deb:
+    desc: Builds DEB for subnet-evm
+    vars:
+      DEB_ARCH: '{{.DEB_ARCH | default .PACKAGING_HOST_DEB_ARCH}}'
+      DEB_TAG: '{{.PACKAGING_TAG}}'
+    cmds:
+      - cmd: mkdir -p {{.PACKAGING_DEB_OUTPUT_DIR}}
+      - cmd: >-
+          PACKAGE=subnet-evm
+          VERSION={{trimPrefix "v" .DEB_TAG}}
+          TAG={{.DEB_TAG}}
+          PACKAGE_ARCH={{.DEB_ARCH}}
+          OUTPUT_DIR={{.PACKAGING_DEB_OUTPUT_DIR}}
+          AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          {{if .DEB_GPG_KEY_FILE}}DEB_GPG_KEY_FILE={{.DEB_GPG_KEY_FILE}}{{end}}
+          {{if .NFPM_DEB_PASSPHRASE}}NFPM_DEB_PASSPHRASE={{.NFPM_DEB_PASSPHRASE}}{{end}}
+          {{.REPO_ROOT}}/.github/packaging/scripts/build-deb.sh
+
+  test-build-debs:
+    desc: Builds and validates DEBs end-to-end
+    cmds:
+      - task: build-debs
+      - task: validate-debs
+
+  validate-debs:
+    desc: Validates built DEBs by installing and smoke testing in a fresh container
+    env:
+      TAG: '{{.PACKAGING_TAG}}'
+      GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-deb.sh'

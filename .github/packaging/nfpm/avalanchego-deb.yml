@@ -1,20 +1,18 @@
 name: avalanchego
-arch: "${RPM_ARCH}"
+arch: "${PACKAGE_ARCH}"
 version: "${VERSION}"
 maintainer: "Ava Labs <security@avalabs.org>"
 description: "AvalancheGo node — the official Avalanche protocol implementation"
 homepage: "https://github.com/ava-labs/avalanchego"
 license: "BSD-3-Clause"
-depends:
-  - "glibc >= 2.34"
 contents:
   - src: "${AVALANCHEGO_BINARY}"
-    dst: /var/opt/avalanchego/bin/avalanchego
+    dst: /usr/local/bin/avalanchego
     expand: true
     file_info:
       mode: 0755
 changelog: "${NFPM_CHANGELOG}"
-rpm:
+deb:
   compression: zstd
   signature:
     key_file: "${NFPM_SIGNING_KEY}"
