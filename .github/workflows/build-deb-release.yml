@@ -53,8 +53,11 @@ jobs:
 
       - uses: ./.github/actions/setup-go-for-project
 
-      - name: Install nfpm
-        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq dpkg-sig
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
 
       - name: Get tag
         run: |

@@ -152,4 +152,13 @@ nfpm package \
     --packager deb \
     --target "${DEB_PATH}"
 
-echo "DEB built: ${DEB_PATH}"
+# ── Step 5: Sign with dpkg-sig ───────────────────────────────────
+# nfpm's Go openpgp signatures are incompatible with dpkg-sig --verify,
+# so we sign post-build with dpkg-sig itself for verifiable signatures.
+
+GPG_FINGERPRINT=$(gpg --batch --with-colons --list-secret-keys "security@avalabs.org" 2>/dev/null \
+    | awk -F: '$1 == "fpr" { print $10; exit }')
+echo "Signing ${DEB_FILENAME} with GPG fingerprint ${GPG_FINGERPRINT}..."
+dpkg-sig --sign builder -k "${GPG_FINGERPRINT}" "${DEB_PATH}"
+
+echo "DEB built and signed: ${DEB_PATH}"
