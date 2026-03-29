@@ -16,3 +16,4 @@ deb:
   compression: zstd
   signature:
     key_file: "${NFPM_SIGNING_KEY}"
+    method: dpkg-sig
