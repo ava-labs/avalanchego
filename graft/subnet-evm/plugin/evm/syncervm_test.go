@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
@@ -49,40 +51,50 @@ import (
 )
 
 func TestSkipStateSync(t *testing.T) {
-	rand.Seed(1)
 	test := syncTest{
 		syncableInterval:   256,
 		stateSyncMinBlocks: 300, // must be greater than [syncableInterval] to skip sync
 		syncMode:           block.StateSyncSkipped,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
-
-	testSyncerVM(t, vmSetup, test)
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			test.stateScheme = scheme
+			vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
+			testSyncerVM(t, vmSetup, test)
+		})
+	}
 }
 
 func TestStateSyncFromScratch(t *testing.T) {
-	rand.Seed(1)
 	test := syncTest{
 		syncableInterval:   256,
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		syncMode:           block.StateSyncStatic,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
-
-	testSyncerVM(t, vmSetup, test)
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			test.stateScheme = scheme
+			vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
+			testSyncerVM(t, vmSetup, test)
+		})
+	}
 }
 
 func TestStateSyncFromScratchExceedParent(t *testing.T) {
-	rand.Seed(1)
 	numToGen := engine.BlocksToFetch + uint64(32)
 	test := syncTest{
 		syncableInterval:   numToGen,
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		syncMode:           block.StateSyncStatic,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, int(numToGen))
 
-	testSyncerVM(t, vmSetup, test)
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			test.stateScheme = scheme
+			vmSetup := createSyncServerAndClientVMs(t, test, int(numToGen))
+			testSyncerVM(t, vmSetup, test)
+		})
+	}
 }
 
 func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
@@ -262,12 +274,12 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	// configure [serverVM]
 	// Align commit intervals with the test's syncable interval so summaries are created
 	// at the expected heights and Accept() does not skip.
-	serverConfigJSON := fmt.Sprintf(`{"commit-interval": %d, "state-sync-commit-interval": %d}`,
-		test.syncableInterval, test.syncableInterval,
+	serverConfigJSON := fmt.Sprintf(`"commit-interval": %d, "state-sync-commit-interval": %d, "state-history": %d`,
+		test.syncableInterval, test.syncableInterval, test.syncableInterval,
 	)
 	serverVM := newVM(t, testVMConfig{
 		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]),
-		configJSON:  serverConfigJSON,
+		configJSON:  getConfig(test.stateScheme, serverConfigJSON),
 	})
 
 	t.Cleanup(func() {
@@ -287,8 +299,24 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	}, nil)
 
 	// make some accounts
-	r := rand.New(rand.NewSource(1))
-	root, accounts := synctest.FillAccountsWithOverlappingStorage(t, r, serverVM.vm.Blockchain().StateCache(), types.EmptyRootHash, 1000, 16)
+	var (
+		r                           = rand.New(rand.NewSource(1))
+		currentRoot                 = serverVM.vm.blockChain.LastAcceptedBlock().Root()
+		root                        common.Hash
+		fundedAccounts, allAccounts map[*utilstest.Key]*types.StateAccount
+	)
+	if test.stateScheme == customrawdb.FirewoodScheme {
+		tdb, ok := serverVM.vm.Blockchain().TrieDB().Backend().(*firewood.TrieDB)
+		require.Truef(ok, "expected TrieDB backend to be *firewood.TrieDB, got %T", serverVM.vm.Blockchain().TrieDB().Backend())
+		tdb.SetHashAndHeight(common.Hash{}, 0) // must be set for FillAccountsWithStorageAndCode to work
+	}
+	root, allAccounts = synctest.FillAccountsWithStorageAndCode(t, r, serverVM.vm.Blockchain().StateCache(), currentRoot, 1000)
+	fundedAccounts = make(map[*utilstest.Key]*types.StateAccount)
+	for key, account := range allAccounts {
+		if len(account.CodeHash) == 0 || bytes.Equal(account.CodeHash, types.EmptyCodeHash[:]) {
+			fundedAccounts[key] = account
+		}
+	}
 
 	// patch serverVM's lastAcceptedBlock to have the new root
 	// and update the vm's state so the trie with accounts will
@@ -304,12 +332,12 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	// initialise [syncerVM] with blank genesis state
 	// Match the server's state-sync-commit-interval so parsed summaries are acceptable.
 	stateSyncEnabledJSON := fmt.Sprintf(
-		`{"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "state-sync-commit-interval": %d}`,
+		`"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "state-sync-commit-interval": %d`,
 		test.stateSyncMinBlocks, 4, test.syncableInterval,
 	)
 	syncerVM := newVM(t, testVMConfig{
 		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]),
-		configJSON:  stateSyncEnabledJSON,
+		configJSON:  getConfig(test.stateScheme, stateSyncEnabledJSON),
 		isSyncing:   true,
 	})
 
@@ -361,7 +389,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	return &syncVMSetup{
 		serverVM:             serverVM.vm,
 		serverAppSender:      serverVM.appSender,
-		fundedAccounts:       accounts,
+		fundedAccounts:       fundedAccounts,
 		syncerVM:             syncerVM.vm,
 		syncerDB:             syncerVM.db,
 		shutdownOnceSyncerVM: shutdownOnceSyncerVM,
@@ -398,6 +426,7 @@ type syncTest struct {
 	stateSyncMinBlocks uint64
 	syncableInterval   uint64
 	syncMode           block.StateSyncMode
+	stateScheme        string
 	expectedErr        error
 }
 
@@ -568,11 +597,17 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 			accepted(block)
 		}
 	}
-	_, _, err := core.GenerateChain(
+
+	lastAccepted := vm.Blockchain().LastAcceptedBlock()
+	c := vm.Blockchain().StateCache()
+
+	// We must not commit this state to disk, as it will make it impossible to verify/accept the generated blocks in the same db for Firewood.
+	// Firewood requires a linear and in-order history. All unused states will be cleaned at commit time.
+	_, _, err := core.GenerateChainFromStateCache(
 		vm.chainConfig,
-		vm.blockChain.LastAcceptedBlock(),
+		lastAccepted,
 		dummy.NewETHFaker(),
-		vm.chaindb,
+		c,
 		numBlocks,
 		10,
 		func(i int, g *core.BlockGen) {
@@ -580,6 +615,7 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 			g.SetCoinbase(constants.BlackholeAddr) // necessary for syntactic validation of the block
 			gen(i, g)
 		},
+		core.WithoutDiskCommit(),
 	)
 	require.NoError(t, err)
 	vm.blockChain.DrainAcceptorQueue()

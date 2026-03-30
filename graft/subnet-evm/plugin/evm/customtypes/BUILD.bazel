@@ -1,0 +1,48 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "customtypes",
+    srcs = [
+        "block_ext.go",
+        "gen_header_serializable_json.go",
+        "gen_header_serializable_rlp.go",
+        "header_ext.go",
+        "libevm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vms/evm/acp226",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//rlp",
+    ],
+)
+
+graft_go_test(
+    name = "customtypes_test",
+    srcs = [
+        "block_ext_test.go",
+        "block_test.go",
+        "header_ext_test.go",
+        "rlp_fuzzer_test.go",
+        "types_test.go",
+    ],
+    embed = [":customtypes"],
+    deps = [
+        "//graft/subnet-evm/internal/blocktest",
+        "//graft/subnet-evm/params",
+        "//utils",
+        "//vms/evm/acp226",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -9,7 +9,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -17,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -116,7 +115,6 @@ func TestRejectBlock(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
 
 			blk, err := tt.newBlockFunc()
 			require.NoError(err)
@@ -129,7 +127,7 @@ func TestRejectBlock(t *testing.T) {
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
-			state := state.NewMockState(ctrl)
+			state := statetest.New(t, statetest.Config{})
 			blkIDToState := map[ids.ID]*blockState{
 				blk.Parent(): nil,
 				blk.ID():     nil,

@@ -118,7 +118,8 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache int
 	// if the background generation is allowed
 	if !generator.Done && !noBuild {
 		snapshot.genPending = make(chan struct{})
-		snapshot.genAbort = make(chan chan struct{})
+		snapshot.cancel = make(chan struct{})
+		snapshot.done = make(chan struct{})
 
 		var origin uint64
 		if len(generator.Marker) >= 8 {

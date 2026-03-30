@@ -1250,7 +1250,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Case: Node is benched
 			{
-				timeoutManager.EXPECT().IsBenched(destinationNodeID, ctx.ChainID).Return(true)
+				timeoutManager.EXPECT().IsBenched(ctx.ChainID, destinationNodeID).Return(true)
 
 				// Make sure we register requests with the router
 				expectedFailedMsg := tt.failedMsgF(destinationNodeID)
@@ -1282,7 +1282,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Case: Node is not myself, not benched and send fails
 			{
-				timeoutManager.EXPECT().IsBenched(destinationNodeID, ctx.ChainID).Return(false)
+				timeoutManager.EXPECT().IsBenched(ctx.ChainID, destinationNodeID).Return(false)
 
 				// Make sure we register requests with the router
 				expectedFailedMsg := tt.failedMsgF(destinationNodeID)

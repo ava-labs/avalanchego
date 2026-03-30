@@ -31,6 +31,7 @@ var (
 )
 
 type Engine struct {
+<<<<<<< simplex-chain
 	// nonValidator marks that this node is not a validator
 	// this is included, but marked as a todo since the e2e tests currently
 	// try and bootstrap a node that is not a validator(see func `CheckBootstrapIsPossible`).
@@ -38,6 +39,8 @@ type Engine struct {
 	// TODO: handle non-validators properly
 	nonValidator bool
 
+=======
+>>>>>>> master
 	// list of NoOpsHandler for messages dropped by engine
 	common.AllGetsServer
 	common.StateSummaryFrontierHandler
@@ -164,6 +167,10 @@ func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Conf
 	}
 
 	return &Engine{
+<<<<<<< simplex-chain
+=======
+		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
+>>>>>>> master
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
@@ -172,12 +179,20 @@ func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Conf
 		PutHandler:                  common.NewNoOpPutHandler(config.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
+<<<<<<< simplex-chain
 		Connector:                   config.VM,
 
 		tickInterval:       getTickInterval(config.Params),
 		AppHandler:         config.VM,
 		vm:                 config.VM,
 		consensusCtx:       snowCtx,
+=======
+		AppHandler:                  config.VM,
+		Connector:                   config.VM,
+		vm:                          config.VM,
+
+		epoch:              epoch,
+>>>>>>> master
 		blockDeserializer:  blockDeserializer,
 		quorumDeserializer: qcDeserializer,
 		epoch:              epoch,

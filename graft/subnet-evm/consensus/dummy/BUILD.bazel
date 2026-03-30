@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "dummy",
+    srcs = ["consensus.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/utils",
+        "//graft/subnet-evm/consensus",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/plugin/evm/customheader",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "//graft/subnet-evm/plugin/evm/vmerrors",
+        "//vms/evm/acp226",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//trie",
+    ],
+)
