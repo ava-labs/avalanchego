@@ -17,8 +17,9 @@ import (
 	"golang.org/x/text/message"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // TestInvalidConfigRejected verifies that zero values for TargetToExcessScaling
@@ -29,17 +30,17 @@ func TestInvalidConfigRejected(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		config   hook.GasPriceConfig
+		config   saetypes.GasPriceConfig
 		expected error
 	}{
 		{
 			"zero_scaling",
-			hook.GasPriceConfig{TargetToExcessScaling: 0, MinPrice: DefaultGasPriceConfig().MinPrice},
+			saetypes.GasPriceConfig{TargetToExcessScaling: 0, MinPrice: DefaultGasPriceConfig().MinPrice},
 			errInvalidGasPriceConfig,
 		},
 		{
 			"zero_min_price",
-			hook.GasPriceConfig{TargetToExcessScaling: DefaultGasPriceConfig().TargetToExcessScaling, MinPrice: 0},
+			saetypes.GasPriceConfig{TargetToExcessScaling: DefaultGasPriceConfig().TargetToExcessScaling, MinPrice: 0},
 			errInvalidGasPriceConfig,
 		},
 	}
@@ -339,7 +340,7 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 			t.Skip("New target too low")
 		}
 
-		initConfig := hook.GasPriceConfig{
+		initConfig := saetypes.GasPriceConfig{
 			TargetToExcessScaling: gas.Gas(initScaling),
 			MinPrice:              gas.Price(initMinPrice),
 			StaticPricing:         initStaticPricing,
@@ -368,7 +369,7 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 		{
 			hooks := hookstest.NewStub(
 				gas.Gas(newTarget),
-				hookstest.WithGasPriceConfig(hook.GasPriceConfig{
+				hookstest.WithGasPriceConfig(saetypes.GasPriceConfig{
 					MinPrice:              gas.Price(newMinPrice),
 					TargetToExcessScaling: gas.Gas(newScaling),
 					StaticPricing:         newStaticPricing,
@@ -441,8 +442,8 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 }
 
 // equalHookConfig is equivalent to [config.equal] but accepts a
-// [hook.GasPriceConfig] that is first converted and validated.
-func (c *config) equalHookConfig(tb testing.TB, hookCfg hook.GasPriceConfig) bool {
+// [saetypes.GasPriceConfig] that is first converted and validated.
+func (c *config) equalHookConfig(tb testing.TB, hookCfg saetypes.GasPriceConfig) bool {
 	tb.Helper()
 	other, err := newConfig(hookCfg)
 	require.NoError(tb, err)
