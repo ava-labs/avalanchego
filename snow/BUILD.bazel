@@ -19,6 +19,7 @@ go_library(
         "//upgrade",
         "//utils",
         "//utils/crypto/bls",
+        "//utils/lock",
         "//utils/logging",
         "//vms/platformvm/warp",
         "@com_github_prometheus_client_golang//prometheus",
