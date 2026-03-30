@@ -21,4 +21,4 @@ tasks:
 
   strevm-subtree-merge:
     desc: Perform git subtree merge of strevm into graft/strevm (commits)
-    cmd: bash ./scripts/subtree-merge.sh {{.REPO_MODULE}}
+    cmd: bash ./scripts/subtree-merge.sh {{.REPO_MODULE}} main
