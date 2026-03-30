@@ -8,6 +8,8 @@ go_library(
         "base_trie.go",
         "iterator.go",
         "metrics.go",
+        "reconstructed_state.go",
+        "reconstructed_trie.go",
         "state.go",
         "storage_trie.go",
         "triedb.go",
@@ -38,6 +40,7 @@ graft_go_test(
     name = "firewood_test",
     srcs = [
         "hash_test.go",
+        "reconstructed_state_test.go",
         "triedb_test.go",
     ],
     embed = [":firewood"],

@@ -8,8 +8,8 @@ module github.com/ava-labs/avalanchego/graft/coreth
 go 1.25.8
 
 require (
-	github.com/ava-labs/avalanchego v0.0.0-initial-consistent-tag
-	github.com/ava-labs/avalanchego/graft/evm v0.0.0-initial-consistent-tag
+	github.com/ava-labs/avalanchego v1.14.2
+	github.com/ava-labs/avalanchego/graft/evm v1.14.2
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1
 	github.com/ava-labs/libevm v1.13.14-0.4.0.rc.2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -44,7 +44,7 @@ require (
 	connectrpc.com/grpcreflect v1.3.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/StephenButtolph/canoto v0.17.3 // indirect
+	github.com/StephenButtolph/canoto v0.18.0 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
