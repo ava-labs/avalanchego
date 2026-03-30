@@ -11,7 +11,8 @@ Coreth is a dependency of AvalancheGo which is used to implement the EVM based V
 
 Some activities, such as collecting metrics and logs from the nodes targeted by an e2e test run, require binary dependencies. One way of making these dependencies available is to use a nix shell which will give access to the dependencies expected by the test tooling. See [flake.nix](../../flake.nix) for how to start.
 
-This repo also defines a `.envrc` file to configure [devenv](https://direnv.net/). With `devenv` and `nix` installed, a shell at the root of the repo will automatically start a nix dev shell.
+This repo also defines a [`.envrc`](../../.envrc). For repo-level `direnv`
+setup and behavior, see [CONTRIBUTING.md](../../CONTRIBUTING.md#direnv).
 
 ## API
 
