@@ -16,9 +16,9 @@ tasks:
   default: '{{.NIX_RUN}} ../scripts/run_task.sh --list'
 
   strevm-rewrite-imports:
-    desc: Rewrite imports of out-of-tree REPO_NAME to in-tree REPO_NAME
+    desc: Rewrite imports of out-of-tree strevm ({{.REPO_MODULE}}) to in-tree strevm
     cmd: bash ./scripts/rewrite-imports.sh {{.REPO_MODULE}}
 
   strevm-subtree-merge:
     desc: Perform git subtree merge of strevm into graft/strevm (commits)
-    cmd: bash ./scripts/subtree-merge.sh {{.REPO_MODULE}} master strevm
+    cmd: bash ./scripts/subtree-merge.sh {{.REPO_MODULE}}
