@@ -8,11 +8,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -63,15 +61,14 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig saetypes.G
 	}, nil
 }
 
-// SubSecond scales the value returned by [hook.Points.SubSecondBlockTime] to
-// reflect the given gas rate.
-func SubSecond(hooks hook.Points, hdr *types.Header, rate gas.Gas) gas.Gas {
+// SubSecond scales [time.Duration] to reflect the given gas rate.
+func SubSecond(subSec time.Duration, rate gas.Gas) gas.Gas { //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
 	// [hook.Points.SubSecondBlockTime] is required to return values in
 	// [0,second). The lower bound guarantees that the conversion to unsigned
 	// [gas.Gas] is safe while the upper bound guarantees that the mul-div
 	// result can't overflow so we don't have to check the error.
 	g, _, _ := intmath.MulDivCeil(
-		gas.Gas(hooks.SubSecondBlockTime(hdr)), //#nosec G115 -- See above
+		gas.Gas(subSec), //#nosec G115 -- See above
 		rate,
 		gas.Gas(time.Second),
 	)

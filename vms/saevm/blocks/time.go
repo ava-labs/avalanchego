@@ -34,6 +34,6 @@ func GasTime(hooks hook.Points, hdr, parent *types.Header) *proxytime.Time[gas.G
 	target, _ := hooks.GasConfigAfter(parent)
 	rate := gastime.SafeRateOfTarget(target)
 	tm := proxytime.New(hdr.Time, rate)
-	tm.Tick(gastime.SubSecond(hooks, hdr, rate))
+	tm.Tick(gastime.SubSecond(hooks.SubSecondBlockTime(hdr), rate))
 	return tm
 }

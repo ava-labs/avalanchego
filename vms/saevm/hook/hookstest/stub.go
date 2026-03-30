@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
@@ -82,16 +83,9 @@ func WithExecutionResultsDBFn(fn func(string) (saetypes.ExecutionResults, error)
 // NewStub returns a stub with defaults applied.
 // It uses [gastime.DefaultGasPriceConfig] unless overridden by [WithGasPriceConfig].
 func NewStub(target gas.Gas, opts ...HookOption) *Stub {
-	// defaultGasPriceConfig is the same as [gastime.DefaultGasPriceConfig]. It is defined
-	// here to avoid a circular dependency between [gastime] and [hookstest].
-	defaultGasPriceConfig := saetypes.GasPriceConfig{
-		TargetToExcessScaling: 87,
-		MinPrice:              1,
-		StaticPricing:         false,
-	}
 	return options.ApplyTo(&Stub{
 		Target:         target,
-		GasPriceConfig: defaultGasPriceConfig,
+		GasPriceConfig: gastime.DefaultGasPriceConfig(),
 	}, opts...)
 }
 

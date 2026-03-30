@@ -6,27 +6,26 @@ package gastime
 import (
 	"fmt"
 	"math"
-
-	"github.com/ava-labs/libevm/core/types"
+	"time"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // BeforeBlock is intended to be called before processing a block, with the
-// timestamp sourced from [hook.Points] and [types.Header].
-func (tm *Time) BeforeBlock(hooks hook.Points, h *types.Header) {
+// timestamp portions provided.
+func (tm *Time) BeforeBlock(sec uint64, subSec time.Duration) { //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
 	tm.FastForwardTo(
-		h.Time,
-		SubSecond(hooks, h, tm.Rate()),
+		sec,
+		SubSecond(subSec, tm.Rate()),
 	)
 }
 
 // AfterBlock is intended to be called after processing a block, with the
-// target and gas configuration sourced from [hook.Points] and [types.Header].
-func (tm *Time) AfterBlock(used gas.Gas, hooks hook.Points, h *types.Header) error {
+// target and gas configuration provided.
+func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, hookCfg saetypes.GasPriceConfig) error {
 	tm.Tick(used)
-	target, hookCfg := hooks.GasConfigAfter(h)
 	// Although [Time.SetTarget] scales the excess by the same factor as the
 	// change in target, it rounds when necessary, which might alter the price
 	// by a negligible amount. We therefore take a price snapshot beforehand
