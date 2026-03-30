@@ -36,7 +36,7 @@ for module_dir in "${BUILD_FILES_DIR}"/*/; do
   while IFS= read -r -d '' build_file; do
     rel_path="${build_file#"${module_dir}"}"
     # Generate a diff against /dev/null (new file)
-    file_lines=$(wc -l < "${build_file}")
+    file_lines=$(wc -l < "${build_file}" | tr -d ' ')
     patch_content+="diff --git a/${rel_path} b/${rel_path}
 new file mode 100644
 --- /dev/null

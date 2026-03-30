@@ -13,7 +13,6 @@ go_library(
         "metadata_delegator.go",
         "metadata_validator.go",
         "mock_chain.go",
-        "mock_diff.go",
         "staker.go",
         "staker_diff_iterator.go",
         "staker_status.go",
