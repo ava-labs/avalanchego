@@ -6,6 +6,7 @@ package hookstest
 
 import (
 	"context"
+	"fmt"
 	"iter"
 	"math/big"
 	"time"
@@ -149,8 +150,9 @@ func (*Stub) BuildBlock(
 	receipts []*types.Receipt,
 	ops []Op,
 	settledHeight uint64,
+	settledGasTime *gastime.Time,
 ) (*types.Block, error) {
-	return BuildBlock(header, blockCtx, txs, receipts, ops, settledHeight)
+	return BuildBlock(header, blockCtx, txs, receipts, ops, settledHeight, settledGasTime)
 }
 
 // BuildBlock encodes ops into [types.Header.Extra] and calls [types.NewBlock]
@@ -162,6 +164,7 @@ func BuildBlock(
 	receipts []*types.Receipt,
 	ops []Op,
 	settledHeight uint64,
+	settledGasTime *gastime.Time,
 ) (*types.Block, error) {
 	var e extra
 	// If the header originally had fractional seconds set, we keep them in the
@@ -171,7 +174,18 @@ func BuildBlock(
 	}
 
 	e.ops = ops
-	e.settledHeight = settledHeight
+	e.settled = settled{
+		height: settledHeight,
+	}
+	// avoid requiring non-nil gastime in tests for unrelated operations
+	if settledGasTime != nil {
+		// storing [gastime.Time] as a [time.Time] aids in reconstruction.
+		tm := settledGasTime.AsTime()
+		e.settled.seconds = tm.Unix()
+		e.settled.nanos = int64(tm.Nanosecond())
+		e.settled.excess = settledGasTime.Excess()
+	}
+
 	header.Extra = e.MarshalCanoto()
 	return types.NewBlock(header, txs, nil, receipts, saetest.TrieHasher()), nil
 }
@@ -208,7 +222,25 @@ func (*Stub) BlockTime(hdr *types.Header) time.Time {
 // SettledHeight returns the height encoded in the Header by [Stub.BuildBlock]
 // or [BuildBlock].
 func (*Stub) SettledHeight(hdr *types.Header) uint64 {
-	return getHeaderExtra(hdr).settledHeight
+	return getHeaderExtra(hdr).settled.height
+}
+
+// SettledGasTime returns the [gastime.Time] associated with the post-execution state
+// of `hdr`, provided by `settler`.
+func (s *Stub) SettledGasTime(hdr, settler *types.Header) (*gastime.Time, error) {
+	target, cfg := s.GasConfigAfter(hdr)
+
+	settled := getHeaderExtra(settler).settled
+	if settled.height != hdr.Number.Uint64() {
+		return nil, fmt.Errorf("block %d settles %d, not %d", hdr.Number.Uint64(), settled.height, hdr.Number.Uint64())
+	}
+
+	sec := settled.seconds
+	nanos := settled.nanos
+	excess := settled.excess
+
+	tm := time.Unix(sec, nanos)
+	return gastime.New(tm, target, excess, cfg)
 }
 
 // EndOfBlockOps return the ops included in the block by [BuildBlock].
@@ -254,11 +286,21 @@ func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) e
 
 //nolint:revive // struct-tag: canoto allows unexported fields
 type extra struct {
-	subSec        time.Duration `canoto:"int,1"` //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
-	ops           []Op          `canoto:"repeated value,2"`
-	settledHeight uint64        `canoto:"uint,3"`
+	subSec  time.Duration `canoto:"int,1"` //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
+	ops     []Op          `canoto:"repeated value,2"`
+	settled settled       `canoto:"value,3"`
 
 	canotoData canotoData_extra
+}
+
+//nolint:revive // struct-tag: canoto allows unexported fields
+type settled struct {
+	height  uint64  `canoto:"uint,1"`
+	seconds int64   `canoto:"int,2"`
+	nanos   int64   `canoto:"int,3"`
+	excess  gas.Gas `canoto:"uint,4"`
+
+	canotoData canotoData_settled
 }
 
 // Op is a serializable representation of [hook.Op].

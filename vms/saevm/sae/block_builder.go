@@ -317,6 +317,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		receipts,
 		includedOps,
 		lastSettled.NumberU64(),
+		lastSettled.ExecutedByGasTime(),
 	)
 	if err != nil {
 		return nil, err

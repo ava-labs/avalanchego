@@ -27,13 +27,13 @@ var (
 )
 
 const (
-	canoto__extra__subSec        = 1
-	canoto__extra__ops           = 2
-	canoto__extra__settledHeight = 3
+	canoto__extra__subSec  = 1
+	canoto__extra__ops     = 2
+	canoto__extra__settled = 3
 
-	canoto__extra__subSec__tag        = "\x08" // canoto.Tag(canoto__extra__subSec, canoto.Varint)
-	canoto__extra__ops__tag           = "\x12" // canoto.Tag(canoto__extra__ops, canoto.Len)
-	canoto__extra__settledHeight__tag = "\x18" // canoto.Tag(canoto__extra__settledHeight, canoto.Varint)
+	canoto__extra__subSec__tag  = "\x08" // canoto.Tag(canoto__extra__subSec, canoto.Varint)
+	canoto__extra__ops__tag     = "\x12" // canoto.Tag(canoto__extra__ops, canoto.Len)
+	canoto__extra__settled__tag = "\x1a" // canoto.Tag(canoto__extra__settled, canoto.Len)
 )
 
 type canotoData_extra struct {
@@ -63,12 +63,16 @@ func (*extra) CanotoSpec(types ...reflect.Type) *canoto.Spec {
 				/*Pointer:       */ false,
 				/*types:         */ types,
 			),
-			{
-				FieldNumber: canoto__extra__settledHeight,
-				Name:        "settledHeight",
-				OneOf:       "",
-				TypeUint:    canoto.SizeOf(zero.settledHeight),
-			},
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.settled),
+				/*FieldNumber:   */ canoto__extra__settled,
+				/*Name:          */ "settled",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
 		},
 	}
 	s.CalculateCanotoCache()
@@ -170,17 +174,30 @@ func (c *extra) UnmarshalCanotoFrom(r canoto.Reader) error {
 				}
 				r.B = remainingBytes
 			}
-		case canoto__extra__settledHeight:
-			if wireType != canoto.Varint {
+		case canoto__extra__settled:
+			if wireType != canoto.Len {
 				return canoto.ErrUnexpectedWireType
 			}
 
-			if err := canoto.ReadUint(&r, &c.settledHeight); err != nil {
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
 				return err
 			}
-			if canoto.IsZero(c.settledHeight) {
+			if len(msgBytes) == 0 {
 				return canoto.ErrZeroValue
 			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.settled).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
 		default:
 			return canoto.ErrUnknownField
 		}
@@ -206,6 +223,9 @@ func (c *extra) ValidCanoto() bool {
 			}
 		}
 	}
+	if !(&c.settled).ValidCanoto() {
+		return false
+	}
 	return true
 }
 
@@ -226,8 +246,9 @@ func (c *extra) CalculateCanotoCache() {
 			size += uint64(len(canoto__extra__ops__tag)) + canoto.SizeUint(fieldSize) + fieldSize
 		}
 	}
-	if !canoto.IsZero(c.settledHeight) {
-		size += uint64(len(canoto__extra__settledHeight__tag)) + canoto.SizeUint(c.settledHeight)
+	(&c.settled).CalculateCanotoCache()
+	if fieldSize := (&c.settled).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canoto__extra__settled__tag)) + canoto.SizeUint(fieldSize) + fieldSize
 	}
 	atomic.StoreUint64(&c.canotoData.size, size)
 }
@@ -279,9 +300,233 @@ func (c *extra) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 			w = (&field[i]).MarshalCanotoInto(w)
 		}
 	}
-	if !canoto.IsZero(c.settledHeight) {
-		canoto.Append(&w, canoto__extra__settledHeight__tag)
-		canoto.AppendUint(&w, c.settledHeight)
+	if fieldSize := (&c.settled).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canoto__extra__settled__tag)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.settled).MarshalCanotoInto(w)
+	}
+	return w
+}
+
+const (
+	canoto__settled__height  = 1
+	canoto__settled__seconds = 2
+	canoto__settled__nanos   = 3
+	canoto__settled__excess  = 4
+
+	canoto__settled__height__tag  = "\x08" // canoto.Tag(canoto__settled__height, canoto.Varint)
+	canoto__settled__seconds__tag = "\x10" // canoto.Tag(canoto__settled__seconds, canoto.Varint)
+	canoto__settled__nanos__tag   = "\x18" // canoto.Tag(canoto__settled__nanos, canoto.Varint)
+	canoto__settled__excess__tag  = "\x20" // canoto.Tag(canoto__settled__excess, canoto.Varint)
+)
+
+type canotoData_settled struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*settled) CanotoSpec(...reflect.Type) *canoto.Spec {
+	var zero settled
+	s := &canoto.Spec{
+		Name: "settled",
+		Fields: []canoto.FieldType{
+			{
+				FieldNumber: canoto__settled__height,
+				Name:        "height",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.height),
+			},
+			{
+				FieldNumber: canoto__settled__seconds,
+				Name:        "seconds",
+				OneOf:       "",
+				TypeInt:     canoto.SizeOf(zero.seconds),
+			},
+			{
+				FieldNumber: canoto__settled__nanos,
+				Name:        "nanos",
+				OneOf:       "",
+				TypeInt:     canoto.SizeOf(zero.nanos),
+			},
+			{
+				FieldNumber: canoto__settled__excess,
+				Name:        "excess",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.excess),
+			},
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *settled) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *settled) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = settled{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canoto__settled__height:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.height); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.height) {
+				return canoto.ErrZeroValue
+			}
+		case canoto__settled__seconds:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadInt(&r, &c.seconds); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.seconds) {
+				return canoto.ErrZeroValue
+			}
+		case canoto__settled__nanos:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadInt(&r, &c.nanos); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.nanos) {
+				return canoto.ErrZeroValue
+			}
+		case canoto__settled__excess:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.excess); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.excess) {
+				return canoto.ErrZeroValue
+			}
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *settled) ValidCanoto() bool {
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *settled) CalculateCanotoCache() {
+	var size uint64
+	if !canoto.IsZero(c.height) {
+		size += uint64(len(canoto__settled__height__tag)) + canoto.SizeUint(c.height)
+	}
+	if !canoto.IsZero(c.seconds) {
+		size += uint64(len(canoto__settled__seconds__tag)) + canoto.SizeInt(c.seconds)
+	}
+	if !canoto.IsZero(c.nanos) {
+		size += uint64(len(canoto__settled__nanos__tag)) + canoto.SizeInt(c.nanos)
+	}
+	if !canoto.IsZero(c.excess) {
+		size += uint64(len(canoto__settled__excess__tag)) + canoto.SizeUint(c.excess)
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *settled) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *settled) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *settled) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if !canoto.IsZero(c.height) {
+		canoto.Append(&w, canoto__settled__height__tag)
+		canoto.AppendUint(&w, c.height)
+	}
+	if !canoto.IsZero(c.seconds) {
+		canoto.Append(&w, canoto__settled__seconds__tag)
+		canoto.AppendInt(&w, c.seconds)
+	}
+	if !canoto.IsZero(c.nanos) {
+		canoto.Append(&w, canoto__settled__nanos__tag)
+		canoto.AppendInt(&w, c.nanos)
+	}
+	if !canoto.IsZero(c.excess) {
+		canoto.Append(&w, canoto__settled__excess__tag)
+		canoto.AppendUint(&w, c.excess)
 	}
 	return w
 }

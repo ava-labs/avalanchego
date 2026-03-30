@@ -69,6 +69,9 @@ type Points interface {
 	// with as the post-execution state root. It MUST match the value passed to
 	// [BlockBuilder.BuildBlock], from which the [types.Header] will be sourced.
 	SettledHeight(*types.Header) uint64
+	// SettledGasTime recreates the [gastime.Time] after `settled` was executed,
+	// using data available in `settler`, the block that settled `settled`.
+	SettledGasTime(settled, settler *types.Header) (*gastime.Time, error)
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
 	// These operations will be performed during both worst-case and actual
@@ -111,7 +114,8 @@ type BlockBuilder[T Transaction] interface {
 		lastSettledBlock common.Hash,
 		source saetypes.BlockSource,
 	) iter.Seq[T]
-	// BuildBlock constructs a block with the given components.
+	// BuildBlock constructs a block with the given components. The header
+	// may be modified, but all other arguments are read-only.
 	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
@@ -122,6 +126,7 @@ type BlockBuilder[T Transaction] interface {
 		receipts []*types.Receipt,
 		endOfBlockOps []T,
 		settledHeight uint64,
+		settledGasTime *gastime.Time,
 	) (*types.Block, error)
 }
 
