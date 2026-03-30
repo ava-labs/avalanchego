@@ -26,6 +26,7 @@ func NewProgressSubscription[T cmp.Ordered](initialProgress T) *ProgressSubscrip
 
 // SetProgress updates the progress of this ProgressSubscription to the given value.
 // This will unblock any calls to WaitForProgress that are waiting for a progress value above the given value.
+// It is assumed that progress values are monotonically increasing.
 func (ps *ProgressSubscription[T]) SetProgress(progress T) {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
