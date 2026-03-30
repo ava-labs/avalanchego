@@ -60,11 +60,13 @@ type TrieDB interface {
 }
 
 func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
-	// Firewood should only be used in pruning mode, but we shouldn't explicitly manage this.
 	switch {
 	case config.StateScheme == rawdb.PathScheme:
+		// PathDB tracks recent all states implicitly, and should not ever be committed explicitly.
+		// Journaling happens at blockchain shutdown.
 		return noopWriter{}
 	case config.StateScheme == customrawdb.FirewoodScheme || !config.Pruning:
+		// Firewood tracks recent states via config, so tip buffer is not needed in pruning mode.
 		return &noPruningTrieWriter{
 			TrieDB: db,
 		}
