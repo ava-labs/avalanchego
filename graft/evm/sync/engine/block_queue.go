@@ -111,22 +111,30 @@ func (q *blockQueue) forget(ops []blockOperation) {
 	}
 }
 
-// removeBelowHeight removes all queued blocks with height < targetHeight.
-// This is called after UpdateSyncTarget to remove blocks that will never be executed
-// because the sync target has advanced past them.
+// removeBelowHeight drops blocks with height < targetHeight.
+// Called during pivots, keeps the target block for slow-syncer gap-fill.
 func (q *blockQueue) removeBelowHeight(targetHeight uint64) {
+	q.remove(func(height uint64) bool { return height >= targetHeight })
+}
+
+// removeThroughHeight drops blocks with height <= targetHeight.
+// Called before batch replay because the commit-target block is already applied by FinalizeVM.
+func (q *blockQueue) removeThroughHeight(targetHeight uint64) {
+	q.remove(func(height uint64) bool { return height > targetHeight })
+}
+
+// remove drops queued blocks for which keep(height) returns false.
+func (q *blockQueue) remove(keep func(height uint64) bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	filtered := q.items[:0]
 	for _, op := range q.items {
 		ethBlock := op.block.GetEthBlock()
-		// Keep the pivot block itself (height == targetHeight). Only drop blocks strictly below the new target.
-		if ethBlock != nil && ethBlock.NumberU64() >= targetHeight {
+		if ethBlock != nil && keep(ethBlock.NumberU64()) {
 			filtered = append(filtered, op)
 			continue
 		}
-		// This op is being dropped; clear dedupe marker so Verify can be re-queued if needed.
 		if ethBlock != nil {
 			q.verifyDedupe.unmarkQueued(op.operation, ethBlock.Hash())
 		}

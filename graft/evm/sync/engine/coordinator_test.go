@@ -47,21 +47,6 @@ func TestCoordinator_StateValidation(t *testing.T) {
 	require.False(t, co.AddBlockOperation(nil, OpAccept))
 }
 
-func TestCoordinator_UpdateSyncTarget_RemovesStaleBlocks(t *testing.T) {
-	co := NewCoordinator(NewSyncerRegistry(), Callbacks{}, WithPivotInterval(1))
-	co.state.Store(int32(StateRunning))
-
-	for i := uint64(100); i <= 110; i++ {
-		co.AddBlockOperation(newMockBlock(i), OpAccept)
-	}
-
-	require.NoError(t, co.UpdateSyncTarget(newTestSyncTarget(105)))
-	require.Equal(t, uint64(1), co.targetEpoch.Load())
-
-	batch := co.queue.dequeueBatch()
-	require.Len(t, batch, 6) // Only 105-110 remain (keep pivot block).
-}
-
 func TestCoordinator_UpdateSyncTarget_SerializesConcurrentCalls(t *testing.T) {
 	var (
 		inUpdate   atomic.Int32
@@ -130,31 +115,6 @@ func TestCoordinator_Lifecycle(t *testing.T) {
 	})
 }
 
-func TestCoordinator_Start_ReplaysDeferredOperationsAfterFinalize(t *testing.T) {
-	var started sync.WaitGroup
-	started.Add(1)
-	release := make(chan struct{})
-
-	registry := NewSyncerRegistry()
-	require.NoError(t, registry.Register(NewBarrierSyncer("barrier", &started, release)))
-
-	done := make(chan error, 1)
-	co := NewCoordinator(registry, Callbacks{
-		FinalizeVM: func(context.Context, message.Syncable) error { return nil },
-		OnDone:     func(err error) { done <- err },
-	}, WithPivotInterval(1))
-	co.Start(t.Context(), newTestSyncTarget(100))
-
-	started.Wait()
-	block := newMockBlock(100)
-	require.True(t, co.AddBlockOperation(block, OpAccept))
-
-	close(release)
-	require.NoError(t, <-done)
-	require.Equal(t, StateCompleted, co.CurrentState())
-	require.Equal(t, 1, block.acceptCount)
-}
-
 func TestCoordinator_Finish_DoesNotOverwriteAbortedState(t *testing.T) {
 	co := NewCoordinator(NewSyncerRegistry(), Callbacks{})
 	co.state.Store(int32(StateRunning))
@@ -171,7 +131,7 @@ func TestCoordinator_ProcessQueuedBlockOperations(t *testing.T) {
 		co := NewCoordinator(NewSyncerRegistry(), Callbacks{})
 		co.state.Store(int32(StateRunning))
 		co.setCommitTarget(newTestSyncTarget(100))
-		co.AddBlockOperation(newMockBlock(100), OpAccept)
+		co.AddBlockOperation(newMockBlock(101), OpAccept)
 
 		require.NoError(t, co.ProcessQueuedBlockOperations(t.Context()))
 		require.Equal(t, StateExecutingBatch, co.CurrentState())
@@ -182,7 +142,7 @@ func TestCoordinator_ProcessQueuedBlockOperations(t *testing.T) {
 		co.state.Store(int32(StateRunning))
 		co.setCommitTarget(newTestSyncTarget(100))
 
-		failBlock := newMockBlock(100)
+		failBlock := newMockBlock(101)
 		failBlock.acceptErr = errors.New("accept failed")
 		co.AddBlockOperation(failBlock, OpAccept)
 
@@ -258,7 +218,7 @@ func TestCoordinator_PivotCycleBlockReplay(t *testing.T) {
 			blockHi:         510,
 			pivots:          []uint64{505},
 			wantFinalHeight: 505,
-			wantReplayedLo:  500, // slow syncer prevents pruning below 500
+			wantReplayedLo:  506, // slow syncer preserves blocks during pivots, but commit-target (505) is pruned before replay
 			wantReplayedHi:  510,
 		},
 		{
@@ -268,7 +228,7 @@ func TestCoordinator_PivotCycleBlockReplay(t *testing.T) {
 			blockHi:         200,
 			pivots:          []uint64{150, 180},
 			wantFinalHeight: 180,
-			wantReplayedLo:  180,
+			wantReplayedLo:  181, // commit-target block (180) is pruned before replay (handled by FinalizeVM)
 			wantReplayedHi:  200,
 		},
 	}
@@ -362,7 +322,7 @@ func TestCoordinator_UpdateTargetFailureAborts(t *testing.T) {
 	// because abort cancels the coordinator context.
 	close(release)
 	err = <-done
-	require.Error(t, err)
+	require.ErrorIs(t, err, wantErr)
 
 	// FinalizeVM should NOT have been called since the coordinator aborted.
 	require.False(t, calledFinalize, "FinalizeVM should not be called after abort")

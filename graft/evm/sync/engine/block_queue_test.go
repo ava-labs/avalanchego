@@ -32,7 +32,7 @@ func TestBlockQueue_EnqueueAndDequeue(t *testing.T) {
 	require.Empty(t, q.dequeueBatch())
 }
 
-func TestBlockQueue_RemoveBelowHeight(t *testing.T) {
+func TestBlockQueue_RemoveThroughHeight(t *testing.T) {
 	q := newBlockQueue()
 
 	// Enqueue blocks at heights 100-110.
@@ -40,13 +40,13 @@ func TestBlockQueue_RemoveBelowHeight(t *testing.T) {
 		q.enqueue(newMockBlock(i), OpAccept)
 	}
 
-	// Remove blocks strictly below height 105.
-	q.removeBelowHeight(105)
+	// Remove blocks at or below height 105 (commit-target block included).
+	q.removeThroughHeight(105)
 
-	// Only blocks >= 105 should remain (105, 106, 107, 108, 109, 110).
+	// Only blocks strictly above 105 should remain (106, 107, 108, 109, 110).
 	batch := q.dequeueBatch()
-	require.Len(t, batch, 6)
-	require.Equal(t, uint64(105), batch[0].block.GetEthBlock().NumberU64())
+	require.Len(t, batch, 5)
+	require.Equal(t, uint64(106), batch[0].block.GetEthBlock().NumberU64())
 }
 
 func TestBlockQueue_OperationDedupSemantics(t *testing.T) {

@@ -25,9 +25,8 @@ var (
 )
 
 type FirewoodSyncer struct {
-	s         *merklesync.Syncer[*syncer.RangeProof, struct{}]
-	cancel    context.CancelFunc
-	codeQueue types.CodeRequestQueue
+	s      *merklesync.Syncer[*syncer.RangeProof, struct{}]
+	cancel context.CancelFunc
 
 	// finalizeCodeQueue guards the single call to codeQueue.Finalize().
 	// Both Sync() (on success) and Finalize() (best-effort cleanup) go through
@@ -50,7 +49,6 @@ func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Has
 	f := &FirewoodSyncer{
 		s:                 s,
 		cancel:            func() {}, // overwritten in Sync
-		codeQueue:         codeQueue,
 		finalizeCodeQueue: sync.OnceValue(codeQueue.Finalize),
 	}
 	return f, nil

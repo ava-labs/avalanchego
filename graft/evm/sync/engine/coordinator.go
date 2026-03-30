@@ -233,6 +233,9 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 		return errInvalidState
 	}
 
+	// Drop blocks <= commit target. FinalizeVM already applied that block.
+	co.queue.removeThroughHeight(target.Height())
+
 	// Drain the queue in batches. Enqueues are allowed during batch execution. Any
 	// operations arriving mid-batch will be picked up by a subsequent iteration.
 	for {

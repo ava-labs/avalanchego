@@ -132,9 +132,10 @@ func TestDynamicExecutor_FullPivotCycleWithBlockAcceptance(t *testing.T) {
 	require.Equal(t, StateCompleted, executor.CurrentState())
 
 	// Each pivot pruned blocks below the new target. With pivotInterval=1,
-	// only the last block (110) survives.
-	requireBlocksNotReplayed(t, blocks, 100, 109)
-	requireBlocksReplayed(t, blocks, 110, 110)
+	// the commit target advances to 110. All blocks <= 110 are pruned before
+	// batch replay: blocks < 110 by pivot-time pruning, block 110 (the commit
+	// target) by the pre-replay removeThroughHeight since FinalizeVM handles it.
+	requireBlocksNotReplayed(t, blocks, 100, 110)
 }
 
 func TestDynamicExecutor_OnBlockRejectedAndVerified(t *testing.T) {
