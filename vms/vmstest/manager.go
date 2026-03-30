@@ -18,27 +18,27 @@ var _ vms.Manager = (*Manager)(nil)
 type Manager struct {
 	T *testing.T
 
-	CantLookup              bool
-	CantPrimaryAlias        bool
+	CantLookup                bool
+	CantPrimaryAlias          bool
 	CantPrimaryAliasOrDefault bool
-	CantAliases             bool
-	CantAlias               bool
-	CantRemoveAliases       bool
-	CantGetFactory          bool
-	CantRegisterFactory     bool
-	CantListFactories       bool
-	CantVersions            bool
+	CantAliases               bool
+	CantAlias                 bool
+	CantRemoveAliases         bool
+	CantGetFactory            bool
+	CantRegisterFactory       bool
+	CantListFactories         bool
+	CantVersions              bool
 
-	LookupF              func(alias string) (ids.ID, error)
-	PrimaryAliasF        func(id ids.ID) (string, error)
+	LookupF                func(alias string) (ids.ID, error)
+	PrimaryAliasF          func(id ids.ID) (string, error)
 	PrimaryAliasOrDefaultF func(id ids.ID) string
-	AliasesF             func(id ids.ID) ([]string, error)
-	AliasF               func(id ids.ID, alias string) error
-	RemoveAliasesF       func(id ids.ID)
-	GetFactoryF          func(vmID ids.ID) (vms.Factory, error)
-	RegisterFactoryF     func(ctx context.Context, vmID ids.ID, factory vms.Factory) error
-	ListFactoriesF       func() ([]ids.ID, error)
-	VersionsF            func() (map[string]string, error)
+	AliasesF               func(id ids.ID) ([]string, error)
+	AliasF                 func(id ids.ID, alias string) error
+	RemoveAliasesF         func(id ids.ID)
+	GetFactoryF            func(vmID ids.ID) (vms.Factory, error)
+	RegisterFactoryF       func(ctx context.Context, vmID ids.ID, factory vms.Factory) error
+	ListFactoriesF         func() ([]ids.ID, error)
+	VersionsF              func() (map[string]string, error)
 }
 
 func (m *Manager) Lookup(alias string) (ids.ID, error) {
