@@ -1792,15 +1792,11 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					require.ErrorIs(t, err, database.ErrNotFound)
 				}
 
-				for i, expectedOut := range tx.Outs {
-					utxoID := avax.UTXOID{
-						TxID:        sTx.ID(),
-						OutputIndex: uint32(i),
-					}
-					utxo, err := state.GetUTXO(utxoID.InputID())
+				for _, expectedOut := range sTx.UTXOs() {
+					utxo, err := state.GetUTXO(expectedOut.InputID())
 					require.NoError(t, err)
 
-					require.Equal(t, expectedOut.Out, utxo.Out.(avax.TransferableOut))
+					require.Equal(t, expectedOut.Out, utxo.Out)
 				}
 			},
 			expectedErr: nil,
@@ -2342,15 +2338,11 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				}
 
 				// assert the utxos outputs were created
-				for i, expectedOut := range tx.Outs {
-					utxoID := avax.UTXOID{
-						TxID:        stx.ID(),
-						OutputIndex: uint32(i),
-					}
-					utxo, err := state.GetUTXO(utxoID.InputID())
+				for _, expectedOut := range stx.UTXOs() {
+					utxo, err := state.GetUTXO(expectedOut.InputID())
 					require.NoError(t, err)
 
-					require.Equal(t, expectedOut.Out, utxo.Out.(avax.TransferableOut))
+					require.Equal(t, expectedOut.Out, utxo.Out)
 				}
 			},
 			err: nil,
