@@ -434,22 +434,24 @@ func (nop *noOpAllGetsServer) GetAccepted(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (nop *noOpAllGetsServer) GetAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, _ ids.ID) error {
+func (nop *noOpAllGetsServer) GetAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetAncestorsOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
+		zap.Stringer("containerID", containerID),
 	)
 	return nil
 }
 
-func (nop *noOpAllGetsServer) Get(_ context.Context, nodeID ids.NodeID, requestID uint32, _ ids.ID) error {
+func (nop *noOpAllGetsServer) Get(_ context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
+		zap.Stringer("containerID", containerID),
 	)
 	return nil
 }
