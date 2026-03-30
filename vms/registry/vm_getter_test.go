@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/vmsmock"
+	"github.com/ava-labs/avalanchego/vms/vmstest"
 )
 
 var (
@@ -80,7 +81,9 @@ func TestGet_InvalidVMName(t *testing.T) {
 
 	resources.mockReader.EXPECT().ReadDir(pluginDir).Times(1).Return(invalidVMs, nil)
 	// didn't find an alias, so we'll try using this invalid vm name
-	resources.mockManager.EXPECT().Lookup("invalid-vm").Times(1).Return(ids.Empty, errTest)
+	resources.mockManager.LookupF = func(alias string) (ids.ID, error) {
+		return ids.Empty, errTest
+	}
 
 	_, _, err := resources.getter.Get()
 	require.ErrorIs(t, err, errInvalidVMID)
@@ -93,9 +96,12 @@ func TestGet_GetFactoryFails(t *testing.T) {
 	vm, _ := ids.FromString("vmId")
 
 	resources.mockReader.EXPECT().ReadDir(pluginDir).Times(1).Return(oneValidVM, nil)
-	resources.mockManager.EXPECT().Lookup(registeredVMName).Times(1).Return(vm, nil)
-	// Getting the factory fails
-	resources.mockManager.EXPECT().GetFactory(vm).Times(1).Return(nil, errTest)
+	resources.mockManager.LookupF = func(alias string) (ids.ID, error) {
+		return vm, nil
+	}
+	resources.mockManager.GetFactoryF = func(vmID ids.ID) (vms.Factory, error) {
+		return nil, errTest
+	}
 
 	_, _, err := resources.getter.Get()
 	require.ErrorIs(t, err, errTest)
@@ -113,10 +119,26 @@ func TestGet_Success(t *testing.T) {
 	registeredVMFactory := vmsmock.NewFactory(resources.ctrl)
 
 	resources.mockReader.EXPECT().ReadDir(pluginDir).Times(1).Return(twoValidVMs, nil)
-	resources.mockManager.EXPECT().Lookup(registeredVMName).Times(1).Return(registeredVMId, nil)
-	resources.mockManager.EXPECT().GetFactory(registeredVMId).Times(1).Return(registeredVMFactory, nil)
-	resources.mockManager.EXPECT().Lookup(unregisteredVMName).Times(1).Return(unregisteredVMId, nil)
-	resources.mockManager.EXPECT().GetFactory(unregisteredVMId).Times(1).Return(nil, vms.ErrNotFound)
+	resources.mockManager.LookupF = func(alias string) (ids.ID, error) {
+		switch alias {
+		case registeredVMName:
+			return registeredVMId, nil
+		case unregisteredVMName:
+			return unregisteredVMId, nil
+		default:
+			return ids.Empty, errTest
+		}
+	}
+	resources.mockManager.GetFactoryF = func(vmID ids.ID) (vms.Factory, error) {
+		switch vmID {
+		case registeredVMId:
+			return registeredVMFactory, nil
+		case unregisteredVMId:
+			return nil, vms.ErrNotFound
+		default:
+			return nil, errTest
+		}
+	}
 
 	registeredVMs, unregisteredVMs, err := resources.getter.Get()
 
@@ -133,7 +155,7 @@ func TestGet_Success(t *testing.T) {
 type vmGetterTestResources struct {
 	ctrl        *gomock.Controller
 	mockReader  *filesystemmock.Reader
-	mockManager *vmsmock.Manager
+	mockManager *vmstest.Manager
 	getter      VMGetter
 }
 
@@ -141,7 +163,7 @@ func initVMGetterTest(t *testing.T) *vmGetterTestResources {
 	ctrl := gomock.NewController(t)
 
 	mockReader := filesystemmock.NewReader(ctrl)
-	mockManager := vmsmock.NewManager(ctrl)
+	mockManager := &vmstest.Manager{}
 	mockRegistry := prometheus.NewRegistry()
 	mockCPUTracker, err := resource.NewManager(
 		logging.NoLog{},

@@ -8,23 +8,21 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/vmsmock"
+	"github.com/ava-labs/avalanchego/vms/vmstest"
 )
 
 var errTest = errors.New("non-nil error")
 
 type getVMsTest struct {
 	info          *Info
-	mockVMManager *vmsmock.Manager
+	mockVMManager *vmstest.Manager
 }
 
 func initGetVMsTest(t *testing.T) *getVMsTest {
-	ctrl := gomock.NewController(t)
-	mockVMManager := vmsmock.NewManager(ctrl)
+	mockVMManager := &vmstest.Manager{}
 	return &getVMsTest{
 		info: &Info{
 			Parameters: Parameters{
@@ -55,9 +53,19 @@ func TestGetVMsSuccess(t *testing.T) {
 		id2: alias2[1:],
 	}
 
-	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
-	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
+	resources.mockVMManager.ListFactoriesF = func() ([]ids.ID, error) {
+		return vmIDs, nil
+	}
+	resources.mockVMManager.AliasesF = func(id ids.ID) ([]string, error) {
+		switch id {
+		case id1:
+			return alias1, nil
+		case id2:
+			return alias2, nil
+		default:
+			return nil, errTest
+		}
+	}
 
 	reply := GetVMsReply{}
 	require.NoError(resources.info.GetVMs(nil, nil, &reply))
@@ -68,7 +76,9 @@ func TestGetVMsSuccess(t *testing.T) {
 func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 	resources := initGetVMsTest(t)
 
-	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errTest)
+	resources.mockVMManager.ListFactoriesF = func() ([]ids.ID, error) {
+		return nil, errTest
+	}
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
@@ -84,9 +94,19 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 	vmIDs := []ids.ID{id1, id2}
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
-	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
-	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)
+	resources.mockVMManager.ListFactoriesF = func() ([]ids.ID, error) {
+		return vmIDs, nil
+	}
+	resources.mockVMManager.AliasesF = func(id ids.ID) ([]string, error) {
+		switch id {
+		case id1:
+			return alias1, nil
+		case id2:
+			return nil, errTest
+		default:
+			return nil, errTest
+		}
+	}
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)

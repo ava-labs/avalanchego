@@ -4,6 +4,7 @@
 package registry
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/registry/registrymock"
 	"github.com/ava-labs/avalanchego/vms/vmsmock"
+	"github.com/ava-labs/avalanchego/vms/vmstest"
 )
 
 var (
@@ -47,14 +49,9 @@ func TestReload_Success(t *testing.T) {
 		Get().
 		Times(1).
 		Return(registeredVms, unregisteredVms, nil)
-	resources.mockVMManager.EXPECT().
-		RegisterFactory(gomock.Any(), id3, factory3).
-		Times(1).
-		Return(nil)
-	resources.mockVMManager.EXPECT().
-		RegisterFactory(gomock.Any(), id4, factory4).
-		Times(1).
-		Return(nil)
+	resources.mockVMManager.RegisterFactoryF = func(_ context.Context, _ ids.ID, _ vms.Factory) error {
+		return nil
+	}
 
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload(t.Context())
 	require.NoError(err)
@@ -101,14 +98,12 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 		Get().
 		Times(1).
 		Return(registeredVms, unregisteredVms, nil)
-	resources.mockVMManager.EXPECT().
-		RegisterFactory(gomock.Any(), id3, factory3).
-		Times(1).
-		Return(errTest)
-	resources.mockVMManager.EXPECT().
-		RegisterFactory(gomock.Any(), id4, factory4).
-		Times(1).
-		Return(nil)
+	resources.mockVMManager.RegisterFactoryF = func(_ context.Context, vmID ids.ID, _ vms.Factory) error {
+		if vmID == id3 {
+			return errTest
+		}
+		return nil
+	}
 
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload(t.Context())
 	require.NoError(err)
@@ -121,7 +116,7 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 type registryTestResources struct {
 	ctrl          *gomock.Controller
 	mockVMGetter  *registrymock.VMGetter
-	mockVMManager *vmsmock.Manager
+	mockVMManager *vmstest.Manager
 	vmRegistry    VMRegistry
 }
 
@@ -129,7 +124,7 @@ func initVMRegistryTest(t *testing.T) *registryTestResources {
 	ctrl := gomock.NewController(t)
 
 	mockVMGetter := registrymock.NewVMGetter(ctrl)
-	mockVMManager := vmsmock.NewManager(ctrl)
+	mockVMManager := &vmstest.Manager{}
 
 	vmRegistry := NewVMRegistry(
 		VMRegistryConfig{
