@@ -55,6 +55,12 @@ func callDataWithAddr(sig string, addr common.Address) []byte {
 	)
 }
 
+// CallDataToWithdraw returns the transaction call data to withdraw the
+// caller's escrowed balance.
+func CallDataToWithdraw() []byte {
+	return crypto.Keccak256([]byte("withdraw()"))[:4]
+}
+
 // DepositEvent returns the [types.Log] emitted by a successful transaction with
 // [CallDataToDeposit] data.
 func DepositEvent(recipient common.Address, amount *uint256.Int) *types.Log {

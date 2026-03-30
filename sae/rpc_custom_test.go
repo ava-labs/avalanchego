@@ -4,20 +4,28 @@
 package sae
 
 import (
+	"fmt"
 	"math/big"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/libevm/ethapi"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/strevm/cmputils"
 	saerpc "github.com/ava-labs/strevm/sae/rpc"
 	"github.com/ava-labs/strevm/saetest"
+	"github.com/ava-labs/strevm/saetest/escrow"
 )
 
 func TestGetChainConfig(t *testing.T) {
@@ -97,4 +105,154 @@ func TestNewAcceptedTransactions(t *testing.T) {
 			t.Errorf("full tx diff (-want +got):\n%s", diff)
 		}
 	})
+}
+
+func TestCallDetailed(t *testing.T) {
+	echoReverter := common.Address{'e', 'c', 'h', 'o'}
+	invalidJumper := common.Address{'i', 'n', 'v', 'a', 'l', 'i', 'd'}
+	const gasCap = 100e6
+	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.RPCConfig.GasCap = gasCap
+
+		const (
+			size   = byte(vm.CALLDATASIZE)
+			cp     = byte(vm.CALLDATACOPY)
+			zero   = byte(vm.PUSH0)
+			revert = byte(vm.REVERT)
+			jump   = byte(vm.JUMP)
+		)
+		c.genesis.Alloc[echoReverter] = types.Account{
+			Code: []byte{
+				size, zero, zero, cp, // https://www.evm.codes/#37
+				size, zero, revert,
+			},
+			Balance: new(big.Int),
+		}
+		c.genesis.Alloc[invalidJumper] = types.Account{
+			// Jumping back to PC=0 is invalid because it's not a [vm.JUMPDEST]
+			Code:    []byte{zero, jump},
+			Balance: new(big.Int),
+		}
+	}))
+
+	deploy := &types.LegacyTx{
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+		Data:     escrow.CreationCode(),
+	}
+
+	escrowAddr := crypto.CreateAddress(sut.wallet.Addresses()[0], 0)
+	recv := common.Address{'r', 'e', 'c', 'v'}
+	const depositVal = 42
+	deposit := &types.LegacyTx{
+		To:       &escrowAddr,
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+		Data:     escrow.CallDataToDeposit(recv),
+		Value:    big.NewInt(depositVal),
+	}
+
+	sign := sut.wallet.SetNonceAndSign
+	b := sut.runConsensusLoop(t, sign(t, 0, deploy), sign(t, 0, deposit))
+	require.Len(t, b.Transactions(), 2, "tx count")
+	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+	for _, r := range b.Receipts() {
+		require.Equalf(t, types.ReceiptStatusSuccessful, r.Status, "%T.Status", r)
+	}
+
+	const revertWith = 12345
+	revertAsPanic := slices.Concat(
+		crypto.Keccak256([]byte("Panic(uint256)"))[:4],
+		uint256.NewInt(revertWith).PaddedBytes(32),
+	)
+
+	noBalance := common.Address{'b', 'a', 'n', 'k', 'r', 'u', 'p', 't'}
+	latest := rpc.LatestBlockNumber.String()
+
+	// revertErrCode is the JSON-RPC error code for execution reverts, matching the
+	// value returned by [ethapi.RevertError.ErrorCode].
+	const revertErrCode = 3
+
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_callDetailed",
+			args: []any{
+				map[string]any{
+					"to":   escrowAddr,
+					"data": hexutil.Encode(escrow.CallDataForBalance(recv)),
+				},
+				latest,
+			},
+			want: saerpc.DetailedExecutionResult{
+				UsedGas:    23675,
+				ReturnData: uint256.NewInt(depositVal).PaddedBytes(32),
+			},
+		},
+		{
+			method: "eth_callDetailed",
+			args: []any{
+				map[string]any{
+					"to":   escrowAddr,
+					"from": noBalance,
+					"data": hexutil.Encode(escrow.CallDataToWithdraw()),
+				},
+				latest,
+			},
+			want: saerpc.DetailedExecutionResult{
+				UsedGas: 23451,
+				ErrCode: revertErrCode,
+				Err:     vm.ErrExecutionReverted.Error(),
+				ReturnData: slices.Concat(
+					crypto.Keccak256([]byte("ZeroBalance(address)"))[:4],
+					make([]byte, common.HashLength-common.AddressLength),
+					noBalance.Bytes(),
+				),
+			},
+		},
+		{
+			method: "eth_callDetailed",
+			args: []any{
+				map[string]any{
+					"to":   echoReverter,
+					"data": hexutil.Bytes{42},
+				},
+				latest,
+			},
+			want: saerpc.DetailedExecutionResult{
+				UsedGas:    21035,
+				ErrCode:    revertErrCode,
+				Err:        vm.ErrExecutionReverted.Error(),
+				ReturnData: hexutil.Bytes{42},
+			},
+		},
+		{
+			method: "eth_callDetailed",
+			args: []any{
+				map[string]any{
+					"to":   echoReverter,
+					"data": hexutil.Bytes(revertAsPanic),
+				},
+				latest,
+			},
+			want: saerpc.DetailedExecutionResult{
+				UsedGas:    21241,
+				ErrCode:    revertErrCode,
+				Err:        fmt.Sprintf("%v: unknown panic code: %#x", vm.ErrExecutionReverted, revertWith),
+				ReturnData: hexutil.Bytes(revertAsPanic),
+			},
+		},
+		{
+			method: "eth_callDetailed",
+			args: []any{
+				map[string]any{
+					"to": invalidJumper,
+				},
+				latest,
+			},
+			want: saerpc.DetailedExecutionResult{
+				UsedGas: gasCap,
+				Err:     vm.ErrInvalidJump.Error(),
+			},
+		},
+	}...)
 }

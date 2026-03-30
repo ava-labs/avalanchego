@@ -5,10 +5,13 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"math/big"
+	"slices"
 
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
@@ -58,8 +61,25 @@ type DetailedExecutionResult struct {
 
 // CallDetailed performs the same call as eth_call, but returns gas usage and
 // error details instead of just the return data.
-func (c *customAPI) CallDetailed(ctx context.Context, args any, blockNrOrHash rpc.BlockNumberOrHash, overrides any) (*DetailedExecutionResult, error) {
-	panic(errUnimplemented)
+func (c *customAPI) CallDetailed(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *ethapi.StateOverride) (*DetailedExecutionResult, error) {
+	result, err := ethapi.DoCall(ctx, c.b, args, blockNrOrHash, overrides, nil, c.b.RPCEVMTimeout(), c.b.RPCGasCap())
+	if err != nil {
+		return nil, err
+	}
+	reply := &DetailedExecutionResult{
+		UsedGas:    result.UsedGas,
+		ReturnData: result.ReturnData,
+	}
+	// Revert data is checked first because [ethapi.NewRevertError] ABI-decodes
+	// the reason, which we provide.
+	if errors.Is(result.Err, vm.ErrExecutionReverted) {
+		e := ethapi.NewRevertError(slices.Clone(result.ReturnData))
+		reply.Err = e.Error()
+		reply.ErrCode = e.ErrorCode()
+	} else if result.Err != nil {
+		reply.Err = result.Err.Error()
+	}
+	return reply, nil
 }
 
 // Price represents a single gas-Price suggestion.
