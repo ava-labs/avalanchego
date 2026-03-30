@@ -21,4 +21,4 @@ runs:
     - uses: ./.github/actions/install-nix
     - name: Run Bazel task
       shell: bash
-      run: nix develop --command ./scripts/run_task.sh ${{ inputs.task }}
+      run: nix develop --command task ${{ inputs.task }}

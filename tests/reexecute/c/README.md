@@ -13,7 +13,8 @@ Configuring your AvalancheGo dev environment requires:
 - Prometheus Credentials
 
 ### Nix Shell
-To install Nix, refer to the AvalancheGo [flake.nix](../../../flake.nix) file for installation instructions.
+For Nix installation and repo dev shell setup, see
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#nix).
 
 To set up your shell environment, run:
 
