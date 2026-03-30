@@ -26,6 +26,11 @@ import (
 
 var _ common.Engine = (*Engine)(nil)
 
+var (
+	errUnknownMessageType   = errors.New("unknown message type")
+	errNilSimplexParameters = errors.New("simplex parameters cannot be nil")
+)
+
 type Engine struct {
 	// nonValidator marks that this node is not a validator
 	// this is included, but marked as a todo since the e2e tests currently
@@ -48,6 +53,7 @@ type Engine struct {
 	// Handler that passes application messages to the VM
 	common.AppHandler
 	validators.Connector
+	vm block.ChainVM
 
 	epoch              *simplex.Epoch
 	blockDeserializer  *blockDeserializer
@@ -57,15 +63,8 @@ type Engine struct {
 	tickInterval time.Duration
 	shutdown     chan struct{}
 	shutdownOnce sync.Once
-
-	vm           block.ChainVM
 	consensusCtx *snow.ConsensusContext
 }
-
-var (
-	errUnknownMessageType   = errors.New("unknown message type")
-	errNilSimplexParameters = errors.New("simplex parameters cannot be nil")
-)
 
 // The VM must be initialized before creating the engine
 func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Config) (*Engine, error) {
@@ -168,15 +167,15 @@ func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Conf
 		PutHandler:                  common.NewNoOpPutHandler(config.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
+		AppHandler:                  config.VM,
 		Connector:                   config.VM,
+		vm:                          config.VM,
+		epoch:                       epoch,
 
 		tickInterval:       getTickInterval(config.Params),
-		AppHandler:         config.VM,
-		vm:                 config.VM,
 		consensusCtx:       snowCtx,
 		blockDeserializer:  blockDeserializer,
 		quorumDeserializer: qcDeserializer,
-		epoch:              epoch,
 		logger:             config.Log,
 		shutdown:           make(chan struct{}, 1),
 	}, nil
