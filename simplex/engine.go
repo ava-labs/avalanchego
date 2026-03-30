@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -25,13 +26,7 @@ import (
 
 var _ common.Engine = (*Engine)(nil)
 
-var (
-	errUnknownMessageType   = errors.New("unknown message type")
-	errNilSimplexParameters = errors.New("simplex parameters cannot be nil")
-)
-
 type Engine struct {
-<<<<<<< simplex-chain
 	// nonValidator marks that this node is not a validator
 	// this is included, but marked as a todo since the e2e tests currently
 	// try and bootstrap a node that is not a validator(see func `CheckBootstrapIsPossible`).
@@ -39,8 +34,6 @@ type Engine struct {
 	// TODO: handle non-validators properly
 	nonValidator bool
 
-=======
->>>>>>> master
 	// list of NoOpsHandler for messages dropped by engine
 	common.AllGetsServer
 	common.StateSummaryFrontierHandler
@@ -55,7 +48,6 @@ type Engine struct {
 	// Handler that passes application messages to the VM
 	common.AppHandler
 	validators.Connector
-	vm block.ChainVM
 
 	epoch              *simplex.Epoch
 	blockDeserializer  *blockDeserializer
@@ -167,10 +159,7 @@ func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Conf
 	}
 
 	return &Engine{
-<<<<<<< simplex-chain
-=======
 		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
->>>>>>> master
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
@@ -179,20 +168,12 @@ func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Conf
 		PutHandler:                  common.NewNoOpPutHandler(config.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
-<<<<<<< simplex-chain
 		Connector:                   config.VM,
 
 		tickInterval:       getTickInterval(config.Params),
 		AppHandler:         config.VM,
 		vm:                 config.VM,
 		consensusCtx:       snowCtx,
-=======
-		AppHandler:                  config.VM,
-		Connector:                   config.VM,
-		vm:                          config.VM,
-
-		epoch:              epoch,
->>>>>>> master
 		blockDeserializer:  blockDeserializer,
 		quorumDeserializer: qcDeserializer,
 		epoch:              epoch,
@@ -319,27 +300,6 @@ func (e *Engine) Shutdown(_ context.Context) error {
 		close(e.shutdown)
 	})
 	return nil
-}
-
-func (*Engine) Gossip(_ context.Context) error {
-	return nil
-}
-
-func (*Engine) Notify(_ context.Context, _ common.Message) error {
-	return nil
-}
-
-func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
-	if e.nonValidator {
-		return "non-validator; no health status", nil
-	}
-	vmIntf, vmErr := e.vm.HealthCheck(ctx)
-	intf := map[string]interface{}{
-		"consensus": struct{}{},
-		"vm":        vmIntf,
-	}
-
-	return intf, vmErr
 }
 
 var _ common.BootstrapableEngine = (*TODOBootstrapper)(nil)

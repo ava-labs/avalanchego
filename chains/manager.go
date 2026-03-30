@@ -1629,7 +1629,6 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	return vmGatherer, nil
 }
 
-<<<<<<< simplex-chain
 // createSimplexHandler creates a handler that passes messages from the network to the consensus engine
 func (m *manager) createSimplexHandler(ctx *snow.ConsensusContext, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
 	handlerReg, err := metrics.MakeAndRegister(
@@ -1865,18 +1864,4 @@ func getChainWALLocation(chainDataDir string, chainID ids.ID) string {
 		chainDataDir,
 		chainID.String()+"_simplex.wal",
 	)
-=======
-func getLastAcceptedHeight(vm block.ChainVM) (uint64, error) {
-	lastAcceptedBlock, err := vm.LastAccepted(context.Background())
-	if err != nil {
-		return 0, fmt.Errorf("error while determining last accepted block ID: %w", err)
-	}
-
-	lastBlock, err := vm.GetBlock(context.Background(), lastAcceptedBlock)
-	if err != nil {
-		return 0, fmt.Errorf("error while fetching last accepted block %x: %w", lastAcceptedBlock, err)
-	}
-
-	return lastBlock.Height(), nil
->>>>>>> master
 }
