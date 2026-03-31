@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//database",
         "//ids",
+        "//proto/pb/p2p",
         "//snow",
         "//snow/engine/common",
         "//utils/set",
