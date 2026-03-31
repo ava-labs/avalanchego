@@ -24,15 +24,17 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.18.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
+	github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100
 	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
-	github.com/ava-labs/libevm v1.13.14-0.4.0.rc.2
+	github.com/ava-labs/libevm v1.13.15-0.20260310192938-d71b6cc8513a
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
 	github.com/compose-spec/compose-go v1.20.2
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/google/btree v1.1.3
+	github.com/google/go-cmp v0.7.0
 	github.com/google/renameio/v2 v2.0.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.0
@@ -92,6 +94,7 @@ require (
 require (
 	github.com/ava-labs/avalanchego/graft/evm v1.14.2 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 )
 
 require (
@@ -195,7 +198,7 @@ require (
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/text v0.34.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

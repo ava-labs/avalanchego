@@ -15,9 +15,11 @@ WORKDIR /build
 # Copy avalanche dependencies first (intermediate docker image caching)
 # Note: Context is now the repo root, so we copy from there
 COPY go.mod go.sum ./
-COPY graft ./graft
+COPY graft/coreth ./graft/coreth
+COPY graft/subnet-evm ./graft/subnet-evm
+COPY graft/evm ./graft/evm
 # Download avalanche dependencies using go mod
-RUN go mod download && go mod tidy
+RUN go mod download
 
 # Copy the entire repo to preserve module structure
 COPY . .
