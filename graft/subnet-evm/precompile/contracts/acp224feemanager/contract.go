@@ -52,13 +52,12 @@ var (
 // AllowList uses common.BytesToHash(address.Bytes()) (zero-left-padded addresses) for role storage,
 // so we use distinct prefixes for fee config.
 var (
-	prefix                       = common.Hash{'a', 'c', 'p', '2', '2', '4'}
-	validatorTargetGasStorageKey = common.BytesToHash(append(prefix.Bytes(), []byte{'v', 'g'}...))
-	targetGasStorageKey          = common.BytesToHash(append(prefix.Bytes(), []byte{'t', 'g'}...))
-	staticPricingStorageKey      = common.BytesToHash(append(prefix.Bytes(), []byte{'s', 'p'}...))
-	minGasPriceStorageKey        = common.BytesToHash(append(prefix.Bytes(), []byte{'m', 'p'}...))
-	timeToDoubleStorageKey       = common.BytesToHash(append(prefix.Bytes(), []byte{'t', 'd'}...))
-	feeConfigLastChangedAtKey    = common.BytesToHash(append(prefix.Bytes(), []byte{'l', 'c', 'a'}...))
+	validatorTargetGasStorageKey = common.Hash{'a', 'c', 'p', '2', '2', '4', 'v', 'g'}
+	targetGasStorageKey          = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'g'}
+	staticPricingStorageKey      = common.Hash{'a', 'c', 'p', '2', '2', '4', 's', 'p'}
+	minGasPriceStorageKey        = common.Hash{'a', 'c', 'p', '2', '2', '4', 'm', 'p'}
+	timeToDoubleStorageKey       = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'd'}
+	feeConfigLastChangedAtKey    = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
 )
 
 // abiFeeConfig uses *big.Int fields to match the Solidity uint256 types.
