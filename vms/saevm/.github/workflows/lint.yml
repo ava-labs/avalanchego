@@ -1,0 +1,63 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  # Required: allow read access to the content for analysis.
+  contents: read
+  # Optional: allow read access to pull request. Use with `only-new-issues` option.
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  # If adding a new linter: (a) create a new job; and (b) add it to the `needs`
+  # list of the `lint` job as this is what gates PRs.
+  lint:
+    runs-on: ubuntu-latest
+    needs: [golangci-lint, yamllint, shellcheck, tausecondslint]
+    steps:
+      - run: echo "Dependencies successful"
+
+  golangci-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.9.0
+
+  yamllint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: yamllint -c .yamllint.yml .
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+
+  tausecondslint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for TauSeconds misuse with time.Add()
+        run: |
+          if grep -rn '\.Add([^)]*TauSeconds' --include='*.go' .; then
+            echo "ERROR: Use params.Tau (time.Duration) with time.Add(), not TauSeconds (int)"
+            echo "TauSeconds would be interpreted as nanoseconds, not seconds"
+            exit 1
+          fi
