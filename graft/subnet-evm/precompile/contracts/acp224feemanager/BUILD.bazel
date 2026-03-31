@@ -31,8 +31,8 @@ graft_go_test(
         "config_test.go",
         "contract_test.go",
     ],
+    embed = [":acp224feemanager"],
     deps = [
-        ":acp224feemanager",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/core/extstate",
         "//graft/subnet-evm/precompile/allowlist",
