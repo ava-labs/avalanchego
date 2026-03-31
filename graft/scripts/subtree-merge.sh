@@ -78,21 +78,7 @@ fi
 REMOTE_NAME="${REPO_BASENAME}"
 
 echo "adding remote ${REMOTE_NAME} from ${REPO_URL}"
-git remote add "${REMOTE_NAME}" "${REPO_URL}"
-trap 'git remote remove "${REMOTE_NAME}" 2>/dev/null || true' EXIT
-
-# Verify the ref exists; if it's a default branch name, try the alternative.
-if ! git ls-remote --exit-code --heads "${REMOTE_NAME}" "${VERSION}" >/dev/null 2>&1; then
-  case "${VERSION}" in
-    master) FALLBACK="main" ;;
-    main)   FALLBACK="master" ;;
-    *)      echo "error: '${VERSION}' not found on ${REMOTE_NAME}" >&2; exit 1 ;;
-  esac
-  echo "branch '${VERSION}' not found on remote, trying '${FALLBACK}'"
-  VERSION="${FALLBACK}"
-fi
-
-git fetch "${REMOTE_NAME}" "${VERSION}"
+git remote add -f "${REMOTE_NAME}" "${REPO_URL}"
 
 echo "performing subtree merge of ${VERSION} into ${TARGET_PATH}"
 git subtree add --prefix="${TARGET_PATH}" "${REMOTE_NAME}" "${VERSION}"
