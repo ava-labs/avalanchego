@@ -28,33 +28,37 @@ var ACP224FeeManagerABI = contract.ParseABI(ACP224FeeManagerRawABI)
 const (
 	numFeeConfigField = 5 // validatorTargetGas, targetGas, staticPricing, minGasPrice, timeToDouble
 
-	GetFeeConfigGasCost              uint64 = contract.ReadGasCostPerSlot * numFeeConfigField
-	GetFeeConfigLastChangedAtGasCost uint64 = contract.ReadGasCostPerSlot
-	// *2 for old + new config in event data (each field is ABI-encoded as a 32-byte word).
-	FeeConfigUpdatedEventGasCost uint64 = contract.LogGas + contract.LogTopicGas*2 + contract.LogDataGas*numFeeConfigField*common.HashLength*2
-	SetFeeConfigGasCost          uint64 = allowlist.ReadAllowListGasCost +
+	getFeeConfigGasCost              uint64 = contract.ReadGasCostPerSlot * numFeeConfigField
+	getFeeConfigLastChangedAtGasCost uint64 = contract.ReadGasCostPerSlot
+	// FeeConfigUpdated has 2 topics (event sig + indexed sender) and non-indexed
+	// data containing old + new FeeConfig. Each config has numFeeConfigField
+	// static fields, each ABI-encoded as a 32-byte word, so the total data size
+	// is numFeeConfigField * 32 bytes * 2 configs.
+	feeConfigUpdatedEventGasCost uint64 = contract.LogGas + contract.LogTopicGas*2 + contract.LogDataGas*numFeeConfigField*common.HashLength*2
+	setFeeConfigGasCost          uint64 = allowlist.ReadAllowListGasCost +
 		contract.WriteGasCostPerSlot*(numFeeConfigField+1) + // +1 for lastChangedAt
-		GetFeeConfigGasCost + // reading old config for event
-		FeeConfigUpdatedEventGasCost
+		getFeeConfigGasCost + // reading old config for event
+		feeConfigUpdatedEventGasCost
 )
 
 var (
-	ErrCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
-	ErrInvalidUint64      = errors.New("value is not a valid uint64")
-	ErrNilBigInt          = errors.New("nil big.Int value")
-	ErrNilBlockNumber     = errors.New("block number cannot be nil")
+	errCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
+	errInvalidUint64      = errors.New("value is not a valid uint64")
+	errNilBigInt          = errors.New("nil big.Int value")
+	errNilBlockNumber     = errors.New("block number cannot be nil")
 )
 
 // Storage layout uses namespaced keys to prevent collisions with allowlist and other precompile state.
 // AllowList uses common.BytesToHash(address.Bytes()) (zero-left-padded addresses) for role storage,
 // so we use distinct prefixes for fee config.
 var (
-	validatorTargetGasStorageKey = common.Hash{'a', 'c', 'p', '2', '2', '4', 'v', 'g'}
-	targetGasStorageKey          = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'g'}
-	staticPricingStorageKey      = common.Hash{'a', 'c', 'p', '2', '2', '4', 's', 'p'}
-	minGasPriceStorageKey        = common.Hash{'a', 'c', 'p', '2', '2', '4', 'm', 'p'}
-	timeToDoubleStorageKey       = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'd'}
-	feeConfigLastChangedAtKey    = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
+	prefix                       = common.Hash{'a', 'c', 'p', '2', '2', '4'}
+	validatorTargetGasStorageKey = common.BytesToHash(append(prefix.Bytes(), []byte{'v', 'g'}...))
+	targetGasStorageKey          = common.BytesToHash(append(prefix.Bytes(), []byte{'t', 'g'}...))
+	staticPricingStorageKey      = common.BytesToHash(append(prefix.Bytes(), []byte{'s', 'p'}...))
+	minGasPriceStorageKey        = common.BytesToHash(append(prefix.Bytes(), []byte{'m', 'p'}...))
+	timeToDoubleStorageKey       = common.BytesToHash(append(prefix.Bytes(), []byte{'t', 'd'}...))
+	feeConfigLastChangedAtKey    = common.BytesToHash(append(prefix.Bytes(), []byte{'l', 'c', 'a'}...))
 )
 
 // abiFeeConfig uses *big.Int fields to match the Solidity uint256 types.
@@ -86,10 +90,10 @@ func fromABIFeeConfig(c abiFeeConfig) (commontype.ACP224FeeConfig, error) {
 		{"timeToDouble", c.TimeToDouble},
 	} {
 		if field.val == nil {
-			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrNilBigInt, field.name)
+			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", errNilBigInt, field.name)
 		}
 		if !field.val.IsUint64() {
-			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", ErrInvalidUint64, field.name)
+			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", errInvalidUint64, field.name)
 		}
 	}
 	return commontype.ACP224FeeConfig{
@@ -181,15 +185,15 @@ func UnpackGetFeeConfigOutput(output []byte) (commontype.ACP224FeeConfig, error)
 	return fromABIFeeConfig(abiConfig)
 }
 
-func getFeeConfig(
+func getFeeConfig( //nolint:revive // unused parameters are part of the RunStatefulPrecompileFunc signature
 	accessibleState contract.AccessibleState,
-	_ common.Address,
-	_ common.Address,
-	_ []byte,
+	caller common.Address,
+	addr common.Address,
+	input []byte,
 	suppliedGas uint64,
-	_ bool,
+	readOnly bool,
 ) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, GetFeeConfigGasCost); err != nil {
+	if remainingGas, err = contract.DeductGas(suppliedGas, getFeeConfigGasCost); err != nil {
 		return nil, 0, err
 	}
 
@@ -223,15 +227,15 @@ func UnpackGetFeeConfigLastChangedAtOutput(output []byte) (*big.Int, error) {
 	return unpacked, nil
 }
 
-func getFeeConfigLastChangedAt(
+func getFeeConfigLastChangedAt( //nolint:revive // unused parameters are part of the RunStatefulPrecompileFunc signature
 	accessibleState contract.AccessibleState,
-	_ common.Address,
-	_ common.Address,
-	_ []byte,
+	caller common.Address,
+	addr common.Address,
+	input []byte,
 	suppliedGas uint64,
-	_ bool,
+	readOnly bool,
 ) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, GetFeeConfigLastChangedAtGasCost); err != nil {
+	if remainingGas, err = contract.DeductGas(suppliedGas, getFeeConfigLastChangedAtGasCost); err != nil {
 		return nil, 0, err
 	}
 
@@ -269,12 +273,12 @@ func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
 func setFeeConfig(
 	accessibleState contract.AccessibleState,
 	caller common.Address,
-	_ common.Address,
+	addr common.Address, //nolint:revive // unused but part of RunStatefulPrecompileFunc signature
 	input []byte,
 	suppliedGas uint64,
 	readOnly bool,
 ) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, SetFeeConfigGasCost); err != nil {
+	if remainingGas, err = contract.DeductGas(suppliedGas, setFeeConfigGasCost); err != nil {
 		return nil, 0, err
 	}
 
@@ -285,7 +289,7 @@ func setFeeConfig(
 	stateDB := accessibleState.GetStateDB()
 	callerStatus := GetACP224FeeManagerAllowListStatus(stateDB, caller)
 	if !callerStatus.IsEnabled() {
-		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotSetFeeConfig, caller)
+		return nil, remainingGas, fmt.Errorf("%w: %s", errCannotSetFeeConfig, caller)
 	}
 
 	feeConfig, err := UnpackSetFeeConfigInput(input)
@@ -295,7 +299,7 @@ func setFeeConfig(
 
 	blockNumber := accessibleState.GetBlockContext().Number()
 	if blockNumber == nil {
-		return nil, remainingGas, ErrNilBlockNumber
+		return nil, remainingGas, errNilBlockNumber
 	}
 
 	oldConfig := GetStoredFeeConfig(stateDB)

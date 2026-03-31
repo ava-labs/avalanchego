@@ -13,7 +13,9 @@ import (
 
 var _ precompileconfig.Config = (*Config)(nil)
 
-// Config is the ACP-224 fee manager precompile configuration.
+// Config specifies when the ACP-224 fee manager precompile is activated (via
+// Upgrade), who may call it (via AllowListConfig), and an optional initial fee
+// config to write to contract storage on activation.
 type Config struct {
 	allowlist.AllowListConfig
 	precompileconfig.Upgrade
