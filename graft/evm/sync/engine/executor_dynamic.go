@@ -24,8 +24,9 @@ func newDynamicExecutor(registry *SyncerRegistry, acceptor Acceptor, pivotInterv
 	coordinator := NewCoordinator(
 		registry,
 		Callbacks{
-			FinalizeVM: acceptor.AcceptSync,
-			OnDone:     nil, // Set in Execute to capture completion.
+			FinalizeVM:         acceptor.AcceptSync,
+			DrainAcceptorQueue: acceptor.DrainAcceptorQueue,
+			OnDone:             nil, // Set in Execute to capture completion.
 		},
 		WithPivotInterval(pivotInterval),
 	)

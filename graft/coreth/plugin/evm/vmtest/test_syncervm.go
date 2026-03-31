@@ -83,6 +83,10 @@ var SyncerVMTests = []SyncerVMTest{
 		Name:     "VMShutdownWhileSyncingTest",
 		TestFunc: VMShutdownWhileSyncingTest,
 	},
+	{
+		Name:     "DynamicSyncWithBlockInjectionTest",
+		TestFunc: DynamicSyncWithBlockInjectionTest,
+	},
 }
 
 func SkipStateSyncTest(t *testing.T, testSetup *SyncTestSetup) {
@@ -320,6 +324,97 @@ func VMShutdownWhileSyncingTest(t *testing.T, testSetup *SyncTestSetup) {
 	testSyncVMSetup = initSyncServerAndClientVMs(t, test, engine.BlocksToFetch, testSetup)
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, testSyncVMSetup, test, testSetup.ExtraSyncerVMTest)
+}
+
+// DynamicSyncWithBlockInjectionTest verifies that blocks injected during
+// dynamic state sync trigger coordinator pivots and that blocks above the commit
+// target are batch-replayed after sync completes.
+//
+// This test relies on empty blocks (same state root as parent) to avoid
+// triggering state syncer session restarts on pivot. Firewood cannot generate
+// blocks after root patching, so only the hash scheme is tested.
+func DynamicSyncWithBlockInjectionTest(t *testing.T, testSetup *SyncTestSetup) {
+	const extraBlockCount = 12
+
+	// Subtest scopes t.Context() for interceptor goroutines.
+	t.Run(rawdb.HashScheme, func(t *testing.T) {
+		var extraBlockBytes [][]byte
+
+		// Gate holds all sync responses until injection completes.
+		gate := make(chan struct{})
+
+		emptyBlockGen := func(_ int, _ extension.InnerVM, gen *core.BlockGen) {
+			br := predicate.BlockResults{}
+			b, err := br.Bytes()
+			require.NoError(t, err)
+			gen.AppendExtra(b)
+		}
+
+		test := SyncTestParams{
+			SyncableInterval:        256,
+			StateSyncMinBlocks:      50,
+			SyncMode:                block.StateSyncDynamic,
+			DynamicStateSyncEnabled: true,
+			StateSyncPivotInterval:  5,
+			StateScheme:             rawdb.HashScheme,
+			responseIntercept: func(syncerVM extension.InnerVM, nodeID ids.NodeID, requestID uint32, response []byte) {
+				<-gate
+				require.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response))
+			},
+		}
+
+		setup := initSyncServerAndClientVMs(t, test, engine.BlocksToFetch, testSetup)
+		serverVM := setup.serverVM.VM
+		syncerVM := setup.syncerVM.VM
+
+		// Empty blocks preserve the parent's state root, so the state syncer
+		// does not need to restart when the coordinator pivots.
+		generateAndAcceptBlocks(t, serverVM, extraBlockCount, emptyBlockGen,
+			func(blk *types.Block) {
+				b, err := rlp.EncodeToBytes(blk)
+				require.NoError(t, err)
+				extraBlockBytes = append(extraBlockBytes, b)
+			},
+			setup.serverVM.ConsensusCallbacks,
+		)
+
+		serverHeight := serverVM.LastAcceptedExtendedBlock().Height()
+
+		summary, err := serverVM.GetLastStateSummary(t.Context())
+		require.NoError(t, err)
+		parsedSummary, err := syncerVM.ParseStateSummary(t.Context(), summary.Bytes())
+		require.NoError(t, err)
+
+		syncMode, err := parsedSummary.Accept(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, block.StateSyncDynamic, syncMode)
+
+		// Inject while the gate holds all sync responses. The coordinator
+		// is in StateRunning so all blocks are enqueued and pivots fire.
+		for _, blkBytes := range extraBlockBytes {
+			blk, err := syncerVM.ParseBlock(t.Context(), blkBytes)
+			require.NoError(t, err)
+			require.NoError(t, blk.Verify(t.Context()))
+			require.NoError(t, blk.Accept(t.Context()))
+		}
+		close(gate)
+
+		msg, err := syncerVM.WaitForEvent(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, commonEng.StateSyncDone, msg)
+		require.NoError(t, syncerVM.SyncerClient().Error())
+
+		require.NoError(t, syncerVM.SetState(t.Context(), snow.Bootstrapping))
+		// Check the blockchain's lastAccepted directly because batch replay
+		// does not update the chain.State layer yet.
+		syncerChain := syncerVM.Ethereum().BlockChain()
+		require.Equal(t, serverHeight, syncerChain.LastAcceptedBlock().NumberU64(), "syncer height mismatch after block injection")
+		require.True(t, syncerChain.HasState(syncerChain.LastAcceptedBlock().Root()), "state unavailable for last accepted block")
+
+		// Build blocks on top to verify chain continuity after replay.
+		generateAndAcceptBlocks(t, syncerVM, 5, emptyBlockGen, nil, setup.syncerVM.ConsensusCallbacks)
+		require.Equal(t, serverHeight+5, syncerVM.LastAcceptedExtendedBlock().Height())
+	})
 }
 
 type SyncTestSetup struct {

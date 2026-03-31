@@ -87,6 +87,9 @@ type BlockAcceptor interface {
 // Acceptor applies the results of state sync to the VM, preparing it for bootstrapping.
 type Acceptor interface {
 	AcceptSync(ctx context.Context, summary message.Syncable) error
+	// DrainAcceptorQueue blocks until all pending accepted blocks have been
+	// fully processed by the async acceptor.
+	DrainAcceptorQueue()
 }
 
 // Executor defines how state sync is executed.
@@ -456,6 +459,11 @@ func (c *client) commitMarkers(summary message.Syncable) error {
 		return err
 	}
 	return c.config.VerDB.Commit()
+}
+
+// DrainAcceptorQueue implements Acceptor.
+func (c *client) DrainAcceptorQueue() {
+	c.config.Chain.BlockChain().DrainAcceptorQueue()
 }
 
 // newSyncerRegistry creates a registry with all required syncers for the given summary.

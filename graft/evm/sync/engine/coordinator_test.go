@@ -332,7 +332,8 @@ func TestCoordinator_UpdateTargetFailureAborts(t *testing.T) {
 
 	// Further state transitions should be rejected.
 	require.Equal(t, StateAborted, co.CurrentState())
-	require.ErrorIs(t, co.UpdateSyncTarget(newTestSyncTarget(200)), errInvalidState)
+	err = co.UpdateSyncTarget(newTestSyncTarget(200))
+	require.ErrorIs(t, err, errInvalidState)
 }
 
 // enqueueBlockRange creates mock blocks for the inclusive range [lo, hi] and

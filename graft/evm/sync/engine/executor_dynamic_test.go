@@ -17,6 +17,7 @@ import (
 type noopAcceptor struct{}
 
 func (noopAcceptor) AcceptSync(context.Context, message.Syncable) error { return nil }
+func (noopAcceptor) DrainAcceptorQueue()                                {}
 
 func TestDynamicExecutor_OnBlockAccepted(t *testing.T) {
 	updateErr := errors.New("update failed")

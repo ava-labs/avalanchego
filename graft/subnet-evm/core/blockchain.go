@@ -2204,6 +2204,12 @@ func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 
+	// Persist the block to the raw DB. During dynamic sync the commit-target
+	// block may not have been fetched by the block syncer if the target
+	// advanced beyond its initial fetch window.
+	rawdb.WriteBlock(bc.db, block)
+	rawdb.WriteCanonicalHash(bc.db, block.Hash(), block.NumberU64())
+
 	// Update head block and snapshot pointers on disk
 	batch := bc.db.NewBatch()
 	if err := bc.batchBlockAcceptedIndices(batch, block); err != nil {

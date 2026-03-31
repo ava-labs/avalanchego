@@ -40,6 +40,9 @@ type Callbacks struct {
 	// FinalizeVM performs the same actions as [Acceptor.AcceptSync].
 	// The context is used for cancellation checks during finalization.
 	FinalizeVM func(ctx context.Context, target message.Syncable) error
+	// DrainAcceptorQueue blocks until the blockchain's acceptor queue has
+	// processed all pending blocks from batch replay.
+	DrainAcceptorQueue func()
 	// OnDone is called when the coordinator finishes (successfully or with error).
 	OnDone func(err error)
 }
@@ -207,8 +210,13 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 		return err
 	}
 
-	if err := co.beginFinalizing(); err != nil {
-		return errInvalidState
+	// Transition to StateFinalizing if not already there. The caller
+	// (coordinator goroutine) may have already transitioned to close the
+	// UpdateSyncTarget window before calling this method.
+	if co.CurrentState() != StateFinalizing {
+		if err := co.beginFinalizing(); err != nil {
+			return errInvalidState
+		}
 	}
 
 	target := co.getCommitTarget()
@@ -250,6 +258,10 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 			co.markAborted()
 			return err
 		}
+	}
+
+	if co.callbacks.DrainAcceptorQueue != nil {
+		co.callbacks.DrainAcceptorQueue()
 	}
 
 	return nil
