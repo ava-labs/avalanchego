@@ -7,7 +7,7 @@
                 "timeout-minutes": 30
             },
             {
-                "runner": "avago-runner-i4i-4xlarge-local-ssd",
+                "runner": "avalanche-avalanchego-runner",
                 "test": "firewood-101-250k",
                 "timeout-minutes": 30
             },
