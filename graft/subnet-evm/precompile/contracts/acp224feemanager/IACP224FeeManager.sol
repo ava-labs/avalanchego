@@ -14,10 +14,10 @@ interface IACP224FeeManager is IAllowList {
     ///      Values exceeding uint64 range will be rejected by the precompile.
     struct FeeConfig {
         bool validatorTargetGas; // When true, validators control targetGas via node preferences
-        uint256 targetGas; // Target gas consumption per second (T)
+        uint256 targetGas; // Target gas consumption per second (T) MUST fit in uint64.
         bool staticPricing; // When true, gas price is always minGasPrice
-        uint256 minGasPrice; // Minimum gas price in wei (M)
-        uint256 timeToDouble; // Seconds for gas price to double at max capacity
+        uint256 minGasPrice; // Minimum gas price in wei (M) MUST fit in uint64.
+        uint256 timeToDouble; // Seconds for gas price to double at max capacity MUST fit in uint64.
     }
 
     /// @notice Emitted when fee configuration is updated
