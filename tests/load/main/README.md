@@ -4,7 +4,8 @@ This executable utilizes the `load` package to perform a load test against an in
 
 ## Prerequisites
 
-Using this executable requires `nix`: to install `nix`, please refer to the AvalancheGo [flake.nix](../../../flake.nix) file for installation instructions.
+Using this executable requires `nix`: for installation and repo dev shell setup, see
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#nix).
 Furthermore, utilization of any monitoring features requires credentials to the
 Avalanche monitoring stack.
 
