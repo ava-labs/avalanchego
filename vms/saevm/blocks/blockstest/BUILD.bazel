@@ -1,0 +1,51 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "blockstest",
+    srcs = [
+        "blocks.go",
+        "chain.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/logging",
+        "//vms/components/gas",
+        "//vms/saevm/blocks",
+        "//vms/saevm/hook/hookstest",
+        "//vms/saevm/saetest",
+        "//vms/saevm/types",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//libevm/options",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rpc",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "blockstest_test",
+    srcs = ["blocks_test.go"],
+    embed = [":blockstest"],
+    deps = [
+        "//vms/saevm/saetest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//consensus",
+        "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

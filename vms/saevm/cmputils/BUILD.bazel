@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "cmputils",
+    srcs = [
+        "cmputils.go",
+        "types.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cmputils",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+    ],
+)
