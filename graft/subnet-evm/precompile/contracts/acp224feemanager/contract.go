@@ -185,13 +185,13 @@ func UnpackGetFeeConfigOutput(output []byte) (commontype.ACP224FeeConfig, error)
 	return fromABIFeeConfig(abiConfig)
 }
 
-func getFeeConfig( //nolint:revive // unused parameters are part of the RunStatefulPrecompileFunc signature
+func getFeeConfig(
 	accessibleState contract.AccessibleState,
-	caller common.Address,
-	addr common.Address,
-	input []byte,
+	caller common.Address, //nolint:revive // unused params are part of RunStatefulPrecompileFunc signature
+	addr common.Address, //nolint:revive
+	input []byte, //nolint:revive
 	suppliedGas uint64,
-	readOnly bool,
+	readOnly bool, //nolint:revive
 ) (ret []byte, remainingGas uint64, err error) {
 	if remainingGas, err = contract.DeductGas(suppliedGas, getFeeConfigGasCost); err != nil {
 		return nil, 0, err
@@ -227,13 +227,13 @@ func UnpackGetFeeConfigLastChangedAtOutput(output []byte) (*big.Int, error) {
 	return unpacked, nil
 }
 
-func getFeeConfigLastChangedAt( //nolint:revive // unused parameters are part of the RunStatefulPrecompileFunc signature
+func getFeeConfigLastChangedAt(
 	accessibleState contract.AccessibleState,
-	caller common.Address,
-	addr common.Address,
-	input []byte,
+	caller common.Address, //nolint:revive // unused params are part of RunStatefulPrecompileFunc signature
+	addr common.Address, //nolint:revive
+	input []byte, //nolint:revive
 	suppliedGas uint64,
-	readOnly bool,
+	readOnly bool, //nolint:revive
 ) (ret []byte, remainingGas uint64, err error) {
 	if remainingGas, err = contract.DeductGas(suppliedGas, getFeeConfigLastChangedAtGasCost); err != nil {
 		return nil, 0, err
@@ -273,7 +273,7 @@ func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
 func setFeeConfig(
 	accessibleState contract.AccessibleState,
 	caller common.Address,
-	addr common.Address, //nolint:revive // unused but part of RunStatefulPrecompileFunc signature
+	addr common.Address, //nolint:revive // part of RunStatefulPrecompileFunc signature
 	input []byte,
 	suppliedGas uint64,
 	readOnly bool,
