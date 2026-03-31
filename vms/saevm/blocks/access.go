@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rpc"
 
-	"github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 type (

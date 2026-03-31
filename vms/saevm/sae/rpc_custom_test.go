@@ -22,10 +22,10 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/cmputils"
-	saerpc "github.com/ava-labs/strevm/sae/rpc"
-	"github.com/ava-labs/strevm/saetest"
-	"github.com/ava-labs/strevm/saetest/escrow"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 )
 
 func TestGetChainConfig(t *testing.T) {

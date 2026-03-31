@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/strevm/proxytime"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // A Block extends a [types.Block] to track SAE-defined concepts of async

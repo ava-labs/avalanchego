@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	saeparams "github.com/ava-labs/strevm/params"
-	"github.com/ava-labs/strevm/saetest/escrow"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 )
 
 func TestDebugTrace(t *testing.T) {

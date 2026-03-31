@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 
-	"github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // A ClonableHeightIndex extends [database.HeightIndex] with the ability to

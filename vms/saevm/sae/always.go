@@ -14,9 +14,9 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/triedb"
 
-	"github.com/ava-labs/strevm/adaptor"
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 var _ adaptor.ChainVM[*blocks.Block] = (*SinceGenesis[hook.Transaction])(nil)

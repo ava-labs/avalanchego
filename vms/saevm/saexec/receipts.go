@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/eventual"
 
-	"github.com/ava-labs/strevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
 func (e *Executor) createReceiptBuffers(b *blocks.Block) {

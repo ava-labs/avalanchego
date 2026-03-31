@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 
-	"github.com/ava-labs/strevm/gasprice"
-	"github.com/ava-labs/strevm/txgossip"
+	"github.com/ava-labs/avalanchego/vms/saevm/gasprice"
+	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 )
 
 // The GethBackends interface is the union of geth interfaces required by

@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/rpc"
 
-	"github.com/ava-labs/strevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
 // neverErrs is a convenience wrapper, intended for use with [rawdb] Read*()

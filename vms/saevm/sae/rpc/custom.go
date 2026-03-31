@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
 
-	"github.com/ava-labs/strevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
 // customAPI implements Avalanche-custom RPCs. These are not part of the

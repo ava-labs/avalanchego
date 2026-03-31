@@ -34,13 +34,13 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/sae/rpc"
-	"github.com/ava-labs/strevm/saedb"
-	"github.com/ava-labs/strevm/saexec"
-	"github.com/ava-labs/strevm/txgossip"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
+	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,

@@ -21,9 +21,9 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/saetest"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // Stub implements [hook.PointsG] parameterized by [Op].

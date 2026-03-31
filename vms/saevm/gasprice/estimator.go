@@ -23,8 +23,8 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/intmath"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 )
 
 // Backend that the [Estimator] depends on for chain data.

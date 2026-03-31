@@ -10,7 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/ava-labs/strevm/proxytime"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
 // CmpOpt returns a configuration for [cmp.Diff] to compare [Time] instances in

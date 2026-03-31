@@ -16,13 +16,13 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/hook"
-	saeparams "github.com/ava-labs/strevm/params"
-	"github.com/ava-labs/strevm/proxytime"
-	"github.com/ava-labs/strevm/saedb"
-	"github.com/ava-labs/strevm/saexec"
-	"github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
+	"github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 type recovery struct {

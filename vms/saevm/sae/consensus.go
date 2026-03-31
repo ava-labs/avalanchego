@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/strevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
 // SetPreference updates the VM's currently [preferred block] with the given block context,

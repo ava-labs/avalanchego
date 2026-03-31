@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/ava-labs/strevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
 var _ saedb.StateDBOpener = (*stateDBOpener)(nil)

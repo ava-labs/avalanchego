@@ -25,9 +25,9 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/strevm/intmath"
-	saeparams "github.com/ava-labs/strevm/params"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // PointsG define user-injected hook points.
@@ -218,7 +218,7 @@ func (c *GasPriceConfig) Validate() error {
 	}
 	// TODO (ceyonur): Decide whether we want to allow zero min price exclusive for static pricing,
 	// to support fee-less networks.
-	// https://github.com/ava-labs/strevm/issues/266
+	// https://github.com/ava-labs/avalanchego/vms/saevm/issues/266
 	if c.MinPrice == 0 {
 		return errMinPriceZero
 	}

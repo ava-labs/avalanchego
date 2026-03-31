@@ -19,10 +19,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/blocks/blockstest"
-	"github.com/ava-labs/strevm/gastime"
-	"github.com/ava-labs/strevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 func TestMain(m *testing.M) {

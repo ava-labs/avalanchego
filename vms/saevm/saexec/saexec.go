@@ -21,10 +21,10 @@ import (
 	"github.com/ava-labs/libevm/libevm/eventual"
 	"github.com/ava-labs/libevm/params"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/saedb"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 var _ saedb.StateDBOpener = (*Executor)(nil)

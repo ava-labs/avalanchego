@@ -11,12 +11,12 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/hook"
-	saerpc "github.com/ava-labs/strevm/sae/rpc"
-	"github.com/ava-labs/strevm/saexec"
-	"github.com/ava-labs/strevm/txgossip"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
+	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // GethRPCBackends returns the backing infrastructure for geth's implementations

@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/strevm/adaptor"
+	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 
 	// Imported to allow IDE resolution of comments like [types.Block]. The
 	// package is imported in other files so this is a no-op beyond devex.

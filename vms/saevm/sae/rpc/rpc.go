@@ -24,12 +24,12 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/gasprice"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/saedb"
-	"github.com/ava-labs/strevm/saexec"
-	"github.com/ava-labs/strevm/txgossip"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/gasprice"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
+	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 )
 
 // A Chain provides the consensus and execution state required to serve RPC

@@ -15,10 +15,10 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/strevm/gastime"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/proxytime"
-	"github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
+	"github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 type ancestry struct {

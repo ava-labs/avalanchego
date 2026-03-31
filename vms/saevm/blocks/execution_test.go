@@ -23,11 +23,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/cmputils"
-	"github.com/ava-labs/strevm/gastime"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/saetest"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // markExecutedForTests calls [Block.MarkExecuted] with zero-value

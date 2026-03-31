@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/intmath"
-	"github.com/ava-labs/strevm/proxytime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
 func mustNew(tb testing.TB, at time.Time, target, startingExcess gas.Gas, gasPriceConfig hook.GasPriceConfig) *Time {

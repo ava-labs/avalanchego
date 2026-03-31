@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/gastime"
-	saeparams "github.com/ava-labs/strevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 func TestGasPriceAPIs(t *testing.T) {
