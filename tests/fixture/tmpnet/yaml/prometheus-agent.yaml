@@ -110,6 +110,7 @@ data:
       basic_auth:
         username_file: /run/secrets/username
         password_file: /run/secrets/password
+      send_native_histograms: true
 
 ---
 apiVersion: apps/v1
@@ -160,6 +161,7 @@ spec:
         - --config.file=/etc/prometheus/config/prometheus.yaml
         - --storage.agent.path=/prometheus
         - --agent
+        - --enable-feature=native-histograms
         volumeMounts:
         - name: config
           mountPath: /etc/prometheus/config/prometheus.yaml
