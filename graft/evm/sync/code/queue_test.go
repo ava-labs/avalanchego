@@ -141,7 +141,7 @@ func TestCodeQueue(t *testing.T) {
 }
 
 // TestFinalizeFlushesAllHashes verifies that AddCode is non-blocking and
-// Finalize waits for all background sends to complete.
+// Finalize waits for the sender goroutine to drain all pending hashes.
 func TestFinalizeFlushesAllHashes(t *testing.T) {
 	const (
 		capacity  = 1
@@ -164,8 +164,8 @@ func TestFinalizeFlushesAllHashes(t *testing.T) {
 	require.Equal(t, hashes, got.hashes, "all hashes received in batch order")
 }
 
-// TestShutdownUnblocksGoroutines verifies that Shutdown cancels stuck
-// goroutines, is idempotent with Finalize, and rejects later AddCode calls.
+// TestShutdownUnblocksGoroutines verifies that Shutdown cancels the stuck
+// sender goroutine, is idempotent with Finalize, and rejects later AddCode calls.
 func TestShutdownUnblocksGoroutines(t *testing.T) {
 	const capacity = 1
 	db := rawdb.NewMemoryDatabase()

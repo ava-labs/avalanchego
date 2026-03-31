@@ -7,14 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -28,32 +26,33 @@ var (
 	ErrQueueClosed = errors.New("code queue is closed")
 )
 
-// Queue implements the producer side of code fetching.
-// It accepts code hashes, persists durable "to-fetch" markers (idempotent per hash),
-// and asynchronously enqueues the hashes onto an internal channel consumed by the
-// code syncer. AddCode never blocks the caller because channel sends are performed by
-// background goroutines managed by an internal errgroup.
+// Queue is a fan-in/fan-out bridge between code hash producers (leaf sync workers)
+// and the code syncer consumer. Producers call [AddCode] which persists durable
+// disk markers and appends hashes to an internal queue. A single sender goroutine
+// forwards them to the output channel. AddCode never blocks the caller.
 //
-// The queue does not perform in-memory deduplication or local-code checks since that is
-// the responsibility of the consumer.
+// Deduplication and local-code checks are the consumer's responsibility.
 type Queue struct {
-	db     ethdb.Database
-	hashCh chan common.Hash
+	db  ethdb.Database
+	out chan common.Hash // output to consumer
 
-	eg     *errgroup.Group
-	cancel context.CancelFunc // cancels the errgroup's internal context
-	done   <-chan struct{}    // errgroup context's Done channel, used in AddCode select
+	cancel     context.CancelFunc
+	done       <-chan struct{} // cancelled on Shutdown
+	senderDone chan struct{}   // closed when sender exits
 
-	closeMu   sync.RWMutex // guards closed and prevents eg.Go after eg.Wait
-	closeOnce sync.Once    // guards close(hashCh), called by Finalize or Shutdown
-	closed    bool         // prevents eg.Go after eg.Wait
+	closeMu     sync.RWMutex
+	closeInOnce sync.Once
+	closed      bool
+
+	pendingMu sync.Mutex
+	pending   []common.Hash
+	in        chan struct{} // producer signal, buffered to 1
 
 	capacity int
 }
 
 type QueueOption = options.Option[Queue]
 
-// WithCapacity overrides the queue buffer capacity.
 func WithCapacity(n int) QueueOption {
 	return options.Func[Queue](func(q *Queue) {
 		if n > 0 {
@@ -62,8 +61,7 @@ func WithCapacity(n int) QueueOption {
 	})
 }
 
-// NewQueue creates a new code queue applying optional functional options.
-// Lifecycle is managed internally: call [Finalize] for normal completion
+// NewQueue creates a code queue. Call [Finalize] for normal completion
 // or [Shutdown] for cancellation. Both are safe to call in any order.
 func NewQueue(db ethdb.Database, opts ...QueueOption) (*Queue, error) {
 	q := &Queue{
@@ -72,28 +70,32 @@ func NewQueue(db ethdb.Database, opts ...QueueOption) (*Queue, error) {
 	}
 	options.ApplyTo(q, opts...)
 
-	q.hashCh = make(chan common.Hash, q.capacity)
+	q.out = make(chan common.Hash, q.capacity)
+	q.in = make(chan struct{}, 1)
+	q.senderDone = make(chan struct{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	q.cancel = cancel
-	q.eg, ctx = errgroup.WithContext(ctx)
 	q.done = ctx.Done()
+
+	go q.sender()
 
 	if err := q.init(); err != nil {
 		cancel()
+		<-q.senderDone
 		return nil, err
 	}
 	return q, nil
 }
 
-// CodeHashes returns the receive-only channel of code hashes to consume.
+// CodeHashes returns the receive-only channel consumed by the code syncer.
 func (q *Queue) CodeHashes() <-chan common.Hash {
-	return q.hashCh
+	return q.out
 }
 
 // AddCode persists code hashes as durable disk markers and enqueues them
-// for the consumer. Never blocks the caller because channel sends happen in a
-// background goroutine. Returns [ErrQueueClosed] after [Shutdown] or [Finalize].
+// for the sender goroutine. Never blocks the caller.
+// Returns [ErrQueueClosed] after [Shutdown] or [Finalize].
 func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
@@ -103,8 +105,6 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 		return err
 	}
 
-	// Shared lock: concurrent AddCode calls are allowed, but stop() blocks
-	// until all in-flight AddCode calls release before proceeding to eg.Wait.
 	q.closeMu.RLock()
 	defer q.closeMu.RUnlock()
 
@@ -127,63 +127,98 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 		return fmt.Errorf("failed to write batch of code to fetch markers due to: %w", err)
 	}
 
-	// Defensive copy: the goroutine outlives the caller and must not share
-	// the backing array.
-	hashesCopy := slices.Clone(codeHashes)
+	q.pendingMu.Lock()
+	q.pending = append(q.pending, codeHashes...)
+	q.pendingMu.Unlock()
 
-	// Spawn a goroutine to push to the channel.
-	// The goroutine may block on channel send but does NOT block the caller.
-	q.eg.Go(func() error {
-		for _, h := range hashesCopy {
-			select {
-			case q.hashCh <- h:
-			case <-q.done:
-				return nil // cancelled, hashes remain as disk markers
-			case <-ctx.Done():
-				return nil // caller context cancelled
-			}
-		}
-		return nil
-	})
+	select {
+	case q.in <- struct{}{}:
+	default:
+	}
 
 	return nil
 }
 
-// Finalize waits for all sends to complete, then closes the channel.
+// Finalize waits for all pending hashes to be sent, then closes out.
 // Idempotent with [Shutdown].
 func (q *Queue) Finalize() error {
 	q.stop(false)
 	return nil
 }
 
-// Shutdown cancels stuck goroutines, waits for exit, then closes the channel.
-// Unsent hashes are safe because disk markers are written before goroutines
-// are spawned. On restart, [init] recovers them via [recoverUnfetchedCodeHashes].
+// Shutdown cancels the sender, waits for exit, then closes out.
+// Unsent hashes are safe as disk markers and will be recovered on restart.
 // Idempotent with [Finalize].
 func (q *Queue) Shutdown() {
 	q.stop(true)
 }
 
-// markClosed prevents new AddCode goroutines. Must precede eg.Wait.
 func (q *Queue) markClosed() {
 	q.closeMu.Lock()
 	defer q.closeMu.Unlock()
 	q.closed = true
 }
 
-// stop drains in-flight goroutines and closes the channel.
-// If shouldCancel is true, stuck goroutines are unblocked first.
+// stop waits for in-flight AddCode calls (via write lock), optionally cancels
+// the sender, signals no more work, and waits for the sender to exit.
 func (q *Queue) stop(shouldCancel bool) {
 	q.markClosed()
 	if shouldCancel {
 		q.cancel()
 	}
-	// The errgroup goroutines spawned by AddCode never return errors,
-	// so it is safe to drop the error here.
-	_ = q.eg.Wait()
-	q.closeOnce.Do(func() {
-		close(q.hashCh)
+	q.closeInOnce.Do(func() {
+		close(q.in)
 	})
+	<-q.senderDone
+}
+
+// sender forwards hashes from pending to out. It owns out and closes it on exit.
+func (q *Queue) sender() {
+	defer func() {
+		close(q.out)
+		close(q.senderDone)
+	}()
+	for {
+		select {
+		case _, ok := <-q.in:
+			if !ok {
+				q.drainPending()
+				return
+			}
+			if q.drainPending() {
+				return
+			}
+		case <-q.done:
+			return
+		}
+	}
+}
+
+// drainPending sends all accumulated pending hashes to out.
+// Returns true if cancelled via done.
+func (q *Queue) drainPending() bool {
+	takePending := func() []common.Hash {
+		q.pendingMu.Lock()
+		defer q.pendingMu.Unlock()
+		batch := q.pending
+		q.pending = nil
+		return batch
+	}
+
+	for {
+		batch := takePending()
+		if len(batch) == 0 {
+			return false
+		}
+
+		for _, h := range batch {
+			select {
+			case q.out <- h:
+			case <-q.done:
+				return true
+			}
+		}
+	}
 }
 
 // init enqueues any persisted code markers found on disk.
@@ -196,6 +231,7 @@ func (q *Queue) init() error {
 	if err != nil {
 		return fmt.Errorf("unable to recover previous sync state: %w", err)
 	}
+
 	// Use context.Background() since init() runs during construction before
 	// sync starts. The queue is not closed yet, so AddCode will always succeed.
 	if err := q.AddCode(context.Background(), dbCodeHashes); err != nil {
