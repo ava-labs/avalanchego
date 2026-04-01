@@ -39,8 +39,18 @@ if [[ -z "${checksum}" || "${checksum}" == "null" ]]; then
 fi
 echo "Go checksum: ${checksum}"
 
-# Include --load for compatibility with podman (docker alternative)
-docker build --load \
+# The docker-container driver leaves the result in BuildKit cache unless we
+# explicitly load it into the local image store for the subsequent docker run.
+build_flags=()
+build_driver=$(
+    docker buildx inspect 2>/dev/null \
+        | awk '/^Driver:/ { print $2; exit }'
+)
+if [[ "${build_driver}" == "docker-container" ]]; then
+    build_flags+=(--load)
+fi
+
+docker build "${build_flags[@]}" \
     --build-arg GO_VERSION="${GO_VERSION}" \
     --build-arg GO_CHECKSUM="${checksum}" \
     -t "${DOCKER_IMAGE}" \
