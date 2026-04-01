@@ -315,13 +315,18 @@ Recommended commands:
   - fetch the current authenticated user's pending review for a PR
   - include top-level body and attached review comments
 - `create`
-  - create a pending review with a body and optional inline comments
+  - create a pending review with a body supplied via `--body` or `--body-file`
 - `update-body`
   - update only the top-level review body
+  - accept the replacement body via `--body` or `--body-file`
   - refuse to overwrite when the live review body no longer matches the last
     body published by the tool, unless `--force` is explicitly used
 - `delete`
   - delete a pending review
+- `get-state`
+  - print the locally stored last-published state for a repo/PR/user tuple
+- `delete-state`
+  - remove locally stored last-published state without mutating GitHub
 - `replace`
   - find the current pending review for the authenticated user
   - delete it if present
@@ -379,6 +384,17 @@ No inline comments are required for the first milestone.
 The tool keeps a local record of the last review body it published so it can
 detect when a human has edited the pending review in GitHub.
 
+For day-to-day recovery and inspection, the CLI also exposes local-only state
+commands:
+
+```bash
+./bin/gh-pending-review get-state --pr 5167 --user YOUR_GITHUB_LOGIN
+./bin/gh-pending-review delete-state --pr 5167 --user YOUR_GITHUB_LOGIN
+```
+
+These commands only read or delete the local state file. They do not talk to
+GitHub and they do not mutate pending reviews.
+
 Default state location:
 
 - `${XDG_STATE_HOME}/gh-pending-review` when `XDG_STATE_HOME` is set
@@ -425,6 +441,20 @@ use:
 `get` does not advance stored state. Only successful writes do. That preserves
 the distinction between "what the agent last published" and "what the agent has
 most recently read."
+
+For body authoring ergonomics, `create` and `update-body` both accept either:
+
+```bash
+--body "inline text"
+```
+
+or:
+
+```bash
+--body-file /path/to/body.txt
+```
+
+Exactly one body input must be provided.
 
 ## Inline Comment Model
 
