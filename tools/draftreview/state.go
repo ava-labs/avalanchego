@@ -15,12 +15,13 @@ import (
 )
 
 type ReviewState struct {
-	Repo              string `json:"repo"`
-	PRNumber          int    `json:"pr"`
-	UserLogin         string `json:"user"`
-	ReviewID          int64  `json:"review_id"`
-	LastPublishedBody string `json:"last_published_body"`
-	HTMLURL           string `json:"html_url,omitempty"`
+	Repo                  string               `json:"repo"`
+	PRNumber              int                  `json:"pr"`
+	UserLogin             string               `json:"user"`
+	ReviewID              int64                `json:"review_id"`
+	LastPublishedBody     string               `json:"last_published_body"`
+	LastPublishedComments []DraftReviewComment `json:"last_published_comments,omitempty"`
+	HTMLURL               string               `json:"html_url,omitempty"`
 }
 
 type StateStore struct {
@@ -76,7 +77,7 @@ func (s StateStore) Save(state ReviewState) error {
 		return stacktrace.Wrap(err)
 	}
 	encoded = append(encoded, '\n')
-	if err := os.WriteFile(path, encoded, 0o644); err != nil {
+	if err := os.WriteFile(path, encoded, 0o600); err != nil {
 		return stacktrace.Wrap(err)
 	}
 	s.log.Info("saved review state",
@@ -144,6 +145,27 @@ func (s StateStore) Delete(repo string, userLogin string, prNumber int) error {
 		zap.String("path", path),
 	)
 	return nil
+}
+
+func (s StateStore) LoadIfExists(repo string, userLogin string, prNumber int) (ReviewState, bool, error) {
+	path, err := s.pathFor(repo, userLogin, prNumber)
+	if err != nil {
+		return ReviewState{}, false, stacktrace.Wrap(err)
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ReviewState{}, false, nil
+		}
+		return ReviewState{}, false, stacktrace.Wrap(err)
+	}
+
+	var state ReviewState
+	if err := json.Unmarshal(content, &state); err != nil {
+		return ReviewState{}, false, stacktrace.Wrap(err)
+	}
+	return state, true, nil
 }
 
 func (s StateStore) pathFor(repo string, userLogin string, prNumber int) (string, error) {

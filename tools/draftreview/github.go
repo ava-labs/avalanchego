@@ -54,10 +54,16 @@ func (c *GitHubClient) Viewer(ctx context.Context) (User, error) {
 }
 
 func (c *GitHubClient) CreatePendingReview(ctx context.Context, repo string, prNumber int, body string) (Review, error) {
+	return c.CreatePendingReviewWithComments(ctx, repo, prNumber, body, nil)
+}
+
+func (c *GitHubClient) CreatePendingReviewWithComments(ctx context.Context, repo string, prNumber int, body string, comments []DraftReviewComment) (Review, error) {
 	payload := struct {
-		Body string `json:"body"`
+		Body     string           `json:"body"`
+		Comments []map[string]any `json:"comments,omitempty"`
 	}{
-		Body: body,
+		Body:     body,
+		Comments: marshalCommentsForCreate(comments),
 	}
 
 	req, err := c.newRequest(ctx, http.MethodPost, fmt.Sprintf("/repos/%s/pulls/%d/reviews", repo, prNumber), payload)
@@ -96,6 +102,19 @@ func (c *GitHubClient) ListReviews(ctx context.Context, repo string, prNumber in
 		return nil, stacktrace.Wrap(err)
 	}
 	return reviews, nil
+}
+
+func (c *GitHubClient) ListReviewComments(ctx context.Context, repo string, prNumber int, reviewID int64) ([]ReviewComment, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/pulls/%d/reviews/%d/comments", repo, prNumber, reviewID), nil)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+
+	var comments []ReviewComment
+	if err := c.doJSON(req, &comments); err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	return comments, nil
 }
 
 func (c *GitHubClient) DeletePendingReview(ctx context.Context, repo string, prNumber int, reviewID int64) error {
