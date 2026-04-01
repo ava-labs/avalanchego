@@ -23,7 +23,7 @@ jobs:
         run: |
           {
             echo 'content<<EOF'
-            cat .github/prompts/pr-review-prompt.md
+            cat agents/pr-review.md
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
       - uses: anthropics/claude-code-action@v1
