@@ -169,3 +169,147 @@ func TestRunReplaceCommentsDetectsConflict(t *testing.T) {
 	})
 	require.ErrorIs(t, err, ErrReviewCommentsConflict)
 }
+
+func TestRunCreateReadsBodyFile(t *testing.T) {
+	t.Parallel()
+
+	bodyPath := filepath.Join(t.TempDir(), "body.txt")
+	require.NoError(t, os.WriteFile(bodyPath, []byte("body from file\n"), 0o644))
+
+	var createPayload struct {
+		Body string `json:"body"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, reviewsPath, r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&createPayload))
+		_, _ = io.WriteString(w, `{"id":123,"state":"PENDING","body":"body from file\n","html_url":"https://example.invalid/review/123","user":{"login":"maru"}}`)
+	}))
+	defer server.Close()
+
+	app := NewApp(strings.NewReader(""), io.Discard, io.Discard)
+	app.tokenProvider = staticTokenProvider{token: "test-token"}
+	app.httpClient = server.Client()
+	app.baseURL = server.URL
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"create",
+		"--pr", "5168",
+		"--body-file", bodyPath,
+		"--state-dir", t.TempDir(),
+		"--config-dir", t.TempDir(),
+	}))
+	require.Equal(t, "body from file\n", createPayload.Body)
+}
+
+func TestRunUpdateBodyReadsBodyFile(t *testing.T) {
+	t.Parallel()
+
+	bodyPath := filepath.Join(t.TempDir(), "body.txt")
+	require.NoError(t, os.WriteFile(bodyPath, []byte("updated from file\n"), 0o644))
+
+	stateDir := t.TempDir()
+	store := NewStateStore(logging.NoLog{}, stateDir)
+	require.NoError(t, store.Save(ReviewState{
+		Repo:              "ava-labs/avalanchego",
+		PRNumber:          5168,
+		UserLogin:         "maru",
+		ReviewID:          123,
+		LastPublishedBody: "live body",
+	}))
+
+	var updatePayload struct {
+		Body string `json:"body"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case userPath:
+			_, _ = io.WriteString(w, `{"login":"maru"}`)
+		case reviewsPath:
+			_, _ = io.WriteString(w, `[{"id":123,"state":"PENDING","body":"live body","html_url":"https://example.invalid/review/123","user":{"login":"maru"}}]`)
+		case "/repos/ava-labs/avalanchego/pulls/5168/reviews/123":
+			require.Equal(t, http.MethodPut, r.Method)
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&updatePayload))
+			_, _ = io.WriteString(w, `{"id":123,"state":"PENDING","body":"updated from file\n","html_url":"https://example.invalid/review/123","user":{"login":"maru"}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	app := NewApp(strings.NewReader(""), io.Discard, io.Discard)
+	app.tokenProvider = staticTokenProvider{token: "test-token"}
+	app.httpClient = server.Client()
+	app.baseURL = server.URL
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"update-body",
+		"--pr", "5168",
+		"--body-file", bodyPath,
+		"--state-dir", stateDir,
+		"--config-dir", t.TempDir(),
+	}))
+	require.Equal(t, "updated from file\n", updatePayload.Body)
+}
+
+func TestRunGetStatePrintsStoredReviewState(t *testing.T) {
+	t.Parallel()
+
+	stateDir := t.TempDir()
+	store := NewStateStore(logging.NoLog{}, stateDir)
+	require.NoError(t, store.Save(ReviewState{
+		Repo:                  "ava-labs/avalanchego",
+		PRNumber:              5168,
+		UserLogin:             "maru",
+		ReviewID:              123,
+		LastPublishedBody:     "stored body",
+		LastPublishedComments: []DraftReviewComment{{Path: "a.go", Line: 7, Side: "RIGHT", Body: "stored comment"}},
+		HTMLURL:               "https://example.invalid/review/123",
+	}))
+
+	var stdout bytes.Buffer
+	app := NewApp(strings.NewReader(""), &stdout, io.Discard)
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"get-state",
+		"--pr", "5168",
+		"--user", "maru",
+		"--state-dir", stateDir,
+	}))
+
+	var state ReviewState
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &state))
+	require.Equal(t, int64(123), state.ReviewID)
+	require.Equal(t, "stored body", state.LastPublishedBody)
+	require.Len(t, state.LastPublishedComments, 1)
+}
+
+func TestRunDeleteStateDeletesStoredReviewState(t *testing.T) {
+	t.Parallel()
+
+	stateDir := t.TempDir()
+	store := NewStateStore(logging.NoLog{}, stateDir)
+	require.NoError(t, store.Save(ReviewState{
+		Repo:              "ava-labs/avalanchego",
+		PRNumber:          5168,
+		UserLogin:         "maru",
+		ReviewID:          123,
+		LastPublishedBody: "stored body",
+	}))
+
+	var stdout bytes.Buffer
+	app := NewApp(strings.NewReader(""), &stdout, io.Discard)
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"delete-state",
+		"--pr", "5168",
+		"--user", "maru",
+		"--state-dir", stateDir,
+	}))
+
+	_, err := store.Load("ava-labs/avalanchego", "maru", 5168)
+	require.EqualError(t, err, "no stored review state for ava-labs/avalanchego#5168 as maru; run create first or use --force")
+	require.Contains(t, stdout.String(), "Deleted stored review state")
+}

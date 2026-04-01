@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	"go.uber.org/zap"
 
@@ -56,8 +57,12 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runDelete(ctx, command)
 	case getCommand:
 		return a.runGet(ctx, command)
+	case getStateCommand:
+		return a.runGetState(command)
 	case replaceCommentsCommand:
 		return a.runReplaceComments(ctx, command)
+	case deleteStateCommand:
+		return a.runDeleteState(command)
 	case updateBodyCommand:
 		return a.runUpdateBody(ctx, command)
 	case versionCommand:
@@ -68,12 +73,16 @@ func (a *App) Run(ctx context.Context, args []string) error {
 }
 
 func (a *App) runCreate(ctx context.Context, command createCommand) error {
+	body, err := resolveBodyInput(command.Body, command.BodyFile)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
 	a.log.Debug("entered create command",
 		zap.String("repo", command.Repo),
 		zap.Int("prNumber", command.PRNumber),
 		zap.String("configDir", command.ConfigDir),
 		zap.String("stateDir", command.StateDir),
-		zap.Int("bodyLength", len(command.Body)),
+		zap.Int("bodyLength", len(body)),
 	)
 	token, err := a.tokenProvider.Token(ctx, command.ConfigDir)
 	if err != nil {
@@ -84,9 +93,9 @@ func (a *App) runCreate(ctx context.Context, command createCommand) error {
 	a.log.Info("creating pending review",
 		zap.String("repo", command.Repo),
 		zap.Int("prNumber", command.PRNumber),
-		zap.Int("bodyLength", len(command.Body)),
+		zap.Int("bodyLength", len(body)),
 	)
-	review, err := client.CreatePendingReview(ctx, command.Repo, command.PRNumber, command.Body)
+	review, err := client.CreatePendingReview(ctx, command.Repo, command.PRNumber, body)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -222,14 +231,34 @@ func (a *App) runGet(ctx context.Context, command getCommand) error {
 	return nil
 }
 
+func (a *App) runGetState(command getStateCommand) error {
+	state, err := NewStateStore(a.log, command.StateDir).Load(command.Repo, command.UserLogin, command.PRNumber)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	encoded, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	if _, err := fmt.Fprintln(a.Stdout, string(encoded)); err != nil {
+		return stacktrace.Wrap(err)
+	}
+	return nil
+}
+
 func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) error {
+	body, err := resolveBodyInput(command.Body, command.BodyFile)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
 	a.log.Debug("entered update-body command",
 		zap.String("repo", command.Repo),
 		zap.Int("prNumber", command.PRNumber),
 		zap.String("configDir", command.ConfigDir),
 		zap.String("stateDir", command.StateDir),
 		zap.Bool("force", command.Force),
-		zap.Int("bodyLength", len(command.Body)),
+		zap.Int("bodyLength", len(body)),
 	)
 	token, err := a.tokenProvider.Token(ctx, command.ConfigDir)
 	if err != nil {
@@ -284,9 +313,9 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 		zap.String("userLogin", viewer.Login),
 		zap.Int64("reviewID", review.ID),
 		zap.Bool("force", command.Force),
-		zap.Int("bodyLength", len(command.Body)),
+		zap.Int("bodyLength", len(body)),
 	)
-	updated, err := client.UpdatePendingReviewBody(ctx, command.Repo, command.PRNumber, review.ID, command.Body)
+	updated, err := client.UpdatePendingReviewBody(ctx, command.Repo, command.PRNumber, review.ID, body)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -313,6 +342,14 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 	)
 
 	_, err = fmt.Fprintf(a.Stdout, "Updated pending review %d for %s#%d (%s)\n", updated.ID, command.Repo, command.PRNumber, updated.State)
+	return stacktrace.Wrap(err)
+}
+
+func (a *App) runDeleteState(command deleteStateCommand) error {
+	if err := NewStateStore(a.log, command.StateDir).Delete(command.Repo, command.UserLogin, command.PRNumber); err != nil {
+		return stacktrace.Wrap(err)
+	}
+	_, err := fmt.Fprintf(a.Stdout, "Deleted stored review state for %s#%d as %s\n", command.Repo, command.PRNumber, command.UserLogin)
 	return stacktrace.Wrap(err)
 }
 
@@ -461,8 +498,12 @@ func commandName(cmd command) string {
 		return "delete"
 	case getCommand:
 		return "get"
+	case getStateCommand:
+		return "get-state"
 	case replaceCommentsCommand:
 		return "replace-comments"
+	case deleteStateCommand:
+		return "delete-state"
 	case updateBodyCommand:
 		return "update-body"
 	case versionCommand:
@@ -470,4 +511,22 @@ func commandName(cmd command) string {
 	default:
 		return fmt.Sprintf("%T", cmd)
 	}
+}
+
+func resolveBodyInput(body string, bodyFile string) (string, error) {
+	switch {
+	case (body == "") == (bodyFile == ""):
+		return "", stacktrace.New("exactly one of --body or --body-file is required")
+	case bodyFile == "":
+		return body, nil
+	}
+
+	content, err := os.ReadFile(bodyFile)
+	if err != nil {
+		return "", stacktrace.Wrap(err)
+	}
+	if len(content) == 0 {
+		return "", stacktrace.New("review body must not be empty")
+	}
+	return string(content), nil
 }

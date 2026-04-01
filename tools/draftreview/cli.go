@@ -18,6 +18,7 @@ type createCommand struct {
 	Repo      string
 	PRNumber  int
 	Body      string
+	BodyFile  string
 	ConfigDir string
 	StateDir  string
 }
@@ -42,16 +43,35 @@ type getCommand struct {
 
 func (getCommand) isCommand() {}
 
+type getStateCommand struct {
+	Repo      string
+	PRNumber  int
+	UserLogin string
+	StateDir  string
+}
+
+func (getStateCommand) isCommand() {}
+
 type updateBodyCommand struct {
 	Repo      string
 	PRNumber  int
 	Body      string
+	BodyFile  string
 	ConfigDir string
 	StateDir  string
 	Force     bool
 }
 
 func (updateBodyCommand) isCommand() {}
+
+type deleteStateCommand struct {
+	Repo      string
+	PRNumber  int
+	UserLogin string
+	StateDir  string
+}
+
+func (deleteStateCommand) isCommand() {}
 
 type replaceCommentsCommand struct {
 	Repo         string
@@ -84,8 +104,12 @@ func parseCommand(args []string) (command, error) {
 		return parseDeleteCommand(args[1:])
 	case "get":
 		return parseGetCommand(args[1:])
+	case "get-state":
+		return parseGetStateCommand(args[1:])
 	case "replace-comments":
 		return parseReplaceCommentsCommand(args[1:])
+	case "delete-state":
+		return parseDeleteStateCommand(args[1:])
 	case "update-body":
 		return parseUpdateBodyCommand(args[1:])
 	default:
@@ -100,6 +124,7 @@ func parseCreateCommand(args []string) (command, error) {
 	repo := flags.String("repo", defaultRepo, "repository in OWNER/REPO form")
 	prNumber := flags.Int("pr", 0, "pull request number")
 	body := flags.String("body", "", "review body")
+	bodyFile := flags.String("body-file", "", "path to a file containing the review body")
 	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
 	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
 
@@ -112,14 +137,15 @@ func parseCreateCommand(args []string) (command, error) {
 	if *prNumber <= 0 {
 		return nil, usageError("--pr must be a positive integer")
 	}
-	if *body == "" {
-		return nil, usageError("--body is required")
+	if (*body == "") == (*bodyFile == "") {
+		return nil, usageError("exactly one of --body or --body-file is required")
 	}
 
 	return createCommand{
 		Repo:      *repo,
 		PRNumber:  *prNumber,
 		Body:      *body,
+		BodyFile:  *bodyFile,
 		ConfigDir: *configDir,
 		StateDir:  *stateDir,
 	}, nil
@@ -179,6 +205,36 @@ func parseGetCommand(args []string) (command, error) {
 	}, nil
 }
 
+func parseGetStateCommand(args []string) (command, error) {
+	flags := flag.NewFlagSet("get-state", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+
+	repo := flags.String("repo", defaultRepo, "repository in OWNER/REPO form")
+	prNumber := flags.Int("pr", 0, "pull request number")
+	userLogin := flags.String("user", "", "GitHub login associated with the stored review state")
+	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
+
+	if err := flags.Parse(args); err != nil {
+		return nil, usageError(err.Error())
+	}
+	if flags.NArg() != 0 {
+		return nil, usageError(fmt.Sprintf("unexpected trailing arguments: %v", flags.Args()))
+	}
+	if *prNumber <= 0 {
+		return nil, usageError("--pr must be a positive integer")
+	}
+	if *userLogin == "" {
+		return nil, usageError("--user is required")
+	}
+
+	return getStateCommand{
+		Repo:      *repo,
+		PRNumber:  *prNumber,
+		UserLogin: *userLogin,
+		StateDir:  *stateDir,
+	}, nil
+}
+
 func parseUpdateBodyCommand(args []string) (command, error) {
 	flags := flag.NewFlagSet("update-body", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
@@ -186,6 +242,7 @@ func parseUpdateBodyCommand(args []string) (command, error) {
 	repo := flags.String("repo", defaultRepo, "repository in OWNER/REPO form")
 	prNumber := flags.Int("pr", 0, "pull request number")
 	body := flags.String("body", "", "review body")
+	bodyFile := flags.String("body-file", "", "path to a file containing the review body")
 	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
 	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
 	force := flags.Bool("force", false, "overwrite even if the review body differs from stored state")
@@ -199,17 +256,48 @@ func parseUpdateBodyCommand(args []string) (command, error) {
 	if *prNumber <= 0 {
 		return nil, usageError("--pr must be a positive integer")
 	}
-	if *body == "" {
-		return nil, usageError("--body is required")
+	if (*body == "") == (*bodyFile == "") {
+		return nil, usageError("exactly one of --body or --body-file is required")
 	}
 
 	return updateBodyCommand{
 		Repo:      *repo,
 		PRNumber:  *prNumber,
 		Body:      *body,
+		BodyFile:  *bodyFile,
 		ConfigDir: *configDir,
 		StateDir:  *stateDir,
 		Force:     *force,
+	}, nil
+}
+
+func parseDeleteStateCommand(args []string) (command, error) {
+	flags := flag.NewFlagSet("delete-state", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+
+	repo := flags.String("repo", defaultRepo, "repository in OWNER/REPO form")
+	prNumber := flags.Int("pr", 0, "pull request number")
+	userLogin := flags.String("user", "", "GitHub login associated with the stored review state")
+	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
+
+	if err := flags.Parse(args); err != nil {
+		return nil, usageError(err.Error())
+	}
+	if flags.NArg() != 0 {
+		return nil, usageError(fmt.Sprintf("unexpected trailing arguments: %v", flags.Args()))
+	}
+	if *prNumber <= 0 {
+		return nil, usageError("--pr must be a positive integer")
+	}
+	if *userLogin == "" {
+		return nil, usageError("--user is required")
+	}
+
+	return deleteStateCommand{
+		Repo:      *repo,
+		PRNumber:  *prNumber,
+		UserLogin: *userLogin,
+		StateDir:  *stateDir,
 	}, nil
 }
 
@@ -251,11 +339,13 @@ func Usage() string {
 	return `gh-pending-review creates and manages pending GitHub pull request reviews.
 
 Usage:
-  gh-pending-review create --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR] [--state-dir DIR]
+  gh-pending-review create --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR]
   gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
   gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
+  gh-pending-review get-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR]
   gh-pending-review replace-comments --pr NUMBER [--repo OWNER/REPO] --comments-file PATH [--config-dir DIR] [--state-dir DIR] [--force]
-  gh-pending-review update-body --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR] [--state-dir DIR] [--force]
+  gh-pending-review delete-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR]
+  gh-pending-review update-body --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force]
   gh-pending-review version
 
 Notes:
