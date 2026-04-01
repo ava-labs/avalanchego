@@ -11,7 +11,7 @@
 #
 # Optional env vars:
 #   DEB_GPG_KEY_FILE      - Path to GPG private key for signing
-#   NFPM_DEB_PASSPHRASE   - Passphrase for the GPG key
+#   NFPM_DEB_PASSPHRASE   - Passphrase for the GPG key (cached in gpg-agent for dpkg-sig)
 #   AVALANCHEGO_COMMIT    - Git commit hash (auto-detected if not set)
 
 set -euo pipefail
@@ -93,16 +93,36 @@ GPG_WORKDIR="${REPO_ROOT}/build/gpg"
 mkdir -p "${GPG_WORKDIR}"
 GPG_PUBLIC_KEY="${OUTPUT_DIR}/DEB-GPG-KEY-avalanchego"
 
+# Configure gpg-agent for non-interactive signing. dpkg-sig delegates to gpg,
+# which needs the passphrase available via gpg-agent. allow-preset-passphrase
+# lets us cache the passphrase so dpkg-sig can sign without prompting.
+GPG_AGENT_CONF="${HOME}/.gnupg/gpg-agent.conf"
+mkdir -p "$(dirname "${GPG_AGENT_CONF}")"
+if ! grep -q allow-preset-passphrase "${GPG_AGENT_CONF}" 2>/dev/null; then
+    echo "allow-preset-passphrase" >> "${GPG_AGENT_CONF}"
+    gpgconf --kill gpg-agent 2>/dev/null || true
+fi
+
 if [[ -n "${DEB_GPG_KEY_FILE:-}" ]]; then
     echo "Using provided GPG key for signing"
     gpg --batch --import "${DEB_GPG_KEY_FILE}"
     # Copy to well-known path for nfpm config
     cp "${DEB_GPG_KEY_FILE}" "${NFPM_SIGNING_KEY}"
+
+    # Cache the passphrase in gpg-agent so dpkg-sig can sign non-interactively.
+    if [[ -n "${NFPM_DEB_PASSPHRASE:-}" ]]; then
+        GPG_PRESET_PASS="$(gpgconf --list-dirs libexecdir)/gpg-preset-passphrase"
+        KEYGRIPS=$(gpg --batch --with-colons --with-keygrip --list-secret-keys "security@avalabs.org" \
+            | awk -F: '$1 == "grp" { print $10 }')
+        for kg in ${KEYGRIPS}; do
+            echo "${NFPM_DEB_PASSPHRASE}" | "${GPG_PRESET_PASS}" --preset "${kg}"
+        done
+        echo "GPG passphrase cached in gpg-agent"
+    fi
 elif [[ -f "${NFPM_SIGNING_KEY}" ]]; then
     # Reuse ephemeral key from a previous build (e.g., avalanchego built before subnet-evm)
     echo "Reusing existing ephemeral GPG key"
     gpg --batch --import "${NFPM_SIGNING_KEY}"
-    export NFPM_DEB_PASSPHRASE=""
 else
     echo "Generating ephemeral GPG key for signing"
 
@@ -120,7 +140,6 @@ GPGEOF
 
     # Export private key to well-known path for nfpm
     gpg --batch --armor --export-secret-keys "security@avalabs.org" > "${NFPM_SIGNING_KEY}"
-    export NFPM_DEB_PASSPHRASE=""
 fi
 
 # Export public key for verification
