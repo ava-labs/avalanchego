@@ -2,6 +2,8 @@ package draftreview
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -38,6 +40,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runCreate(ctx, command)
 	case deleteCommand:
 		return a.runDelete(ctx, command)
+	case getCommand:
+		return a.runGet(ctx, command)
+	case updateBodyCommand:
+		return a.runUpdateBody(ctx, command)
 	case versionCommand:
 		return a.runVersion(command)
 	default:
@@ -54,6 +60,17 @@ func (a *App) runCreate(ctx context.Context, command createCommand) error {
 	client := NewGitHubClient(a.httpClient, a.baseURL, token)
 	review, err := client.CreatePendingReview(ctx, command.Repo, command.PRNumber, command.Body)
 	if err != nil {
+		return err
+	}
+
+	if err := NewStateStore(command.StateDir).Save(ReviewState{
+		Repo:              command.Repo,
+		PRNumber:          command.PRNumber,
+		UserLogin:         review.User.Login,
+		ReviewID:          review.ID,
+		LastPublishedBody: review.Body,
+		HTMLURL:           review.HTMLURL,
+	}); err != nil {
 		return err
 	}
 
@@ -94,7 +111,99 @@ func (a *App) runDelete(ctx context.Context, command deleteCommand) error {
 		return err
 	}
 
+	if err := NewStateStore(command.StateDir).Delete(command.Repo, viewer.Login, command.PRNumber); err != nil {
+		return err
+	}
+
 	_, err = fmt.Fprintf(a.Stdout, "Deleted pending review %d for %s#%d\n", review.ID, command.Repo, command.PRNumber)
+	return err
+}
+
+func (a *App) runGet(ctx context.Context, command getCommand) error {
+	token, err := a.tokenProvider.Token(ctx, command.ConfigDir)
+	if err != nil {
+		return err
+	}
+
+	client := NewGitHubClient(a.httpClient, a.baseURL, token)
+	viewer, err := client.Viewer(ctx)
+	if err != nil {
+		return err
+	}
+
+	reviews, err := client.ListReviews(ctx, command.Repo, command.PRNumber)
+	if err != nil {
+		return err
+	}
+
+	review, found := FindPendingReviewForAuthor(reviews, viewer.Login)
+	if !found {
+		return fmt.Errorf("no pending review found for %s on %s#%d", viewer.Login, command.Repo, command.PRNumber)
+	}
+
+	encoded, err := json.MarshalIndent(review, "", "  ")
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(a.Stdout, string(encoded)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) error {
+	token, err := a.tokenProvider.Token(ctx, command.ConfigDir)
+	if err != nil {
+		return err
+	}
+
+	client := NewGitHubClient(a.httpClient, a.baseURL, token)
+	viewer, err := client.Viewer(ctx)
+	if err != nil {
+		return err
+	}
+
+	reviews, err := client.ListReviews(ctx, command.Repo, command.PRNumber)
+	if err != nil {
+		return err
+	}
+
+	review, found := FindPendingReviewForAuthor(reviews, viewer.Login)
+	if !found {
+		return fmt.Errorf("no pending review found for %s on %s#%d", viewer.Login, command.Repo, command.PRNumber)
+	}
+
+	store := NewStateStore(command.StateDir)
+	if !command.Force {
+		state, err := store.Load(command.Repo, viewer.Login, command.PRNumber)
+		if err != nil {
+			return err
+		}
+		if state.ReviewID != 0 && state.ReviewID != review.ID {
+			return fmt.Errorf("stored review state points to review %d but GitHub has pending review %d; run get, reconcile, then retry with --force if intended", state.ReviewID, review.ID)
+		}
+		if state.LastPublishedBody != review.Body {
+			return ErrReviewConflict
+		}
+	}
+
+	updated, err := client.UpdatePendingReviewBody(ctx, command.Repo, command.PRNumber, review.ID, command.Body)
+	if err != nil {
+		return err
+	}
+
+	if err := store.Save(ReviewState{
+		Repo:              command.Repo,
+		PRNumber:          command.PRNumber,
+		UserLogin:         viewer.Login,
+		ReviewID:          updated.ID,
+		LastPublishedBody: updated.Body,
+		HTMLURL:           updated.HTMLURL,
+	}); err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(a.Stdout, "Updated pending review %d for %s#%d (%s)\n", updated.ID, command.Repo, command.PRNumber, updated.State)
 	return err
 }
 
@@ -106,3 +215,5 @@ func (a *App) runVersion(_ versionCommand) error {
 func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 	return NewApp(stdin, stdout, stderr).Run(ctx, args)
 }
+
+var ErrReviewConflict = errors.New("pending review body no longer matches stored state; run get, reconcile the current review body, then retry with --force if you intend to overwrite it")

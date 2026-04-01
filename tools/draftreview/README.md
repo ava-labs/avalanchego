@@ -271,6 +271,8 @@ Recommended commands:
   - create a pending review with a body and optional inline comments
 - `update-body`
   - update only the top-level review body
+  - refuse to overwrite when the live review body no longer matches the last
+    body published by the tool, unless `--force` is explicitly used
 - `delete`
   - delete a pending review
 - `replace`
@@ -308,6 +310,58 @@ The first completed flow should be:
    - the body is `test`
 
 No inline comments are required for the first milestone.
+
+## Local State And Conflict Detection
+
+The tool keeps a local record of the last review body it published so it can
+detect when a human has edited the pending review in GitHub.
+
+Default state location:
+
+- `${XDG_STATE_HOME}/gh-draft-review` when `XDG_STATE_HOME` is set
+- otherwise `~/.local/state/gh-draft-review`
+
+It can be overridden with:
+
+```bash
+--state-dir <dir>
+```
+
+State is keyed by:
+
+- repository
+- pull request number
+- authenticated GitHub user
+
+The minimal stored fields are:
+
+- review ID
+- last published body
+- review URL
+
+### Update Safety Rule
+
+`update-body` uses optimistic concurrency:
+
+1. load the stored last-published body
+2. fetch the current pending review from GitHub
+3. compare the live body to the stored body
+4. if they differ, refuse to update and return a conflict error
+
+This is the guardrail that prevents the tool from blindly overwriting manual
+GitHub edits.
+
+If the agent has already fetched the current review, reconciled the human's
+changes, and intentionally wants to overwrite the draft review body, it must
+use:
+
+```bash
+--force
+```
+
+`get` does not advance stored state. Only successful writes do. That preserves
+the distinction between "what the agent last published" and "what the agent has
+most recently read."
 
 ## Testing Strategy
 
@@ -437,6 +491,8 @@ Current command shape:
 ```bash
 ./bin/gh-draft-review create --pr 5167 --body test
 ./bin/gh-draft-review delete --pr 5167
+./bin/gh-draft-review get --pr 5167
+./bin/gh-draft-review update-body --pr 5167 --body "revised text"
 ./bin/gh-draft-review version
 ```
 
@@ -463,6 +519,9 @@ The test will:
   `GH_DRAFT_REVIEW_TEST_DELETE_EXISTING=1` is set
 - create a pending review with body `test`
 - fetch the created review and verify author, state, and body
+- simulate an external manual edit to the review body
+- verify that `update-body` refuses to overwrite that external change
+- verify that an explicit `--force` update succeeds after that conflict
 - delete the created pending review during cleanup
 
 ## Key Facts Not To Lose

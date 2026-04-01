@@ -16,6 +16,7 @@ type createCommand struct {
 	PRNumber  int
 	Body      string
 	ConfigDir string
+	StateDir  string
 }
 
 func (createCommand) isCommand() {}
@@ -24,9 +25,30 @@ type deleteCommand struct {
 	Repo      string
 	PRNumber  int
 	ConfigDir string
+	StateDir  string
 }
 
 func (deleteCommand) isCommand() {}
+
+type getCommand struct {
+	Repo      string
+	PRNumber  int
+	ConfigDir string
+	StateDir  string
+}
+
+func (getCommand) isCommand() {}
+
+type updateBodyCommand struct {
+	Repo      string
+	PRNumber  int
+	Body      string
+	ConfigDir string
+	StateDir  string
+	Force     bool
+}
+
+func (updateBodyCommand) isCommand() {}
 
 type versionCommand struct{}
 
@@ -46,6 +68,10 @@ func parseCommand(args []string) (command, error) {
 		return parseCreateCommand(args[1:])
 	case "delete":
 		return parseDeleteCommand(args[1:])
+	case "get":
+		return parseGetCommand(args[1:])
+	case "update-body":
+		return parseUpdateBodyCommand(args[1:])
 	default:
 		return nil, usageError(fmt.Sprintf("unknown command %q", args[0]))
 	}
@@ -59,6 +85,7 @@ func parseCreateCommand(args []string) (command, error) {
 	prNumber := flags.Int("pr", 0, "pull request number")
 	body := flags.String("body", "", "review body")
 	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
+	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -78,6 +105,7 @@ func parseCreateCommand(args []string) (command, error) {
 		PRNumber:  *prNumber,
 		Body:      *body,
 		ConfigDir: *configDir,
+		StateDir:  *stateDir,
 	}, nil
 }
 
@@ -88,6 +116,7 @@ func parseDeleteCommand(args []string) (command, error) {
 	repo := flags.String("repo", defaultRepo, "repository in OWNER/REPO form")
 	prNumber := flags.Int("pr", 0, "pull request number")
 	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
+	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -103,6 +132,68 @@ func parseDeleteCommand(args []string) (command, error) {
 		Repo:      *repo,
 		PRNumber:  *prNumber,
 		ConfigDir: *configDir,
+		StateDir:  *stateDir,
+	}, nil
+}
+
+func parseGetCommand(args []string) (command, error) {
+	flags := flag.NewFlagSet("get", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+
+	repo := flags.String("repo", defaultRepo, "repository in OWNER/REPO form")
+	prNumber := flags.Int("pr", 0, "pull request number")
+	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
+	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
+
+	if err := flags.Parse(args); err != nil {
+		return nil, usageError(err.Error())
+	}
+	if flags.NArg() != 0 {
+		return nil, usageError(fmt.Sprintf("unexpected trailing arguments: %v", flags.Args()))
+	}
+	if *prNumber <= 0 {
+		return nil, usageError("--pr must be a positive integer")
+	}
+
+	return getCommand{
+		Repo:      *repo,
+		PRNumber:  *prNumber,
+		ConfigDir: *configDir,
+		StateDir:  *stateDir,
+	}, nil
+}
+
+func parseUpdateBodyCommand(args []string) (command, error) {
+	flags := flag.NewFlagSet("update-body", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+
+	repo := flags.String("repo", defaultRepo, "repository in OWNER/REPO form")
+	prNumber := flags.Int("pr", 0, "pull request number")
+	body := flags.String("body", "", "review body")
+	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
+	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
+	force := flags.Bool("force", false, "overwrite even if the review body differs from stored state")
+
+	if err := flags.Parse(args); err != nil {
+		return nil, usageError(err.Error())
+	}
+	if flags.NArg() != 0 {
+		return nil, usageError(fmt.Sprintf("unexpected trailing arguments: %v", flags.Args()))
+	}
+	if *prNumber <= 0 {
+		return nil, usageError("--pr must be a positive integer")
+	}
+	if *body == "" {
+		return nil, usageError("--body is required")
+	}
+
+	return updateBodyCommand{
+		Repo:      *repo,
+		PRNumber:  *prNumber,
+		Body:      *body,
+		ConfigDir: *configDir,
+		StateDir:  *stateDir,
+		Force:     *force,
 	}, nil
 }
 
@@ -110,13 +201,16 @@ func Usage() string {
 	return `gh-draft-review creates and manages pending GitHub pull request reviews.
 
 Usage:
-  gh-draft-review create --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR]
-  gh-draft-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR]
+  gh-draft-review create --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR] [--state-dir DIR]
+  gh-draft-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
+  gh-draft-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
+  gh-draft-review update-body --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR] [--state-dir DIR] [--force]
   gh-draft-review version
 
 Notes:
   - This tool only manipulates pending reviews owned by the authenticated user.
   - It uses isolated gh auth from --config-dir.
+  - It stores the last published review body locally to detect user edits before update.
   - It never submits a review.
 `
 }

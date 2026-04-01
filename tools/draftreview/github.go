@@ -110,6 +110,25 @@ func (c *GitHubClient) DeletePendingReview(ctx context.Context, repo string, prN
 	return nil
 }
 
+func (c *GitHubClient) UpdatePendingReviewBody(ctx context.Context, repo string, prNumber int, reviewID int64, body string) (Review, error) {
+	payload := struct {
+		Body string `json:"body"`
+	}{
+		Body: body,
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPut, fmt.Sprintf("/repos/%s/pulls/%d/reviews/%d", repo, prNumber, reviewID), payload)
+	if err != nil {
+		return Review{}, err
+	}
+
+	var review Review
+	if err := c.doJSON(req, &review); err != nil {
+		return Review{}, err
+	}
+	return review, nil
+}
+
 func (c *GitHubClient) newRequest(ctx context.Context, method string, path string, payload any) (*http.Request, error) {
 	var body io.Reader
 	if payload != nil {
