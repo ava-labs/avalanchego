@@ -375,6 +375,7 @@ func TestUnpackSetFeeConfigInput_malformed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := UnpackSetFeeConfigInput(tt.input)
+			//nolint:forbidigo // ABI decode errors are unexported; ErrorIs is not possible
 			require.ErrorContains(t, err, tt.wantErr, "UnpackSetFeeConfigInput(%x)", tt.input)
 		})
 	}
