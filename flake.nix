@@ -56,6 +56,7 @@
             kubernetes-helm                            # Helm CLI (Kubernetes package manager)
 
             # JSON processing
+            gh
             jq
 
             # Linters

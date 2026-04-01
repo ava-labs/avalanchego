@@ -1,0 +1,27 @@
+package draftreview
+
+import (
+	"os"
+	"path/filepath"
+)
+
+const (
+	defaultRepo             = "ava-labs/avalanchego"
+	defaultGitHubAPIBaseURL = "https://api.github.com"
+)
+
+func defaultConfigDir() string {
+	if dir := os.Getenv("GH_DRAFT_REVIEW_CONFIG_DIR"); dir != "" {
+		return dir
+	}
+
+	configHome := os.Getenv("XDG_CONFIG_HOME")
+	if configHome == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return ".config/gh-draft-review"
+		}
+		configHome = filepath.Join(homeDir, ".config")
+	}
+	return filepath.Join(configHome, "gh-draft-review")
+}
