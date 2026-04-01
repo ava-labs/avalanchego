@@ -78,7 +78,7 @@ func StandardTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	tx *txs.Tx,
-	state state.Diff,
+	state *state.Diff,
 ) (set.Set[ids.ID], map[ids.ID]*atomic.Requests, func(), error) {
 	standardExecutor := standardTxExecutor{
 		backend:       backend,
@@ -96,7 +96,7 @@ func StandardTx(
 type standardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
-	state         state.Diff // state is expected to be modified
+	state         *state.Diff // state is expected to be modified
 	feeCalculator fee.Calculator
 	tx            *txs.Tx
 
