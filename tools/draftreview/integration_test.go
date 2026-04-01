@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestCreatePendingReviewLive(t *testing.T) {
@@ -37,13 +39,13 @@ func TestCreatePendingReviewLive(t *testing.T) {
 	stateDir := t.TempDir()
 
 	ctx := context.Background()
-	tokenProvider := NewGHTokenProvider()
+	tokenProvider := NewGHTokenProvider(logging.NoLog{})
 	token, err := tokenProvider.Token(ctx, configDir)
 	if err != nil {
 		t.Fatalf("acquire token: %v", err)
 	}
 
-	client := NewGitHubClient(DefaultHTTPClient(), defaultGitHubAPIBaseURL, token)
+	client := NewGitHubClient(logging.NoLog{}, DefaultHTTPClient(), defaultGitHubAPIBaseURL, token)
 	viewer, err := client.Viewer(ctx)
 	if err != nil {
 		t.Fatalf("resolve viewer: %v", err)

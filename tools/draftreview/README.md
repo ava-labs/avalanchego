@@ -16,6 +16,26 @@ The required boundary is:
 - the write-capable path is narrowly scoped to draft review manipulation only
 - the tool must never submit the review; a human submits it in the GitHub UI
 
+## Logging Rationale
+
+This package intentionally uses zap-backed structured logging through the repo's
+`utils/logging` abstraction even though the workflow is small.
+
+The point is not that `gh-pending-review` is operationally complex. The point is
+that agents need legible execution traces when something goes wrong. A failed
+test, a mismatched local state file, or an unexpected GitHub API response should
+leave behind enough structured context to reconstruct what happened without
+re-running the workflow blindly.
+
+The logging model follows `tests/fixture/tmpnet`:
+
+- log command entry points and external call boundaries at debug
+- log review creation, update, deletion, and persisted state changes at info
+- prefer stable structured fields over interpolated strings
+
+That makes this package a small but concrete example of the observability
+standard expected for future agent-developed tooling.
+
 ## What Was Learned
 
 The key design question was whether GitHub CLI authentication could be used for
