@@ -39,7 +39,8 @@ if [[ -z "${checksum}" || "${checksum}" == "null" ]]; then
 fi
 echo "Go checksum: ${checksum}"
 
-docker build \
+# Include --load for compatibility with podman (docker alternative)
+docker build --load \
     --build-arg GO_VERSION="${GO_VERSION}" \
     --build-arg GO_CHECKSUM="${checksum}" \
     -t "${DOCKER_IMAGE}" \
