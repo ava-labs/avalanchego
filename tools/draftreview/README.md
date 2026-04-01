@@ -5,14 +5,14 @@ reviews as part of an agent-assisted review workflow.
 
 ## Goal
 
-Enable an agent to manipulate a GitHub pull request draft review as part of a
+Enable an agent to manipulate a GitHub pull request pending review as part of a
 human-in-the-loop review workflow, while keeping normal `gh` usage on the
 machine read-only via the existing PAT-based environment.
 
 The required boundary is:
 
 - normal `gh` usage continues to use the ambient read-only token path
-- draft review operations use a separate authenticated `gh` context
+- pending review operations use a separate authenticated `gh` context
 - the write-capable path is narrowly scoped to draft review manipulation only
 - the tool must never submit the review; a human submits it in the GitHub UI
 
@@ -66,7 +66,7 @@ supposed to preserve.
 ## What Was Learned
 
 The key design question was whether GitHub CLI authentication could be used for
-draft reviews at all, given that:
+pending reviews at all, given that:
 
 - `gh pr review` does not expose a draft/pending review mode
 - the user does not have a PAT with PR write access
@@ -148,7 +148,7 @@ This returned PR metadata for:
 - title: `[ci] Update rpm builder script for podman compatibility`
 - user: `maru-ava`
 
-### Draft Review Creation Validation
+### Pending Review Creation Validation
 
 The isolated auth was able to create a pending review:
 
@@ -170,7 +170,7 @@ This returned:
 This is the core proof that the intended auth and API model works end to end
 without a PAT that has PR write access.
 
-### Draft Review Retrieval Validation
+### Pending Review Retrieval Validation
 
 The created pending review was retrievable through both list and get endpoints:
 
@@ -189,7 +189,7 @@ Both returned the pending review with:
 - body: `test`
 
 That matters because the desired workflow requires the agent to pull down the
-current draft review after the human edits it in the GitHub UI.
+current pending review after the human edits it in the GitHub UI.
 
 ## Confirmed API Capabilities
 
@@ -214,7 +214,7 @@ mutation of individual draft inline comments. Because of that, a higher-level
 
 The intended human-in-the-loop loop is:
 
-1. agent creates or replaces a draft review
+1. agent creates or replaces a pending review
 2. human opens the pending review in GitHub
 3. human edits the top-level review body or inline review comments
 4. human can add `!!` markers or other instructions directed at the agent
@@ -222,7 +222,7 @@ The intended human-in-the-loop loop is:
 6. agent updates or replaces the pending review based on the human edits
 7. human manually submits the review in GitHub when satisfied
 
-The tool must assist with draft state only. It must never submit.
+The tool must assist with pending-review state only. It must never submit.
 
 ## Recommended Maintained Design
 
@@ -334,6 +334,22 @@ Intentionally excluded:
 - `request-changes`
 - any generic GitHub write operations outside review endpoints
 
+## Body Workflow
+
+The currently implemented body-only workflow is:
+
+1. create a pending review with a top-level body
+2. store the exact body that was published
+3. fetch the current pending review body with `get`
+4. update the body only if the live body still matches the stored last
+   published body
+5. refuse to overwrite if the human has edited the body in GitHub
+6. allow an explicit `--force` update only after the agent has read and
+   reconciled the current live body
+
+This is the baseline safety model. Inline comment support must preserve the
+same overwrite protection guarantees.
+
 ## First Milestone
 
 The first milestone is intentionally narrow:
@@ -410,18 +426,142 @@ use:
 the distinction between "what the agent last published" and "what the agent has
 most recently read."
 
+## Inline Comment Model
+
+Inline comments are the main remaining capability after the body-only workflow.
+The README is the source of truth for the intended first implementation.
+
+### Scope
+
+The first inline-comment implementation should stay narrow:
+
+- modern line-based review comments only
+- comments owned by the authenticated user only
+- comments attached to the authenticated user's `PENDING` review only
+- no review submission
+- no approve/request-changes flows
+- no generic GitHub write surface outside pending review endpoints
+
+### Read Shape
+
+The first useful `get` result for comment-aware workflows should include both:
+
+- the top-level pending review body
+- the authenticated user's pending inline review comments
+
+The intent is that the agent sees the entire current pending-review state in a
+single read operation before deciding how to update it.
+
+### Write Shape
+
+The first comment write path should favor replace semantics over granular
+mutation.
+
+Recommended initial operation:
+
+- replace the authenticated user's pending review comments as a set
+
+Reasoning:
+
+- GitHub's granular pending-comment mutation surface is more awkward and easier
+  to get wrong
+- the agent workflow naturally wants to regenerate the intended set of pending
+  comments after reading the current review
+- replace semantics align better with optimistic concurrency and reduce partial
+  update edge cases
+
+That means the likely first implementation is:
+
+- keep `update-body` for top-level body-only changes
+- add a comment-aware replace operation for body plus comments, or comments
+  alone, based on the authenticated user's current pending review
+
+### Input Shape
+
+The first durable inline-comment input should be structured and file-based.
+
+Suggested initial comment shape:
+
+```json
+[
+  {
+    "path": "file.go",
+    "line": 123,
+    "side": "RIGHT",
+    "body": "!! re-check this error path"
+  }
+]
+```
+
+The first version should:
+
+- validate the JSON schema strictly
+- reject unsupported legacy positioning fields
+- avoid mixing multiple incompatible comment-position models in one command
+
+## Inline Comment Conflict Model
+
+Inline comments need the same overwrite protection as the review body.
+
+### Principle
+
+The tool must not blindly overwrite manual user edits to pending inline
+comments. A normal comment update should fail if the live comment set no longer
+matches what the tool last published.
+
+### State Requirement
+
+Once inline comments are supported, local state should be extended to store:
+
+- the last published review body
+- the last published pending comment set
+- the pending review ID
+
+The key distinction remains:
+
+- stored state means what the agent last published
+- reading current GitHub state does not silently update stored state
+
+### Conflict Rule
+
+Normal comment writes should:
+
+1. load the stored last-published comment set
+2. fetch the current live pending comment set
+3. compare them
+4. fail with a conflict if they differ
+
+That conflict should instruct the caller to:
+
+1. run `get`
+2. reconcile the live review body and comments
+3. retry intentionally, using an explicit override only when overwrite is
+   desired
+
+### Override Path
+
+An explicit override path is acceptable, but it must not be the default.
+
+The design goal is not to make overwrites impossible. It is to make them
+intentional and visible to the agent so that manual GitHub edits are not
+silently clobbered.
+
 ## Testing Strategy
 
 The primary risk is live behavior, not local parsing. Because of that, the
 first meaningful validation should be an opt-in integration test against
 GitHub.
 
-The initial test target should:
+The body-only live test already validates create, external edit, conflict, and
+forced reconcile for the top-level review body.
+
+The next live test target for inline comments should:
 
 - accept a target PR number through explicit configuration
 - allow hard-coding `ava-labs/avalanchego` for the initial implementation
 - create a pending review with body `test`
-- fetch the review and verify the expected author, state, and body
+- create or replace pending inline comments for that review
+- fetch the full pending review state and verify body plus comments
 
 Safety expectations for the live test:
 
@@ -431,6 +571,8 @@ Safety expectations for the live test:
 - it should avoid touching unrelated reviews
 - if practical for the initial flow, it should delete the test-created pending
   review during cleanup
+- it should verify conflict detection after a simulated external manual change
+  to the pending inline comments
 
 Unit tests are still useful, but secondary. They should focus on narrow,
 deterministic logic such as:
@@ -458,33 +600,6 @@ The implementation should enforce these constraints in code:
 This is the main mechanism for narrowing the privilege surface of the OAuth
 token.
 
-## Data Model Direction
-
-The first maintained version should accept:
-
-- top-level review body from a file or stdin
-- review comments from a structured JSON file
-
-Suggested initial comment shape:
-
-```json
-[
-  {
-    "path": "file.go",
-    "line": 123,
-    "side": "RIGHT",
-    "body": "!! re-check this error path"
-  }
-]
-```
-
-Keep the first implementation narrow:
-
-- use modern line-based review comments
-- validate the JSON schema strictly
-- avoid broad support for every legacy GitHub comment-position variant until
-  needed
-
 ## Testing Requirements
 
 Automated testing is a requirement. The tool should not depend on manual
@@ -506,6 +621,8 @@ The maintained implementation should include:
   - replace
   - author/state guardrails
   - error mapping
+  - state persistence for both body and inline comments
+  - conflict detection for both body and inline comments
 
 ### Live Smoke Tests
 
@@ -519,6 +636,9 @@ These should exercise:
 - update review body
 - delete pending review
 - replace pending review
+- create or replace pending inline comments
+- fetch pending inline comments
+- conflict on user-edited pending inline comments
 
 Live smoke tests should still never submit the review.
 
@@ -529,8 +649,10 @@ The current Go implementation provides:
 - package `github.com/ava-labs/avalanchego/tools/draftreview`
 - minimal binary entrypoint at `tools/draftreview/cmd/main.go`
 - repo-local launcher at `bin/gh-pending-review`
-- initial `create` command for creating a pending review
-- live integration test coverage for create, fetch, and cleanup
+- body-only pending review commands: `create`, `get`, `update-body`, `delete`
+- local state tracking for last-published review bodies
+- live integration test coverage for create, fetch, conflict, forced reconcile,
+  and cleanup
 - build-time version metadata via embedded git commit
 
 Current command shape:
@@ -570,6 +692,17 @@ The test will:
 - verify that `update-body` refuses to overwrite that external change
 - verify that an explicit `--force` update succeeds after that conflict
 - delete the created pending review during cleanup
+
+## Remaining Work
+
+The main remaining implementation work is:
+
+- define and document the first inline-comment replace model
+- extend `get` to return pending body plus inline comments together
+- implement pending inline comment write support
+- extend local state and conflict protection to inline comments
+- add live integration coverage for inline comments
+- improve file-based input and state ergonomics for day-to-day agent use
 
 ## Key Facts Not To Lose
 
