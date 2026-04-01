@@ -9,7 +9,12 @@
 
 version: '3'
 
+# Included Taskfiles share one variable namespace. Prefix included-task vars with
+# a domain-specific name (for example `DRAFT_REVIEW_`) so they do not collide
+# with root vars or other includes.
 includes:
+  draftreview:
+    taskfile: tools/draftreview/Taskfile.yml
   packaging:
     taskfile: .github/packaging/Taskfile.yml
 
