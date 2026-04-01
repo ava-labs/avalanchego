@@ -9,6 +9,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 type HTTPDoer interface {
@@ -23,13 +27,15 @@ type GitHubClient struct {
 	httpClient HTTPDoer
 	baseURL    string
 	token      string
+	log        logging.Logger
 }
 
-func NewGitHubClient(httpClient HTTPDoer, baseURL string, token string) *GitHubClient {
+func NewGitHubClient(log logging.Logger, httpClient HTTPDoer, baseURL string, token string) *GitHubClient {
 	return &GitHubClient{
 		httpClient: httpClient,
 		baseURL:    strings.TrimRight(baseURL, "/"),
 		token:      token,
+		log:        log,
 	}
 }
 
@@ -97,11 +103,21 @@ func (c *GitHubClient) DeletePendingReview(ctx context.Context, repo string, prN
 		return err
 	}
 
+	c.log.Debug("sending GitHub API request",
+		zap.String("method", req.Method),
+		zap.String("path", req.URL.Path),
+	)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	c.log.Debug("received GitHub API response",
+		zap.String("method", req.Method),
+		zap.String("path", req.URL.Path),
+		zap.Int("statusCode", resp.StatusCode),
+	)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<10))
@@ -149,15 +165,29 @@ func (c *GitHubClient) newRequest(ctx context.Context, method string, path strin
 	if payload != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	c.log.Debug("constructed GitHub API request",
+		zap.String("method", method),
+		zap.String("path", path),
+	)
 	return req, nil
 }
 
 func (c *GitHubClient) doJSON(req *http.Request, target any) error {
+	c.log.Debug("sending GitHub API request",
+		zap.String("method", req.Method),
+		zap.String("path", req.URL.Path),
+	)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	c.log.Debug("received GitHub API response",
+		zap.String("method", req.Method),
+		zap.String("path", req.URL.Path),
+		zap.Int("statusCode", resp.StatusCode),
+	)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<10))

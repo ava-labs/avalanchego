@@ -7,6 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 type ReviewState struct {
@@ -20,10 +24,14 @@ type ReviewState struct {
 
 type StateStore struct {
 	rootDir string
+	log     logging.Logger
 }
 
-func NewStateStore(rootDir string) StateStore {
-	return StateStore{rootDir: rootDir}
+func NewStateStore(log logging.Logger, rootDir string) StateStore {
+	return StateStore{
+		rootDir: rootDir,
+		log:     log,
+	}
 }
 
 func defaultStateDir() string {
@@ -51,6 +59,13 @@ func (s StateStore) Save(state ReviewState) error {
 	if err != nil {
 		return err
 	}
+	s.log.Info("saving review state",
+		zap.String("repo", state.Repo),
+		zap.Int("prNumber", state.PRNumber),
+		zap.String("userLogin", state.UserLogin),
+		zap.Int64("reviewID", state.ReviewID),
+		zap.String("path", path),
+	)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -60,7 +75,17 @@ func (s StateStore) Save(state ReviewState) error {
 		return err
 	}
 	encoded = append(encoded, '\n')
-	return os.WriteFile(path, encoded, 0o644)
+	if err := os.WriteFile(path, encoded, 0o644); err != nil {
+		return err
+	}
+	s.log.Info("saved review state",
+		zap.String("repo", state.Repo),
+		zap.Int("prNumber", state.PRNumber),
+		zap.String("userLogin", state.UserLogin),
+		zap.Int64("reviewID", state.ReviewID),
+		zap.String("path", path),
+	)
+	return nil
 }
 
 func (s StateStore) Load(repo string, userLogin string, prNumber int) (ReviewState, error) {
@@ -68,6 +93,12 @@ func (s StateStore) Load(repo string, userLogin string, prNumber int) (ReviewSta
 	if err != nil {
 		return ReviewState{}, err
 	}
+	s.log.Debug("loading review state",
+		zap.String("repo", repo),
+		zap.Int("prNumber", prNumber),
+		zap.String("userLogin", userLogin),
+		zap.String("path", path),
+	)
 
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -81,6 +112,13 @@ func (s StateStore) Load(repo string, userLogin string, prNumber int) (ReviewSta
 	if err := json.Unmarshal(content, &state); err != nil {
 		return ReviewState{}, err
 	}
+	s.log.Debug("loaded review state",
+		zap.String("repo", repo),
+		zap.Int("prNumber", prNumber),
+		zap.String("userLogin", userLogin),
+		zap.Int64("reviewID", state.ReviewID),
+		zap.String("path", path),
+	)
 	return state, nil
 }
 
@@ -89,9 +127,21 @@ func (s StateStore) Delete(repo string, userLogin string, prNumber int) error {
 	if err != nil {
 		return err
 	}
+	s.log.Info("deleting review state",
+		zap.String("repo", repo),
+		zap.Int("prNumber", prNumber),
+		zap.String("userLogin", userLogin),
+		zap.String("path", path),
+	)
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
+	s.log.Info("deleted review state",
+		zap.String("repo", repo),
+		zap.Int("prNumber", prNumber),
+		zap.String("userLogin", userLogin),
+		zap.String("path", path),
+	)
 	return nil
 }
 

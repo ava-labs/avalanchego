@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestStateStoreSaveLoadDelete(t *testing.T) {
 	t.Parallel()
 
-	store := NewStateStore(t.TempDir())
+	store := NewStateStore(logging.NoLog{}, t.TempDir())
 	state := ReviewState{
 		Repo:              "ava-labs/avalanchego",
 		PRNumber:          5168,
