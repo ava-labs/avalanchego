@@ -1,9 +1,11 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package main
 
 import (
 	"os"
 	"os/exec"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -23,10 +25,11 @@ func TestMainPrintsStackTraceWhenEnabled(t *testing.T) {
 	)
 
 	output, err := cmd.CombinedOutput()
-	require.Error(t, err)
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr)
 
 	stderr := string(output)
-	require.True(t, strings.Contains(stderr, "missing command"), "expected usage error in output, got %q", stderr)
-	require.True(t, strings.Contains(stderr, "Stack trace:"), "expected stack trace in output, got %q", stderr)
-	require.True(t, strings.Contains(stderr, "/tools/draftreview/cmd/main.go:"), "expected stack frame for main.go in output, got %q", stderr)
+	require.Contains(t, stderr, "missing command")
+	require.Contains(t, stderr, "Stack trace:")
+	require.Contains(t, stderr, "/tools/draftreview/cmd/main.go:")
 }

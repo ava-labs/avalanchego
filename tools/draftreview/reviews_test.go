@@ -1,6 +1,13 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package draftreview
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestFindPendingReviewForAuthor(t *testing.T) {
 	t.Parallel()
@@ -12,12 +19,8 @@ func TestFindPendingReviewForAuthor(t *testing.T) {
 	}
 
 	review, found := FindPendingReviewForAuthor(reviews, "maru")
-	if !found {
-		t.Fatalf("expected to find pending review")
-	}
-	if review.ID != 3 {
-		t.Fatalf("unexpected review id %d", review.ID)
-	}
+	require.True(t, found)
+	require.Equal(t, int64(3), review.ID)
 }
 
 func TestEnsureNoPendingReviewForAuthor(t *testing.T) {
@@ -26,7 +29,5 @@ func TestEnsureNoPendingReviewForAuthor(t *testing.T) {
 	err := EnsureNoPendingReviewForAuthor([]Review{
 		{ID: 7, State: reviewStatePending, User: User{Login: "maru"}},
 	}, "maru")
-	if err == nil {
-		t.Fatalf("expected error")
-	}
+	require.EqualError(t, err, "refusing to create a new pending review because maru already has pending review 7")
 }

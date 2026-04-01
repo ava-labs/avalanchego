@@ -1,3 +1,6 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package draftreview
 
 import (
@@ -46,15 +49,14 @@ func TestRunCreateLogsStructuredOperations(t *testing.T) {
 	)
 
 	stateDir := t.TempDir()
-	err := app.Run(t.Context(), []string{
+	require.NoError(t, app.Run(t.Context(), []string{
 		"create",
 		"--repo", "ava-labs/avalanchego",
 		"--pr", "5168",
 		"--body", "test",
 		"--config-dir", t.TempDir(),
 		"--state-dir", stateDir,
-	})
-	require.NoError(t, err)
+	}))
 
 	logOutput := stderr.String()
 	for _, expected := range []string{

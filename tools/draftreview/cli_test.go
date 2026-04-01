@@ -1,112 +1,73 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package draftreview
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestParseDeleteCommand(t *testing.T) {
 	t.Parallel()
 
 	command, err := parseCommand([]string{"delete", "--pr", "5168"})
-	if err != nil {
-		t.Fatalf("parseCommand returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	deleteCommand, ok := command.(deleteCommand)
-	if !ok {
-		t.Fatalf("unexpected command type %T", command)
-	}
-	if deleteCommand.Repo != defaultRepo {
-		t.Fatalf("unexpected repo %q", deleteCommand.Repo)
-	}
-	if deleteCommand.PRNumber != 5168 {
-		t.Fatalf("unexpected pr number %d", deleteCommand.PRNumber)
-	}
-	if deleteCommand.StateDir == "" {
-		t.Fatalf("expected state dir")
-	}
+	require.True(t, ok, "unexpected command type %T", command)
+	require.Equal(t, defaultRepo, deleteCommand.Repo)
+	require.Equal(t, 5168, deleteCommand.PRNumber)
+	require.NotEmpty(t, deleteCommand.StateDir)
 }
 
 func TestParseGetCommand(t *testing.T) {
 	t.Parallel()
 
 	command, err := parseCommand([]string{"get", "--pr", "5168"})
-	if err != nil {
-		t.Fatalf("parseCommand returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	getCommand, ok := command.(getCommand)
-	if !ok {
-		t.Fatalf("unexpected command type %T", command)
-	}
-	if getCommand.PRNumber != 5168 {
-		t.Fatalf("unexpected pr number %d", getCommand.PRNumber)
-	}
-	if getCommand.StateDir == "" {
-		t.Fatalf("expected state dir")
-	}
+	require.True(t, ok, "unexpected command type %T", command)
+	require.Equal(t, 5168, getCommand.PRNumber)
+	require.NotEmpty(t, getCommand.StateDir)
 }
 
 func TestParseUpdateBodyCommand(t *testing.T) {
 	t.Parallel()
 
 	command, err := parseCommand([]string{"update-body", "--pr", "5168", "--body", "test"})
-	if err != nil {
-		t.Fatalf("parseCommand returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	updateBodyCommand, ok := command.(updateBodyCommand)
-	if !ok {
-		t.Fatalf("unexpected command type %T", command)
-	}
-	if updateBodyCommand.PRNumber != 5168 {
-		t.Fatalf("unexpected pr number %d", updateBodyCommand.PRNumber)
-	}
-	if updateBodyCommand.Body != "test" {
-		t.Fatalf("unexpected body %q", updateBodyCommand.Body)
-	}
-	if updateBodyCommand.StateDir == "" {
-		t.Fatalf("expected state dir")
-	}
-	if updateBodyCommand.Force {
-		t.Fatalf("expected force to default to false")
-	}
+	require.True(t, ok, "unexpected command type %T", command)
+	require.Equal(t, 5168, updateBodyCommand.PRNumber)
+	require.Equal(t, "test", updateBodyCommand.Body)
+	require.NotEmpty(t, updateBodyCommand.StateDir)
+	require.False(t, updateBodyCommand.Force)
 }
 
 func TestParseUpdateBodyCommandForce(t *testing.T) {
 	t.Parallel()
 
 	command, err := parseCommand([]string{"update-body", "--pr", "5168", "--body", "test", "--force"})
-	if err != nil {
-		t.Fatalf("parseCommand returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	updateBodyCommand, ok := command.(updateBodyCommand)
-	if !ok {
-		t.Fatalf("unexpected command type %T", command)
-	}
-	if !updateBodyCommand.Force {
-		t.Fatalf("expected force to be true")
-	}
+	require.True(t, ok, "unexpected command type %T", command)
+	require.True(t, updateBodyCommand.Force)
 }
 
 func TestParseReplaceCommentsCommand(t *testing.T) {
 	t.Parallel()
 
 	command, err := parseCommand([]string{"replace-comments", "--pr", "5168", "--comments-file", "/tmp/comments.json", "--force"})
-	if err != nil {
-		t.Fatalf("parseCommand returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	replaceCommentsCommand, ok := command.(replaceCommentsCommand)
-	if !ok {
-		t.Fatalf("unexpected command type %T", command)
-	}
-	if replaceCommentsCommand.PRNumber != 5168 {
-		t.Fatalf("unexpected pr number %d", replaceCommentsCommand.PRNumber)
-	}
-	if replaceCommentsCommand.CommentsFile != "/tmp/comments.json" {
-		t.Fatalf("unexpected comments file %q", replaceCommentsCommand.CommentsFile)
-	}
-	if !replaceCommentsCommand.Force {
-		t.Fatalf("expected force to be true")
-	}
+	require.True(t, ok, "unexpected command type %T", command)
+	require.Equal(t, 5168, replaceCommentsCommand.PRNumber)
+	require.Equal(t, "/tmp/comments.json", replaceCommentsCommand.CommentsFile)
+	require.True(t, replaceCommentsCommand.Force)
 }

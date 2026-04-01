@@ -1,9 +1,14 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package draftreview
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadCommentsFile(t *testing.T) {
@@ -15,20 +20,12 @@ func TestLoadCommentsFile(t *testing.T) {
   {"path":"b.go","line":2,"side":"RIGHT","body":"second"},
   {"path":"a.go","line":1,"side":"RIGHT","body":"first"}
 ]`
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("write comments file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 
 	comments, err := loadCommentsFile(path)
-	if err != nil {
-		t.Fatalf("loadCommentsFile returned error: %v", err)
-	}
-	if len(comments) != 2 {
-		t.Fatalf("unexpected comment count %d", len(comments))
-	}
-	if comments[0].Path != "a.go" {
-		t.Fatalf("expected normalized ordering, got first path %q", comments[0].Path)
-	}
+	require.NoError(t, err)
+	require.Len(t, comments, 2)
+	require.Equal(t, "a.go", comments[0].Path)
 }
 
 func TestLoadCommentsFileRejectsUnknownField(t *testing.T) {
@@ -37,11 +34,8 @@ func TestLoadCommentsFileRejectsUnknownField(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "comments.json")
 	content := `[{"path":"a.go","line":1,"side":"RIGHT","body":"first","position":3}]`
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("write comments file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 
-	if _, err := loadCommentsFile(path); err == nil {
-		t.Fatal("expected error for unknown field")
-	}
+	_, err := loadCommentsFile(path)
+	require.EqualError(t, err, `json: unknown field "position"`)
 }
