@@ -1,0 +1,43 @@
+# GitHub pending review helper tasks.
+
+version: '3'
+
+vars:
+  DRAFT_REVIEW_REPO_ROOT:
+    sh: cd "{{.TASKFILE_DIR}}/../.." && pwd
+  DRAFT_REVIEW_NIX_RUN: '{{printf "%s/scripts/nix_run.sh" .DRAFT_REVIEW_REPO_ROOT}}'
+  DRAFT_REVIEW_CONFIG_DIR:
+    sh: echo "${GH_PENDING_REVIEW_CONFIG_DIR:-${HOME}/.config/gh-pending-review}"
+
+tasks:
+  default:
+    desc: Lists available draftreview tasks
+    silent: true
+    cmd: task --list | grep draftreview
+
+  auth-login:
+    desc: Start the isolated gh auth login flow used by gh-pending-review
+    cmds:
+      - cmd: >-
+          printf '%s\n' \
+          'Starting isolated GitHub CLI auth for gh-pending-review.' \
+          'When prompted with "Authenticate Git with your GitHub credentials?", answer "n".' \
+          'This config is for API access only and should not configure Git auth.'
+      - cmd: >-
+          env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN
+          GH_CONFIG_DIR="{{.DRAFT_REVIEW_CONFIG_DIR}}"
+          {{.DRAFT_REVIEW_NIX_RUN}} gh auth login --hostname github.com --web --git-protocol https
+
+  auth-status:
+    desc: Show isolated gh auth status used by gh-pending-review
+    cmd: >-
+      env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN
+      GH_CONFIG_DIR="{{.DRAFT_REVIEW_CONFIG_DIR}}"
+      {{.DRAFT_REVIEW_NIX_RUN}} gh auth status --hostname github.com
+
+  auth-logout:
+    desc: Invalidate isolated gh auth used by gh-pending-review
+    cmd: >-
+      env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN
+      GH_CONFIG_DIR="{{.DRAFT_REVIEW_CONFIG_DIR}}"
+      {{.DRAFT_REVIEW_NIX_RUN}} gh auth logout --hostname github.com
