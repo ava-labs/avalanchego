@@ -18,9 +18,27 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
+
+func TestGenesisCustomMinDelay(t *testing.T) {
+	const initialMinDelayMS = 12345
+	db := rawdb.NewMemoryDatabase()
+	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+	config := params.TestGraniteChainConfig
+	params.GetExtra(config).InitialMinDelayMS = initialMinDelayMS
+	genesis := &Genesis{
+		Config: config,
+	}
+	block, err := genesis.Commit(db, tdb)
+	require.NoError(t, err)
+
+	expectedMinDelay := acp226.DesiredDelayExcess(initialMinDelayMS)
+	require.Equal(t, expectedMinDelay, *customtypes.GetHeaderExtra(block.Header()).MinDelayExcess)
+}
 
 func TestGenesisEthUpgrades(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
