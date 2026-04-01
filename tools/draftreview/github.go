@@ -12,6 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -42,12 +43,12 @@ func NewGitHubClient(log logging.Logger, httpClient HTTPDoer, baseURL string, to
 func (c *GitHubClient) Viewer(ctx context.Context) (User, error) {
 	req, err := c.newRequest(ctx, http.MethodGet, "/user", nil)
 	if err != nil {
-		return User{}, err
+		return User{}, stacktrace.Wrap(err)
 	}
 
 	var user User
 	if err := c.doJSON(req, &user); err != nil {
-		return User{}, err
+		return User{}, stacktrace.Wrap(err)
 	}
 	return user, nil
 }
@@ -61,12 +62,12 @@ func (c *GitHubClient) CreatePendingReview(ctx context.Context, repo string, prN
 
 	req, err := c.newRequest(ctx, http.MethodPost, fmt.Sprintf("/repos/%s/pulls/%d/reviews", repo, prNumber), payload)
 	if err != nil {
-		return Review{}, err
+		return Review{}, stacktrace.Wrap(err)
 	}
 
 	var review Review
 	if err := c.doJSON(req, &review); err != nil {
-		return Review{}, err
+		return Review{}, stacktrace.Wrap(err)
 	}
 	return review, nil
 }
@@ -74,12 +75,12 @@ func (c *GitHubClient) CreatePendingReview(ctx context.Context, repo string, prN
 func (c *GitHubClient) GetReview(ctx context.Context, repo string, prNumber int, reviewID int64) (Review, error) {
 	req, err := c.newRequest(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/pulls/%d/reviews/%d", repo, prNumber, reviewID), nil)
 	if err != nil {
-		return Review{}, err
+		return Review{}, stacktrace.Wrap(err)
 	}
 
 	var review Review
 	if err := c.doJSON(req, &review); err != nil {
-		return Review{}, err
+		return Review{}, stacktrace.Wrap(err)
 	}
 	return review, nil
 }
@@ -87,12 +88,12 @@ func (c *GitHubClient) GetReview(ctx context.Context, repo string, prNumber int,
 func (c *GitHubClient) ListReviews(ctx context.Context, repo string, prNumber int) ([]Review, error) {
 	req, err := c.newRequest(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/pulls/%d/reviews", repo, prNumber), nil)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 
 	var reviews []Review
 	if err := c.doJSON(req, &reviews); err != nil {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 	return reviews, nil
 }
@@ -100,7 +101,7 @@ func (c *GitHubClient) ListReviews(ctx context.Context, repo string, prNumber in
 func (c *GitHubClient) DeletePendingReview(ctx context.Context, repo string, prNumber int, reviewID int64) error {
 	req, err := c.newRequest(ctx, http.MethodDelete, fmt.Sprintf("/repos/%s/pulls/%d/reviews/%d", repo, prNumber, reviewID), nil)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	c.log.Debug("sending GitHub API request",
@@ -109,7 +110,7 @@ func (c *GitHubClient) DeletePendingReview(ctx context.Context, repo string, prN
 	)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	defer resp.Body.Close()
 
@@ -121,7 +122,7 @@ func (c *GitHubClient) DeletePendingReview(ctx context.Context, repo string, prN
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<10))
-		return fmt.Errorf("GitHub API %s: %s", resp.Status, strings.TrimSpace(string(body)))
+		return stacktrace.Errorf("GitHub API %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 	return nil
 }
@@ -135,12 +136,12 @@ func (c *GitHubClient) UpdatePendingReviewBody(ctx context.Context, repo string,
 
 	req, err := c.newRequest(ctx, http.MethodPut, fmt.Sprintf("/repos/%s/pulls/%d/reviews/%d", repo, prNumber, reviewID), payload)
 	if err != nil {
-		return Review{}, err
+		return Review{}, stacktrace.Wrap(err)
 	}
 
 	var review Review
 	if err := c.doJSON(req, &review); err != nil {
-		return Review{}, err
+		return Review{}, stacktrace.Wrap(err)
 	}
 	return review, nil
 }
@@ -150,14 +151,14 @@ func (c *GitHubClient) newRequest(ctx context.Context, method string, path strin
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
 		if err != nil {
-			return nil, err
+			return nil, stacktrace.Wrap(err)
 		}
 		body = bytes.NewReader(encoded)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("Authorization", "Bearer "+c.token)
@@ -179,7 +180,7 @@ func (c *GitHubClient) doJSON(req *http.Request, target any) error {
 	)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	defer resp.Body.Close()
 
@@ -191,11 +192,11 @@ func (c *GitHubClient) doJSON(req *http.Request, target any) error {
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<10))
-		return fmt.Errorf("GitHub API %s: %s", resp.Status, strings.TrimSpace(string(body)))
+		return stacktrace.Errorf("GitHub API %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
-		return fmt.Errorf("decode GitHub API response: %w", err)
+		return stacktrace.Errorf("decode GitHub API response: %w", err)
 	}
 	return nil
 }

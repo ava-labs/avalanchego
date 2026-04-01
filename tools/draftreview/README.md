@@ -36,6 +36,33 @@ The logging model follows `tests/fixture/tmpnet`:
 That makes this package a small but concrete example of the observability
 standard expected for future agent-developed tooling.
 
+## Stack Trace Errors
+
+This package also follows `tests/fixture/tmpnet` in opting into stack-bearing
+errors via `tests/fixture/stacktrace`.
+
+Set `STACK_TRACE_ERRORS=1` when running `gh-pending-review` to include a stack
+trace in emitted errors. This tool is agent-facing and not performance
+critical, so the usual Go tradeoff of omitting stack traces for overhead does
+not apply here.
+
+The point is better agent debugging: when a command fails because of a bad local
+state file, an auth problem, or an unexpected GitHub API response, the stack
+trace shows where the failure was constructed instead of forcing a blind
+reproduction loop.
+
+For future maintenance, treat this as a package-level rule:
+
+- create all new errors originating in this package with
+  `stacktrace.New` or `stacktrace.Errorf`
+- wrap errors returned from other packages or libraries with
+  `stacktrace.Wrap` before returning them
+
+This is the only way to keep stack traces attached consistently as the tool
+evolves. If a new error path bypasses `tests/fixture/stacktrace`, that failure
+will fall back to a plain Go error and lose the debugging context this tool is
+supposed to preserve.
+
 ## What Was Learned
 
 The key design question was whether GitHub CLI authentication could be used for
