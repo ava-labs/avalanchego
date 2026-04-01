@@ -198,14 +198,14 @@ func parseUpdateBodyCommand(args []string) (command, error) {
 }
 
 func Usage() string {
-	return `gh-draft-review creates and manages pending GitHub pull request reviews.
+	return `gh-pending-review creates and manages pending GitHub pull request reviews.
 
 Usage:
-  gh-draft-review create --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR] [--state-dir DIR]
-  gh-draft-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
-  gh-draft-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
-  gh-draft-review update-body --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR] [--state-dir DIR] [--force]
-  gh-draft-review version
+  gh-pending-review create --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR] [--state-dir DIR]
+  gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
+  gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
+  gh-pending-review update-body --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR] [--state-dir DIR] [--force]
+  gh-pending-review version
 
 Notes:
   - This tool only manipulates pending reviews owned by the authenticated user.

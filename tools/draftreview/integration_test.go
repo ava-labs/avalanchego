@@ -12,25 +12,25 @@ import (
 )
 
 func TestCreatePendingReviewLive(t *testing.T) {
-	if os.Getenv("GH_DRAFT_REVIEW_LIVE_TEST") != "1" {
-		t.Skip("set GH_DRAFT_REVIEW_LIVE_TEST=1 to run live GitHub integration test")
+	if envOrFallback("GH_PENDING_REVIEW_LIVE_TEST", "GH_DRAFT_REVIEW_LIVE_TEST") != "1" {
+		t.Skip("set GH_PENDING_REVIEW_LIVE_TEST=1 to run live GitHub integration test")
 	}
 
-	prValue := os.Getenv("GH_DRAFT_REVIEW_TEST_PR")
+	prValue := envOrFallback("GH_PENDING_REVIEW_TEST_PR", "GH_DRAFT_REVIEW_TEST_PR")
 	if prValue == "" {
-		t.Fatal("GH_DRAFT_REVIEW_TEST_PR is required")
+		t.Fatal("GH_PENDING_REVIEW_TEST_PR is required")
 	}
 	prNumber, err := strconv.Atoi(prValue)
 	if err != nil || prNumber <= 0 {
-		t.Fatalf("invalid GH_DRAFT_REVIEW_TEST_PR %q", prValue)
+		t.Fatalf("invalid GH_PENDING_REVIEW_TEST_PR %q", prValue)
 	}
 
-	repo := os.Getenv("GH_DRAFT_REVIEW_TEST_REPO")
+	repo := envOrFallback("GH_PENDING_REVIEW_TEST_REPO", "GH_DRAFT_REVIEW_TEST_REPO")
 	if repo == "" {
 		repo = defaultRepo
 	}
 
-	configDir := os.Getenv("GH_DRAFT_REVIEW_CONFIG_DIR")
+	configDir := envOrFallback("GH_PENDING_REVIEW_CONFIG_DIR", "GH_DRAFT_REVIEW_CONFIG_DIR")
 	if configDir == "" {
 		configDir = defaultConfigDir()
 	}
@@ -55,8 +55,8 @@ func TestCreatePendingReviewLive(t *testing.T) {
 	}
 
 	if review, found := FindPendingReviewForAuthor(reviews, viewer.Login); found {
-		if os.Getenv("GH_DRAFT_REVIEW_TEST_DELETE_EXISTING") != "1" {
-			t.Fatalf("refusing to create a new pending review because %s already has pending review %d; set GH_DRAFT_REVIEW_TEST_DELETE_EXISTING=1 to delete it first", viewer.Login, review.ID)
+		if envOrFallback("GH_PENDING_REVIEW_TEST_DELETE_EXISTING", "GH_DRAFT_REVIEW_TEST_DELETE_EXISTING") != "1" {
+			t.Fatalf("refusing to create a new pending review because %s already has pending review %d; set GH_PENDING_REVIEW_TEST_DELETE_EXISTING=1 to delete it first", viewer.Login, review.ID)
 		}
 		if err := client.DeletePendingReview(ctx, repo, prNumber, review.ID); err != nil {
 			t.Fatalf("delete pre-existing pending review %d: %v", review.ID, err)
@@ -142,4 +142,11 @@ func TestCreatePendingReviewLive(t *testing.T) {
 	if fetched.Body != "agent reconciled result" {
 		t.Fatalf("unexpected review body after force update %q", fetched.Body)
 	}
+}
+
+func envOrFallback(primary string, fallback string) string {
+	if value := os.Getenv(primary); value != "" {
+		return value
+	}
+	return os.Getenv(fallback)
 }

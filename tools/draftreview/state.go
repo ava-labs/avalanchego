@@ -27,20 +27,23 @@ func NewStateStore(rootDir string) StateStore {
 }
 
 func defaultStateDir() string {
+	if dir := os.Getenv("GH_PENDING_REVIEW_STATE_DIR"); dir != "" {
+		return dir
+	}
 	if dir := os.Getenv("GH_DRAFT_REVIEW_STATE_DIR"); dir != "" {
 		return dir
 	}
 
 	stateHome := os.Getenv("XDG_STATE_HOME")
 	if stateHome != "" {
-		return filepath.Join(stateHome, "gh-draft-review")
+		return filepath.Join(stateHome, "gh-pending-review")
 	}
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return ".gh-draft-review/state"
+		return ".gh-pending-review/state"
 	}
-	return filepath.Join(homeDir, ".local", "state", "gh-draft-review")
+	return filepath.Join(homeDir, ".local", "state", "gh-pending-review")
 }
 
 func (s StateStore) Save(state ReviewState) error {

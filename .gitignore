@@ -45,6 +45,8 @@ tmp/
 .coverage
 
 bin/
+!bin/
+!bin/gh-pending-review
 build/
 !.bazel/patches/build_files/**/build/
 
