@@ -236,6 +236,10 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			},
 			SuppliedGas: setFeeConfigGasCost,
 			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
+				got := GetStoredFeeConfig(state)
+				require.Equal(t, testFeeConfig, got, "GetStoredFeeConfig()")
+			},
 		},
 		{
 			Name:   "setFeeConfig_from_Admin",
@@ -246,6 +250,10 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			},
 			SuppliedGas: setFeeConfigGasCost,
 			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
+				got := GetStoredFeeConfig(state)
+				require.Equal(t, testFeeConfig, got, "GetStoredFeeConfig()")
+			},
 		},
 		{
 			Name:   "setFeeConfig_readOnly_rejected",
@@ -341,4 +349,33 @@ func TestACP224FeeManagerRun(t *testing.T) {
 	}
 
 	precompiletest.RunPrecompileTests(t, Module, tests)
+}
+
+func TestUnpackSetFeeConfigInput_malformed(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   []byte
+		wantErr string
+	}{
+		{
+			name:    "nil",
+			wantErr: "abi: attempting to unmarshal an empty string while arguments are expected",
+		},
+		{
+			name:    "empty",
+			input:   []byte{},
+			wantErr: "abi: attempting to unmarshal an empty string while arguments are expected",
+		},
+		{
+			name:    "random",
+			input:   []byte("random"),
+			wantErr: "abi: cannot marshal in to go type: length insufficient",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := UnpackSetFeeConfigInput(tt.input)
+			require.ErrorContains(t, err, tt.wantErr, "UnpackSetFeeConfigInput(%x)", tt.input)
+		})
+	}
 }
