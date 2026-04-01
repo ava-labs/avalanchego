@@ -431,6 +431,44 @@ most recently read."
 Inline comments are the main remaining capability after the body-only workflow.
 The README is the source of truth for the intended first implementation.
 
+### Decision
+
+The first supported inline comment workflow is a comment-aware replace
+operation, not granular per-comment mutation.
+
+Concretely, the tool should read the authenticated user's current `PENDING`
+review, treat that review's inline comments as a single managed set, and then
+replace that set intentionally when asked to write comments.
+
+This should be designed as a local-review-first workflow that compiles into the
+GitHub pending review model, not as a GitHub mutation surface that drives the
+review process directly.
+
+In practice, that means the natural authoring flow is:
+
+1. the agent reviews code locally with the user
+2. the agent identifies findings anchored to local file and line information
+3. the agent accumulates a local draft review representation
+4. the tool materializes that draft into the authenticated user's pending
+   GitHub review body and inline comments
+
+The tool should therefore optimize for a local intermediate representation that
+matches how review is performed in chat: a top-level summary plus findings
+anchored to repo paths and local line numbers.
+
+This first implementation should optimize for:
+
+- deterministic regeneration of the full intended pending comment set
+- clear conflict detection against manual GitHub edits
+- a narrow write surface limited to the authenticated user's pending review
+- easy translation from local review findings into GitHub pending review state
+
+It should not optimize for:
+
+- patching a single existing pending inline comment in place
+- exposing generic add/edit/delete comment primitives
+- supporting multiple GitHub comment positioning models at once
+
 ### Scope
 
 The first inline-comment implementation should stay narrow:
@@ -457,7 +495,7 @@ single read operation before deciding how to update it.
 The first comment write path should favor replace semantics over granular
 mutation.
 
-Recommended initial operation:
+Supported initial operation:
 
 - replace the authenticated user's pending review comments as a set
 
@@ -476,9 +514,43 @@ That means the likely first implementation is:
 - add a comment-aware replace operation for body plus comments, or comments
   alone, based on the authenticated user's current pending review
 
+Operationally, `replace` should mean:
+
+1. read the authenticated user's current pending review and attached inline
+   comments
+2. compare that live comment set to the last comment set the tool published
+3. fail with a conflict if they differ, unless the caller explicitly overrides
+4. delete and recreate the managed pending review comments so the live set
+   exactly matches the requested set
+
+The exact command surface can still be finalized during implementation, but the
+behavioral contract should stay fixed: a successful write leaves the
+authenticated user's pending inline comments exactly equal to the supplied
+structured input.
+
 ### Input Shape
 
 The first durable inline-comment input should be structured and file-based.
+
+Suggested initial review-draft shape:
+
+```json
+{
+  "body": "Top-level review summary",
+  "comments": [
+    {
+      "path": "file.go",
+      "line": 123,
+      "side": "RIGHT",
+      "body": "!! re-check this error path"
+    }
+  ]
+}
+```
+
+If the implementation chooses to accept comments and body through separate
+inputs, it should still preserve this conceptual model internally: one local
+review draft that can be compiled into GitHub pending review state.
 
 Suggested initial comment shape:
 
@@ -498,6 +570,22 @@ The first version should:
 - validate the JSON schema strictly
 - reject unsupported legacy positioning fields
 - avoid mixing multiple incompatible comment-position models in one command
+
+## Follow-On Workflow Boundary
+
+This first inline-comment milestone is about authoring the authenticated user's
+own pending review from a local draft.
+
+It is not yet the workflow for responding to existing review threads left by
+other reviewers. That follow-on workflow likely needs a separate local model
+for:
+
+- existing thread and comment metadata fetched from GitHub
+- the user's intended response per thread
+- interactive drafting and iteration before publishing replies
+
+That work should be tracked separately so the initial pending-review authoring
+model stays narrow and implementable.
 
 ## Inline Comment Conflict Model
 
@@ -545,6 +633,32 @@ An explicit override path is acceptable, but it must not be the default.
 The design goal is not to make overwrites impossible. It is to make them
 intentional and visible to the agent so that manual GitHub edits are not
 silently clobbered.
+
+## Inline Comment Acceptance Criteria
+
+Issue `xb1.2` should be considered complete only when the implementation meets
+all of the following criteria:
+
+- `get` returns the authenticated user's current pending review body together
+  with that review's inline comments in one response shape
+- the first inline-comment write path uses replace semantics for the
+  authenticated user's pending review comments, not per-comment mutation
+- inline-comment writes accept a strict structured file input and reject
+  unsupported positioning fields
+- the implementation only operates on comments authored by the authenticated
+  user and attached to that user's `PENDING` review
+- a successful replace leaves the live pending inline comment set exactly equal
+  to the requested comment set
+- body-only updates remain available without forcing comment replacement
+- normal writes fail on divergence between the live pending comment set and the
+  last stored comment set
+- an explicit override path exists for intentional overwrite after reconcile
+- the tool does not expose review submission, approve/request-changes flows, or
+  generic GitHub API mutation outside the pending review endpoints already
+  documented here
+- automated coverage includes unit tests for parsing/validation and an opt-in
+  live integration test that verifies create/read/replace/conflict behavior for
+  pending inline comments
 
 ## Testing Strategy
 
