@@ -1,6 +1,6 @@
-# GitHub Draft Review
+# GitHub Pending Review
 
-This directory contains a repo-local tool for manipulating GitHub pending draft
+This directory contains a repo-local tool for manipulating GitHub pending
 reviews as part of an agent-assisted review workflow.
 
 ## Goal
@@ -38,7 +38,7 @@ The answer is yes:
 The crucial operational detail is:
 
 - ambient `GH_TOKEN` / `GITHUB_TOKEN` override stored `gh` auth
-- the draft-review tool must clear those variables before invoking `gh` or the
+- the pending-review tool must clear those variables before invoking `gh` or the
   read-only PAT path will win
 
 ## Validated Behavior
@@ -51,7 +51,7 @@ This is no longer just a theoretical spike. The following was validated live on
 The user ran:
 
 ```bash
-GH_CONFIG_DIR="$HOME/.config/gh-draft-review" gh auth login --hostname github.com --web
+GH_CONFIG_DIR="$HOME/.config/gh-pending-review" gh auth login --hostname github.com --web
 ```
 
 During the interactive prompts:
@@ -72,7 +72,7 @@ After clearing the ambient token override, the keyring-backed account became the
 active account:
 
 ```bash
-GH_TOKEN= GH_CONFIG_DIR="$HOME/.config/gh-draft-review" \
+GH_TOKEN= GH_CONFIG_DIR="$HOME/.config/gh-pending-review" \
   gh auth status --hostname github.com
 ```
 
@@ -89,7 +89,7 @@ The isolated auth was able to read the target PR:
 
 ```bash
 GH_TOKEN= \
-GH_CONFIG_DIR="$HOME/.config/gh-draft-review" \
+GH_CONFIG_DIR="$HOME/.config/gh-pending-review" \
 gh api repos/ava-labs/avalanchego/pulls/5168 \
   --jq '{number: .number, state: .state, title: .title, user: .user.login}'
 ```
@@ -107,7 +107,7 @@ The isolated auth was able to create a pending review:
 
 ```bash
 GH_TOKEN= \
-GH_CONFIG_DIR="$HOME/.config/gh-draft-review" \
+GH_CONFIG_DIR="$HOME/.config/gh-pending-review" \
 gh api repos/ava-labs/avalanchego/pulls/5168/reviews \
   --method POST \
   -f body='test'
@@ -128,10 +128,10 @@ without a PAT that has PR write access.
 The created pending review was retrievable through both list and get endpoints:
 
 ```bash
-GH_TOKEN= GH_CONFIG_DIR="$HOME/.config/gh-draft-review" \
+GH_TOKEN= GH_CONFIG_DIR="$HOME/.config/gh-pending-review" \
   gh api repos/ava-labs/avalanchego/pulls/5168/reviews
 
-GH_TOKEN= GH_CONFIG_DIR="$HOME/.config/gh-draft-review" \
+GH_TOKEN= GH_CONFIG_DIR="$HOME/.config/gh-pending-review" \
   gh api repos/ava-labs/avalanchego/pulls/5168/reviews/4041220791
 ```
 
@@ -243,16 +243,16 @@ Conventions:
   testable without going through a `main` package
 
 The source tree does not need an extra `draftreview/` subdirectory, and it does
-not need a `cmd/gh-draft-review/` layer for a single internal command.
+not need a `cmd/gh-pending-review/` layer for a single internal command.
 
 ### Repo Integration
 
 The command should be exposed using the same repo-local pattern as `tmpnetctl`:
 
 - add `gh` to the root development environment so it is always available
-- add a build script, for example `scripts/build_gh_draft_review.sh`
-- add a thin launcher at `bin/gh-draft-review`
-- have the launcher build `./build/gh-draft-review` before execution and then
+- add a build script, for example `scripts/build_gh_pending_review.sh`
+- add a thin launcher at `bin/gh-pending-review`
+- have the launcher build `./build/gh-pending-review` before execution and then
   run it
 
 This keeps developer ergonomics simple while avoiding repeated `go run`
@@ -318,8 +318,8 @@ detect when a human has edited the pending review in GitHub.
 
 Default state location:
 
-- `${XDG_STATE_HOME}/gh-draft-review` when `XDG_STATE_HOME` is set
-- otherwise `~/.local/state/gh-draft-review`
+- `${XDG_STATE_HOME}/gh-pending-review` when `XDG_STATE_HOME` is set
+- otherwise `~/.local/state/gh-pending-review`
 
 It can be overridden with:
 
@@ -481,7 +481,7 @@ The current Go implementation provides:
 
 - package `github.com/ava-labs/avalanchego/tools/draftreview`
 - minimal binary entrypoint at `tools/draftreview/cmd/main.go`
-- repo-local launcher at `bin/gh-draft-review`
+- repo-local launcher at `bin/gh-pending-review`
 - initial `create` command for creating a pending review
 - live integration test coverage for create, fetch, and cleanup
 - build-time version metadata via embedded git commit
@@ -489,25 +489,25 @@ The current Go implementation provides:
 Current command shape:
 
 ```bash
-./bin/gh-draft-review create --pr 5167 --body test
-./bin/gh-draft-review delete --pr 5167
-./bin/gh-draft-review get --pr 5167
-./bin/gh-draft-review update-body --pr 5167 --body "revised text"
-./bin/gh-draft-review version
+./bin/gh-pending-review create --pr 5167 --body test
+./bin/gh-pending-review delete --pr 5167
+./bin/gh-pending-review get --pr 5167
+./bin/gh-pending-review update-body --pr 5167 --body "revised text"
+./bin/gh-pending-review version
 ```
 
 The repo defaults to `ava-labs/avalanchego`. The isolated auth config defaults
-to `${XDG_CONFIG_HOME:-$HOME/.config}/gh-draft-review`.
+to `${XDG_CONFIG_HOME:-$HOME/.config}/gh-pending-review`.
 
 ### Live Integration Test
 
 The live test is opt-in and requires an isolated authenticated `gh` config:
 
 ```bash
-GH_DRAFT_REVIEW_LIVE_TEST=1 \
-GH_DRAFT_REVIEW_TEST_REPO=ava-labs/avalanchego \
-GH_DRAFT_REVIEW_TEST_PR=5167 \
-GH_DRAFT_REVIEW_CONFIG_DIR="$HOME/.config/gh-draft-review" \
+GH_PENDING_REVIEW_LIVE_TEST=1 \
+GH_PENDING_REVIEW_TEST_REPO=ava-labs/avalanchego \
+GH_PENDING_REVIEW_TEST_PR=5167 \
+GH_PENDING_REVIEW_CONFIG_DIR="$HOME/.config/gh-pending-review" \
 go test ./tools/draftreview -run TestCreatePendingReviewLive -count=1 -v
 ```
 
@@ -516,7 +516,7 @@ The test will:
 - resolve the authenticated viewer
 - refuse to run if that viewer already has a pending review on the target PR
 - optionally delete that existing pending review first when
-  `GH_DRAFT_REVIEW_TEST_DELETE_EXISTING=1` is set
+  `GH_PENDING_REVIEW_TEST_DELETE_EXISTING=1` is set
 - create a pending review with body `test`
 - fetch the created review and verify author, state, and body
 - simulate an external manual edit to the review body

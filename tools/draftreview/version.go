@@ -11,5 +11,5 @@ func VersionString() string {
 	if commit == "" {
 		commit = "unknown"
 	}
-	return fmt.Sprintf("gh-draft-review commit=%s", commit)
+	return fmt.Sprintf("gh-pending-review commit=%s", commit)
 }

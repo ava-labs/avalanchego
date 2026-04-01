@@ -11,6 +11,9 @@ const (
 )
 
 func defaultConfigDir() string {
+	if dir := os.Getenv("GH_PENDING_REVIEW_CONFIG_DIR"); dir != "" {
+		return dir
+	}
 	if dir := os.Getenv("GH_DRAFT_REVIEW_CONFIG_DIR"); dir != "" {
 		return dir
 	}
@@ -19,9 +22,9 @@ func defaultConfigDir() string {
 	if configHome == "" {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return ".config/gh-draft-review"
+			return ".config/gh-pending-review"
 		}
 		configHome = filepath.Join(homeDir, ".config")
 	}
-	return filepath.Join(configHome, "gh-draft-review")
+	return filepath.Join(configHome, "gh-pending-review")
 }

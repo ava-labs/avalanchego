@@ -5,5 +5,5 @@ set -euo pipefail
 AVALANCHE_PATH=$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 cd "${AVALANCHE_PATH}"
 
-./scripts/build_gh_draft_review.sh
-./build/gh-draft-review "${@}"
+./scripts/build_gh_pending_review.sh
+./build/gh-pending-review "${@}"
