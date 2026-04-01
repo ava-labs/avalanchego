@@ -4,6 +4,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -87,45 +88,36 @@ func New(config nodeconfig.Config) (App, error) {
 }
 
 func Run(app App) int {
-	// start running the application
-	app.Start()
+	// cancel the context on SIGINT or SIGTERM to initiate shutdown.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	// register terminationSignals to kill the application
-	terminationSignals := make(chan os.Signal, 1)
-	signal.Notify(terminationSignals, syscall.SIGINT, syscall.SIGTERM)
-
+	// SIGABRT is not a shutdown signal; handle it separately to print a stack
+	// trace to stderr without stopping the application.
 	stackTraceSignal := make(chan os.Signal, 1)
 	signal.Notify(stackTraceSignal, syscall.SIGABRT)
-
-	// start up a new go routine to handle attempts to kill the application
-	go func() {
-		for range terminationSignals {
-			app.Stop()
-			return
-		}
+	defer func() {
+		signal.Stop(stackTraceSignal)
+		close(stackTraceSignal)
 	}()
 
-	// start a goroutine to listen on SIGABRT signals,
-	// to print the stack trace to standard error.
 	go func() {
 		for range stackTraceSignal {
 			fmt.Fprint(os.Stderr, utils.GetStacktrace(true))
 		}
 	}()
 
-	// wait for the app to exit and get the exit code response
-	exitCode := app.ExitCode()
+	// start running the application
+	app.Start()
 
-	// shut down the termination signal go routine
-	signal.Stop(terminationSignals)
-	close(terminationSignals)
+	// stop the application when the shutdown context is cancelled.
+	go func() {
+		<-ctx.Done()
+		stop()
+		app.Stop()
+	}()
 
-	// shut down the stack trace go routine
-	signal.Stop(stackTraceSignal)
-	close(stackTraceSignal)
-
-	// return the exit code that the application reported
-	return exitCode
+	return app.ExitCode()
 }
 
 // app is a wrapper around a node that runs in this process

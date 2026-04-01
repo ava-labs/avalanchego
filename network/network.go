@@ -59,6 +59,10 @@ var (
 )
 
 // Network defines the functionality of the networking library.
+//
+// Contexts passed to methods on this interface bound individual operations
+// and do not control the lifetime of the network. To stop the network, call
+// StartClose and wait for Dispatch to return.
 type Network interface {
 	// All consensus messages can be sent through this interface. Thread safety
 	// must be managed internally in the network.

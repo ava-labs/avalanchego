@@ -210,6 +210,11 @@ type peer struct {
 //
 // Invariant: There must only be one peer running at a time with a reference to
 // the same [config.InboundMsgThrottler].
+//
+// The peer manages its own internal context for the lifetime of its goroutines.
+// Callers cannot cancel the peer through an external context. To stop the peer,
+// call StartClose and wait with AwaitClosed. Contexts passed to AwaitReady and
+// AwaitClosed control how long the caller waits, not the peer lifetime.
 func Start(
 	config *Config,
 	conn net.Conn,

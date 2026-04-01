@@ -20,8 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 )
 
-func NewCmd(path string, args ...string) *exec.Cmd {
-	cmd := exec.Command(path, args...)
+func NewCmd(ctx context.Context, path string, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, path, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM}
 	return cmd
 }

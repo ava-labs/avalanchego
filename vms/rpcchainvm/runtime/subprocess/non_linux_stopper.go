@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-func NewCmd(path string, args ...string) *exec.Cmd {
-	return exec.Command(path, args...)
+func NewCmd(ctx context.Context, path string, args ...string) *exec.Cmd {
+	return exec.CommandContext(ctx, path, args...)
 }
 
 func stop(_ context.Context, log logging.Logger, cmd *exec.Cmd) {

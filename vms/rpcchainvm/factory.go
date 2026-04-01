@@ -57,7 +57,7 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 	status, stopper, err := subprocess.Bootstrap(
 		context.TODO(),
 		listener,
-		subprocess.NewCmd(f.path),
+		subprocess.NewCmd(context.Background(), f.path),
 		config,
 	)
 	if err != nil {
