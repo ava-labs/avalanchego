@@ -50,6 +50,17 @@ type updateBodyCommand struct {
 
 func (updateBodyCommand) isCommand() {}
 
+type replaceCommentsCommand struct {
+	Repo         string
+	PRNumber     int
+	CommentsFile string
+	ConfigDir    string
+	StateDir     string
+	Force        bool
+}
+
+func (replaceCommentsCommand) isCommand() {}
+
 type versionCommand struct{}
 
 func (versionCommand) isCommand() {}
@@ -70,6 +81,8 @@ func parseCommand(args []string) (command, error) {
 		return parseDeleteCommand(args[1:])
 	case "get":
 		return parseGetCommand(args[1:])
+	case "replace-comments":
+		return parseReplaceCommentsCommand(args[1:])
 	case "update-body":
 		return parseUpdateBodyCommand(args[1:])
 	default:
@@ -197,6 +210,40 @@ func parseUpdateBodyCommand(args []string) (command, error) {
 	}, nil
 }
 
+func parseReplaceCommentsCommand(args []string) (command, error) {
+	flags := flag.NewFlagSet("replace-comments", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+
+	repo := flags.String("repo", defaultRepo, "repository in OWNER/REPO form")
+	prNumber := flags.Int("pr", 0, "pull request number")
+	commentsFile := flags.String("comments-file", "", "path to a JSON file containing inline comments")
+	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
+	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
+	force := flags.Bool("force", false, "overwrite even if the pending review comments differ from stored state")
+
+	if err := flags.Parse(args); err != nil {
+		return nil, usageError(err.Error())
+	}
+	if flags.NArg() != 0 {
+		return nil, usageError(fmt.Sprintf("unexpected trailing arguments: %v", flags.Args()))
+	}
+	if *prNumber <= 0 {
+		return nil, usageError("--pr must be a positive integer")
+	}
+	if *commentsFile == "" {
+		return nil, usageError("--comments-file is required")
+	}
+
+	return replaceCommentsCommand{
+		Repo:         *repo,
+		PRNumber:     *prNumber,
+		CommentsFile: *commentsFile,
+		ConfigDir:    *configDir,
+		StateDir:     *stateDir,
+		Force:        *force,
+	}, nil
+}
+
 func Usage() string {
 	return `gh-pending-review creates and manages pending GitHub pull request reviews.
 
@@ -204,13 +251,14 @@ Usage:
   gh-pending-review create --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR] [--state-dir DIR]
   gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
   gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
+  gh-pending-review replace-comments --pr NUMBER [--repo OWNER/REPO] --comments-file PATH [--config-dir DIR] [--state-dir DIR] [--force]
   gh-pending-review update-body --pr NUMBER [--repo OWNER/REPO] --body TEXT [--config-dir DIR] [--state-dir DIR] [--force]
   gh-pending-review version
 
 Notes:
   - This tool only manipulates pending reviews owned by the authenticated user.
   - It uses isolated gh auth from --config-dir.
-  - It stores the last published review body locally to detect user edits before update.
+  - It stores the last published review body and comment set locally to detect user edits before update.
   - It never submits a review.
 `
 }

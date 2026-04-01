@@ -53,6 +53,8 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runDelete(ctx, command)
 	case getCommand:
 		return a.runGet(ctx, command)
+	case replaceCommentsCommand:
+		return a.runReplaceComments(ctx, command)
 	case updateBodyCommand:
 		return a.runUpdateBody(ctx, command)
 	case versionCommand:
@@ -87,12 +89,13 @@ func (a *App) runCreate(ctx context.Context, command createCommand) error {
 	}
 
 	if err := NewStateStore(a.log, command.StateDir).Save(ReviewState{
-		Repo:              command.Repo,
-		PRNumber:          command.PRNumber,
-		UserLogin:         review.User.Login,
-		ReviewID:          review.ID,
-		LastPublishedBody: review.Body,
-		HTMLURL:           review.HTMLURL,
+		Repo:                  command.Repo,
+		PRNumber:              command.PRNumber,
+		UserLogin:             review.User.Login,
+		ReviewID:              review.ID,
+		LastPublishedBody:     review.Body,
+		LastPublishedComments: nil,
+		HTMLURL:               review.HTMLURL,
 	}); err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -192,6 +195,12 @@ func (a *App) runGet(ctx context.Context, command getCommand) error {
 		return stacktrace.Errorf("no pending review found for %s on %s#%d", viewer.Login, command.Repo, command.PRNumber)
 	}
 
+	comments, err := client.ListReviewComments(ctx, command.Repo, command.PRNumber, review.ID)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	review.Comments = comments
+
 	a.log.Info("fetched pending review",
 		zap.String("repo", command.Repo),
 		zap.Int("prNumber", command.PRNumber),
@@ -261,6 +270,11 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 		}
 	}
 
+	storedState, _, err := store.LoadIfExists(command.Repo, viewer.Login, command.PRNumber)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
 	a.log.Info("updating pending review body",
 		zap.String("repo", command.Repo),
 		zap.Int("prNumber", command.PRNumber),
@@ -275,12 +289,13 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 	}
 
 	if err := store.Save(ReviewState{
-		Repo:              command.Repo,
-		PRNumber:          command.PRNumber,
-		UserLogin:         viewer.Login,
-		ReviewID:          updated.ID,
-		LastPublishedBody: updated.Body,
-		HTMLURL:           updated.HTMLURL,
+		Repo:                  command.Repo,
+		PRNumber:              command.PRNumber,
+		UserLogin:             viewer.Login,
+		ReviewID:              updated.ID,
+		LastPublishedBody:     updated.Body,
+		LastPublishedComments: storedState.LastPublishedComments,
+		HTMLURL:               updated.HTMLURL,
 	}); err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -298,6 +313,125 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 	return stacktrace.Wrap(err)
 }
 
+func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCommand) error {
+	a.log.Debug("entered replace-comments command",
+		zap.String("repo", command.Repo),
+		zap.Int("prNumber", command.PRNumber),
+		zap.String("commentsFile", command.CommentsFile),
+		zap.String("configDir", command.ConfigDir),
+		zap.String("stateDir", command.StateDir),
+		zap.Bool("force", command.Force),
+	)
+
+	comments, err := loadCommentsFile(command.CommentsFile)
+	if err != nil {
+		return stacktrace.Wrap(formatCommentsPathError(command.CommentsFile, err))
+	}
+
+	token, err := a.tokenProvider.Token(ctx, command.ConfigDir)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	client := NewGitHubClient(a.log, a.httpClient, a.baseURL, token)
+	viewer, err := client.Viewer(ctx)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	reviews, err := client.ListReviews(ctx, command.Repo, command.PRNumber)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	review, found := FindPendingReviewForAuthor(reviews, viewer.Login)
+	if !found {
+		return stacktrace.Errorf("no pending review found for %s on %s#%d", viewer.Login, command.Repo, command.PRNumber)
+	}
+
+	liveComments, err := client.ListReviewComments(ctx, command.Repo, command.PRNumber, review.ID)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	liveManagedComments := normalizeLiveReviewComments(liveComments, viewer.Login)
+
+	store := NewStateStore(a.log, command.StateDir)
+	storedState, foundStoredState, err := store.LoadIfExists(command.Repo, viewer.Login, command.PRNumber)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	if !foundStoredState && !command.Force {
+		return stacktrace.Errorf("no stored review state for %s#%d as %s; run create first or use --force", command.Repo, command.PRNumber, viewer.Login)
+	}
+	if foundStoredState && storedState.ReviewID != 0 && storedState.ReviewID != review.ID && !command.Force {
+		return stacktrace.Errorf("stored review state points to review %d but GitHub has pending review %d; run get, reconcile, then retry with --force if intended", storedState.ReviewID, review.ID)
+	}
+
+	if !command.Force {
+		storedComments := normalizeDraftReviewComments(storedState.LastPublishedComments)
+		if !draftReviewCommentsEqual(storedComments, liveManagedComments) {
+			a.log.Info("refusing pending review comment replace because stored state diverged",
+				zap.String("repo", command.Repo),
+				zap.Int("prNumber", command.PRNumber),
+				zap.String("userLogin", viewer.Login),
+				zap.Int64("reviewID", review.ID),
+				zap.String("diff", diffCommentsMessage(liveManagedComments, storedComments)),
+			)
+			return stacktrace.Wrap(ErrReviewCommentsConflict)
+		}
+	}
+
+	a.log.Info("replacing pending review comments",
+		zap.String("repo", command.Repo),
+		zap.Int("prNumber", command.PRNumber),
+		zap.String("userLogin", viewer.Login),
+		zap.Int64("reviewID", review.ID),
+		zap.Int("commentCount", len(comments)),
+		zap.Bool("force", command.Force),
+	)
+
+	if err := client.DeletePendingReview(ctx, command.Repo, command.PRNumber, review.ID); err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	recreated, err := client.CreatePendingReviewWithComments(ctx, command.Repo, command.PRNumber, review.Body, comments)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	if err := store.Save(ReviewState{
+		Repo:                  command.Repo,
+		PRNumber:              command.PRNumber,
+		UserLogin:             viewer.Login,
+		ReviewID:              recreated.ID,
+		LastPublishedBody:     recreated.Body,
+		LastPublishedComments: comments,
+		HTMLURL:               recreated.HTMLURL,
+	}); err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	a.log.Info("replaced pending review comments",
+		zap.String("repo", command.Repo),
+		zap.Int("prNumber", command.PRNumber),
+		zap.String("userLogin", viewer.Login),
+		zap.Int64("oldReviewID", review.ID),
+		zap.Int64("newReviewID", recreated.ID),
+		zap.Int("commentCount", len(comments)),
+		zap.String("htmlURL", recreated.HTMLURL),
+	)
+
+	if _, err := fmt.Fprintf(a.Stdout, "Replaced comments for pending review %d on %s#%d; new review %d (%s)\n", review.ID, command.Repo, command.PRNumber, recreated.ID, recreated.State); err != nil {
+		return stacktrace.Wrap(err)
+	}
+	if recreated.HTMLURL != "" {
+		if _, err := fmt.Fprintln(a.Stdout, recreated.HTMLURL); err != nil {
+			return stacktrace.Wrap(err)
+		}
+	}
+	return nil
+}
+
 func (a *App) runVersion(_ versionCommand) error {
 	_, err := fmt.Fprintln(a.Stdout, VersionString())
 	return stacktrace.Wrap(err)
@@ -307,7 +441,14 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, 
 	return stacktrace.Wrap(NewApp(stdin, stdout, stderr).Run(ctx, args))
 }
 
-var ErrReviewConflict = stacktrace.New("pending review body no longer matches stored state; run get, reconcile the current review body, then retry with --force if you intend to overwrite it")
+var (
+	ErrReviewConflict = stacktrace.New(
+		"pending review body no longer matches stored state; run get, reconcile the current review body, then retry with --force if you intend to overwrite it",
+	)
+	ErrReviewCommentsConflict = stacktrace.New(
+		"pending review comments no longer match stored state; run get, reconcile the current review body and comments, then retry with --force if you intend to overwrite them",
+	)
+)
 
 func commandName(cmd command) string {
 	switch cmd.(type) {
@@ -317,6 +458,8 @@ func commandName(cmd command) string {
 		return "delete"
 	case getCommand:
 		return "get"
+	case replaceCommentsCommand:
+		return "replace-comments"
 	case updateBodyCommand:
 		return "update-body"
 	case versionCommand:

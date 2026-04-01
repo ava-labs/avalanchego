@@ -87,3 +87,26 @@ func TestParseUpdateBodyCommandForce(t *testing.T) {
 		t.Fatalf("expected force to be true")
 	}
 }
+
+func TestParseReplaceCommentsCommand(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"replace-comments", "--pr", "5168", "--comments-file", "/tmp/comments.json", "--force"})
+	if err != nil {
+		t.Fatalf("parseCommand returned error: %v", err)
+	}
+
+	replaceCommentsCommand, ok := command.(replaceCommentsCommand)
+	if !ok {
+		t.Fatalf("unexpected command type %T", command)
+	}
+	if replaceCommentsCommand.PRNumber != 5168 {
+		t.Fatalf("unexpected pr number %d", replaceCommentsCommand.PRNumber)
+	}
+	if replaceCommentsCommand.CommentsFile != "/tmp/comments.json" {
+		t.Fatalf("unexpected comments file %q", replaceCommentsCommand.CommentsFile)
+	}
+	if !replaceCommentsCommand.Force {
+		t.Fatalf("expected force to be true")
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -35,7 +36,7 @@ func TestStateStoreSaveLoadDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
-	if loaded != state {
+	if !reflect.DeepEqual(loaded, state) {
 		t.Fatalf("unexpected loaded state: got %+v want %+v", loaded, state)
 	}
 
