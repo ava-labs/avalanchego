@@ -3,14 +3,13 @@ package draftreview
 import (
 	"bytes"
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -45,12 +44,12 @@ func (p GHTokenProvider) Token(ctx context.Context, configDir string) (string, e
 	)
 	output, err := p.exec(ctx, isolatedGitHubEnv(p.env, configDir), "gh", "auth", "token", "--hostname", "github.com")
 	if err != nil {
-		return "", fmt.Errorf("acquire GitHub token with isolated gh auth: %w", err)
+		return "", stacktrace.Errorf("acquire GitHub token with isolated gh auth: %w", err)
 	}
 
 	token := strings.TrimSpace(string(output))
 	if token == "" {
-		return "", errors.New("gh auth token returned an empty token")
+		return "", stacktrace.New("gh auth token returned an empty token")
 	}
 	log.Debug("acquired GitHub token from isolated gh auth",
 		zap.String("configDir", configDir),
@@ -90,9 +89,9 @@ func runCommand(ctx context.Context, env []string, name string, args ...string) 
 
 	if err := cmd.Run(); err != nil {
 		if stderr.Len() == 0 {
-			return nil, err
+			return nil, stacktrace.Wrap(err)
 		}
-		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+		return nil, stacktrace.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return stdout.Bytes(), nil
 }
