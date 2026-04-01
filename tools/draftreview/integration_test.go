@@ -3,6 +3,7 @@ package draftreview
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"strconv"
@@ -33,6 +34,7 @@ func TestCreatePendingReviewLive(t *testing.T) {
 	if configDir == "" {
 		configDir = defaultConfigDir()
 	}
+	stateDir := t.TempDir()
 
 	ctx := context.Background()
 	tokenProvider := NewGHTokenProvider()
@@ -71,6 +73,7 @@ func TestCreatePendingReviewLive(t *testing.T) {
 		"--pr", strconv.Itoa(prNumber),
 		"--body", "test",
 		"--config-dir", configDir,
+		"--state-dir", stateDir,
 	}); err != nil {
 		t.Fatalf("run create command: %v", err)
 	}
@@ -102,5 +105,41 @@ func TestCreatePendingReviewLive(t *testing.T) {
 	}
 	if fetched.Body != "test" {
 		t.Fatalf("unexpected review body %q", fetched.Body)
+	}
+
+	if _, err := client.UpdatePendingReviewBody(ctx, repo, prNumber, review.ID, "user changed this"); err != nil {
+		t.Fatalf("simulate external update: %v", err)
+	}
+
+	err = app.Run(ctx, []string{
+		"update-body",
+		"--repo", repo,
+		"--pr", strconv.Itoa(prNumber),
+		"--body", "agent overwrite",
+		"--config-dir", configDir,
+		"--state-dir", stateDir,
+	})
+	if !errors.Is(err, ErrReviewConflict) {
+		t.Fatalf("expected ErrReviewConflict after external change, got: %v", err)
+	}
+
+	if err := app.Run(ctx, []string{
+		"update-body",
+		"--repo", repo,
+		"--pr", strconv.Itoa(prNumber),
+		"--body", "agent reconciled result",
+		"--config-dir", configDir,
+		"--state-dir", stateDir,
+		"--force",
+	}); err != nil {
+		t.Fatalf("force update after conflict: %v", err)
+	}
+
+	fetched, err = client.GetReview(ctx, repo, prNumber, review.ID)
+	if err != nil {
+		t.Fatalf("get review after force update: %v", err)
+	}
+	if fetched.Body != "agent reconciled result" {
+		t.Fatalf("unexpected review body after force update %q", fetched.Body)
 	}
 }
