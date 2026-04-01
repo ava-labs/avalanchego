@@ -1,15 +1,18 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package draftreview
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestVersionString(t *testing.T) {
 	t.Parallel()
 
 	got := VersionString()
-	if !strings.HasPrefix(got, "gh-pending-review commit=") {
-		t.Fatalf("unexpected version string %q", got)
-	}
+	require.True(t, strings.HasPrefix(got, "gh-pending-review commit="), "unexpected version string %q", got)
 }

@@ -1,3 +1,6 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package draftreview
 
 import (
@@ -46,8 +49,7 @@ func TestRunGetIncludesComments(t *testing.T) {
 	app.httpClient = server.Client()
 	app.baseURL = server.URL
 
-	err := app.Run(t.Context(), []string{"get", "--pr", "5168", "--state-dir", t.TempDir(), "--config-dir", t.TempDir()})
-	require.NoError(t, err)
+	require.NoError(t, app.Run(t.Context(), []string{"get", "--pr", "5168", "--state-dir", t.TempDir(), "--config-dir", t.TempDir()}))
 
 	var review Review
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &review))
@@ -103,14 +105,13 @@ func TestRunReplaceCommentsRecreatesPendingReviewWithLiveBody(t *testing.T) {
 	app.httpClient = server.Client()
 	app.baseURL = server.URL
 
-	err := app.Run(t.Context(), []string{
+	require.NoError(t, app.Run(t.Context(), []string{
 		"replace-comments",
 		"--pr", "5168",
 		"--comments-file", commentsPath,
 		"--state-dir", stateDir,
 		"--config-dir", t.TempDir(),
-	})
-	require.NoError(t, err)
+	}))
 	require.Equal(t, "live body", createPayload.Body)
 	require.Len(t, createPayload.Comments, 1)
 	require.Equal(t, "a.go", createPayload.Comments[0]["path"])

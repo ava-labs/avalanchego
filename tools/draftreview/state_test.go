@@ -1,11 +1,15 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package draftreview
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -23,27 +27,17 @@ func TestStateStoreSaveLoadDelete(t *testing.T) {
 		HTMLURL:           "https://example.invalid/review/123",
 	}
 
-	if err := store.Save(state); err != nil {
-		t.Fatalf("Save returned error: %v", err)
-	}
+	require.NoError(t, store.Save(state))
 
 	path := filepath.Join(store.rootDir, "ava-labs", "avalanchego", "maru-ava", "5168.json")
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("expected state file at %s: %v", path, err)
-	}
+	_, err := os.Stat(path)
+	require.NoError(t, err)
 
 	loaded, err := store.Load(state.Repo, state.UserLogin, state.PRNumber)
-	if err != nil {
-		t.Fatalf("Load returned error: %v", err)
-	}
-	if !reflect.DeepEqual(loaded, state) {
-		t.Fatalf("unexpected loaded state: got %+v want %+v", loaded, state)
-	}
+	require.NoError(t, err)
+	require.True(t, reflect.DeepEqual(loaded, state), "unexpected loaded state: got %+v want %+v", loaded, state)
 
-	if err := store.Delete(state.Repo, state.UserLogin, state.PRNumber); err != nil {
-		t.Fatalf("Delete returned error: %v", err)
-	}
-	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected state file to be removed, got: %v", err)
-	}
+	require.NoError(t, store.Delete(state.Repo, state.UserLogin, state.PRNumber))
+	_, err = os.Stat(path)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }

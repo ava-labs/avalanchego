@@ -1,3 +1,6 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package draftreview
 
 import (
@@ -5,6 +8,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsolatedGitHubEnv(t *testing.T) {
@@ -20,27 +25,13 @@ func TestIsolatedGitHubEnv(t *testing.T) {
 		"KEEP=1",
 	}, "/tmp/config")
 
-	if slicesContainPrefix(env, "GH_TOKEN=") {
-		t.Fatalf("expected GH_TOKEN to be removed: %v", env)
-	}
-	if slicesContainPrefix(env, "GITHUB_TOKEN=") {
-		t.Fatalf("expected GITHUB_TOKEN to be removed: %v", env)
-	}
-	if slicesContainPrefix(env, "GH_ENTERPRISE_TOKEN=") {
-		t.Fatalf("expected GH_ENTERPRISE_TOKEN to be removed: %v", env)
-	}
-	if slicesContainPrefix(env, "GITHUB_ENTERPRISE_TOKEN=") {
-		t.Fatalf("expected GITHUB_ENTERPRISE_TOKEN to be removed: %v", env)
-	}
-	if !slicesContainExact(env, "GH_CONFIG_DIR=/tmp/config") {
-		t.Fatalf("expected GH_CONFIG_DIR override: %v", env)
-	}
-	if !slicesContainExact(env, "GH_PROMPT_DISABLED=1") {
-		t.Fatalf("expected GH_PROMPT_DISABLED=1: %v", env)
-	}
-	if !slicesContainExact(env, "KEEP=1") {
-		t.Fatalf("expected unrelated env to survive: %v", env)
-	}
+	require.False(t, slicesContainPrefix(env, "GH_TOKEN="), "expected GH_TOKEN to be removed: %v", env)
+	require.False(t, slicesContainPrefix(env, "GITHUB_TOKEN="), "expected GITHUB_TOKEN to be removed: %v", env)
+	require.False(t, slicesContainPrefix(env, "GH_ENTERPRISE_TOKEN="), "expected GH_ENTERPRISE_TOKEN to be removed: %v", env)
+	require.False(t, slicesContainPrefix(env, "GITHUB_ENTERPRISE_TOKEN="), "expected GITHUB_ENTERPRISE_TOKEN to be removed: %v", env)
+	require.True(t, slicesContainExact(env, "GH_CONFIG_DIR=/tmp/config"), "expected GH_CONFIG_DIR override: %v", env)
+	require.True(t, slicesContainExact(env, "GH_PROMPT_DISABLED=1"), "expected GH_PROMPT_DISABLED=1: %v", env)
+	require.True(t, slicesContainExact(env, "KEEP=1"), "expected unrelated env to survive: %v", env)
 }
 
 func TestTokenProviderToken(t *testing.T) {
@@ -60,26 +51,14 @@ func TestTokenProviderToken(t *testing.T) {
 		},
 	}
 
-	token, err := provider.Token(context.Background(), "/tmp/config")
-	if err != nil {
-		t.Fatalf("Token returned error: %v", err)
-	}
-	if token != "token-value" {
-		t.Fatalf("unexpected token %q", token)
-	}
-	if gotName != "gh" {
-		t.Fatalf("unexpected command %q", gotName)
-	}
+	token, err := provider.Token(t.Context(), "/tmp/config")
+	require.NoError(t, err)
+	require.Equal(t, "token-value", token)
+	require.Equal(t, "gh", gotName)
 	wantArgs := []string{"auth", "token", "--hostname", "github.com"}
-	if !reflect.DeepEqual(gotArgs, wantArgs) {
-		t.Fatalf("unexpected args: got %v want %v", gotArgs, wantArgs)
-	}
-	if !slicesContainExact(gotEnv, "GH_CONFIG_DIR=/tmp/config") {
-		t.Fatalf("expected isolated GH_CONFIG_DIR: %v", gotEnv)
-	}
-	if slicesContainPrefix(gotEnv, "GH_TOKEN=") {
-		t.Fatalf("expected GH_TOKEN to be scrubbed: %v", gotEnv)
-	}
+	require.True(t, reflect.DeepEqual(gotArgs, wantArgs), "unexpected args: got %v want %v", gotArgs, wantArgs)
+	require.True(t, slicesContainExact(gotEnv, "GH_CONFIG_DIR=/tmp/config"), "expected isolated GH_CONFIG_DIR: %v", gotEnv)
+	require.False(t, slicesContainPrefix(gotEnv, "GH_TOKEN="), "expected GH_TOKEN to be scrubbed: %v", gotEnv)
 }
 
 func slicesContainExact(values []string, target string) bool {

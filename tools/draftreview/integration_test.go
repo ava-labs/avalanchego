@@ -1,14 +1,17 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package draftreview
 
 import (
 	"bytes"
-	"context"
-	"errors"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -19,13 +22,10 @@ func TestCreatePendingReviewLive(t *testing.T) {
 	}
 
 	prValue := envOrFallback("GH_PENDING_REVIEW_TEST_PR", "GH_DRAFT_REVIEW_TEST_PR")
-	if prValue == "" {
-		t.Fatal("GH_PENDING_REVIEW_TEST_PR is required")
-	}
+	require.NotEmpty(t, prValue, "GH_PENDING_REVIEW_TEST_PR is required")
 	prNumber, err := strconv.Atoi(prValue)
-	if err != nil || prNumber <= 0 {
-		t.Fatalf("invalid GH_PENDING_REVIEW_TEST_PR %q", prValue)
-	}
+	require.NoError(t, err)
+	require.Positive(t, prNumber, "invalid GH_PENDING_REVIEW_TEST_PR %q", prValue)
 
 	repo := envOrFallback("GH_PENDING_REVIEW_TEST_REPO", "GH_DRAFT_REVIEW_TEST_REPO")
 	if repo == "" {
@@ -38,80 +38,53 @@ func TestCreatePendingReviewLive(t *testing.T) {
 	}
 	stateDir := t.TempDir()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	tokenProvider := NewGHTokenProvider(logging.NoLog{})
 	token, err := tokenProvider.Token(ctx, configDir)
-	if err != nil {
-		t.Fatalf("acquire token: %v", err)
-	}
+	require.NoError(t, err)
 
 	client := NewGitHubClient(logging.NoLog{}, DefaultHTTPClient(), defaultGitHubAPIBaseURL, token)
 	viewer, err := client.Viewer(ctx)
-	if err != nil {
-		t.Fatalf("resolve viewer: %v", err)
-	}
+	require.NoError(t, err)
 
 	reviews, err := client.ListReviews(ctx, repo, prNumber)
-	if err != nil {
-		t.Fatalf("list reviews: %v", err)
-	}
+	require.NoError(t, err)
 
 	if review, found := FindPendingReviewForAuthor(reviews, viewer.Login); found {
-		if envOrFallback("GH_PENDING_REVIEW_TEST_DELETE_EXISTING", "GH_DRAFT_REVIEW_TEST_DELETE_EXISTING") != "1" {
-			t.Fatalf("refusing to create a new pending review because %s already has pending review %d; set GH_PENDING_REVIEW_TEST_DELETE_EXISTING=1 to delete it first", viewer.Login, review.ID)
-		}
-		if err := client.DeletePendingReview(ctx, repo, prNumber, review.ID); err != nil {
-			t.Fatalf("delete pre-existing pending review %d: %v", review.ID, err)
-		}
+		require.Equalf(t, "1", envOrFallback("GH_PENDING_REVIEW_TEST_DELETE_EXISTING", "GH_DRAFT_REVIEW_TEST_DELETE_EXISTING"), "refusing to create a new pending review because %s already has pending review %d; set GH_PENDING_REVIEW_TEST_DELETE_EXISTING=1 to delete it first", viewer.Login, review.ID)
+		require.NoError(t, client.DeletePendingReview(ctx, repo, prNumber, review.ID))
 	}
 
 	var stdout bytes.Buffer
 	app := NewApp(strings.NewReader(""), &stdout, io.Discard)
 	app.tokenProvider = tokenProvider
 
-	if err := app.Run(ctx, []string{
+	require.NoError(t, app.Run(ctx, []string{
 		"create",
 		"--repo", repo,
 		"--pr", strconv.Itoa(prNumber),
 		"--body", "test",
 		"--config-dir", configDir,
 		"--state-dir", stateDir,
-	}); err != nil {
-		t.Fatalf("run create command: %v", err)
-	}
+	}))
 
 	reviews, err = client.ListReviews(ctx, repo, prNumber)
-	if err != nil {
-		t.Fatalf("list reviews after create: %v", err)
-	}
+	require.NoError(t, err)
 	review, found := FindPendingReviewForAuthor(reviews, viewer.Login)
-	if !found {
-		t.Fatalf("expected pending review for %s after create; stdout=%q", viewer.Login, stdout.String())
-	}
+	require.True(t, found, "expected pending review for %s after create; stdout=%q", viewer.Login, stdout.String())
 
 	t.Cleanup(func() {
-		if err := client.DeletePendingReview(context.Background(), repo, prNumber, review.ID); err != nil {
-			t.Fatalf("delete pending review %d: %v", review.ID, err)
-		}
+		require.NoError(t, client.DeletePendingReview(t.Context(), repo, prNumber, review.ID))
 	})
 
 	fetched, err := client.GetReview(ctx, repo, prNumber, review.ID)
-	if err != nil {
-		t.Fatalf("get review: %v", err)
-	}
-	if fetched.User.Login != viewer.Login {
-		t.Fatalf("unexpected review author %q", fetched.User.Login)
-	}
-	if fetched.State != reviewStatePending {
-		t.Fatalf("unexpected review state %q", fetched.State)
-	}
-	if fetched.Body != "test" {
-		t.Fatalf("unexpected review body %q", fetched.Body)
-	}
+	require.NoError(t, err)
+	require.Equal(t, viewer.Login, fetched.User.Login)
+	require.Equal(t, reviewStatePending, fetched.State)
+	require.Equal(t, "test", fetched.Body)
 
-	if _, err := client.UpdatePendingReviewBody(ctx, repo, prNumber, review.ID, "user changed this"); err != nil {
-		t.Fatalf("simulate external update: %v", err)
-	}
+	_, err = client.UpdatePendingReviewBody(ctx, repo, prNumber, review.ID, "user changed this")
+	require.NoError(t, err)
 
 	err = app.Run(ctx, []string{
 		"update-body",
@@ -121,11 +94,9 @@ func TestCreatePendingReviewLive(t *testing.T) {
 		"--config-dir", configDir,
 		"--state-dir", stateDir,
 	})
-	if !errors.Is(err, ErrReviewConflict) {
-		t.Fatalf("expected ErrReviewConflict after external change, got: %v", err)
-	}
+	require.ErrorIs(t, err, ErrReviewConflict)
 
-	if err := app.Run(ctx, []string{
+	require.NoError(t, app.Run(ctx, []string{
 		"update-body",
 		"--repo", repo,
 		"--pr", strconv.Itoa(prNumber),
@@ -133,17 +104,11 @@ func TestCreatePendingReviewLive(t *testing.T) {
 		"--config-dir", configDir,
 		"--state-dir", stateDir,
 		"--force",
-	}); err != nil {
-		t.Fatalf("force update after conflict: %v", err)
-	}
+	}))
 
 	fetched, err = client.GetReview(ctx, repo, prNumber, review.ID)
-	if err != nil {
-		t.Fatalf("get review after force update: %v", err)
-	}
-	if fetched.Body != "agent reconciled result" {
-		t.Fatalf("unexpected review body after force update %q", fetched.Body)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "agent reconciled result", fetched.Body)
 }
 
 func envOrFallback(primary string, fallback string) string {
