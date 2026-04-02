@@ -28,7 +28,7 @@ var ACP224FeeManagerABI = contract.ParseABI(ACP224FeeManagerRawABI)
 const (
 	numFeeConfigField = 5 // validatorTargetGas, targetGas, staticPricing, minGasPrice, timeToDouble
 
-	getFeeConfigGasCost              uint64 = contract.ReadGasCostPerSlot * numFeeConfigField
+	getFeeConfigGasCost              uint64 = contract.ReadGasCostPerSlot
 	getFeeConfigLastChangedAtGasCost uint64 = contract.ReadGasCostPerSlot
 	// FeeConfigUpdated has 2 topics (event sig + indexed sender) and non-indexed
 	// data containing old + new FeeConfig. Each config has numFeeConfigField
@@ -36,7 +36,7 @@ const (
 	// is numFeeConfigField * 32 bytes * 2 configs.
 	feeConfigUpdatedEventGasCost uint64 = contract.LogGas + contract.LogTopicGas*2 + contract.LogDataGas*numFeeConfigField*common.HashLength*2
 	setFeeConfigGasCost          uint64 = allowlist.ReadAllowListGasCost +
-		contract.WriteGasCostPerSlot*(numFeeConfigField+1) + // +1 for lastChangedAt
+		contract.WriteGasCostPerSlot*2 + // fee config slot + lastChangedAt slot
 		getFeeConfigGasCost + // reading old config for event
 		feeConfigUpdatedEventGasCost
 )
@@ -46,18 +46,22 @@ var (
 	errInvalidUint64      = errors.New("value is not a valid uint64")
 	errNilBigInt          = errors.New("nil big.Int value")
 	errNilBlockNumber     = errors.New("block number cannot be nil")
+	errInvalidABIConfig   = errors.New("failed to convert ABI config")
 )
 
-// Storage layout uses namespaced keys to prevent collisions with allowlist and other precompile state.
-// AllowList uses common.BytesToHash(address.Bytes()) (zero-left-padded addresses) for role storage,
-// so we use distinct prefixes for fee config.
+// storageSlot returns a storage key with the "acp224" namespace prefix
+// left-aligned in the hash. This avoids collisions with AllowList role
+// storage, which right-aligns 20-byte addresses via BytesToHash and
+// therefore always has 12 leading zero bytes.
+func storageSlot(key ...byte) common.Hash {
+	s := common.Hash{'a', 'c', 'p', '2', '2', '4'}
+	copy(s[6:], key)
+	return s
+}
+
 var (
-	validatorTargetGasStorageKey = common.Hash{'a', 'c', 'p', '2', '2', '4', 'v', 'g'}
-	targetGasStorageKey          = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'g'}
-	staticPricingStorageKey      = common.Hash{'a', 'c', 'p', '2', '2', '4', 's', 'p'}
-	minGasPriceStorageKey        = common.Hash{'a', 'c', 'p', '2', '2', '4', 'm', 'p'}
-	timeToDoubleStorageKey       = common.Hash{'a', 'c', 'p', '2', '2', '4', 't', 'd'}
-	feeConfigLastChangedAtKey    = common.Hash{'a', 'c', 'p', '2', '2', '4', 'l', 'c', 'a'}
+	feeConfigStorageKey       = storageSlot('f', 'c')
+	feeConfigLastChangedAtKey = storageSlot('l', 'c', 'a')
 )
 
 // abiFeeConfig uses *big.Int fields to match the Solidity uint256 types.
@@ -104,62 +108,41 @@ func fromABIFeeConfig(c abiFeeConfig) (commontype.ACP224FeeConfig, error) {
 	}, nil
 }
 
-var trueHash = common.BigToHash(common.Big1)
-
-func hashToBool(h common.Hash) bool {
-	return h == trueHash
-}
-
-func boolToHash(b bool) common.Hash {
-	if b {
-		return trueHash
-	}
-	return common.Hash{}
-}
-
 // GetACP224FeeManagerAllowListStatus returns the role of [address] for the allow list.
-func GetACP224FeeManagerAllowListStatus(stateDB contract.StateReader, address common.Address) allowlist.Role {
-	return allowlist.GetAllowListStatus(stateDB, ContractAddress, address)
+func GetACP224FeeManagerAllowListStatus(stateDB contract.StateReader, contractAddr common.Address, address common.Address) allowlist.Role {
+	return allowlist.GetAllowListStatus(stateDB, contractAddr, address)
 }
 
 // SetACP224FeeManagerAllowListStatus assumes [role] has already been verified as valid.
 // Roles are stored keyed by address hash, so precompile storage keys must not collide
 // with address-derived keys.
-func SetACP224FeeManagerAllowListStatus(stateDB contract.StateDB, address common.Address, role allowlist.Role) {
-	allowlist.SetAllowListRole(stateDB, ContractAddress, address, role)
+func SetACP224FeeManagerAllowListStatus(stateDB contract.StateDB, contractAddr common.Address, address common.Address, role allowlist.Role) {
+	allowlist.SetAllowListRole(stateDB, contractAddr, address, role)
 }
 
 // GetStoredFeeConfig returns the fee config from contract storage.
 // Configure always stores a value during activation, so the caller
 // MUST NOT call this before the precompile has been configured.
-func GetStoredFeeConfig(stateDB contract.StateReader) commontype.ACP224FeeConfig {
-	return commontype.ACP224FeeConfig{
-		ValidatorTargetGas: hashToBool(stateDB.GetState(ContractAddress, validatorTargetGasStorageKey)),
-		TargetGas:          stateDB.GetState(ContractAddress, targetGasStorageKey).Big().Uint64(),
-		StaticPricing:      hashToBool(stateDB.GetState(ContractAddress, staticPricingStorageKey)),
-		MinGasPrice:        stateDB.GetState(ContractAddress, minGasPriceStorageKey).Big().Uint64(),
-		TimeToDouble:       stateDB.GetState(ContractAddress, timeToDoubleStorageKey).Big().Uint64(),
-	}
+func GetStoredFeeConfig(stateDB contract.StateReader, contractAddr common.Address) commontype.ACP224FeeConfig {
+	var cfg commontype.ACP224FeeConfig
+	cfg.UnpackFrom(stateDB.GetState(contractAddr, feeConfigStorageKey))
+	return cfg
 }
 
 // GetFeeConfigLastChangedAt returns the block number of the last fee config update.
-func GetFeeConfigLastChangedAt(stateDB contract.StateReader) *big.Int {
-	val := stateDB.GetState(ContractAddress, feeConfigLastChangedAtKey)
+func GetFeeConfigLastChangedAt(stateDB contract.StateReader, contractAddr common.Address) *big.Int {
+	val := stateDB.GetState(contractAddr, feeConfigLastChangedAtKey)
 	return val.Big()
 }
 
-// StoreFeeConfig validates and persists [feeConfig] and [blockNumber] to contract storage.
-func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.ACP224FeeConfig, blockNumber *big.Int) error {
+// StoreFeeConfig validates and persists feeConfig and blockNumber to contract storage.
+func StoreFeeConfig(stateDB contract.StateDB, contractAddr common.Address, feeConfig commontype.ACP224FeeConfig, blockNumber *big.Int) error {
 	if err := feeConfig.Verify(); err != nil {
 		return fmt.Errorf("cannot verify fee config: %w", err)
 	}
 
-	stateDB.SetState(ContractAddress, validatorTargetGasStorageKey, boolToHash(feeConfig.ValidatorTargetGas))
-	stateDB.SetState(ContractAddress, targetGasStorageKey, common.BigToHash(new(big.Int).SetUint64(feeConfig.TargetGas)))
-	stateDB.SetState(ContractAddress, staticPricingStorageKey, boolToHash(feeConfig.StaticPricing))
-	stateDB.SetState(ContractAddress, minGasPriceStorageKey, common.BigToHash(new(big.Int).SetUint64(feeConfig.MinGasPrice)))
-	stateDB.SetState(ContractAddress, timeToDoubleStorageKey, common.BigToHash(new(big.Int).SetUint64(feeConfig.TimeToDouble)))
-	stateDB.SetState(ContractAddress, feeConfigLastChangedAtKey, common.BigToHash(blockNumber))
+	stateDB.SetState(contractAddr, feeConfigStorageKey, feeConfig.Pack())
+	stateDB.SetState(contractAddr, feeConfigLastChangedAtKey, common.BigToHash(blockNumber))
 	return nil
 }
 
@@ -180,23 +163,27 @@ func UnpackGetFeeConfigOutput(output []byte) (commontype.ACP224FeeConfig, error)
 	if err != nil {
 		return commontype.ACP224FeeConfig{}, err
 	}
-	abiConfig := *abi.ConvertType(res[0], new(abiFeeConfig)).(*abiFeeConfig)
-	return fromABIFeeConfig(abiConfig)
+	abiConfig, ok := abi.ConvertType(res[0], new(abiFeeConfig)).(*abiFeeConfig)
+	if !ok {
+		return commontype.ACP224FeeConfig{}, errInvalidABIConfig
+	}
+	return fromABIFeeConfig(*abiConfig)
 }
 
+//nolint:revive // unused params are part of RunStatefulPrecompileFunc signature
 func getFeeConfig(
 	accessibleState contract.AccessibleState,
-	caller common.Address, //nolint:revive // unused params are part of RunStatefulPrecompileFunc signature
-	addr common.Address, //nolint:revive
-	input []byte, //nolint:revive
+	caller common.Address,
+	addr common.Address,
+	input []byte,
 	suppliedGas uint64,
-	readOnly bool, //nolint:revive
+	readOnly bool,
 ) (ret []byte, remainingGas uint64, err error) {
 	if remainingGas, err = contract.DeductGas(suppliedGas, getFeeConfigGasCost); err != nil {
 		return nil, 0, err
 	}
 
-	feeConfig := GetStoredFeeConfig(accessibleState.GetStateDB())
+	feeConfig := GetStoredFeeConfig(accessibleState.GetStateDB(), addr)
 
 	output, err := PackGetFeeConfigOutput(feeConfig)
 	if err != nil {
@@ -226,19 +213,20 @@ func UnpackGetFeeConfigLastChangedAtOutput(output []byte) (*big.Int, error) {
 	return unpacked, nil
 }
 
+//nolint:revive // unused params are part of RunStatefulPrecompileFunc signature
 func getFeeConfigLastChangedAt(
 	accessibleState contract.AccessibleState,
-	caller common.Address, //nolint:revive // unused params are part of RunStatefulPrecompileFunc signature
-	addr common.Address, //nolint:revive
-	input []byte, //nolint:revive
+	caller common.Address,
+	addr common.Address,
+	input []byte,
 	suppliedGas uint64,
-	readOnly bool, //nolint:revive
+	readOnly bool,
 ) (ret []byte, remainingGas uint64, err error) {
 	if remainingGas, err = contract.DeductGas(suppliedGas, getFeeConfigLastChangedAtGasCost); err != nil {
 		return nil, 0, err
 	}
 
-	lastChangedAt := GetFeeConfigLastChangedAt(accessibleState.GetStateDB())
+	lastChangedAt := GetFeeConfigLastChangedAt(accessibleState.GetStateDB(), addr)
 	packedOutput, err := PackGetFeeConfigLastChangedAtOutput(lastChangedAt)
 	if err != nil {
 		return nil, remainingGas, err
@@ -265,14 +253,17 @@ func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
 	if err != nil {
 		return commontype.ACP224FeeConfig{}, err
 	}
-	abiConfig := *abi.ConvertType(res[0], new(abiFeeConfig)).(*abiFeeConfig)
-	return fromABIFeeConfig(abiConfig)
+	abiConfig, ok := abi.ConvertType(res[0], new(abiFeeConfig)).(*abiFeeConfig)
+	if !ok {
+		return commontype.ACP224FeeConfig{}, errInvalidABIConfig
+	}
+	return fromABIFeeConfig(*abiConfig)
 }
 
 func setFeeConfig(
 	accessibleState contract.AccessibleState,
 	caller common.Address,
-	addr common.Address, //nolint:revive // part of RunStatefulPrecompileFunc signature
+	addr common.Address,
 	input []byte,
 	suppliedGas uint64,
 	readOnly bool,
@@ -286,7 +277,7 @@ func setFeeConfig(
 	}
 
 	stateDB := accessibleState.GetStateDB()
-	callerStatus := GetACP224FeeManagerAllowListStatus(stateDB, caller)
+	callerStatus := GetACP224FeeManagerAllowListStatus(stateDB, addr, caller)
 	if !callerStatus.IsEnabled() {
 		return nil, remainingGas, fmt.Errorf("%w: %s", errCannotSetFeeConfig, caller)
 	}
@@ -301,7 +292,7 @@ func setFeeConfig(
 		return nil, remainingGas, errNilBlockNumber
 	}
 
-	oldConfig := GetStoredFeeConfig(stateDB)
+	oldConfig := GetStoredFeeConfig(stateDB, addr)
 	topics, data, err := PackFeeConfigUpdatedEvent(
 		caller,
 		oldConfig,
@@ -311,21 +302,21 @@ func setFeeConfig(
 		return nil, remainingGas, err
 	}
 
+	if err := StoreFeeConfig(stateDB, addr, feeConfig, blockNumber); err != nil {
+		return nil, remainingGas, err
+	}
+
 	stateDB.AddLog(&types.Log{
-		Address:     ContractAddress,
+		Address:     addr,
 		Topics:      topics,
 		Data:        data,
 		BlockNumber: blockNumber.Uint64(),
 	})
 
-	if err := StoreFeeConfig(stateDB, feeConfig, blockNumber); err != nil {
-		return nil, remainingGas, err
-	}
-
 	return []byte{}, remainingGas, nil
 }
 
-var ACP224FeeManagerPrecompile = createACP224FeeManagerPrecompile()
+var acp224FeeManagerPrecompile = createACP224FeeManagerPrecompile()
 
 func createACP224FeeManagerPrecompile() contract.StatefulPrecompiledContract {
 	abiFunctionMap := map[string]contract.RunStatefulPrecompileFunc{

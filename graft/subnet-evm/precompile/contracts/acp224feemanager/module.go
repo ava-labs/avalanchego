@@ -24,7 +24,7 @@ var ContractAddress = common.HexToAddress("0x02000000000000000000000000000000000
 var Module = modules.Module{
 	ConfigKey:    ConfigKey,
 	Address:      ContractAddress,
-	Contract:     ACP224FeeManagerPrecompile,
+	Contract:     acp224FeeManagerPrecompile,
 	Configurator: &configurator{},
 }
 
@@ -54,7 +54,7 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 	if config.InitialFeeConfig != nil {
 		initialFeeConfig = *config.InitialFeeConfig
 	}
-	if err := StoreFeeConfig(state, initialFeeConfig, blockContext.Number()); err != nil {
+	if err := StoreFeeConfig(state, ContractAddress, initialFeeConfig, blockContext.Number()); err != nil {
 		return fmt.Errorf("cannot configure initial fee config: %w", err)
 	}
 	return config.AllowListConfig.Configure(chainConfig, ContractAddress, state, blockContext)

@@ -3,7 +3,12 @@
 
 package commontype
 
-import "errors"
+import (
+	"encoding/binary"
+	"errors"
+
+	"github.com/ava-labs/libevm/common"
+)
 
 const MinTargetGasACP224 uint64 = 1_000_000
 
@@ -57,6 +62,43 @@ func (a *ACP224FeeConfig) Verify() error {
 	default:
 		return nil
 	}
+}
+
+// Pack encodes the fee config into a single common.Hash (32 bytes).
+//
+// Layout (26 bytes used, 6 bytes padding):
+//
+//	h[0]     ValidatorTargetGas (bool)
+//	h[1:9]   TargetGas          (uint64)
+//	h[9]     StaticPricing      (bool)
+//	h[10:18] MinGasPrice        (uint64)
+//	h[18:26] TimeToDouble       (uint64)
+func (a *ACP224FeeConfig) Pack() common.Hash {
+	var h common.Hash
+	put := binary.BigEndian.PutUint64
+
+	if a.ValidatorTargetGas {
+		h[0] = 1
+	}
+	put(h[1:], a.TargetGas)
+	if a.StaticPricing {
+		h[9] = 1
+	}
+	put(h[10:], a.MinGasPrice)
+	put(h[18:], a.TimeToDouble)
+	return h
+}
+
+// UnpackFrom decodes a packed common.Hash into the fee config fields.
+// See [ACP224FeeConfig.Pack] for the byte layout.
+func (a *ACP224FeeConfig) UnpackFrom(h common.Hash) {
+	u64 := binary.BigEndian.Uint64
+
+	a.ValidatorTargetGas = h[0] != 0
+	a.TargetGas = u64(h[1:])
+	a.StaticPricing = h[9] != 0
+	a.MinGasPrice = u64(h[10:])
+	a.TimeToDouble = u64(h[18:])
 }
 
 // Equal returns true if both configs are nil or have identical field values.

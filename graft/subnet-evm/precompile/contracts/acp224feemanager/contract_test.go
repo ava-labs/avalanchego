@@ -70,22 +70,20 @@ func mustPackSetFeeConfigInput(t testing.TB, config commontype.ACP224FeeConfig) 
 
 func mustStoreTestFeeConfig(t testing.TB, state *extstate.StateDB) {
 	t.Helper()
-	require.NoError(t, StoreFeeConfig(state, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
+	require.NoError(t, StoreFeeConfig(state, ContractAddress, testFeeConfig, testBlockNumber), "StoreFeeConfig()")
 }
 
-func mustPackGetFeeConfigOutput(config commontype.ACP224FeeConfig) []byte {
+func mustPackGetFeeConfigOutput(t testing.TB, config commontype.ACP224FeeConfig) []byte {
+	t.Helper()
 	res, err := PackGetFeeConfigOutput(config)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err, "PackGetFeeConfigOutput()")
 	return res
 }
 
-func mustPackGetFeeConfigLastChangedAtOutput(blockNumber *big.Int) []byte {
+func mustPackGetFeeConfigLastChangedAtOutput(t testing.TB, blockNumber *big.Int) []byte {
+	t.Helper()
 	res, err := PackGetFeeConfigLastChangedAtOutput(blockNumber)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err, "PackGetFeeConfigLastChangedAtOutput()")
 	return res
 }
 
@@ -98,7 +96,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			Config:      defaultConfig,
 			InputFn:     mustPackGetFeeConfigInput,
 			SuppliedGas: getFeeConfigGasCost,
-			ExpectedRes: mustPackGetFeeConfigOutput(commontype.DefaultACP224FeeConfig()),
+			ExpectedRes: mustPackGetFeeConfigOutput(t, commontype.DefaultACP224FeeConfig()),
 		},
 		{
 			Name:        "getFeeConfig_from_Enabled",
@@ -106,7 +104,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			Config:      defaultConfig,
 			InputFn:     mustPackGetFeeConfigInput,
 			SuppliedGas: getFeeConfigGasCost,
-			ExpectedRes: mustPackGetFeeConfigOutput(commontype.DefaultACP224FeeConfig()),
+			ExpectedRes: mustPackGetFeeConfigOutput(t, commontype.DefaultACP224FeeConfig()),
 		},
 		{
 			Name:        "getFeeConfig_from_Manager",
@@ -114,7 +112,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			Config:      defaultConfig,
 			InputFn:     mustPackGetFeeConfigInput,
 			SuppliedGas: getFeeConfigGasCost,
-			ExpectedRes: mustPackGetFeeConfigOutput(commontype.DefaultACP224FeeConfig()),
+			ExpectedRes: mustPackGetFeeConfigOutput(t, commontype.DefaultACP224FeeConfig()),
 		},
 		{
 			Name:        "getFeeConfig_from_Admin",
@@ -122,7 +120,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			Config:      defaultConfig,
 			InputFn:     mustPackGetFeeConfigInput,
 			SuppliedGas: getFeeConfigGasCost,
-			ExpectedRes: mustPackGetFeeConfigOutput(commontype.DefaultACP224FeeConfig()),
+			ExpectedRes: mustPackGetFeeConfigOutput(t, commontype.DefaultACP224FeeConfig()),
 		},
 		{
 			Name:    "getFeeConfig_returns_initialFeeConfig_from_configure",
@@ -132,7 +130,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 				InitialFeeConfig: &testFeeConfig,
 			},
 			SuppliedGas: getFeeConfigGasCost,
-			ExpectedRes: mustPackGetFeeConfigOutput(testFeeConfig),
+			ExpectedRes: mustPackGetFeeConfigOutput(t, testFeeConfig),
 		},
 		{
 			Name:        "getFeeConfig_after_store_returns_new_config",
@@ -140,18 +138,18 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			BeforeHook:  mustStoreTestFeeConfig,
 			InputFn:     mustPackGetFeeConfigInput,
 			SuppliedGas: getFeeConfigGasCost,
-			ExpectedRes: mustPackGetFeeConfigOutput(testFeeConfig),
+			ExpectedRes: mustPackGetFeeConfigOutput(t, testFeeConfig),
 		},
 		{
 			Name:   "getFeeConfig_boolean_fields_round_trip",
 			Caller: allowlisttest.TestEnabledAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				t.Helper()
-				require.NoError(t, StoreFeeConfig(state, testBoolFeeConfig, testBlockNumber), "StoreFeeConfig()")
+				require.NoError(t, StoreFeeConfig(state, ContractAddress, testBoolFeeConfig, testBlockNumber), "StoreFeeConfig()")
 			},
 			InputFn:     mustPackGetFeeConfigInput,
 			SuppliedGas: getFeeConfigGasCost,
-			ExpectedRes: mustPackGetFeeConfigOutput(testBoolFeeConfig),
+			ExpectedRes: mustPackGetFeeConfigOutput(t, testBoolFeeConfig),
 		},
 		{
 			Name:        "getFeeConfig_insufficient_gas",
@@ -168,7 +166,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			BeforeHook:  mustStoreTestFeeConfig,
 			InputFn:     mustPackGetFeeConfigLastChangedAtInput,
 			SuppliedGas: getFeeConfigLastChangedAtGasCost,
-			ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(testBlockNumber),
+			ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(t, testBlockNumber),
 		},
 		{
 			Name:        "getFeeConfigLastChangedAt_from_Enabled",
@@ -176,7 +174,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			BeforeHook:  mustStoreTestFeeConfig,
 			InputFn:     mustPackGetFeeConfigLastChangedAtInput,
 			SuppliedGas: getFeeConfigLastChangedAtGasCost,
-			ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(testBlockNumber),
+			ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(t, testBlockNumber),
 		},
 		{
 			Name:        "getFeeConfigLastChangedAt_from_Manager",
@@ -184,7 +182,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			BeforeHook:  mustStoreTestFeeConfig,
 			InputFn:     mustPackGetFeeConfigLastChangedAtInput,
 			SuppliedGas: getFeeConfigLastChangedAtGasCost,
-			ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(testBlockNumber),
+			ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(t, testBlockNumber),
 		},
 		{
 			Name:        "getFeeConfigLastChangedAt_from_Admin",
@@ -192,7 +190,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			BeforeHook:  mustStoreTestFeeConfig,
 			InputFn:     mustPackGetFeeConfigLastChangedAtInput,
 			SuppliedGas: getFeeConfigLastChangedAtGasCost,
-			ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(testBlockNumber),
+			ExpectedRes: mustPackGetFeeConfigLastChangedAtOutput(t, testBlockNumber),
 		},
 		{
 			Name:        "getFeeConfigLastChangedAt_insufficient_gas",
@@ -223,7 +221,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			SuppliedGas: setFeeConfigGasCost,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				got := GetStoredFeeConfig(state)
+				got := GetStoredFeeConfig(state, ContractAddress)
 				require.Equal(t, testFeeConfig, got, "GetStoredFeeConfig()")
 			},
 		},
@@ -237,7 +235,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			SuppliedGas: setFeeConfigGasCost,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				got := GetStoredFeeConfig(state)
+				got := GetStoredFeeConfig(state, ContractAddress)
 				require.Equal(t, testFeeConfig, got, "GetStoredFeeConfig()")
 			},
 		},
@@ -251,7 +249,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			SuppliedGas: setFeeConfigGasCost,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				got := GetStoredFeeConfig(state)
+				got := GetStoredFeeConfig(state, ContractAddress)
 				require.Equal(t, testFeeConfig, got, "GetStoredFeeConfig()")
 			},
 		},
@@ -281,7 +279,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				t.Helper()
 				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
-				require.NoError(t, StoreFeeConfig(state, commontype.DefaultACP224FeeConfig(), big.NewInt(0)), "StoreFeeConfig()")
+				require.NoError(t, StoreFeeConfig(state, ContractAddress, commontype.DefaultACP224FeeConfig(), big.NewInt(0)), "StoreFeeConfig()")
 			},
 			InputFn: func(t testing.TB) []byte {
 				return mustPackSetFeeConfigInput(t, testFeeConfig)
@@ -320,10 +318,10 @@ func TestACP224FeeManagerRun(t *testing.T) {
 			SuppliedGas: setFeeConfigGasCost,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := GetStoredFeeConfig(state)
+				feeConfig := GetStoredFeeConfig(state, ContractAddress)
 				require.Equal(t, testFeeConfig, feeConfig, "GetStoredFeeConfig()")
 
-				lastChangedAt := GetFeeConfigLastChangedAt(state)
+				lastChangedAt := GetFeeConfigLastChangedAt(state, ContractAddress)
 				require.Equal(t, testBlockNumber, lastChangedAt, "GetFeeConfigLastChangedAt()")
 
 				logs := state.Logs()

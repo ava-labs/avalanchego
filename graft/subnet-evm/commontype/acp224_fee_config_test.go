@@ -108,6 +108,27 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 	}
 }
 
+func FuzzACP224FeeConfigPacking(f *testing.F) {
+	for _, v := range []bool{true, false} {
+		for _, s := range []bool{true, false} {
+			for t := range uint64(3) {
+				for m := range uint64(3) {
+					for d := range uint64(3) {
+						f.Add(v, s, t, m, d)
+					}
+				}
+			}
+		}
+	}
+
+	f.Fuzz(func(t *testing.T, validator, static bool, target, minGas, double uint64) {
+		in := &ACP224FeeConfig{validator, target, static, minGas, double}
+		got := new(ACP224FeeConfig)
+		got.UnpackFrom(in.Pack())
+		require.Equalf(t, *in, *got, "%T.UnpackFrom(%[1]T.Pack()) round trip", in)
+	})
+}
+
 func TestACP224FeeConfigEqual(t *testing.T) {
 	tests := []struct {
 		name string
@@ -118,11 +139,8 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 		{
 			name: "both equal",
 			a:    utils.PointerTo(DefaultACP224FeeConfig()),
-			b: &ACP224FeeConfig{
-				TargetGas:    1_000_000,
-				MinGasPrice:  1,
-				TimeToDouble: 60,
-			},
+			b: utils.PointerTo(
+				DefaultACP224FeeConfig()),
 			want: true,
 		},
 		{
