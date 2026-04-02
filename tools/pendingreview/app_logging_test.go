@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -84,6 +86,176 @@ func TestRunCreateLogsStructuredOperations(t *testing.T) {
 		`"repo":"ava-labs/avalanchego"`,
 		`"prNumber":5168`,
 		`"reviewID":"review-123"`,
+	} {
+		require.Contains(t, logOutput, expected)
+	}
+}
+
+func TestRunUpdateBodyLogsStateComparison(t *testing.T) {
+	t.Parallel()
+
+	stateDir := t.TempDir()
+	store := NewStateStore(logging.NoLog{}, stateDir)
+	require.NoError(t, store.Save(ReviewState{
+		Repo:                 "ava-labs/avalanchego",
+		PRNumber:             5168,
+		UserLogin:            "maru",
+		ReviewID:             "review-123",
+		LastPublishedBody:    "live body",
+		LastPublishedEntries: []DraftReviewEntry{{Kind: DraftReviewEntryKindNewThread, Path: "a.go", Line: 7, Side: reviewSideRight, Body: "stored comment"}},
+	}))
+
+	server := newGraphQLTestServer(t, func(t *testing.T, query string, variables map[string]any) any {
+		switch {
+		case strings.Contains(query, "query Viewer"):
+			return map[string]any{"viewer": map[string]any{"login": "maru"}}
+		case strings.Contains(query, "query PullRequestContext"):
+			return graphQLPullRequestData("live body", nil)
+		case strings.Contains(query, "mutation UpdatePendingReviewBody"):
+			require.Equal(t, "review-123", variables["reviewID"])
+			require.Equal(t, "updated body", variables["body"])
+			return map[string]any{
+				"updatePullRequestReview": map[string]any{
+					"pullRequestReview": map[string]any{
+						"id":         "review-123",
+						"databaseId": 123,
+						"state":      reviewStatePending,
+						"body":       "updated body",
+						"url":        "https://example.invalid/review/123",
+						"author":     map[string]any{"login": "maru"},
+					},
+				},
+			}
+		default:
+			require.FailNowf(t, "unexpected query", "query: %s", query)
+			return nil
+		}
+	})
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	app := NewApp(strings.NewReader(""), &stdout, &stderr)
+	app.tokenProvider = staticTokenProvider{token: "test-token"}
+	app.httpClient = server.Client()
+	app.baseURL = server.URL
+	app.log = logging.NewLogger(
+		"pendingreview",
+		logging.NewWrappedCore(logging.Debug, nopWriteCloser{Writer: &stderr}, logging.JSON.ConsoleEncoder()),
+	)
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"update-body",
+		"--pr", "5168",
+		"--body", "updated body",
+		"--state-dir", stateDir,
+		"--config-dir", t.TempDir(),
+	}))
+
+	logOutput := stderr.String()
+	for _, expected := range []string{
+		`"msg":"fetched live pending review for body update"`,
+		`"msg":"loaded stored pending review state for body update"`,
+		`"msg":"applying pending review body update"`,
+		`"reviewID":"review-123"`,
+		`"liveBodyLength":9`,
+		`"storedBodyLength":9`,
+		`"desiredBodyLength":12`,
+		`"reviewIDMatches":true`,
+		`"bodyMatches":true`,
+		`"preservedEntryCount":1`,
+	} {
+		require.Contains(t, logOutput, expected)
+	}
+}
+
+func TestRunReplaceCommentsLogsStateComparison(t *testing.T) {
+	t.Parallel()
+
+	commentsPath := filepath.Join(t.TempDir(), "comments.json")
+	require.NoError(t, os.WriteFile(commentsPath, []byte(`[{"path":"a.go","line":7,"side":"RIGHT","body":"new comment"}]`), 0o644))
+
+	stateDir := t.TempDir()
+	store := NewStateStore(logging.NoLog{}, stateDir)
+	require.NoError(t, store.Save(ReviewState{
+		Repo:                 "ava-labs/avalanchego",
+		PRNumber:             5168,
+		UserLogin:            "maru",
+		ReviewID:             "review-123",
+		LastPublishedBody:    "live body",
+		LastPublishedEntries: []DraftReviewEntry{{Kind: DraftReviewEntryKindNewThread, Path: "a.go", Line: 7, Side: reviewSideRight, Body: "old comment"}},
+	}))
+
+	var replaced bool
+	server := newGraphQLTestServer(t, func(t *testing.T, query string, variables map[string]any) any {
+		switch {
+		case strings.Contains(query, "query Viewer"):
+			return map[string]any{"viewer": map[string]any{"login": "maru"}}
+		case strings.Contains(query, "query PullRequestContext"):
+			if replaced {
+				return graphQLPullRequestData("live body", []map[string]any{
+					graphQLThreadComment("comment-2", "thread-2", "new comment", "a.go", 7),
+				})
+			}
+			return graphQLPullRequestData("live body", []map[string]any{
+				graphQLThreadComment("comment-1", "thread-1", "old comment", "a.go", 7),
+			})
+		case strings.Contains(query, "mutation DeletePendingReviewComment"):
+			return map[string]any{
+				"deletePullRequestReviewComment": map[string]any{"clientMutationId": "deleted"},
+			}
+		case strings.Contains(query, "mutation AddPendingReviewThread"):
+			replaced = true
+			return map[string]any{
+				"addPullRequestReviewThread": map[string]any{
+					"thread": map[string]any{
+						"id": "thread-2",
+						"comments": map[string]any{
+							"nodes": []map[string]any{
+								graphQLThreadComment("comment-2", "thread-2", "new comment", "a.go", 7),
+							},
+						},
+					},
+				},
+			}
+		default:
+			require.FailNowf(t, "unexpected query", "query: %s", query)
+			return nil
+		}
+	})
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	app := NewApp(strings.NewReader(""), &stdout, &stderr)
+	app.tokenProvider = staticTokenProvider{token: "test-token"}
+	app.httpClient = server.Client()
+	app.baseURL = server.URL
+	app.log = logging.NewLogger(
+		"pendingreview",
+		logging.NewWrappedCore(logging.Debug, nopWriteCloser{Writer: &stderr}, logging.JSON.ConsoleEncoder()),
+	)
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"replace-comments",
+		"--pr", "5168",
+		"--comments-file", commentsPath,
+		"--state-dir", stateDir,
+		"--config-dir", t.TempDir(),
+	}))
+
+	logOutput := stderr.String()
+	for _, expected := range []string{
+		`"msg":"fetched live pending review for comment replace"`,
+		`"msg":"loaded stored pending review state for comment replace"`,
+		`"msg":"comparing stored and live managed entries"`,
+		`"msg":"applying pending review comment replace"`,
+		`"reviewID":"review-123"`,
+		`"liveManagedEntryCount":1`,
+		`"storedEntryCount":1`,
+		`"desiredEntryCount":1`,
+		`"entriesMatch":true`,
+		`"existingCommentCount":1`,
 	} {
 		require.Contains(t, logOutput, expected)
 	}

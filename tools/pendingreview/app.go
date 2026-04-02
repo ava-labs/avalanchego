@@ -245,6 +245,14 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
+	a.log.Debug("fetched live pending review for body update",
+		zap.String("repo", command.Repo),
+		zap.Int("prNumber", command.PRNumber),
+		zap.String("userLogin", viewer.Login),
+		zap.String("reviewID", review.ID),
+		zap.Int("liveBodyLength", len(review.Body)),
+		zap.Int("liveCommentCount", len(review.Comments)),
+	)
 
 	store := NewStateStore(a.log, command.StateDir)
 	if !command.Force {
@@ -252,6 +260,17 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 		if err != nil {
 			return stacktrace.Wrap(err)
 		}
+		a.log.Debug("loaded stored pending review state for body update",
+			zap.String("repo", command.Repo),
+			zap.Int("prNumber", command.PRNumber),
+			zap.String("userLogin", viewer.Login),
+			zap.String("storedReviewID", state.ReviewID),
+			zap.Int("storedBodyLength", len(state.LastPublishedBody)),
+			zap.Int("storedEntryCount", len(state.LastPublishedEntries)),
+			zap.Bool("reviewIDMatches", state.ReviewID == "" || state.ReviewID == review.ID),
+			zap.Bool("bodyMatches", state.LastPublishedBody == review.Body),
+			zap.Int("desiredBodyLength", len(body)),
+		)
 		if state.ReviewID != "" && state.ReviewID != review.ID {
 			return stacktrace.Errorf("stored review state points to review %s but GitHub has pending review %s; run get, reconcile, then retry with --force if intended", state.ReviewID, displayReviewID(review))
 		}
@@ -271,6 +290,16 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
+	a.log.Debug("applying pending review body update",
+		zap.String("repo", command.Repo),
+		zap.Int("prNumber", command.PRNumber),
+		zap.String("userLogin", viewer.Login),
+		zap.String("reviewID", review.ID),
+		zap.Int("liveBodyLength", len(review.Body)),
+		zap.Int("desiredBodyLength", len(body)),
+		zap.Int("preservedEntryCount", len(storedState.LastPublishedEntries)),
+		zap.Bool("force", command.Force),
+	)
 
 	updated, err := client.UpdatePendingReviewBody(ctx, review.ID, body)
 	if err != nil {
@@ -334,12 +363,31 @@ func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCom
 		return stacktrace.Wrap(err)
 	}
 	liveManagedEntries := normalizeLiveReviewComments(review.Comments, viewer.Login)
+	a.log.Debug("fetched live pending review for comment replace",
+		zap.String("repo", command.Repo),
+		zap.Int("prNumber", command.PRNumber),
+		zap.String("userLogin", viewer.Login),
+		zap.String("reviewID", review.ID),
+		zap.Int("liveBodyLength", len(review.Body)),
+		zap.Int("liveManagedEntryCount", len(liveManagedEntries)),
+		zap.Int("desiredEntryCount", len(entries)),
+	)
 
 	store := NewStateStore(a.log, command.StateDir)
 	storedState, foundStoredState, err := store.LoadIfExists(command.Repo, viewer.Login, command.PRNumber)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
+	a.log.Debug("loaded stored pending review state for comment replace",
+		zap.String("repo", command.Repo),
+		zap.Int("prNumber", command.PRNumber),
+		zap.String("userLogin", viewer.Login),
+		zap.Bool("foundStoredState", foundStoredState),
+		zap.String("storedReviewID", storedState.ReviewID),
+		zap.Int("storedBodyLength", len(storedState.LastPublishedBody)),
+		zap.Int("storedEntryCount", len(storedState.LastPublishedEntries)),
+		zap.Bool("force", command.Force),
+	)
 	if !foundStoredState && !command.Force {
 		return stacktrace.Errorf("no stored review state for %s#%d as %s; run create first or use --force", command.Repo, command.PRNumber, viewer.Login)
 	}
@@ -348,6 +396,16 @@ func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCom
 	}
 	if !command.Force {
 		storedEntries := normalizeDraftReviewEntries(storedState.LastPublishedEntries)
+		a.log.Debug("comparing stored and live managed entries",
+			zap.String("repo", command.Repo),
+			zap.Int("prNumber", command.PRNumber),
+			zap.String("userLogin", viewer.Login),
+			zap.String("reviewID", review.ID),
+			zap.Int("storedEntryCount", len(storedEntries)),
+			zap.Int("liveManagedEntryCount", len(liveManagedEntries)),
+			zap.Bool("entriesMatch", draftReviewEntriesEqual(storedEntries, liveManagedEntries)),
+			zap.Int("desiredEntryCount", len(entries)),
+		)
 		if !draftReviewEntriesEqual(storedEntries, liveManagedEntries) {
 			a.log.Info("refusing pending review comment replace because stored state diverged",
 				zap.String("repo", command.Repo),
@@ -360,6 +418,15 @@ func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCom
 		}
 	}
 
+	a.log.Debug("applying pending review comment replace",
+		zap.String("repo", command.Repo),
+		zap.Int("prNumber", command.PRNumber),
+		zap.String("userLogin", viewer.Login),
+		zap.String("reviewID", review.ID),
+		zap.Int("existingCommentCount", len(review.Comments)),
+		zap.Int("desiredEntryCount", len(entries)),
+		zap.Bool("force", command.Force),
+	)
 	if err := client.ReplacePendingReviewEntries(ctx, review.ID, review.Comments, entries); err != nil {
 		return stacktrace.Wrap(err)
 	}
