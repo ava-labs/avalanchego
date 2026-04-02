@@ -30,12 +30,14 @@ var Module = modules.Module{
 
 type configurator struct{}
 
-// TODO(JonathanOppenheimer): Register the precompile module when ready.
-// func init() {
-// 	if err := modules.RegisterModule(Module); err != nil {
-// 		panic(err)
-// 	}
-// }
+func init() {
+	// TODO(JonathanOppenheimer): Register the precompile module when ready.
+	if false {
+		if err := modules.RegisterModule(Module); err != nil {
+			panic(err)
+		}
+	}
+}
 
 // MakeConfig is required for Marshal/Unmarshal of the precompile config.
 func (*configurator) MakeConfig() precompileconfig.Config {
