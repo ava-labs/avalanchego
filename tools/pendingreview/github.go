@@ -108,7 +108,7 @@ func (c *GitHubClient) GetPendingReview(ctx context.Context, repo string, prNumb
 			return review, nil
 		}
 		if attempt == maxAttempts {
-			return Review{}, stacktrace.Errorf("no pending review found for %s on %s#%d", effectiveLogin, repo, prNumber)
+			return Review{}, stacktrace.Errorf("%w for %s on %s#%d", ErrNoPendingReview, effectiveLogin, repo, prNumber)
 		}
 
 		timer := time.NewTimer(time.Duration(attempt) * 200 * time.Millisecond)
@@ -119,7 +119,7 @@ func (c *GitHubClient) GetPendingReview(ctx context.Context, repo string, prNumb
 		case <-timer.C:
 		}
 	}
-	return Review{}, stacktrace.Errorf("no pending review found for %s on %s#%d", login, repo, prNumber)
+	return Review{}, stacktrace.Errorf("%w for %s on %s#%d", ErrNoPendingReview, login, repo, prNumber)
 }
 
 func (c *GitHubClient) DeletePendingReview(ctx context.Context, reviewID string) error {

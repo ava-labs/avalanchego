@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -74,7 +75,7 @@ func TestCreatePendingReviewLive(t *testing.T) {
 	require.NoError(t, err, "expected pending review for %s after create; stdout=%q", viewer.Login, stdout.String())
 
 	t.Cleanup(func() {
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		cleanupCtx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 		defer cancel()
 		require.NoError(t, client.DeletePendingReview(cleanupCtx, review.ID))
 	})
@@ -163,7 +164,7 @@ func TestReplacePendingReviewCommentsLive(t *testing.T) {
 	require.NoError(t, ensureNoLivePendingReviewOrDelete(ctx, t, client, repo, prNumber, viewer.Login, deleteExisting == "1"))
 
 	t.Cleanup(func() {
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		cleanupCtx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 		defer cancel()
 		require.NoError(t, deleteCurrentPendingReview(cleanupCtx, client, repo, prNumber, viewer.Login))
 	})
@@ -304,12 +305,11 @@ func TestReplacePendingReviewThreadRepliesLive(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		cleanupCtx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 		defer cancel()
 		require.NoError(t, deleteCurrentPendingReview(cleanupCtx, client, repo, prNumber, viewer.Login))
 		_, err := client.GetPendingReview(cleanupCtx, repo, prNumber, viewer.Login)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "no pending review found")
+		require.ErrorIs(t, err, ErrNoPendingReview)
 	})
 
 	app := NewApp(strings.NewReader(""), io.Discard, io.Discard)
@@ -518,7 +518,7 @@ func ensureNoLivePendingReviewOrDelete(ctx context.Context, t *testing.T, client
 
 	review, err := client.GetPendingReview(ctx, repo, prNumber, login)
 	if err != nil {
-		if strings.Contains(err.Error(), "no pending review found") {
+		if errors.Is(err, ErrNoPendingReview) {
 			return nil
 		}
 		return err
@@ -532,7 +532,7 @@ func ensureNoLivePendingReviewOrDelete(ctx context.Context, t *testing.T, client
 func deleteCurrentPendingReview(ctx context.Context, client *GitHubClient, repo string, prNumber int, login string) error {
 	review, err := client.GetPendingReview(ctx, repo, prNumber, login)
 	if err != nil {
-		if strings.Contains(err.Error(), "no pending review found") {
+		if errors.Is(err, ErrNoPendingReview) {
 			return nil
 		}
 		return err
