@@ -223,8 +223,12 @@ Stored fields:
 - `user`
 - `review_id`
 - `last_published_body`
-- `last_published_comments`
+- `last_published_entries`
 - `html_url`
+
+For backward compatibility, the loader still accepts older state files that use
+`last_published_comments`, but newly written state uses
+`last_published_entries`.
 
 The stored state represents what the tool last wrote, not what it last read.
 That distinction is intentional and is the basis for conflict detection.
@@ -239,6 +243,9 @@ The tool protects human GitHub edits with optimistic concurrency checks.
 
 - the stored `review_id` points to a different pending review than the live one
 - the live review body differs from `last_published_body`
+
+On success, `update-body` advances the stored `last_published_body` and keeps
+the previously stored managed entry set unchanged.
 
 The failure is deliberate. The intended recovery flow is:
 
