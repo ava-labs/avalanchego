@@ -163,7 +163,7 @@ func startPrometheus(ctx context.Context, log logging.Logger) error {
 	cmdName := prometheusCmd
 
 	args := fmt.Sprintf(
-		"--config.file=%s.yaml --web.listen-address=%s --agent --storage.agent.path=./data",
+		"--config.file=%s.yaml --web.listen-address=%s --agent --storage.agent.path=./data --enable-feature=native-histograms",
 		cmdName,
 		prometheusListenAddress,
 	)
@@ -199,6 +199,7 @@ remote_write:
     basic_auth:
       username: "%s"
       password: "%s"
+    send_native_histograms: true
 `, prometheusScrapeInterval, serviceDiscoveryDir, collectorConfig.url, collectorConfig.username, collectorConfig.password)
 
 	err = startCollector(ctx, log, cmdName, args, config)

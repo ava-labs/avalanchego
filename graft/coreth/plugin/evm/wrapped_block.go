@@ -501,6 +501,9 @@ func (b *wrappedBlock) syntacticVerify() error {
 	if headerExtra.TargetExcess != nil {
 		return fmt.Errorf("unexpected TargetExcess in header extra: %d", *headerExtra.TargetExcess)
 	}
+	if headerExtra.SettledHeight != nil {
+		return fmt.Errorf("unexpected SettledHeight in header extra: %d", *headerExtra.SettledHeight)
+	}
 
 	if b.extension != nil {
 		if err := b.extension.SyntacticVerify(*rulesExtra); err != nil {

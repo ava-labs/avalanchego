@@ -119,6 +119,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		TimeMilliseconds: utils.PointerTo[uint64](24),
 		MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(25)),
 		TargetExcess:     utils.PointerTo(acp176.TargetExcess(26)),
+		SettledHeight:    utils.PointerTo[uint64](27),
 	}
 	return WithHeaderExtra(header, extra), extra
 }

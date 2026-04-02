@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/saedb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -34,7 +33,8 @@ import (
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	saestate "github.com/ava-labs/avalanchego/vms/saevm/state"
-	gethparams "github.com/ava-labs/libevm/params"
+	ethparams "github.com/ava-labs/libevm/params"
+	saetypes "github.com/ava-labs/strevm/types"
 )
 
 var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
@@ -42,14 +42,14 @@ var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
 type Points struct {
 	blockBuilder
 	db          database.Database
-	chainConfig *gethparams.ChainConfig
+	chainConfig *ethparams.ChainConfig
 	txs         *txpool.Txs
 }
 
 func NewPoints(
 	ctx *snow.Context,
 	db database.Database,
-	chainConfig *gethparams.ChainConfig,
+	chainConfig *ethparams.ChainConfig,
 	consensusState *utils.Atomic[snow.State],
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
@@ -107,12 +107,12 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 	}, nil
 }
 
-func (p *Points) ExecutionResultsDB(dataDir string) (saedb.ExecutionResults, error) {
+func (p *Points) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error) {
 	db, err := blockdb.New(
 		blockdb.DefaultConfig().WithDir(dataDir),
 		p.ctx.Log,
 	)
-	return saedb.ExecutionResults{HeightIndex: db}, err
+	return saetypes.ExecutionResults{HeightIndex: db}, err
 }
 
 func (*Points) GasConfigAfter(h *types.Header) (gas.Gas, hook.GasPriceConfig) {
@@ -125,6 +125,13 @@ func (*Points) GasConfigAfter(h *types.Header) (gas.Gas, hook.GasPriceConfig) {
 func targetExcess(h *types.Header) acp176.TargetExcess {
 	if te := customtypes.GetHeaderExtra(h).TargetExcess; te != nil {
 		return *te
+	}
+	return 0
+}
+
+func (*Points) SettledHeight(h *types.Header) uint64 {
+	if s := customtypes.GetHeaderExtra(h).SettledHeight; s != nil {
+		return *s
 	}
 	return 0
 }
@@ -157,7 +164,7 @@ func (*Points) CanExecuteTransaction(common.Address, *common.Address, libevm.Sta
 	return nil
 }
 
-func (*Points) BeforeExecutingBlock(gethparams.Rules, *state.StateDB, *types.Block) error {
+func (*Points) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {
 	return nil
 }
 

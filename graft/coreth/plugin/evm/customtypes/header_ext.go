@@ -45,6 +45,7 @@ type HeaderExtra struct {
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
 	TargetExcess     *acp176.TargetExcess
+	SettledHeight    *uint64
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.
@@ -130,6 +131,10 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		e := *h.TargetExcess
 		cp.TargetExcess = &e
 	}
+	if h.SettledHeight != nil {
+		s := *h.SettledHeight
+		cp.SettledHeight = &s
+	}
 	SetHeaderExtra(dst, cp)
 }
 
@@ -184,6 +189,7 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.TimeMilliseconds = extras.TimeMilliseconds
 	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
 	h.TargetExcess = (*uint64)(extras.TargetExcess)
+	h.SettledHeight = extras.SettledHeight
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
@@ -193,6 +199,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.TimeMilliseconds = h.TimeMilliseconds
 	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
 	extras.TargetExcess = (*acp176.TargetExcess)(h.TargetExcess)
+	extras.SettledHeight = h.SettledHeight
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -257,6 +264,9 @@ type HeaderSerializable struct {
 	// TargetExcess was added by Helicon and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	TargetExcess *uint64 `json:"targetExcess" rlp:"optional"`
+
+	// SettledHeight was added by Helicon and is ignored in legacy headers.
+	SettledHeight *uint64 `json:"settledHeight" rlp:"optional"`
 }
 
 // field type overrides for gencodec

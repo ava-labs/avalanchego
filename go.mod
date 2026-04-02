@@ -22,13 +22,13 @@ require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpcreflect v1.3.0
 	github.com/DataDog/zstd v1.5.2
-	github.com/StephenButtolph/canoto v0.17.3
+	github.com/StephenButtolph/canoto v0.18.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/avalanchego/graft/coreth v0.0.0-initial-consistent-tag
-	github.com/ava-labs/avalanchego/graft/evm v0.0.0-initial-consistent-tag
-	github.com/ava-labs/avalanchego/graft/subnet-evm v0.0.0-initial-consistent-tag
+	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
+	github.com/ava-labs/avalanchego/graft/evm v1.14.2
+	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
 	github.com/ava-labs/libevm v1.13.15-0.20260310192938-d71b6cc8513a
-	github.com/ava-labs/strevm v0.0.0-20260324112128-dc59a5af0479
+	github.com/ava-labs/strevm v0.0.0-20260402181257-eca343805711
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593

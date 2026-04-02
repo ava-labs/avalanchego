@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
@@ -101,6 +102,7 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 			TimeMilliseconds: utils.PointerTo[uint64](nowMS),
 			MinDelayExcess:   &mde,
 			TargetExcess:     &te,
+			SettledHeight:    utils.PointerTo[uint64](0), // Populated in BuildBlock
 		},
 	), nil
 }
@@ -163,9 +165,11 @@ var errEmptyBlock = errors.New("empty block")
 
 func (*blockBuilder) BuildBlock(
 	header *types.Header,
+	blockContext *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	poolTxs []*txpool.Tx,
+	settledHeight uint64,
 ) (*types.Block, error) {
 	if len(txs) == 0 && len(poolTxs) == 0 {
 		return nil, errEmptyBlock
@@ -180,6 +184,8 @@ func (*blockBuilder) BuildBlock(
 		return nil, fmt.Errorf("failed to marshal atomic transactions: %w", err)
 	}
 
+	headerExtra := customtypes.GetHeaderExtra(header)
+	headerExtra.SettledHeight = &settledHeight
 	return customtypes.NewBlockWithExtData(
 		header,
 		txs,
