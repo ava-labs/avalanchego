@@ -15,7 +15,12 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 )
 
-func loadCommentsFile(path string) ([]DraftReviewComment, error) {
+const (
+	reviewSideLeft  = "LEFT"
+	reviewSideRight = "RIGHT"
+)
+
+func loadCommentsFile(path string) ([]DraftReviewEntry, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, stacktrace.Wrap(err)
@@ -24,8 +29,8 @@ func loadCommentsFile(path string) ([]DraftReviewComment, error) {
 	decoder := json.NewDecoder(strings.NewReader(string(content)))
 	decoder.DisallowUnknownFields()
 
-	var comments []DraftReviewComment
-	if err := decoder.Decode(&comments); err != nil {
+	var entries []DraftReviewEntry
+	if err := decoder.Decode(&entries); err != nil {
 		return nil, stacktrace.Wrap(err)
 	}
 	if err := decoder.Decode(&struct{}{}); err == nil {
@@ -34,40 +39,98 @@ func loadCommentsFile(path string) ([]DraftReviewComment, error) {
 		return nil, stacktrace.Wrap(err)
 	}
 
-	for i, comment := range comments {
-		if err := validateDraftReviewComment(comment); err != nil {
+	for i := range entries {
+		if entries[i].Kind == "" {
+			entries[i].Kind = DraftReviewEntryKindNewThread
+		}
+		if err := validateDraftReviewEntry(entries[i]); err != nil {
 			return nil, stacktrace.Errorf("comments[%d]: %w", i, err)
 		}
 	}
-	return normalizeDraftReviewComments(comments), nil
+	return normalizeDraftReviewEntries(entries), nil
 }
 
-func validateDraftReviewComment(comment DraftReviewComment) error {
-	if strings.TrimSpace(comment.Path) == "" {
-		return stacktrace.New("path is required")
-	}
-	if comment.Line <= 0 {
-		return stacktrace.New("line must be a positive integer")
-	}
-	if comment.Side != "LEFT" && comment.Side != "RIGHT" {
-		return stacktrace.Errorf("side must be LEFT or RIGHT, got %q", comment.Side)
-	}
-	if strings.TrimSpace(comment.Body) == "" {
+func validateDraftReviewEntry(entry DraftReviewEntry) error {
+	if strings.TrimSpace(entry.Body) == "" {
 		return stacktrace.New("body is required")
 	}
-	return nil
+
+	switch entry.Kind {
+	case "", DraftReviewEntryKindNewThread:
+		if strings.TrimSpace(entry.Path) == "" {
+			return stacktrace.New("path is required")
+		}
+		if entry.Line <= 0 {
+			return stacktrace.New("line must be a positive integer")
+		}
+		if entry.Side != reviewSideLeft && entry.Side != reviewSideRight {
+			return stacktrace.Errorf("side must be LEFT or RIGHT, got %q", entry.Side)
+		}
+		if entry.StartLine < 0 {
+			return stacktrace.New("start_line must be zero or a positive integer")
+		}
+		if entry.StartLine == 0 && entry.StartSide != "" {
+			return stacktrace.New("start_side requires start_line")
+		}
+		if entry.StartLine > 0 && entry.StartSide != reviewSideLeft && entry.StartSide != reviewSideRight {
+			return stacktrace.Errorf("start_side must be LEFT or RIGHT, got %q", entry.StartSide)
+		}
+		return nil
+
+	case DraftReviewEntryKindThreadReply:
+		if strings.TrimSpace(entry.ThreadID) == "" {
+			return stacktrace.New("thread_id is required for thread_reply")
+		}
+		if entry.Path != "" || entry.Line != 0 || entry.Side != "" || entry.StartLine != 0 || entry.StartSide != "" {
+			return stacktrace.New("thread_reply entries must not include file anchor fields")
+		}
+		return nil
+
+	default:
+		return stacktrace.Errorf("kind must be %q or %q, got %q", DraftReviewEntryKindNewThread, DraftReviewEntryKindThreadReply, entry.Kind)
+	}
 }
 
-func normalizeDraftReviewComments(comments []DraftReviewComment) []DraftReviewComment {
-	normalized := append([]DraftReviewComment(nil), comments...)
-	slices.SortFunc(normalized, compareDraftReviewComments)
+func normalizeDraftReviewEntries(entries []DraftReviewEntry) []DraftReviewEntry {
+	normalized := append([]DraftReviewEntry(nil), entries...)
+	for i := range normalized {
+		if normalized[i].Kind == "" {
+			normalized[i].Kind = DraftReviewEntryKindNewThread
+		}
+	}
+	slices.SortFunc(normalized, compareDraftReviewEntries)
 	return normalized
 }
 
-func compareDraftReviewComments(left DraftReviewComment, right DraftReviewComment) int {
+func compareDraftReviewEntries(left DraftReviewEntry, right DraftReviewEntry) int {
+	leftThreadID := left.ThreadID
+	rightThreadID := right.ThreadID
+	if left.Kind != DraftReviewEntryKindThreadReply {
+		leftThreadID = ""
+	}
+	if right.Kind != DraftReviewEntryKindThreadReply {
+		rightThreadID = ""
+	}
+	leftSide := left.Side
+	rightSide := right.Side
+	leftStartSide := left.StartSide
+	rightStartSide := right.StartSide
+	if left.Kind != DraftReviewEntryKindThreadReply && right.Kind != DraftReviewEntryKindThreadReply {
+		if leftSide == "" || rightSide == "" {
+			leftSide = ""
+			rightSide = ""
+		}
+		if leftStartSide == "" || rightStartSide == "" {
+			leftStartSide = ""
+			rightStartSide = ""
+		}
+	}
 	for _, pair := range [][2]string{
+		{string(left.Kind), string(right.Kind)},
+		{leftThreadID, rightThreadID},
 		{left.Path, right.Path},
-		{left.Side, right.Side},
+		{leftSide, rightSide},
+		{leftStartSide, rightStartSide},
 		{left.Body, right.Body},
 	} {
 		switch {
@@ -77,38 +140,47 @@ func compareDraftReviewComments(left DraftReviewComment, right DraftReviewCommen
 			return 1
 		}
 	}
-	switch {
-	case left.Line < right.Line:
-		return -1
-	case left.Line > right.Line:
-		return 1
-	default:
-		return 0
+	for _, pair := range [][2]int{
+		{left.Line, right.Line},
+		{left.StartLine, right.StartLine},
+	} {
+		switch {
+		case pair[0] < pair[1]:
+			return -1
+		case pair[0] > pair[1]:
+			return 1
+		}
 	}
+	return 0
 }
 
-func normalizeLiveReviewComments(comments []ReviewComment, author string) []DraftReviewComment {
-	normalized := make([]DraftReviewComment, 0, len(comments))
+func normalizeLiveReviewComments(comments []ReviewComment, author string) []DraftReviewEntry {
+	normalized := make([]DraftReviewEntry, 0, len(comments))
 	for _, comment := range comments {
 		if author != "" && comment.User.Login != "" && comment.User.Login != author {
 			continue
 		}
-		normalized = append(normalized, DraftReviewComment{
-			Path: comment.Path,
-			Line: comment.Line,
-			Side: comment.Side,
-			Body: comment.Body,
+		normalized = append(normalized, DraftReviewEntry{
+			Kind:             comment.Kind,
+			ThreadID:         comment.ThreadID,
+			ReplyToCommentID: comment.ReplyToCommentID,
+			Path:             comment.Path,
+			Line:             comment.Line,
+			Side:             comment.Side,
+			StartLine:        comment.StartLine,
+			StartSide:        comment.StartSide,
+			Body:             comment.Body,
 		})
 	}
-	return normalizeDraftReviewComments(normalized)
+	return normalizeDraftReviewEntries(normalized)
 }
 
-func draftReviewCommentsEqual(left []DraftReviewComment, right []DraftReviewComment) bool {
+func draftReviewEntriesEqual(left []DraftReviewEntry, right []DraftReviewEntry) bool {
 	if len(left) != len(right) {
 		return false
 	}
 	for i := range left {
-		if left[i] != right[i] {
+		if compareDraftReviewEntries(left[i], right[i]) != 0 {
 			return false
 		}
 	}
@@ -119,23 +191,6 @@ func formatCommentsPathError(path string, err error) error {
 	return stacktrace.Errorf("load comments from %q: %w", path, err)
 }
 
-func marshalCommentsForCreate(comments []DraftReviewComment) []map[string]any {
-	if len(comments) == 0 {
-		return nil
-	}
-
-	encoded := make([]map[string]any, 0, len(comments))
-	for _, comment := range comments {
-		encoded = append(encoded, map[string]any{
-			"path": comment.Path,
-			"line": comment.Line,
-			"side": comment.Side,
-			"body": comment.Body,
-		})
-	}
-	return encoded
-}
-
-func diffCommentsMessage(live []DraftReviewComment, stored []DraftReviewComment) string {
+func diffCommentsMessage(live []DraftReviewEntry, stored []DraftReviewEntry) string {
 	return fmt.Sprintf("live=%d stored=%d", len(live), len(stored))
 }
