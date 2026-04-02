@@ -10,9 +10,14 @@ The tool exists to support an agent-assisted, human-submitted review workflow:
 - the human may edit that pending review in the GitHub UI between agent runs
 - the tool must detect those edits before overwriting them
 - the tool must never submit the review
+- for any live mutation testing or API validation, the PR under test must be
+  explicitly chosen by the user; the agent must never pick a PR autonomously
 
 This README documents the maintained contract of the tool. It is not a spike
 log or implementation plan.
+
+For the GraphQL migration research that motivated the next draft-review-session
+design, see [graphql-draft-review-design.md](./graphql-draft-review-design.md).
 
 ## Scope
 
