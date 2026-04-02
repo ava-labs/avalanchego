@@ -312,14 +312,17 @@ Normalization rule:
 
 ## Output Contract
 
+This tool follows the repo-local tool conventions documented in
+[`../README.md`](../README.md), including structured read output, concise
+human-readable write output, structured logging, and stack-bearing error
+wrapping.
+
+Pending-review-specific output behavior:
+
 - `get` prints the live pending review as JSON
 - `get-state` prints stored review state as JSON
-- mutating commands print a short human-readable success line
 - `create` and `replace-comments` also print the review URL when GitHub returns
   one
-
-This split is intentional: structured output for reads, concise status output
-for writes.
 
 ## Operational Constraints
 
@@ -331,14 +334,8 @@ for writes.
 
 ## Maintenance Notes
 
-This package treats logging and stack-bearing errors as part of the debugging
-contract for agent-driven tooling.
+Follow the shared tooling conventions in [`../README.md`](../README.md).
 
-- command entry points and external call boundaries are logged
-- review mutations and state persistence are logged at info level
-- errors should continue to be created or wrapped through
-  `tests/fixture/stacktrace`
-
-If the command surface grows, keep the boundary narrow: pending review state
+For this package specifically, keep the boundary narrow: pending review state
 only, with explicit conflict protection around any mutation path that could
 overwrite human edits.
