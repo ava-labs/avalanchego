@@ -1,12 +1,12 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
 
 import (
 	"context"
+	"errors"
 	"sync"
-	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
@@ -21,6 +21,8 @@ const (
 var (
 	_ State = (*lockedState)(nil)
 	_ State = (*cachedState)(nil)
+
+	ErrUnfinalizedHeight = errors.New("validator set height not yet finalized")
 )
 
 // State allows the lookup of validator sets on specified subnets at the
@@ -43,21 +45,6 @@ type State interface {
 	//
 	// The returned map should not be modified.
 	GetWarpValidatorSets(ctx context.Context, height uint64) (map[ids.ID]WarpSet, error)
-
-	// GetWarpValidatorSet returns the canonical warp validator set for the
-	// requested subnet at the requested P-chain height. If the subnet doesn't
-	// have a canonical warp validator set, either the returned set will be
-	// empty or an error will be returned.
-	//
-	// The returned set should not be modified.
-	//
-	// TODO: After Granite, this method should be removed and users should
-	// directly call GetWarpValidatorSets.
-	GetWarpValidatorSet(
-		ctx context.Context,
-		height uint64,
-		subnetID ids.ID,
-	) (WarpSet, error)
 
 	// GetValidatorSet returns the validators of the provided subnet at the
 	// requested P-chain height.
@@ -131,17 +118,6 @@ func (s *lockedState) GetWarpValidatorSets(
 	return s.s.GetWarpValidatorSets(ctx, height)
 }
 
-func (s *lockedState) GetWarpValidatorSet(
-	ctx context.Context,
-	height uint64,
-	subnetID ids.ID,
-) (WarpSet, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.s.GetWarpValidatorSet(ctx, height, subnetID)
-}
-
 func (s *lockedState) GetCurrentValidatorSet(
 	ctx context.Context,
 	subnetID ids.ID,
@@ -166,10 +142,6 @@ func (*noValidators) GetWarpValidatorSets(context.Context, uint64) (map[ids.ID]W
 	return nil, nil
 }
 
-func (*noValidators) GetWarpValidatorSet(context.Context, uint64, ids.ID) (WarpSet, error) {
-	return WarpSet{}, nil
-}
-
 func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {
 	return nil, nil
 }
@@ -182,16 +154,6 @@ func (n *noValidators) GetCurrentValidatorSet(ctx context.Context, _ ids.ID) (ma
 type cachedState struct {
 	State
 
-	// Activate caching of individual validator sets after this time.
-	//
-	// This enables pre-Granite code to call GetWarpValidatorSet without
-	// generating the full validator set for each P-chain height.
-	//
-	// After Granite, it is expected that the P-chain height will be frozen for
-	// the duration of an epoch, so generating the full set is not expensive as
-	// long as it is cached.
-	activation time.Time
-
 	// Caches the subnet ID for given blockchain IDs.
 	// Key: blockchain ID
 	// Value: subnet ID
@@ -203,15 +165,9 @@ type cachedState struct {
 	validatorSetsCache cache.Cacher[uint64, map[ids.ID]WarpSet]
 }
 
-// TODO: Remove the graniteActivation parameter once all networks have
-// activated the granite upgrade.
-func NewCachedState(
-	state State,
-	graniteActivation time.Time,
-) State {
+func NewCachedState(state State) State {
 	return &cachedState{
 		State:              state,
-		activation:         graniteActivation,
 		validatorSetsCache: lru.NewCache[uint64, map[ids.ID]WarpSet](validatorSetsCacheSize),
 		subnetIDsCache:     lru.NewCache[ids.ID, ids.ID](subnetIDsCacheSize),
 	}
@@ -243,27 +199,4 @@ func (c *cachedState) GetWarpValidatorSets(
 	}
 	c.validatorSetsCache.Put(height, s)
 	return s, nil
-}
-
-func (c *cachedState) GetWarpValidatorSet(
-	ctx context.Context,
-	height uint64,
-	subnetID ids.ID,
-) (WarpSet, error) {
-	if time.Now().Before(c.activation) {
-		// Rather than calling [State.GetWarpValidatorSet], we fetch the
-		// non-canonical validator set and canonicalize it here. This avoids
-		// canonicalizing the validator set with the P-chain lock held.
-		vdrSet, err := c.GetValidatorSet(ctx, height, subnetID)
-		if err != nil {
-			return WarpSet{}, err
-		}
-		return FlattenValidatorSet(vdrSet)
-	}
-
-	s, err := c.GetWarpValidatorSets(ctx, height)
-	if err != nil {
-		return WarpSet{}, err
-	}
-	return s[subnetID], nil
 }

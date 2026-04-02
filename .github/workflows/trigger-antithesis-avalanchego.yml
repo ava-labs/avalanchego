@@ -2,6 +2,10 @@ name: Trigger Antithesis Avalanchego Setup
 
 on:
   schedule:
+    # When adjusting the schedule and duration of execution, make sure
+    # to check the schedule of other antithesis jobs (trigger-antithesis-*).
+    # The schedules for different test setups should not overlap to avoid 
+    # unintended resource contention.
     - cron: '0 22 * * *' # Every day at 10PM UTC
   workflow_dispatch:
     inputs:
@@ -37,5 +41,5 @@ jobs:
           email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           # Duration is in hours
           additional_parameters: |-
-            custom.duration=${{ github.event.inputs.duration || '7.5' }}
+            custom.duration=${{ github.event.inputs.duration || '4' }}
             custom.workload=avalanchego

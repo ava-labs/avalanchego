@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -68,7 +68,7 @@ type environment struct {
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
 	msm            *mutableSharedMemory
-	state          state.State
+	state          *state.State
 	states         map[ids.ID]state.Chain
 	uptimes        uptime.Manager
 	backend        Backend
@@ -212,7 +212,7 @@ func addSubnet(t *testing.T, env *environment) {
 	)
 	require.NoError(err)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)

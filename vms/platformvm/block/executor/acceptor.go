@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -27,7 +27,7 @@ var (
 type acceptor struct {
 	*backend
 	metrics    metrics.Metrics
-	validators validators.Manager
+	validators *validators.Manager
 }
 
 func (a *acceptor) BanffAbortBlock(b *block.BanffAbortBlock) error {

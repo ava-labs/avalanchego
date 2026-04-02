@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rewardmanager_test
@@ -451,6 +451,49 @@ var (
 			SuppliedGas: rewardmanager.AreFeeRecipientsAllowedGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
+		},
+		{
+			Name:       "set_reward_address_invalid_length_pre_durango",
+			Caller:     allowlisttest.TestEnabledAddr,
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				// Create invalid input with extra bytes
+				input, err := rewardmanager.PackSetRewardAddress(rewardAddress)
+				require.NoError(t, err)
+				return append(input, []byte{0, 0}...)
+			},
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
+				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
+				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
+				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
+				return mockChainConfig
+			},
+			SuppliedGas: rewardmanager.SetRewardAddressGasCost,
+			ReadOnly:    false,
+			ExpectedErr: rewardmanager.ErrInvalidLen,
+		},
+		{
+			Name:       "set_reward_address_invalid_length_post_durango",
+			Caller:     allowlisttest.TestEnabledAddr,
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				// Create invalid input with extra bytes
+				input, err := rewardmanager.PackSetRewardAddress(rewardAddress)
+				require.NoError(t, err)
+				return append(input, []byte{0, 0}...)
+			},
+			SuppliedGas: rewardmanager.SetRewardAddressGasCost + rewardmanager.RewardAddressChangedEventGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
+				address, isFeeRecipients := rewardmanager.GetStoredRewardAddress(state)
+				require.Equal(t, rewardAddress, address)
+				require.False(t, isFeeRecipients)
+
+				logs := state.Logs()
+				assertRewardAddressChanged(t, logs, allowlisttest.TestEnabledAddr, common.Address{}, rewardAddress)
+			},
 		},
 	}
 )

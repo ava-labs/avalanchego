@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -11,9 +11,9 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/ava-labs/avalanchego/graft/evm/log"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/load"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/log"
 
 	gethlog "github.com/ava-labs/libevm/log"
 )

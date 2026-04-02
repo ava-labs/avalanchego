@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package extras
@@ -9,9 +9,10 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
 
+	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -237,7 +238,7 @@ func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
 // Nil values are used to indicate optional upgrades.
 func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 	return NetworkUpgrades{
-		SubnetEVMTimestamp: utils.NewUint64(0),
+		SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
 		DurangoTimestamp:   utils.TimeToNewUint64(agoUpgrade.DurangoTime),
 		EtnaTimestamp:      utils.TimeToNewUint64(agoUpgrade.EtnaTime),
 		FortunaTimestamp:   nil, // Fortuna is optional and has no effect on Subnet-EVM

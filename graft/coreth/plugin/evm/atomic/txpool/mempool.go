@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txpool
@@ -19,9 +19,7 @@ import (
 )
 
 var (
-	_ gossip.HandlerSet[*atomic.Tx]      = (*Mempool)(nil)
-	_ gossip.PullGossiperSet[*atomic.Tx] = (*Mempool)(nil)
-	_ gossip.PushGossiperSet             = (*Mempool)(nil)
+	_ gossip.SystemSet[*atomic.Tx] = (*Mempool)(nil)
 
 	ErrAlreadyKnown    = errors.New("already known")
 	ErrConflict        = errors.New("conflict present")
@@ -134,7 +132,7 @@ func (m *Mempool) ForceAddTx(tx *atomic.Tx) error {
 func (m *Mempool) checkConflictTx(tx *atomic.Tx) (uint256.Int, ids.ID, []*atomic.Tx, error) {
 	utxoSet := tx.InputUTXOs()
 
-	var ( //nolint:prealloc
+	var (
 		highestGasPrice             uint256.Int
 		highestGasPriceConflictTxID ids.ID
 		// We don't know the length ahead of time (# of conflicts), so we don't want to preallocate

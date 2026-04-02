@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -60,7 +60,7 @@ var _ acp118.Verifier = (*signatureRequestVerifier)(nil)
 type signatureRequestVerifier struct {
 	vdrsState validators.State
 	stateLock sync.Locker
-	state     state.State
+	state     *state.State
 	log       logging.Logger
 }
 

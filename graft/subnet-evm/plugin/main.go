@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -14,6 +14,6 @@ import (
 func main() {
 	evm.RegisterAllLibEVMExtras()
 
-	versionString := fmt.Sprintf("Subnet-EVM/%s [AvalancheGo=%s, rpcchainvm=%d]", evm.Version, version.Current, version.RPCChainVMProtocol)
+	versionString := fmt.Sprintf("Subnet-EVM/%s [rpcchainvm=%d]", version.Current.SemanticWithCommit(version.GitCommit), version.RPCChainVMProtocol)
 	runner.Run(versionString)
 }

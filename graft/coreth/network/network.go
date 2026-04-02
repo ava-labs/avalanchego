@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/network/stats"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -34,13 +34,17 @@ const (
 )
 
 var (
-	errAcquiringSemaphore                      = errors.New("error acquiring semaphore")
-	errEmptyNodeID                             = errors.New("cannot send request to empty nodeID")
-	errExpiredRequest                          = errors.New("expired request")
-	errNoPeersFound                            = errors.New("no peers found matching version")
-	_                     Network              = (*network)(nil)
-	_                     validators.Connector = (*network)(nil)
-	_                     common.AppHandler    = (*network)(nil)
+	_ Network              = (*network)(nil)
+	_ validators.Connector = (*network)(nil)
+	_ common.AppHandler    = (*network)(nil)
+
+	errAcquiringSemaphore = errors.New("error acquiring semaphore")
+	errEmptyNodeID        = errors.New("cannot send request to empty nodeID")
+	errExpiredRequest     = errors.New("expired request")
+	errNoPeersFound       = errors.New("no peers found matching version")
+
+	timeUntilDeadline = metrics.GetOrRegisterTimer("net_req_time_until_deadline", nil)
+	droppedRequests   = metrics.GetOrRegisterCounter("net_req_deadline_dropped", nil)
 )
 
 // SyncedNetworkClient defines ability to send request / response through the Network
@@ -63,6 +67,7 @@ type SyncedNetworkClient interface {
 type Network interface {
 	validators.Connector
 	common.AppHandler
+	p2p.NodeSampler
 
 	SyncedNetworkClient
 
@@ -86,11 +91,7 @@ type Network interface {
 	// Size returns the size of the network in number of connected peers
 	Size() uint32
 
-	// NewClient returns a client to send messages with for the given protocol
-	NewClient(protocol uint64) *p2p.Client
-	// AddHandler registers a server handler for an application protocol
-	AddHandler(protocol uint64, handler p2p.Handler) error
-
+	P2PNetwork() *p2p.Network
 	P2PValidators() *p2p.Validators
 }
 
@@ -107,7 +108,6 @@ type network struct {
 	codec                      codec.Manager                      // Codec used for parsing messages
 	appRequestHandler          message.RequestHandler             // maps request type => handler
 	peers                      *peerTracker                       // tracking of peers & bandwidth
-	appStats                   stats.RequestHandlerStats          // Provide request handler metrics
 
 	// Set to true when Shutdown is called, after which all operations on this
 	// struct are no-ops.
@@ -154,9 +154,33 @@ func NewNetwork(
 		sdkNetwork:                 p2pNetwork,
 		appRequestHandler:          message.NoopRequestHandler{},
 		peers:                      NewPeerTracker(),
-		appStats:                   stats.NewRequestHandlerStats(),
 		p2pValidators:              p2pValidators,
 	}, nil
+}
+
+// Sample returns a random sample of connected peers.
+// `limit` is ignored, and one peer will be returned.
+// The peer returned may not be a validator - to sample validators,
+// use [p2p.Validators.Sample] instead.
+func (n *network) Sample(_ context.Context, limit int) []ids.NodeID {
+	if limit <= 0 {
+		return nil
+	}
+	if limit > 1 {
+		log.Warn("Sample called with limit > 1, but only 1 peer will be returned", "limit", limit)
+	}
+
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	node, ok, err := n.peers.GetAnyPeer(nil)
+	if err != nil {
+		log.Error("error getting peer from peer tracker", "error", err)
+		return nil
+	}
+	if !ok {
+		return nil
+	}
+	return []ids.NodeID{node}
 }
 
 // SendAppRequestAny synchronously sends request to an arbitrary peer with a
@@ -284,8 +308,10 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 		return n.sdkNetwork.AppRequest(ctx, nodeID, requestID, deadline, request)
 	}
 
-	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n.appStats)
+	bufferedDeadline, err := timeUntil(deadline)
 	if err != nil {
+		// Drop the request if we already missed the deadline to respond.
+		droppedRequests.Inc(1)
 		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "err", err)
 		return nil
 	}
@@ -353,13 +379,13 @@ func (n *network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reque
 	return handler.OnFailure()
 }
 
-// calculateTimeUntilDeadline calculates the time until deadline and drops it if we missed he deadline to response.
+// timeUntil calculates the time until deadline and returns an error if the deadline has passed.
 // This function updates metrics for app requests.
 // This is called by [AppRequest].
-func calculateTimeUntilDeadline(deadline time.Time, stats stats.RequestHandlerStats) (time.Time, error) {
+func timeUntil(deadline time.Time) (time.Time, error) {
 	// calculate how much time is left until the deadline
 	timeTillDeadline := time.Until(deadline)
-	stats.UpdateTimeUntilDeadline(timeTillDeadline)
+	timeUntilDeadline.Update(timeTillDeadline)
 
 	// bufferedDeadline is half the time till actual deadline so that the message has a reasonable chance
 	// of completing its processing and sending the response to the peer.
@@ -367,8 +393,6 @@ func calculateTimeUntilDeadline(deadline time.Time, stats stats.RequestHandlerSt
 
 	// check if we have enough time to handle this request
 	if time.Until(bufferedDeadline) < minRequestHandlingDuration {
-		// Drop the request if we already missed the deadline to respond.
-		stats.IncDeadlineDroppedRequest()
 		return time.Time{}, errExpiredRequest
 	}
 
@@ -496,12 +520,9 @@ func (n *network) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, r
 	return waitingHandler.WaitForResult(ctx)
 }
 
-func (n *network) NewClient(protocol uint64) *p2p.Client {
-	return n.sdkNetwork.NewClient(protocol, n.p2pValidators)
-}
-
-func (n *network) AddHandler(protocol uint64, handler p2p.Handler) error {
-	return n.sdkNetwork.AddHandler(protocol, handler)
+// P2PNetwork returns the p2p network
+func (n *network) P2PNetwork() *p2p.Network {
+	return n.sdkNetwork
 }
 
 // P2PValidators returns the p2p validators

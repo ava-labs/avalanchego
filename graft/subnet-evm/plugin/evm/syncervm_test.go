@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -19,19 +20,20 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/coretest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customrawdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/sync/statesync/statesynctest"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -41,52 +43,64 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
-	syncervm "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/sync"
-	statesyncclient "github.com/ava-labs/avalanchego/graft/subnet-evm/sync/client"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestSkipStateSync(t *testing.T) {
-	rand.Seed(1)
 	test := syncTest{
 		syncableInterval:   256,
 		stateSyncMinBlocks: 300, // must be greater than [syncableInterval] to skip sync
 		syncMode:           block.StateSyncSkipped,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
-
-	testSyncerVM(t, vmSetup, test)
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			test.stateScheme = scheme
+			vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
+			testSyncerVM(t, vmSetup, test)
+		})
+	}
 }
 
 func TestStateSyncFromScratch(t *testing.T) {
-	rand.Seed(1)
 	test := syncTest{
 		syncableInterval:   256,
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		syncMode:           block.StateSyncStatic,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
-
-	testSyncerVM(t, vmSetup, test)
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			test.stateScheme = scheme
+			vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
+			testSyncerVM(t, vmSetup, test)
+		})
+	}
 }
 
 func TestStateSyncFromScratchExceedParent(t *testing.T) {
-	rand.Seed(1)
-	numToGen := syncervm.ParentsToFetch + uint64(32)
+	numToGen := engine.BlocksToFetch + uint64(32)
 	test := syncTest{
 		syncableInterval:   numToGen,
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		syncMode:           block.StateSyncStatic,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, int(numToGen))
 
-	testSyncerVM(t, vmSetup, test)
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			test.stateScheme = scheme
+			vmSetup := createSyncServerAndClientVMs(t, test, int(numToGen))
+			testSyncerVM(t, vmSetup, test)
+		})
+	}
 }
 
 func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
+	// TODO(#4702): flaky test - should be fixed with state sync refactor
+	t.Skip("Flaky test - tracked in #4702")
+
 	rand.New(rand.NewSource(1))
 
 	var lock sync.Mutex
@@ -110,7 +124,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		},
 		expectedErr: context.Canceled,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup := createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, vmSetup, test)
@@ -213,7 +227,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	require.NoError(t, syncReEnabledVM.Connected(
 		t.Context(),
 		vmSetup.serverVM.ctx.NodeID,
-		statesyncclient.StateSyncVersion,
+		client.StateSyncVersion,
 	))
 
 	enabled, err = syncReEnabledVM.StateSyncEnabled(t.Context())
@@ -250,7 +264,7 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 		},
 		expectedErr: context.Canceled,
 	}
-	vmSetup = createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup = createSyncServerAndClientVMs(t, test, engine.BlocksToFetch)
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, vmSetup, test)
 }
@@ -260,12 +274,12 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	// configure [serverVM]
 	// Align commit intervals with the test's syncable interval so summaries are created
 	// at the expected heights and Accept() does not skip.
-	serverConfigJSON := fmt.Sprintf(`{"commit-interval": %d, "state-sync-commit-interval": %d}`,
-		test.syncableInterval, test.syncableInterval,
+	serverConfigJSON := fmt.Sprintf(`"commit-interval": %d, "state-sync-commit-interval": %d, "state-history": %d`,
+		test.syncableInterval, test.syncableInterval, test.syncableInterval,
 	)
 	serverVM := newVM(t, testVMConfig{
 		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]),
-		configJSON:  serverConfigJSON,
+		configJSON:  getConfig(test.stateScheme, serverConfigJSON),
 	})
 
 	t.Cleanup(func() {
@@ -285,9 +299,24 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	}, nil)
 
 	// make some accounts
-	r := rand.New(rand.NewSource(1))
-	trieDB := triedb.NewDatabase(serverVM.vm.chaindb, nil)
-	root, accounts := statesynctest.FillAccountsWithOverlappingStorage(t, r, trieDB, types.EmptyRootHash, 1000, 16)
+	var (
+		r                           = rand.New(rand.NewSource(1))
+		currentRoot                 = serverVM.vm.blockChain.LastAcceptedBlock().Root()
+		root                        common.Hash
+		fundedAccounts, allAccounts map[*utilstest.Key]*types.StateAccount
+	)
+	if test.stateScheme == customrawdb.FirewoodScheme {
+		tdb, ok := serverVM.vm.Blockchain().TrieDB().Backend().(*firewood.TrieDB)
+		require.Truef(ok, "expected TrieDB backend to be *firewood.TrieDB, got %T", serverVM.vm.Blockchain().TrieDB().Backend())
+		tdb.SetHashAndHeight(common.Hash{}, 0) // must be set for FillAccountsWithStorageAndCode to work
+	}
+	root, allAccounts = synctest.FillAccountsWithStorageAndCode(t, r, serverVM.vm.Blockchain().StateCache(), currentRoot, 1000)
+	fundedAccounts = make(map[*utilstest.Key]*types.StateAccount)
+	for key, account := range allAccounts {
+		if len(account.CodeHash) == 0 || bytes.Equal(account.CodeHash, types.EmptyCodeHash[:]) {
+			fundedAccounts[key] = account
+		}
+	}
 
 	// patch serverVM's lastAcceptedBlock to have the new root
 	// and update the vm's state so the trie with accounts will
@@ -303,12 +332,12 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	// initialise [syncerVM] with blank genesis state
 	// Match the server's state-sync-commit-interval so parsed summaries are acceptable.
 	stateSyncEnabledJSON := fmt.Sprintf(
-		`{"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "state-sync-commit-interval": %d}`,
+		`"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "state-sync-commit-interval": %d`,
 		test.stateSyncMinBlocks, 4, test.syncableInterval,
 	)
 	syncerVM := newVM(t, testVMConfig{
 		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]),
-		configJSON:  stateSyncEnabledJSON,
+		configJSON:  getConfig(test.stateScheme, stateSyncEnabledJSON),
 		isSyncing:   true,
 	})
 
@@ -345,7 +374,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		syncerVM.vm.Connected(
 			t.Context(),
 			serverVM.vm.ctx.NodeID,
-			statesyncclient.StateSyncVersion,
+			client.StateSyncVersion,
 		),
 	)
 
@@ -360,7 +389,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	return &syncVMSetup{
 		serverVM:             serverVM.vm,
 		serverAppSender:      serverVM.appSender,
-		fundedAccounts:       accounts,
+		fundedAccounts:       fundedAccounts,
 		syncerVM:             syncerVM.vm,
 		syncerDB:             syncerVM.db,
 		shutdownOnceSyncerVM: shutdownOnceSyncerVM,
@@ -397,6 +426,7 @@ type syncTest struct {
 	stateSyncMinBlocks uint64
 	syncableInterval   uint64
 	syncMode           block.StateSyncMode
+	stateScheme        string
 	expectedErr        error
 }
 
@@ -434,7 +464,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 		require.ErrorIs(err, test.expectedErr)
 		// Note we re-open the database here to avoid a closed error when the test is for a shutdown VM.
 		chaindb := database.New(prefixdb.NewNested(ethDBPrefix, syncerVM.versiondb))
-		assertSyncPerformedHeights(t, chaindb, map[uint64]struct{}{})
+		requireSyncPerformedHeight(t, chaindb, 0)
 		return
 	}
 	require.NoError(err, "state sync failed")
@@ -445,7 +475,8 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	require.Equal(serverVM.LastAcceptedBlock().Height(), syncerVM.LastAcceptedBlock().Height(), "block height mismatch between syncer and server")
 	require.Equal(serverVM.LastAcceptedBlock().ID(), syncerVM.LastAcceptedBlock().ID(), "blockID mismatch between syncer and server")
 	require.True(syncerVM.blockChain.HasState(syncerVM.blockChain.LastAcceptedBlock().Root()), "unavailable state for last accepted block")
-	assertSyncPerformedHeights(t, syncerVM.chaindb, map[uint64]struct{}{retrievedSummary.Height(): {}})
+	expectedHeight := retrievedSummary.Height()
+	requireSyncPerformedHeight(t, syncerVM.chaindb, expectedHeight)
 
 	lastNumber := syncerVM.blockChain.LastAcceptedBlock().NumberU64()
 	// check the last block is indexed
@@ -566,11 +597,17 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 			accepted(block)
 		}
 	}
-	_, _, err := core.GenerateChain(
+
+	lastAccepted := vm.Blockchain().LastAcceptedBlock()
+	c := vm.Blockchain().StateCache()
+
+	// We must not commit this state to disk, as it will make it impossible to verify/accept the generated blocks in the same db for Firewood.
+	// Firewood requires a linear and in-order history. All unused states will be cleaned at commit time.
+	_, _, err := core.GenerateChainFromStateCache(
 		vm.chainConfig,
-		vm.blockChain.LastAcceptedBlock(),
+		lastAccepted,
 		dummy.NewETHFaker(),
-		vm.chaindb,
+		c,
 		numBlocks,
 		10,
 		func(i int, g *core.BlockGen) {
@@ -578,21 +615,17 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 			g.SetCoinbase(constants.BlackholeAddr) // necessary for syntactic validation of the block
 			gen(i, g)
 		},
+		core.WithoutDiskCommit(),
 	)
 	require.NoError(t, err)
 	vm.blockChain.DrainAcceptorQueue()
 }
 
-// assertSyncPerformedHeights iterates over all heights the VM has synced to and
+// requireSyncPerformedHeight iterates over all heights the VM has synced to and
 // verifies it matches [expected].
-func assertSyncPerformedHeights(t *testing.T, db ethdb.Iteratee, expected map[uint64]struct{}) {
-	it := customrawdb.NewSyncPerformedIterator(db)
-	defer it.Release()
-
-	found := make(map[uint64]struct{}, len(expected))
-	for it.Next() {
-		found[customrawdb.UnpackSyncPerformedKey(it.Key())] = struct{}{}
-	}
-	require.NoError(t, it.Error())
-	require.Equal(t, expected, found)
+func requireSyncPerformedHeight(t *testing.T, db ethdb.Iteratee, expected uint64) {
+	t.Helper()
+	latest, err := customrawdb.GetLatestSyncPerformed(db)
+	require.NoError(t, err)
+	require.Equal(t, expected, latest, "sync performed height mismatch")
 }

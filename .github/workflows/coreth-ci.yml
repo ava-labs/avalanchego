@@ -16,11 +16,11 @@ jobs:
         working-directory: ./graft/coreth
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
       - name: Run all lint checks
-        run: ./scripts/run_task.sh lint-all-ci
+        run: nix develop --command ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
-        run: ./scripts/run_task.sh check-go-mod-tidy
+        run: nix develop --command ./scripts/run_task.sh check-go-mod-tidy
 
   unit_test:
     name: Unit Tests (${{ matrix.os }})
@@ -54,9 +54,9 @@ jobs:
           artifact_prefix: warp
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}

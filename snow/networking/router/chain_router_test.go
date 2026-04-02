@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -29,11 +29,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -43,6 +45,7 @@ import (
 const (
 	engineType         = p2ppb.EngineType_ENGINE_TYPE_DAG
 	testThreadPoolSize = 2
+	defaultTestTimeout = 500 * time.Millisecond
 )
 
 // TODO refactor tests in this file
@@ -1433,13 +1436,229 @@ func TestAppRequest(t *testing.T) {
 	}
 }
 
+func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
+	var (
+		nodeID  = ids.GenerateTestNodeID()
+		chainID = snowtest.PChainID
+	)
+	const requestID uint32 = 1
+	tests := []struct {
+		timeout    *message.InboundMessage
+		response   *message.InboundMessage
+		setHandler func(*testing.T, *enginetest.Engine, chan<- struct{})
+	}{
+		{
+			timeout:  message.InternalGetStateSummaryFrontierFailed(nodeID, chainID, requestID),
+			response: message.InboundStateSummaryFrontier(chainID, requestID, []byte("summary"), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetStateSummaryFrontierFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout:  message.InternalGetAcceptedStateSummaryFailed(nodeID, chainID, requestID),
+			response: message.InboundAcceptedStateSummary(chainID, requestID, []ids.ID{ids.GenerateTestID()}, nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetAcceptedStateSummaryFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout:  message.InternalGetAcceptedFrontierFailed(nodeID, chainID, requestID),
+			response: message.InboundAcceptedFrontier(chainID, requestID, ids.GenerateTestID(), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetAcceptedFrontierFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout:  message.InternalGetAcceptedFailed(nodeID, chainID, requestID),
+			response: message.InboundAccepted(chainID, requestID, []ids.ID{ids.GenerateTestID()}, nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetAcceptedFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout: message.InternalGetAncestorsFailed(nodeID, chainID, requestID, engineType),
+			response: &message.InboundMessage{
+				NodeID: nodeID,
+				Op:     message.AncestorsOp,
+				Message: &p2ppb.Ancestors{
+					ChainId:    chainID[:],
+					RequestId:  requestID,
+					Containers: [][]byte{[]byte("a")},
+				},
+				Expiration: mockable.MaxTime,
+			},
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetAncestorsFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout: message.InternalGetFailed(nodeID, chainID, requestID),
+			response: &message.InboundMessage{
+				NodeID: nodeID,
+				Op:     message.PutOp,
+				Message: &p2ppb.Put{
+					ChainId:   chainID[:],
+					RequestId: requestID,
+					Container: []byte("container"),
+				},
+				Expiration: mockable.MaxTime,
+			},
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout:  message.InternalQueryFailed(nodeID, chainID, requestID),
+			response: message.InboundChits(chainID, requestID, ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID(), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.QueryFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout:  message.InboundAppError(nodeID, chainID, requestID, common.ErrTimeout.Code, common.ErrTimeout.Message),
+			response: message.InboundAppResponse(chainID, requestID, []byte("response"), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.AppRequestFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32, appErr *common.AppError) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					require.Equal(t, common.ErrTimeout.Code, appErr.Code)
+					require.Equal(t, common.ErrTimeout.Message, appErr.Message)
+					close(call)
+					return nil
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		op := tt.response.Op
+		t.Run(op.String(), func(t *testing.T) {
+			test := func(t *testing.T, handle func(cr *ChainRouter)) {
+				chainRouter, engine := newChainRouterTest(t)
+
+				unwantedCall := make(chan struct{})
+				engine.StateSummaryFrontierF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
+				engine.AcceptedFrontierF = func(context.Context, ids.NodeID, uint32, ids.ID) error { close(unwantedCall); return nil }
+				engine.AcceptedF = func(context.Context, ids.NodeID, uint32, set.Set[ids.ID]) error { close(unwantedCall); return nil }
+				engine.AncestorsF = func(context.Context, ids.NodeID, uint32, [][]byte) error { close(unwantedCall); return nil }
+				engine.PutF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
+				engine.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
+				engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) error {
+					close(unwantedCall)
+					return nil
+				}
+
+				call := make(chan struct{})
+				tt.setHandler(t, engine, call)
+
+				ctx := t.Context()
+				chainRouter.RegisterRequest(ctx, nodeID, chainID, requestID, op, tt.timeout, engineType)
+
+				require := require.New(t)
+				chainRouter.lock.Lock()
+				require.Equal(1, chainRouter.timedRequests.Len())
+				chainRouter.lock.Unlock()
+
+				chainRouter.HandleInternal(ctx, tt.timeout)
+				<-call
+
+				chainRouter.lock.Lock()
+				require.Equal(1, chainRouter.timedRequests.Len())
+				chainRouter.lock.Unlock()
+
+				handle(chainRouter)
+
+				chainRouter.lock.Lock()
+				require.Equal(0, chainRouter.timedRequests.Len())
+				chainRouter.lock.Unlock()
+
+				select {
+				case <-unwantedCall:
+					require.FailNow("unexpected duplicate failure message")
+				case <-time.After(50 * time.Millisecond):
+				}
+			}
+
+			// Timeout path: early internal failure is handled once, then the
+			// timeout clears the outstanding request without invoking the
+			// response handler.
+			t.Run("timeout", func(t *testing.T) {
+				test(t, func(cr *ChainRouter) {
+					// Wait for the timeout manager to fire and clear the
+					// request.
+					// Note: relying on the timeout manager to fire results in
+					// longer running tests. The alternative not chosen here is
+					// to send a mock timeout message early rather than relying
+					// on the production code, which tests both the timeout
+					// manager and its integration with the chain router.
+					require.Eventually(
+						t,
+						func() bool {
+							cr.lock.Lock()
+							defer cr.lock.Unlock()
+							return cr.timedRequests.Len() == 0
+						},
+						constants.DefaultNetworkInitialTimeout,
+						100*time.Millisecond,
+						"timed out waiting for timeout to clear request",
+					)
+				})
+			})
+
+			// Response path: early internal failure is handled once, then the
+			// actual response clears the outstanding request without invoking
+			// the response handler.
+			t.Run("response", func(t *testing.T) {
+				test(t, func(cr *ChainRouter) {
+					cr.HandleInbound(t.Context(), tt.response)
+				})
+			})
+		})
+	}
+}
+
 func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	// Create a timeout manager
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
-			InitialTimeout:     3 * time.Second,
-			MinimumTimeout:     3 * time.Second,
-			MaximumTimeout:     5 * time.Minute,
+			InitialTimeout:     defaultTestTimeout,
+			MinimumTimeout:     defaultTestTimeout,
+			MaximumTimeout:     defaultTestTimeout,
 			TimeoutCoefficient: 1,
 			TimeoutHalflife:    5 * time.Minute,
 		},

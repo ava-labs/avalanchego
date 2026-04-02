@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -41,6 +41,32 @@ type Staker struct {
 	// [priorities.go] and depends on if the stakers are in the pending or
 	// current validator set.
 	Priority txs.Priority
+}
+
+// Equals returns true if this staker is equal to the provided staker.
+// If s.Less(other) and other.Less(s) are both false, then it doesn't mean that s.Equals(other) is true.
+func (s *Staker) Equals(other *Staker) bool {
+	if s == nil && other == nil {
+		return true
+	}
+
+	if other == nil || s == nil {
+		return false
+	}
+
+	equalPKs := (s.PublicKey == nil && other.PublicKey == nil) ||
+		(s.PublicKey != nil && other.PublicKey != nil && s.PublicKey.Equals(other.PublicKey))
+
+	return s.TxID == other.TxID &&
+		s.NodeID == other.NodeID &&
+		equalPKs &&
+		s.SubnetID == other.SubnetID &&
+		s.Weight == other.Weight &&
+		s.StartTime.Equal(other.StartTime) &&
+		s.EndTime.Equal(other.EndTime) &&
+		s.PotentialReward == other.PotentialReward &&
+		s.NextTime.Equal(other.NextTime) &&
+		s.Priority == other.Priority
 }
 
 // A *Staker is considered to be less than another *Staker when:

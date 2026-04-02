@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -88,7 +88,7 @@ func TestBlockSerialization(t *testing.T) {
 			testVM.ParseBlockF = tt.parseFunc
 			deserializer := &blockDeserializer{
 				parser:       testVM,
-				blockTracker: newBlockTracker(genesisBlock),
+				blockTracker: func() *blockTracker { bt := newBlockTracker(); bt.init(genesisBlock); return bt }(),
 			}
 
 			// Deserialize the block

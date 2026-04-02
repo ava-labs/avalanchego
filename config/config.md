@@ -11,7 +11,7 @@ This document lists all available configuration options for AvalancheGo nodes. Y
 .config-tables table {
   min-width: 1400px;
 }
-.config-tables td:nth-child(5) { 
+.config-tables td:nth-child(5) {
   width: 50%;
 }
 .config-tables td:nth-child(-n+4) {
@@ -126,7 +126,7 @@ Some blockchains allow the node operator to provide custom configurations for in
 ### Config File
 
 | Flag | Env Var | Type | Default | Description |
-|--------|--------|------|----|--------------------| 
+|--------|--------|------|----|--------------------|
 |`--config-file` | `AVAGO_CONFIG_FILE` | string | - | Path to a JSON file that specifies this node's configuration. Command line arguments will override arguments set in the config file. This flag is ignored if `--config-file-content` is specified. Example JSON config file: `{"log-level": "debug"}`. [Install Script](https://build.avax.network/docs/tooling/avalanche-go-installer) creates the node config file at `~/.avalanchego/configs/node.json`. No default file is created if [AvalancheGo is built from source](https://build.avax.network/docs/nodes/run-a-node/from-source), you would need to create it manually if needed. |
 | `--config-file-content` | `AVAGO_CONFIG_FILE_CONTENT` | string | - | As an alternative to `--config-file`, it allows specifying base64 encoded config content. |
 | `--config-file-content-type` | `AVAGO_CONFIG_FILE_CONTENT_TYPE` | string | `JSON` | Specifies the format of the base64 encoded config content. JSON, TOML, YAML are among currently supported file format (see [here](https://github.com/spf13/viper#reading-config-files) for full list). |
@@ -289,7 +289,7 @@ It is possible to provide parameters for Subnets. Parameters here apply to all c
 
 | Flag | Env Var | Type | Default | Description |
 |--------|--------|------|----|--------------------|
-| `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/subnets` | Specifies the directory that contains Subnet configs, as described above. If the flag is set explicitly, the specified folder must exist, or AvalancheGo will exit with an error. This flag is ignored if `--subnet-config-content` is specified. Example: Let's say we have a Subnet with ID `p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6`. We can create a config file under the default `subnet-config-dir` at `$HOME/.avalanchego/configs/subnets/p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6.json`. An example config file is: `{"validatorOnly": false, "consensusParameters": {"k": 25, "alpha": 18}}`. By default, none of these directories and/or files exist. You would need to create them manually if needed. |
+| `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/subnets` | Specifies the directory that contains Subnet configs, as described above. If the flag is set explicitly, the specified folder must exist, or AvalancheGo will exit with an error. This flag is ignored if `--subnet-config-content` is specified. Example: Let's say we have a Subnet with ID `p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6`. We can create a config file under the default `subnet-config-dir` at `$HOME/.avalanchego/configs/subnets/p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6.json`. An example config file is: `{"validatorOnly": false, "snowParameters":{"k":25,"alpha":18}}`. By default, none of these directories and/or files exist. You would need to create them manually if needed. |
 | `--subnet-config-content` | `AVAGO_SUBNET_CONFIG_CONTENT` | string | - | As an alternative to `--subnet-config-dir`, it allows specifying base64 encoded parameters for a Subnet. |
 
 ### Version
@@ -327,13 +327,14 @@ Sybil protection configuration. These settings affect how the node participates 
 
 ### Benchlist
 
-Peer benchlisting configuration.
+Peer benchlisting configuration using an EWMA (Exponentially Weighted Moving Average) failure probability model.
 
 | Flag | Env Var | Type | Default | Description |
 |--------|--------|------|----|--------------------|
-| `--benchlist-duration` | `AVAGO_BENCHLIST_DURATION` | duration | `15m` | Maximum amount of time a peer is benchlisted after surpassing `--benchlist-fail-threshold`. |
-| `--benchlist-fail-threshold` | `AVAGO_BENCHLIST_FAIL_THRESHOLD` | int | `10` | Number of consecutive failed queries to a node before benching it (assuming all queries to it will fail). |
-| `--benchlist-min-failing-duration` | `AVAGO_BENCHLIST_MIN_FAILING_DURATION` | duration | `150s` | Minimum amount of time queries to a peer must be failing before the peer is benched. |
+| `--benchlist-halflife` | `AVAGO_BENCHLIST_HALFLIFE` | duration | `1m` | Halflife of the EWMA averager used for benchlisting. |
+| `--benchlist-unbench-probability` | `AVAGO_BENCHLIST_UNBENCH_PROBABILITY` | float | `0.2` | EWMA failure probability below which a node is unbenched. |
+| `--benchlist-bench-probability` | `AVAGO_BENCHLIST_BENCH_PROBABILITY` | float | `0.5` | EWMA failure probability above which a node is benched. |
+| `--benchlist-duration` | `AVAGO_BENCHLIST_DURATION` | duration | `5m` | Max amount of time a peer is benchlisted. |
 
 ### Consensus Parameters
 

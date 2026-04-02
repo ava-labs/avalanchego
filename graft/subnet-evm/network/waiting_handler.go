@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
 
 var (

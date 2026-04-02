@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -166,6 +166,9 @@ func newReplicationResponse(
 		if err != nil {
 			return nil, err
 		}
+		if p2pQR == nil {
+			continue
+		}
 		qrs = append(qrs, p2pQR)
 	}
 
@@ -175,9 +178,11 @@ func newReplicationResponse(
 		if err != nil {
 			return nil, err
 		}
+		if qr == nil {
+			return nil, nil
+		}
 		latestQR = qr
 	}
-
 	return &p2p.Simplex{
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_ReplicationResponse{
@@ -224,6 +229,10 @@ func quorumRoundToP2P(qr *simplex.VerifiedQuorumRound) (*p2p.QuorumRound, error)
 		}
 	}
 	if qr.Finalization != nil {
+		// This can only happen if the finalization of the genesis block is being sent
+		if qr.Finalization.QC == nil {
+			return nil, nil
+		}
 		p2pQR.Finalization = &p2p.QuorumCertificate{
 			BlockHeader:       blockHeaderToP2P(qr.Finalization.Finalization.BlockHeader),
 			QuorumCertificate: qr.Finalization.QC.Bytes(),

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -17,7 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -192,9 +194,10 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(NetworkTLSKeyLogFileKey, "", "TLS key log file path. Should only be specified for debugging")
 
 	// Benchlist
-	fs.Int(BenchlistFailThresholdKey, constants.DefaultBenchlistFailThreshold, "Number of consecutive failed queries before benchlisting a node")
-	fs.Duration(BenchlistDurationKey, constants.DefaultBenchlistDuration, "Max amount of time a peer is benchlisted after surpassing the threshold")
-	fs.Duration(BenchlistMinFailingDurationKey, constants.DefaultBenchlistMinFailingDuration, "Minimum amount of time messages to a peer must be failing before the peer is benched")
+	fs.Duration(BenchlistHalflifeKey, benchlist.DefaultHalflife, "Halflife of the EWMA averager used for benchlisting")
+	fs.Float64(BenchlistUnbenchProbabilityKey, benchlist.DefaultUnbenchProbability, "EWMA failure probability below which a node is unbenched")
+	fs.Float64(BenchlistBenchProbabilityKey, benchlist.DefaultBenchProbability, "EWMA failure probability above which a node is benched")
+	fs.Duration(BenchlistDurationKey, benchlist.DefaultBenchDuration, "Max amount of time a peer is benchlisted")
 
 	// Router
 	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")
@@ -302,7 +305,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint(BootstrapAncestorsMaxContainersSentKey, 2000, "Max number of containers in an Ancestors message sent by this node")
 	fs.Uint(BootstrapAncestorsMaxContainersReceivedKey, 2000, "This node reads at most this many containers from an incoming Ancestors message")
 
-	// Consensus
+	// Snow Consensus
 	fs.Int(SnowSampleSizeKey, snowball.DefaultParameters.K, "Number of nodes to query for each network poll")
 	fs.Int(SnowQuorumSizeKey, snowball.DefaultParameters.AlphaConfidence, "Threshold of nodes required to update this node's preference and increase its confidence in a network poll")
 	fs.Int(SnowPreferenceQuorumSizeKey, snowball.DefaultParameters.AlphaPreference, fmt.Sprintf("Threshold of nodes required to update this node's preference in a network poll. Ignored if %s is provided", SnowQuorumSizeKey))
@@ -315,9 +318,13 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Int(SnowMaxProcessingKey, snowball.DefaultParameters.MaxOutstandingItems, "Maximum number of processing items to be considered healthy")
 	fs.Duration(SnowMaxTimeProcessingKey, snowball.DefaultParameters.MaxItemProcessingTime, "Maximum amount of time an item should be processing and still be healthy")
 
+	// Simplex Consensus
+	fs.Duration(SimplexMaxNetworkDelayKey, simplex.DefaultParameters.MaxNetworkDelay, "Maximum expected network delay for message transmission in Simplex consensus")
+	fs.Duration(SimplexMaxRebroadcastWaitKey, simplex.DefaultParameters.MaxRebroadcastWait, "Time to retry message transmission in case of network instability")
+
 	// ProposerVM
 	fs.Bool(ProposerVMUseCurrentHeightKey, false, "Have the ProposerVM always report the last accepted P-chain block height")
-	fs.Duration(ProposerVMMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the primary network chains and the default minimum delay for subnets")
+	fs.Duration(ProposerVMMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the P-chain and X-chain")
 
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")

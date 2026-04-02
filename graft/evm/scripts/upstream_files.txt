@@ -1,0 +1,7 @@
+rpc/*
+core/*
+log/*
+triedb/*
+
+!core/state/snapshot/snapshot_ext.go
+!core/state/snapshot/main_test.go

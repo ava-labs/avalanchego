@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -37,10 +37,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind/precompilebind/templatetest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
+	"github.com/ava-labs/libevm/accounts/abi"
 )
 
 var errNoAnonymousEvent = errors.New("event type must not be anonymous")

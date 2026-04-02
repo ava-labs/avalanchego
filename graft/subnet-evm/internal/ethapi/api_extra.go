@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ethapi
@@ -14,11 +14,11 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 
+	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/rpc"
 )
 
 func (s *BlockChainAPI) GetChainConfig(context.Context) *params.ChainConfigWithUpgradesJSON {
@@ -125,6 +125,7 @@ func (s *BlockChainAPI) FeeConfig(ctx context.Context, blockNrOrHash *rpc.BlockN
 }
 
 // GetActivePrecompilesAt returns the active precompile configs at the given block timestamp.
+//
 // Deprecated: Use GetActiveRulesAt instead.
 func (s *BlockChainAPI) GetActivePrecompilesAt(_ context.Context, blockTimestamp *uint64) extras.Precompiles {
 	var timestamp uint64

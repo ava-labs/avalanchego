@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -39,8 +39,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -385,7 +385,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 	if configExtra.IsGranite(header.Time) {
 		headerExtra := customtypes.GetHeaderExtra(header)
-		headerExtra.TimeMilliseconds = utils.NewUint64(timeMS)
+		headerExtra.TimeMilliseconds = utils.PointerTo(timeMS)
 	}
 
 	if params.GetExtra(config).IsSubnetEVM(header.Time) {

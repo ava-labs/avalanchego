@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -27,7 +27,7 @@ func AtomicTx(
 	parentID ids.ID,
 	stateVersions state.Versions,
 	tx *txs.Tx,
-) (state.Diff, set.Set[ids.ID], map[ids.ID]*atomic.Requests, error) {
+) (*state.Diff, set.Set[ids.ID], map[ids.ID]*atomic.Requests, error) {
 	atomicExecutor := atomicTxExecutor{
 		backend:       backend,
 		feeCalculator: feeCalculator,
@@ -51,7 +51,7 @@ type atomicTxExecutor struct {
 	tx            *txs.Tx
 
 	// outputs of visitor execution
-	onAccept       state.Diff
+	onAccept       *state.Diff
 	inputs         set.Set[ids.ID]
 	atomicRequests map[ids.ID]*atomic.Requests
 }
@@ -140,6 +140,7 @@ func (e *atomicTxExecutor) atomicTx() error {
 	onAccept, err := state.NewDiff(
 		e.parentID,
 		e.stateVersions,
+		state.StakerAdditionAfterDeletionForbidden,
 	)
 	if err != nil {
 		return err

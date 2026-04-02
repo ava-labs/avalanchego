@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nativeminter
@@ -73,7 +73,7 @@ func UnpackMintNativeCoinInput(input []byte, useStrictMode bool) (common.Address
 		return common.Address{}, nil, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
 	}
 	inputStruct := MintNativeCoinInput{}
-	err := NativeMinterABI.UnpackInputIntoInterface(&inputStruct, "mintNativeCoin", input, useStrictMode)
+	err := NativeMinterABI.UnpackInputIntoInterface(&inputStruct, "mintNativeCoin", input)
 	if err != nil {
 		return common.Address{}, nil, fmt.Errorf("%w: %w", ErrUnpackInput, err)
 	}

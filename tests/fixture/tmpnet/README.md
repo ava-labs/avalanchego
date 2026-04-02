@@ -467,8 +467,6 @@ Example usage:
 ```yaml
 - name: Run e2e tests
 
-  # A qualified path is required for use outside of avalanchego
-  # e.g. `ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@[sha or tag]`
   uses: ./.github/actions/run-monitored-tmpnet-cmd
 
   with:
@@ -498,7 +496,7 @@ Example usage:
 [Top](#table-of-contents)
 
 When a network is started with tmpnet, a link to the [default grafana
-instance](https://grafana-poc.avax-dev.network) will be
+instance](https://avalabs.grafana.net) will be
 emitted. The dashboards will only be populated if prometheus and
 promtail are running locally (as per previous sections) to collect
 metrics and logs.

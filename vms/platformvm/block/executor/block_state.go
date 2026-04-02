@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -15,9 +15,9 @@ import (
 )
 
 type proposalBlockState struct {
-	onDecisionState state.Diff
-	onCommitState   state.Diff
-	onAbortState    state.Diff
+	onDecisionState *state.Diff
+	onCommitState   *state.Diff
+	onAbortState    *state.Diff
 }
 
 // The state of a block.
@@ -26,7 +26,7 @@ type blockState struct {
 	proposalBlockState
 	statelessBlock block.Block
 
-	onAcceptState state.Diff
+	onAcceptState *state.Diff
 	onAcceptFunc  func()
 
 	inputs          set.Set[ids.ID]

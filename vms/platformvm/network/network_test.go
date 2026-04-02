@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -39,7 +39,6 @@ var (
 		PushGossipDiscardedCacheSize:                1,
 		PushGossipMaxRegossipFrequency:              time.Second,
 		PushGossipFrequency:                         time.Second,
-		PullGossipPollSize:                          1,
 		PullGossipFrequency:                         time.Second,
 		PullGossipThrottlingPeriod:                  time.Second,
 		PullGossipRequestsPerValidator:              1,

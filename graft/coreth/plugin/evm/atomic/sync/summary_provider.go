@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -7,16 +7,17 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-var _ sync.SummaryProvider = (*SummaryProvider)(nil)
+var _ message.SyncSummaryProvider = (*SummaryProvider)(nil)
 
-// SummaryProvider is the summary provider that provides the state summary for the atomic trie.
+// SummaryProvider provides and parses state sync summaries for the atomic trie.
 type SummaryProvider struct {
 	trie *state.AtomicTrie
 }
@@ -27,7 +28,7 @@ func (a *SummaryProvider) Initialize(trie *state.AtomicTrie) {
 }
 
 // StateSummaryAtBlock returns the block state summary at [blk] if valid.
-func (a *SummaryProvider) StateSummaryAtBlock(blk *types.Block) (block.StateSummary, error) {
+func (a *SummaryProvider) StateSummaryAtBlock(blk *ethtypes.Block) (block.StateSummary, error) {
 	height := blk.NumberU64()
 	atomicRoot, err := a.trie.Root(height)
 	if err != nil {
@@ -43,4 +44,18 @@ func (a *SummaryProvider) StateSummaryAtBlock(blk *types.Block) (block.StateSumm
 		return nil, fmt.Errorf("failed to construct syncable block at height %d: %w", height, err)
 	}
 	return summary, nil
+}
+
+// Parse parses the summary bytes into a Syncable summary.
+func (*SummaryProvider) Parse(summaryBytes []byte, acceptImpl message.AcceptImplFn) (message.Syncable, error) {
+	var summary Summary
+	summaryID, err := message.ParseSyncableSummary(message.CorethCodec, summaryBytes, &summary)
+	if err != nil {
+		return nil, err
+	}
+
+	summary.bytes = summaryBytes
+	summary.summaryID = summaryID
+	summary.acceptImpl = acceptImpl
+	return &summary, nil
 }

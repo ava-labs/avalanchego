@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -26,6 +26,8 @@ const (
 	AtomicTxGossipHandlerID
 	// SignatureRequestHandlerID is specified in ACP-118: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request
 	SignatureRequestHandlerID
+	FirewoodRangeProofHandlerID
+	FirewoodChangeProofHandlerID
 )
 
 var (

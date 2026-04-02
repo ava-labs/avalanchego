@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package contract
@@ -8,10 +8,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
-
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi"
 )
 
 // Gas costs for stateful precompiles

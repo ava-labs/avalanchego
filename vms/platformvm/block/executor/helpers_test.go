@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -10,7 +10,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -44,9 +43,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
+
+	platformvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 const (
@@ -88,14 +88,13 @@ type environment struct {
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
 	fx             fx.Fx
-	state          state.State
-	mockedState    *state.MockState
+	state          *state.State
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
 	backend        *executor.Backend
 }
 
-func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *environment {
+func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(f),
@@ -114,25 +113,16 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 
-	if ctrl == nil {
-		res.state = statetest.New(t, statetest.Config{
-			DB:         res.baseDB,
-			Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
-			Validators: res.config.Validators,
-			Context:    res.ctx,
-			Rewards:    rewardsCalc,
-		})
+	res.state = statetest.New(t, statetest.Config{
+		DB:         res.baseDB,
+		Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
+		Validators: res.config.Validators,
+		Context:    res.ctx,
+		Rewards:    rewardsCalc,
+	})
 
-		res.uptimes = uptime.NewManager(res.state, res.clk)
-		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-	} else {
-		res.mockedState = state.NewMockState(ctrl)
-		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
-		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-
-		// setup expectations strictly needed for environment creation
-		res.mockedState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).Times(1)
-	}
+	res.uptimes = uptime.NewManager(res.state, res.clk)
+	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
 	res.backend = &executor.Backend{
 		Config:       res.config,
@@ -161,35 +151,20 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
 
-	if ctrl == nil {
-		res.blkManager = NewManager(
-			res.mempool,
-			metrics,
-			res.state,
-			res.backend,
-			validatorstest.Manager,
-		)
-		addSubnet(t, res)
-	} else {
-		res.blkManager = NewManager(
-			res.mempool,
-			metrics,
-			res.mockedState,
-			res.backend,
-			validatorstest.Manager,
-		)
-		// we do not add any subnet to state, since we can mock
-		// whatever we need
-	}
+	manager := platformvalidators.NewManager(*res.config, res.state, metrics, res.clk)
+
+	res.blkManager = NewManager(
+		res.mempool,
+		metrics,
+		res.state,
+		res.backend,
+		manager,
+	)
+	addSubnet(t, res)
 
 	t.Cleanup(func() {
 		res.ctx.Lock.Lock()
 		defer res.ctx.Lock.Unlock()
-
-		if res.mockedState != nil {
-			// state is mocked, nothing to do here
-			return
-		}
 
 		require := require.New(t)
 
@@ -252,7 +227,7 @@ func addSubnet(t testing.TB, env *environment) {
 	require.NoError(err)
 
 	genesisID := env.state.GetLastAccepted()
-	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
+	stateDiff, err := state.NewDiff(genesisID, env.blkManager, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -56,6 +57,15 @@ const (
 	subnetConfigFileExt  = ".json"
 
 	maxDiskSpaceThreshold = 50
+)
+
+type consensusMode int
+
+const (
+	modeSimplex consensusMode = iota
+	modeSnow
+	modeSnowFromDeprecated
+	modeDefaultSnow
 )
 
 var (
@@ -90,8 +100,8 @@ var (
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
 )
 
-func getConsensusConfig(v *viper.Viper) snowball.Parameters {
-	p := snowball.Parameters{
+func getPrimaryNetworkSnowConfig(v *viper.Viper) *snowball.Parameters {
+	p := &snowball.Parameters{
 		K:                     v.GetInt(SnowSampleSizeKey),
 		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
 		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
@@ -106,6 +116,125 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		p.AlphaConfidence = p.AlphaPreference
 	}
 	return p
+}
+
+// applySnowballParameterDefaults populates unset fields in a snowball.Parameters
+// struct with values from viper. It is intended for subnet configurations that
+// have been unmarshalled into a snowball.Parameters struct where some fields
+// may be omitted.
+//
+// If a field is zero-valued, it is treated as unset and defaulted from the
+// corresponding configuration key.
+//
+// This function also handles the deprecated Alpha field for backward
+// compatibility by mapping it to both AlphaPreference and AlphaConfidence.
+func applySnowballParameterDefaults(config *snowball.Parameters, v *viper.Viper) {
+	if config == nil {
+		return
+	}
+	if config.K == 0 {
+		config.K = v.GetInt(SnowSampleSizeKey)
+	}
+	if config.AlphaPreference == 0 {
+		if v.IsSet(SnowQuorumSizeKey) {
+			config.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
+		} else {
+			config.AlphaPreference = v.GetInt(SnowPreferenceQuorumSizeKey)
+		}
+	}
+	if config.AlphaConfidence == 0 {
+		if v.IsSet(SnowQuorumSizeKey) {
+			config.AlphaConfidence = v.GetInt(SnowQuorumSizeKey)
+		} else {
+			config.AlphaConfidence = v.GetInt(SnowConfidenceQuorumSizeKey)
+		}
+	}
+	if config.Beta == 0 {
+		config.Beta = v.GetInt(SnowCommitThresholdKey)
+	}
+	if config.ConcurrentRepolls == 0 {
+		config.ConcurrentRepolls = v.GetInt(SnowConcurrentRepollsKey)
+	}
+	if config.OptimalProcessing == 0 {
+		config.OptimalProcessing = v.GetInt(SnowOptimalProcessingKey)
+	}
+	if config.MaxOutstandingItems == 0 {
+		config.MaxOutstandingItems = v.GetInt(SnowMaxProcessingKey)
+	}
+	if config.MaxItemProcessingTime == 0 {
+		config.MaxItemProcessingTime = v.GetDuration(SnowMaxTimeProcessingKey)
+	}
+	if config.Alpha != nil {
+		config.AlphaPreference = *config.Alpha
+		config.AlphaConfidence = *config.Alpha
+	}
+}
+
+// applySimplexDefaults sets the default values for any unset fields in the
+// simplex.Parameters.
+func applySimplexDefaults(config *simplex.Parameters, v *viper.Viper) {
+	if config.MaxNetworkDelay == 0 {
+		config.MaxNetworkDelay = v.GetDuration(SimplexMaxNetworkDelayKey)
+	}
+	if config.MaxRebroadcastWait == 0 {
+		config.MaxRebroadcastWait = v.GetDuration(SimplexMaxRebroadcastWaitKey)
+	}
+}
+
+func resolveConsensusMode(config *subnets.Config) consensusMode {
+	switch {
+	case config.SimplexParameters != nil:
+		return modeSimplex
+	case config.SnowParameters != nil:
+		return modeSnow
+	case config.ConsensusParameters != nil:
+		return modeSnowFromDeprecated
+	default:
+		return modeDefaultSnow
+	}
+}
+
+// applySubnetConfigDefaults sets the default values for any unset fields in the subnets.Config.
+func applySubnetConfigDefaults(config *subnets.Config, v *viper.Viper) {
+	switch resolveConsensusMode(config) {
+	case modeSimplex:
+		applySimplexDefaults(config.SimplexParameters, v)
+	case modeSnow:
+		applySnowballParameterDefaults(config.SnowParameters, v)
+	case modeSnowFromDeprecated:
+		applySnowballParameterDefaults(config.ConsensusParameters, v)
+		config.SnowParameters = config.ConsensusParameters
+		config.ConsensusParameters = nil
+	case modeDefaultSnow:
+		config.SnowParameters = getPrimaryNetworkSnowConfig(v)
+	}
+}
+
+// getSubnetConfigFromBytes unmarshals a subnet config from rawBytes and validates it.
+// It also sets any unset fields to their default values for the provided subnet config.
+func getSubnetConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, error) {
+	config := getPrimaryNetworkConfig(v)
+	config.SnowParameters = nil
+	config.SimplexParameters = nil
+	config.ConsensusParameters = nil
+
+	if err := json.Unmarshal(rawBytes, &config); err != nil {
+		return subnets.Config{}, fmt.Errorf("%w: %s", errUnmarshalling, err.Error())
+	}
+
+	// Ensure that at most one consensus parameter type is set
+	if err := config.ValidConsensusConfiguration(); err != nil {
+		return subnets.Config{}, err
+	}
+	// set unset fields
+	applySubnetConfigDefaults(&config, v)
+
+	// validate parameters
+	if err := config.ValidParameters(); err != nil {
+		return subnets.Config{}, err
+	}
+
+	return config, nil
 }
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
@@ -421,25 +550,23 @@ func getNetworkConfig(
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper, consensusParameters snowball.Parameters) (benchlist.Config, error) {
+func getBenchlistConfig(v *viper.Viper, snowballParameters *snowball.Parameters) (benchlist.Config, error) {
+	if snowballParameters == nil {
+		return benchlist.Config{}, errors.New("snowball parameters must be non-nil")
+	}
 	// AlphaConfidence is used here to ensure that benching can't cause a
 	// liveness failure. If AlphaPreference were used, the benchlist may grow to
 	// a point that committing would be extremely unlikely to happen.
-	alpha := consensusParameters.AlphaConfidence
-	k := consensusParameters.K
-	config := benchlist.Config{
-		Threshold:              v.GetInt(BenchlistFailThresholdKey),
-		Duration:               v.GetDuration(BenchlistDurationKey),
-		MinimumFailingDuration: v.GetDuration(BenchlistMinFailingDurationKey),
-		MaxPortion:             (1.0 - (float64(alpha) / float64(k))) / 3.0,
-	}
-	switch {
-	case config.Duration < 0:
-		return benchlist.Config{}, fmt.Errorf("%q must be >= 0", BenchlistDurationKey)
-	case config.MinimumFailingDuration < 0:
-		return benchlist.Config{}, fmt.Errorf("%q must be >= 0", BenchlistMinFailingDurationKey)
-	}
-	return config, nil
+	alpha := snowballParameters.AlphaConfidence
+	k := snowballParameters.K
+
+	return benchlist.Config{
+		Halflife:           v.GetDuration(BenchlistHalflifeKey),
+		UnbenchProbability: v.GetFloat64(BenchlistUnbenchProbabilityKey),
+		BenchProbability:   v.GetFloat64(BenchlistBenchProbabilityKey),
+		BenchDuration:      v.GetDuration(BenchlistDurationKey),
+		MaxPortion:         (1.0 - (float64(alpha) / float64(k))) / 3.0,
+	}, nil
 }
 
 func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
@@ -1029,21 +1156,15 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 
 	res := make(map[ids.ID]subnets.Config)
 	for _, subnetID := range subnetIDs {
-		config := getDefaultSubnetConfig(v)
+		rawSubnetConfigBytes, ok := subnetConfigs[subnetID]
+		if !ok {
+			res[subnetID] = getPrimaryNetworkConfig(v)
+			continue
+		}
 
-		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
-			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
-				return nil, err
-			}
-
-			if config.ConsensusParameters.Alpha != nil {
-				config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
-				config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
-			}
-
-			if err := config.Valid(); err != nil {
-				return nil, err
-			}
+		config, err := getSubnetConfigFromBytes(rawSubnetConfigBytes, v)
+		if err != nil {
+			return nil, fmt.Errorf("could not read subnet config for %q: %w", subnetID, err)
 		}
 
 		res[subnetID] = config
@@ -1062,11 +1183,8 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 	// reads subnet config files from a path and given subnetIDs and returns a map.
 	for _, subnetID := range subnetIDs {
-		// Ensure default configuration
-		config := getDefaultSubnetConfig(v)
-		subnetConfigs[subnetID] = config
-
 		if len(subnetConfigPath) == 0 {
+			subnetConfigs[subnetID] = getPrimaryNetworkConfig(v)
 			// subnet config path does not exist but not explicitly specified, so ignore it
 			continue
 		}
@@ -1076,6 +1194,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 		switch {
 		case errors.Is(err, os.ErrNotExist):
 			// this subnet config does not exist, the default configuration will be used
+			subnetConfigs[subnetID] = getPrimaryNetworkConfig(v)
 			continue
 		case err != nil:
 			return nil, err
@@ -1089,18 +1208,9 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, err
 		}
 
-		// Update the default config with the values from the file
-		if err := json.Unmarshal(file, &config); err != nil {
-			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
-		}
-
-		if config.ConsensusParameters.Alpha != nil {
-			config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
-			config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
-		}
-
-		if err := config.Valid(); err != nil {
-			return nil, err
+		config, err := getSubnetConfigFromBytes(file, v)
+		if err != nil {
+			return nil, fmt.Errorf("could not read subnet config file %q: %w", filePath, err)
 		}
 
 		subnetConfigs[subnetID] = config
@@ -1109,18 +1219,10 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 	return subnetConfigs, nil
 }
 
-func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
-	subnetDefaults := getPrimaryNetworkConfig(v)
-	// Allow L1s (other than Primary Network) to use their own throttling mechanisms.
-	subnetDefaults.ProposerMinBlockDelay = 0
-	return subnetDefaults
-}
-
 func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
-		ConsensusParameters:         getConsensusConfig(v),
+		SnowParameters:              getPrimaryNetworkSnowConfig(v),
 		ValidatorOnly:               false,
-		ProposerMinBlockDelay:       v.GetDuration(ProposerVMMinBlockDelayKey),
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}
 }
@@ -1352,15 +1454,16 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	primaryNetworkConfig := getPrimaryNetworkConfig(v)
-	if err := primaryNetworkConfig.Valid(); err != nil {
+	if err := primaryNetworkConfig.ValidParameters(); err != nil {
 		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
 	}
 	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig
 
+	nodeConfig.ProposerMinBlockDelay = v.GetDuration(ProposerVMMinBlockDelayKey)
 	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Benchlist
-	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.ConsensusParameters)
+	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.SnowParameters)
 	if err != nil {
 		return node.Config{}, err
 	}

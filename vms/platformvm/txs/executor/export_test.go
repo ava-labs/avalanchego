@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -60,7 +60,7 @@ func TestNewExportTx(t *testing.T) {
 			)
 			require.NoError(err)
 
-			stateDiff, err := state.NewDiff(lastAcceptedID, env)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
 			stateDiff.SetTimestamp(tt.timestamp)

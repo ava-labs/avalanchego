@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -76,7 +76,7 @@ type VM struct {
 	ctx *snow.Context
 	db  database.Database
 
-	state state.State
+	state *state.State
 
 	fx            fx.Fx
 	codecRegistry codec.Registry

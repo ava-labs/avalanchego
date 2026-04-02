@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -38,7 +38,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
-	"github.com/ava-labs/avalanchego/graft/coreth/triedb/pathdb"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -55,7 +56,7 @@ import (
 	"github.com/holiman/uint256"
 )
 
-//go:generate go tool -modfile=../../../tools/go.mod gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
+//go:generate go tool gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
 
 var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 
@@ -159,6 +160,15 @@ func SetupGenesisBlock(
 		if hash != stored {
 			return genesis.Config, common.Hash{}, &GenesisMismatchError{stored, hash}
 		}
+		if _, ok := triedb.Backend().(*firewood.TrieDB); ok {
+			// With Firewood's deferred persistence, a crash before the
+			// first persist leaves the trie database empty while LevelDB
+			// already has blocks beyond genesis. In this case, only recommit
+			// genesis state to the trieDB.
+			genesis.toBlock(db, triedb)
+			return genesis.Config, common.Hash{}, nil
+		}
+
 		_, err := genesis.Commit(db, triedb)
 		return genesis.Config, common.Hash{}, err
 	}

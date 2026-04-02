@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -46,7 +46,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
@@ -89,7 +89,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require.NoError(err)
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
@@ -126,10 +126,10 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	builderDiff, err := state.NewDiffOn(stateDiff)
+	builderDiff, err := state.NewDiffOn(stateDiff, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, builderDiff)
@@ -163,10 +163,10 @@ func TestCreateChainTxValid(t *testing.T) {
 	)
 	require.NoError(err)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	builderDiff, err := state.NewDiffOn(stateDiff)
+	builderDiff, err := state.NewDiffOn(stateDiff, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, builderDiff)
@@ -230,7 +230,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			)
 			require.NoError(err)
 
-			stateDiff, err := state.NewDiff(lastAcceptedID, env)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
 			stateDiff.SetTimestamp(test.time)
@@ -267,10 +267,10 @@ func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 	)
 	require.NoError(err)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	builderDiff, err := state.NewDiffOn(stateDiff)
+	builderDiff, err := state.NewDiffOn(stateDiff, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	stateDiff.SetSubnetToL1Conversion(

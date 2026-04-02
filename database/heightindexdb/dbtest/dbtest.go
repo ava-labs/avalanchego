@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dbtest
@@ -19,9 +19,11 @@ var Tests = []struct {
 }{
 	{"TestPutGet", TestPutGet},
 	{"TestHas", TestHas},
+	{"TestSync", TestSync},
 	{"TestCloseAndPut", TestCloseAndPut},
 	{"TestCloseAndGet", TestCloseAndGet},
 	{"TestCloseAndHas", TestCloseAndHas},
+	{"TestCloseAndSync", TestCloseAndSync},
 	{"TestClose", TestClose},
 }
 
@@ -94,12 +96,10 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 				require.NoError(t, db.Close())
 			}()
 
-			// Perform all puts
 			for _, write := range tt.puts {
 				require.NoError(t, db.Put(write.height, write.data))
 			}
 
-			// Query the specific height
 			retrievedData, err := db.Get(tt.queryHeight)
 			require.ErrorIs(t, err, tt.wantErr)
 			require.True(t, bytes.Equal(tt.want, retrievedData))
@@ -193,6 +193,15 @@ func TestCloseAndHas(t *testing.T, newDB func() database.HeightIndex) {
 	require.ErrorIs(t, err, database.ErrClosed)
 }
 
+func TestCloseAndSync(t *testing.T, newDB func() database.HeightIndex) {
+	db := newDB()
+	require.NoError(t, db.Close())
+
+	// Try to sync after close - should return error
+	err := db.Sync(1, 10)
+	require.ErrorIs(t, err, database.ErrClosed)
+}
+
 func TestClose(t *testing.T, newDB func() database.HeightIndex) {
 	db := newDB()
 	require.NoError(t, db.Close())
@@ -200,4 +209,63 @@ func TestClose(t *testing.T, newDB func() database.HeightIndex) {
 	// Second close should return error
 	err := db.Close()
 	require.ErrorIs(t, err, database.ErrClosed)
+}
+
+func TestSync(t *testing.T, newDB func() database.HeightIndex) {
+	tests := []struct {
+		name    string
+		heights []uint64
+		start   uint64
+		end     uint64
+	}{
+		{
+			name: "empty range",
+			end:  10,
+		},
+		{
+			name:    "single height",
+			heights: []uint64{5},
+			start:   5,
+			end:     5,
+		},
+		{
+			name:    "contiguous range",
+			heights: []uint64{1, 2, 3},
+			start:   1,
+			end:     3,
+		},
+		{
+			name:    "partial range",
+			heights: []uint64{0, 1, 2, 3, 4, 5},
+			start:   2,
+			end:     4,
+		},
+		{
+			name:    "range with gaps",
+			heights: []uint64{1, 3, 5},
+			start:   1,
+			end:     5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newDB()
+			t.Cleanup(func() {
+				require.NoError(t, db.Close())
+			})
+
+			for _, h := range tt.heights {
+				require.NoError(t, db.Put(h, []byte("data")))
+			}
+
+			require.NoError(t, db.Sync(tt.start, tt.end))
+
+			for _, h := range tt.heights {
+				has, err := db.Has(h)
+				require.NoError(t, err)
+				require.True(t, has)
+			}
+		})
+	}
 }

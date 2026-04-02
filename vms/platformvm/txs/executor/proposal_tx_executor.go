@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -56,8 +56,8 @@ func ProposalTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	tx *txs.Tx,
-	onCommitState state.Diff,
-	onAbortState state.Diff,
+	onCommitState *state.Diff,
+	onAbortState *state.Diff,
 ) error {
 	proposalExecutor := proposalTxExecutor{
 		backend:       backend,
@@ -81,10 +81,10 @@ type proposalTxExecutor struct {
 	// [onCommitState] is the state used for validation.
 	// [onCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
-	onCommitState state.Diff
+	onCommitState *state.Diff
 	// [onAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
-	onAbortState state.Diff
+	onAbortState *state.Diff
 }
 
 func (*proposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
@@ -468,13 +468,14 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	}
 
 	// Provide the accrued delegatee rewards from successful delegations here.
-	delegateeReward, err := e.onCommitState.GetDelegateeReward(
+	stakingInfo, err := e.onCommitState.GetStakingInfo(
 		validator.SubnetID,
 		validator.NodeID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
 	}
+	delegateeReward := stakingInfo.DelegateeReward
 
 	if delegateeReward == 0 {
 		return nil
@@ -599,25 +600,25 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 
 	// Reward the delegatee here
 	if e.backend.Config.UpgradeConfig.IsCortinaActivated(validator.StartTime) {
-		previousDelegateeReward, err := e.onCommitState.GetDelegateeReward(
+		stakingInfo, err := e.onCommitState.GetStakingInfo(
 			validator.SubnetID,
 			validator.NodeID,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to get delegatee reward: %w", err)
+			return fmt.Errorf("failed to get staking info: %w", err)
 		}
 
 		// Invariant: The rewards calculator can never return a
 		//            [potentialReward] that would overflow the
 		//            accumulated rewards.
-		newDelegateeReward := previousDelegateeReward + delegateeReward
+		stakingInfo.DelegateeReward += delegateeReward
 
 		// For any validators starting after [CortinaTime], we defer rewarding the
 		// [reward] until their staking period is over.
-		err = e.onCommitState.SetDelegateeReward(
+		err = e.onCommitState.SetStakingInfo(
 			validator.SubnetID,
 			validator.NodeID,
-			newDelegateeReward,
+			stakingInfo,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to update delegatee reward: %w", err)

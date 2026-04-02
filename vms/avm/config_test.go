@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -46,7 +46,6 @@ func TestParseConfig(t *testing.T) {
 					PushGossipDiscardedCacheSize:                network.DefaultConfig.PushGossipDiscardedCacheSize,
 					PushGossipMaxRegossipFrequency:              network.DefaultConfig.PushGossipMaxRegossipFrequency,
 					PushGossipFrequency:                         network.DefaultConfig.PushGossipFrequency,
-					PullGossipPollSize:                          network.DefaultConfig.PullGossipPollSize,
 					PullGossipFrequency:                         network.DefaultConfig.PullGossipFrequency,
 					PullGossipThrottlingPeriod:                  network.DefaultConfig.PullGossipThrottlingPeriod,
 					PullGossipRequestsPerValidator:              network.DefaultConfig.PullGossipRequestsPerValidator,

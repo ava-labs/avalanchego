@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1
@@ -307,7 +307,7 @@ func sigToRawSig(sig []byte) ([]byte, error) {
 		return nil, errInvalidSigLen
 	}
 	newSig := make([]byte, SignatureLen)
-	newSig[0] = sig[SignatureLen-1] + compactSigMagicOffset
+	newSig[0] = sig[SignatureLen-1] + compactSigMagicOffset //nolint:gosec // G602: length is validated above
 	copy(newSig[1:], sig)
 	return newSig, nil
 }

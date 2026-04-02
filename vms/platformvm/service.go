@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -838,11 +838,11 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 		apiStaker := toPlatformStaker(currentStaker)
 		potentialReward := avajson.Uint64(currentStaker.PotentialReward)
 
-		delegateeReward, err := s.vm.state.GetDelegateeReward(currentStaker.SubnetID, currentStaker.NodeID)
+		stakingInfo, err := s.vm.state.GetStakingInfo(currentStaker.SubnetID, currentStaker.NodeID)
 		if err != nil {
 			return nil, err
 		}
-		jsonDelegateeReward := avajson.Uint64(delegateeReward)
+		jsonDelegateeReward := avajson.Uint64(stakingInfo.DelegateeReward)
 
 		switch currentStaker.Priority {
 		case txs.PrimaryNetworkValidatorCurrentPriority, txs.SubnetPermissionlessValidatorCurrentPriority:

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -470,7 +470,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 	type test struct {
 		name                 string
 		timestamp            time.Time
-		stateF               func(*gomock.Controller) state.Chain
+		state                *state.State
 		expectedTxID         ids.ID
 		expectedShouldReward bool
 		expectedErr          error
@@ -478,131 +478,123 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 	tests := []test{
 		{
-			name:      "end of time",
-			timestamp: mockable.MaxTime,
-			stateF: func(ctrl *gomock.Controller) state.Chain {
-				return state.NewMockChain(ctrl)
-			},
+			name:        "end of time",
+			timestamp:   mockable.MaxTime,
+			state:       statetest.New(t, statetest.Config{}),
 			expectedErr: ErrEndOfTime,
 		},
 		{
 			name:      "no stakers",
 			timestamp: now,
-			stateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil)
+			state: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				// statetest.New initializes the state with a genesis that contains validators.
+				// To test the case where there are no stakers, we need to delete the genesis validators.
+				currentStakerIterator, err := s.GetCurrentStakerIterator()
+				require.NoError(t, err)
+				for _, staker := range iterator.ToSlice(currentStakerIterator) {
+					s.DeleteCurrentValidator(staker)
+				}
 				return s
-			},
+			}(),
 		},
 		{
 			name:      "expired subnet validator/delegator",
 			timestamp: now,
-			stateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(
-					iterator.FromSlice(
-						&state.Staker{
-							Priority: txs.SubnetPermissionedValidatorCurrentPriority,
-							EndTime:  now,
-						},
-						&state.Staker{
-							TxID:     txID,
-							Priority: txs.SubnetPermissionlessDelegatorCurrentPriority,
-							EndTime:  now,
-						},
-					),
-					nil,
-				)
+			state: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				staker1 := &state.Staker{
+					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+					EndTime:  now,
+					NodeID:   ids.GenerateTestNodeID(),
+				}
+				staker2 := &state.Staker{
+					TxID:     txID,
+					Priority: txs.SubnetPermissionlessDelegatorCurrentPriority,
+					EndTime:  now,
+					NodeID:   staker1.NodeID,
+				}
+				require.NoError(t, s.PutCurrentValidator(staker1))
+				s.PutCurrentDelegator(staker2)
 				return s
-			},
+			}(),
 			expectedTxID:         txID,
 			expectedShouldReward: true,
 		},
 		{
 			name:      "expired primary network validator after subnet expired subnet validator",
 			timestamp: now,
-			stateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(
-					iterator.FromSlice(
-						&state.Staker{
-							Priority: txs.SubnetPermissionedValidatorCurrentPriority,
-							EndTime:  now,
-						},
-						&state.Staker{
-							TxID:     txID,
-							Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-							EndTime:  now,
-						},
-					),
-					nil,
-				)
+			state: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				staker1 := &state.Staker{
+					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+					EndTime:  now,
+					NodeID:   ids.GenerateTestNodeID(),
+				}
+				staker2 := &state.Staker{
+					TxID:     txID,
+					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+					EndTime:  now,
+					NodeID:   ids.GenerateTestNodeID(),
+				}
+				require.NoError(t, s.PutCurrentValidator(staker1))
+				require.NoError(t, s.PutCurrentValidator(staker2))
 				return s
-			},
+			}(),
 			expectedTxID:         txID,
 			expectedShouldReward: true,
 		},
 		{
 			name:      "expired primary network delegator after subnet expired subnet validator",
 			timestamp: now,
-			stateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(
-					iterator.FromSlice(
-						&state.Staker{
-							Priority: txs.SubnetPermissionedValidatorCurrentPriority,
-							EndTime:  now,
-						},
-						&state.Staker{
-							TxID:     txID,
-							Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-							EndTime:  now,
-						},
-					),
-					nil,
-				)
+			state: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				staker1 := &state.Staker{
+					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+					EndTime:  now,
+					NodeID:   ids.GenerateTestNodeID(),
+				}
+				staker2 := &state.Staker{
+					TxID:     txID,
+					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
+					EndTime:  now,
+					NodeID:   staker1.NodeID,
+				}
+				require.NoError(t, s.PutCurrentValidator(staker1))
+				s.PutCurrentDelegator(staker2)
 				return s
-			},
+			}(),
 			expectedTxID:         txID,
 			expectedShouldReward: true,
 		},
 		{
 			name:      "non-expired primary network delegator",
 			timestamp: now,
-			stateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(
-					iterator.FromSlice(
-						&state.Staker{
-							TxID:     txID,
-							Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-							EndTime:  now.Add(time.Second),
-						},
-					),
-					nil,
-				)
+			state: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.PutCurrentDelegator(&state.Staker{
+					TxID:     txID,
+					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
+					EndTime:  now.Add(time.Second),
+				})
 				return s
-			},
+			}(),
 			expectedTxID:         txID,
 			expectedShouldReward: false,
 		},
 		{
 			name:      "non-expired primary network validator",
 			timestamp: now,
-			stateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(
-					iterator.FromSlice(
-						&state.Staker{
-							TxID:     txID,
-							Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-							EndTime:  now.Add(time.Second),
-						},
-					),
-					nil,
-				)
+			state: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				require.NoError(t, s.PutCurrentValidator(&state.Staker{
+					TxID:     txID,
+					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+					EndTime:  now.Add(time.Second),
+					NodeID:   ids.GenerateTestNodeID(),
+				}))
 				return s
-			},
+			}(),
 			expectedTxID:         txID,
 			expectedShouldReward: false,
 		},
@@ -611,10 +603,8 @@ func TestGetNextStakerToReward(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
 
-			state := tt.stateF(ctrl)
-			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, state)
+			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, tt.state)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
 				return

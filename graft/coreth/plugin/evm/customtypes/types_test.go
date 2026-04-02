@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -33,6 +33,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
 )
@@ -60,14 +61,14 @@ func BenchmarkDecodeRLP(b *testing.B) {
 func benchRLP(b *testing.B, encode bool) {
 	key, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	to := common.HexToAddress("0x00000000000000000000000000000000deadbeef")
-	signer := NewLondonSigner(big.NewInt(1337))
+	signer := types.NewLondonSigner(big.NewInt(1337))
 	for _, tc := range []struct {
 		name string
 		obj  interface{}
 	}{
 		{
 			"legacy-header",
-			&Header{
+			&types.Header{
 				Difficulty: big.NewInt(10000000000),
 				Number:     big.NewInt(1000),
 				GasLimit:   8_000_000,
@@ -78,7 +79,7 @@ func benchRLP(b *testing.B, encode bool) {
 		},
 		{
 			"london-header",
-			&Header{
+			&types.Header{
 				Difficulty: big.NewInt(10000000000),
 				Number:     big.NewInt(1000),
 				GasLimit:   8_000_000,
@@ -90,24 +91,24 @@ func benchRLP(b *testing.B, encode bool) {
 		},
 		{
 			"receipt-for-storage",
-			&ReceiptForStorage{
-				Status:            ReceiptStatusSuccessful,
+			&types.ReceiptForStorage{
+				Status:            types.ReceiptStatusSuccessful,
 				CumulativeGasUsed: 0x888888888,
-				Logs:              make([]*Log, 0),
+				Logs:              make([]*types.Log, 0),
 			},
 		},
 		{
 			"receipt-full",
-			&Receipt{
-				Status:            ReceiptStatusSuccessful,
+			&types.Receipt{
+				Status:            types.ReceiptStatusSuccessful,
 				CumulativeGasUsed: 0x888888888,
-				Logs:              make([]*Log, 0),
+				Logs:              make([]*types.Log, 0),
 			},
 		},
 		{
 			"legacy-transaction",
-			MustSignNewTx(key, signer,
-				&LegacyTx{
+			types.MustSignNewTx(key, signer,
+				&types.LegacyTx{
 					Nonce:    1,
 					GasPrice: big.NewInt(500),
 					Gas:      1000000,
@@ -117,8 +118,8 @@ func benchRLP(b *testing.B, encode bool) {
 		},
 		{
 			"access-transaction",
-			MustSignNewTx(key, signer,
-				&AccessListTx{
+			types.MustSignNewTx(key, signer,
+				&types.AccessListTx{
 					Nonce:    1,
 					GasPrice: big.NewInt(500),
 					Gas:      1000000,
@@ -128,8 +129,8 @@ func benchRLP(b *testing.B, encode bool) {
 		},
 		{
 			"1559-transaction",
-			MustSignNewTx(key, signer,
-				&DynamicFeeTx{
+			types.MustSignNewTx(key, signer,
+				&types.DynamicFeeTx{
 					Nonce:     1,
 					Gas:       1000000,
 					To:        &to,

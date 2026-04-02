@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
@@ -33,6 +33,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/holiman/uint256"
 )
@@ -121,23 +122,23 @@ func fuzzRlp(t *testing.T, input []byte) {
 		}
 	}
 	{
-		var h Header
+		var h types.Header
 		if err := decodeEncode(input, &h); err != nil {
 			t.Fatal(err)
 		}
-		var b Block
+		var b types.Block
 		if err := decodeEncode(input, &b); err != nil {
 			t.Fatal(err)
 		}
-		var tx Transaction
+		var tx types.Transaction
 		if err := decodeEncode(input, &tx); err != nil {
 			t.Fatal(err)
 		}
-		var txs Transactions
+		var txs types.Transactions
 		if err := decodeEncode(input, &txs); err != nil {
 			t.Fatal(err)
 		}
-		var rs Receipts
+		var rs types.Receipts
 		if err := decodeEncode(input, &rs); err != nil {
 			t.Fatal(err)
 		}

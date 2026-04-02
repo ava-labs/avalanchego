@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -34,6 +35,38 @@ func TestInterface(t *testing.T) {
 				return db
 			})
 		})
+	}
+}
+
+func TestSyncPersistence(t *testing.T) {
+	config := DefaultConfig().WithMaxDataFileSize(250).WithSyncToDisk(false)
+	db := newDatabase(t, config)
+	db.compressor = compression.NewNoCompressor()
+	tempDir := db.config.DataDir
+
+	// Write 4 blocks spanning 2 data files
+	blocks := make(map[uint64][]byte)
+	for h := range uint64(4) {
+		blocks[h] = fixedSizeBlock(t, 100, h)
+		require.NoError(t, db.Put(h, blocks[h]))
+	}
+
+	require.NoError(t, db.Sync(0, 3))
+	require.NoError(t, db.Close())
+
+	// Reopen and verify all data persisted across files
+	hdb, err := New(config.WithDir(tempDir).WithBlockCacheSize(0), logging.NoLog{})
+	require.NoError(t, err)
+	reopenedDB := hdb.(*Database)
+	reopenedDB.compressor = compression.NewNoCompressor()
+	t.Cleanup(func() {
+		require.NoError(t, reopenedDB.Close())
+	})
+
+	for h, expected := range blocks {
+		data, err := reopenedDB.Get(h)
+		require.NoError(t, err)
+		require.Equal(t, expected, data)
 	}
 }
 
@@ -321,10 +354,12 @@ func TestFileCache_Eviction(t *testing.T) {
 			// Build error message if there were errors
 			var errorMsg string
 			if writeErrors.Load() > 0 {
-				errorMsg = fmt.Sprintf("concurrent writes had %d errors:\n", writeErrors.Load())
+				var b strings.Builder
+				fmt.Fprintf(&b, "concurrent writes had %d errors:\n", writeErrors.Load())
 				for _, msg := range errorMessages {
-					errorMsg += fmt.Sprintf("  %s\n", msg)
+					fmt.Fprintf(&b, "  %s\n", msg)
 				}
+				errorMsg = b.String()
 			}
 
 			// Verify no write errors and we have evictions

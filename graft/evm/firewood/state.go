@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package firewood
@@ -37,7 +37,7 @@ func (*stateAccessor) OpenStorageTrie(stateRoot common.Hash, addr common.Address
 	if !ok {
 		return nil, fmt.Errorf("invalid account trie type: %T", self)
 	}
-	return newStorageTrie(accountTrie), nil
+	return newStorageTrie(accountTrie.baseTrie), nil
 }
 
 // CopyTrie returns a deep copy of the given trie.

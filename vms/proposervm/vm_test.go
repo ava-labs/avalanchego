@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -158,6 +158,8 @@ func initTestProposerVM(
 		},
 	)
 
+	proVM.Set(snowmantest.GenesisTimestamp)
+
 	valState := &validatorstest.State{
 		T: t,
 		GetMinimumHeightF: func(context.Context) (uint64, error) {
@@ -216,8 +218,6 @@ func initTestProposerVM(
 
 	require.NoError(proVM.SetState(t.Context(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(t.Context(), snowmantest.GenesisID))
-
-	proVM.Set(snowmantest.GenesisTimestamp)
 
 	return coreVM, valState, proVM, db
 }

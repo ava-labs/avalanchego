@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -24,9 +24,10 @@ var (
 	_ simplex.Block             = (*Block)(nil)
 	_ simplex.VerifiedBlock     = (*Block)(nil)
 
-	errDigestNotFound       = errors.New("digest not found in block tracker")
-	errMismatchedPrevDigest = errors.New("prev digest does not match block parent")
-	errGenesisVerification  = errors.New("genesis block should not be verified")
+	errDigestNotFound        = errors.New("digest not found in block tracker")
+	errMismatchedPrevDigest  = errors.New("prev digest does not match block parent")
+	errGenesisVerification   = errors.New("genesis block should not be verified")
+	errFailedToParseMetadata = errors.New("failed to parse protocol metadata")
 )
 
 type Block struct {
@@ -132,7 +133,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 
 	md, err := simplex.ProtocolMetadataFromBytes(canotoBlock.Metadata)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
+		return nil, fmt.Errorf("%w: %w", errFailedToParseMetadata, err)
 	}
 
 	vmblock, err := d.parser.ParseBlock(ctx, canotoBlock.InnerBlock)
@@ -154,13 +155,17 @@ type blockTracker struct {
 	tree tree.Tree
 }
 
-func newBlockTracker(latestBlock *Block) *blockTracker {
+func newBlockTracker() *blockTracker {
 	return &blockTracker{
-		tree: tree.New(),
-		simplexDigestsToBlock: map[simplex.Digest]*Block{
-			latestBlock.digest: latestBlock,
-		},
+		tree:                  tree.New(),
+		simplexDigestsToBlock: make(map[simplex.Digest]*Block),
 	}
+}
+
+// init sets the latest block in the tracker.
+// This should only be called once, with the genesis or latest block.
+func (bt *blockTracker) init(latestBlock *Block) {
+	bt.simplexDigestsToBlock[latestBlock.digest] = latestBlock
 }
 
 func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) (*Block, bool) {

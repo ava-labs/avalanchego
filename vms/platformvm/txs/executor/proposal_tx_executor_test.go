@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -261,10 +261,10 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				tt.setup(env)
 			}
 
-			onCommitState, err := state.NewDiff(lastAcceptedID, env)
+			onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
-			onAbortState, err := state.NewDiff(lastAcceptedID, env)
+			onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
 			feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -308,10 +308,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -346,10 +346,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -404,10 +404,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -457,10 +457,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -493,10 +493,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -529,10 +529,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -567,10 +567,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -637,10 +637,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -683,10 +683,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -723,10 +723,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -773,10 +773,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -819,10 +819,10 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -853,10 +853,10 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -901,10 +901,10 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -943,10 +943,10 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			env.state.DeleteUTXO(utxoID)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)

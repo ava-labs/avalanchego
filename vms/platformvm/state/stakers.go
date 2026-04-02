@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -12,9 +12,20 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/iterator"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
+
+// StakerAdditionAfterDeletionLegality specifies whether a staker can be added after being deleted in the same diff.
+// Pre Helicon it is forbidden, and post Helicon it is allowed.
+type StakerAdditionAfterDeletionLegality bool
+
+const (
+	StakerAdditionAfterDeletionAllowed   StakerAdditionAfterDeletionLegality = true
+	StakerAdditionAfterDeletionForbidden StakerAdditionAfterDeletionLegality = false
+)
 
 type Stakers interface {
 	CurrentStakers
@@ -39,13 +50,11 @@ type CurrentStakers interface {
 	// Invariant: [staker] is currently a CurrentValidator
 	DeleteCurrentValidator(staker *Staker)
 
-	// SetDelegateeReward sets the accrued delegation rewards for [nodeID] on
-	// [subnetID] to [amount].
-	SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error
+	// SetStakingInfo updates the mutable staking info for [nodeID] on [subnetID].
+	SetStakingInfo(subnetID ids.ID, nodeID ids.NodeID, stakingInfo StakingInfo) error
 
-	// GetDelegateeReward returns the accrued delegation rewards for [nodeID] on
-	// [subnetID].
-	GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error)
+	// GetStakingInfo returns the mutable staking info for [nodeID] on [subnetID].
+	GetStakingInfo(subnetID ids.ID, nodeID ids.NodeID) (StakingInfo, error)
 
 	// GetCurrentDelegatorIterator returns the delegators associated with the
 	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
@@ -142,8 +151,7 @@ func (v *baseStakers) PutValidator(staker *Staker) {
 	validator.validator = staker
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorStatus = added
-	validatorDiff.validator = staker
+	validatorDiff.added = staker
 
 	v.stakers.ReplaceOrInsert(staker)
 }
@@ -154,8 +162,8 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorStatus = deleted
-	validatorDiff.validator = staker
+	validatorDiff.added = nil
+	validatorDiff.removed = staker
 
 	v.stakers.Delete(staker)
 }
@@ -247,15 +255,17 @@ func (v *baseStakers) getOrCreateValidatorDiff(subnetID ids.ID, nodeID ids.NodeI
 	}
 	validatorDiff, ok := subnetValidatorDiffs[nodeID]
 	if !ok {
-		validatorDiff = &diffValidator{
-			validatorStatus: unmodified,
-		}
+		validatorDiff = &diffValidator{}
 		subnetValidatorDiffs[nodeID] = validatorDiff
 	}
 	return validatorDiff
 }
 
 type diffStakers struct {
+	// isAdditionAfterDeletionAllowed specifies whether a staker can be added after being deleted in the same diff.
+	// This is done to preserve the pre-Helicon invariant that a staker cannot be added after being deleted,
+	// while allowing post-Helicon diffs to do that.
+	isAdditionAfterDeletionAllowed StakerAdditionAfterDeletionLegality
 	// subnetID --> nodeID --> diff for that validator
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 	addedStakers   *btree.BTreeG[*Staker]
@@ -263,48 +273,66 @@ type diffStakers struct {
 }
 
 type diffValidator struct {
-	// validatorStatus describes whether a validator has been added or removed.
-	//
-	// validatorStatus is not affected by delegators ops so unmodified does not
-	// mean that diffValidator hasn't change, since delegators may have changed.
-	validatorStatus diffValidatorStatus
-	validator       *Staker
-
+	// added represents a validator that was added in this diff, or nil if no
+	// validator was added. Can be non-nil at the same time as removed to represent a replacement.
+	added *Staker
+	// removed represents a validator that was removed in this diff, or nil if no
+	// validator was removed. Can be non-nil at the same time as added to represent a replacement.
+	removed           *Staker
 	addedDelegators   *btree.BTreeG[*Staker]
 	deletedDelegators map[ids.ID]*Staker
 }
 
-func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
-	weightDiff := ValidatorWeightDiff{
-		Decrease: d.validatorStatus == deleted,
-	}
-	if d.validatorStatus != unmodified {
-		weightDiff.Amount = d.validator.Weight
-	}
-
-	for _, staker := range d.deletedDelegators {
-		if err := weightDiff.Sub(staker.Weight); err != nil {
-			return ValidatorWeightDiff{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
-		}
+// weightChanges returns the total weight added to and removed from this
+// validator by this diff. The added weight includes the added validator and all
+// added delegators. The removed weight includes the removed validator and all
+// deleted delegators.
+func (d *diffValidator) weightChanges() (addedWeight uint64, removedWeight uint64, err error) {
+	if d.added != nil {
+		addedWeight = d.added.Weight
 	}
 
 	addedDelegatorIterator := iterator.FromTree(d.addedDelegators)
 	defer addedDelegatorIterator.Release()
 
 	for addedDelegatorIterator.Next() {
-		staker := addedDelegatorIterator.Value()
-
-		if err := weightDiff.Add(staker.Weight); err != nil {
-			return ValidatorWeightDiff{}, fmt.Errorf("failed to increase node weight diff: %w", err)
+		addedWeight, err = safemath.Add(addedWeight, addedDelegatorIterator.Value().Weight)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to calculate added weight: %w", err)
 		}
 	}
 
+	if d.removed != nil {
+		removedWeight = d.removed.Weight
+	}
+	for _, staker := range d.deletedDelegators {
+		removedWeight, err = safemath.Add(removedWeight, staker.Weight)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to calculate removed weight: %w", err)
+		}
+	}
+
+	return addedWeight, removedWeight, nil
+}
+
+func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
+	addedWeight, removedWeight, err := d.weightChanges()
+	if err != nil {
+		return ValidatorWeightDiff{}, err
+	}
+
+	var weightDiff ValidatorWeightDiff
+	if err := weightDiff.Add(addedWeight); err != nil {
+		return ValidatorWeightDiff{}, fmt.Errorf("failed to increase node weight diff: %w", err)
+	}
+	if err := weightDiff.Sub(removedWeight); err != nil {
+		return ValidatorWeightDiff{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
+	}
 	return weightDiff, nil
 }
 
 // GetValidator attempts to fetch the validator with the given subnetID and
 // nodeID.
-// Invariant: Assumes that the validator will never be removed and then added.
 func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, diffValidatorStatus) {
 	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
 	if !ok {
@@ -316,22 +344,42 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 		return nil, unmodified
 	}
 
-	if validatorDiff.validatorStatus == added {
-		return validatorDiff.validator, added
+	switch {
+	case validatorDiff.added != nil:
+		return validatorDiff.added, added
+	case validatorDiff.removed != nil:
+		return nil, deleted
+	default:
+		return nil, unmodified
 	}
-	return nil, validatorDiff.validatorStatus
 }
 
 func (s *diffStakers) PutValidator(staker *Staker) error {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.validatorStatus == deleted {
+
+	if validatorDiff.removed != nil && !s.isAdditionAfterDeletionAllowed {
 		// Enforce the invariant that a validator cannot be added after being
 		// deleted.
 		return ErrAddingStakerAfterDeletion
 	}
 
-	validatorDiff.validatorStatus = added
-	validatorDiff.validator = staker
+	if validatorDiff.removed != nil && validatorDiff.removed.Equals(staker) {
+		// We set the removed field when we delete the validator that was not added in this diff before.
+		// So if we reached here, it means we removed it first and now either re-adding it.
+		// If we're re-adding the exact same validator, we should remove it from the deleted stakers set since it's no longer deleted.
+
+		delete(s.deletedStakers, validatorDiff.removed.TxID)
+		if len(s.deletedStakers) == 0 {
+			s.deletedStakers = nil
+		}
+
+		// If we're re-adding the exact same validator that was removed,
+		// the two operations cancel out.
+		validatorDiff.removed = nil
+		return nil
+	}
+
+	validatorDiff.added = staker
 
 	if s.addedStakers == nil {
 		s.addedStakers = btree.NewG(defaultTreeDegree, (*Staker).Less)
@@ -342,15 +390,12 @@ func (s *diffStakers) PutValidator(staker *Staker) error {
 
 func (s *diffStakers) DeleteValidator(staker *Staker) {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.validatorStatus == added {
-		// This validator was added and immediately removed in this diff. We
-		// treat it as if it was never added.
-		validatorDiff.validatorStatus = unmodified
-		s.addedStakers.Delete(validatorDiff.validator)
-		validatorDiff.validator = nil
+	if validatorDiff.added != nil {
+		// This validator was added in this diff. Rollback the addition.
+		s.addedStakers.Delete(validatorDiff.added)
+		validatorDiff.added = nil
 	} else {
-		validatorDiff.validatorStatus = deleted
-		validatorDiff.validator = staker
+		validatorDiff.removed = staker
 		if s.deletedStakers == nil {
 			s.deletedStakers = make(map[ids.ID]*Staker)
 		}
@@ -421,8 +466,11 @@ func (s *diffStakers) GetStakerIterator(parentIterator iterator.Iterator[*Staker
 			iterator.FromTree(s.addedStakers),
 		),
 		func(staker *Staker) bool {
-			_, ok := s.deletedStakers[staker.TxID]
-			return ok
+			deletedStaker, ok := s.deletedStakers[staker.TxID]
+			if !ok {
+				return false
+			}
+			return deletedStaker.Equals(staker)
 		},
 	)
 }
@@ -438,9 +486,7 @@ func (s *diffStakers) getOrCreateDiff(subnetID ids.ID, nodeID ids.NodeID) *diffV
 	}
 	validatorDiff, ok := subnetValidatorDiffs[nodeID]
 	if !ok {
-		validatorDiff = &diffValidator{
-			validatorStatus: unmodified,
-		}
+		validatorDiff = &diffValidator{}
 		subnetValidatorDiffs[nodeID] = validatorDiff
 	}
 	return validatorDiff

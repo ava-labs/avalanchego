@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -561,19 +561,11 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	}
 
 	// Configure benchlist
-	n.Config.BenchlistConfig.Validators = n.vdrs
-	n.Config.BenchlistConfig.Benchable = n.chainRouter
-	n.Config.BenchlistConfig.BenchlistRegisterer = metrics.NewLabelGatherer(chains.ChainLabel)
-
-	err = n.MetricsGatherer.Register(
-		benchlistNamespace,
-		n.Config.BenchlistConfig.BenchlistRegisterer,
-	)
-	if err != nil {
+	benchlistReg := metrics.NewLabelGatherer(chains.ChainLabel)
+	if err := n.MetricsGatherer.Register(benchlistNamespace, benchlistReg); err != nil {
 		return err
 	}
-
-	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
+	n.benchlistManager = benchlist.NewManager(n.chainRouter, n.vdrs, benchlistReg, n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
 
@@ -1162,6 +1154,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MeterVMEnabled:                          n.Config.MeterVMEnabled,
 			Metrics:                                 n.MetricsGatherer,
 			MeterDBMetrics:                          n.MeterDBMetricsGatherer,
+			ProposerMinBlockDelay:                   n.Config.ProposerMinBlockDelay,
 			SubnetConfigs:                           n.Config.SubnetConfigs,
 			ChainConfigs:                            n.Config.ChainConfigs,
 			FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
@@ -1865,6 +1858,9 @@ func (n *Node) shutdown() {
 	n.timeoutManager.Stop()
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
+	}
+	if n.benchlistManager != nil {
+		n.benchlistManager.Shutdown()
 	}
 	if n.profiler != nil {
 		n.profiler.Shutdown()

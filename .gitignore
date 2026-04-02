@@ -1,3 +1,6 @@
+# Bazel symlinks
+/bazel-*
+
 *.log
 *~
 .DS_Store
@@ -43,6 +46,7 @@ tmp/
 
 bin/
 build/
+!.bazel/patches/build_files/**/build/
 
 keys/staker.*
 
@@ -66,5 +70,6 @@ vendor
 # debug files
 __debug_*
 
-# solc downloads from setup-solc GitHub Action
-setup-solc_downloads/
+# polyrepo
+polyrepo.log
+/firewood/

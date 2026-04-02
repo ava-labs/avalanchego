@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -48,7 +48,7 @@ func NewAtomicBackend(
 ) (*AtomicBackend, error) {
 	codec := repo.codec
 
-	atomicTrie, err := newAtomicTrie(repo.atomicTrieDB, repo.metadataDB, codec, lastAcceptedHeight, commitInterval)
+	atomicTrie, err := newAtomicTrie(repo.atomicTrieStorage, repo.metadataDB, codec, lastAcceptedHeight, commitInterval)
 	if err != nil {
 		return nil, err
 	}

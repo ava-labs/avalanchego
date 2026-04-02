@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txstest
@@ -14,7 +14,7 @@ import (
 func newContext(
 	ctx *snow.Context,
 	config *config.Internal,
-	state state.State,
+	state *state.State,
 ) *builder.Context {
 	builderContext := &builder.Context{
 		NetworkID:   ctx.NetworkID,

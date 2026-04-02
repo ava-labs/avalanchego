@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -63,13 +63,12 @@ const (
 	HTTPSCertFileKey                         = "http-tls-cert-file"
 	HTTPSCertContentKey                      = "http-tls-cert-file-content"
 
-	HTTPAllowedOrigins       = "http-allowed-origins"
-	HTTPAllowedHostsKey      = "http-allowed-hosts"
-	HTTPShutdownTimeoutKey   = "http-shutdown-timeout"
-	HTTPShutdownWaitKey      = "http-shutdown-wait"
-	HTTPReadTimeoutKey       = "http-read-timeout"
-	HTTPReadHeaderTimeoutKey = "http-read-header-timeout"
-
+	HTTPAllowedOrigins                                   = "http-allowed-origins"
+	HTTPAllowedHostsKey                                  = "http-allowed-hosts"
+	HTTPShutdownTimeoutKey                               = "http-shutdown-timeout"
+	HTTPShutdownWaitKey                                  = "http-shutdown-wait"
+	HTTPReadTimeoutKey                                   = "http-read-timeout"
+	HTTPReadHeaderTimeoutKey                             = "http-read-header-timeout"
 	HTTPIdleTimeoutKey                                   = "http-idle-timeout"
 	StateSyncIPsKey                                      = "state-sync-ips"
 	StateSyncIDsKey                                      = "state-sync-ids"
@@ -88,6 +87,8 @@ const (
 	StakingRPCSignerEndpointKey                          = "staking-rpc-signer-endpoint"
 	SybilProtectionEnabledKey                            = "sybil-protection-enabled"
 	SybilProtectionDisabledWeightKey                     = "sybil-protection-disabled-weight"
+	SimplexMaxNetworkDelayKey                            = "simplex-max-network-delay"
+	SimplexMaxRebroadcastWaitKey                         = "simplex-max-rebroadcast-wait"
 	NetworkInitialTimeoutKey                             = "network-initial-timeout"
 	NetworkMinimumTimeoutKey                             = "network-minimum-timeout"
 	NetworkMaximumTimeoutKey                             = "network-maximum-timeout"
@@ -122,9 +123,10 @@ const (
 	NetworkOutboundConnectionThrottlingRpsKey            = "network-outbound-connection-throttling-rps"
 	NetworkOutboundConnectionTimeoutKey                  = "network-outbound-connection-timeout"
 	NetworkNoIngressValidatorConnectionsGracePeriodKey   = "network-no-ingress-connections-grace-period"
-	BenchlistFailThresholdKey                            = "benchlist-fail-threshold"
+	BenchlistHalflifeKey                                 = "benchlist-halflife"
+	BenchlistUnbenchProbabilityKey                       = "benchlist-unbench-probability"
+	BenchlistBenchProbabilityKey                         = "benchlist-bench-probability"
 	BenchlistDurationKey                                 = "benchlist-duration"
-	BenchlistMinFailingDurationKey                       = "benchlist-min-failing-duration"
 	LogsDirKey                                           = "log-dir"
 	LogLevelKey                                          = "log-level"
 	LogDisplayLevelKey                                   = "log-display-level"

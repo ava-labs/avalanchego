@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package memdb
@@ -60,6 +60,16 @@ func (db *Database) Has(height uint64) (bool, error) {
 
 	_, ok := db.data[height]
 	return ok, nil
+}
+
+func (db *Database) Sync(_, _ uint64) error {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+	return nil
 }
 
 func (db *Database) Close() error {

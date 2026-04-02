@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package acp118
@@ -28,12 +28,23 @@ var _ Verifier = (*testVerifier)(nil)
 func TestHandler(t *testing.T) {
 	tests := []struct {
 		name         string
+		msg          *warp.UnsignedMessage
 		cacher       cache.Cacher[ids.ID, []byte]
 		verifier     Verifier
 		expectedErrs []error
 	}{
 		{
-			name:   "signature fails verification",
+			name: "signature fails verification",
+			msg: func() *warp.UnsignedMessage {
+				msg, err := warp.NewUnsignedMessage(
+					uint32(123),
+					ids.ID{1, 2, 3},
+					[]byte("foobar"),
+				)
+				require.NoError(t, err)
+
+				return msg
+			}(),
 			cacher: &cache.Empty[ids.ID, []byte]{},
 			verifier: &testVerifier{
 				Errs: []*common.AppError{
@@ -45,7 +56,17 @@ func TestHandler(t *testing.T) {
 			},
 		},
 		{
-			name:     "signature signed",
+			name: "signature signed",
+			msg: func() *warp.UnsignedMessage {
+				msg, err := warp.NewUnsignedMessage(
+					uint32(123),
+					ids.ID{1, 2, 3},
+					[]byte("foobar"),
+				)
+				require.NoError(t, err)
+
+				return msg
+			}(),
 			cacher:   &cache.Empty[ids.ID, []byte]{},
 			verifier: &testVerifier{},
 			expectedErrs: []error{
@@ -53,7 +74,17 @@ func TestHandler(t *testing.T) {
 			},
 		},
 		{
-			name:   "signature is cached",
+			name: "signature is cached",
+			msg: func() *warp.UnsignedMessage {
+				msg, err := warp.NewUnsignedMessage(
+					uint32(123),
+					ids.ID{1, 2, 3},
+					[]byte("foobar"),
+				)
+				require.NoError(t, err)
+
+				return msg
+			}(),
 			cacher: lru.NewCache[ids.ID, []byte](1),
 			verifier: &testVerifier{
 				Errs: []*common.AppError{
@@ -64,6 +95,42 @@ func TestHandler(t *testing.T) {
 			expectedErrs: []error{
 				nil,
 				nil,
+			},
+		},
+		{
+			name: "invalid network id",
+			msg: func() *warp.UnsignedMessage {
+				msg, err := warp.NewUnsignedMessage(
+					uint32(456),
+					ids.ID{1, 2, 3},
+					[]byte("foobar"),
+				)
+				require.NoError(t, err)
+
+				return msg
+			}(),
+			cacher:   &cache.Empty[ids.ID, []byte]{},
+			verifier: &testVerifier{},
+			expectedErrs: []error{
+				p2p.ErrUnexpected,
+			},
+		},
+		{
+			name: "invalid chain id",
+			msg: func() *warp.UnsignedMessage {
+				msg, err := warp.NewUnsignedMessage(
+					uint32(123),
+					ids.ID{4, 5, 6},
+					[]byte("foobar"),
+				)
+				require.NoError(t, err)
+
+				return msg
+			}(),
+			cacher:   &cache.Empty[ids.ID, []byte]{},
+			verifier: &testVerifier{},
+			expectedErrs: []error{
+				p2p.ErrUnexpected,
 			},
 		},
 	}
@@ -77,7 +144,7 @@ func TestHandler(t *testing.T) {
 			require.NoError(err)
 			pk := sk.PublicKey()
 			networkID := uint32(123)
-			chainID := ids.GenerateTestID()
+			chainID := ids.ID{1, 2, 3}
 			signer := warp.NewSigner(sk, networkID, chainID)
 			h := NewCachedHandler(tt.cacher, tt.verifier, signer)
 			clientNodeID := ids.GenerateTestNodeID()
@@ -91,15 +158,8 @@ func TestHandler(t *testing.T) {
 				h,
 			)
 
-			unsignedMessage, err := warp.NewUnsignedMessage(
-				networkID,
-				chainID,
-				[]byte("payload"),
-			)
-			require.NoError(err)
-
 			request := &sdk.SignatureRequest{
-				Message:       unsignedMessage.Bytes(),
+				Message:       tt.msg.Bytes(),
 				Justification: []byte("justification"),
 			}
 
@@ -129,7 +189,7 @@ func TestHandler(t *testing.T) {
 				require.True(bls.Verify(pk, signature, request.Message))
 
 				// Ensure the cache is populated with correct signature
-				sig, ok := tt.cacher.Get(unsignedMessage.ID())
+				sig, ok := tt.cacher.Get(tt.msg.ID())
 				if ok {
 					require.Equal(sig, response.Signature)
 				}

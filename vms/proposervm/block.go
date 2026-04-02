@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -23,7 +24,8 @@ import (
 
 const (
 	// allowable block issuance in the future
-	maxSkew = 10 * time.Second
+	maxSkew                         = 10 * time.Second
+	bootstrappingWarningGracePeriod = 5 * time.Minute
 )
 
 var (
@@ -451,6 +453,14 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // build an unsigned block
+	case errors.Is(err, validators.ErrUnfinalizedHeight):
+		p.logWarnOrError()("build block failed, validator set not yet finalized",
+			zap.String("reason", "failed to calculate expected proposer"),
+			zap.Uint64("parentPChainHeight", parentPChainHeight),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
+		return false, err
 	case err != nil:
 		p.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate expected proposer"),
@@ -513,4 +523,12 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 		zap.Time("blockTimestamp", newTimestamp),
 	)
 	return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
+}
+
+func (p *postForkCommonComponents) logWarnOrError() func(msg string, fields ...zap.Field) {
+	timeSinceBootstrapping := p.vm.Clock.Time().Sub(p.vm.finishedBootstrappingAt)
+	if p.vm.finishedBootstrappingAt.IsZero() || timeSinceBootstrapping < bootstrappingWarningGracePeriod {
+		return p.vm.ctx.Log.Warn
+	}
+	return p.vm.ctx.Log.Error
 }

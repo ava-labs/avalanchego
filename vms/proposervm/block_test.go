@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -15,6 +15,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -558,6 +560,90 @@ func TestPostGraniteBlock_EpochMatches(t *testing.T) {
 
 			err = block.Verify(ctx)
 			require.ErrorIs(err, test.wantErr)
+		})
+	}
+}
+
+func TestFailedToCalculateExpectedProposerLogLevel(t *testing.T) {
+	testCases := []struct {
+		name          string
+		clockOffset   time.Duration
+		expectedLevel zapcore.Level
+	}{
+		{
+			name:          "within grace period",
+			clockOffset:   bootstrappingWarningGracePeriod - time.Second,
+			expectedLevel: zapcore.Level(logging.Warn),
+		},
+		{
+			name:          "past grace period",
+			clockOffset:   bootstrappingWarningGracePeriod + time.Second,
+			expectedLevel: zapcore.Level(logging.Error),
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := t.Context()
+
+			coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+			defer func() {
+				require.NoError(proVM.Shutdown(ctx))
+			}()
+
+			initTime := proVM.Time()
+
+			coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
+			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+				return coreParentBlk, nil
+			}
+			coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+				switch {
+				case bytes.Equal(b, coreParentBlk.Bytes()):
+					return coreParentBlk, nil
+				case bytes.Equal(b, snowmantest.GenesisBytes):
+					return snowmantest.Genesis, nil
+				default:
+					return nil, errUnknownBlock
+				}
+			}
+
+			parentBlk, err := proVM.BuildBlock(ctx)
+			require.NoError(err)
+			require.NoError(parentBlk.Verify(ctx))
+			require.NoError(parentBlk.Accept(ctx))
+			require.NoError(proVM.SetPreference(ctx, parentBlk.ID()))
+
+			// Make GetValidatorSetF return an error so that ExpectedProposer
+			// fails, triggering the failure log path.
+			valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+				return nil, validators.ErrUnfinalizedHeight
+			}
+
+			coreChildBlk := snowmantest.BuildChild(coreParentBlk)
+			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+				return coreChildBlk, nil
+			}
+
+			// Override the logger to assert that the expected log entry is emitted with the expected log level.
+			// We want to confirm that before the grace period expires, we log a warning, and after the grace period expires, we log an error.
+			var logged bool
+			loggingCore := logging.NewWrappedCore(logging.Warn, logging.Discard, logging.Plain.ConsoleEncoder())
+			proVM.ctx.Log = logging.NewLogger("", loggingCore).WithOptions(zap.Hooks(func(e zapcore.Entry) error {
+				require.False(logged, "expected exactly one log entry")
+				logged = true
+				require.Equal(test.expectedLevel, e.Level)
+				require.Equal("build block failed, validator set not yet finalized", e.Message)
+				return nil
+			}))
+
+			// Advance the clock relative to when bootstrapping finished
+			proVM.Set(initTime.Add(test.clockOffset))
+
+			_, err = proVM.BuildBlock(ctx)
+			require.ErrorIs(err, validators.ErrUnfinalizedHeight)
+			require.True(logged, "expected log entry was not emitted")
 		})
 	}
 }

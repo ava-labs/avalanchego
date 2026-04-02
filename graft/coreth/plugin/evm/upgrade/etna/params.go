@@ -1,10 +1,10 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Etna defines constants used after the Etna upgrade.
 package etna
 
-import "github.com/ava-labs/avalanchego/graft/coreth/utils"
+import "github.com/ava-labs/avalanchego/graft/evm/utils"
 
 // MinBaseFee is the minimum base fee specified in ACP-125 that is allowed after
 // the Etna upgrade.

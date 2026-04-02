@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nativeminter
@@ -11,9 +11,9 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/utils"
 )
 
 var (
@@ -84,7 +84,7 @@ func (c *Config) Equal(cfg precompileconfig.Config) bool {
 		}
 		bigIntAmount := (*big.Int)(amount)
 		bigIntVal := (*big.Int)(val)
-		if !utils.BigNumEqual(bigIntAmount, bigIntVal) {
+		if !utils.BigEqual(bigIntAmount, bigIntVal) {
 			return false
 		}
 	}

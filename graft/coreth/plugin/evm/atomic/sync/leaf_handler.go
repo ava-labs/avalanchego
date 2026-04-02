@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -11,9 +11,9 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
