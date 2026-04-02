@@ -15,10 +15,14 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/strevm/cmputils"
 	"github.com/ava-labs/strevm/saetest"
 )
 
@@ -134,4 +138,26 @@ func TestNewGenesis(t *testing.T) {
 			assert.Truef(t, sdb.GetBalance(addr).Eq(want), "%T.GetBalance(%T.Addresses()[%d]) is max uint256", sdb, wallet, i)
 		}
 	})
+}
+
+func TestNewEthBlockParsing(t *testing.T) {
+	parent := types.NewBlockWithHeader(&types.Header{
+		Number: big.NewInt(0),
+	})
+	built := NewEthBlock(t, parent, nil)
+
+	bytes, err := rlp.EncodeToBytes(built)
+	require.NoError(t, err, "rlp.EncodeToBytes()")
+
+	parsed := new(types.Block)
+	require.NoError(t, rlp.DecodeBytes(bytes, parsed), "rlp.DecodeBytes()")
+
+	opts := cmp.Options{
+		cmputils.Blocks(),
+		cmputils.Headers(),
+		cmpopts.EquateEmpty(),
+	}
+	if diff := cmp.Diff(built, parsed, opts); diff != "" {
+		t.Errorf("rlp.DecodeBytes(...) diff (-want +got)\n%s", diff)
+	}
 }

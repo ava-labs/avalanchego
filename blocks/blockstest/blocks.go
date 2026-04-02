@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -39,10 +40,12 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 	tb.Helper()
 	props := &ethBlockProperties{
 		header: &types.Header{
-			Number:        new(big.Int).Add(parent.Number(), big.NewInt(1)),
-			ParentHash:    parent.Hash(),
-			BaseFee:       big.NewInt(0),
-			ExcessBlobGas: new(uint64),
+			Number:          new(big.Int).Add(parent.Number(), big.NewInt(1)),
+			ParentHash:      parent.Hash(),
+			BaseFee:         big.NewInt(0),
+			WithdrawalsHash: &common.Hash{},
+			BlobGasUsed:     new(uint64),
+			ExcessBlobGas:   new(uint64),
 		},
 		settledHeight: parent.NumberU64() + 1, // synchronoous
 	}
