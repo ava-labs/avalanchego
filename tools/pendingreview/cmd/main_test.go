@@ -31,5 +31,5 @@ func TestMainPrintsStackTraceWhenEnabled(t *testing.T) {
 	stderr := string(output)
 	require.Contains(t, stderr, "missing command")
 	require.Contains(t, stderr, "Stack trace:")
-	require.Contains(t, stderr, "/tools/draftreview/cmd/main.go:")
+	require.Contains(t, stderr, "/tools/pendingreview/cmd/main.go:")
 }

@@ -1,4 +1,4 @@
-# GraphQL Draft Review Session Design
+# GraphQL Pending Review Session Design
 
 This document captures the `xb1.9` research outcome for migrating
 `gh-pending-review` from the current REST-backed pending-review model to a
@@ -250,7 +250,7 @@ cutover, but the end state should use GraphQL for:
 These current abstractions are still useful and should survive the migration:
 
 - CLI boundary and command names in `gh-pending-review`
-- isolated auth flow from `tools/draftreview/auth.go`
+- isolated auth flow from `tools/pendingreview/auth.go`
 - one-pending-review-per-viewer lookup semantics
 - local state as an optimistic-concurrency guard
 - narrow repo-local scope: pending review manipulation only, never submission

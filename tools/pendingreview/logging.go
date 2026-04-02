@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package draftreview
+package pendingreview
 
 import (
 	"io"
@@ -11,7 +11,7 @@ import (
 
 func newDebugLogger(w io.Writer) logging.Logger {
 	return logging.NewLogger(
-		"draftreview",
+		"pendingreview",
 		logging.NewWrappedCore(logging.Debug, nopWriteCloser{Writer: w}, logging.Plain.ConsoleEncoder()),
 	)
 }

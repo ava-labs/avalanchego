@@ -10,4 +10,4 @@ echo "Building gh-pending-review..."
 go build -ldflags \
    "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" \
    -o "$AVALANCHE_PATH/build/gh-pending-review" \
-   "$AVALANCHE_PATH/tools/draftreview/cmd"
+   "$AVALANCHE_PATH/tools/pendingreview/cmd"

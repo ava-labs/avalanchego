@@ -12,12 +12,12 @@ user's pending GitHub review on `ava-labs/avalanchego`.
 
 Use this skill when the user wants to:
 
-- create a pending draft review body
-- fetch the current pending draft review body and inline comments
-- update the current pending draft review body
+- create a pending review body
+- fetch the current pending review body and inline comments
+- update the current pending review body
 - replace the current managed inline comment set
-- delete the current pending draft review
-- inspect or delete the local draft review state
+- delete the current pending review
+- inspect or delete the local pending review state
 - iterate on a pending review after the user edits it in GitHub with `!!`
   instructions
 
@@ -66,7 +66,7 @@ overwriting GitHub edits.
 
 ### Create
 
-When the user asks to post a draft review body:
+When the user asks to post a pending review body:
 
 ```bash
 ./bin/gh-pending-review create --pr <number> --body-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"

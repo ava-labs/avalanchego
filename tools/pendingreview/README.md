@@ -1,6 +1,6 @@
 # GitHub Pending Review
 
-`tools/draftreview` contains the repo-local implementation behind
+`tools/pendingreview` contains the repo-local implementation behind
 `gh-pending-review`, a narrowly scoped CLI for manipulating the authenticated
 user's pending GitHub review on a pull request.
 
@@ -16,8 +16,8 @@ The tool exists to support an agent-assisted, human-submitted review workflow:
 This README documents the maintained contract of the tool. It is not a spike
 log or implementation plan.
 
-For the GraphQL migration research that motivated the next draft-review-session
-design, see [graphql-draft-review-design.md](./graphql-draft-review-design.md).
+For the GraphQL migration research that motivated the next pending-review-session
+design, see [graphql-pending-review-design.md](./graphql-pending-review-design.md).
 
 ## Scope
 
@@ -201,7 +201,7 @@ state has become stale.
 
 ## Local State Model
 
-Conflict detection is state-based. The tool persists the last draft review state
+Conflict detection is state-based. The tool persists the last pending review state
 that it successfully published under:
 
 ```text
