@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sync"
 	"time"
 
@@ -1179,11 +1180,8 @@ func (s *State) AddTx(tx *txs.Tx, status status.Status) {
 }
 
 func (s *State) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
-	if utxos, exists := s.addedRewardUTXOs[txID]; exists {
-		return utxos, nil
-	}
 	if utxos, exists := s.rewardUTXOsCache.Get(txID); exists {
-		return utxos, nil
+		return append(slices.Clone(utxos), s.addedRewardUTXOs[txID]...), nil
 	}
 
 	rawTxDB := prefixdb.New(txID[:], s.rewardUTXODB)
@@ -1204,7 +1202,7 @@ func (s *State) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	}
 
 	s.rewardUTXOsCache.Put(txID, utxos)
-	return utxos, nil
+	return append(slices.Clone(utxos), s.addedRewardUTXOs[txID]...), nil
 }
 
 func (s *State) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
@@ -3028,7 +3026,12 @@ func (s *State) writeTXs() error {
 func (s *State) writeRewardUTXOs() error {
 	for txID, utxos := range s.addedRewardUTXOs {
 		delete(s.addedRewardUTXOs, txID)
-		s.rewardUTXOsCache.Put(txID, utxos)
+		// Evict rather than Put to avoid caching only the newly added
+		// UTXOs. The cache may already hold a stale entry for this txID
+		// (e.g. from a prior read). Evicting forces the next
+		// GetRewardUTXOs call to re-read from the DB, which will
+		// return the complete set of reward UTXOs for this tx.
+		s.rewardUTXOsCache.Evict(txID)
 		rawTxDB := prefixdb.New(txID[:], s.rewardUTXODB)
 		txDB := linkeddb.NewDefault(rawTxDB)
 

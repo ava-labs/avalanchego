@@ -3211,3 +3211,38 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 		})
 	}
 }
+
+func TestStateRewardUTXOs(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	state := newTestState(t, db)
+
+	txID := ids.GenerateTestID()
+	utxo0 := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: txID, OutputIndex: 0},
+		Out:    &secp256k1fx.TransferOutput{Amt: 1},
+	}
+	utxo1 := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: txID, OutputIndex: 1},
+		Out:    &secp256k1fx.TransferOutput{Amt: 2},
+	}
+
+	// Add a first reward UTXO and persist to disk.
+	state.AddRewardUTXO(txID, utxo0)
+	require.NoError(state.Commit())
+
+	// Reload from the persisted state.
+	state = newTestState(t, db)
+
+	// Add a second reward UTXO for the same txID.
+	state.AddRewardUTXO(txID, utxo1)
+
+	utxos, err := state.GetRewardUTXOs(txID)
+	require.NoError(err)
+	require.Len(utxos, 2)
+
+	wantIDs := set.Of(utxo0.InputID(), utxo1.InputID())
+	gotIDs := set.Of(utxos[0].InputID(), utxos[1].InputID())
+	require.Equal(wantIDs, gotIDs)
+}
