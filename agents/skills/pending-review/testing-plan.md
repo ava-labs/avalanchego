@@ -217,15 +217,18 @@ Implemented:
 
 - smoke-style `get-state` coverage for basic command selection and repo-local
   tool usage
-- stateful create-body coverage using:
+- stateful body-workflow coverage using:
   - the real skill
   - the real `./bin/gh-pending-review` launcher
   - a fake GraphQL backend
   - isolated local state on disk
+  - create-body
+  - read-body
+  - update-body
 - Bazel metadata for the skill test package via `tests/BUILD.bazel`
 
-The next meaningful steps are read-body and update-body scenarios using the
-same harness.
+The next meaningful steps are comment workflows, then external-edit and
+conflict scenarios using the same harness.
 
 ## Scenario Philosophy
 
@@ -260,12 +263,14 @@ This is the target workflow inventory to grow into over time.
    - user asks to inspect current draft
    - assert no mutation occurs
    - assert returned content matches fake backend state
+   - status: implemented
 
 3. Update body
    - existing draft present
    - user asks to replace body text
    - assert final live body changes accordingly
    - assert stored last-published body advances with the live update
+   - status: implemented
 
 ### Phase 2: Comment Workflows
 
@@ -324,20 +329,18 @@ Completed:
 1. Choose and implement the CLI-to-app backend override path
 2. Extend `skilltest` so the skill can activate that override in test
 3. Add a minimal fake backend server backed by canonical review state
-4. Implement first real body-create scenario
+4. Implement create-body, read-body, and update-body scenarios
 
 Remaining:
 
-5. Add read-body scenario
-6. Add update-body scenario
-7. Expand to comments
-8. Expand to external edits and conflicts
+5. Expand to comments
+6. Expand to external edits and conflicts
 
 This sequence proves the harness before adding complexity.
 
-## First Vertical Slice
+## First Body Slices
 
-Implemented scenario:
+Implemented scenarios:
 
 - fake backend starts with no pending review
 - user prompt says to create a pending review on PR `123` with body `foo`
@@ -348,12 +351,24 @@ Implemented scenario:
   - live body is `foo`
   - stored state was updated consistently
   - fake server observed the expected GraphQL operations in the expected order
+- fake backend starts with an existing pending review whose body is `draft v1`
+- user asks to read the current draft
+- test asserts:
+  - no mutation occurs
+  - no local state is written
+  - the agent output includes the live body text
+- fake backend and local state both start at `draft v1`
+- user asks to replace the body with `bar`
+- test asserts:
+  - live body advances to `bar`
+  - stored `last_published_body` advances to `bar`
+  - stored managed entries remain intact
 
-This slice now proves:
+These slices now prove:
 
 - skill context is sufficient
 - the real tool can be driven end to end
-- state mutation can be asserted mechanically
+- read-only and mutating body flows can be asserted mechanically
 - the backend override wiring is actually live
 
 ## Multi-Turn Transcript Tests
@@ -402,14 +417,11 @@ The point is observability of state transitions, not realism of prose.
 ## Concrete Next Tasks
 
 The next implementation session should keep the current harness and finish only
-after at least one additional stateful skill test is green.
+after at least one additional comment or conflict scenario is green.
 
-1. Add a read-body scenario against existing fake draft state with no mutation.
-2. Add an update-body scenario that verifies both live body replacement and
-   stored-state advancement.
-3. Reuse and extend the current fake backend only as needed for comment
+1. Reuse and extend the current fake backend only as needed for comment
    workflows.
-4. Move on to external-edit and conflict scenarios once the body workflows are
+2. Move on to external-edit and conflict scenarios once the body workflows are
    stable.
 
 ## Test Execution Assumption
@@ -434,5 +446,5 @@ The next implementation session should start from the existing harness in:
 - `tools/skilltest/skilltest.go`
 - `tools/pendingreview/app.go`
 
-The next work item is read-body, followed by update-body, then comment and
-conflict workflows.
+The next work item is comment workflows, followed by external-edit and conflict
+workflows.

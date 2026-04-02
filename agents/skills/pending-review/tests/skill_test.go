@@ -5,6 +5,7 @@ package tests
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -118,6 +119,149 @@ func TestPendingReviewCreateBodyEndToEnd(t *testing.T) {
 	}
 }
 
+func TestPendingReviewReadBodyEndToEnd(t *testing.T) {
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			xdgStateHome := filepath.Join(t.TempDir(), "state-home")
+			configDir := filepath.Join(xdgConfigHome, "gh-pending-review")
+			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			backend := newFakePendingReviewBackend("octocat")
+			backend.seedReview(fakeReview{
+				ID:         "review-123",
+				DatabaseID: 123,
+				Body:       "draft v1",
+				State:      "PENDING",
+				URL:        "https://example.invalid/review/123",
+				Author: fakeUser{
+					Login: "octocat",
+				},
+			})
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Read the current pending review body on PR 123 and tell me exactly what it is. " +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
+					"Do not change anything.",
+				Timeout: 3 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             xdgStateHome,
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+
+			review := backend.review()
+			require.Equal(t, "draft v1", review.Body)
+			require.Equal(t, []string{"Viewer", "PullRequestContext"}, backend.operations())
+
+			_, err := os.Stat(stateFilePath(stateDir, "ava-labs/avalanchego", "octocat", 123))
+			require.ErrorIs(t, err, os.ErrNotExist)
+
+			output := readOutput(t, result.OutputPath)
+			require.Contains(t, output, "draft v1")
+		})
+	}
+}
+
+func TestPendingReviewUpdateBodyEndToEnd(t *testing.T) {
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			xdgStateHome := filepath.Join(t.TempDir(), "state-home")
+			configDir := filepath.Join(xdgConfigHome, "gh-pending-review")
+			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
+			require.NoError(t, store.Save(pendingreview.ReviewState{
+				Repo:              "ava-labs/avalanchego",
+				PRNumber:          123,
+				UserLogin:         "octocat",
+				ReviewID:          "review-123",
+				LastPublishedBody: "draft v1",
+				LastPublishedEntries: []pendingreview.DraftReviewEntry{{
+					Kind: pendingreview.DraftReviewEntryKindNewThread,
+					Path: "snow/engine.go",
+					Line: 7,
+					Side: "RIGHT",
+					Body: "existing comment",
+				}},
+				HTMLURL: "https://example.invalid/review/123",
+			}))
+
+			backend := newFakePendingReviewBackend("octocat")
+			backend.seedReview(fakeReview{
+				ID:         "review-123",
+				DatabaseID: 123,
+				Body:       "draft v1",
+				State:      "PENDING",
+				URL:        "https://example.invalid/review/123",
+				Author: fakeUser{
+					Login: "octocat",
+				},
+			})
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Replace the current pending review body on PR 123 with bar. " +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
+					"Do not submit the review.",
+				Timeout: 3 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             xdgStateHome,
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+
+			review := backend.review()
+			require.Equal(t, "bar", review.Body)
+			require.Equal(t, []string{"Viewer", "PullRequestContext", "UpdatePendingReviewBody"}, backend.operations())
+
+			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
+			require.NoError(t, err)
+			require.Equal(t, "review-123", stored.ReviewID)
+			require.Equal(t, "bar", stored.LastPublishedBody)
+			require.Equal(t, "https://example.invalid/review/123", stored.HTMLURL)
+			require.Len(t, stored.LastPublishedEntries, 1)
+			require.Equal(t, "existing comment", stored.LastPublishedEntries[0].Body)
+		})
+	}
+}
+
 func newPendingReviewTestRepo(t *testing.T) string {
 	t.Helper()
 
@@ -157,6 +301,23 @@ func repoRoot(t *testing.T) string {
 	return filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", "..", "..", ".."))
 }
 
+func readOutput(t *testing.T, path string) string {
+	t.Helper()
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(content)
+}
+
+func stateFilePath(stateDir string, repo string, userLogin string, prNumber int) string {
+	return filepath.Join(
+		stateDir,
+		strings.ReplaceAll(repo, "/", string(filepath.Separator)),
+		userLogin,
+		fmt.Sprintf("%d.json", prNumber),
+	)
+}
+
 type fakePendingReviewBackend struct {
 	mu           sync.Mutex
 	viewer       string
@@ -179,6 +340,14 @@ type fakeUser struct {
 
 func newFakePendingReviewBackend(viewer string) *fakePendingReviewBackend {
 	return &fakePendingReviewBackend{viewer: viewer}
+}
+
+func (b *fakePendingReviewBackend) seedReview(review fakeReview) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	reviewCopy := review
+	b.liveReview = &reviewCopy
 }
 
 func (b *fakePendingReviewBackend) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -222,6 +391,11 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 	defer b.mu.Unlock()
 
 	switch {
+	case strings.Contains(query, "query Viewer"):
+		b.requestedOps = append(b.requestedOps, "Viewer")
+		return map[string]any{
+			"viewer": map[string]any{"login": b.viewer},
+		}, nil
 	case strings.Contains(query, "query PullRequestContext"):
 		b.requestedOps = append(b.requestedOps, "PullRequestContext")
 		return map[string]any{
@@ -253,6 +427,31 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 		}
 		return map[string]any{
 			"addPullRequestReview": map[string]any{
+				"pullRequestReview": map[string]any{
+					"id":         b.liveReview.ID,
+					"databaseId": b.liveReview.DatabaseID,
+					"state":      b.liveReview.State,
+					"body":       b.liveReview.Body,
+					"url":        b.liveReview.URL,
+					"author": map[string]any{
+						"login": b.liveReview.Author.Login,
+					},
+				},
+			},
+		}, nil
+	case strings.Contains(query, "mutation UpdatePendingReviewBody"):
+		b.requestedOps = append(b.requestedOps, "UpdatePendingReviewBody")
+		if b.liveReview == nil {
+			return nil, errors.New("unexpected update with no live review")
+		}
+		reviewID, _ := variables["reviewID"].(string)
+		if reviewID != b.liveReview.ID {
+			return nil, fmt.Errorf("unexpected review id %q", reviewID)
+		}
+		body, _ := variables["body"].(string)
+		b.liveReview.Body = body
+		return map[string]any{
+			"updatePullRequestReview": map[string]any{
 				"pullRequestReview": map[string]any{
 					"id":         b.liveReview.ID,
 					"databaseId": b.liveReview.DatabaseID,
