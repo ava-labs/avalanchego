@@ -15,7 +15,8 @@ Use this skill when the user wants to:
 - create a pending review body
 - fetch the current pending review body and inline comments
 - update the current pending review body
-- replace the current managed inline comment set
+- replace the current managed inline comment set, including replies on existing
+  review threads
 - delete the current pending review
 - inspect or delete the local pending review state
 - iterate on a pending review after the user edits it in GitHub with `!!`
@@ -25,7 +26,6 @@ Do not use this skill for:
 
 - submitting a review
 - approving or requesting changes
-- drafting replies on existing review threads
 - generic GitHub API access outside pending review operations
 
 ## Tool Boundary
@@ -115,9 +115,10 @@ desired comments to a JSON file and apply them with:
 Important behavior:
 
 - this is replace-only, not patch-in-place comment editing
-- the tool deletes the current pending review and recreates it with the same
-  top-level body plus the supplied comments
-- the review ID and URL may therefore change after `replace-comments`
+- the tool updates the existing pending review session in place rather than
+  intentionally recreating the top-level review
+- the managed set may contain both new draft threads and replies to existing
+  review threads
 - use `--force` only after reading and reconciling live changes intentionally
 
 Comments file shape:
@@ -133,13 +134,37 @@ Comments file shape:
 ]
 ```
 
+Replies to existing review threads use `kind: "thread_reply"` and a GitHub
+review thread node ID:
+
+```json
+[
+  {
+    "kind": "thread_reply",
+    "thread_id": "PRRT_kwDODq-TvM52SHRS",
+    "body": "This should stay on the existing thread."
+  }
+]
+```
+
 Rules:
 
-- `path` is required
-- `line` must be a positive integer
-- `side` must be `LEFT` or `RIGHT`
 - `body` is required
+- for `new_thread` entries:
+  - `path` is required
+  - `line` must be a positive integer
+  - `side` must be `LEFT` or `RIGHT`
+- for `thread_reply` entries:
+  - `thread_id` is required
+  - file anchor fields must be omitted
 - unknown fields are rejected
+
+Normalization rule:
+
+- replies are compared by reply kind, thread ID, and body
+- GitHub may read replies back with inherited anchor fields such as `path`,
+  `line`, or `start_line`; those fields are ignored for reply comparison and
+  conflict reconciliation
 
 ### Local State
 
@@ -182,7 +207,7 @@ Do not retry blindly after a conflict.
   they confirm.
 - Prefer `--body-file` for nontrivial review bodies.
 - Preserve the user's current draft intent when replacing comments; the tool
-  recreates the review with the existing top-level body.
+  keeps the existing top-level review and updates its managed entry set.
 - If there is no pending review for the authenticated user, say so plainly.
 - Preserve safety: do not submit the review.
 
@@ -191,7 +216,7 @@ Do not retry blindly after a conflict.
 This skill covers pending review state only:
 
 - top-level body create/read/update/delete
-- inline comment read and replace
+- inline comment and existing-thread reply read/replace
 - local state inspection and cleanup
 
-It does not cover submission or review-thread reply workflows.
+It does not cover submission.
