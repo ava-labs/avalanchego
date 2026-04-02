@@ -140,3 +140,18 @@ go_test(
         "@org_uber_go_goleak//:goleak",
     ],
 )
+
+go_test(
+    name = "nocmpopts",
+    embed = [":sae"],
+    gotags = [
+        # If any identifiers in the cmpopt.go files of dependencies are used
+        # then this target won't build because they're all constrained by the
+        # tags not being present.
+        #
+        # TODO(arr4n) the nocmpopts tag is also present on `//main:avalanchego`
+        # so this target can be removed once SAE is integrated.
+        "prod",
+        "nocmpopts",
+    ],
+)
