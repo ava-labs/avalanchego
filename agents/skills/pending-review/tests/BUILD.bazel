@@ -1,0 +1,12 @@
+load("//.bazel:defs.bzl", "go_test")
+
+go_test(
+    name = "tests_test",
+    srcs = ["skill_test.go"],
+    deps = [
+        "//utils/logging",
+        "@com_github_ava_labs_avalanchego//tools/pendingreview",
+        "@com_github_ava_labs_avalanchego//tools/skilltest",
+        "@com_github_stretchr_testify//require",
+    ],
+)

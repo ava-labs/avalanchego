@@ -41,6 +41,9 @@ type Config struct {
 	// WorkDir sets the agent working directory. If empty, the current process
 	// working directory is used.
 	WorkDir string
+	// Env adds or overrides environment variables for the spawned agent
+	// process and any child commands it runs.
+	Env map[string]string
 	// BinWrappers maps command names to script content. Each entry creates
 	// a wrapper script in a temp directory prepended to PATH, allowing tests
 	// to intercept commands (e.g., redirect yt-dlp output to a temp dir).
@@ -195,6 +198,7 @@ func run(t *testing.T, cfg Config, withSkill bool) Result {
 	cmd := exec.Command(command, args...)
 	cmd.Dir = workDir
 	cmd.Env = filteredEnv()
+	cmd.Env = mergeEnv(cmd.Env, cfg.Env)
 
 	if len(cfg.BinWrappers) > 0 {
 		binDir := filepath.Join(t.TempDir(), "bin")
@@ -305,4 +309,30 @@ func filteredEnv() []string {
 		}
 	}
 	return env
+}
+
+func mergeEnv(base []string, overrides map[string]string) []string {
+	if len(overrides) == 0 {
+		return base
+	}
+
+	merged := append([]string(nil), base...)
+	indexByKey := make(map[string]int, len(merged))
+	for i, entry := range merged {
+		key, _, found := strings.Cut(entry, "=")
+		if !found {
+			continue
+		}
+		indexByKey[key] = i
+	}
+
+	for key, value := range overrides {
+		entry := key + "=" + value
+		if idx, ok := indexByKey[key]; ok {
+			merged[idx] = entry
+			continue
+		}
+		merged = append(merged, entry)
+	}
+	return merged
 }

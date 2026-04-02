@@ -104,6 +104,29 @@ func TestFilteredEnv_RemovesClaudeVars(t *testing.T) {
 		"non-Claude env vars should be preserved")
 }
 
+func TestMergeEnv_AddsAndOverrides(t *testing.T) {
+	base := []string{
+		"PATH=/usr/bin",
+		"KEEP=old",
+	}
+
+	got := mergeEnv(base, map[string]string{
+		"KEEP": "new",
+		"ADD":  "value",
+	})
+
+	envMap := make(map[string]string)
+	for _, e := range got {
+		key, value, found := strings.Cut(e, "=")
+		require.True(t, found)
+		envMap[key] = value
+	}
+
+	require.Equal(t, "new", envMap["KEEP"])
+	require.Equal(t, "value", envMap["ADD"])
+	require.Equal(t, "/usr/bin", envMap["PATH"])
+}
+
 func TestWrapPromptWithSkill(t *testing.T) {
 	got := wrapPromptWithSkill("# Skill\nDo X.\n", "Handle request")
 	require.Contains(t, got, "# Skill\nDo X.\n")
