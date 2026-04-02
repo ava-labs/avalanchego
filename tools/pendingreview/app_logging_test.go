@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package draftreview
+package pendingreview
 
 import (
 	"bytes"
@@ -44,7 +44,7 @@ func TestRunCreateLogsStructuredOperations(t *testing.T) {
 	app.httpClient = server.Client()
 	app.baseURL = server.URL
 	app.log = logging.NewLogger(
-		"draftreview",
+		"pendingreview",
 		logging.NewWrappedCore(logging.Debug, nopWriteCloser{Writer: &stderr}, logging.JSON.ConsoleEncoder()),
 	)
 

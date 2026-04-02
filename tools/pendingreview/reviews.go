@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package draftreview
+package pendingreview
 
 import "github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 
