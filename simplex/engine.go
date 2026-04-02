@@ -73,7 +73,7 @@ func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Conf
 	}
 
 	if isNonValidator(config) {
-		config.Log.Info("Out node is not a validator for the subnet",
+		config.Log.Info("Our node is not a validator for the subnet",
 			zap.Stringer("nodeID", config.Ctx.NodeID),
 			zap.Stringer("chainID", config.Ctx.ChainID),
 			zap.Stringer("subnetID", config.Ctx.SubnetID),
@@ -186,6 +186,7 @@ func (e *Engine) Start(ctx context.Context, _ uint32) error {
 		e.logger.Info("non-validator cannot start simplex engine")
 		return nil
 	}
+
 	e.logger.Info(
 		"Starting simplex engine",
 		zap.Duration("TickInterval", e.tickInterval),
@@ -336,7 +337,7 @@ func (t *TODOBootstrapper) HealthCheck(ctx context.Context) (interface{}, error)
 func nonValidatingEngine(consensusCtx *snow.ConsensusContext, config *Config) (*Engine, error) {
 	engine := &Engine{
 		nonValidator:                true,
-		logger:                      config.Log,
+		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
@@ -345,10 +346,14 @@ func nonValidatingEngine(consensusCtx *snow.ConsensusContext, config *Config) (*
 		PutHandler:                  common.NewNoOpPutHandler(config.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
+		AppHandler:                  config.VM,
 		Connector:                   config.VM,
-		consensusCtx:                consensusCtx,
-		AppHandler:                  common.NewNoOpAppHandler(config.Log),
 		vm:                          config.VM,
+
+		consensusCtx: consensusCtx,
+		logger:       config.Log,
+		tickInterval: getTickInterval(config.Params),
+		shutdown:     make(chan struct{}, 1),
 	}
 
 	return engine, nil

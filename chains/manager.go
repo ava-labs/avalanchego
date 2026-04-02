@@ -1695,7 +1695,7 @@ func (m *manager) createTrackedPeers(primaryAlias string) (tracker.Peers, error)
 	return connectedValidators, nil
 }
 
-// createPeerTracker creates a peer tracker for the Snowman consensus engine
+// createPeerTracker creates a peer tracker for chain engines
 func (m *manager) createPeerTracker(ctx *snow.ConsensusContext, primaryAlias string) (*p2p.PeerTracker, error) {
 	p2pReg, err := metrics.MakeAndRegister(
 		m.p2pGatherer,
@@ -1790,7 +1790,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	}
 
 	walLocation := getChainWALLocation(ctx.ChainDataDir, ctx.ChainID)
-	wal, err := wal.New(walLocation)
+	chainWal, err := wal.New(walLocation)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create simplex wal: %w", err)
 	}
@@ -1801,7 +1801,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		Sender:             m.Net,
 		OutboundMsgBuilder: m.MsgCreator,
 		VM:                 vm,
-		WAL:                wal,
+		WAL:                chainWal,
 		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
 		DB:                 simplexDB,
 		Params:             sb.Config().SimplexParameters,
