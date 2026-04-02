@@ -435,6 +435,9 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, 
 }
 
 var (
+	ErrNoPendingReview = stacktrace.New(
+		"no pending review found",
+	)
 	ErrReviewConflict = stacktrace.New(
 		"pending review body no longer matches stored state; run get, reconcile the current review body, then retry with --force if you intend to overwrite it",
 	)
