@@ -8,6 +8,11 @@
             },
             {
                 "runner": "avalanche-avalanchego-runner-2ti",
+                "test": "firewood-101-250k",
+                "timeout-minutes": 30
+            },
+            {
+                "runner": "avalanche-avalanchego-runner-2ti",
                 "config": "default",
                 "start-block": 101,
                 "end-block": 250000,
