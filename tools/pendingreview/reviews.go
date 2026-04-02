@@ -83,6 +83,7 @@ func draftEntriesByKey(entries []DraftReviewEntry) map[string][]DraftReviewEntry
 }
 
 func draftReviewEntryKey(entry DraftReviewEntry) string {
+	entry = normalizeDraftReviewEntry(entry)
 	threadID := entry.ThreadID
 	side := entry.Side
 	startSide := entry.StartSide

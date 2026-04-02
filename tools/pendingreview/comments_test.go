@@ -39,3 +39,52 @@ func TestLoadCommentsFileRejectsUnknownField(t *testing.T) {
 	_, err := loadCommentsFile(path)
 	require.EqualError(t, err, `json: unknown field "position"`)
 }
+
+func TestNormalizeDraftReviewEntriesIgnoresReplyAnchorFields(t *testing.T) {
+	t.Parallel()
+
+	entries := []DraftReviewEntry{
+		{
+			Kind:             DraftReviewEntryKindThreadReply,
+			ThreadID:         "thread-1",
+			ReplyToCommentID: "comment-1",
+			Path:             "a.go",
+			Line:             7,
+			Side:             reviewSideRight,
+			StartLine:        6,
+			StartSide:        reviewSideLeft,
+			Body:             "reply",
+		},
+	}
+
+	normalized := normalizeDraftReviewEntries(entries)
+	require.Equal(t, []DraftReviewEntry{
+		{
+			Kind:             DraftReviewEntryKindThreadReply,
+			ThreadID:         "thread-1",
+			ReplyToCommentID: "comment-1",
+			Body:             "reply",
+		},
+	}, normalized)
+}
+
+func TestDraftReviewEntriesEqualIgnoresReplyAnchorFields(t *testing.T) {
+	t.Parallel()
+
+	left := []DraftReviewEntry{{
+		Kind:     DraftReviewEntryKindThreadReply,
+		ThreadID: "thread-1",
+		Body:     "reply",
+	}}
+	right := []DraftReviewEntry{{
+		Kind:             DraftReviewEntryKindThreadReply,
+		ThreadID:         "thread-1",
+		ReplyToCommentID: "comment-1",
+		Path:             "a.go",
+		Line:             7,
+		StartLine:        6,
+		Body:             "reply",
+	}}
+
+	require.True(t, draftReviewEntriesEqual(left, right))
+}

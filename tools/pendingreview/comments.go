@@ -97,12 +97,27 @@ func normalizeDraftReviewEntries(entries []DraftReviewEntry) []DraftReviewEntry 
 		if normalized[i].Kind == "" {
 			normalized[i].Kind = DraftReviewEntryKindNewThread
 		}
+		normalized[i] = normalizeDraftReviewEntry(normalized[i])
 	}
 	slices.SortFunc(normalized, compareDraftReviewEntries)
 	return normalized
 }
 
+func normalizeDraftReviewEntry(entry DraftReviewEntry) DraftReviewEntry {
+	if entry.Kind != DraftReviewEntryKindThreadReply {
+		return entry
+	}
+	entry.Path = ""
+	entry.Line = 0
+	entry.Side = ""
+	entry.StartLine = 0
+	entry.StartSide = ""
+	return entry
+}
+
 func compareDraftReviewEntries(left DraftReviewEntry, right DraftReviewEntry) int {
+	left = normalizeDraftReviewEntry(left)
+	right = normalizeDraftReviewEntry(right)
 	leftThreadID := left.ThreadID
 	rightThreadID := right.ThreadID
 	if left.Kind != DraftReviewEntryKindThreadReply {

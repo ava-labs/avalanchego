@@ -25,7 +25,7 @@ The supported surface is intentionally small and pending-review-only:
 
 - create a pending review with a top-level body
 - fetch the authenticated user's current pending review, including inline
-  comments
+  comments and replies to existing threads
 - update the top-level review body
 - replace the managed inline comment set
 - delete the pending review
@@ -168,13 +168,13 @@ implementation:
 2. finds the authenticated user's current pending review
 3. verifies the live comment set still matches stored state unless `--force` is
    used
-4. deletes the existing pending review
-5. recreates a new pending review with the previous top-level body and the new
-   comment set
-6. saves the new review ID and comments in local state
+4. deletes managed draft comments that are no longer desired
+5. adds new draft threads and draft replies needed to reach the desired set
+6. reads the pending review back and saves the resulting body and entries in
+   local state
 
-Because the review is recreated, the review ID and review URL may change after
-`replace-comments`.
+The pending review itself is updated in place. Its inline comment set may
+change, but the command does not intentionally recreate the top-level review.
 
 ### Delete
 
@@ -261,7 +261,8 @@ file order.
 
 ## Comments File Format
 
-`replace-comments` reads a JSON array of objects with this schema:
+`replace-comments` reads a JSON array of objects. The default entry kind is a
+new draft thread:
 
 ```json
 [
@@ -274,16 +275,40 @@ file order.
 ]
 ```
 
+To reply to an existing review thread instead of opening a new one, set
+`kind` to `thread_reply` and provide the GitHub review thread node ID:
+
+```json
+[
+  {
+    "kind": "thread_reply",
+    "thread_id": "PRRT_kwDODq-TvM52SHRS",
+    "body": "This should stay attached to the existing thread."
+  }
+]
+```
+
 Rules:
 
-- `path` is required
-- `line` must be a positive integer
-- `side` must be `LEFT` or `RIGHT`
 - `body` is required
+- for `new_thread` entries:
+  - `path` is required
+  - `line` must be a positive integer
+  - `side` must be `LEFT` or `RIGHT`
+- for `thread_reply` entries:
+  - `thread_id` is required
+  - file anchor fields must be omitted
 - unknown fields are rejected
 
 The file must contain exactly one JSON value. Parsed comments are normalized
 before comparison and persistence.
+
+Normalization rule:
+
+- `thread_reply` entries are compared by reply kind, thread ID, and body
+- GitHub may read replies back with inherited anchor fields such as `path`,
+  `line`, or `start_line`; those fields are ignored for reply comparison and
+  stored-state reconciliation
 
 ## Output Contract
 
@@ -300,9 +325,9 @@ for writes.
 
 - The tool never submits reviews. Human submission happens in the GitHub UI.
 - The tool only manipulates the authenticated user's own `PENDING` review.
-- Inline comment writes are replace-only.
-- Review recreation during `replace-comments` is expected behavior, not an
-  implementation accident.
+- Inline comment writes are replace-only at the managed-set level.
+- The managed set may contain both new draft threads and replies to existing
+  review threads.
 
 ## Maintenance Notes
 
