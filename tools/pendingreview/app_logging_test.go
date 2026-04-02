@@ -6,6 +6,7 @@ package pendingreview
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -30,9 +31,21 @@ func TestRunCreateLogsStructuredOperations(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/repos/ava-labs/avalanchego/pulls/5168/reviews", r.URL.Path)
+		require.Equal(t, "/graphql", r.URL.Path)
+		var payload struct {
+			Query     string         `json:"query"`
+			Variables map[string]any `json:"variables"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"id":123,"state":"PENDING","body":"test","html_url":"https://example.invalid/review/123","user":{"login":"maru"}}`)
+		switch {
+		case strings.Contains(payload.Query, "query PullRequestContext"):
+			_, _ = io.WriteString(w, `{"data":{"viewer":{"login":"maru"},"repository":{"pullRequest":{"id":"pr-1","reviewThreads":{"nodes":[]},"reviews":{"nodes":[{"id":"review-0","databaseId":111,"state":"PENDING","body":"existing","url":"https://example.invalid/review/111","author":{"login":"maru"},"comments":{"nodes":[]}}]}}}}}`)
+		case strings.Contains(payload.Query, "mutation CreatePendingReview"):
+			_, _ = io.WriteString(w, `{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"review-123","databaseId":123,"state":"PENDING","body":"test","url":"https://example.invalid/review/123","author":{"login":"maru"}}}}}`)
+		default:
+			require.FailNowf(t, "unexpected query", "query: %s", payload.Query)
+		}
 	}))
 	defer server.Close()
 
@@ -70,7 +83,7 @@ func TestRunCreateLogsStructuredOperations(t *testing.T) {
 		`"msg":"created pending review"`,
 		`"repo":"ava-labs/avalanchego"`,
 		`"prNumber":5168`,
-		`"reviewID":123`,
+		`"reviewID":"review-123"`,
 	} {
 		require.Contains(t, logOutput, expected)
 	}

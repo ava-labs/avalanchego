@@ -22,7 +22,7 @@ func TestStateStoreSaveLoadDelete(t *testing.T) {
 		Repo:              "ava-labs/avalanchego",
 		PRNumber:          5168,
 		UserLogin:         "maru-ava",
-		ReviewID:          123,
+		ReviewID:          "review-123",
 		LastPublishedBody: "test",
 		HTMLURL:           "https://example.invalid/review/123",
 	}

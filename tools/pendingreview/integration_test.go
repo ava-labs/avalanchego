@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -51,12 +52,9 @@ func TestCreatePendingReviewLive(t *testing.T) {
 	viewer, err := client.Viewer(ctx)
 	require.NoError(t, err)
 
-	reviews, err := client.ListReviews(ctx, repo, prNumber)
-	require.NoError(t, err)
-
-	if review, found := FindPendingReviewForAuthor(reviews, viewer.Login); found {
-		require.Equalf(t, "1", envOrFallback("GH_PENDING_REVIEW_TEST_DELETE_EXISTING", "GH_DRAFT_REVIEW_TEST_DELETE_EXISTING"), "refusing to create a new pending review because %s already has pending review %d; set GH_PENDING_REVIEW_TEST_DELETE_EXISTING=1 to delete it first", viewer.Login, review.ID)
-		require.NoError(t, client.DeletePendingReview(ctx, repo, prNumber, review.ID))
+	if review, err := client.GetPendingReview(ctx, repo, prNumber, viewer.Login); err == nil {
+		require.Equalf(t, "1", envOrFallback("GH_PENDING_REVIEW_TEST_DELETE_EXISTING", "GH_DRAFT_REVIEW_TEST_DELETE_EXISTING"), "refusing to create a new pending review because %s already has pending review %s; set GH_PENDING_REVIEW_TEST_DELETE_EXISTING=1 to delete it first", viewer.Login, displayReviewID(review))
+		require.NoError(t, client.DeletePendingReview(ctx, review.ID))
 	}
 
 	var stdout bytes.Buffer
@@ -72,23 +70,26 @@ func TestCreatePendingReviewLive(t *testing.T) {
 		"--state-dir", stateDir,
 	}))
 
-	reviews, err = client.ListReviews(ctx, repo, prNumber)
-	require.NoError(t, err)
-	review, found := FindPendingReviewForAuthor(reviews, viewer.Login)
-	require.True(t, found, "expected pending review for %s after create; stdout=%q", viewer.Login, stdout.String())
+	review, err := client.GetPendingReview(ctx, repo, prNumber, viewer.Login)
+	require.NoError(t, err, "expected pending review for %s after create; stdout=%q", viewer.Login, stdout.String())
 
 	t.Cleanup(func() {
-		require.NoError(t, client.DeletePendingReview(t.Context(), repo, prNumber, review.ID))
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		require.NoError(t, client.DeletePendingReview(cleanupCtx, review.ID))
 	})
 
-	fetched, err := client.GetReview(ctx, repo, prNumber, review.ID)
+	fetched, err := client.GetPendingReview(ctx, repo, prNumber, viewer.Login)
 	require.NoError(t, err)
 	require.Equal(t, viewer.Login, fetched.User.Login)
 	require.Equal(t, reviewStatePending, fetched.State)
 	require.Equal(t, "test", fetched.Body)
 
-	_, err = client.UpdatePendingReviewBody(ctx, repo, prNumber, review.ID, "user changed this")
+	_, err = client.UpdatePendingReviewBody(ctx, review.ID, "user changed this")
 	require.NoError(t, err)
+	require.NoError(t, waitForPendingReview(ctx, client, repo, prNumber, viewer.Login, func(review Review) bool {
+		return review.Body == "user changed this"
+	}))
 
 	err = app.Run(ctx, []string{
 		"update-body",
@@ -110,7 +111,7 @@ func TestCreatePendingReviewLive(t *testing.T) {
 		"--force",
 	}))
 
-	fetched, err = client.GetReview(ctx, repo, prNumber, review.ID)
+	fetched, err = client.GetPendingReview(ctx, repo, prNumber, viewer.Login)
 	require.NoError(t, err)
 	require.Equal(t, "agent reconciled result", fetched.Body)
 }
@@ -162,7 +163,9 @@ func TestReplacePendingReviewCommentsLive(t *testing.T) {
 	require.NoError(t, ensureNoLivePendingReviewOrDelete(ctx, t, client, repo, prNumber, viewer.Login, deleteExisting == "1"))
 
 	t.Cleanup(func() {
-		require.NoError(t, deleteCurrentPendingReview(ctx, client, repo, prNumber, viewer.Login))
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		require.NoError(t, deleteCurrentPendingReview(cleanupCtx, client, repo, prNumber, viewer.Login))
 	})
 
 	app := NewApp(strings.NewReader(""), io.Discard, io.Discard)
@@ -198,7 +201,7 @@ func TestReplacePendingReviewCommentsLive(t *testing.T) {
 	review, err := getCurrentPendingReviewWithComments(ctx, client, repo, prNumber, viewer.Login)
 	require.NoError(t, err)
 	require.Equal(t, "test", review.Body)
-	require.Equal(t, normalizeDraftReviewComments(desiredComments), normalizeLiveReviewComments(review.Comments, viewer.Login))
+	require.True(t, draftReviewEntriesEqual(normalizeDraftReviewEntries(desiredComments), normalizeLiveReviewComments(review.Comments, viewer.Login)))
 
 	var stdout bytes.Buffer
 	app.Stdout = &stdout
@@ -213,7 +216,7 @@ func TestReplacePendingReviewCommentsLive(t *testing.T) {
 	var fetched Review
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &fetched))
 	require.Equal(t, "test", fetched.Body)
-	require.Equal(t, normalizeDraftReviewComments(desiredComments), normalizeLiveReviewComments(fetched.Comments, viewer.Login))
+	require.True(t, draftReviewEntriesEqual(normalizeDraftReviewEntries(desiredComments), normalizeLiveReviewComments(fetched.Comments, viewer.Login)))
 
 	externalComments := []DraftReviewComment{{
 		Path: commentPath,
@@ -221,9 +224,10 @@ func TestReplacePendingReviewCommentsLive(t *testing.T) {
 		Side: commentSide,
 		Body: "user changed this comment",
 	}}
-	require.NoError(t, client.DeletePendingReview(ctx, repo, prNumber, review.ID))
-	_, err = client.CreatePendingReviewWithComments(ctx, repo, prNumber, review.Body, externalComments)
-	require.NoError(t, err)
+	require.NoError(t, client.ReplacePendingReviewEntries(ctx, review.ID, review.Comments, externalComments))
+	require.NoError(t, waitForPendingReview(ctx, client, repo, prNumber, viewer.Login, func(review Review) bool {
+		return draftReviewEntriesEqual(normalizeDraftReviewEntries(externalComments), normalizeLiveReviewComments(review.Comments, viewer.Login))
+	}))
 
 	err = app.Run(ctx, []string{
 		"replace-comments",
@@ -248,7 +252,7 @@ func TestReplacePendingReviewCommentsLive(t *testing.T) {
 	review, err = getCurrentPendingReviewWithComments(ctx, client, repo, prNumber, viewer.Login)
 	require.NoError(t, err)
 	require.Equal(t, "test", review.Body)
-	require.Equal(t, normalizeDraftReviewComments(desiredComments), normalizeLiveReviewComments(review.Comments, viewer.Login))
+	require.True(t, draftReviewEntriesEqual(normalizeDraftReviewEntries(desiredComments), normalizeLiveReviewComments(review.Comments, viewer.Login)))
 }
 
 func envOrFallback(primary string, fallback string) string {
@@ -259,53 +263,34 @@ func envOrFallback(primary string, fallback string) string {
 }
 
 func getCurrentPendingReviewWithComments(ctx context.Context, client *GitHubClient, repo string, prNumber int, login string) (Review, error) {
-	reviews, err := client.ListReviews(ctx, repo, prNumber)
-	if err != nil {
-		return Review{}, err
-	}
-
-	review, found := FindPendingReviewForAuthor(reviews, login)
-	if !found {
-		return Review{}, stacktrace.Errorf("no pending review found for %s on %s#%d", login, repo, prNumber)
-	}
-
-	comments, err := client.ListReviewComments(ctx, repo, prNumber, review.ID)
-	if err != nil {
-		return Review{}, err
-	}
-	review.Comments = comments
-	return review, nil
+	return client.GetPendingReview(ctx, repo, prNumber, login)
 }
 
 func ensureNoLivePendingReviewOrDelete(ctx context.Context, t *testing.T, client *GitHubClient, repo string, prNumber int, login string, deleteExisting bool) error {
 	t.Helper()
 
-	reviews, err := client.ListReviews(ctx, repo, prNumber)
+	review, err := client.GetPendingReview(ctx, repo, prNumber, login)
 	if err != nil {
+		if strings.Contains(err.Error(), "no pending review found") {
+			return nil
+		}
 		return err
 	}
-
-	review, found := FindPendingReviewForAuthor(reviews, login)
-	if !found {
-		return nil
-	}
 	if !deleteExisting {
-		return stacktrace.Errorf("refusing to create a new pending review because %s already has pending review %d; set GH_PENDING_REVIEW_TEST_DELETE_EXISTING=1 to delete it first", login, review.ID)
+		return stacktrace.Errorf("refusing to create a new pending review because %s already has pending review %s; set GH_PENDING_REVIEW_TEST_DELETE_EXISTING=1 to delete it first", login, displayReviewID(review))
 	}
-	return client.DeletePendingReview(ctx, repo, prNumber, review.ID)
+	return client.DeletePendingReview(ctx, review.ID)
 }
 
 func deleteCurrentPendingReview(ctx context.Context, client *GitHubClient, repo string, prNumber int, login string) error {
-	reviews, err := client.ListReviews(ctx, repo, prNumber)
+	review, err := client.GetPendingReview(ctx, repo, prNumber, login)
 	if err != nil {
+		if strings.Contains(err.Error(), "no pending review found") {
+			return nil
+		}
 		return err
 	}
-
-	review, found := FindPendingReviewForAuthor(reviews, login)
-	if !found {
-		return nil
-	}
-	return client.DeletePendingReview(ctx, repo, prNumber, review.ID)
+	return client.DeletePendingReview(ctx, review.ID)
 }
 
 func writeDraftReviewCommentsFile(path string, comments []DraftReviewComment) error {
@@ -314,4 +299,28 @@ func writeDraftReviewCommentsFile(path string, comments []DraftReviewComment) er
 		return err
 	}
 	return os.WriteFile(path, content, 0o644)
+}
+
+func waitForPendingReview(ctx context.Context, client *GitHubClient, repo string, prNumber int, login string, predicate func(Review) bool) error {
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		review, err := client.GetPendingReview(ctx, repo, prNumber, login)
+		if err == nil && predicate(review) {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			if err != nil {
+				return err
+			}
+			return stacktrace.Errorf("pending review on %s#%d did not reach expected state before timeout", repo, prNumber)
+		}
+
+		timer := time.NewTimer(300 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
 }
