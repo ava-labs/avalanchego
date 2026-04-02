@@ -1,8 +1,8 @@
 # Pending Review Skill Testing Plan
 
-This document captures the intended direction for end-to-end testing of the
-`pending-review` skill so a later implementation session can proceed without
-reconstructing the design discussion.
+This document captures the current direction for end-to-end testing of the
+`pending-review` skill, including the first implemented vertical slice and the
+remaining scenario backlog.
 
 ## Goal
 
@@ -94,10 +94,12 @@ seams** rather than inventing a second fake transport layer.
 The pending-review tool should be configurable in tests to target a local fake
 server instead of real GitHub.
 
-Preferred shape:
+Implemented shape:
 
-- the CLI/app supports a base URL override that reaches `pendingreview.App`
-- the skill test configures the tool via environment variable or similar
+- the CLI/app supports a base URL override via
+  `GH_PENDING_REVIEW_BASE_URL`
+- the skill test configures the tool through per-test environment injection
+  in `skilltest.Config`
 - the real tool then talks to the fake server for all GitHub operations
 
 The exact mechanism can be decided during implementation, but the desired
@@ -114,19 +116,16 @@ The verification model for these tests should be:
 Do **not** rely on wrapper-based command interception for the stateful workflow
 suite.
 
-### Constraint: Skill Harness Environment
+### Skill Harness Environment
 
-The current `tools/skilltest` helper supports command wrappers on `PATH`, but
-it does **not** currently support per-test environment injection.
+`tools/skilltest` now supports per-test environment injection through
+`skilltest.Config.Env`.
 
-That creates a concrete decision for implementation:
+That was the right choice for this harness because it lets the real agent
+process and the real `./bin/gh-pending-review` launcher inherit:
 
-1. add environment override support to `skilltest.Config`, or
-2. choose a CLI-visible override mechanism that can be driven without custom
-   environment injection
-
-Do not leave this implicit. The first vertical slice should pick one path and
-validate it end to end.
+- `GH_PENDING_REVIEW_BASE_URL` for fake-backend routing
+- `XDG_CONFIG_HOME` / `XDG_STATE_HOME` for isolated on-disk state
 
 ## Fake Server Rule
 
@@ -200,8 +199,8 @@ change, not just command selection.
 
 ### Validation Criteria For Phase 1
 
-Before implementation, treat the first phase as successful only if a test can
-assert all of the following mechanically:
+The first phase is successful only if a test can assert all of the following
+mechanically:
 
 - the agent exits successfully
 - the fake backend's final live review body matches the requested body
@@ -214,12 +213,19 @@ inspection, the harness is still too weak.
 
 ## Current Status
 
-There is already a smoke-style skill test in place that validates basic command
-selection and repo-local tool usage. Treat that as harness plumbing, not as the
-real end-to-end workflow validation target.
+Implemented:
 
-The next meaningful step is to add the first stateful workflow scenario using
-the fake backend.
+- smoke-style `get-state` coverage for basic command selection and repo-local
+  tool usage
+- stateful create-body coverage using:
+  - the real skill
+  - the real `./bin/gh-pending-review` launcher
+  - a fake GraphQL backend
+  - isolated local state on disk
+- Bazel metadata for the skill test package via `tests/BUILD.bazel`
+
+The next meaningful steps are read-body and update-body scenarios using the
+same harness.
 
 ## Scenario Philosophy
 
@@ -247,6 +253,7 @@ This is the target workflow inventory to grow into over time.
    - no existing draft
    - assert created live body matches requested text
    - assert local state is created consistently
+   - status: implemented
 
 2. Read body back
    - existing draft present
@@ -310,12 +317,17 @@ This is the target workflow inventory to grow into over time.
 
 ## Vertical Slice Ordering
 
-Implement in this order:
+Implementation status:
+
+Completed:
 
 1. Choose and implement the CLI-to-app backend override path
-2. Extend `skilltest` if needed so the skill can activate that override in test
+2. Extend `skilltest` so the skill can activate that override in test
 3. Add a minimal fake backend server backed by canonical review state
 4. Implement first real body-create scenario
+
+Remaining:
+
 5. Add read-body scenario
 6. Add update-body scenario
 7. Expand to comments
@@ -325,21 +337,19 @@ This sequence proves the harness before adding complexity.
 
 ## First Vertical Slice
 
-The first realistic transcript should remain intentionally simple.
-
-Suggested scenario:
+Implemented scenario:
 
 - fake backend starts with no pending review
 - user prompt says to create a pending review on PR `123` with body `foo`
 - agent runs the skill
 - real tool creates the draft through the fake backend
 - test asserts:
-- live review exists
-- live body is `foo`
-- stored state was updated consistently
-- fake server observed the expected GraphQL operations in the expected order
+  - live review exists
+  - live body is `foo`
+  - stored state was updated consistently
+  - fake server observed the expected GraphQL operations in the expected order
 
-This is the first slice because it proves:
+This slice now proves:
 
 - skill context is sufficient
 - the real tool can be driven end to end
@@ -389,23 +399,18 @@ The point is observability of state transitions, not realism of prose.
   minimum needed helper code into shared test support or copy the minimum helper
   code into the skill test package deliberately.
 
-## Concrete First Tasks
+## Concrete Next Tasks
 
-The next implementation session should start with a short exploration pass and
-finish only after one stateful skill test is green.
+The next implementation session should keep the current harness and finish only
+after at least one additional stateful skill test is green.
 
-1. Inspect how `./bin/gh-pending-review` constructs `pendingreview.App` and
-   identify the narrowest way to plumb a test-only base URL override through the
-   real CLI.
-2. Decide whether the skill test will pass that override through environment or
-   whether `skilltest` itself needs a small API extension.
-3. Factor or copy the smallest existing GraphQL fake-server helper needed from
-   `tools/pendingreview` package tests.
-4. Write the first failing skill test for create-body with assertions on:
-   - fake backend live state
-   - local state on disk
-   - fake backend request sequence
-5. Make the minimum production changes needed to make that test pass.
+1. Add a read-body scenario against existing fake draft state with no mutation.
+2. Add an update-body scenario that verifies both live body replacement and
+   stored-state advancement.
+3. Reuse and extend the current fake backend only as needed for comment
+   workflows.
+4. Move on to external-edit and conflict scenarios once the body workflows are
+   stable.
 
 ## Test Execution Assumption
 
@@ -423,12 +428,11 @@ working directory that contains the real launcher and its build script.
 
 ## Session Handoff
 
-The next implementation session should start by:
+The next implementation session should start from the existing harness in:
 
-1. Inspecting how `tools/pendingreview` chooses its GitHub base URL and client
-   boundary
-2. Resolving the `skilltest` environment/override gap explicitly
-3. Adding a test-only backend override path for the real CLI
-4. Building the smallest fake backend needed for create/read/update-body
-5. Replacing or supplementing the current smoke-style scenario with the first
-   real stateful create-body scenario
+- `agents/skills/pending-review/tests/skill_test.go`
+- `tools/skilltest/skilltest.go`
+- `tools/pendingreview/app.go`
+
+The next work item is read-body, followed by update-body, then comment and
+conflict workflows.
