@@ -30,13 +30,17 @@ type App struct {
 
 func NewApp(stdin io.Reader, stdout io.Writer, stderr io.Writer) *App {
 	log := newDebugLogger(stderr)
+	baseURL := defaultGitHubAPIBaseURL
+	if override := os.Getenv("GH_PENDING_REVIEW_BASE_URL"); override != "" {
+		baseURL = override
+	}
 	return &App{
 		Stdin:         stdin,
 		Stdout:        stdout,
 		Stderr:        stderr,
 		tokenProvider: NewGHTokenProvider(log),
 		httpClient:    DefaultHTTPClient(),
-		baseURL:       defaultGitHubAPIBaseURL,
+		baseURL:       baseURL,
 		log:           log,
 	}
 }

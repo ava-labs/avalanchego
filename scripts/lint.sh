@@ -114,6 +114,7 @@ function test_interface_compliance_nil {
 
 function test_import_dev_only_packages_in_wrong_place {
   ROOT=$( git rev-parse --show-toplevel )
+  # shellcheck disable=SC2016
   ROOT_ESCAPED=$( printf '%s\n' "${ROOT}" | sed 's/[.[\*^$()+?{|]/\\&/g' )
   # Build exclusions with absolute paths (ROOT prefix)
   local exclude_paths=(! -path "${ROOT}/tests/*")
