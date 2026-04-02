@@ -197,6 +197,9 @@ func TestReplacePendingReviewCommentsLive(t *testing.T) {
 		"--config-dir", configDir,
 		"--state-dir", stateDir,
 	}))
+	require.NoError(t, waitForPendingReview(ctx, client, repo, prNumber, viewer.Login, func(review Review) bool {
+		return draftReviewEntriesEqual(normalizeDraftReviewEntries(desiredComments), normalizeLiveReviewComments(review.Comments, viewer.Login))
+	}))
 
 	review, err := getCurrentPendingReviewWithComments(ctx, client, repo, prNumber, viewer.Login)
 	require.NoError(t, err)
@@ -248,6 +251,151 @@ func TestReplacePendingReviewCommentsLive(t *testing.T) {
 		"--state-dir", stateDir,
 		"--force",
 	}))
+	require.NoError(t, waitForPendingReview(ctx, client, repo, prNumber, viewer.Login, func(review Review) bool {
+		return draftReviewEntriesEqual(normalizeDraftReviewEntries(desiredComments), normalizeLiveReviewComments(review.Comments, viewer.Login))
+	}))
+
+	review, err = getCurrentPendingReviewWithComments(ctx, client, repo, prNumber, viewer.Login)
+	require.NoError(t, err)
+	require.Equal(t, "test", review.Body)
+	require.True(t, draftReviewEntriesEqual(normalizeDraftReviewEntries(desiredComments), normalizeLiveReviewComments(review.Comments, viewer.Login)))
+}
+
+func TestReplacePendingReviewThreadRepliesLive(t *testing.T) {
+	if envOrFallback("GH_PENDING_REVIEW_LIVE_TEST", "GH_DRAFT_REVIEW_LIVE_TEST") != "1" {
+		t.Skip("set GH_PENDING_REVIEW_LIVE_TEST=1 to run live GitHub integration test")
+	}
+
+	prValue := envOrFallback("GH_PENDING_REVIEW_TEST_PR", "GH_DRAFT_REVIEW_TEST_PR")
+	require.NotEmpty(t, prValue, "GH_PENDING_REVIEW_TEST_PR is required")
+	prNumber, err := strconv.Atoi(prValue)
+	require.NoError(t, err)
+	require.Positive(t, prNumber, "invalid GH_PENDING_REVIEW_TEST_PR %q", prValue)
+
+	repo := envOrFallback("GH_PENDING_REVIEW_TEST_REPO", "GH_DRAFT_REVIEW_TEST_REPO")
+	if repo == "" {
+		repo = defaultRepo
+	}
+
+	configDir := envOrFallback("GH_PENDING_REVIEW_CONFIG_DIR", "GH_DRAFT_REVIEW_CONFIG_DIR")
+	if configDir == "" {
+		configDir = defaultConfigDir()
+	}
+
+	replyThreadPath := envOrFallback("GH_PENDING_REVIEW_TEST_REPLY_THREAD_PATH", "")
+	if replyThreadPath == "" {
+		replyThreadPath = ".github/workflows/bazel-ci.yml"
+	}
+
+	stateDir := t.TempDir()
+	ctx := t.Context()
+	tokenProvider := NewGHTokenProvider(logging.NoLog{})
+	token, err := tokenProvider.Token(ctx, configDir)
+	require.NoError(t, err)
+
+	client := NewGitHubClient(logging.NoLog{}, DefaultHTTPClient(), defaultGitHubAPIBaseURL, token)
+	viewer, err := client.Viewer(ctx)
+	require.NoError(t, err)
+
+	deleteExisting := envOrFallback("GH_PENDING_REVIEW_TEST_DELETE_EXISTING", "GH_DRAFT_REVIEW_TEST_DELETE_EXISTING")
+	require.NoError(t, ensureNoLivePendingReviewOrDelete(ctx, t, client, repo, prNumber, viewer.Login, deleteExisting == "1"))
+
+	threadID, err := findExistingReviewThreadID(ctx, client, repo, prNumber, envOrFallback("GH_PENDING_REVIEW_TEST_REPLY_THREAD_ID", ""), replyThreadPath)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		require.NoError(t, deleteCurrentPendingReview(cleanupCtx, client, repo, prNumber, viewer.Login))
+		_, err := client.GetPendingReview(cleanupCtx, repo, prNumber, viewer.Login)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no pending review found")
+	})
+
+	app := NewApp(strings.NewReader(""), io.Discard, io.Discard)
+	app.tokenProvider = tokenProvider
+
+	require.NoError(t, app.Run(ctx, []string{
+		"create",
+		"--repo", repo,
+		"--pr", strconv.Itoa(prNumber),
+		"--body", "test",
+		"--config-dir", configDir,
+		"--state-dir", stateDir,
+	}))
+
+	desiredCommentsPath := filepath.Join(t.TempDir(), "desired-thread-replies.json")
+	desiredComments := []DraftReviewComment{{
+		Kind:     DraftReviewEntryKindThreadReply,
+		ThreadID: threadID,
+		Body:     "agent reply",
+	}}
+	require.NoError(t, writeDraftReviewCommentsFile(desiredCommentsPath, desiredComments))
+
+	require.NoError(t, app.Run(ctx, []string{
+		"replace-comments",
+		"--repo", repo,
+		"--pr", strconv.Itoa(prNumber),
+		"--comments-file", desiredCommentsPath,
+		"--config-dir", configDir,
+		"--state-dir", stateDir,
+	}))
+
+	review, err := getCurrentPendingReviewWithComments(ctx, client, repo, prNumber, viewer.Login)
+	require.NoError(t, err)
+	require.Equal(t, "test", review.Body)
+	require.True(t, draftReviewEntriesEqual(normalizeDraftReviewEntries(desiredComments), normalizeLiveReviewComments(review.Comments, viewer.Login)))
+	require.True(t, hasReviewComment(review.Comments, func(comment ReviewComment) bool {
+		return comment.ThreadID == threadID &&
+			comment.Kind == DraftReviewEntryKindThreadReply &&
+			comment.Body == "agent reply" &&
+			comment.User.Login == viewer.Login
+	}))
+
+	var stdout bytes.Buffer
+	app.Stdout = &stdout
+	require.NoError(t, app.Run(ctx, []string{
+		"get",
+		"--repo", repo,
+		"--pr", strconv.Itoa(prNumber),
+		"--config-dir", configDir,
+		"--state-dir", stateDir,
+	}))
+
+	var fetched Review
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &fetched))
+	require.Equal(t, "test", fetched.Body)
+	require.True(t, draftReviewEntriesEqual(normalizeDraftReviewEntries(desiredComments), normalizeLiveReviewComments(fetched.Comments, viewer.Login)))
+
+	externalComments := []DraftReviewComment{{
+		Kind:     DraftReviewEntryKindThreadReply,
+		ThreadID: threadID,
+		Body:     "user changed this reply",
+	}}
+	require.NoError(t, client.ReplacePendingReviewEntries(ctx, review.ID, review.Comments, externalComments))
+	require.NoError(t, waitForPendingReview(ctx, client, repo, prNumber, viewer.Login, func(review Review) bool {
+		return draftReviewEntriesEqual(normalizeDraftReviewEntries(externalComments), normalizeLiveReviewComments(review.Comments, viewer.Login))
+	}))
+
+	err = app.Run(ctx, []string{
+		"replace-comments",
+		"--repo", repo,
+		"--pr", strconv.Itoa(prNumber),
+		"--comments-file", desiredCommentsPath,
+		"--config-dir", configDir,
+		"--state-dir", stateDir,
+	})
+	require.ErrorIs(t, err, ErrReviewCommentsConflict)
+
+	require.NoError(t, app.Run(ctx, []string{
+		"replace-comments",
+		"--repo", repo,
+		"--pr", strconv.Itoa(prNumber),
+		"--comments-file", desiredCommentsPath,
+		"--config-dir", configDir,
+		"--state-dir", stateDir,
+		"--force",
+	}))
 
 	review, err = getCurrentPendingReviewWithComments(ctx, client, repo, prNumber, viewer.Login)
 	require.NoError(t, err)
@@ -262,8 +410,107 @@ func envOrFallback(primary string, fallback string) string {
 	return os.Getenv(fallback)
 }
 
+func findExistingReviewThreadID(ctx context.Context, client *GitHubClient, repo string, prNumber int, explicitThreadID string, preferredPath string) (string, error) {
+	if explicitThreadID != "" {
+		return explicitThreadID, nil
+	}
+
+	owner, name, err := splitRepo(repo)
+	if err != nil {
+		return "", err
+	}
+
+	var resp struct {
+		Repository struct {
+			PullRequest *struct {
+				ReviewThreads struct {
+					Nodes []struct {
+						ID       string `json:"id"`
+						Comments struct {
+							Nodes []struct {
+								Path    string `json:"path"`
+								ReplyTo *struct {
+									ID string `json:"id"`
+								} `json:"replyTo"`
+							} `json:"nodes"`
+						} `json:"comments"`
+					} `json:"nodes"`
+				} `json:"reviewThreads"`
+			} `json:"pullRequest"`
+		} `json:"repository"`
+	}
+	if err := client.graphql(ctx, `
+query ExistingReviewThreads($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          id
+          comments(first: 100) {
+            nodes {
+              path
+              replyTo { id }
+            }
+          }
+        }
+      }
+    }
+  }
+}`, map[string]any{
+		"owner":  owner,
+		"name":   name,
+		"number": prNumber,
+	}, &resp); err != nil {
+		return "", err
+	}
+
+	if resp.Repository.PullRequest == nil {
+		return "", stacktrace.Errorf("pull request not found for %s#%d", repo, prNumber)
+	}
+
+	var fallbackThreadID string
+	for _, thread := range resp.Repository.PullRequest.ReviewThreads.Nodes {
+		if thread.ID == "" {
+			continue
+		}
+		hasRootComment := false
+		matchesPreferredPath := false
+		for _, comment := range thread.Comments.Nodes {
+			if comment.ReplyTo == nil {
+				hasRootComment = true
+			}
+			if preferredPath != "" && comment.Path == preferredPath {
+				matchesPreferredPath = true
+			}
+		}
+		if !hasRootComment {
+			continue
+		}
+		if matchesPreferredPath {
+			return thread.ID, nil
+		}
+		if fallbackThreadID == "" {
+			fallbackThreadID = thread.ID
+		}
+	}
+
+	if fallbackThreadID != "" {
+		return fallbackThreadID, nil
+	}
+	return "", stacktrace.Errorf("no existing review thread found on %s#%d", repo, prNumber)
+}
+
 func getCurrentPendingReviewWithComments(ctx context.Context, client *GitHubClient, repo string, prNumber int, login string) (Review, error) {
 	return client.GetPendingReview(ctx, repo, prNumber, login)
+}
+
+func hasReviewComment(comments []ReviewComment, predicate func(ReviewComment) bool) bool {
+	for _, comment := range comments {
+		if predicate(comment) {
+			return true
+		}
+	}
+	return false
 }
 
 func ensureNoLivePendingReviewOrDelete(ctx context.Context, t *testing.T, client *GitHubClient, repo string, prNumber int, login string, deleteExisting bool) error {
