@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "autorenewedvalidators",
+    srcs = [
+        "helpers.go",
+        "reward_eligibility.go",
+        "staking_rewards.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tests/e2e/p/autorenewedvalidators",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/admin",
+        "//api/info",
+        "//ids",
+        "//tests/e2e/p",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//utils/units",
+        "//vms/components/avax",
+        "//vms/platformvm",
+        "//vms/platformvm/reward",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+        "//wallet/subnet/primary/common",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+    ],
+)
