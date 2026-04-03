@@ -2,9 +2,9 @@
 
 # Post-build validation of DEB packages.
 #
-# Validates locally-built DEBs by running fresh Ubuntu containers
-# (both 22.04/jammy and 24.04/noble) to verify signature, install,
-# and smoke test.
+# Validates locally-built DEBs by running fresh Ubuntu containers:
+# - ubuntu:22.04 (jammy): signature verification, install, and smoke test
+# - ubuntu:24.04 (noble): install and smoke test only (dpkg-sig unavailable)
 #
 # Required env vars:
 #   TAG            - Git tag (e.g., "v1.14.1")
@@ -47,26 +47,39 @@ for f in \
     fi
 done
 
-# Validate in both jammy (22.04) and noble (24.04) containers to ensure
-# the jammy-built binary works on both Ubuntu releases.
+# ── Signature verification (jammy only) ──────────────────────────
+# dpkg-sig was removed from Ubuntu 24.04 (noble) repositories.
+# Verify signatures in jammy where dpkg-sig is available; the signature
+# is embedded in the .deb and does not change between Ubuntu releases.
+
+echo "=== Verifying DEB signatures in fresh ubuntu:22.04 container ==="
+docker run --rm \
+    -v "${DEB_DIR}:/debs:ro" \
+    ubuntu:22.04 \
+    bash -euxc '
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y dpkg-sig gnupg
+
+        if [[ -f /debs/DEB-GPG-KEY-avalanchego ]]; then
+            gpg --batch --import /debs/DEB-GPG-KEY-avalanchego
+            dpkg-sig --verify "/debs/avalanchego-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
+            dpkg-sig --verify "/debs/subnet-evm-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
+        else
+            echo "Skipping GPG verification (unsigned build)"
+        fi
+    '
+
+# ── Install and smoke test (both jammy and noble) ────────────────
+# Validates that the jammy-built binary installs and runs on both releases.
+
 for UBUNTU_IMAGE in ubuntu:22.04 ubuntu:24.04; do
-    echo "=== Validating DEBs in fresh ${UBUNTU_IMAGE} container ==="
+    echo "=== Install and smoke test in fresh ${UBUNTU_IMAGE} container ==="
     docker run --rm \
         -v "${DEB_DIR}:/debs:ro" \
         "${UBUNTU_IMAGE}" \
         bash -euxc '
             export DEBIAN_FRONTEND=noninteractive
-            apt-get update
-            apt-get install -y dpkg-sig gnupg
-
-            # Import GPG key and verify signatures if available
-            if [[ -f /debs/DEB-GPG-KEY-avalanchego ]]; then
-                gpg --batch --import /debs/DEB-GPG-KEY-avalanchego
-                dpkg-sig --verify "/debs/avalanchego-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
-                dpkg-sig --verify "/debs/subnet-evm-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
-            else
-                echo "Skipping GPG verification (unsigned build)"
-            fi
 
             # Install both packages
             dpkg -i "/debs/avalanchego-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
