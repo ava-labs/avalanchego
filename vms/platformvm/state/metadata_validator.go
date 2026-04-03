@@ -33,6 +33,14 @@ type validatorMetadata struct {
 	PotentialDelegateeReward uint64        `v0:"true"`
 	StakerStartTime          uint64        `          v1:"true"`
 
+	// ACP-236 fields for auto-renewed validators.
+	// Weight is computed as: tx.Weight + AccruedRewards + AccruedDelegateeRewards
+	AccruedRewards           uint64 `v2:"true"` // the sum of validation rewards restaked from previous cycles.
+	AccruedDelegateeRewards  uint64 `v2:"true"` // the sum of delegatee rewards restaked from previous cycles.
+	AutoCompoundRewardShares uint32 `v2:"true"` // the percentage of rewards to restake at cycle end
+	Period                   uint64 `v2:"true"` // the validation cycle duration in seconds.
+	StakerEndTime            uint64 `v2:"true"` // the Unix timestamp (seconds) when the current cycle ends.
+
 	txID        ids.ID
 	lastUpdated time.Time
 }
@@ -78,11 +86,21 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 // StakingInfo holds mutable validator data that can be modified.
 type StakingInfo struct {
 	DelegateeReward uint64
+
+	// ACP-236
+	AccruedRewards           uint64
+	AccruedDelegateeRewards  uint64
+	AutoCompoundRewardShares uint32
+	Period                   time.Duration
 }
 
 func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
 	return StakingInfo{
-		DelegateeReward: vdrMetadata.PotentialDelegateeReward,
+		DelegateeReward:          vdrMetadata.PotentialDelegateeReward,
+		AccruedRewards:           vdrMetadata.AccruedRewards,
+		AccruedDelegateeRewards:  vdrMetadata.AccruedDelegateeRewards,
+		AutoCompoundRewardShares: vdrMetadata.AutoCompoundRewardShares,
+		Period:                   time.Duration(vdrMetadata.Period) * time.Second,
 	}
 }
 
@@ -189,6 +207,10 @@ func (vs *validatorState) SetStakingInfo(
 		return database.ErrNotFound
 	}
 	metadata.PotentialDelegateeReward = stakingInfo.DelegateeReward
+	metadata.AccruedRewards = stakingInfo.AccruedRewards
+	metadata.AccruedDelegateeRewards = stakingInfo.AccruedDelegateeRewards
+	metadata.AutoCompoundRewardShares = stakingInfo.AutoCompoundRewardShares
+	metadata.Period = uint64(stakingInfo.Period / time.Second)
 
 	vs.addUpdatedTxID(vdrID, subnetID, metadata.txID)
 	return nil
