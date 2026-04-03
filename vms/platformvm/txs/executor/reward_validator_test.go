@@ -34,6 +34,15 @@ func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
 	return tx, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID))
 }
 
+func newRewardAutoRenewedValidatorTx(t testing.TB, txID ids.ID, timestamp uint64) *txs.Tx {
+	t.Helper()
+
+	utx := &txs.RewardAutoRenewedValidatorTx{TxID: txID, Timestamp: timestamp}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	require.NoError(t, err)
+	return tx
+}
+
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, upgradetest.ApricotPhase5)

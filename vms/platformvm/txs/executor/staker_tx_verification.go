@@ -42,6 +42,10 @@ var (
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
+	errMissingStakerTx                 = errors.New("missing staker tx")
+	errInvalidStakerTxType             = errors.New("invalid staker tx type")
+	errInvalidStakerTx                 = errors.New("invalid staker tx")
+	errMissingValidator                = errors.New("missing validator")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -866,6 +870,202 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	return nil
+}
+
+// verifyAddAutoRenewedValidatorTx carries out the validation for an AddAutoRenewedValidatorTx.
+func verifyAddAutoRenewedValidatorTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.AddAutoRenewedValidatorTx,
+) error {
+	if !backend.Config.UpgradeConfig.IsHeliconActivated(chainState.GetTimestamp()) {
+		return errHeliconUpgradeNotActive
+	}
+
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return nil
+	}
+
+	switch {
+	case tx.Weight() < backend.Config.MinValidatorStake:
+		// Ensure validator is staking at least the minimum amount
+		return ErrWeightTooSmall
+
+	case tx.Weight() > backend.Config.MaxValidatorStake:
+		// Ensure validator isn't staking too much
+		return ErrWeightTooLarge
+
+	case tx.Shares() < backend.Config.MinDelegationFee:
+		// Ensure the validator fee is at least the minimum amount
+		return ErrInsufficientDelegationFee
+
+	case tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
+		// Ensure staking length is not too short
+		return ErrStakeTooShort
+
+	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
+		// Ensure staking length is not too long
+		return ErrStakeTooLong
+	}
+
+	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.NodeID())
+	switch {
+	case err == nil:
+		return fmt.Errorf(
+			"%w: %s",
+			ErrDuplicateValidator,
+			tx.NodeID(),
+		)
+	case errors.Is(err, database.ErrNotFound):
+		// OK: validator not found
+
+	default:
+		return fmt.Errorf(
+			"failed to get primary network validator %s: %w",
+			tx.NodeID(),
+			err,
+		)
+	}
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("getting utxos: %w", err)
+	}
+
+	// Verify the flowcheck
+	fee, err := feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return fmt.Errorf("calculating fee: %w", err)
+	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return fmt.Errorf("adding fee: %w", err)
+	}
+
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		ins,
+		outs,
+		sTx.Creds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: producedAVAX,
+		},
+	); err != nil {
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	}
+
+	return nil
+}
+
+// verifySetAutoRenewedValidatorConfigTx carries out the validation for an SetAutoRenewedValidatorConfigTx.
+func verifySetAutoRenewedValidatorConfigTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.SetAutoRenewedValidatorConfigTx,
+) (*state.Staker, error) {
+	if !backend.Config.UpgradeConfig.IsHeliconActivated(chainState.GetTimestamp()) {
+		return nil, errHeliconUpgradeNotActive
+	}
+
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return nil, err
+	}
+
+	stakerTx, _, err := chainState.GetTx(tx.TxID)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, errMissingStakerTx
+		}
+
+		return nil, fmt.Errorf("error getting staker tx: %w", err)
+	}
+
+	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+	if !ok {
+		return nil, fmt.Errorf("%w: %T", errInvalidStakerTxType, stakerTx.Unsigned)
+	}
+
+	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, errMissingValidator
+		}
+
+		return nil, fmt.Errorf("failed to get validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
+	}
+
+	if tx.TxID != validator.TxID {
+		// This can happen if a validator restaked with the same node id.
+		// In this case, TxID should be the latest transaction of the auto-renewed validator.
+		return nil, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return validator, nil
+	}
+
+	switch {
+	case tx.Period > 0 && tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
+		return nil, ErrStakeTooShort
+	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
+		return nil, ErrStakeTooLong
+	}
+
+	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.Owner, tx.Auth)
+	if err != nil {
+		return nil, err
+	}
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return nil, fmt.Errorf("getting utxos %w", err)
+	}
+
+	fee, err := feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return nil, fmt.Errorf("calculating fee: %w", err)
+	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return nil, fmt.Errorf("adding fee: %w", err)
+	}
+
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		ins,
+		outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: producedAVAX,
+		},
+	); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	}
+
+	return validator, nil
 }
 
 // Ensure the proposed validator starts after the current time
