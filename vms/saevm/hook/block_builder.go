@@ -165,7 +165,7 @@ var errEmptyBlock = errors.New("empty block")
 
 func (*blockBuilder) BuildBlock(
 	header *types.Header,
-	blockContext *block.Context,
+	_ *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	poolTxs []*txpool.Tx,
