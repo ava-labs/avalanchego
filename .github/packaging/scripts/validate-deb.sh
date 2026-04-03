@@ -2,8 +2,9 @@
 
 # Post-build validation of DEB packages.
 #
-# Validates locally-built DEBs by running a fresh ubuntu:22.04
-# container to verify signature, install, and smoke test.
+# Validates locally-built DEBs by running fresh Ubuntu containers
+# (both 22.04/jammy and 24.04/noble) to verify signature, install,
+# and smoke test.
 #
 # Required env vars:
 #   TAG            - Git tag (e.g., "v1.14.1")
@@ -46,59 +47,63 @@ for f in \
     fi
 done
 
-echo "=== Validating DEBs in fresh Ubuntu 22.04 container ==="
-docker run --rm \
-    -v "${DEB_DIR}:/debs:ro" \
-    ubuntu:22.04 \
-    bash -euxc '
-        export DEBIAN_FRONTEND=noninteractive
-        apt-get update
-        apt-get install -y dpkg-sig gnupg
+# Validate in both jammy (22.04) and noble (24.04) containers to ensure
+# the jammy-built binary works on both Ubuntu releases.
+for UBUNTU_IMAGE in ubuntu:22.04 ubuntu:24.04; do
+    echo "=== Validating DEBs in fresh ${UBUNTU_IMAGE} container ==="
+    docker run --rm \
+        -v "${DEB_DIR}:/debs:ro" \
+        "${UBUNTU_IMAGE}" \
+        bash -euxc '
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y dpkg-sig gnupg
 
-        # Import GPG key and verify signatures if available
-        if [[ -f /debs/DEB-GPG-KEY-avalanchego ]]; then
-            gpg --batch --import /debs/DEB-GPG-KEY-avalanchego
-            dpkg-sig --verify "/debs/avalanchego-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
-            dpkg-sig --verify "/debs/subnet-evm-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
-        else
-            echo "Skipping GPG verification (unsigned build)"
-        fi
+            # Import GPG key and verify signatures if available
+            if [[ -f /debs/DEB-GPG-KEY-avalanchego ]]; then
+                gpg --batch --import /debs/DEB-GPG-KEY-avalanchego
+                dpkg-sig --verify "/debs/avalanchego-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
+                dpkg-sig --verify "/debs/subnet-evm-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
+            else
+                echo "Skipping GPG verification (unsigned build)"
+            fi
 
-        # Install both packages
-        dpkg -i "/debs/avalanchego-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
-        dpkg -i "/debs/subnet-evm-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
+            # Install both packages
+            dpkg -i "/debs/avalanchego-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
+            dpkg -i "/debs/subnet-evm-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
 
-        # Smoke test avalanchego
-        full_commit="'"${GIT_COMMIT}"'"
-        output=$(/usr/local/bin/avalanchego --version)
-        echo "avalanchego --version: ${output}"
-        if [[ "${output}" != avalanchego/* ]]; then
-            echo "ERROR: --version output does not start with avalanchego/" >&2
-            exit 1
-        fi
-        if [[ "${output}" != *"${full_commit}"* ]]; then
-            echo "ERROR: avalanchego --version output does not contain expected commit ${full_commit}" >&2
-            echo "Output: ${output}" >&2
-            exit 1
-        fi
+            # Smoke test avalanchego
+            full_commit="'"${GIT_COMMIT}"'"
+            output=$(/usr/local/bin/avalanchego --version)
+            echo "avalanchego --version: ${output}"
+            if [[ "${output}" != avalanchego/* ]]; then
+                echo "ERROR: --version output does not start with avalanchego/" >&2
+                exit 1
+            fi
+            if [[ "${output}" != *"${full_commit}"* ]]; then
+                echo "ERROR: avalanchego --version output does not contain expected commit ${full_commit}" >&2
+                echo "Output: ${output}" >&2
+                exit 1
+            fi
 
-        # Verify subnet-evm plugin
-        plugin="/usr/local/lib/avalanchego/plugins/'"${SUBNET_EVM_VM_ID}"'"
-        if [[ ! -x "${plugin}" ]]; then
-            echo "ERROR: subnet-evm plugin not found or not executable" >&2
-            exit 1
-        fi
+            # Verify subnet-evm plugin
+            plugin="/usr/local/lib/avalanchego/plugins/'"${SUBNET_EVM_VM_ID}"'"
+            if [[ ! -x "${plugin}" ]]; then
+                echo "ERROR: subnet-evm plugin not found or not executable" >&2
+                exit 1
+            fi
 
-        # Smoke test subnet-evm version and commit
-        evm_output=$("${plugin}" --version)
-        echo "subnet-evm --version: ${evm_output}"
-        if [[ "${evm_output}" != *"${full_commit}"* ]]; then
-            echo "ERROR: subnet-evm --version output does not contain expected commit ${full_commit}" >&2
-            echo "Output: ${evm_output}" >&2
-            exit 1
-        fi
+            # Smoke test subnet-evm version and commit
+            evm_output=$("${plugin}" --version)
+            echo "subnet-evm --version: ${evm_output}"
+            if [[ "${evm_output}" != *"${full_commit}"* ]]; then
+                echo "ERROR: subnet-evm --version output does not contain expected commit ${full_commit}" >&2
+                echo "Output: ${evm_output}" >&2
+                exit 1
+            fi
 
-        echo "All DEB validations passed"
-    '
+            echo "All DEB validations passed for '"${UBUNTU_IMAGE}"'"
+        '
+done
 
-echo "=== DEB validation complete ==="
+echo "=== DEB validation complete (jammy + noble) ==="
