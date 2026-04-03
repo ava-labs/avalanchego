@@ -170,6 +170,7 @@ func (vm *SinceGenesis) Initialize(
 	vm.ctx = snowCtx
 	vm.db = avaDB
 	vm.mempool = txpool.New(txs, snowCtx, inner.GethRPCBackends())
+	vm.onClose = append(vm.onClose, vm.mempool.Close)
 
 	metrics := prometheus.NewRegistry()
 	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {

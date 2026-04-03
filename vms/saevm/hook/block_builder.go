@@ -169,7 +169,7 @@ func (*blockBuilder) BuildBlock(
 	for i, poolTx := range poolTxs {
 		atomicTxs[i] = poolTx.Tx
 	}
-	extData, err := tx.MarshalSlice(atomicTxs)
+	atomicTxBytes, err := tx.MarshalSlice(atomicTxs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal atomic transactions: %w", err)
 	}
@@ -182,7 +182,7 @@ func (*blockBuilder) BuildBlock(
 		nil, // uncles
 		receipts,
 		trie.NewStackTrie(nil),
-		extData,
+		atomicTxBytes,
 		true, // update [customtypes.HeaderExtra.ExtDataHash]
 	), nil
 }

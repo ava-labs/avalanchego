@@ -90,14 +90,6 @@ func (t *Txs) Get(txID ids.ID) (*tx.Tx, bool) {
 	return tx.Tx, ok
 }
 
-// RemoveConflicts removes all transactions consuming any of the given UTXOs.
-func (t *Txs) RemoveConflicts(utxos set.Set[ids.ID]) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	t.removeConflicts(utxos)
-}
-
 func (t *Txs) removeConflicts(utxos set.Set[ids.ID]) {
 	for _, removed := range t.utxos.DeleteOverlapping(utxos) {
 		t.txs.Remove(removed.Key)
