@@ -12,6 +12,8 @@ version: '3'
 includes:
   packaging:
     taskfile: .github/packaging/Taskfile.yml
+  tests:
+    taskfile: tests/Taskfile.yml
 
 vars:
   # Task entrypoints run through the repo's nix wrapper so they use the pinned
