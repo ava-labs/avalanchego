@@ -147,6 +147,14 @@ func (*proposalTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error
 	return ErrWrongTxType
 }
 
+func (*proposalTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
+	return ErrWrongTxType
+}
+
 func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into
@@ -421,6 +429,11 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 	e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
+	return nil
+}
+
+func (*proposalTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	// todo: implement
 	return nil
 }
 
