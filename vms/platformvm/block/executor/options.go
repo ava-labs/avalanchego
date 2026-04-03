@@ -141,17 +141,17 @@ func (*options) ApricotAtomicBlock(*block.ApricotAtomicBlock) error {
 }
 
 func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
-	unsignedTx, ok := tx.Unsigned.(*txs.RewardValidatorTx)
+	unsignedTx, ok := tx.Unsigned.(txs.RewardTx)
 	if !ok {
 		return false, fmt.Errorf("%w: %T", errUnexpectedProposalTxType, tx.Unsigned)
 	}
 
-	stakerTx, _, err := o.state.GetTx(unsignedTx.TxID)
+	stakerTx, _, err := o.state.GetTx(unsignedTx.StakerTxID())
 	if err != nil {
 		return false, fmt.Errorf("%w: %w", errFailedFetchingStakerTx, err)
 	}
 
-	staker, ok := stakerTx.Unsigned.(txs.Staker)
+	staker, ok := stakerTx.Unsigned.(txs.BaseStaker)
 	if !ok {
 		return false, fmt.Errorf("%w: %T", errUnexpectedStakerTxType, stakerTx.Unsigned)
 	}
