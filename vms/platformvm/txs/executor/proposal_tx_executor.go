@@ -771,6 +771,9 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 	validator *state.Staker,
 	stakingInfo state.StakingInfo,
 ) error {
+	// Ignore the withdrawn portions from reward.Split because the restaked
+	// amounts may be capped below. Withdrawn rewards are computed later from the
+	// difference between total rewards and the amounts actually restaked.
 	restakingValidationRewards, _ := reward.Split(validator.PotentialReward, stakingInfo.AutoCompoundRewardShares)
 	restakingDelegateeRewards, _ := reward.Split(stakingInfo.DelegateeReward, stakingInfo.AutoCompoundRewardShares)
 
