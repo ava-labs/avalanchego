@@ -133,7 +133,9 @@ func (m *Mempool) advanceHeight(height uint64, inputs set.Set[ids.ID]) {
 }
 
 func (m *Mempool) Add(rawTx *tx.Tx) error {
-	if err := rawTx.SanityCheck(context.TODO(), m.ctx); err != nil {
+	ctx := context.TODO()
+
+	if err := rawTx.SanityCheck(ctx, m.ctx); err != nil {
 		return fmt.Errorf("tx failed sanity check: %w", err)
 	}
 
@@ -162,7 +164,7 @@ func (m *Mempool) Add(rawTx *tx.Tx) error {
 		// TODO: Using the rpc backend is gross. We should make something easier
 		// to use for this.
 		// TODO: Is it okay for us to be opening so many state dbs?
-		state, _, err := m.backends.StateAndHeaderByNumber(context.TODO(), ethrpc.BlockNumber(m.height))
+		state, _, err := m.backends.StateAndHeaderByNumber(ctx, ethrpc.BlockNumber(m.height))
 		if err != nil {
 			return fmt.Errorf("problem getting latest state: %w", err)
 		}

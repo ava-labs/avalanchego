@@ -106,6 +106,8 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 }
 
 func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {
+	ctx := context.TODO()
+
 	seq := b.potentialTxs()
 	return func(yield func(*txpool.Tx) bool) {
 		// Transactions are verified against the last executed state. We must
@@ -126,7 +128,7 @@ func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash 
 				)
 				continue
 			}
-			if err := tx.Tx.SanityCheck(context.TODO(), b.ctx); err != nil {
+			if err := tx.Tx.SanityCheck(ctx, b.ctx); err != nil {
 				b.ctx.Log.Debug("tx failed sanity check",
 					zap.Stringer("txID", tx.ID),
 					zap.Error(err),
@@ -140,7 +142,8 @@ func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash 
 				)
 				continue
 			}
-			// We don't verify state here. It is verified by the SAE builder.
+			// We don't need to verify state here. It will be verified by the
+			// SAE builder.
 
 			if !yield(tx) {
 				return

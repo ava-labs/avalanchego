@@ -121,7 +121,6 @@ func (e *Export) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 	if !utils.IsSortedAndUnique(e.Ins) {
 		return errInputsNotSortedUnique
 	}
-	// TODO: Should this be unique?
 	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
 		return errOutputsNotSorted
 	}
