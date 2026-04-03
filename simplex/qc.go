@@ -203,12 +203,13 @@ func (a *SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex
 // For now, this is calculated using one node = one vote, but in the future we can adjust
 // this calculation to cross reference validator weights if we want to support PoS.
 func (a *SignatureAggregator) IsQuorum(nodes []simplex.NodeID) bool {
-	uniqueNodes := set.NewSet[*simplex.NodeID](len(nodes))
+	uniqueNodes := set.NewSet[ids.NodeID](len(nodes))
 	for _, node := range nodes {
-		if _, exists := a.verifier.nodeID2PK[ids.NodeID(node)]; !exists {
+		nodeID := ids.NodeID(node)
+		if _, exists := a.verifier.nodeID2PK[nodeID]; !exists {
 			return false
 		}
-		uniqueNodes.Add(&node)
+		uniqueNodes.Add(nodeID)
 	}
 
 	quorumSize := simplex.Quorum(len(a.verifier.nodeID2PK))
