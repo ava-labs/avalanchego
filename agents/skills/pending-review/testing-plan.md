@@ -225,9 +225,11 @@ Implemented:
   - create-body
   - read-body
   - update-body
+- stateful comment-workflow coverage using the same harness for:
+  - replace-comments
 - Bazel metadata for the skill test package via `tests/BUILD.bazel`
 
-The next meaningful steps are comment workflows, then external-edit and
+The next meaningful steps are existing-thread replies, then external-edit and
 conflict scenarios using the same harness.
 
 ## Scenario Philosophy
@@ -277,6 +279,7 @@ This is the target workflow inventory to grow into over time.
 4. Replace managed inline comments
    - existing draft present
    - assert comment set changes and top-level body does not
+   - status: implemented
 
 5. Existing-thread reply support
    - validate reply flow once comment replacement harness is in place
@@ -330,11 +333,12 @@ Completed:
 2. Extend `skilltest` so the skill can activate that override in test
 3. Add a minimal fake backend server backed by canonical review state
 4. Implement create-body, read-body, and update-body scenarios
+5. Implement replace-comments against the same fake backend
 
 Remaining:
 
-5. Expand to comments
-6. Expand to external edits and conflicts
+6. Add existing-thread reply coverage
+7. Expand to external edits and conflicts
 
 This sequence proves the harness before adding complexity.
 
@@ -369,6 +373,8 @@ These slices now prove:
 - skill context is sufficient
 - the real tool can be driven end to end
 - read-only and mutating body flows can be asserted mechanically
+- replace-comments can preserve the top-level body while replacing the managed
+  inline comment set
 - the backend override wiring is actually live
 
 ## Multi-Turn Transcript Tests
@@ -446,5 +452,5 @@ The next implementation session should start from the existing harness in:
 - `tools/skilltest/skilltest.go`
 - `tools/pendingreview/app.go`
 
-The next work item is comment workflows, followed by external-edit and conflict
-workflows.
+The next work item is existing-thread reply coverage, followed by external-edit
+and conflict workflows.

@@ -78,7 +78,7 @@ func TestPendingReviewCreateBodyEndToEnd(t *testing.T) {
 			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
 			require.NoError(t, os.MkdirAll(configDir, 0o755))
 
-			backend := newFakePendingReviewBackend("octocat")
+			backend := newFakePendingReviewBackend()
 			server := httptest.NewServer(backend)
 			defer server.Close()
 
@@ -133,7 +133,7 @@ func TestPendingReviewReadBodyEndToEnd(t *testing.T) {
 			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
 			require.NoError(t, os.MkdirAll(configDir, 0o755))
 
-			backend := newFakePendingReviewBackend("octocat")
+			backend := newFakePendingReviewBackend()
 			backend.seedReview(fakeReview{
 				ID:         "review-123",
 				DatabaseID: 123,
@@ -212,7 +212,7 @@ func TestPendingReviewUpdateBodyEndToEnd(t *testing.T) {
 				HTMLURL: "https://example.invalid/review/123",
 			}))
 
-			backend := newFakePendingReviewBackend("octocat")
+			backend := newFakePendingReviewBackend()
 			backend.seedReview(fakeReview{
 				ID:         "review-123",
 				DatabaseID: 123,
@@ -258,6 +258,110 @@ func TestPendingReviewUpdateBodyEndToEnd(t *testing.T) {
 			require.Equal(t, "https://example.invalid/review/123", stored.HTMLURL)
 			require.Len(t, stored.LastPublishedEntries, 1)
 			require.Equal(t, "existing comment", stored.LastPublishedEntries[0].Body)
+		})
+	}
+}
+
+func TestPendingReviewReplaceCommentsEndToEnd(t *testing.T) {
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			xdgStateHome := filepath.Join(t.TempDir(), "state-home")
+			configDir := filepath.Join(xdgConfigHome, "gh-pending-review")
+			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
+			require.NoError(t, store.Save(pendingreview.ReviewState{
+				Repo:              "ava-labs/avalanchego",
+				PRNumber:          123,
+				UserLogin:         "octocat",
+				ReviewID:          "review-123",
+				LastPublishedBody: "draft body",
+				LastPublishedEntries: []pendingreview.DraftReviewEntry{{
+					Kind: pendingreview.DraftReviewEntryKindNewThread,
+					Path: "old/file.go",
+					Line: 5,
+					Side: "RIGHT",
+					Body: "old comment",
+				}},
+				HTMLURL: "https://example.invalid/review/123",
+			}))
+
+			backend := newFakePendingReviewBackend()
+			backend.seedReview(fakeReview{
+				ID:         "review-123",
+				DatabaseID: 123,
+				Body:       "draft body",
+				State:      "PENDING",
+				URL:        "https://example.invalid/review/123",
+				Author: fakeUser{
+					Login: "octocat",
+				},
+				Comments: []fakeReviewComment{{
+					ID:       "comment-1",
+					ThreadID: "thread-1",
+					Body:     "old comment",
+					Path:     "old/file.go",
+					Line:     5,
+					Side:     "RIGHT",
+				}},
+			})
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Replace the current managed pending review comments on PR 123 " +
+					"with a single comment on snow/engine.go line 7 on the RIGHT side " +
+					`saying "new comment". Keep the existing top-level review body unchanged. ` +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
+					"Do not submit the review.",
+				Timeout: 3 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             xdgStateHome,
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+
+			review := backend.review()
+			require.Equal(t, "draft body", review.Body)
+			require.Len(t, review.Comments, 1)
+			require.Equal(t, "new comment", review.Comments[0].Body)
+			require.Equal(t, "snow/engine.go", review.Comments[0].Path)
+			require.Equal(t, 7, review.Comments[0].Line)
+			require.Equal(t, "RIGHT", review.Comments[0].Side)
+			require.Equal(t, []string{
+				"Viewer",
+				"PullRequestContext",
+				"DeletePendingReviewComment",
+				"AddPendingReviewThread",
+				"PullRequestContext",
+			}, backend.operations())
+
+			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
+			require.NoError(t, err)
+			require.Equal(t, "review-123", stored.ReviewID)
+			require.Equal(t, "draft body", stored.LastPublishedBody)
+			require.Equal(t, "https://example.invalid/review/123", stored.HTMLURL)
+			require.Len(t, stored.LastPublishedEntries, 1)
+			require.Equal(t, "new comment", stored.LastPublishedEntries[0].Body)
+			require.Equal(t, "snow/engine.go", stored.LastPublishedEntries[0].Path)
+			require.Equal(t, 7, stored.LastPublishedEntries[0].Line)
 		})
 	}
 }
@@ -323,6 +427,7 @@ type fakePendingReviewBackend struct {
 	viewer       string
 	liveReview   *fakeReview
 	requestedOps []string
+	nextID       int
 }
 
 type fakeReview struct {
@@ -332,14 +437,30 @@ type fakeReview struct {
 	State      string
 	URL        string
 	Author     fakeUser
+	Comments   []fakeReviewComment
 }
 
 type fakeUser struct {
 	Login string
 }
 
-func newFakePendingReviewBackend(viewer string) *fakePendingReviewBackend {
-	return &fakePendingReviewBackend{viewer: viewer}
+type fakeReviewComment struct {
+	ID               string
+	ThreadID         string
+	ReplyToCommentID string
+	Body             string
+	Path             string
+	Line             int
+	Side             string
+	StartLine        int
+	StartSide        string
+}
+
+func newFakePendingReviewBackend() *fakePendingReviewBackend {
+	return &fakePendingReviewBackend{
+		viewer: "octocat",
+		nextID: 1,
+	}
 }
 
 func (b *fakePendingReviewBackend) seedReview(review fakeReview) {
@@ -347,7 +468,12 @@ func (b *fakePendingReviewBackend) seedReview(review fakeReview) {
 	defer b.mu.Unlock()
 
 	reviewCopy := review
+	reviewCopy.Comments = slices.Clone(review.Comments)
 	b.liveReview = &reviewCopy
+	for _, comment := range review.Comments {
+		b.advanceNextID(comment.ID)
+		b.advanceNextID(comment.ThreadID)
+	}
 }
 
 func (b *fakePendingReviewBackend) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -425,6 +551,7 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 				Login: b.viewer,
 			},
 		}
+		b.advanceNextID(b.liveReview.ID)
 		return map[string]any{
 			"addPullRequestReview": map[string]any{
 				"pullRequestReview": map[string]any{
@@ -464,6 +591,43 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 				},
 			},
 		}, nil
+	case strings.Contains(query, "mutation DeletePendingReviewComment"):
+		b.requestedOps = append(b.requestedOps, "DeletePendingReviewComment")
+		if b.liveReview == nil {
+			return nil, errors.New("unexpected comment delete with no live review")
+		}
+		commentID, _ := variables["commentID"].(string)
+		if !b.deleteComment(commentID) {
+			return nil, fmt.Errorf("unexpected comment id %q", commentID)
+		}
+		return map[string]any{
+			"deletePullRequestReviewComment": map[string]any{
+				"clientMutationId": "deleted",
+			},
+		}, nil
+	case strings.Contains(query, "mutation AddPendingReviewThread"):
+		b.requestedOps = append(b.requestedOps, "AddPendingReviewThread")
+		if b.liveReview == nil {
+			return nil, errors.New("unexpected thread create with no live review")
+		}
+		input, _ := variables["input"].(map[string]any)
+		reviewID, _ := input["pullRequestReviewId"].(string)
+		if reviewID != b.liveReview.ID {
+			return nil, fmt.Errorf("unexpected review id %q", reviewID)
+		}
+		comment := b.addThreadComment(input)
+		return map[string]any{
+			"addPullRequestReviewThread": map[string]any{
+				"thread": map[string]any{
+					"id": comment.ThreadID,
+					"comments": map[string]any{
+						"nodes": []map[string]any{
+							b.graphQLComment(comment),
+						},
+					},
+				},
+			},
+		}, nil
 	default:
 		return nil, fmt.Errorf("unexpected query: %s", query)
 	}
@@ -484,7 +648,7 @@ func (b *fakePendingReviewBackend) reviewNodes() []map[string]any {
 				"login": b.liveReview.Author.Login,
 			},
 			"comments": map[string]any{
-				"nodes": []map[string]any{},
+				"nodes": b.graphQLComments(),
 			},
 		},
 	}
@@ -497,7 +661,9 @@ func (b *fakePendingReviewBackend) review() fakeReview {
 	if b.liveReview == nil {
 		panic("fake pending review was never created")
 	}
-	return *b.liveReview
+	reviewCopy := *b.liveReview
+	reviewCopy.Comments = slices.Clone(b.liveReview.Comments)
+	return reviewCopy
 }
 
 func (b *fakePendingReviewBackend) operations() []string {
@@ -505,4 +671,97 @@ func (b *fakePendingReviewBackend) operations() []string {
 	defer b.mu.Unlock()
 
 	return slices.Clone(b.requestedOps)
+}
+
+func (b *fakePendingReviewBackend) graphQLComments() []map[string]any {
+	comments := make([]map[string]any, 0, len(b.liveReview.Comments))
+	for _, comment := range b.liveReview.Comments {
+		comments = append(comments, b.graphQLComment(comment))
+	}
+	return comments
+}
+
+func (b *fakePendingReviewBackend) graphQLComment(comment fakeReviewComment) map[string]any {
+	replyTo := any(nil)
+	if comment.ReplyToCommentID != "" {
+		replyTo = map[string]any{"id": comment.ReplyToCommentID}
+	}
+
+	return map[string]any{
+		"id":            comment.ID,
+		"threadID":      comment.ThreadID,
+		"body":          comment.Body,
+		"path":          comment.Path,
+		"line":          comment.Line,
+		"diffSide":      comment.Side,
+		"startLine":     comment.StartLine,
+		"startDiffSide": comment.StartSide,
+		"author": map[string]any{
+			"login": b.liveReview.Author.Login,
+		},
+		"replyTo": replyTo,
+		"pullRequestReview": map[string]any{
+			"id": b.liveReview.ID,
+		},
+	}
+}
+
+func (b *fakePendingReviewBackend) deleteComment(commentID string) bool {
+	for i, comment := range b.liveReview.Comments {
+		if comment.ID != commentID {
+			continue
+		}
+		b.liveReview.Comments = append(b.liveReview.Comments[:i], b.liveReview.Comments[i+1:]...)
+		return true
+	}
+	return false
+}
+
+func (b *fakePendingReviewBackend) addThreadComment(input map[string]any) fakeReviewComment {
+	comment := fakeReviewComment{
+		ID:       b.nextGraphQLID("comment"),
+		ThreadID: b.nextGraphQLID("thread"),
+		Body:     stringValue(input["body"]),
+		Path:     stringValue(input["path"]),
+		Line:     intValue(input["line"]),
+		Side:     stringValue(input["side"]),
+	}
+	comment.StartLine = intValue(input["startLine"])
+	comment.StartSide = stringValue(input["startSide"])
+
+	b.liveReview.Comments = append(b.liveReview.Comments, comment)
+	return comment
+}
+
+func (b *fakePendingReviewBackend) nextGraphQLID(prefix string) string {
+	id := fmt.Sprintf("%s-%d", prefix, b.nextID)
+	b.nextID++
+	return id
+}
+
+func (b *fakePendingReviewBackend) advanceNextID(id string) {
+	var prefix string
+	var value int
+	if _, err := fmt.Sscanf(id, "%[^-]-%d", &prefix, &value); err != nil {
+		return
+	}
+	if value >= b.nextID {
+		b.nextID = value + 1
+	}
+}
+
+func stringValue(value any) string {
+	s, _ := value.(string)
+	return s
+}
+
+func intValue(value any) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case float64:
+		return int(v)
+	default:
+		return 0
+	}
 }
