@@ -62,6 +62,11 @@ type ClientPermissionlessValidator struct {
 	DelegatorCount  *uint64
 	DelegatorWeight *uint64
 	Delegators      []ClientDelegator
+
+	// ACP-236
+	ConfigOwner              *ClientOwner
+	Period                   *uint64
+	AutoCompoundRewardShares *uint32
 }
 
 // ClientDelegator is the repr. of a delegator sent over client
@@ -158,6 +163,11 @@ func getClientPrimaryOrSubnetValidator(apiValidator api.PermissionlessValidator)
 		return ClientPermissionlessValidator{}, err
 	}
 
+	configOwner, err := apiOwnerToClientOwner(apiValidator.ConfigOwner)
+	if err != nil {
+		return ClientPermissionlessValidator{}, err
+	}
+
 	var clientDelegators []ClientDelegator
 	if apiValidator.Delegators != nil {
 		clientDelegators = make([]ClientDelegator, len(*apiValidator.Delegators))
@@ -188,5 +198,9 @@ func getClientPrimaryOrSubnetValidator(apiValidator api.PermissionlessValidator)
 		DelegatorCount:         (*uint64)(apiValidator.DelegatorCount),
 		DelegatorWeight:        (*uint64)(apiValidator.DelegatorWeight),
 		Delegators:             clientDelegators,
+
+		ConfigOwner:              configOwner,
+		Period:                   (*uint64)(apiValidator.Period),
+		AutoCompoundRewardShares: (*uint32)(apiValidator.AutoCompoundRewardShares),
 	}, nil
 }

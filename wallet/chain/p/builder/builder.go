@@ -319,6 +319,54 @@ type Builder interface {
 		rewardsOwner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (*txs.AddPermissionlessDelegatorTx, error)
+
+	// NewAddAutoRenewedValidatorTx creates an auto-renewed validator on the
+	// primary network. Auto-renewed validators automatically renew at the end
+	// of each validation period without requiring a new transaction.
+	//
+	// - validatorNodeID is the node ID of the validator.
+	// - weight is the amount of AVAX to stake.
+	// - signer is the BLS key for this validator.
+	// - assetID specifies the asset to stake.
+	// - validationRewardsOwner specifies the owner of all the validation
+	//   rewards this validator earns.
+	// - delegationRewardsOwner specifies the owner of all the rewards this
+	//   validator earns from delegations.
+	// - configOwner specifies the owner authorized to modify the validator's
+	//   auto-renewal configuration.
+	// - delegationShares specifies the fraction (out of 1,000,000) that this
+	//   validator will take from delegation rewards.
+	// - autoCompoundRewardShares specifies the fraction (out of 1,000,000) of
+	//   rewards to automatically restake at the end of each period.
+	// - period is the duration of each validation cycle.
+	NewAddAutoRenewedValidatorTx(
+		validatorNodeID ids.NodeID,
+		weight uint64,
+		signer signer.Signer,
+		assetID ids.ID,
+		validationRewardsOwner *secp256k1fx.OutputOwners,
+		delegationRewardsOwner *secp256k1fx.OutputOwners,
+		configOwner *secp256k1fx.OutputOwners,
+		delegationShares uint32,
+		autoCompoundRewardShares uint32,
+		period time.Duration,
+		options ...common.Option,
+	) (*txs.AddAutoRenewedValidatorTx, error)
+
+	// NewSetAutoRenewedValidatorConfigTx creates a transaction to modify the
+	// configuration of an existing auto-renewed validator.
+	//
+	// - txID is the transaction ID of the auto-renewed validator to modify.
+	// - autoRestakeShares specifies the new fraction (out of 1,000,000) of
+	//   rewards to automatically restake.
+	// - period is the new duration of each validation cycle. Set to 0 to
+	//   trigger a graceful exit at the end of the current period.
+	NewSetAutoRenewedValidatorConfigTx(
+		txID ids.ID,
+		autoRestakeShares uint32,
+		period time.Duration,
+		options ...common.Option,
+	) (*txs.SetAutoRenewedValidatorConfigTx, error)
 }
 
 type Backend interface {
@@ -1489,6 +1537,156 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		Subnet:                 vdr.Subnet,
 		StakeOuts:              stakeOutputs,
 		DelegationRewardsOwner: rewardsOwner,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewAddAutoRenewedValidatorTx(
+	validatorNodeID ids.NodeID,
+	weight uint64,
+	signer signer.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	configOwner *secp256k1fx.OutputOwners,
+	delegationShares uint32,
+	autoCompoundRewardShares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.AddAutoRenewedValidatorTx, error) {
+	toBurn := map[ids.ID]uint64{}
+	toStake := map[ids.ID]uint64{
+		assetID: weight,
+	}
+
+	ops := common.NewOptions(options)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	signerComplexity, err := fee.SignerComplexity(signer)
+	if err != nil {
+		return nil, err
+	}
+	validatorOwnerComplexity, err := fee.OwnerComplexity(validationRewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	delegatorOwnerComplexity, err := fee.OwnerComplexity(delegationRewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	configOwnerComplexity, err := fee.OwnerComplexity(configOwner)
+	if err != nil {
+		return nil, err
+	}
+
+	complexity, err := fee.IntrinsicAddAutoRenewedValidatorTxComplexities.Add(
+		&memoComplexity,
+		&signerComplexity,
+		&validatorOwnerComplexity,
+		&delegatorOwnerComplexity,
+		&configOwnerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.Sort(validationRewardsOwner.Addrs)
+	utils.Sort(delegationRewardsOwner.Addrs)
+	utils.Sort(configOwner.Addrs)
+	tx := &txs.AddAutoRenewedValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         baseOutputs,
+			Memo:         memo,
+		}},
+		ValidatorNodeID:          validatorNodeID,
+		Signer:                   signer,
+		StakeOuts:                stakeOutputs,
+		ValidatorRewardsOwner:    validationRewardsOwner,
+		DelegatorRewardsOwner:    delegationRewardsOwner,
+		Owner:                    configOwner,
+		DelegationShares:         delegationShares,
+		Wght:                     weight,
+		AutoCompoundRewardShares: autoCompoundRewardShares,
+		Period:                   uint64(period / time.Second),
+	}
+
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewSetAutoRenewedValidatorConfigTx(
+	txID ids.ID,
+	autoCompoundRewardShares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.SetAutoRenewedValidatorConfigTx, error) {
+	toBurn := map[ids.ID]uint64{}
+	toStake := map[ids.ID]uint64{}
+	ops := common.NewOptions(options)
+
+	auth, err := b.authorize(txID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	authComplexity, err := fee.AuthComplexity(auth)
+	if err != nil {
+		return nil, err
+	}
+
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+
+	complexity, err := fee.IntrinsicSetAutoRenewedValidatorConfigTxComplexities.Add(
+		&memoComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &txs.SetAutoRenewedValidatorConfigTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		TxID:                     txID,
+		Auth:                     auth,
+		AutoCompoundRewardShares: autoCompoundRewardShares,
+		Period:                   uint64(period / time.Second),
 	}
 	return tx, b.initCtx(tx)
 }
