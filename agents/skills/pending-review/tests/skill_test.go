@@ -366,6 +366,129 @@ func TestPendingReviewReplaceCommentsEndToEnd(t *testing.T) {
 	}
 }
 
+func TestPendingReviewReplaceCommentsWithThreadReplyEndToEnd(t *testing.T) {
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			xdgStateHome := filepath.Join(t.TempDir(), "state-home")
+			configDir := filepath.Join(xdgConfigHome, "gh-pending-review")
+			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
+			require.NoError(t, store.Save(pendingreview.ReviewState{
+				Repo:              "ava-labs/avalanchego",
+				PRNumber:          123,
+				UserLogin:         "octocat",
+				ReviewID:          "review-123",
+				LastPublishedBody: "draft body",
+				LastPublishedEntries: []pendingreview.DraftReviewEntry{{
+					Kind: pendingreview.DraftReviewEntryKindNewThread,
+					Path: "old/file.go",
+					Line: 5,
+					Side: "RIGHT",
+					Body: "old comment",
+				}},
+				HTMLURL: "https://example.invalid/review/123",
+			}))
+
+			backend := newFakePendingReviewBackend()
+			backend.seedReview(fakeReview{
+				ID:         "review-123",
+				DatabaseID: 123,
+				Body:       "draft body",
+				State:      "PENDING",
+				URL:        "https://example.invalid/review/123",
+				Author: fakeUser{
+					Login: "octocat",
+				},
+				Comments: []fakeReviewComment{{
+					ID:       "comment-1",
+					ThreadID: "thread-1",
+					Body:     "old comment",
+					Path:     "old/file.go",
+					Line:     5,
+					Side:     "RIGHT",
+				}},
+				Threads: []fakeReviewThread{{
+					ID: "thread-42",
+					Comments: []fakeReviewComment{{
+						ID:          "comment-2",
+						ThreadID:    "thread-42",
+						Body:        "existing thread root",
+						Path:        "snow/engine.go",
+						Line:        7,
+						Side:        "RIGHT",
+						AuthorLogin: "reviewer",
+					}},
+				}},
+			})
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Write a comments file containing exactly " +
+					`[{"kind":"thread_reply","thread_id":"thread-42","body":"new reply"}] ` +
+					"and use the repo-local ./bin/gh-pending-review replace-comments command " +
+					"to replace the current managed pending review comments on PR 123. " +
+					"Keep the existing top-level review body unchanged. " +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
+					"Do not submit the review.",
+				Timeout: 3 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             xdgStateHome,
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+
+			output := readOutput(t, result.OutputPath)
+			review := backend.review()
+			require.Equal(t, "draft body", review.Body)
+			if len(review.Comments) != 1 {
+				t.Fatalf("expected 1 pending review comment, got %d; ops=%v comments=%+v output=%s", len(review.Comments), backend.operations(), review.Comments, output)
+			}
+			require.Contains(t, backend.operations(), "AddPendingReviewThreadReply")
+			require.NotContains(t, backend.operations(), "AddPendingReviewThread")
+
+			existingThread := review.commentsForThread("thread-42")
+			require.Len(t, existingThread, 2)
+			require.Equal(t, "existing thread root", existingThread[0].Body)
+			require.Equal(t, "reviewer", existingThread[0].AuthorLogin)
+			require.Equal(t, "new reply", existingThread[1].Body)
+			require.Equal(t, "thread-42", existingThread[1].ThreadID)
+			require.Equal(t, "comment-2", existingThread[1].ReplyToCommentID)
+			require.Equal(t, "octocat", existingThread[1].AuthorLogin)
+
+			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
+			require.NoError(t, err)
+			require.Equal(t, "review-123", stored.ReviewID)
+			require.Equal(t, "draft body", stored.LastPublishedBody)
+			require.Equal(t, "https://example.invalid/review/123", stored.HTMLURL)
+			require.Equal(t, []pendingreview.DraftReviewEntry{{
+				Kind:             pendingreview.DraftReviewEntryKindThreadReply,
+				ThreadID:         "thread-42",
+				ReplyToCommentID: "comment-2",
+				Body:             "new reply",
+			}}, stored.LastPublishedEntries)
+		})
+	}
+}
+
 func newPendingReviewTestRepo(t *testing.T) string {
 	t.Helper()
 
@@ -438,6 +561,12 @@ type fakeReview struct {
 	URL        string
 	Author     fakeUser
 	Comments   []fakeReviewComment
+	Threads    []fakeReviewThread
+}
+
+type fakeReviewThread struct {
+	ID       string
+	Comments []fakeReviewComment
 }
 
 type fakeUser struct {
@@ -454,6 +583,7 @@ type fakeReviewComment struct {
 	Side             string
 	StartLine        int
 	StartSide        string
+	AuthorLogin      string
 }
 
 func newFakePendingReviewBackend() *fakePendingReviewBackend {
@@ -469,10 +599,18 @@ func (b *fakePendingReviewBackend) seedReview(review fakeReview) {
 
 	reviewCopy := review
 	reviewCopy.Comments = slices.Clone(review.Comments)
+	reviewCopy.Threads = cloneFakeReviewThreads(review.Threads)
 	b.liveReview = &reviewCopy
 	for _, comment := range review.Comments {
 		b.advanceNextID(comment.ID)
 		b.advanceNextID(comment.ThreadID)
+	}
+	for _, thread := range review.Threads {
+		b.advanceNextID(thread.ID)
+		for _, comment := range thread.Comments {
+			b.advanceNextID(comment.ID)
+			b.advanceNextID(comment.ThreadID)
+		}
 	}
 }
 
@@ -530,7 +668,7 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 				"pullRequest": map[string]any{
 					"id": "pr-123",
 					"reviewThreads": map[string]any{
-						"nodes": []map[string]any{},
+						"nodes": b.graphQLThreads(),
 					},
 					"reviews": map[string]any{
 						"nodes": b.reviewNodes(),
@@ -605,6 +743,25 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 				"clientMutationId": "deleted",
 			},
 		}, nil
+	case strings.Contains(query, "mutation AddPendingReviewThreadReply"):
+		b.requestedOps = append(b.requestedOps, "AddPendingReviewThreadReply")
+		if b.liveReview == nil {
+			return nil, errors.New("unexpected thread reply with no live review")
+		}
+		reviewID, _ := variables["reviewID"].(string)
+		if reviewID != b.liveReview.ID {
+			return nil, fmt.Errorf("unexpected review id %q", reviewID)
+		}
+		threadID, _ := variables["threadID"].(string)
+		comment, err := b.addThreadReplyComment(threadID, stringValue(variables["body"]))
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"addPullRequestReviewThreadReply": map[string]any{
+				"comment": b.graphQLComment(comment),
+			},
+		}, nil
 	case strings.Contains(query, "mutation AddPendingReviewThread"):
 		b.requestedOps = append(b.requestedOps, "AddPendingReviewThread")
 		if b.liveReview == nil {
@@ -663,6 +820,7 @@ func (b *fakePendingReviewBackend) review() fakeReview {
 	}
 	reviewCopy := *b.liveReview
 	reviewCopy.Comments = slices.Clone(b.liveReview.Comments)
+	reviewCopy.Threads = cloneFakeReviewThreads(b.liveReview.Threads)
 	return reviewCopy
 }
 
@@ -681,6 +839,41 @@ func (b *fakePendingReviewBackend) graphQLComments() []map[string]any {
 	return comments
 }
 
+func (b *fakePendingReviewBackend) graphQLThreads() []map[string]any {
+	if b.liveReview == nil {
+		return nil
+	}
+
+	commentsByThread := make(map[string][]map[string]any)
+	threadIDs := make([]string, 0)
+	for _, thread := range b.liveReview.Threads {
+		threadIDs = append(threadIDs, thread.ID)
+		for _, comment := range thread.Comments {
+			commentsByThread[thread.ID] = append(commentsByThread[thread.ID], b.graphQLComment(comment))
+		}
+	}
+	for _, comment := range b.liveReview.Comments {
+		if comment.ThreadID == "" {
+			continue
+		}
+		if _, exists := commentsByThread[comment.ThreadID]; !exists {
+			threadIDs = append(threadIDs, comment.ThreadID)
+		}
+		commentsByThread[comment.ThreadID] = append(commentsByThread[comment.ThreadID], b.graphQLComment(comment))
+	}
+
+	threads := make([]map[string]any, 0, len(threadIDs))
+	for _, threadID := range threadIDs {
+		threads = append(threads, map[string]any{
+			"id": threadID,
+			"comments": map[string]any{
+				"nodes": commentsByThread[threadID],
+			},
+		})
+	}
+	return threads
+}
+
 func (b *fakePendingReviewBackend) graphQLComment(comment fakeReviewComment) map[string]any {
 	replyTo := any(nil)
 	if comment.ReplyToCommentID != "" {
@@ -697,7 +890,7 @@ func (b *fakePendingReviewBackend) graphQLComment(comment fakeReviewComment) map
 		"startLine":     comment.StartLine,
 		"startDiffSide": comment.StartSide,
 		"author": map[string]any{
-			"login": b.liveReview.Author.Login,
+			"login": b.commentAuthorLogin(comment),
 		},
 		"replyTo": replyTo,
 		"pullRequestReview": map[string]any{
@@ -733,6 +926,36 @@ func (b *fakePendingReviewBackend) addThreadComment(input map[string]any) fakeRe
 	return comment
 }
 
+func (b *fakePendingReviewBackend) addThreadReplyComment(threadID string, body string) (fakeReviewComment, error) {
+	threadComments := b.liveReview.commentsForThread(threadID)
+	if len(threadComments) == 0 {
+		return fakeReviewComment{}, fmt.Errorf("thread %q not found", threadID)
+	}
+
+	parent := threadComments[len(threadComments)-1]
+	comment := fakeReviewComment{
+		ID:               b.nextGraphQLID("comment"),
+		ThreadID:         threadID,
+		ReplyToCommentID: parent.ID,
+		Body:             body,
+		Path:             parent.Path,
+		Line:             parent.Line,
+		Side:             parent.Side,
+		StartLine:        parent.StartLine,
+		StartSide:        parent.StartSide,
+		AuthorLogin:      b.viewer,
+	}
+	b.liveReview.Comments = append(b.liveReview.Comments, comment)
+	return comment, nil
+}
+
+func (b *fakePendingReviewBackend) commentAuthorLogin(comment fakeReviewComment) string {
+	if comment.AuthorLogin != "" {
+		return comment.AuthorLogin
+	}
+	return b.liveReview.Author.Login
+}
+
 func (b *fakePendingReviewBackend) nextGraphQLID(prefix string) string {
 	id := fmt.Sprintf("%s-%d", prefix, b.nextID)
 	b.nextID++
@@ -764,4 +987,30 @@ func intValue(value any) int {
 	default:
 		return 0
 	}
+}
+
+func (r fakeReview) commentsForThread(threadID string) []fakeReviewComment {
+	comments := make([]fakeReviewComment, 0)
+	for _, thread := range r.Threads {
+		if thread.ID == threadID {
+			comments = append(comments, thread.Comments...)
+		}
+	}
+	for _, comment := range r.Comments {
+		if comment.ThreadID == threadID {
+			comments = append(comments, comment)
+		}
+	}
+	return comments
+}
+
+func cloneFakeReviewThreads(threads []fakeReviewThread) []fakeReviewThread {
+	cloned := make([]fakeReviewThread, 0, len(threads))
+	for _, thread := range threads {
+		cloned = append(cloned, fakeReviewThread{
+			ID:       thread.ID,
+			Comments: slices.Clone(thread.Comments),
+		})
+	}
+	return cloned
 }
