@@ -93,8 +93,9 @@ type SUT struct {
 	*ethclient.Client
 	rpcClient *rpc.Client
 
-	rawVM   *VM
-	genesis *blocks.Block
+	rawVM      *VM
+	rawGenesis core.Genesis
+	genesis    *blocks.Block
 	wallet  *saetest.Wallet
 	db      ethdb.Database
 	hooks   *hookstest.Stub
@@ -106,12 +107,13 @@ type SUT struct {
 
 type (
 	sutConfig struct {
-		hooks       *hookstest.Stub
-		vmConfig    Config
-		logLevel    logging.Level
-		genesis     core.Genesis
-		db          database.Database
-		precompiles map[common.Address]libevm.PrecompiledContract
+		hooks            *hookstest.Stub
+		vmConfig         Config
+		logLevel         logging.Level
+		genesis          core.Genesis
+		db               database.Database
+		precompiles      map[common.Address]libevm.PrecompiledContract
+		stateSyncEnabled bool
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -146,7 +148,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	}, opts...)
 
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
-	snow := adaptor.Convert(vm)
+	snow := adaptor.ConvertStateSync[*blocks.Block, *stateSummary](vm)
 	tb.Cleanup(func() {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
@@ -184,19 +186,26 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	}
 	tb.Cleanup(func() {
 		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+		if b := vm.last.accepted.Load(); b != nil {
+			require.NoError(tb, b.WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+		}
 	})
 
-	rpcClient, ethClient := dialRPC(ctx, tb, snow)
+	var rpcClient *rpc.Client
+	var ethClient *ethclient.Client
+	if !conf.stateSyncEnabled {
+		rpcClient, ethClient = dialRPC(ctx, tb, snow)
+	}
 
 	validators, ok := snowCtx.ValidatorState.(*validatorstest.State)
 	require.Truef(tb, ok, "unexpected type %T for snowCtx.ValidatorState", snowCtx.ValidatorState)
 	return ctx, &SUT{
-		ChainVM:   snow,
-		Client:    ethClient,
-		rpcClient: rpcClient,
-		rawVM:     vm.VM,
-		genesis:   vm.last.settled.Load(),
+		ChainVM:    snow,
+		Client:     ethClient,
+		rpcClient:  rpcClient,
+		rawVM:      vm.VM,
+		rawGenesis: conf.genesis,
+		genesis:    vm.last.settled.Load(),
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,
 			types.LatestSigner(conf.genesis.Config),
@@ -297,6 +306,20 @@ func withExecResultsDB(hdb database.HeightIndex) sutOption {
 func withCommitInterval(interval uint64) sutOption { //nolint:unparam // always 16 for now but caller-controlled by design
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.DBConfig.TrieCommitInterval = interval
+	})
+}
+
+func withStateSyncEnabled(sourceDB ethdb.Database) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.stateSyncEnabled = true
+		c.vmConfig.StateSyncEnabled = true
+		hookstest.WithSyncSourceDB(sourceDB).Configure(c.hooks)
+	})
+}
+
+func withGenesis(g core.Genesis) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis = g
 	})
 }
 

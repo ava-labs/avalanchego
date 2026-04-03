@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 type ancestry struct {
@@ -115,6 +117,28 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 		return err
 	}
 	b.synchronous = true
+	return b.markSettled(nil)
+}
+
+// MarkSyncedWith provides the minimum information for `b`, which was state-synced to its post-execution state,
+// using `settler`, provided by peers, to allow continuing execution after `b`.
+func (b *Block) MarkSyncedWith(settler *ethtypes.Header, hooks hook.Points, db ethdb.Database, xdb types.ExecutionResults) error {
+	if b.NumberU64() != hooks.SettledHeight(settler) {
+		return errors.New("blocks supplided don't match")
+	}
+
+	gt, err := hooks.SettledGasTime(b.Header(), settler)
+	if err != nil {
+		return err
+	}
+	e := &executionResults{
+		byGas:         *gt.Clone(),
+		stateRootPost: settler.Root,
+	}
+
+	if err := b.markExecuted(db.NewBatch(), xdb, e, false, nil); err != nil {
+		return err
+	}
 	return b.markSettled(nil)
 }
 

@@ -19,11 +19,14 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -58,6 +61,8 @@ type Points interface {
 	// will be closed by the VM when no longer needed. It MAY use the provided
 	// directory for persistence and MUST NOT write data outside of it.
 	ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error)
+	// StateSync TODO
+	StateSync(ctx context.Context, target *types.Block, cfg StateSyncConfig) error
 	// GasConfigAfter returns the gas target and configuration that should go
 	// into effect immediately after the provided block.
 	GasConfigAfter(*types.Header) (target gas.Gas, c gastime.GasPriceConfig)
@@ -221,4 +226,12 @@ func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, er
 
 	pt := proxytime.New(sec, denom, gastime.SafeRateOfTarget(target))
 	return gastime.FromProxyTime(pt, target, excess, cfg)
+}
+
+// StateSyncConfig TODO
+type StateSyncConfig struct {
+	SnowCtx *snow.Context
+	DB      ethdb.Database
+	Network *p2p.Network
+	Peers   *p2p.Peers
 }

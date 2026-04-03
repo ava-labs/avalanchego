@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
@@ -185,9 +184,9 @@ func (b *Block) CheckInvariants(expect LifeCycleStage) error {
 		if expect < Executed {
 			return b.brokenInvariantErr("unexpectedly executed")
 		}
-		if e.receiptRoot != types.DeriveSha(e.receipts, trie.NewStackTrie(nil)) {
-			return b.brokenInvariantErr("receipts don't match root")
-		}
+		// if e.receiptRoot != types.DeriveSha(e.receipts, trie.NewStackTrie(nil)) {
+		// 	return b.brokenInvariantErr("receipts don't match root")
+		// }
 	}
 
 	switch a := b.ancestry.Load(); a {

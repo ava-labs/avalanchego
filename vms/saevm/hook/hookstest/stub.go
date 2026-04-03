@@ -5,17 +5,23 @@
 package hookstest
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"iter"
 	"math/big"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -38,6 +44,7 @@ type Stub struct {
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
 	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
 	GasPriceConfig          gastime.GasPriceConfig
+	syncSourceDB            ethdb.Database
 }
 
 var _ hook.PointsG[Op] = (*Stub)(nil)
@@ -77,6 +84,13 @@ func WithOps(ops []Op) HookOption {
 func WithExecutionResultsDBFn(fn func(string) (saetypes.ExecutionResults, error)) HookOption {
 	return options.Func[Stub](func(s *Stub) {
 		s.ExecutionResultsDBFn = fn
+	})
+}
+
+// WithSyncSourceDB provides an [ethdb.Database] to mimic a state sync operation.
+func WithSyncSourceDB(sourceDB ethdb.Database) HookOption {
+	return options.Func[Stub](func(s *Stub) {
+		s.syncSourceDB = sourceDB
 	})
 }
 
@@ -264,6 +278,83 @@ func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) er
 // AfterExecutingBlock is a no-op that always returns nil.
 func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
 	return nil
+}
+
+// StateSync copies all accounts, code, and storage from the source DB (set via
+// [WithSyncSourceDB]) into dest at `target.Root()`. It writes raw trie nodes
+// directly via [rawdb.WriteLegacyTrieNode], avoiding any reliance on preimages.
+//
+// This will only work for HashDB.
+func (s *Stub) StateSync(ctx context.Context, target *types.Block, c hook.StateSyncConfig) error {
+	if s.syncSourceDB == nil {
+		return errors.New("source DB not supplied")
+	}
+
+	src := state.NewDatabase(s.syncSourceDB)
+	root := target.Root()
+
+	accountTrie, err := src.OpenTrie(root)
+	if err != nil {
+		return fmt.Errorf("open account trie: %w", err)
+	}
+
+	nodeIt, err := accountTrie.NodeIterator(nil)
+	if err != nil {
+		return fmt.Errorf("account trie iterator: %w", err)
+	}
+	for nodeIt.Next(true) {
+		if hash := nodeIt.Hash(); hash != (common.Hash{}) {
+			rawdb.WriteLegacyTrieNode(c.DB, hash, nodeIt.NodeBlob())
+		}
+		if !nodeIt.Leaf() {
+			continue
+		}
+		var acct types.StateAccount
+		if err := rlp.DecodeBytes(nodeIt.LeafBlob(), &acct); err != nil {
+			return fmt.Errorf("decode account: %w", err)
+		}
+		if !bytes.Equal(acct.CodeHash, types.EmptyCodeHash.Bytes()) {
+			codeHash := common.BytesToHash(acct.CodeHash)
+			rawdb.WriteCode(c.DB, codeHash, rawdb.ReadCode(src.DiskDB(), codeHash))
+		}
+		if acct.Root != types.EmptyRootHash {
+			storageTrie, err := src.OpenTrie(acct.Root)
+			if err != nil {
+				return fmt.Errorf("open storage trie: %w", err)
+			}
+			storageIt, err := storageTrie.NodeIterator(nil)
+			if err != nil {
+				return fmt.Errorf("storage trie iterator: %w", err)
+			}
+			for storageIt.Next(true) {
+				if hash := storageIt.Hash(); hash != (common.Hash{}) {
+					rawdb.WriteLegacyTrieNode(c.DB, hash, storageIt.NodeBlob())
+				}
+			}
+			if err := storageIt.Error(); err != nil {
+				return fmt.Errorf("storage iteration: %w", err)
+			}
+		}
+	}
+	if err := nodeIt.Error(); err != nil {
+		return err
+	}
+
+	// Copy canonical block data from the settled height through the target block,
+	// and mark the target as the head. This mirrors what a real network-based
+	// state sync would do when downloading blocks from peers.
+	settledHeight := s.SettledHeight(target.Header())
+	batch := c.DB.NewBatch()
+	for num := settledHeight; num <= target.NumberU64(); num++ {
+		hash := rawdb.ReadCanonicalHash(s.syncSourceDB, num)
+		rawdb.WriteCanonicalHash(batch, hash, num)
+		if b := rawdb.ReadBlock(s.syncSourceDB, hash, num); b != nil {
+			rawdb.WriteBlock(batch, b)
+		}
+	}
+	rawdb.WriteHeadBlockHash(batch, target.Hash())
+	rawdb.WriteHeadHeaderHash(batch, target.Hash())
+	return batch.Write()
 }
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE

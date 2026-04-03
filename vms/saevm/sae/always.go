@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
-var _ adaptor.ChainVM[*blocks.Block] = (*SinceGenesis[hook.Transaction])(nil)
+var _ adaptor.SyncVM[*blocks.Block, *stateSummary] = (*SinceGenesis[hook.Transaction])(nil)
 
 // SinceGenesis is a harness around a [VM], providing an `Initialize` method
 // that treats the chain as being asynchronous since genesis.

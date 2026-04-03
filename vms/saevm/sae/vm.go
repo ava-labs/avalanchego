@@ -52,10 +52,14 @@ type VM struct {
 	Peers          *p2p.Peers
 	ValidatorPeers *p2p.Validators
 
-	hooks   hook.Points
-	config  Config
-	snowCtx *snow.Context
-	metrics *prometheus.Registry
+	hooks       hook.Points
+	config      Config
+	snowCtx     *snow.Context
+	metrics     *prometheus.Registry
+	chainConfig *params.ChainConfig
+
+	afterSync     func(context.Context, *blocks.Block) error
+	stateSyncDone chan error
 
 	db  ethdb.Database
 	xdb saetypes.ExecutionResults
@@ -99,6 +103,7 @@ type Config struct {
 	DBConfig      saedb.Config
 	RPCConfig     rpc.Config
 
+	StateSyncEnabled           bool
 	ExcessAfterLastSynchronous gas.Gas
 
 	Now func() time.Time // defaults to [time.Now] if nil
@@ -124,11 +129,13 @@ func NewVM[T hook.Transaction](
 		cfg.Now = time.Now
 	}
 	vm := &VM{
-		hooks:   hooks,
-		config:  cfg,
-		snowCtx: snowCtx,
-		metrics: prometheus.NewRegistry(),
-		db:      db,
+		hooks:         hooks,
+		config:        cfg,
+		snowCtx:       snowCtx,
+		metrics:       prometheus.NewRegistry(),
+		db:            db,
+		chainConfig:   chainConfig,
+		stateSyncDone: make(chan error, 1),
 	}
 	defer func() {
 		if retErr != nil {
@@ -140,6 +147,14 @@ func NewVM[T hook.Transaction](
 		return nil, err
 	}
 
+	network, peers, validatorPeers, err := newNetwork(snowCtx, sender, vm.metrics)
+	if err != nil {
+		return nil, fmt.Errorf("newNetwork(...): %v", err)
+	}
+	vm.Network = network
+	vm.Peers = peers
+	vm.ValidatorPeers = validatorPeers
+
 	xdb, err := hooks.ExecutionResultsDB(
 		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
 	)
@@ -149,51 +164,75 @@ func NewVM[T hook.Transaction](
 	vm.xdb = xdb
 	vm.toClose = append(vm.toClose, &xdb)
 
-	lastSync, err := blocks.New(lastSynchronous, nil, nil, snowCtx.Log)
+	// We guarantee another entrypoint to initialize the executor.
+	// The last synchronous block likely isn't known in this case.
+	if cfg.StateSyncEnabled {
+		// Block map will be overwritten after sync
+		noop := func(*blocks.Block) {}
+		vm.consensusCritical = newSyncMap[common.Hash, *blocks.Block](noop, noop)
+		vm.afterSync = onCaughtUp(vm, hooks)
+		return vm, nil
+	}
+
+	lastSync, err := blocks.New(lastSynchronous, nil, nil, vm.snowCtx.Log)
 	if err != nil {
 		return nil, fmt.Errorf("blocks.New([last synchronous], ...): %v", err)
 	}
 	vm.last.synchronous = lastSync.Height()
 
 	{ // ==========  Sync -> Async  ==========
-		if err := lastSync.MarkSynchronous(hooks, db, xdb, cfg.ExcessAfterLastSynchronous); err != nil {
+		if err := lastSync.MarkSynchronous(hooks, vm.db, vm.xdb, vm.config.ExcessAfterLastSynchronous); err != nil {
 			return nil, fmt.Errorf("%T{genesis}.MarkSynchronous(): %v", lastSync, err)
 		}
-		if err := canonicaliseLastSynchronous(db, lastSync); err != nil {
+		if err := canonicaliseLastSynchronous(vm.db, lastSync); err != nil {
 			return nil, err
 		}
 	}
+	if err := initializeStateful(vm, ctx, lastSync, hooks); err != nil {
+		return nil, err
+	}
 
-	rec := &recovery{db, xdb, chainConfig, snowCtx.Log, hooks, cfg, lastSync}
+	return vm, nil
+}
+
+func onCaughtUp[T hook.Transaction](vm *VM, hooks hook.PointsG[T]) func(ctx context.Context, firstKnown *blocks.Block) error {
+	return func(ctx context.Context, firstKnown *blocks.Block) error {
+		return initializeStateful(vm, ctx, firstKnown, hooks)
+	}
+}
+
+// TODO: generic methods!
+func initializeStateful[T hook.Transaction](vm *VM, ctx context.Context, firstKnown *blocks.Block, hooks hook.PointsG[T]) error {
 	{ // ==========  Block State  ==========
+		rec := &recovery{vm.db, vm.xdb, vm.chainConfig, vm.snowCtx.Log, hooks, vm.config, firstKnown}
 		lastCommitted, err := rec.lastCommittedBlock()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		exec, err := saexec.New(
 			lastCommitted,
 			vm.headerSource,
-			chainConfig,
-			db,
-			xdb,
-			cfg.DBConfig,
+			vm.chainConfig,
+			vm.db,
+			vm.xdb,
+			vm.config.DBConfig,
 			hooks,
-			snowCtx.Log,
+			vm.snowCtx.Log,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("saexec.New(...): %v", err)
+			return fmt.Errorf("saexec.New(...): %v", err)
 		}
 		vm.exec = exec
 		vm.toClose = append(vm.toClose, exec)
 
 		if err := rec.executeAllAccepted(ctx, exec); err != nil {
-			return nil, err
+			return err
 		}
 
 		bMap, lastSettled, err := rec.consensusCriticalBlocks(exec)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		vm.consensusCritical = bMap
 
@@ -206,22 +245,22 @@ func NewVM[T hook.Transaction](
 	{ // ==========  Mempool  ==========
 		bc := txgossip.NewBlockChain(vm.exec, vm.ethBlockSource)
 		pools := []txpool.SubPool{
-			legacypool.New(cfg.MempoolConfig, bc),
+			legacypool.New(vm.config.MempoolConfig, bc),
 		}
 		txPool, err := txpool.New(0, bc, pools)
 		if err != nil {
-			return nil, fmt.Errorf("txpool.New(...): %v", err)
+			return fmt.Errorf("txpool.New(...): %v", err)
 		}
 		vm.toClose = append(vm.toClose, txPool)
 
 		metrics, err := bloom.NewMetrics("mempool", vm.metrics)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		conf := gossip.BloomSetConfig{Metrics: metrics}
 		pool, err := txgossip.NewSet(txPool, conf)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		vm.mempool = pool
 		vm.signalNewTxsToEngine()
@@ -230,8 +269,8 @@ func NewVM[T hook.Transaction](
 	{ // ==========  Block Builder  ==========
 		vm.blockBuilder = &blockBuilderG[T]{
 			hooks,
-			cfg.Now,
-			snowCtx.Log,
+			vm.config.Now,
+			vm.snowCtx.Log,
 			vm.exec,
 			vm.mempool,
 			vm.ethBlockSource,
@@ -239,30 +278,25 @@ func NewVM[T hook.Transaction](
 	}
 
 	{ // ==========  P2P Gossip  ==========
-		network, peers, validatorPeers, err := newNetwork(snowCtx, sender, vm.metrics)
-		if err != nil {
-			return nil, fmt.Errorf("newNetwork(...): %v", err)
-		}
-
 		const pullGossipPeriod = time.Second
 		handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
-			snowCtx.NodeID,
-			network,
-			validatorPeers,
+			vm.snowCtx.NodeID,
+			vm.Network,
+			vm.ValidatorPeers,
 			vm.mempool,
 			txgossip.Marshaller{},
 			gossip.SystemConfig{
-				Log:           snowCtx.Log,
+				Log:           vm.snowCtx.Log,
 				Registry:      vm.metrics,
 				Namespace:     "gossip",
 				RequestPeriod: pullGossipPeriod,
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("gossip.NewSystem(...): %v", err)
+			return fmt.Errorf("gossip.NewSystem(...): %v", err)
 		}
-		if err := network.AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
-			return nil, fmt.Errorf("network.AddHandler(...): %v", err)
+		if err := vm.AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
+			return fmt.Errorf("network.AddHandler(...): %v", err)
 		}
 
 		var (
@@ -272,17 +306,14 @@ func NewVM[T hook.Transaction](
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, pullGossipPeriod)
+			gossip.Every(gossipCtx, vm.snowCtx.Log, pullGossiper, pullGossipPeriod)
 		}()
 		go func() {
 			defer wg.Done()
 			const pushGossipPeriod = 100 * time.Millisecond
-			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
+			gossip.Every(gossipCtx, vm.snowCtx.Log, pushGossiper, pushGossipPeriod)
 		}()
 
-		vm.Network = network
-		vm.Peers = peers
-		vm.ValidatorPeers = validatorPeers
 		vm.mempool.RegisterPushGossiper(pushGossiper)
 		vm.toClose = append(vm.toClose, closerFunc(func() error {
 			cancel()
@@ -291,16 +322,17 @@ func NewVM[T hook.Transaction](
 		}))
 	}
 
+	// TODO: move to the `NewVM` method once I define the path, and just replace the backend later.
 	{ // ==========  RPC Provider  ==========
-		r, err := rpc.New(chain{vm, vm.exec}, cfg.RPCConfig)
+		r, err := rpc.New(chain{vm}, vm.config.RPCConfig)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		vm.toClose = append(vm.toClose, r)
 		vm.rpcProvider = r
 	}
 
-	return vm, nil
+	return nil
 }
 
 // canonicaliseLastSynchronous writes all necessary information to the database
@@ -359,6 +391,15 @@ func (vm *VM) signalNewTxsToEngine() {
 // transactions. In both cases it returns [snowcommon.PendingTxs]. In the latter
 // scenario it respects context cancellation.
 func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
+	if vm.consensusState.Get() == snow.StateSyncing {
+		select {
+		case err := <-vm.stateSyncDone:
+			return snowcommon.StateSyncDone, err
+		case <-ctx.Done():
+			return 0, context.Cause(ctx)
+		}
+	}
+
 	if vm.numPendingTxs() > 0 {
 		select {
 		case <-vm.newTxs: // probably has something buffered

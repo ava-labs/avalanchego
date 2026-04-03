@@ -27,13 +27,13 @@ import (
 )
 
 type recovery struct {
-	db              ethdb.Database
-	xdb             types.ExecutionResults
-	chainConfig     *params.ChainConfig
-	log             logging.Logger
-	hooks           hook.Points
-	config          Config
-	lastSynchronous *blocks.Block
+	db          ethdb.Database
+	xdb         types.ExecutionResults
+	chainConfig *params.ChainConfig
+	log         logging.Logger
+	hooks       hook.Points
+	config      Config
+	firstKnown  *blocks.Block
 }
 
 func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*blocks.Block, error) {
@@ -49,9 +49,9 @@ func (rec *recovery) lastCommittedBlock() (*blocks.Block, error) {
 		rec.db,
 		rec.config.DBConfig,
 		rec.hooks,
-		rec.lastSynchronous.Height(),
+		rec.firstKnown.Height(),
 	)
-	if ls := rec.lastSynchronous; num == ls.Height() {
+	if ls := rec.firstKnown; num == ls.Height() {
 		return ls, nil
 	}
 
@@ -135,8 +135,8 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				}
 				return b.MarkSettled(blackhole)
 
-			case b.Height() == rec.lastSynchronous.Height()+1:
-				chain = append(chain, rec.lastSynchronous)
+			case b.Height() == rec.firstKnown.Height()+1:
+				chain = append(chain, rec.firstKnown)
 
 			default:
 				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
