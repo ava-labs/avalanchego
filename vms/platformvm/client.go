@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -653,12 +655,46 @@ func GetDeactivationOwners(
 	return deactivationOwners, nil
 }
 
-// GetOwners returns the union of GetSubnetOwners and GetDeactivationOwners.
+// GetAutoRenewedValidatorConfigOwners returns a map of auto-renewed validator
+// tx ID to config owner.
+func GetAutoRenewedValidatorConfigOwners(
+	c *Client,
+	ctx context.Context,
+	txIDs ...ids.ID,
+) (map[ids.ID]fx.Owner, error) {
+	if len(txIDs) == 0 {
+		return nil, nil
+	}
+
+	owners := make(map[ids.ID]fx.Owner, len(txIDs))
+	for _, txID := range txIDs {
+		txBytes, err := c.GetTx(ctx, txID)
+		if err != nil {
+			return nil, err
+		}
+
+		tx, err := txs.Parse(txs.Codec, txBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		addTx, ok := tx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+		if !ok {
+			return nil, fmt.Errorf("expected AddAutoRenewedValidatorTx but got %T for txID %s", tx.Unsigned, txID)
+		}
+		owners[txID] = addTx.Owner
+	}
+	return owners, nil
+}
+
+// GetOwners returns the union of GetSubnetOwners, GetDeactivationOwners, and
+// GetAutoRenewedValidatorConfigOwners.
 func GetOwners(
 	c *Client,
 	ctx context.Context,
 	subnetIDs []ids.ID,
 	validationIDs []ids.ID,
+	autoRenewedValidatorTxIDs []ids.ID,
 ) (map[ids.ID]fx.Owner, error) {
 	subnetOwners, err := GetSubnetOwners(c, ctx, subnetIDs...)
 	if err != nil {
@@ -668,9 +704,14 @@ func GetOwners(
 	if err != nil {
 		return nil, err
 	}
+	configOwners, err := GetAutoRenewedValidatorConfigOwners(c, ctx, autoRenewedValidatorTxIDs...)
+	if err != nil {
+		return nil, err
+	}
 
-	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners))
+	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners)+len(configOwners))
 	maps.Copy(owners, subnetOwners)
 	maps.Copy(owners, deactivationOwners)
+	maps.Copy(owners, configOwners)
 	return owners, nil
 }
