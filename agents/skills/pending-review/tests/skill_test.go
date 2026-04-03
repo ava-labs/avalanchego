@@ -487,6 +487,235 @@ func TestPendingReviewReconcileCommentsAfterExternalEdit(t *testing.T) {
 	}
 }
 
+func TestPendingReviewConflictBodyRequiresReadBeforeForcedOverwrite(t *testing.T) {
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			xdgStateHome := filepath.Join(t.TempDir(), "state-home")
+			configDir := filepath.Join(xdgConfigHome, "gh-pending-review")
+			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
+			require.NoError(t, store.Save(pendingreview.ReviewState{
+				Repo:              "ava-labs/avalanchego",
+				PRNumber:          123,
+				UserLogin:         "octocat",
+				ReviewID:          "review-123",
+				LastPublishedBody: "Original intro.\n\nShared context from the previous draft.",
+				LastPublishedEntries: []pendingreview.DraftReviewEntry{{
+					Kind: pendingreview.DraftReviewEntryKindNewThread,
+					Path: "snow/engine.go",
+					Line: 7,
+					Side: "RIGHT",
+					Body: "existing comment",
+				}},
+				HTMLURL: "https://example.invalid/review/123",
+			}))
+
+			backend := newFakePendingReviewBackend()
+			backend.seedReview(fakeReview{
+				ID:         "review-123",
+				DatabaseID: 123,
+				Body: "Original intro.\n\nShared context from the previous draft.\n\n" +
+					"Human note: keep this context intact.",
+				State: "PENDING",
+				URL:   "https://example.invalid/review/123",
+				Author: fakeUser{
+					Login: "octocat",
+				},
+				Comments: []fakeReviewComment{{
+					ID:       "comment-1",
+					ThreadID: "thread-1",
+					Body:     "existing comment",
+					Path:     "snow/engine.go",
+					Line:     7,
+					Side:     "RIGHT",
+				}},
+			})
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Update the pending review body on PR 123 so it starts with " +
+					`"Updated intro after conflict." while preserving any live human note ` +
+					"and the existing shared context. If the draft changed in GitHub, reconcile " +
+					"those live edits rather than clobbering them. " +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
+					"Do not submit the review.",
+				Timeout: 3 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             xdgStateHome,
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+
+			review := backend.review()
+			require.Equal(t,
+				"Updated intro after conflict.\n\nShared context from the previous draft.\n\nHuman note: keep this context intact.",
+				strings.TrimSpace(review.Body),
+			)
+
+			ops := backend.operations()
+			require.Equal(t, 1, countStrings(ops, "UpdatePendingReviewBody"))
+			require.GreaterOrEqual(t, countStrings(ops, "PullRequestContext"), 2, "ops=%v", ops)
+			updateIndex := slices.Index(ops, "UpdatePendingReviewBody")
+			require.NotEqual(t, -1, updateIndex)
+			require.GreaterOrEqual(t, countStrings(ops[:updateIndex], "PullRequestContext"), 2, "ops=%v", ops)
+
+			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
+			require.NoError(t, err)
+			require.Equal(t, "review-123", stored.ReviewID)
+			require.Equal(t, review.Body, stored.LastPublishedBody)
+			require.Equal(t, "https://example.invalid/review/123", stored.HTMLURL)
+			require.Len(t, stored.LastPublishedEntries, 1)
+			require.Equal(t, "existing comment", stored.LastPublishedEntries[0].Body)
+
+			output := readOutput(t, result.OutputPath)
+			require.Contains(t, strings.ToLower(output), "conflict")
+			require.Contains(t, output, "--force")
+			require.Contains(t, output, "Updated intro after conflict.")
+			require.Contains(t, strings.ToLower(output), "human note")
+		})
+	}
+}
+
+func TestPendingReviewConflictCommentsRequiresReadBeforeForcedOverwrite(t *testing.T) {
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			xdgStateHome := filepath.Join(t.TempDir(), "state-home")
+			configDir := filepath.Join(xdgConfigHome, "gh-pending-review")
+			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
+			require.NoError(t, store.Save(pendingreview.ReviewState{
+				Repo:              "ava-labs/avalanchego",
+				PRNumber:          123,
+				UserLogin:         "octocat",
+				ReviewID:          "review-123",
+				LastPublishedBody: "draft body",
+				LastPublishedEntries: []pendingreview.DraftReviewEntry{{
+					Kind: pendingreview.DraftReviewEntryKindNewThread,
+					Path: "snow/engine.go",
+					Line: 7,
+					Side: "RIGHT",
+					Body: "Original finding.\n\nShared context from the previous draft.",
+				}},
+				HTMLURL: "https://example.invalid/review/123",
+			}))
+
+			backend := newFakePendingReviewBackend()
+			backend.seedReview(fakeReview{
+				ID:         "review-123",
+				DatabaseID: 123,
+				Body:       "draft body",
+				State:      "PENDING",
+				URL:        "https://example.invalid/review/123",
+				Author: fakeUser{
+					Login: "octocat",
+				},
+				Comments: []fakeReviewComment{{
+					ID:       "comment-1",
+					ThreadID: "thread-1",
+					Body: "Original finding.\n\nShared context from the previous draft.\n\n" +
+						"Human note: keep this context intact.",
+					Path: "snow/engine.go",
+					Line: 7,
+					Side: "RIGHT",
+				}},
+			})
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Replace the managed pending review comments on PR 123 with a single " +
+					"comment on snow/engine.go line 7 on the RIGHT side. The comment should start " +
+					`with "Updated finding after conflict." while preserving any live human note ` +
+					"and the existing shared context. If the draft changed in GitHub, reconcile " +
+					"those live edits rather than clobbering them. Keep the top-level review body unchanged. " +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
+					"Do not submit the review.",
+				Timeout: 3 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             xdgStateHome,
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+
+			review := backend.review()
+			require.Equal(t, "draft body", review.Body)
+			require.Len(t, review.Comments, 1)
+			require.Equal(t,
+				"Updated finding after conflict.\n\nShared context from the previous draft.\n\nHuman note: keep this context intact.",
+				strings.TrimSpace(review.Comments[0].Body),
+			)
+			require.Equal(t, "snow/engine.go", review.Comments[0].Path)
+			require.Equal(t, 7, review.Comments[0].Line)
+			require.Equal(t, "RIGHT", review.Comments[0].Side)
+
+			ops := backend.operations()
+			require.Equal(t, 1, countStrings(ops, "DeletePendingReviewComment"))
+			require.Equal(t, 1, countStrings(ops, "AddPendingReviewThread"))
+			require.GreaterOrEqual(t, countStrings(ops, "PullRequestContext"), 2, "ops=%v", ops)
+			deleteIndex := slices.Index(ops, "DeletePendingReviewComment")
+			require.NotEqual(t, -1, deleteIndex)
+			require.GreaterOrEqual(t, countStrings(ops[:deleteIndex], "PullRequestContext"), 2, "ops=%v", ops)
+
+			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
+			require.NoError(t, err)
+			require.Equal(t, "review-123", stored.ReviewID)
+			require.Equal(t, "draft body", stored.LastPublishedBody)
+			require.Equal(t, "https://example.invalid/review/123", stored.HTMLURL)
+			require.Len(t, stored.LastPublishedEntries, 1)
+			require.Equal(t, pendingreview.DraftReviewEntryKindNewThread, stored.LastPublishedEntries[0].Kind)
+			require.Equal(t, "snow/engine.go", stored.LastPublishedEntries[0].Path)
+			require.Equal(t, 7, stored.LastPublishedEntries[0].Line)
+			require.Equal(t,
+				"Updated finding after conflict.\n\nShared context from the previous draft.\n\nHuman note: keep this context intact.",
+				stored.LastPublishedEntries[0].Body,
+			)
+
+			output := readOutput(t, result.OutputPath)
+			require.Contains(t, strings.ToLower(output), "conflict")
+			require.Contains(t, output, "--force")
+			require.Contains(t, output, "Updated finding after conflict.")
+			require.Contains(t, strings.ToLower(output), "human note")
+		})
+	}
+}
+
 func TestPendingReviewReplaceCommentsEndToEnd(t *testing.T) {
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
