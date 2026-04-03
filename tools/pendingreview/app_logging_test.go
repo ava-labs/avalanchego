@@ -187,7 +187,7 @@ func TestRunReplaceCommentsLogsStateComparison(t *testing.T) {
 	}))
 
 	var replaced bool
-	server := newGraphQLTestServer(t, func(t *testing.T, query string, variables map[string]any) any {
+	server := newGraphQLTestServer(t, func(t *testing.T, query string, _ map[string]any) any {
 		switch {
 		case strings.Contains(query, "query Viewer"):
 			return map[string]any{"viewer": map[string]any{"login": "maru"}}
