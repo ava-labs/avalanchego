@@ -1370,6 +1370,20 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	return e.state.PutL1Validator(l1Validator)
 }
 
+func (*standardTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+	// todo: implement
+	return nil
+}
+
+func (*standardTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
+	// todo: implement
+	return nil
+}
+
+func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	return ErrWrongTxType
+}
+
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
 func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 	var (
