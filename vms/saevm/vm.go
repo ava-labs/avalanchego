@@ -51,11 +51,10 @@ type SinceGenesis struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
 	config  sae.Config
 
-	ctx            *snow.Context
-	consensusState utils.Atomic[snow.State]
-	db             avadb.Database
-	mempool        *txpool.Mempool
-	pushGossiper   *gossip.PushGossiper[*tx.Tx]
+	ctx          *snow.Context
+	db           avadb.Database
+	mempool      *txpool.Mempool
+	pushGossiper *gossip.PushGossiper[*tx.Tx]
 
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
@@ -159,7 +158,6 @@ func (vm *SinceGenesis) Initialize(
 		snowCtx,
 		avaDB,
 		config,
-		&vm.consensusState,
 		desiredDelayExcess,
 		desiredTargetExcess,
 		txs,
@@ -247,11 +245,6 @@ func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Han
 
 	m[avaxHTTPExtensionPath] = handler
 	return m, nil
-}
-
-func (vm *SinceGenesis) SetState(ctx context.Context, state snow.State) error {
-	vm.consensusState.Set(state)
-	return vm.VM.SetState(ctx, state)
 }
 
 func (vm *SinceGenesis) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {

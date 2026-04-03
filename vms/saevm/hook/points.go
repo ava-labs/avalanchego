@@ -50,15 +50,13 @@ func NewPoints(
 	ctx *snow.Context,
 	db database.Database,
 	chainConfig *ethparams.ChainConfig,
-	consensusState *utils.Atomic[snow.State],
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
 	pool *txpool.Txs,
 ) *Points {
 	return &Points{
 		blockBuilder{
-			ctx:            ctx,
-			consensusState: consensusState,
+			ctx: ctx,
 			desired: params{
 				delayExcess:  desiredDelayExcess,
 				targetExcess: desiredTargetExcess,
@@ -89,8 +87,7 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 	header := b.Header()
 	headerExtra := customtypes.GetHeaderExtra(header)
 	return &blockBuilder{
-		ctx:            p.ctx,
-		consensusState: p.consensusState,
+		ctx: p.ctx,
 		now: func() time.Time {
 			return time.Unix(
 				int64(b.Time()),

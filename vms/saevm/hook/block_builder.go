@@ -38,8 +38,7 @@ type params struct {
 }
 
 type blockBuilder struct {
-	ctx            *snow.Context
-	consensusState *utils.Atomic[snow.State]
+	ctx *snow.Context
 
 	now func() time.Time
 	// When fields in params are set, the block builder will build blocks that
@@ -109,15 +108,6 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 
 func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {
 	seq := b.potentialTxs()
-
-	// During bootstrapping, we may be processing transactions that were
-	// previously valid, but are no longer valid. Additionally, Input UTXOs may
-	// not have been populated by the source chain. Therefore we skip
-	// verification during bootstrapping.
-	if b.consensusState.Get() != snow.NormalOp {
-		return seq
-	}
-
 	return func(yield func(*txpool.Tx) bool) {
 		// Transactions are verified against the last executed state. We must
 		// guarantee that they don't conflict with any transactions in blocks
