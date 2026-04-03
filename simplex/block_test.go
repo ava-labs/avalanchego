@@ -75,6 +75,21 @@ func TestBlockSerialization(t *testing.T) {
 				return nil, nil
 			},
 		},
+		{
+			name: "invalid blacklist",
+			blockBytes: func() []byte {
+				cBlock := &canotoSimplexBlock{
+					Metadata:   b.metadata.Bytes(),
+					InnerBlock: testBlock.BytesV,
+					Blacklist:  []byte("invalid blacklist"),
+				}
+				return cBlock.MarshalCanoto()
+			}(),
+			expectedError: errFailedToParseBlacklist,
+			parseFunc: func(_ context.Context, _ []byte) (snowman.Block, error) {
+				return testBlock, nil
+			},
+		},
 	}
 
 	for _, tt := range tests {

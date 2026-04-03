@@ -199,6 +199,23 @@ func (a *SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex
 	}, nil
 }
 
+// IsQuorum checks if the provided nodes are a quorum of the membership set.
+// For now, this is calculated using one node = one vote, but in the future we can adjust
+// this calculation to cross reference validator weights if we want to support PoS.
+func (a *SignatureAggregator) IsQuorum(nodes []simplex.NodeID) bool {
+	uniqueNodes := set.NewSet[*simplex.NodeID](len(nodes))
+	for _, node := range nodes {
+		if _, exists := a.verifier.nodeID2PK[ids.NodeID(node)]; !exists {
+			return false
+		}
+		uniqueNodes.Add(&node)
+	}
+
+	quorumSize := simplex.Quorum(len(a.verifier.nodeID2PK))
+
+	return len(uniqueNodes) >= quorumSize
+}
+
 func (d *QCDeserializer) signersFromBytes(signerBytes []byte) ([]ids.NodeID, error) {
 	signerIndices := set.BitsFromBytes(signerBytes)
 	if !bytes.Equal(signerIndices.Bytes(), signerBytes) {
