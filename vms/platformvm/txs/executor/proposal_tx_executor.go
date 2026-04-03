@@ -727,7 +727,7 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnAbort(
 	stakingInfo state.StakingInfo,
 ) error {
 	createUTXOsStakeOut(addAutoRenewedValidatorTx, validator, e.onAbortState)
-	return e.createAbortRewardUTXOs(addAutoRenewedValidatorTx, validator, stakingInfo)
+	return e.createAbortRewardUTXOs(addAutoRenewedValidatorTx, stakingInfo)
 }
 
 // createAbortRewardUTXOs creates reward UTXOs on the abort state for an
@@ -735,7 +735,6 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnAbort(
 // all delegatee rewards (accrued + pending).
 func (e *proposalTxExecutor) createAbortRewardUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
-	validator *state.Staker,
 	stakingInfo state.StakingInfo,
 ) error {
 	totalDelegateeRewards, err := math.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
@@ -743,14 +742,7 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 		return err
 	}
 
-	if _, err = e.createRewardsUTXOs(
-		addAutoRenewedValidatorTx,
-		validator.TxID,
-		stakingInfo.AccruedRewards,
-		totalDelegateeRewards,
-		e.onAbortState,
-		uint32(len(e.tx.Unsigned.Outputs())),
-	); err != nil {
+	if _, err = e.createRewardsUTXOs(addAutoRenewedValidatorTx, stakingInfo.AccruedRewards, totalDelegateeRewards, e.onAbortState, uint32(len(e.tx.Unsigned.Outputs()))); err != nil {
 		return err
 	}
 
@@ -759,7 +751,6 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 
 func (e *proposalTxExecutor) createRewardsUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
-	stakerTxID ids.ID,
 	validationRewards uint64,
 	delegateeRewards uint64,
 	chainState state.Diff,
@@ -772,7 +763,7 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 			return 0, err
 		}
 		chainState.AddUTXO(utxo)
-		chainState.AddRewardUTXO(stakerTxID, utxo)
+		chainState.AddRewardUTXO(e.tx.ID(), utxo)
 		outputIndexOffset++
 	}
 
@@ -783,7 +774,7 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 			return 0, err
 		}
 		chainState.AddUTXO(utxo)
-		chainState.AddRewardUTXO(stakerTxID, utxo)
+		chainState.AddRewardUTXO(e.tx.ID(), utxo)
 		outputIndexOffset++
 	}
 
@@ -807,14 +798,7 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 	restakingRewards, withdrawingRewards := reward.Split(validator.PotentialReward, stakingInfo.AutoCompoundRewardShares)
 	restakingDelegateeRewards, withdrawingDelegateeRewards := reward.Split(stakingInfo.DelegateeReward, stakingInfo.AutoCompoundRewardShares)
 
-	outputIndexOffset, err := e.createRewardsUTXOs(
-		addAutoRenewedValidatorTx,
-		validator.TxID,
-		withdrawingRewards,
-		withdrawingDelegateeRewards,
-		e.onCommitState,
-		uint32(len(e.tx.Unsigned.Outputs())),
-	)
+	outputIndexOffset, err := e.createRewardsUTXOs(addAutoRenewedValidatorTx, withdrawingRewards, withdrawingDelegateeRewards, e.onCommitState, uint32(len(e.tx.Unsigned.Outputs())))
 	if err != nil {
 		return err
 	}
@@ -847,15 +831,7 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 	}
 
 	if newWeight > e.backend.Config.MaxValidatorStake {
-		excessValidationRewards, excessDelegateeRewards, err := e.createOverflowUTXOs(
-			addAutoRenewedValidatorTx,
-			validator.TxID,
-			newWeight,
-			restakingDelegateeRewards,
-			restakingRewards,
-			validator.Weight,
-			outputIndexOffset,
-		)
+		excessValidationRewards, excessDelegateeRewards, err := e.createOverflowUTXOs(addAutoRenewedValidatorTx, newWeight, restakingDelegateeRewards, restakingRewards, validator.Weight, outputIndexOffset)
 		if err != nil {
 			return err
 		}
@@ -957,7 +933,7 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 ) error {
 	createUTXOsStakeOut(addAutoRenewedValidatorTx, validator, e.onCommitState, e.onAbortState)
 
-	if err := e.createAbortRewardUTXOs(addAutoRenewedValidatorTx, validator, stakingInfo); err != nil {
+	if err := e.createAbortRewardUTXOs(addAutoRenewedValidatorTx, stakingInfo); err != nil {
 		return err
 	}
 
@@ -971,14 +947,7 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 		return err
 	}
 
-	if _, err = e.createRewardsUTXOs(
-		addAutoRenewedValidatorTx,
-		validator.TxID,
-		totalRewards,
-		totalDelegateeRewards,
-		e.onCommitState,
-		uint32(len(e.tx.Unsigned.Outputs())),
-	); err != nil {
+	if _, err = e.createRewardsUTXOs(addAutoRenewedValidatorTx, totalRewards, totalDelegateeRewards, e.onCommitState, uint32(len(e.tx.Unsigned.Outputs()))); err != nil {
 		return err
 	}
 
@@ -1022,7 +991,6 @@ func (e *proposalTxExecutor) newUTXO(
 // Returns the excess validation and delegatee rewards that were withdrawn.
 func (e *proposalTxExecutor) createOverflowUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
-	txID ids.ID,
 	newWeight uint64,
 	delegateeReward uint64,
 	rewards uint64,
@@ -1063,14 +1031,7 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 		return 0, 0, err
 	}
 
-	if _, err = e.createRewardsUTXOs(
-		addAutoRenewedValidatorTx,
-		txID,
-		excessValidationReward,
-		excessDelegateeReward,
-		e.onCommitState,
-		outputIndexOffset,
-	); err != nil {
+	if _, err = e.createRewardsUTXOs(addAutoRenewedValidatorTx, excessValidationReward, excessDelegateeReward, e.onCommitState, outputIndexOffset); err != nil {
 		return 0, 0, err
 	}
 

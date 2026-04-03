@@ -1169,6 +1169,16 @@ func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
 		_, err = stateTest.diff.GetUTXO(utxoID.InputID())
 		require.ErrorIs(t, database.ErrNotFound, err)
 	}
+
+	// Verify reward UTXOs are correctly tracked via GetRewardUTXOs.
+	require.NoError(t, onCommitState.Apply(env.state))
+	require.NoError(t, env.state.Commit())
+
+	rewardUTXOs, err := env.state.GetRewardUTXOs(rewardTx.ID())
+	require.NoError(t, err)
+	require.Len(t, rewardUTXOs, 2)
+	require.Equal(t, uint64(11_000_000), rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
+	require.Equal(t, uint64(5_500_000), rewardUTXOs[1].Out.(*secp256k1fx.TransferOutput).Amount())
 }
 
 func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
@@ -1359,6 +1369,16 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, currentSupply+validator.PotentialReward, commitSupply)
 	}
+
+	// Verify reward UTXOs are correctly tracked via GetRewardUTXOs.
+	require.NoError(t, onCommitState.Apply(env.state))
+	require.NoError(t, env.state.Commit())
+
+	rewardUTXOs, err := env.state.GetRewardUTXOs(rewardTx.ID())
+	require.NoError(t, err)
+	require.Len(t, rewardUTXOs, 2)
+	require.Equal(t, uint64(6_000_000), rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
+	require.Equal(t, uint64(3_000_000), rewardUTXOs[1].Out.(*secp256k1fx.TransferOutput).Amount())
 }
 
 func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
@@ -1567,6 +1587,18 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, currentSupply+validator.PotentialReward, commitSupply)
 	}
+
+	// Verify reward UTXOs are correctly tracked via GetRewardUTXOs.
+	require.NoError(t, onCommitState.Apply(env.state))
+	require.NoError(t, env.state.Commit())
+
+	rewardUTXOs, err := env.state.GetRewardUTXOs(rewardTx.ID())
+	require.NoError(t, err)
+	require.Len(t, rewardUTXOs, 4)
+	require.Equal(t, uint64(6_000_000), rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
+	require.Equal(t, uint64(3_000_000), rewardUTXOs[1].Out.(*secp256k1fx.TransferOutput).Amount())
+	require.Equal(t, uint64(2_666_667), rewardUTXOs[2].Out.(*secp256k1fx.TransferOutput).Amount())
+	require.Equal(t, uint64(1_333_333), rewardUTXOs[3].Out.(*secp256k1fx.TransferOutput).Amount())
 }
 
 // TestRewardDelegatorToAutoRenewedValidator tests the full delegator reward
@@ -1710,4 +1742,10 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 	// Commit the delegator diff.
 	require.NoError(t, delOnCommitState.Apply(env.state))
 	require.NoError(t, env.state.Commit())
+
+	// Verify reward UTXOs are correctly tracked via GetRewardUTXOs.
+	rewardUTXOs, err := env.state.GetRewardUTXOs(delTx.ID())
+	require.NoError(t, err)
+	require.Len(t, rewardUTXOs, 1)
+	require.Equal(t, wantDelegatorReward, rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
 }
