@@ -172,6 +172,22 @@ func (b *backendVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) erro
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) error {
+	b.b.setOwner(
+		b.txID,
+		tx.Owner,
+	)
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenewedValidatorConfigTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (*backendVisitor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	return ErrUnsupportedTxType
+}
+
 func (b *backendVisitor) baseTx(tx *txs.BaseTx) error {
 	return b.b.removeUTXOs(
 		b.ctx,
