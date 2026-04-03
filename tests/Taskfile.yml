@@ -1,0 +1,5 @@
+version: '3'
+
+includes:
+  merkle-sync:
+    taskfile: msync/Taskfile.yml
