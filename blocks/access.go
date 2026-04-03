@@ -167,6 +167,7 @@ func ResolveRPCNumberOrHash(c Chain, numOrHash rpc.BlockNumberOrHash) (uint64, c
 	case isHash:
 		if bl, ok := c.ConsensusCriticalBlock(hash); ok {
 			n := bl.NumberU64()
+			// TODO(JonathanOppenheimer): avoid the DB read to confirm if canonical
 			if numOrHash.RequireCanonical && hash != rawdb.ReadCanonicalHash(c.DB(), n) {
 				return 0, common.Hash{}, fmt.Errorf("%w: hash %#x", ErrNonCanonicalBlock, hash)
 			}
@@ -220,8 +221,12 @@ func FromNumber[T any](c Chain, n rpc.BlockNumber, fromDB DBReaderWithErr[T]) (*
 // returned by the [ConsensusCritical] method of the [Chain], otherwise it returns
 // `fromDB()` i.f.f. the block was previously accepted. If `fromDB()` is called
 // then the block is guaranteed to exist if read with [rawdb] functions.
-func FromHash[T any](c Chain, hash common.Hash, fromConsensus Extractor[T], fromDB DBReaderWithErr[T]) (*T, error) {
+func FromHash[T any](c Chain, hash common.Hash, requireCanonical bool, fromConsensus Extractor[T], fromDB DBReaderWithErr[T]) (*T, error) {
 	if blk, ok := c.ConsensusCriticalBlock(hash); ok {
+		// TODO(JonathanOppenheimer): avoid the DB read to confirm if canonical
+		if requireCanonical && hash != rawdb.ReadCanonicalHash(c.DB(), blk.NumberU64()) {
+			return nil, fmt.Errorf("%w: hash %#x", ErrNonCanonicalBlock, hash)
+		}
 		return fromConsensus(blk), nil
 	}
 	num := rawdb.ReadHeaderNumber(c.DB(), hash)

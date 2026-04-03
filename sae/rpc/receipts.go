@@ -29,11 +29,6 @@ func (b *backend) GetReceipts(ctx context.Context, hash common.Hash) (types.Rece
 // hash, checking in-memory blocks first then falling back to the database.
 // Returns nils for blocks that are not yet executed.
 func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, *types.Block, error) {
-	// If the block isn't available from the [blocks.InConsensus] of the
-	// [blocks.Chain] then it can only have receipts if it's settled and
-	// therefore must be canonical.
-	numOrHash.RequireCanonical = true
-
 	blk, err := readByNumberOrHash(
 		b,
 		numOrHash,

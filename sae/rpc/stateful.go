@@ -79,6 +79,7 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		return nil, nil, errors.New("state not available for pending block")
 	}
 
+	numOrHash.RequireCanonical = true
 	num, hash, err := blocks.ResolveRPCNumberOrHash(b, numOrHash)
 	if err != nil {
 		return nil, nil, err

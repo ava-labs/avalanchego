@@ -168,6 +168,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (*blocks.Block, error) {
 	b, err := blocks.FromHash(
 		vm.chain(),
 		common.Hash(id),
+		false, // consensus MAY request verified-but-not-accepted blocks
 		func(b *blocks.Block) *blocks.Block {
 			return b
 		},

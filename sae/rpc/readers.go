@@ -20,21 +20,28 @@ func neverErrs[T any](r blocks.DBReader[T]) blocks.DBReaderWithErr[T] {
 }
 
 func notFoundIsNil[T any](x *T, err error) (*T, error) {
+	// [blocks.ErrNonCanonicalBlock] wraps [blocks.ErrNotFound], which
+	// would be a misleading error to return.
 	if errors.Is(err, blocks.ErrNotFound) {
 		return nil, nil
 	}
 	return x, err
 }
 
+// Note that these readers will only work for canonical blocks (blocks that are guaranteed
+// to be executed) to ensure that every block will eventually have post-execution artefacts.
+// Non-canonical blocks are rejected with [blocks.ErrNonCanonicalBlock].
+
 func readByNumber[T any](c Chain, n rpc.BlockNumber, read blocks.DBReader[T]) (*T, error) {
 	return notFoundIsNil(blocks.FromNumber(c, n, read.WithNilErr()))
 }
 
 func readByHash[T any](c Chain, hash common.Hash, fromMem blocks.Extractor[T], fromDB blocks.DBReader[T]) (*T, error) {
-	return notFoundIsNil(blocks.FromHash(c, hash, fromMem, fromDB.WithNilErr()))
+	return notFoundIsNil(blocks.FromHash(c, hash, true, fromMem, fromDB.WithNilErr()))
 }
 
 func readByNumberOrHash[T any](c Chain, blockNrOrHash rpc.BlockNumberOrHash, fromMem blocks.Extractor[T], fromDB blocks.DBReaderWithErr[T]) (*T, error) {
+	blockNrOrHash.RequireCanonical = true
 	return notFoundIsNil(blocks.FromNumberOrHash(c, blockNrOrHash, fromMem, fromDB))
 }
 
