@@ -194,6 +194,7 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 		return fmt.Errorf("failed to extract atomic ops of block %s (%d): %w", b.Hash(), height, err)
 	}
 
+	// TODO: Write Ops into the atomic trie.
 	/*
 		var previousRoot common.Hash
 		trieDB := saestate.NewTrieDB(p.db)

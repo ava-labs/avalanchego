@@ -90,7 +90,6 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
 			Time:             uint64(now.Unix()),
-			Extra:            nil, // TODO: Include warp predicates
 			BlobGasUsed:      utils.PointerTo[uint64](0),
 			ExcessBlobGas:    utils.PointerTo[uint64](0),
 			ParentBeaconRoot: &common.Hash{},
@@ -174,6 +173,7 @@ func (*blockBuilder) BuildBlock(
 		return nil, fmt.Errorf("failed to marshal atomic transactions: %w", err)
 	}
 
+	// TODO: Include warp predicates
 	headerExtra := customtypes.GetHeaderExtra(header)
 	headerExtra.SettledHeight = &settledHeight
 	return customtypes.NewBlockWithExtData(
