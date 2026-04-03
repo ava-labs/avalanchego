@@ -14,7 +14,7 @@ import (
 )
 
 // BeforeBlock is intended to be called before processing a block, with the
-// timestamp portions provided.
+// timestamp portions provided. `subSec` must be in [0, second).
 func (tm *Time) BeforeBlock(sec uint64, subSec time.Duration) { //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
 	tm.FastForwardTo(
 		sec,

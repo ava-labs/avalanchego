@@ -62,9 +62,9 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig saetypes.G
 }
 
 // SubSecond scales [time.Duration] to reflect the given gas rate.
+// `subSec` MUST be in [0, second).
 func SubSecond(subSec time.Duration, rate gas.Gas) gas.Gas { //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
-	// [hook.Points.SubSecondBlockTime] is required to return values in
-	// [0,second). The lower bound guarantees that the conversion to unsigned
+	// `subSec` is in [0,second). The lower bound guarantees that the conversion to unsigned
 	// [gas.Gas] is safe while the upper bound guarantees that the mul-div
 	// result can't overflow so we don't have to check the error.
 	g, _, _ := intmath.MulDivCeil(
