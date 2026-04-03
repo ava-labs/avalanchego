@@ -1908,11 +1908,6 @@ func (s *State) loadCurrentValidators() error {
 			return fmt.Errorf("failed loading validator transaction txID %s, %w", txID, err)
 		}
 
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
-		if !ok {
-			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
-		}
-
 		metadataBytes := validatorIt.Value()
 		metadata := &validatorMetadata{
 			txID: txID,
@@ -1929,13 +1924,41 @@ func (s *State) loadCurrentValidators() error {
 			return err
 		}
 
-		staker, err := NewCurrentStaker(
-			txID,
-			stakerTx,
-			time.Unix(int64(metadata.StakerStartTime), 0),
-			metadata.PotentialReward)
-		if err != nil {
-			return err
+		var staker *Staker
+		switch stakerTx := tx.Unsigned.(type) {
+		case *txs.AddAutoRenewedValidatorTx:
+			weight, err := safemath.Add(stakerTx.Weight(), metadata.AccruedRewards)
+			if err != nil {
+				return fmt.Errorf("overflow computing weight: %w", err)
+			}
+			weight, err = safemath.Add(weight, metadata.AccruedDelegateeRewards)
+			if err != nil {
+				return fmt.Errorf("overflow computing weight: %w", err)
+			}
+
+			staker, err = NewStaker(
+				txID,
+				stakerTx,
+				time.Unix(int64(metadata.StakerStartTime), 0),
+				time.Unix(int64(metadata.StakerEndTime), 0),
+				weight,
+				metadata.PotentialReward,
+			)
+			if err != nil {
+				return fmt.Errorf("failed creating staker: %w", err)
+			}
+		case txs.Staker:
+			staker, err = NewCurrentStaker(
+				txID,
+				stakerTx,
+				time.Unix(int64(metadata.StakerStartTime), 0),
+				metadata.PotentialReward,
+			)
+			if err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("invalid staker tx type: %T", tx.Unsigned)
 		}
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
@@ -2239,10 +2262,7 @@ func (s *State) initValidatorSets() error {
 }
 
 func (s *State) write(updateValidators bool, height uint64) error {
-	codecVersion := CodecVersion1
-	if !s.upgrades.IsDurangoActivated(s.GetTimestamp()) {
-		codecVersion = CodecVersion0
-	}
+	codecVersion := s.resolveValidatorMetadataCodec()
 
 	return errors.Join(
 		s.writeBlocks(),
@@ -2263,6 +2283,20 @@ func (s *State) write(updateValidators bool, height uint64) error {
 		s.writeChains(),
 		s.writeMetadata(),
 	)
+}
+
+func (s *State) resolveValidatorMetadataCodec() uint16 {
+	ts := s.GetTimestamp()
+
+	if s.upgrades.IsHeliconActivated(ts) {
+		return codecVersion2
+	}
+
+	if s.upgrades.IsDurangoActivated(ts) {
+		return CodecVersion1
+	}
+
+	return CodecVersion0
 }
 
 func (s *State) Close() error {
@@ -2867,6 +2901,7 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 					UpDuration:               0,
 					LastUpdated:              startTime,
 					StakerStartTime:          startTime,
+					StakerEndTime:            uint64(staker.EndTime.Unix()),
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
 				}

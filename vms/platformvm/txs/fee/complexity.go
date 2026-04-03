@@ -223,9 +223,31 @@ var (
 		gas.DBWrite: 6, // write remaining balance utxo + weight diff + deactivated weight diff + public key diff + delete staker + write staker
 	}
 
-	IntrinsicAddAutoRenewedValidatorTxComplexities = gas.Dimensions{} // todo: implement
+	IntrinsicAddAutoRenewedValidatorTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.NodeIDLen + // nodeID
+			wrappers.IntLen + // signer typeID
+			wrappers.IntLen + // num stake outs
+			wrappers.IntLen + // validator rewards typeID
+			wrappers.IntLen + // delegator rewards typeID
+			wrappers.IntLen + // owner typeID
+			wrappers.IntLen + // delegation shares
+			wrappers.LongLen + // weight
+			wrappers.IntLen + // auto compound reward shares
+			wrappers.LongLen, // period
+		gas.DBWrite: 3, // put staker + write weight diff + write pk diff
+	}
 
-	IntrinsicSetAutoRenewedValidatorConfigTxComplexities = gas.Dimensions{} // todo: implement
+	IntrinsicSetAutoRenewedValidatorConfigTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // txID
+			wrappers.IntLen + // auth typeID
+			wrappers.IntLen + // authCredential typeID
+			wrappers.IntLen + // auto compound reward shares
+			wrappers.LongLen, // period
+		gas.DBRead:  1, // read tx
+		gas.DBWrite: 1, // update staker
+	}
 
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
