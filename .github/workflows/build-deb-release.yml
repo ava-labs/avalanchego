@@ -99,7 +99,7 @@ jobs:
             build/deb/DEB-GPG-KEY-avalanchego
 
       - name: Configure AWS credentials
-        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/')
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
@@ -107,14 +107,14 @@ jobs:
           aws-region: us-east-1
 
       - name: Install aws cli
-        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/')
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
         run: |
           if ! command -v aws &>/dev/null; then
             sudo snap install aws-cli --classic
           fi
 
       - name: Upload DEBs to S3
-        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/')
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
         run: |
           for release in jammy noble; do
             aws s3 cp "build/deb/avalanchego-${{ env.TAG }}-${{ matrix.deb_arch }}.deb" \
