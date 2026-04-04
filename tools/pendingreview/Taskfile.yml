@@ -23,7 +23,7 @@ tasks:
   test-skill:
     desc: Run agent-driven pending-review skill tests (slow)
     cmd: >-
-      {{.PENDING_REVIEW_NIX_RUN}} go test ./agents/skills/pending-review/tests -count=1
+      {{.PENDING_REVIEW_NIX_RUN}} env RUN_PENDING_REVIEW_SKILL_TESTS=1 go test ./agents/skills/pending-review/tests -count=1
 
   test:
     desc: Run deterministic tool tests, then agent-driven pending-review skill tests
