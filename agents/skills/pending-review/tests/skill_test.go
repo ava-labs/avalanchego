@@ -678,8 +678,10 @@ func TestPendingReviewReconcileCommentsAfterExternalEdit(t *testing.T) {
 				SkillPath: "../SKILL.md",
 				WorkDir:   repoRoot,
 				Prompt: "The pending review inline comments on PR 123 were edited in GitHub by a human. " +
-					"Continue the managed draft comments by applying any !! instruction in the live pending review comments, " +
-					"preserving the human note and existing shared context. Keep the existing top-level review body unchanged. " +
+					"Stay at the ./bin/gh-pending-review CLI boundary and do not inspect repo source or tests. " +
+					"Run get first, inspect the live pending review comments, and reconcile the existing managed comment instead of drafting from scratch. " +
+					"Apply any !! instruction in the live managed comment by updating only the first sentence, removing the !! instruction text from the final body, and preserving the human note, shared context, and existing anchor fields. " +
+					"Then replace the managed comment set with that reconciled single comment using the default new-thread comments-file shape with only path, line, side, and body fields, and keep the existing top-level review body unchanged. " +
 					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
 					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
 					"Do not submit the review.",
@@ -905,8 +907,7 @@ func TestPendingReviewConflictCommentsRequiresReadBeforeForcedOverwrite(t *testi
 				Prompt: "Replace the managed pending review comments on PR 123 with a single " +
 					"comment on snow/engine.go line 7 on the RIGHT side. The comment should start " +
 					`with "Updated finding after conflict." while preserving any live human note ` +
-					"and the existing shared context. If the draft changed in GitHub, reconcile " +
-					"those live edits rather than clobbering them. Keep the top-level review body unchanged. " +
+					"and the existing shared context. Stay at the ./bin/gh-pending-review CLI boundary and do not inspect repo source or tests. Write the replacement comments file using the default new-thread shape with only path, line, side, and body fields. If the draft changed in GitHub, run get, use the live pending review comment as the source of truth, reconcile those live edits rather than clobbering them, and only then retry replace-comments with --force. Keep the top-level review body unchanged. " +
 					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
 					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
 					"Do not submit the review.",
@@ -1440,6 +1441,20 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 				},
 			},
 		}, nil
+	case strings.Contains(query, "mutation DeletePendingReviewComment"):
+		b.requestedOps = append(b.requestedOps, "DeletePendingReviewComment")
+		if b.liveReview == nil {
+			return nil, errors.New("unexpected comment delete with no live review")
+		}
+		commentID, _ := variables["commentID"].(string)
+		if !b.deleteComment(commentID) {
+			return nil, fmt.Errorf("unexpected comment id %q", commentID)
+		}
+		return map[string]any{
+			"deletePullRequestReviewComment": map[string]any{
+				"clientMutationId": "deleted",
+			},
+		}, nil
 	case strings.Contains(query, "mutation DeletePendingReview"):
 		b.requestedOps = append(b.requestedOps, "DeletePendingReview")
 		if b.liveReview == nil {
@@ -1452,20 +1467,6 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 		b.liveReview = nil
 		return map[string]any{
 			"deletePullRequestReview": map[string]any{
-				"clientMutationId": "deleted",
-			},
-		}, nil
-	case strings.Contains(query, "mutation DeletePendingReviewComment"):
-		b.requestedOps = append(b.requestedOps, "DeletePendingReviewComment")
-		if b.liveReview == nil {
-			return nil, errors.New("unexpected comment delete with no live review")
-		}
-		commentID, _ := variables["commentID"].(string)
-		if !b.deleteComment(commentID) {
-			return nil, fmt.Errorf("unexpected comment id %q", commentID)
-		}
-		return map[string]any{
-			"deletePullRequestReviewComment": map[string]any{
 				"clientMutationId": "deleted",
 			},
 		}, nil
