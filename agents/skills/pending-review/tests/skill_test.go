@@ -27,7 +27,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+const runPendingReviewSkillTestsEnv = "RUN_PENDING_REVIEW_SKILL_TESTS"
+
+func requirePendingReviewSkillTests(t *testing.T) {
+	t.Helper()
+
+	if os.Getenv(runPendingReviewSkillTestsEnv) != "1" {
+		t.Skipf("set %s=1 to run agent-driven pending-review skill tests", runPendingReviewSkillTestsEnv)
+	}
+}
+
 func TestPendingReviewGetState(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -65,6 +77,8 @@ func TestPendingReviewGetState(t *testing.T) {
 }
 
 func TestPendingReviewDeleteStateLocalOnly(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -134,6 +148,8 @@ func TestPendingReviewDeleteStateLocalOnly(t *testing.T) {
 }
 
 func TestPendingReviewCreateBodyEndToEnd(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -189,6 +205,8 @@ func TestPendingReviewCreateBodyEndToEnd(t *testing.T) {
 }
 
 func TestPendingReviewInspectBeforeMutatingStaysReadOnly(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -282,6 +300,8 @@ func TestPendingReviewInspectBeforeMutatingStaysReadOnly(t *testing.T) {
 }
 
 func TestPendingReviewReadBodyEndToEnd(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -344,6 +364,8 @@ func TestPendingReviewReadBodyEndToEnd(t *testing.T) {
 }
 
 func TestPendingReviewDeleteEndToEnd(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -431,6 +453,8 @@ func TestPendingReviewDeleteEndToEnd(t *testing.T) {
 }
 
 func TestPendingReviewUpdateBodyEndToEnd(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -512,6 +536,8 @@ func TestPendingReviewUpdateBodyEndToEnd(t *testing.T) {
 }
 
 func TestPendingReviewReconcileBodyAfterExternalEdit(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -618,6 +644,8 @@ func TestPendingReviewReconcileBodyAfterExternalEdit(t *testing.T) {
 }
 
 func TestPendingReviewReconcileCommentsAfterExternalEdit(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -739,6 +767,8 @@ func TestPendingReviewReconcileCommentsAfterExternalEdit(t *testing.T) {
 }
 
 func TestPendingReviewConflictBodyRequiresReadBeforeForcedOverwrite(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -847,6 +877,8 @@ func TestPendingReviewConflictBodyRequiresReadBeforeForcedOverwrite(t *testing.T
 }
 
 func TestPendingReviewConflictCommentsRequiresReadBeforeForcedOverwrite(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -967,6 +999,8 @@ func TestPendingReviewConflictCommentsRequiresReadBeforeForcedOverwrite(t *testi
 }
 
 func TestPendingReviewReplaceCommentsEndToEnd(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {
@@ -1076,6 +1110,8 @@ func TestPendingReviewReplaceCommentsEndToEnd(t *testing.T) {
 }
 
 func TestPendingReviewReplaceCommentsWithThreadReplyEndToEnd(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
 			if _, err := exec.LookPath(agent); err != nil {

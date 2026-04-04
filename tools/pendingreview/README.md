@@ -19,6 +19,25 @@ log or implementation plan.
 For the GraphQL migration research that motivated the next pending-review-session
 design, see [graphql-pending-review-design.md](./graphql-pending-review-design.md).
 
+## Validation
+
+Pending-review validation is split into explicit cheap and expensive paths:
+
+- `task pendingreview:test-tool` runs deterministic `./tools/pendingreview/...`
+  tests and is the default fast validation path for tool logic
+- `task pendingreview:test-skill` runs the agent-driven
+  `./agents/skills/pending-review/tests` suite and is intentionally slow
+- `task pendingreview:test` runs both in that order
+
+The skill suite is opt-in by design. A plain:
+
+```bash
+go test ./agents/skills/pending-review/tests -count=1
+```
+
+skips unless `RUN_PENDING_REVIEW_SKILL_TESTS=1` is set, which prevents
+surprise multi-minute agent runs during ordinary local `go test` usage.
+
 ## Scope
 
 The supported surface is intentionally small and pending-review-only:

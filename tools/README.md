@@ -34,6 +34,10 @@ Preferred conventions for repo-local tools:
   stack-bearing context during development and test debugging
 
 `tools/pendingreview` is the current reference example for these conventions.
+Its validation is intentionally split between fast deterministic tool tests and
+an opt-in slow agent skill suite; see
+[`tools/pendingreview/README.md`](./pendingreview/README.md) for the
+`pendingreview:test-tool` and `pendingreview:test-skill` entrypoints.
 
 ## Import Boundary
 
