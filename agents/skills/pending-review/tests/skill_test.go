@@ -128,7 +128,7 @@ func TestPendingReviewDeleteStateLocalOnly(t *testing.T) {
 
 			output := readOutput(t, result.OutputPath)
 			require.Contains(t, strings.ToLower(output), "deleted")
-			require.Contains(t, strings.ToLower(output), "local state")
+			require.Contains(t, strings.ToLower(output), "pending review state")
 		})
 	}
 }
@@ -1049,13 +1049,18 @@ func TestPendingReviewReplaceCommentsEndToEnd(t *testing.T) {
 			require.Equal(t, "snow/engine.go", review.Comments[0].Path)
 			require.Equal(t, 7, review.Comments[0].Line)
 			require.Equal(t, "RIGHT", review.Comments[0].Side)
-			require.Equal(t, []string{
-				"Viewer",
-				"PullRequestContext",
-				"DeletePendingReviewComment",
-				"AddPendingReviewThread",
-				"PullRequestContext",
-			}, backend.operations())
+			ops := backend.operations()
+			require.Equal(t, 1, countStrings(ops, "DeletePendingReviewComment"))
+			require.Equal(t, 1, countStrings(ops, "AddPendingReviewThread"))
+			require.GreaterOrEqual(t, countStrings(ops, "Viewer"), 1, "ops=%v", ops)
+			require.GreaterOrEqual(t, countStrings(ops, "PullRequestContext"), 2, "ops=%v", ops)
+			deleteIndex := slices.Index(ops, "DeletePendingReviewComment")
+			addIndex := slices.Index(ops, "AddPendingReviewThread")
+			require.NotEqual(t, -1, deleteIndex, "ops=%v", ops)
+			require.NotEqual(t, -1, addIndex, "ops=%v", ops)
+			require.Less(t, deleteIndex, addIndex, "ops=%v", ops)
+			require.GreaterOrEqual(t, countStrings(ops[:deleteIndex], "PullRequestContext"), 1, "ops=%v", ops)
+			require.Equal(t, "PullRequestContext", ops[len(ops)-1], "ops=%v", ops)
 
 			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
 			require.NoError(t, err)

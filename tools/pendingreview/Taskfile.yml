@@ -15,6 +15,22 @@ tasks:
     silent: true
     cmd: task --list | grep pendingreview
 
+  test-tool:
+    desc: Run deterministic gh-pending-review tests (no agent skill suite)
+    cmd: >-
+      {{.PENDING_REVIEW_NIX_RUN}} go test ./tools/pendingreview/... -count=1
+
+  test-skill:
+    desc: Run agent-driven pending-review skill tests (slow)
+    cmd: >-
+      {{.PENDING_REVIEW_NIX_RUN}} go test ./agents/skills/pending-review/tests -count=1
+
+  test:
+    desc: Run deterministic tool tests, then agent-driven pending-review skill tests
+    cmds:
+      - task: test-tool
+      - task: test-skill
+
   auth-login:
     desc: Start the isolated gh auth login flow used by gh-pending-review
     cmds:
