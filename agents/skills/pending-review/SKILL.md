@@ -40,6 +40,23 @@ This tool is only the GitHub pending review interface. Keep instruction
 interpretation, review drafting, and reconciliation in the agent, not in the
 tool.
 
+For routine pending-review work, stay at the CLI boundary:
+
+- use `./bin/gh-pending-review`
+- write any temporary body or comments payloads you need
+- do not inspect or modify `tools/pendingreview`, tests, or other repo source
+  just to complete a normal pending-review task
+- if a command fails, correct the command usage or payload and retry; do not
+  pivot into debugging the tool implementation unless the user explicitly asks
+
+Shell note:
+
+- commands in this environment may run under `zsh`
+- avoid bash-only cleanup snippets or assigning to `status`, which is read-only
+  in `zsh`
+- if you need to preserve an exit code while cleaning up a temp file, use a
+  variable such as `rc`
+
 The tool currently supports:
 
 - `create --pr <number> (--body <text> | --body-file <path>)`
@@ -92,6 +109,20 @@ Read the returned JSON and inspect:
 - any inline comments attached to that pending review
 - `!!` instructions in either place
 
+`get` returns JSON for the live pending review. The fields that matter for
+reconciliation are:
+
+- top-level `body`
+- `comments[]` entries with:
+  - `kind`
+  - `thread_id` for replies
+  - `path`, `line`, and `side` for new threads
+  - `body`
+
+Treat `id`, `reply_to_comment_id`, and `user` as read-only metadata. Do not copy
+those fields into a `replace-comments` input file unless the write format
+explicitly requires them.
+
 ### Update Body
 
 If the user wants you to revise only the top-level review body:
@@ -111,6 +142,37 @@ desired comments to a JSON file and apply them with:
 ```bash
 ./bin/gh-pending-review replace-comments --pr <number> --comments-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
 ```
+
+Prefer a simple temp file write such as a heredoc over complex shell quoting or
+helper scripts when producing the JSON payload for `--comments-file`.
+
+Safe pattern:
+
+```bash
+tmp=$(mktemp)
+cat >"$tmp" <<'EOF'
+[
+  {
+    "path": "path/to/file.go",
+    "line": 123,
+    "side": "RIGHT",
+    "body": "Review comment text."
+  }
+]
+EOF
+./bin/gh-pending-review replace-comments --pr <number> --comments-file "$tmp" --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
+rc=$?
+rm -f "$tmp"
+exit $rc
+```
+
+When using a heredoc for JSON, write raw JSON object syntax inside the heredoc.
+Do not shell-escape the JSON quotes.
+
+For reconciliation-sensitive comment updates, do not treat the task as complete
+until `replace-comments` succeeds. If a write fails, fix the command or payload
+and retry. When helpful, run `get` again to confirm the live comment body now
+matches the reconciled text.
 
 Important behavior:
 
@@ -133,6 +195,10 @@ Comments file shape:
   }
 ]
 ```
+
+For ordinary new-thread replacements, prefer that default shape and omit
+`kind`. Only include `kind` when you actually need a non-default entry type such
+as `thread_reply`.
 
 Replies to existing review threads use `kind: "thread_reply"` and a GitHub
 review thread node ID:
@@ -165,6 +231,24 @@ Normalization rule:
 - GitHub may read replies back with inherited anchor fields such as `path`,
   `line`, or `start_line`; those fields are ignored for reply comparison and
   conflict reconciliation
+
+When reconciling comments after a human GitHub edit:
+
+1. run `get`
+2. read the live pending review JSON
+3. identify the managed comment entries in `comments`
+4. apply any `!!` instruction to the live comment text
+5. remove the `!!` instruction text from the final comment body
+6. preserve the human note, shared context, and anchor fields that should stay
+7. write the desired managed set to a JSON file using the `replace-comments`
+   input format
+8. rerun `replace-comments` with `--force` only after that reconciliation
+
+For new-thread entries, the replacement file normally keeps `path`, `line`,
+`side`, and the reconciled `body`, while omitting `kind` unless a non-default
+entry type is needed. For thread replies, keep `kind:
+"thread_reply"`, `thread_id`, and the reconciled `body`, while omitting
+read-only fields such as reply comment IDs inherited from `get`.
 
 ### Local State
 
@@ -199,6 +283,10 @@ If `update-body` or `replace-comments` reports a conflict:
 
 Do not retry blindly after a conflict.
 
+If the request already says the draft was edited in GitHub, assume the safe flow
+is still: `get`, reconcile, then mutate. Do not skip straight to overwriting
+based only on local state.
+
 ## Interpretation Rules
 
 - Treat `!!` in the review body or inline comments as instructions to the
@@ -208,6 +296,12 @@ Do not retry blindly after a conflict.
 - Prefer `--body-file` for nontrivial review bodies.
 - Preserve the user's current draft intent when replacing comments; the tool
   keeps the existing top-level review and updates its managed entry set.
+- When `!!` appears inside a live inline comment, edit that live comment text
+  into the requested final comment body rather than appending a second
+  instruction response.
+- For write requests, completion means the pending-review write command
+  succeeded. Do not stop after a failed mutation or after only reading the
+  draft state.
 - If there is no pending review for the authenticated user, say so plainly.
 - Preserve safety: do not submit the review.
 
