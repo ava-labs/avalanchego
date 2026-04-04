@@ -64,6 +64,75 @@ func TestPendingReviewGetState(t *testing.T) {
 	}
 }
 
+func TestPendingReviewDeleteStateLocalOnly(t *testing.T) {
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			stateDir := filepath.Join(t.TempDir(), "state-home", "gh-pending-review")
+			require.NoError(t, os.MkdirAll(filepath.Join(xdgConfigHome, "gh-pending-review"), 0o755))
+
+			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
+			require.NoError(t, store.Save(pendingreview.ReviewState{
+				Repo:              "ava-labs/avalanchego",
+				PRNumber:          123,
+				UserLogin:         "octocat",
+				ReviewID:          "review-123",
+				LastPublishedBody: "stale draft",
+				HTMLURL:           "https://example.invalid/review/123",
+			}))
+
+			backend := newFakePendingReviewBackend()
+			backend.seedReview(fakeReview{
+				ID:         "review-123",
+				DatabaseID: 123,
+				Body:       "live draft should remain untouched",
+				State:      "PENDING",
+				URL:        "https://example.invalid/review/123",
+				Author: fakeUser{
+					Login: "octocat",
+				},
+			})
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Delete my local pending review state for PR 123 as github " +
+					"login octocat because the local state is stale. Do not touch GitHub. " +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review".`,
+				Timeout: 2 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             filepath.Dir(stateDir),
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+			require.Empty(t, backend.operations())
+			require.True(t, backend.hasReview())
+
+			_, err := os.Stat(stateFilePath(stateDir, "ava-labs/avalanchego", "octocat", 123))
+			require.ErrorIs(t, err, os.ErrNotExist)
+
+			output := readOutput(t, result.OutputPath)
+			require.Contains(t, strings.ToLower(output), "deleted")
+			require.Contains(t, strings.ToLower(output), "local state")
+		})
+	}
+}
+
 func TestPendingReviewCreateBodyEndToEnd(t *testing.T) {
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
 		t.Run(agent, func(t *testing.T) {
@@ -115,6 +184,99 @@ func TestPendingReviewCreateBodyEndToEnd(t *testing.T) {
 			require.Equal(t, "review-123", stored.ReviewID)
 			require.Equal(t, "foo", stored.LastPublishedBody)
 			require.Equal(t, "https://example.invalid/review/123", stored.HTMLURL)
+		})
+	}
+}
+
+func TestPendingReviewInspectBeforeMutatingStaysReadOnly(t *testing.T) {
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			xdgStateHome := filepath.Join(t.TempDir(), "state-home")
+			configDir := filepath.Join(xdgConfigHome, "gh-pending-review")
+			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
+			require.NoError(t, store.Save(pendingreview.ReviewState{
+				Repo:              "ava-labs/avalanchego",
+				PRNumber:          123,
+				UserLogin:         "octocat",
+				ReviewID:          "review-123",
+				LastPublishedBody: "draft v1",
+				LastPublishedEntries: []pendingreview.DraftReviewEntry{{
+					Kind: pendingreview.DraftReviewEntryKindNewThread,
+					Path: "snow/engine.go",
+					Line: 7,
+					Side: "RIGHT",
+					Body: "existing finding",
+				}},
+				HTMLURL: "https://example.invalid/review/123",
+			}))
+
+			backend := newFakePendingReviewBackend()
+			backend.seedReview(fakeReview{
+				ID:         "review-123",
+				DatabaseID: 123,
+				Body:       "draft v2 from GitHub",
+				State:      "PENDING",
+				URL:        "https://example.invalid/review/123",
+				Author: fakeUser{
+					Login: "octocat",
+				},
+				Comments: []fakeReviewComment{{
+					ID:       "comment-1",
+					ThreadID: "thread-1",
+					Body:     "live finding from GitHub",
+					Path:     "snow/engine.go",
+					Line:     7,
+					Side:     "RIGHT",
+				}},
+			})
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Before changing anything on PR 123, inspect the current pending review body " +
+					"and inline comments and tell me what is there. Do not mutate the draft until I confirm. " +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review".`,
+				Timeout: 3 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             xdgStateHome,
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+
+			review := backend.review()
+			require.Equal(t, "draft v2 from GitHub", review.Body)
+			require.Len(t, review.Comments, 1)
+			require.Equal(t, "live finding from GitHub", review.Comments[0].Body)
+			require.Equal(t, []string{"Viewer", "PullRequestContext"}, backend.operations())
+
+			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
+			require.NoError(t, err)
+			require.Equal(t, "draft v1", stored.LastPublishedBody)
+			require.Len(t, stored.LastPublishedEntries, 1)
+			require.Equal(t, "existing finding", stored.LastPublishedEntries[0].Body)
+
+			output := readOutput(t, result.OutputPath)
+			require.Contains(t, output, "draft v2 from GitHub")
+			require.Contains(t, output, "live finding from GitHub")
 		})
 	}
 }
@@ -177,6 +339,93 @@ func TestPendingReviewReadBodyEndToEnd(t *testing.T) {
 
 			output := readOutput(t, result.OutputPath)
 			require.Contains(t, output, "draft v1")
+		})
+	}
+}
+
+func TestPendingReviewDeleteEndToEnd(t *testing.T) {
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			xdgStateHome := filepath.Join(t.TempDir(), "state-home")
+			configDir := filepath.Join(xdgConfigHome, "gh-pending-review")
+			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
+			require.NoError(t, store.Save(pendingreview.ReviewState{
+				Repo:              "ava-labs/avalanchego",
+				PRNumber:          123,
+				UserLogin:         "octocat",
+				ReviewID:          "review-123",
+				LastPublishedBody: "draft body",
+				LastPublishedEntries: []pendingreview.DraftReviewEntry{{
+					Kind: pendingreview.DraftReviewEntryKindNewThread,
+					Path: "snow/engine.go",
+					Line: 7,
+					Side: "RIGHT",
+					Body: "existing finding",
+				}},
+				HTMLURL: "https://example.invalid/review/123",
+			}))
+
+			backend := newFakePendingReviewBackend()
+			backend.seedReview(fakeReview{
+				ID:         "review-123",
+				DatabaseID: 123,
+				Body:       "draft body",
+				State:      "PENDING",
+				URL:        "https://example.invalid/review/123",
+				Author: fakeUser{
+					Login: "octocat",
+				},
+				Comments: []fakeReviewComment{{
+					ID:       "comment-1",
+					ThreadID: "thread-1",
+					Body:     "existing finding",
+					Path:     "snow/engine.go",
+					Line:     7,
+					Side:     "RIGHT",
+				}},
+			})
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Delete my pending review on PR 123 and clean up any local pending review state. " +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
+					"Do not submit the review.",
+				Timeout: 3 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             xdgStateHome,
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+
+			require.False(t, backend.hasReview())
+			require.Equal(t, []string{"Viewer", "PullRequestContext", "DeletePendingReview"}, backend.operations())
+
+			_, err := os.Stat(stateFilePath(stateDir, "ava-labs/avalanchego", "octocat", 123))
+			require.ErrorIs(t, err, os.ErrNotExist)
+
+			output := readOutput(t, result.OutputPath)
+			require.Contains(t, strings.ToLower(output), "deleted")
+			require.Contains(t, strings.ToLower(output), "pending review")
 		})
 	}
 }
@@ -1191,6 +1440,21 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 				},
 			},
 		}, nil
+	case strings.Contains(query, "mutation DeletePendingReview"):
+		b.requestedOps = append(b.requestedOps, "DeletePendingReview")
+		if b.liveReview == nil {
+			return nil, errors.New("unexpected delete with no live review")
+		}
+		reviewID, _ := variables["reviewID"].(string)
+		if reviewID != b.liveReview.ID {
+			return nil, fmt.Errorf("unexpected review id %q", reviewID)
+		}
+		b.liveReview = nil
+		return map[string]any{
+			"deletePullRequestReview": map[string]any{
+				"clientMutationId": "deleted",
+			},
+		}, nil
 	case strings.Contains(query, "mutation DeletePendingReviewComment"):
 		b.requestedOps = append(b.requestedOps, "DeletePendingReviewComment")
 		if b.liveReview == nil {
@@ -1291,6 +1555,13 @@ func (b *fakePendingReviewBackend) operations() []string {
 	defer b.mu.Unlock()
 
 	return slices.Clone(b.requestedOps)
+}
+
+func (b *fakePendingReviewBackend) hasReview() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.liveReview != nil
 }
 
 func (b *fakePendingReviewBackend) graphQLComments() []map[string]any {
