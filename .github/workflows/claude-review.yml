@@ -15,17 +15,25 @@ jobs:
       pull-requests: write # Required for Claude to post PR comments and inline review feedback
       id-token: write # Required for OIDC authentication with Anthropic's API
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout trusted prompt from master
+        uses: actions/checkout@v4
         with:
+          ref: master
+          sparse-checkout: agents/pr-review.md
+          sparse-checkout-cone-mode: false
+          path: trusted-prompt
           fetch-depth: 1
       - name: Read review prompt
         id: prompt
         run: |
           {
             echo 'content<<EOF'
-            cat agents/pr-review.md
+            cat trusted-prompt/agents/pr-review.md
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
