@@ -183,7 +183,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 // Returns the database and its resulting root.
 func generateDB(t *testing.T, r *rand.Rand, numKeys int) (*ffi.Database, ids.ID) {
 	t.Helper()
-	db, err := ffi.New(t.TempDir(), ffi.EthereumNodeHashing)
+	db, err := ffi.New(t.TempDir(), ffi.EthereumNodeHashing, true)
 	require.NoError(t, err)
 	require.NotNil(t, db)
 

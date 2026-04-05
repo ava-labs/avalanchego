@@ -256,10 +256,15 @@ const (
 // If no [Option] is provided, sensible defaults will be used.
 // See the With* functions for details about each configuration parameter and its default value.
 //
+// [requireInTreeFFI] is a temporary compatibility breaker used to exercise
+// callers that are compiled against the published FFI module instead of the
+// in-tree Bazel target.
+//
 // It is the caller's responsibility to call [Database.Close] when the database
 // is no longer needed. No other [Database] in this process should be opened with
 // the same file path until the database is closed.
-func New(dbDir string, nodeHashAlgorithm NodeHashAlgorithm, opts ...Option) (*Database, error) {
+func New(dbDir string, nodeHashAlgorithm NodeHashAlgorithm, requireInTreeFFI bool, opts ...Option) (*Database, error) {
+	_ = requireInTreeFFI
 	conf := defaultConfig()
 	for _, opt := range opts {
 		opt(conf)
