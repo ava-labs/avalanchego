@@ -11,7 +11,7 @@
 #   CONTEXT_DIR   - Path to the Dockerfile directory
 #
 # Optional env vars:
-#   DOCKERFILE    - Dockerfile name (default: "Dockerfile")
+#   DOCKERFILE    - Dockerfile name (default: "Dockerfile.rpm")
 
 set -euo pipefail
 
@@ -56,6 +56,6 @@ fi
 docker build "${build_flags[@]}" \
     --build-arg GO_VERSION="${GO_VERSION}" \
     --build-arg GO_CHECKSUM="${checksum}" \
-    -f "${CONTEXT_DIR}/${DOCKERFILE:-Dockerfile}" \
+    -f "${CONTEXT_DIR}/${DOCKERFILE:-Dockerfile.rpm}" \
     -t "${DOCKER_IMAGE}" \
     "${CONTEXT_DIR}"

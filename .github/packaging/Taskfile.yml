@@ -50,6 +50,7 @@ tasks:
       GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
       DOCKER_IMAGE: '{{.PACKAGING_DOCKER_IMAGE}}'
       CONTEXT_DIR: '{{.REPO_ROOT}}/.github/packaging'
+      DOCKERFILE: Dockerfile.rpm
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/build-builder-image.sh'
 
