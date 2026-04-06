@@ -23,6 +23,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/strevm/gastime"
+	saeparams "github.com/ava-labs/strevm/params"
 	"github.com/ava-labs/strevm/proxytime"
 	saetypes "github.com/ava-labs/strevm/types"
 )
@@ -197,16 +198,21 @@ func (b *Block) Executed() bool {
 	return b.execution.Load() != nil
 }
 
+// executionArtefact blocks until [Block.MarkExecuted] has been called and then
+// returns the requested value. A warning is logged if the caller is blocked for
+// longer than [saeparams.MaxQueueWallTime].
 func executionArtefact[T any](b *Block, desc string, get func(*executionResults) T) T {
-	e := b.execution.Load()
-	if e == nil {
-		b.log.Error("execution artefact requested before execution",
+	select {
+	case <-b.executed:
+	case <-time.After(saeparams.MaxQueueWallTime):
+		b.log.Warn("blocking on execution artefact longer than expected",
 			zap.String("artefact", desc),
+			zap.Duration("waited", saeparams.MaxQueueWallTime),
 		)
-		var zero T
-		return zero
+		<-b.executed
 	}
-	return get(e)
+
+	return get(b.execution.Load())
 }
 
 func (e *executionResults) executedByGasTime() *gastime.Time    { return e.byGas.Clone() }
@@ -215,32 +221,32 @@ func (e *executionResults) cloneBaseFee() *uint256.Int          { return e.baseF
 func (e *executionResults) cloneReceiptsSlice() types.Receipts  { return slices.Clone(e.receipts) }
 func (e *executionResults) postExecutionStateRoot() common.Hash { return e.stateRootPost }
 
-// ExecutedByGasTime returns a clone of the gas time passed to
-// [Block.MarkExecuted] or nil if no such successful call has been made.
+// ExecutedByGasTime blocks until [Block.MarkExecuted] has been called and
+// returns a clone of the gas time passed to it.
 func (b *Block) ExecutedByGasTime() *gastime.Time {
 	return executionArtefact(b, "execution (gas) time", (*executionResults).executedByGasTime)
 }
 
-// ExecutedByWallTime returns the wall time passed to [Block.MarkExecuted] or
-// the zero time if no such successful call has been made.
+// ExecutedByWallTime blocks until [Block.MarkExecuted] has been called and
+// returns the wall time passed to it.
 func (b *Block) ExecutedByWallTime() time.Time {
 	return executionArtefact(b, "execution (wall) time", (*executionResults).executedByWallTime)
 }
 
-// ExecutedBaseFee returns the base gas price passed to [Block.MarkExecuted] or nil if
-// no such successful call has been made.
+// ExecutedBaseFee blocks until [Block.MarkExecuted] has been called and returns
+// a clone of the base fee passed to it.
 func (b *Block) ExecutedBaseFee() *uint256.Int {
 	return executionArtefact(b, "baseFee", (*executionResults).cloneBaseFee)
 }
 
-// Receipts returns the receipts passed to [Block.MarkExecuted] or nil if no
-// such successful call has been made.
+// Receipts blocks until [Block.MarkExecuted] has been called and returns the
+// receipts passed to it.
 func (b *Block) Receipts() types.Receipts {
 	return executionArtefact(b, "receipts", (*executionResults).cloneReceiptsSlice)
 }
 
-// PostExecutionStateRoot returns the state root passed to [Block.MarkExecuted]
-// or the zero hash if no such successful call has been made.
+// PostExecutionStateRoot blocks until [Block.MarkExecuted] has been called and
+// returns the state root passed to it.
 func (b *Block) PostExecutionStateRoot() common.Hash {
 	return executionArtefact(b, "state root", (*executionResults).postExecutionStateRoot)
 }

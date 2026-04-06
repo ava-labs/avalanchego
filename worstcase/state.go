@@ -88,11 +88,6 @@ func NewState(
 
 const (
 	maxGasSecondsPerBlock = saeparams.TauSeconds * saeparams.Lambda
-	// The concepts of "fullness" and "capacity" are ambiguous with respect to
-	// the SAE queue so it is better to think of it as "open" or "closed" to
-	// accepting a new block. An open queue MAY accept an entire, maximal block,
-	// which could leave it in an _allowed_ over-threshold (closed) state.
-	maxFullBlocksInOpenQueue = 2
 )
 
 var (
@@ -125,7 +120,7 @@ func (s *State) StartBlock(h *types.Header) error {
 	s.blockSize = 0
 
 	s.maxBlockSize = safeMaxBlockSize(s.clock)
-	if maxOpenQSize := maxFullBlocksInOpenQueue * s.maxBlockSize; s.qSize > maxOpenQSize {
+	if maxOpenQSize := saeparams.MaxFullBlocksInOpenQueue * s.maxBlockSize; s.qSize > maxOpenQSize {
 		return fmt.Errorf("%w: current size %d exceeds maximum size for accepting new blocks %d", ErrQueueFull, s.qSize, maxOpenQSize)
 	}
 
@@ -147,16 +142,14 @@ func (s *State) StartBlock(h *types.Header) error {
 }
 
 // safeMaxBlockSize returns the maximum block size for the clock's rate,
-// possibly capping it to avoid overflow when calculating the queue size. At the
+// possibly capping it so a full closed queue still fits in [gas.Gas]. At the
 // time of writing, the cap is ~6e17, so capping is exceedingly unlikely.
-//
-// The cap follows from:
-//
-//	maxBlockSize = maxSafeRate * maxGasSecondsPerBlock
-//	maxOpenQSize = maxFullBlocksInOpenQueue * maxBlockSize
-//	maxClosedQSize = maxOpenQSize + maxBlockSize
 func safeMaxBlockSize(clock *gastime.Time) gas.Gas {
-	const maxSafeRate gas.Gas = math.MaxUint64 / maxGasSecondsPerBlock / (maxFullBlocksInOpenQueue + 1)
+	const (
+		maxGasSecondsInClosedQueue         = saeparams.MaxFullBlocksInClosedQueue * maxGasSecondsPerBlock
+		maxGasInClosedQueue        gas.Gas = math.MaxUint64
+		maxSafeRate                gas.Gas = maxGasInClosedQueue / maxGasSecondsInClosedQueue
+	)
 	return min(clock.Rate(), maxSafeRate) * maxGasSecondsPerBlock
 }
 

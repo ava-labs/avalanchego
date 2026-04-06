@@ -74,27 +74,6 @@ func TestMarkExecuted(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 		require.ErrorIs(t, context.DeadlineExceeded, b.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
-
-		rec := saetest.NewLogRecorder(logging.Warn)
-		b.log = rec
-		assertNumErrorLogs := func(t *testing.T, want int) {
-			t.Helper()
-			assert.Len(t, rec.At(logging.Error), want, "Number of ERROR logs")
-		}
-
-		tests := []struct {
-			method string
-			call   func() any
-		}{
-			{"ExecutedByGasTime()", func() any { return b.ExecutedByGasTime() }},
-			{"ExecutedBaseFee()", func() any { return b.ExecutedBaseFee() }},
-			{"Receipts()", func() any { return b.Receipts() }},
-			{"PostExecutionStateRoot()", func() any { return b.PostExecutionStateRoot() }},
-		}
-		for i, tt := range tests {
-			assert.Zero(t, tt.call(), tt.method)
-			assertNumErrorLogs(t, i+1)
-		}
 	})
 
 	gasTime := mustNewGasTime(t, time.Unix(42, 0), 1e6, 42, gastime.DefaultGasPriceConfig())

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -46,6 +47,43 @@ func TestStateQueryOnNonCanonicalBlock(t *testing.T) {
 			method: "eth_getBlockByHash",
 			args:   []any{b.Hash(), false},
 			want:   (*types.Header)(nil),
+		},
+	}...)
+}
+
+// TestStateQueryBlocksUntilExecuted verifies that state-dependent RPC calls on
+// an accepted-but-unexecuted block will wait until execution completes,
+// regardless of whether the block is addressed by hash or height.
+func TestStateQueryBlocksUntilExecuted(t *testing.T) {
+	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
+	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
+	ctx, sut := newSUT(t, 2, precompileOpt)
+	defer unblock()
+
+	addr := sut.wallet.Addresses()[1]
+	want, err := sut.BalanceAt(ctx, addr, nil)
+	require.NoError(t, err, "%T.BalanceAt(latest)", sut.Client)
+
+	b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &blockingPrecompile,
+		Gas:      params.TxGas,
+		GasPrice: big.NewInt(1),
+	}))
+
+	// Running in parallel allows the main test to unblock() after the tests are
+	// started.
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method:   "eth_getBalance",
+			args:     []any{addr, rpc.BlockNumberOrHashWithHash(b.Hash(), false)},
+			want:     (*hexutil.Big)(want),
+			parallel: true,
+		},
+		{
+			method:   "eth_getBalance",
+			args:     []any{addr, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(b.Number().Int64()))},
+			want:     (*hexutil.Big)(want),
+			parallel: true,
 		},
 	}...)
 }
