@@ -124,5 +124,5 @@ jobs:
           if [[ -n "${GPG_KEY_FILE:-}" ]]; then
             rm -f "${GPG_KEY_FILE}"
           fi
-          rm -rf build/deb build/gpg
+          sudo rm -rf build/deb build/gpg
         shell: bash
