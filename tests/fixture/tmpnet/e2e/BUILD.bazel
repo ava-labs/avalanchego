@@ -1,0 +1,14 @@
+load("//.bazel:defs.bzl", "go_test")
+
+go_test(
+    name = "e2e_test",
+    srcs = ["e2e_test.go"],
+    tags = ["manual"],  # keep
+    deps = [
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+    ],
+)
