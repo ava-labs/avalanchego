@@ -97,4 +97,5 @@ jobs:
             rm -f "${GPG_KEY_FILE}"
           fi
           rm -rf build/rpm
+          sudo rm -rf build/gpg
         shell: bash
