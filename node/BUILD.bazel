@@ -87,11 +87,10 @@ go_test(
     embed = [":node"],
     deps = [
         "//ids",
-        "//snow/networking/router/routermock",
+        "//snow/networking/router/routertest",
         "//snow/validators",
         "//utils/constants",
         "//version",
         "@com_github_stretchr_testify//require",
-        "@org_uber_go_mock//gomock",
     ],
 )

@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/router/routermock"
+	"github.com/ava-labs/avalanchego/snow/networking/router/routertest"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendertest"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -827,7 +827,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				msgCreator     = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender = sendermock.NewExternalSender(ctrl)
 				timeoutManager = timeoutmock.NewManager(ctrl)
-				router         = routermock.NewRouter(ctrl)
+				testRouter     = routertest.New(t)
 				nodeIDs        = set.Of(successNodeID, failedNodeID, ctx.NodeID)
 				nodeIDsCopy    set.Set[ids.NodeID]
 			)
@@ -841,7 +841,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				ctx,
 				msgCreator,
 				externalSender,
-				router,
+				testRouter,
 				timeoutManager,
 				p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
@@ -852,29 +852,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			// Set the timeout (deadline)
 			timeoutManager.EXPECT().TimeoutDuration().Return(deadline).AnyTimes()
 
-			// Make sure we register requests with the router
-			for nodeID := range nodeIDs {
-				expectedFailedMsg := tt.failedMsgF(nodeID)
-				router.EXPECT().RegisterRequest(
-					gomock.Any(),          // Context
-					nodeID,                // Node ID
-					ctx.ChainID,           // Destination Chain
-					requestID,             // Request ID
-					tt.expectedResponseOp, // Operation
-					expectedFailedMsg,     // Failure Message
-					p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
-				)
-			}
-
-			// Make sure we send a message to ourselves since [myNodeID]
-			// is in [nodeIDs].
-			router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
-				func(_ context.Context, msg *message.InboundMessage) {
-					// Make sure we're sending ourselves the expected message.
-					tt.assertMsgToMyself(require, msg)
-				},
-			)
-
 			// Make sure we're making the correct outbound message.
 			tt.setMsgCreatorExpect(msgCreator)
 
@@ -882,6 +859,20 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			tt.setExternalSenderExpect(externalSender)
 
 			tt.sendF(require, sender, nodeIDsCopy)
+
+			// Verify requests were registered with the router
+			for range nodeIDs {
+				req := testRouter.PopRegisteredRequest(t)
+				require.True(nodeIDs.Contains(req.NodeID))
+				require.Equal(ctx.ChainID, req.ChainID)
+				require.Equal(requestID, req.RequestID)
+				require.Equal(tt.expectedResponseOp, req.Op)
+				expectedFailedMsg := tt.failedMsgF(req.NodeID)
+				require.Equal(expectedFailedMsg.Op, req.FailedMsg.Op)
+			}
+
+			// Verify the message sent to ourselves
+			tt.assertMsgToMyself(require, testRouter.PopInternalMessage(t))
 		})
 	}
 }
@@ -1041,14 +1032,14 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				msgCreator     = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender = sendermock.NewExternalSender(ctrl)
 				timeoutManager = timeoutmock.NewManager(ctrl)
-				router         = routermock.NewRouter(ctrl)
+				testRouter     = routertest.New(t)
 			)
 
 			sender, err := New(
 				ctx,
 				msgCreator,
 				externalSender,
-				router,
+				testRouter,
 				timeoutManager,
 				p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
@@ -1061,13 +1052,10 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 
 			// Case: sending to ourselves
 			{
-				router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
-					func(_ context.Context, msg *message.InboundMessage) {
-						// Make sure we're sending ourselves the expected message.
-						tt.assertMsgToMyself(require, msg)
-					},
-				)
 				tt.sendF(require, sender, ctx.NodeID)
+
+				// Verify the message sent to ourselves
+				tt.assertMsgToMyself(require, testRouter.PopInternalMessage(t))
 			}
 
 			// Case: not sending to ourselves
@@ -1200,7 +1188,7 @@ func TestSender_Single_Request(t *testing.T) {
 				msgCreator     = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender = sendermock.NewExternalSender(ctrl)
 				timeoutManager = timeoutmock.NewManager(ctrl)
-				router         = routermock.NewRouter(ctrl)
+				testRouter     = routertest.New(t)
 			)
 
 			// Instantiate new registerers to avoid duplicate metrics
@@ -1211,7 +1199,7 @@ func TestSender_Single_Request(t *testing.T) {
 				ctx,
 				msgCreator,
 				externalSender,
-				router,
+				testRouter,
 				timeoutManager,
 				engineType,
 				subnets.New(ctx.NodeID, subnets.Config{}),
@@ -1224,52 +1212,24 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Case: sending to myself
 			{
-				// Make sure we register requests with the router
-				expectedFailedMsg := tt.failedMsgF(ctx.NodeID)
-				router.EXPECT().RegisterRequest(
-					gomock.Any(),          // Context
-					ctx.NodeID,            // Node ID
-					ctx.ChainID,           // Destination Chain
-					requestID,             // Request ID
-					tt.expectedResponseOp, // Operation
-					expectedFailedMsg,     // Failure Message
-					tt.expectedEngineType, // Engine Type
-				)
+				tt.sendF(require, sender, ctx.NodeID)
+
+				req := testRouter.PopRegisteredRequest(t)
+				require.Equal(ctx.NodeID, req.NodeID)
+				require.Equal(ctx.ChainID, req.ChainID)
+				require.Equal(requestID, req.RequestID)
+				require.Equal(tt.expectedResponseOp, req.Op)
+				require.Equal(tt.failedMsgF(ctx.NodeID).Op, req.FailedMsg.Op)
+				require.Equal(tt.expectedEngineType, req.EngineType)
 
 				if tt.shouldFailMessageToSelf {
-					router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
-						func(_ context.Context, msg *message.InboundMessage) {
-							// Make sure we're sending ourselves the expected message.
-							tt.assertMsg(require, msg)
-						},
-					)
+					tt.assertMsg(require, testRouter.PopInternalMessage(t))
 				}
-
-				tt.sendF(require, sender, ctx.NodeID)
 			}
 
 			// Case: Node is benched
 			{
 				timeoutManager.EXPECT().IsBenched(ctx.ChainID, destinationNodeID).Return(true)
-
-				// Make sure we register requests with the router
-				expectedFailedMsg := tt.failedMsgF(destinationNodeID)
-				router.EXPECT().RegisterRequest(
-					gomock.Any(),          // Context
-					destinationNodeID,     // Node ID
-					ctx.ChainID,           // Destination Chain
-					requestID,             // Request ID
-					tt.expectedResponseOp, // Operation
-					expectedFailedMsg,     // Failure Message
-					tt.expectedEngineType, // Engine Type
-				)
-
-				router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
-					func(_ context.Context, msg *message.InboundMessage) {
-						// Make sure we're sending ourselves the expected message.
-						tt.assertMsg(require, msg)
-					},
-				)
 
 				// Make sure we're expecting the correct outbound message.
 				tt.setMsgCreatorExpect(msgCreator)
@@ -1278,30 +1238,19 @@ func TestSender_Single_Request(t *testing.T) {
 				tt.setExternalSenderExpect(externalSender, set.Set[ids.NodeID]{})
 
 				tt.sendF(require, sender, destinationNodeID)
+
+				req := testRouter.PopRegisteredRequest(t)
+				require.Equal(destinationNodeID, req.NodeID)
+				require.Equal(tt.expectedResponseOp, req.Op)
+				require.Equal(tt.failedMsgF(destinationNodeID).Op, req.FailedMsg.Op)
+				require.Equal(tt.expectedEngineType, req.EngineType)
+
+				tt.assertMsg(require, testRouter.PopInternalMessage(t))
 			}
 
 			// Case: Node is not myself, not benched and send fails
 			{
 				timeoutManager.EXPECT().IsBenched(ctx.ChainID, destinationNodeID).Return(false)
-
-				// Make sure we register requests with the router
-				expectedFailedMsg := tt.failedMsgF(destinationNodeID)
-				router.EXPECT().RegisterRequest(
-					gomock.Any(),          // Context
-					destinationNodeID,     // Node ID
-					ctx.ChainID,           // Destination Chain
-					requestID,             // Request ID
-					tt.expectedResponseOp, // Operation
-					expectedFailedMsg,     // Failure Message
-					tt.expectedEngineType, // Engine Type
-				)
-
-				router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
-					func(_ context.Context, msg *message.InboundMessage) {
-						// Make sure we're sending ourselves the expected message.
-						tt.assertMsg(require, msg)
-					},
-				)
 
 				// Make sure we're making the correct outbound message.
 				tt.setMsgCreatorExpect(msgCreator)
@@ -1310,6 +1259,14 @@ func TestSender_Single_Request(t *testing.T) {
 				tt.setExternalSenderExpect(externalSender, set.Set[ids.NodeID]{})
 
 				tt.sendF(require, sender, destinationNodeID)
+
+				req := testRouter.PopRegisteredRequest(t)
+				require.Equal(destinationNodeID, req.NodeID)
+				require.Equal(tt.expectedResponseOp, req.Op)
+				require.Equal(tt.failedMsgF(destinationNodeID).Op, req.FailedMsg.Op)
+				require.Equal(tt.expectedEngineType, req.EngineType)
+
+				tt.assertMsg(require, testRouter.PopInternalMessage(t))
 			}
 		})
 	}
