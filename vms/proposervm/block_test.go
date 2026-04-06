@@ -678,13 +678,12 @@ func TestBuildBlockErrClosedLogsWarn(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
 			ctx := t.Context()
 
 			coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
-			defer func() {
-				require.NoError(proVM.Shutdown(ctx))
-			}()
+			t.Cleanup(func() {
+				require.NoError(t, proVM.Shutdown(ctx))
+			})
 
 			coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
 			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -702,10 +701,10 @@ func TestBuildBlockErrClosedLogsWarn(t *testing.T) {
 			}
 
 			parentBlk, err := proVM.BuildBlock(ctx)
-			require.NoError(err)
-			require.NoError(parentBlk.Verify(ctx))
-			require.NoError(parentBlk.Accept(ctx))
-			require.NoError(proVM.SetPreference(ctx, parentBlk.ID()))
+			require.NoError(t, err)
+			require.NoError(t, parentBlk.Verify(ctx))
+			require.NoError(t, parentBlk.Accept(ctx))
+			require.NoError(t, proVM.SetPreference(ctx, parentBlk.ID()))
 
 			test.setupMock(valState)
 
@@ -717,28 +716,27 @@ func TestBuildBlockErrClosedLogsWarn(t *testing.T) {
 			var logged bool
 			loggingCore := logging.NewWrappedCore(logging.Warn, logging.Discard, logging.Plain.ConsoleEncoder())
 			proVM.ctx.Log = logging.NewLogger("", loggingCore).WithOptions(zap.Hooks(func(e zapcore.Entry) error {
-				require.False(logged, "expected exactly one log entry")
+				require.False(t, logged, "expected exactly one log entry")
 				logged = true
-				require.Equal(zapcore.Level(logging.Warn), e.Level)
-				require.Equal(test.expectedMessage, e.Message)
+				require.Equal(t, zapcore.Level(logging.Warn), e.Level)
+				require.Equal(t, test.expectedMessage, e.Message)
 				return nil
 			}))
 
 			_, err = proVM.BuildBlock(ctx)
-			require.ErrorIs(err, database.ErrClosed)
-			require.True(logged, "expected log entry was not emitted")
+			require.ErrorIs(t, err, database.ErrClosed)
+			require.True(t, logged, "expected log entry was not emitted")
 		})
 	}
 }
 
 func TestVerifyBlockErrClosedLogsWarn(t *testing.T) {
-	require := require.New(t)
 	ctx := t.Context()
 
 	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
-	defer func() {
-		require.NoError(proVM.Shutdown(ctx))
-	}()
+	t.Cleanup(func() {
+		require.NoError(t, proVM.Shutdown(ctx))
+	})
 
 	coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	coreChildBlk := snowmantest.BuildChild(coreParentBlk)
@@ -759,10 +757,10 @@ func TestVerifyBlockErrClosedLogsWarn(t *testing.T) {
 	}
 
 	parentBlk, err := proVM.BuildBlock(ctx)
-	require.NoError(err)
-	require.NoError(parentBlk.Verify(ctx))
-	require.NoError(parentBlk.Accept(ctx))
-	require.NoError(proVM.SetPreference(ctx, parentBlk.ID()))
+	require.NoError(t, err)
+	require.NoError(t, parentBlk.Verify(ctx))
+	require.NoError(t, parentBlk.Accept(ctx))
+	require.NoError(t, proVM.SetPreference(ctx, parentBlk.ID()))
 
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return 0, database.ErrClosed
@@ -781,7 +779,7 @@ func TestVerifyBlockErrClosedLogsWarn(t *testing.T) {
 	}
 
 	childBlk, err := proVM.BuildBlock(ctx)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Now break GetCurrentHeight and verify the built block
 	valState.GetCurrentHeightF = savedGetCurrentHeightF
@@ -789,14 +787,14 @@ func TestVerifyBlockErrClosedLogsWarn(t *testing.T) {
 	var logged bool
 	loggingCore := logging.NewWrappedCore(logging.Warn, logging.Discard, logging.Plain.ConsoleEncoder())
 	proVM.ctx.Log = logging.NewLogger("", loggingCore).WithOptions(zap.Hooks(func(e zapcore.Entry) error {
-		require.False(logged, "expected exactly one log entry")
+		require.False(t, logged, "expected exactly one log entry")
 		logged = true
-		require.Equal(zapcore.Level(logging.Warn), e.Level)
-		require.Equal("block verification failed", e.Message)
+		require.Equal(t, zapcore.Level(logging.Warn), e.Level)
+		require.Equal(t, "block verification failed", e.Message)
 		return nil
 	}))
 
 	err = childBlk.Verify(ctx)
-	require.ErrorIs(err, database.ErrClosed)
-	require.True(logged, "expected log entry was not emitted")
+	require.ErrorIs(t, err, database.ErrClosed)
+	require.True(t, logged, "expected log entry was not emitted")
 }
