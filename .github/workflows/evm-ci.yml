@@ -15,7 +15,7 @@ jobs:
       run:
         working-directory: ./graft/evm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ./.github/actions/setup-go-for-project
       - name: Run all lint checks
         run: ../../scripts/run_task.sh lint-all-ci
@@ -33,7 +33,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-22.04, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ./.github/actions/setup-go-for-project
       - run: ../../scripts/run_task.sh build-test
       - run: ../../scripts/run_task.sh coverage

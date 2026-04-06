@@ -16,7 +16,7 @@ jobs:
       run:
         working-directory: ./graft/subnet-evm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ./.github/actions/install-nix
       - name: Run all lint checks
         run: ./scripts/run_task.sh lint-all-ci
@@ -34,7 +34,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-22.04, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ./.github/actions/setup-go-for-project
       - run: ./scripts/run_task.sh build-test
       - run: ./scripts/run_task.sh coverage
@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
       - name: Run Warp E2E Tests
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
       - name: Run E2E Load Tests
@@ -92,7 +92,7 @@ jobs:
       run:
         working-directory: ./graft/subnet-evm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install qemu (required for cross-platform builds)
         run: |
           sudo apt update
@@ -108,7 +108,7 @@ jobs:
         with:
           tool-cache: true
           docker-images: true
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for subnet-evm test setup
         shell: bash

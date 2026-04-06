@@ -44,7 +44,7 @@ jobs:
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Define Matrix
         id: define-matrix
         shell: bash -x {0}
@@ -88,12 +88,12 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           role-duration-seconds: '43200'
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Run chaos test with Firewood
         shell: nix develop --impure --command bash -x {0}
         run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ matrix.test || '' }}"
