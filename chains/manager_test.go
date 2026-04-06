@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/router/routermock"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -35,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/vmsmock"
@@ -52,10 +52,35 @@ func (m *manager) startChainCreatorNoPChain() {
 
 // newRouter returns a mock router that mocks the call of adding a chain to the router.
 func newRouter(t *testing.T) router.Router {
-	ctrl := gomock.NewController(t)
-	r := routermock.NewRouter(ctrl)
-	r.EXPECT().AddChain(gomock.Any(), gomock.Any()).Return().AnyTimes()
-	return r
+	chainRouter := router.ChainRouter{}
+	benchlist := benchlist.NewNoBenchlist()
+	tm, err := timeout.NewManager(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutCoefficient: 1.25,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist,
+		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+	require.NoError(t, chainRouter.Initialize(
+		ids.EmptyNodeID,
+		logging.NoLog{},
+		tm,
+		time.Second,
+		set.Set[ids.ID]{},
+		true,
+		set.Set[ids.ID]{},
+		nil,
+		router.HealthConfig{},
+		prometheus.NewRegistry(),
+	))
+
+	return &chainRouter
 }
 
 func newTimeoutManager(t *testing.T) timeout.Manager {
