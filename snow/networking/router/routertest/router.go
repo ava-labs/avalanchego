@@ -108,10 +108,10 @@ func (r *Router) PopRegisteredRequest(t testing.TB) RegisteredRequest {
 func New(t testing.TB) *Router {
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
-			InitialTimeout:     time.Millisecond,
-			MinimumTimeout:     time.Millisecond,
-			MaximumTimeout:     10 * time.Second,
-			TimeoutCoefficient: 1.25,
+			InitialTimeout:     500 * time.Millisecond,
+			MinimumTimeout:     500 * time.Millisecond,
+			MaximumTimeout:     500 * time.Millisecond,
+			TimeoutCoefficient: 1,
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
