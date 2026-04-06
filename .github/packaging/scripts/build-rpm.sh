@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Build and validate an RPM package inside the container.
+# Build and sign an RPM package inside the container.
 #
 # Required env vars:
 #   PACKAGE        - "avalanchego" or "subnet-evm"
@@ -25,121 +25,31 @@ set -euo pipefail
 REPO_ROOT="/build"
 PACKAGING_DIR="${REPO_ROOT}/.github/packaging"
 
+# shellcheck disable=SC1091
+source "${PACKAGING_DIR}/scripts/lib-build-common.sh"
+
 # Well-known paths referenced by nfpm configs
 export NFPM_CHANGELOG="${REPO_ROOT}/build/nfpm-changelog.yml"
 export NFPM_SIGNING_KEY="${REPO_ROOT}/build/gpg/signing-key.asc"
 
 echo "=== Building ${PACKAGE} RPM for ${RPM_ARCH} (tag: ${TAG}) ==="
 
-# ── Step 1: Build binary ──────────────────────────────────────────
+init_build_env
+build_binary "${PACKAGE}"
+generate_changelog "${VERSION}"
 
-# In CI, the bind-mounted source tree is owned by the host user. Mark it
-# as safe so that git works inside the container (needed by older build
-# scripts that resolve the commit hash via git rather than AVALANCHEGO_COMMIT).
-if ! git -C "${REPO_ROOT}" rev-parse HEAD &>/dev/null; then
-    git config --global --add safe.directory "${REPO_ROOT}"
-fi
+# ── GPG signing ───────────────────────────────────────────────────
 
-# shellcheck disable=SC1091
-source "${REPO_ROOT}/scripts/constants.sh"
-# shellcheck disable=SC1091
-source "${REPO_ROOT}/scripts/git_commit.sh"
-
-# shellcheck disable=SC2154
-echo "Git commit: ${git_commit}"
-
-# Disable Go's automatic VCS stamping — the commit hash is passed
-# explicitly via AVALANCHEGO_COMMIT and -ldflags instead.
-export GOFLAGS="${GOFLAGS:-} -buildvcs=false"
-
-case "${PACKAGE}" in
-    avalanchego)
-        echo "Building avalanchego..."
-        "${REPO_ROOT}/scripts/build.sh"
-        # shellcheck disable=SC2154
-        BINARY_PATH="${avalanchego_path}"
-        ;;
-    subnet-evm)
-        echo "Building subnet-evm..."
-        # Source VM ID from constants.sh (canonical definition)
-        SUBNET_EVM_VM_ID=$(
-            grep '^DEFAULT_VM_ID=' "${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh" \
-            | cut -d'"' -f2
-        )
-        export SUBNET_EVM_VM_ID
-        echo "Subnet-EVM VM ID: ${SUBNET_EVM_VM_ID}"
-
-        SUBNET_EVM_BINARY="${REPO_ROOT}/build/subnet-evm"
-        # Build from subnet-evm directory — build.sh uses relative glob "plugin/"*.go
-        (cd "${REPO_ROOT}/graft/subnet-evm" && ./scripts/build.sh "${SUBNET_EVM_BINARY}")
-        BINARY_PATH="${SUBNET_EVM_BINARY}"
-        ;;
-    *)
-        echo "Unknown package: ${PACKAGE}" >&2
-        exit 1
-        ;;
-esac
-
-echo "Binary built at: ${BINARY_PATH}"
-
-# ── Step 2: Generate changelog ────────────────────────────────────
-
-cat > "${NFPM_CHANGELOG}" <<EOF
----
-- semver: ${VERSION}
-  date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-  packager: Ava Labs <security@avalabs.org>
-  changes:
-    - note: "See https://github.com/ava-labs/avalanchego/releases/tag/v${VERSION}"
-EOF
-
-# ── Step 3: Set up GPG signing ────────────────────────────────────
-
-GPG_WORKDIR="${REPO_ROOT}/build/gpg"
-mkdir -p "${GPG_WORKDIR}"
 GPG_PUBLIC_KEY="${OUTPUT_DIR}/RPM-GPG-KEY-avalanchego"
+setup_gpg "${RPM_GPG_KEY_FILE:-}" "${GPG_PUBLIC_KEY}" "RPM"
 
-if [[ -n "${RPM_GPG_KEY_FILE:-}" ]]; then
-    echo "Using provided GPG key for signing"
-    gpg --batch --import "${RPM_GPG_KEY_FILE}"
-    # Copy to well-known path for nfpm config
-    cp "${RPM_GPG_KEY_FILE}" "${NFPM_SIGNING_KEY}"
-elif [[ -f "${NFPM_SIGNING_KEY}" ]]; then
-    # Reuse ephemeral key from a previous build (e.g., avalanchego built before subnet-evm)
-    echo "Reusing existing ephemeral GPG key"
-    gpg --batch --import "${NFPM_SIGNING_KEY}"
-    export NFPM_RPM_PASSPHRASE=""
-else
-    echo "Generating ephemeral GPG key for signing"
-
-    gpg --batch --gen-key <<GPGEOF
-%no-protection
-Key-Type: RSA
-Key-Length: 4096
-Subkey-Type: RSA
-Subkey-Length: 4096
-Name-Real: AvalancheGo RPM Signing (ephemeral)
-Name-Email: security@avalabs.org
-Expire-Date: 1d
-%commit
-GPGEOF
-
-    # Export private key to well-known path for nfpm
-    gpg --batch --armor --export-secret-keys "security@avalabs.org" > "${NFPM_SIGNING_KEY}"
+# For ephemeral keys (no passphrase), nfpm needs an empty passphrase
+if [[ -z "${RPM_GPG_KEY_FILE:-}" && -z "${NFPM_RPM_PASSPHRASE+x}" ]]; then
     export NFPM_RPM_PASSPHRASE=""
 fi
 
-# Export public key for verification
-gpg --batch --armor --export "security@avalabs.org" > "${GPG_PUBLIC_KEY}"
-echo "GPG public key exported to: ${GPG_PUBLIC_KEY}"
+# ── Package with nfpm ─────────────────────────────────────────────
 
-# ── Step 4: Package with nfpm ─────────────────────────────────────
-
-RPM_FILENAME="${PACKAGE}-${TAG}-${RPM_ARCH}.rpm"
-RPM_PATH="${OUTPUT_DIR}/${RPM_FILENAME}"
-mkdir -p "${OUTPUT_DIR}"
-
-# Set binary path env var for nfpm config (contents use expand: true)
 case "${PACKAGE}" in
     avalanchego) export AVALANCHEGO_BINARY="${BINARY_PATH}" ;;
     subnet-evm)  export SUBNET_EVM_BINARY="${BINARY_PATH}" ;;
@@ -147,15 +57,13 @@ esac
 
 export VERSION RPM_ARCH
 
-# nfpm does not expand env vars in top-level fields (changelog, signature.key_file).
-# Preprocess the config template with envsubst so all ${VAR} references resolve.
-NFPM_CONFIG_RESOLVED="${REPO_ROOT}/build/${PACKAGE}-rpm-resolved.yml"
-envsubst < "${PACKAGING_DIR}/nfpm/${PACKAGE}-rpm.yml" > "${NFPM_CONFIG_RESOLVED}"
+RPM_FILENAME="${PACKAGE}-${TAG}-${RPM_ARCH}.rpm"
+RPM_PATH="${OUTPUT_DIR}/${RPM_FILENAME}"
 
-echo "Packaging ${RPM_FILENAME}..."
-nfpm package \
-    --config "${NFPM_CONFIG_RESOLVED}" \
-    --packager rpm \
-    --target "${RPM_PATH}"
+run_nfpm_package \
+    "${PACKAGING_DIR}/nfpm/${PACKAGE}-rpm.yml" \
+    "${REPO_ROOT}/build/${PACKAGE}-rpm-resolved.yml" \
+    rpm \
+    "${RPM_PATH}"
 
 echo "RPM built: ${RPM_PATH}"
