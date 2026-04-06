@@ -19,12 +19,24 @@ import (
 	"github.com/ava-labs/strevm/hook"
 )
 
-// Config allows parameterization of the TrieDB and when
-// state is committed.
+// Config allows parameterization of the TrieDB and when state is committed.
 type Config struct {
 	// TODO(alarso16): move minimal elements to config and construct in method.
-	TrieDBConfig *triedb.Config
-	Archival     bool // if true, will store every state on disk
+	TrieDBConfig       *triedb.Config
+	Archival           bool // if true, will store every state on disk
+	TrieCommitInterval uint64
+}
+
+// defaultCommitInterval is the default number of blocks between commits of the
+// state trie to disk.
+const defaultCommitInterval = 4096
+
+// CommitInterval returns the trie commit interval.
+func (c Config) CommitInterval() uint64 {
+	if c.TrieCommitInterval == 0 {
+		return defaultCommitInterval
+	}
+	return c.TrieCommitInterval
 }
 
 // SnapshotCacheSizeMB is the snapshot cache size used by a [Tracker].
@@ -39,11 +51,11 @@ var _ StateDBOpener = (*Tracker)(nil)
 // All methods are safe to be called even after [Tracker.Close], but state
 // will be unavailable.
 type Tracker struct {
-	snaps      *snapshot.Tree
-	cache      state.Database
-	isHashDB   bool
-	isArchival bool
-	log        logging.Logger
+	snaps    *snapshot.Tree
+	cache    state.Database
+	isHashDB bool
+	config   Config
+	log      logging.Logger
 }
 
 // NewTracker provides a new [Tracker] on the underlying database.
@@ -59,16 +71,16 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log loggi
 		return nil, err
 	}
 	return &Tracker{
-		snaps:      snaps,
-		cache:      cache,
-		isHashDB:   isHashDB,
-		isArchival: c.Archival,
-		log:        log,
+		snaps:    snaps,
+		cache:    cache,
+		isHashDB: isHashDB,
+		config:   c,
+		log:      log,
 	}, nil
 }
 
 // Track tracks the root and may commit the trie associated with the root
-// to the database if [ShouldCommitTrieDB] returns true, or the [Config]
+// to the database if [Config.ShouldCommitTrieDB] returns true, or the [Config]
 // specifies that the node is archival.
 //
 // This state will be available in memory until [Tracker.Untrack] has been
@@ -98,10 +110,10 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 		because string
 	)
 	switch {
-	case t.isArchival:
+	case t.config.Archival:
 		commit = executionRoot
 		because = "post-execution archive"
-	case ShouldCommitTrieDB(height):
+	case ShouldCommitTrieDB(height, t.config.CommitInterval()):
 		commit = settledRoot
 		because = "settled"
 	default:
@@ -127,7 +139,7 @@ func LastHeightWithExecutionRootCommitted(db ethdb.Database, c Config, hooks hoo
 		return head
 
 	default:
-		num := LastCommittedTrieDBHeight(head)
+		num := LastCommittedTrieDBHeight(head, c.CommitInterval())
 		if num <= lastSynchronous {
 			return lastSynchronous
 		}

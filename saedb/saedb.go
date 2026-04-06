@@ -12,23 +12,15 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 )
 
-const (
-	// CommitTrieDBEvery is the number of blocks between commits of the state
-	// trie to disk.
-	CommitTrieDBEvery     = 1 << commitTrieDBEveryLog2
-	commitTrieDBEveryLog2 = 12
-	commitTrieDBMask      = CommitTrieDBEvery - 1
-)
-
 // ShouldCommitTrieDB returns whether or not to commit the state trie to disk.
-func ShouldCommitTrieDB(blockNum uint64) bool {
-	return blockNum&commitTrieDBMask == 0
+func ShouldCommitTrieDB(blockNum, commitInterval uint64) bool {
+	return blockNum%commitInterval == 0
 }
 
 // LastCommittedTrieDBHeight returns the largest value <= the argument at which
 // [ShouldCommitTrieDB] would have returned true.
-func LastCommittedTrieDBHeight(atOrBefore uint64) uint64 {
-	return atOrBefore &^ commitTrieDBMask
+func LastCommittedTrieDBHeight(atOrBefore, commitInterval uint64) uint64 {
+	return atOrBefore - atOrBefore%commitInterval
 }
 
 // A StateDBOpener opens a [state.StateDB] at the given root.

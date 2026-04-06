@@ -290,6 +290,12 @@ func withExecResultsDB(hdb database.HeightIndex) sutOption {
 	})
 }
 
+func withCommitInterval(interval uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.DBConfig.TrieCommitInterval = interval
+	})
+}
+
 func withBloomSectionSize(size uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.BlocksPerBloomSection = size

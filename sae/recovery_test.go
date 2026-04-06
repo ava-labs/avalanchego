@@ -39,7 +39,8 @@ func TestRecoverFromDatabase(t *testing.T) {
 
 	var srcDB database.Database
 	srcHDB := saetest.NewHeightIndexDB()
-	ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), options.Func[sutConfig](func(c *sutConfig) {
+	const commitInterval = 16
+	ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 		srcDB = c.db
 		c.logLevel = logging.Warn
 	}))
@@ -55,8 +56,8 @@ func TestRecoverFromDatabase(t *testing.T) {
 		// iteration.
 		last := src.lastAcceptedBlock(t)
 		height := last.Height()
-		quick := height < saedb.CommitTrieDBEvery && src.rawVM.last.settled.Load().Height() > 1
-		final = height > saedb.CommitTrieDBEvery
+		quick := height < commitInterval && src.rawVM.last.settled.Load().Height() > 1
+		final = height > commitInterval
 
 		if !quick {
 			src.mustSendTx(t, src.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
@@ -80,7 +81,7 @@ func TestRecoverFromDatabase(t *testing.T) {
 		t.Run("recover", func(t *testing.T) {
 			newDB := copyDB(t, srcDB)
 
-			sutCtx, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), options.Func[sutConfig](func(c *sutConfig) {
+			sutCtx, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 				c.db = newDB
 				c.logLevel = logging.Warn
 			}))
@@ -131,6 +132,7 @@ func TestRecoverFromDatabase(t *testing.T) {
 func TestRecoverSimple(t *testing.T) {
 	t.Parallel()
 
+	const commitInterval = 16
 	tests := []struct {
 		name      string
 		numBlocks int
@@ -143,15 +145,15 @@ func TestRecoverSimple(t *testing.T) {
 		},
 		{
 			name:      "non_archival_before_first_trie_commit",
-			numBlocks: 10, // << [saedb.CommitTrieDBEvery]
+			numBlocks: 10, // < commitInterval
 		},
 		{
 			name:      "non_archival_after_trie_commit",
-			numBlocks: saedb.CommitTrieDBEvery + 15, // ensure another settled block
+			numBlocks: commitInterval + 15, // ensure another settled block
 		},
 		{
 			name:      "non_archival_commit_interval_exactly",
-			numBlocks: saedb.CommitTrieDBEvery,
+			numBlocks: commitInterval,
 		},
 	}
 	for _, tt := range tests {
@@ -162,7 +164,7 @@ func TestRecoverSimple(t *testing.T) {
 			srcHDB := saetest.NewHeightIndexDB()
 
 			sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-			ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), options.Func[sutConfig](func(c *sutConfig) {
+			ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 				srcDB = c.db
 				c.logLevel = logging.Warn
 				c.vmConfig.DBConfig.Archival = tt.archival
@@ -179,7 +181,7 @@ func TestRecoverSimple(t *testing.T) {
 			}
 
 			newDB := copyDB(t, srcDB)
-			_, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), options.Func[sutConfig](func(c *sutConfig) {
+			_, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 				c.db = newDB
 				c.logLevel = logging.Warn
 				c.vmConfig.DBConfig.Archival = tt.archival
@@ -196,7 +198,7 @@ func TestRecoverSimple(t *testing.T) {
 			// where the settled state was written to disk.
 			t.Run("unavailable_outside_window", func(t *testing.T) {
 				lastSettled := sut.rawVM.last.settled.Load().NumberU64()
-				committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled)
+				committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)
 				lastOnDisk, err := canonicalBlock(sut.rawVM.db, committedHeight)
 				require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)
 

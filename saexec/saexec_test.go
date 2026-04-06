@@ -64,10 +64,11 @@ func TestMain(m *testing.M) {
 // SUT is the system under test, primarily the [Executor].
 type SUT struct {
 	*Executor
-	chain  *blockstest.ChainBuilder
-	wallet *saetest.Wallet
-	logger *saetest.TBLogger
-	db     ethdb.Database
+	saedbConfig saedb.Config
+	chain       *blockstest.ChainBuilder
+	wallet      *saetest.Wallet
+	logger      *saetest.TBLogger
+	db          ethdb.Database
 
 	// [closeOnce] ensures that [Executor.Close] is only called once, so tests can
 	// explicitly close the [Executor] without worrying about the cleanup calling it again.
@@ -76,8 +77,9 @@ type SUT struct {
 
 type (
 	sutConfig struct {
-		hooks    *saehookstest.Stub
-		archival bool
+		hooks          *saehookstest.Stub
+		archival       bool
+		commitInterval uint64
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -110,8 +112,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	src := blocks.Source(chain.GetBlock)
 
 	saedbConfig := saedb.Config{
-		TrieDBConfig: tdbConfig,
-		Archival:     sutCfg.archival,
+		TrieDBConfig:       tdbConfig,
+		Archival:           sutCfg.archival,
+		TrieCommitInterval: sutCfg.commitInterval,
 	}
 	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger)
 	require.NoError(tb, err, "New()")
@@ -121,12 +124,13 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		require.NoErrorf(tb, closeOnce(), "%T.Close()", e)
 	})
 	return ctx, &SUT{
-		Executor:  e,
-		chain:     chain,
-		wallet:    wallet,
-		logger:    logger,
-		db:        db,
-		closeOnce: closeOnce,
+		Executor:    e,
+		saedbConfig: saedbConfig,
+		chain:       chain,
+		wallet:      wallet,
+		logger:      logger,
+		db:          db,
+		closeOnce:   closeOnce,
 	}
 }
 
@@ -933,10 +937,13 @@ func TestSnapshotPersistence(t *testing.T) {
 }
 
 func TestStateRootAvailability(t *testing.T) {
-	ctx, sut := newSUT(t)
+	const commitInterval = 16
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.commitInterval = commitInterval
+	}))
 	e, chain := sut.Executor, sut.chain
 
-	const numBlocks = uint64(saedb.CommitTrieDBEvery) + 10
+	const numBlocks = commitInterval + 10
 	for range numBlocks {
 		b := chain.NewBlock(t, types.Transactions{
 			sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
@@ -959,7 +966,7 @@ func TestStateRootAvailability(t *testing.T) {
 
 			var want testerr.Want
 			switch {
-			case saedb.ShouldCommitTrieDB(b.NumberU64()):
+			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval()):
 				// on disk
 			case expectReferenced(b.NumberU64()):
 				// still referenced
@@ -997,12 +1004,14 @@ func TestStateRootAvailability(t *testing.T) {
 }
 
 func TestArchivalStoresAll(t *testing.T) {
+	const commitInterval = 16
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
 		c.archival = true
+		c.commitInterval = commitInterval
 	}))
 	e, chain := sut.Executor, sut.chain
 
-	const numBlocks = uint64(saedb.CommitTrieDBEvery) + 10
+	const numBlocks = commitInterval + 10
 	for range numBlocks {
 		b := chain.NewBlock(t, types.Transactions{
 			sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
@@ -1026,7 +1035,7 @@ func TestArchivalStoresAll(t *testing.T) {
 	t.Run("recover", func(t *testing.T) {
 		// Restart the chain to remove the TrieDB cache.
 		src := blocks.Source(chain.GetBlock)
-		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, saedb.Config{Archival: true}, defaultHooks(), sut.log)
+		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log)
 		require.NoError(t, err, "New()")
 		t.Cleanup(func() {
 			require.NoErrorf(t, e.Close(), "%T.Close()", e)
