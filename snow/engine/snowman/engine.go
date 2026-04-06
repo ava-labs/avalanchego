@@ -57,6 +57,7 @@ type Engine struct {
 	common.AcceptedHandler
 	common.AncestorsHandler
 	common.AppHandler
+	common.SimplexHandler
 	validators.Connector
 
 	requestID uint32
@@ -140,6 +141,7 @@ func New(config Config) (*Engine, error) {
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
 		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
 		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
+		SimplexHandler:              common.NewNoOpSimplexHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 		Connector:                   config.VM,
 		pending:                     make(map[ids.ID]snowman.Block),
@@ -1100,10 +1102,19 @@ func (e *Engine) addUnverifiedBlockToConsensus(
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", blkHeight),
 	)
+
+	onAccept := func() {}
+	if e.PChainProgressUpdater != nil {
+		onAccept = func() {
+			e.PChainProgressUpdater.SetProgress(blkHeight)
+		}
+	}
+
 	return true, e.Consensus.Add(&memoryBlock{
-		Block:   blk,
-		metrics: e.metrics,
-		tree:    e.unverifiedIDToAncestor,
+		onAccept: onAccept,
+		Block:    blk,
+		metrics:  e.metrics,
+		tree:     e.unverifiedIDToAncestor,
 	})
 }
 
@@ -1199,4 +1210,10 @@ func (e *Engine) isDecided(blk snowman.Block) bool {
 	parentHeight := height - 1
 	parentID := blk.Parent()
 	return parentHeight == lastAcceptedHeight && parentID != lastAcceptedID // the parent was rejected
+}
+
+// PChainProgressUpdater is used to update the P-Chain height progress of this chain.
+// It's only used by the engine instance that runs the P-chain.
+type PChainProgressUpdater interface {
+	SetProgress(height uint64)
 }

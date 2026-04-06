@@ -15,10 +15,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
+
+var _ common.Engine = (*Engine)(nil)
 
 var (
 	errUnknownMessageType   = errors.New("unknown message type")
@@ -26,6 +31,22 @@ var (
 )
 
 type Engine struct {
+	// list of NoOpsHandler for messages dropped by engine
+	common.AllGetsServer
+	common.StateSummaryFrontierHandler
+	common.AcceptedStateSummaryHandler
+	common.AcceptedFrontierHandler
+	common.AcceptedHandler
+	common.AncestorsHandler
+	common.PutHandler
+	common.QueryHandler
+	common.ChitsHandler
+
+	// Handler that passes application messages to the VM
+	common.AppHandler
+	validators.Connector
+	vm block.ChainVM
+
 	epoch              *simplex.Epoch
 	blockDeserializer  *blockDeserializer
 	quorumDeserializer *QCDeserializer
@@ -119,6 +140,19 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	}
 
 	return &Engine{
+		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
+		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
+		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
+		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
+		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Log),
+		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Log),
+		PutHandler:                  common.NewNoOpPutHandler(config.Log),
+		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
+		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
+		AppHandler:                  config.VM,
+		Connector:                   config.VM,
+		vm:                          config.VM,
+
 		epoch:              epoch,
 		blockDeserializer:  blockDeserializer,
 		quorumDeserializer: qcDeserializer,
@@ -202,6 +236,29 @@ func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*si
 	default:
 		return nil, errUnknownMessageType
 	}
+}
+
+// Gossip is a no-op because there is no need for the Simplex engine
+// to periodically pull/push messages from the network.
+// This is all handled internally inside of Simplex consensus.
+func (*Engine) Gossip(_ context.Context) error {
+	return nil
+}
+
+// Notify is a no-op because the Simplex engine does not need to be notified of any events from the VM.
+// This is because the Simplex instance listens to the VM events by directly calling `WaitForEvent` when needed.
+func (*Engine) Notify(_ context.Context, _ common.Message) error {
+	return nil
+}
+
+func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
+	vmIntf, vmErr := e.vm.HealthCheck(ctx)
+	intf := map[string]interface{}{
+		"consensus": struct{}{},
+		"vm":        vmIntf,
+	}
+
+	return intf, vmErr
 }
 
 func (e *Engine) Shutdown(_ context.Context) error {
