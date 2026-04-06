@@ -1741,7 +1741,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 
 	messageSender, err := m.createMessageSender(ctx, sb)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create snowman message sender: %w", err)
+		return nil, fmt.Errorf("couldn't create simplex message sender: %w", err)
 	}
 
 	// initialize the VM
