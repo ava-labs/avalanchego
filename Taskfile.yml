@@ -94,6 +94,13 @@ tasks:
       - cmd: |
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
+  test-e2e-tmpnet:
+    desc: Run tmpnet archive e2e test with bazel-built binary
+    cmds:
+      - task: bazel-build
+      - cmd: |
+          {{.NIX_RUN}} bash -c 'unset AVALANCHEGO_PATH; AVALANCHEGO_PATH="$(pwd)/$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null)"; export AVALANCHEGO_PATH; bazelisk test //tests/fixture/tmpnet/e2e:e2e_test --test_output=errors --test_env=AVALANCHEGO_PATH'
+
   bazel-test-fast:
     desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
     cmd: '{{.NIX_RUN}} bazelisk test --config=fast //...'

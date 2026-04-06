@@ -169,6 +169,11 @@ func (n *Node) getRuntimeConfig() NodeRuntimeConfig {
 	return n.network.DefaultRuntimeConfig
 }
 
+func (n *Node) hasRuntimeConfig() bool {
+	runtimeConfig := n.getRuntimeConfig()
+	return runtimeConfig.Process != nil || runtimeConfig.Kube != nil
+}
+
 // Runtime methods
 
 func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
@@ -199,6 +204,11 @@ func (n *Node) Restart(ctx context.Context) error {
 }
 
 func (n *Node) readState(ctx context.Context) error {
+	if !n.hasRuntimeConfig() {
+		n.URI = ""
+		n.StakingAddress = netip.AddrPort{}
+		return nil
+	}
 	return n.getRuntime().readState(ctx)
 }
 
