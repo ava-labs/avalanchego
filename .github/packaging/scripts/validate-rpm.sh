@@ -28,6 +28,7 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RPM_DIR="${REPO_ROOT}/build/rpm"
+SCRIPTS_DIR="${REPO_ROOT}/.github/packaging/scripts"
 
 # Source VM ID from constants.sh (canonical definition)
 SUBNET_EVM_VM_ID=$(
@@ -49,6 +50,7 @@ done
 echo "=== Validating RPMs in fresh Rocky Linux 9 container ==="
 docker run --rm \
     -v "${RPM_DIR}:/rpms:ro" \
+    -v "${SCRIPTS_DIR}/smoke-test.sh:/smoke-test.sh:ro" \
     rockylinux:9 \
     bash -euxc '
         # Import GPG key and verify signatures if available
@@ -64,37 +66,12 @@ docker run --rm \
         rpm -ivh "/rpms/avalanchego-'"${TAG}"'-'"${RPM_ARCH}"'.rpm"
         rpm -ivh "/rpms/subnet-evm-'"${TAG}"'-'"${RPM_ARCH}"'.rpm"
 
-        # Smoke test avalanchego
-        full_commit="'"${GIT_COMMIT}"'"
-        output=$(/var/opt/avalanchego/bin/avalanchego --version)
-        echo "avalanchego --version: ${output}"
-        if [[ "${output}" != avalanchego/* ]]; then
-            echo "ERROR: --version output does not start with avalanchego/" >&2
-            exit 1
-        fi
-        if [[ "${output}" != *"${full_commit}"* ]]; then
-            echo "ERROR: avalanchego --version output does not contain expected commit ${full_commit}" >&2
-            echo "Output: ${output}" >&2
-            exit 1
-        fi
-
-        # Verify subnet-evm plugin
-        plugin="/var/opt/avalanchego/plugins/'"${SUBNET_EVM_VM_ID}"'"
-        if [[ ! -x "${plugin}" ]]; then
-            echo "ERROR: subnet-evm plugin not found or not executable" >&2
-            exit 1
-        fi
-
-        # Smoke test subnet-evm version and commit
-        evm_output=$("${plugin}" --version)
-        echo "subnet-evm --version: ${evm_output}"
-        if [[ "${evm_output}" != *"${full_commit}"* ]]; then
-            echo "ERROR: subnet-evm --version output does not contain expected commit ${full_commit}" >&2
-            echo "Output: ${evm_output}" >&2
-            exit 1
-        fi
-
-        echo "All RPM validations passed"
+        # Run shared smoke test
+        bash /smoke-test.sh \
+            /var/opt/avalanchego/bin/avalanchego \
+            /var/opt/avalanchego/plugins \
+            "'"${GIT_COMMIT}"'" \
+            "'"${SUBNET_EVM_VM_ID}"'"
     '
 
 echo "=== RPM validation complete ==="
