@@ -8,6 +8,7 @@
 package hook
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"iter"
@@ -103,6 +104,7 @@ type BlockBuilder[T Transaction] interface {
 	// SAE will filter any transactions whose [Op] can not be safely applied to
 	// the state.
 	PotentialEndOfBlockOps(
+		ctx context.Context,
 		header *types.Header,
 		lastSettledBlock common.Hash,
 		source saetypes.BlockSource,

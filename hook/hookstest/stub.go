@@ -5,6 +5,7 @@
 package hookstest
 
 import (
+	"context"
 	"iter"
 	"math/big"
 	"slices"
@@ -122,7 +123,7 @@ func (s *Stub) BuildHeader(parent *types.Header) (*types.Header, error) {
 
 // PotentialEndOfBlockOps ignores its arguments and returns [Stub.Ops] as a
 // sequence.
-func (s *Stub) PotentialEndOfBlockOps(header *types.Header, lastSettledBlock common.Hash, source saetypes.BlockSource) iter.Seq[Op] {
+func (s *Stub) PotentialEndOfBlockOps(ctx context.Context, header *types.Header, lastSettledBlock common.Hash, source saetypes.BlockSource) iter.Seq[Op] {
 	return slices.Values(s.Ops)
 }
 
