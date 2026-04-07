@@ -20,6 +20,18 @@ func TestParseDeleteCommand(t *testing.T) {
 	require.Equal(t, defaultRepo, deleteCommand.Repo)
 	require.Equal(t, 5168, deleteCommand.PRNumber)
 	require.NotEmpty(t, deleteCommand.StateDir)
+	require.False(t, deleteCommand.EnsureAbsent)
+}
+
+func TestParseDeleteCommandEnsureAbsent(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"delete", "--pr", "5168", "--ensure-absent"})
+	require.NoError(t, err)
+
+	deleteCommand, ok := command.(deleteCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.True(t, deleteCommand.EnsureAbsent)
 }
 
 func TestParseGetCommand(t *testing.T) {

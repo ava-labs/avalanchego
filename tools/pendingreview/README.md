@@ -100,7 +100,7 @@ Use a GitHub account with the repo access needed to create pending reviews.
 
 ```text
 gh-pending-review create --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR]
-gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
+gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--ensure-absent]
 gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
 gh-pending-review get-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR]
 gh-pending-review replace-comments --pr NUMBER [--repo OWNER/REPO] --comments-file PATH [--config-dir DIR] [--state-dir DIR] [--force]
@@ -116,6 +116,8 @@ Notes:
 - `replace-comments` requires `--comments-file`
 - `--repo` defaults to `ava-labs/avalanchego`
 - `get-state` and `delete-state` are local-only and do not talk to GitHub
+- `delete --ensure-absent` is idempotent: it clears stored state, deletes any
+  live pending review, succeeds when no live draft exists, and verifies absence
 
 ## Workflow
 
