@@ -16,11 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var (
-	ErrNotFound = errors.New("not found")
-
-	_ Manager = (*manager)(nil)
-)
+var ErrNotFound = errors.New("not found")
 
 // A Factory creates new instances of a VM
 type Factory interface {
@@ -38,26 +34,7 @@ type Factory interface {
 //     the factory that the ID is associated with.
 //  3. Manage the aliases of VMs
 //  4. Manage the versions of VMs
-type Manager interface {
-	ids.Aliaser
-
-	// Return a factory that can create new instances of the vm whose ID is
-	// [vmID]
-	GetFactory(vmID ids.ID) (Factory, error)
-
-	// Map [vmID] to [factory]. [factory] creates new instances of the vm whose
-	// ID is [vmID]
-	RegisterFactory(ctx context.Context, vmID ids.ID, factory Factory) error
-
-	// ListFactories returns all the IDs that have had factories registered.
-	ListFactories() ([]ids.ID, error)
-
-	// Versions returns the primary alias of the VM mapped to the reported
-	// version of the VM for all the registered VMs that reported versions.
-	Versions() (map[string]string, error)
-}
-
-type manager struct {
+type Manager struct {
 	// Note: The string representation of a VM's ID is also considered to be an
 	// alias of the VM. That is, [vmID].String() is an alias for [vmID].
 	ids.Aliaser
@@ -76,8 +53,8 @@ type manager struct {
 }
 
 // NewManager returns an instance of a VM manager
-func NewManager(log logging.Logger, aliaser ids.Aliaser) Manager {
-	return &manager{
+func NewManager(log logging.Logger, aliaser ids.Aliaser) *Manager {
+	return &Manager{
 		Aliaser:   aliaser,
 		log:       log,
 		factories: make(map[ids.ID]Factory),
@@ -85,7 +62,7 @@ func NewManager(log logging.Logger, aliaser ids.Aliaser) Manager {
 	}
 }
 
-func (m *manager) GetFactory(vmID ids.ID) (Factory, error) {
+func (m *Manager) GetFactory(vmID ids.ID) (Factory, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -95,7 +72,7 @@ func (m *manager) GetFactory(vmID ids.ID) (Factory, error) {
 	return nil, fmt.Errorf("%q was %w", vmID, ErrNotFound)
 }
 
-func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Factory) error {
+func (m *Manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Factory) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -129,14 +106,14 @@ func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Fact
 	return commonVM.Shutdown(ctx)
 }
 
-func (m *manager) ListFactories() ([]ids.ID, error) {
+func (m *Manager) ListFactories() ([]ids.ID, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	return maps.Keys(m.factories), nil
 }
 
-func (m *manager) Versions() (map[string]string, error) {
+func (m *Manager) Versions() (map[string]string, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
