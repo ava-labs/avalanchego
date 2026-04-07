@@ -194,7 +194,7 @@ func TestPendingReviewCreateBodyEndToEnd(t *testing.T) {
 			require.Equal(t, "octocat", review.Author.Login)
 			ops := backend.operations()
 			require.Equal(t, 1, countStrings(ops, "CreatePendingReview"), "ops=%v", ops)
-			require.Equal(t, 1, countStrings(ops, "PullRequestContext"), "ops=%v", ops)
+			require.Equal(t, 1, countStrings(ops, "PullRequestID"), "ops=%v", ops)
 			require.NotContains(t, ops, "UpdatePendingReviewBody")
 			require.NotContains(t, ops, "DeletePendingReview")
 
@@ -456,10 +456,10 @@ func TestPendingReviewDeleteEndToEnd(t *testing.T) {
 			ops := backend.operations()
 			require.Equal(t, 1, countStrings(ops, "Viewer"), "ops=%v", ops)
 			require.Equal(t, 1, countStrings(ops, "DeletePendingReview"), "ops=%v", ops)
-			require.GreaterOrEqual(t, countStrings(ops, "PullRequestContext"), 1, "ops=%v", ops)
+			require.GreaterOrEqual(t, countStrings(ops, "PullRequestPendingReview"), 1, "ops=%v", ops)
 			deleteIndex := slices.Index(ops, "DeletePendingReview")
 			require.NotEqual(t, -1, deleteIndex, "ops=%v", ops)
-			require.Contains(t, ops[:deleteIndex], "PullRequestContext")
+			require.Contains(t, ops[:deleteIndex], "PullRequestPendingReview")
 
 			_, err := os.Stat(stateFilePath(stateDir, "ava-labs/avalanchego", "octocat", 123))
 			require.ErrorIs(t, err, os.ErrNotExist)
@@ -544,10 +544,10 @@ func TestPendingReviewUpdateBodyEndToEnd(t *testing.T) {
 			ops := backend.operations()
 			require.Equal(t, 1, countStrings(ops, "Viewer"), "ops=%v", ops)
 			require.Equal(t, 1, countStrings(ops, "UpdatePendingReviewBody"), "ops=%v", ops)
-			require.GreaterOrEqual(t, countStrings(ops, "PullRequestContext"), 1, "ops=%v", ops)
+			require.GreaterOrEqual(t, countStrings(ops, "PullRequestPendingReview"), 1, "ops=%v", ops)
 			updateIndex := slices.Index(ops, "UpdatePendingReviewBody")
 			require.NotEqual(t, -1, updateIndex, "ops=%v", ops)
-			require.Contains(t, ops[:updateIndex], "PullRequestContext")
+			require.Contains(t, ops[:updateIndex], "PullRequestPendingReview")
 
 			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
 			require.NoError(t, err)
@@ -648,10 +648,10 @@ func TestPendingReviewReconcileBodyAfterExternalEdit(t *testing.T) {
 			)
 			ops := backend.operations()
 			require.Equal(t, 1, countStrings(ops, "UpdatePendingReviewBody"))
-			require.GreaterOrEqual(t, countStrings(ops, "PullRequestContext"), 2)
+			require.GreaterOrEqual(t, countStrings(ops, "PullRequestPendingReview"), 2)
 			updateIndex := slices.Index(ops, "UpdatePendingReviewBody")
 			require.NotEqual(t, -1, updateIndex)
-			require.Contains(t, ops[:updateIndex], "PullRequestContext")
+			require.Contains(t, ops[:updateIndex], "PullRequestPendingReview")
 
 			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
 			require.NoError(t, err)
@@ -1591,6 +1591,28 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 		return map[string]any{
 			"viewer": map[string]any{"login": b.viewer},
 		}, nil
+	case strings.Contains(query, "query PullRequestID"):
+		b.requestedOps = append(b.requestedOps, "PullRequestID")
+		return map[string]any{
+			"repository": map[string]any{
+				"pullRequest": map[string]any{
+					"id": "pr-123",
+				},
+			},
+		}, nil
+	case strings.Contains(query, "query PullRequestPendingReview"):
+		b.requestedOps = append(b.requestedOps, "PullRequestPendingReview")
+		return map[string]any{
+			"viewer": map[string]any{"login": b.viewer},
+			"repository": map[string]any{
+				"pullRequest": map[string]any{
+					"id": "pr-123",
+					"reviews": map[string]any{
+						"nodes": b.reviewNodesWithoutComments(),
+					},
+				},
+			},
+		}, nil
 	case strings.Contains(query, "query PullRequestContext"):
 		b.requestedOps = append(b.requestedOps, "PullRequestContext")
 		return map[string]any{
@@ -1733,6 +1755,24 @@ func (b *fakePendingReviewBackend) handle(query string, variables map[string]any
 		}, nil
 	default:
 		return nil, fmt.Errorf("unexpected query: %s", query)
+	}
+}
+
+func (b *fakePendingReviewBackend) reviewNodesWithoutComments() []map[string]any {
+	if b.liveReview == nil || b.liveReview.State != "PENDING" {
+		return []map[string]any{}
+	}
+	return []map[string]any{
+		{
+			"id":         b.liveReview.ID,
+			"databaseId": b.liveReview.DatabaseID,
+			"state":      b.liveReview.State,
+			"body":       b.liveReview.Body,
+			"url":        b.liveReview.URL,
+			"author": map[string]any{
+				"login": b.liveReview.Author.Login,
+			},
+		},
 	}
 }
 

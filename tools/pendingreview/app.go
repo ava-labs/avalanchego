@@ -162,7 +162,7 @@ func (a *App) runDelete(ctx context.Context, command deleteCommand) error {
 	}
 
 	store := NewStateStore(a.log, command.StateDir)
-	review, err := client.GetPendingReview(ctx, command.Repo, command.PRNumber, viewer.Login)
+	review, err := client.GetPendingReviewMetadata(ctx, command.Repo, command.PRNumber, viewer.Login)
 	if err != nil {
 		if !command.EnsureAbsent || !errors.Is(err, ErrNoPendingReview) {
 			return stacktrace.Wrap(err)
@@ -219,7 +219,7 @@ func (a *App) runDelete(ctx context.Context, command deleteCommand) error {
 		return stacktrace.Wrap(err)
 	}
 
-	if _, err := client.GetPendingReview(ctx, command.Repo, command.PRNumber, viewer.Login); err != nil {
+	if _, err := client.GetPendingReviewMetadata(ctx, command.Repo, command.PRNumber, viewer.Login); err != nil {
 		if errors.Is(err, ErrNoPendingReview) {
 			a.log.Info("verified no pending review remains",
 				zap.String("repo", command.Repo),
@@ -302,7 +302,7 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 		return stacktrace.Wrap(err)
 	}
 
-	review, err := client.GetPendingReview(ctx, command.Repo, command.PRNumber, viewer.Login)
+	review, err := client.GetPendingReviewMetadata(ctx, command.Repo, command.PRNumber, viewer.Login)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
