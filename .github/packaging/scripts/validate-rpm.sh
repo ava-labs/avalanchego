@@ -23,28 +23,15 @@ SCRIPTS_DIR="${REPO_ROOT}/.github/packaging/scripts"
 
 # shellcheck disable=SC1091
 source "${SCRIPTS_DIR}/lib-build-common.sh"
+# shellcheck disable=SC1091
+source "${SCRIPTS_DIR}/lib-validate-common.sh"
 
 resolve_subnet_evm_vm_id
+detect_host_arch RPM
 
-if [[ -z "${PACKAGE_ARCH:-}" ]]; then
-    arch=$(uname -m)
-    case "${arch}" in
-        x86_64) PACKAGE_ARCH="x86_64" ;;
-        arm64)  PACKAGE_ARCH="aarch64" ;;
-        *)      PACKAGE_ARCH="${arch}" ;;
-    esac
-fi
-
-# Verify expected files exist
-for f in \
+assert_files_exist "${RPM_DIR}" \
     "avalanchego-${TAG}-${PACKAGE_ARCH}.rpm" \
-    "subnet-evm-${TAG}-${PACKAGE_ARCH}.rpm" \
-; do
-    if [[ ! -f "${RPM_DIR}/${f}" ]]; then
-        echo "ERROR: expected file not found: ${RPM_DIR}/${f}" >&2
-        exit 1
-    fi
-done
+    "subnet-evm-${TAG}-${PACKAGE_ARCH}.rpm"
 
 echo "=== Validating RPMs in fresh Rocky Linux 9 container ==="
 docker run --rm \
