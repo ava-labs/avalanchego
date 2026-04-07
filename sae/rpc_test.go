@@ -837,7 +837,7 @@ func TestGetReceipts(t *testing.T) {
 	settled, wantSettled := slice(t, 2, 4)
 	vmTime.advanceToSettle(ctx, t, settled)
 	unsettled, wantUnsettled := slice(t, 4, 6)
-	sut.waitUntilExecuted(t, unsettled)
+	require.NoError(t, unsettled.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
 
 	pending := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 		To:       &blockingPrecompile,
