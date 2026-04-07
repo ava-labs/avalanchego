@@ -4,30 +4,25 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "warp",
     srcs = [
-        "intrinsic_gas.go",
         "precompile_accept.go",
         "predicates.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/warp",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/coreth/core",
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/precompile/precompileconfig",
         "//utils/set",
         "//vms/evm/predicate",
-        "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//log",
-        "@com_github_ava_labs_libevm//params",
     ],
 )
 
 go_test(
     name = "warp_test",
     srcs = [
-        "intrinsic_gas_test.go",
         "main_test.go",
         "predicates_test.go",
     ],
@@ -35,14 +30,11 @@ go_test(
     deps = [
         "//graft/coreth/core",
         "//graft/coreth/params",
-        "//graft/coreth/precompile/contracts/warp",
         "//graft/coreth/precompile/precompileconfig",
         "//snow/engine/snowman/block",
         "//utils/set",
         "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//common/math",
-        "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_mock//gomock",
