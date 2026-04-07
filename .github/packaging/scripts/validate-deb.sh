@@ -11,42 +11,28 @@
 #   GIT_COMMIT     - Full git commit hash used to build the binaries
 #
 # Optional env vars:
-#   DEB_ARCH       - DEB architecture ("amd64" or "arm64"), defaults to host
+#   PACKAGE_ARCH   - DEB architecture ("amd64" or "arm64"), defaults to host
 
 set -euo pipefail
 
 : "${TAG:?TAG must be set}"
 : "${GIT_COMMIT:?GIT_COMMIT must be set}"
 
-if [[ -z "${DEB_ARCH:-}" ]]; then
-    arch=$(uname -m)
-    case "${arch}" in
-        x86_64)        DEB_ARCH="amd64" ;;
-        aarch64|arm64) DEB_ARCH="arm64" ;;
-        *)             DEB_ARCH="${arch}" ;;
-    esac
-fi
-
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEB_DIR="${REPO_ROOT}/build/deb"
 SCRIPTS_DIR="${REPO_ROOT}/.github/packaging/scripts"
 
-# Source VM ID from constants.sh (canonical definition)
-SUBNET_EVM_VM_ID=$(
-    grep '^DEFAULT_VM_ID=' "${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh" \
-    | cut -d'"' -f2
-)
+# shellcheck disable=SC1091
+source "${SCRIPTS_DIR}/lib-build-common.sh"
+# shellcheck disable=SC1091
+source "${SCRIPTS_DIR}/lib-validate-common.sh"
 
-# Verify expected files exist
-for f in \
-    "avalanchego-${TAG}-${DEB_ARCH}.deb" \
-    "subnet-evm-${TAG}-${DEB_ARCH}.deb" \
-; do
-    if [[ ! -f "${DEB_DIR}/${f}" ]]; then
-        echo "ERROR: expected file not found: ${DEB_DIR}/${f}" >&2
-        exit 1
-    fi
-done
+detect_host_arch DEB
+resolve_subnet_evm_vm_id
+
+assert_files_exist "${DEB_DIR}" \
+    "avalanchego-${TAG}-${PACKAGE_ARCH}.deb" \
+    "subnet-evm-${TAG}-${PACKAGE_ARCH}.deb"
 
 # ── Signature verification (jammy only) ──────────────────────────
 # dpkg-sig was removed from Ubuntu 24.04 (noble) repositories.
@@ -64,8 +50,8 @@ docker run --rm \
 
         if [[ -f /debs/DEB-GPG-KEY-avalanchego ]]; then
             gpg --batch --import /debs/DEB-GPG-KEY-avalanchego
-            dpkg-sig --verify "/debs/avalanchego-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
-            dpkg-sig --verify "/debs/subnet-evm-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
+            dpkg-sig --verify "/debs/avalanchego-'"${TAG}"'-'"${PACKAGE_ARCH}"'.deb"
+            dpkg-sig --verify "/debs/subnet-evm-'"${TAG}"'-'"${PACKAGE_ARCH}"'.deb"
         else
             echo "Skipping GPG verification (unsigned build)"
         fi
@@ -84,8 +70,8 @@ for UBUNTU_IMAGE in ubuntu:22.04 ubuntu:24.04; do
             export DEBIAN_FRONTEND=noninteractive
 
             # Install both packages
-            dpkg -i "/debs/avalanchego-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
-            dpkg -i "/debs/subnet-evm-'"${TAG}"'-'"${DEB_ARCH}"'.deb"
+            dpkg -i "/debs/avalanchego-'"${TAG}"'-'"${PACKAGE_ARCH}"'.deb"
+            dpkg -i "/debs/subnet-evm-'"${TAG}"'-'"${PACKAGE_ARCH}"'.deb"
 
             # Run shared smoke test
             bash /smoke-test.sh \
