@@ -5,18 +5,18 @@ package warp
 
 import (
 	"errors"
-	"math"
 	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
@@ -27,46 +27,58 @@ var (
 	errInvalidPredicate = errors.New("invalid predicate")
 )
 
-func verifyMockPredicate(_ *precompileconfig.PredicateContext, pred predicate.Predicate) error {
+type predicater struct{}
+
+func (predicater) PredicateGas(predicate.Predicate, precompileconfig.Rules) (uint64, error) {
+	return 0, nil
+}
+func (predicater) VerifyPredicate(_ *precompileconfig.PredicateContext, pred predicate.Predicate) error {
 	if slices.Equal(pred, validPredicate) {
 		return nil
 	}
 	return errInvalidPredicate
 }
 
-func TestCheckBlockPredicates(t *testing.T) {
+func newRules(contracts ...common.Address) *extras.Rules {
+	rules := params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0)
+	rulesExtra := params.GetRulesExtra(rules)
+	for _, addr := range contracts {
+		rulesExtra.Predicaters[addr] = predicater{}
+	}
+	return rulesExtra
+}
+
+func TestBlockPredicates(t *testing.T) {
 	var (
 		addr    = common.Address{0}
 		validTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
 				{Address: addr, StorageKeys: validPredicate},
 			},
-			Gas: math.MaxUint64,
 		})
 		invalidTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
 				{Address: addr, StorageKeys: invalidPredicate},
 			},
-			Gas: math.MaxUint64,
 		})
 	)
 	tests := []struct {
-		name                string
-		nilPredicateContext bool
-		txs                 []*types.Transaction
-		expected            predicate.BlockResults
-		expectedErr         error
+		name         string
+		blockContext *block.Context
+		txs          []*types.Transaction
+		expected     predicate.BlockResults
+		expectedErr  error
 	}{
 		{
-			name:                "invalid",
-			nilPredicateContext: true,
+			name: "invalid",
 			txs: []*types.Transaction{
 				validTx,
 			},
-			expectedErr: ErrMissingPredicateContext,
+			expectedErr: errNoBlockContext,
 		},
 		{
-			name: "one_tx_one_address_one_predicate",
+			name:         "one_tx_one_address_one_predicate",
+			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
 			},
@@ -77,7 +89,8 @@ func TestCheckBlockPredicates(t *testing.T) {
 			},
 		},
 		{
-			name: "one_tx_one_address_one_invalid_predicate",
+			name:         "one_tx_one_address_one_invalid_predicate",
+			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				invalidTx,
 			},
@@ -88,7 +101,8 @@ func TestCheckBlockPredicates(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple_txs",
+			name:         "multiple_txs",
+			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
 				invalidTx,
@@ -105,108 +119,56 @@ func TestCheckBlockPredicates(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			rules := params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0)
-			predicater := precompileconfig.NewMockPredicater(gomock.NewController(t))
-			predicater.EXPECT().PredicateGas(gomock.Any(), gomock.Any()).Return(uint64(0), nil).AnyTimes()
-			predicater.EXPECT().VerifyPredicate(gomock.Any(), gomock.Any()).DoAndReturn(verifyMockPredicate).AnyTimes()
-
-			rulesExtra := params.GetRulesExtra(rules)
-			rulesExtra.Predicaters[addr] = predicater
-
-			predicateContext := &precompileconfig.PredicateContext{
-				ProposerVMBlockCtx: &block.Context{},
-			}
-			if test.nilPredicateContext {
-				predicateContext = nil
-			}
-
-			actual, err := checkBlockPredicates(rules, predicateContext, test.txs)
-			require.ErrorIs(err, test.expectedErr)
-			require.Equal(test.expected, actual)
+			var (
+				snowContext = snowtest.Context(t, snowtest.CChainID)
+				rules       = newRules(addr)
+			)
+			actual, err := blockPredicates(snowContext, test.blockContext, rules, test.txs)
+			require.ErrorIs(t, err, test.expectedErr)
+			require.Equal(t, test.expected, actual)
 		})
 	}
 }
 
-func TestCheckTxPredicates(t *testing.T) {
+func TestTxPredicates(t *testing.T) {
 	var (
 		addr0 = common.Address{0}
 		addr1 = common.Address{1}
 	)
 	tests := []struct {
-		name                string
-		predicates          set.Set[common.Address]
-		predicateGas        uint64
-		nilBlockContext     bool
-		nilPredicateContext bool
-		insufficientGas     bool
-		accessList          types.AccessList
-		expected            predicate.PrecompileResults
-		expectedErr         error
+		name         string
+		contracts    []common.Address
+		blockContext *block.Context
+		accessList   types.AccessList
+		expected     predicate.PrecompileResults
+		expectedErr  error
 	}{
-		// TODO(ceyonur): add intrinsic gas tests if needed.
-		// {
-		// 	name:         "invalid_intrinsic_gas",
-		// 	predicates:   set.Of(addr0),
-		// 	predicateGas: math.MaxUint64,
-		// 	accessList: types.AccessList{
-		// 		{Address: addr0, StorageKeys: validPredicate},
-		// 	},
-		// 	expectedErr: ErrGasUintOverflow,
-		// },
-		// {
-		// 	name:            "insufficient_intrinsic_gas",
-		// 	predicates:      set.Of(addr0),
-		// 	insufficientGas: true,
-		// 	accessList: types.AccessList{
-		// 		{Address: addr0, StorageKeys: validPredicate},
-		// 	},
-		// 	expectedErr: ErrIntrinsicGas,
-		// },
 		{
 			name: "no_predicaters",
 		},
 		{
-			name:       "no_predicates",
-			predicates: set.Of(addr0),
+			name:      "no_predicates",
+			contracts: []common.Address{addr0},
 		},
 		{
-			name:       "filtered_predicates",
-			predicates: set.Of(addr0),
+			name:      "filtered_predicates",
+			contracts: []common.Address{addr0},
 			accessList: types.AccessList{
 				{Address: addr1, StorageKeys: validPredicate},
 			},
 		},
 		{
-			name:            "nil_block_context",
-			predicates:      set.Of(addr0),
-			nilBlockContext: true,
+			name:      "no_block_context",
+			contracts: []common.Address{addr0},
 			accessList: types.AccessList{
 				{Address: addr0, StorageKeys: validPredicate},
 			},
-			expectedErr: ErrMissingPredicateContext,
+			expectedErr: errNoBlockContext,
 		},
 		{
-			name:                "nil_predicate_context",
-			predicates:          set.Of(addr0),
-			nilPredicateContext: true,
-			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
-			},
-			expectedErr: ErrMissingPredicateContext,
-		},
-		{
-			name:                "nil_predicate_with_filtered_predicates",
-			predicates:          set.Of(addr0),
-			nilPredicateContext: true,
-			accessList: types.AccessList{
-				{Address: addr1, StorageKeys: validPredicate},
-			},
-		},
-		{
-			name:       "one_address_one_predicate",
-			predicates: set.Of(addr0),
+			name:         "one_address_one_predicate",
+			contracts:    []common.Address{addr0},
+			blockContext: &block.Context{},
 			accessList: types.AccessList{
 				{Address: addr0, StorageKeys: validPredicate},
 			},
@@ -215,8 +177,9 @@ func TestCheckTxPredicates(t *testing.T) {
 			},
 		},
 		{
-			name:       "one_address_one_invalid_predicate",
-			predicates: set.Of(addr0),
+			name:         "one_address_one_invalid_predicate",
+			contracts:    []common.Address{addr0},
+			blockContext: &block.Context{},
 			accessList: types.AccessList{
 				{Address: addr0, StorageKeys: invalidPredicate},
 			},
@@ -225,8 +188,9 @@ func TestCheckTxPredicates(t *testing.T) {
 			},
 		},
 		{
-			name:       "one_address_two_invalid_predicates",
-			predicates: set.Of(addr0),
+			name:         "one_address_two_invalid_predicates",
+			contracts:    []common.Address{addr0},
+			blockContext: &block.Context{},
 			accessList: types.AccessList{
 				{Address: addr0, StorageKeys: invalidPredicate},
 				{Address: addr0, StorageKeys: invalidPredicate},
@@ -236,8 +200,9 @@ func TestCheckTxPredicates(t *testing.T) {
 			},
 		},
 		{
-			name:       "one_address_two_mixed_predicates",
-			predicates: set.Of(addr0),
+			name:         "one_address_two_mixed_predicates",
+			contracts:    []common.Address{addr0},
+			blockContext: &block.Context{},
 			accessList: types.AccessList{
 				{Address: addr0, StorageKeys: validPredicate},
 				{Address: addr0, StorageKeys: invalidPredicate},
@@ -247,8 +212,9 @@ func TestCheckTxPredicates(t *testing.T) {
 			},
 		},
 		{
-			name:       "one_address_mixed_predicates",
-			predicates: set.Of(addr0),
+			name:         "one_address_mixed_predicates",
+			contracts:    []common.Address{addr0},
+			blockContext: &block.Context{},
 			accessList: types.AccessList{
 				{Address: addr0, StorageKeys: validPredicate},
 				{Address: addr0, StorageKeys: invalidPredicate},
@@ -260,8 +226,9 @@ func TestCheckTxPredicates(t *testing.T) {
 			},
 		},
 		{
-			name:       "two_addresses_mixed_predicates",
-			predicates: set.Of(addr0, addr1),
+			name:         "two_addresses_mixed_predicates",
+			contracts:    []common.Address{addr0, addr1},
+			blockContext: &block.Context{},
 			accessList: types.AccessList{
 				{Address: addr0, StorageKeys: validPredicate},
 				{Address: addr1, StorageKeys: invalidPredicate},
@@ -278,8 +245,9 @@ func TestCheckTxPredicates(t *testing.T) {
 			},
 		},
 		{
-			name:       "two_addresses_all_valid_predicates",
-			predicates: set.Of(addr0, addr1),
+			name:         "two_addresses_all_valid_predicates",
+			contracts:    []common.Address{addr0, addr1},
+			blockContext: &block.Context{},
 			accessList: types.AccessList{
 				{Address: addr0, StorageKeys: validPredicate},
 				{Address: addr1, StorageKeys: validPredicate},
@@ -292,8 +260,9 @@ func TestCheckTxPredicates(t *testing.T) {
 			},
 		},
 		{
-			name:       "two_addresses_all_invalid_predicates",
-			predicates: set.Of(addr0, addr1),
+			name:         "two_addresses_all_invalid_predicates",
+			contracts:    []common.Address{addr0, addr1},
+			blockContext: &block.Context{},
 			accessList: types.AccessList{
 				{Address: addr0, StorageKeys: invalidPredicate},
 				{Address: addr1, StorageKeys: invalidPredicate},
@@ -308,39 +277,16 @@ func TestCheckTxPredicates(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			rules := params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0)
-			predicater := precompileconfig.NewMockPredicater(gomock.NewController(t))
-			predicater.EXPECT().PredicateGas(gomock.Any(), gomock.Any()).Return(test.predicateGas, nil).AnyTimes()
-			predicater.EXPECT().VerifyPredicate(gomock.Any(), gomock.Any()).DoAndReturn(verifyMockPredicate).AnyTimes()
-
-			rulesExtra := params.GetRulesExtra(rules)
-			for addr := range test.predicates {
-				rulesExtra.Predicaters[addr] = predicater
-			}
-
-			predicateContext := &precompileconfig.PredicateContext{
-				ProposerVMBlockCtx: &block.Context{},
-			}
-			if test.nilBlockContext {
-				predicateContext.ProposerVMBlockCtx = nil
-			}
-			if test.nilPredicateContext {
-				predicateContext = nil
-			}
-
-			gas := uint64(math.MaxUint64)
-			if test.insufficientGas {
-				gas = 0
-			}
-			tx := types.NewTx(&types.DynamicFeeTx{
-				AccessList: test.accessList,
-				Gas:        gas,
-			})
-			actual, err := checkTxPredicates(rules, predicateContext, tx)
-			require.ErrorIs(err, test.expectedErr)
-			require.Equal(test.expected, actual)
+			var (
+				snowContext = snowtest.Context(t, snowtest.CChainID)
+				rules       = newRules(test.contracts...)
+				tx          = types.NewTx(&types.DynamicFeeTx{
+					AccessList: test.accessList,
+				})
+			)
+			actual, err := txPredicates(snowContext, test.blockContext, rules, tx)
+			require.ErrorIs(t, err, test.expectedErr)
+			require.Equal(t, test.expected, actual)
 		})
 	}
 }

@@ -53,7 +53,6 @@ go_library(
 go_test(
     name = "saevm_test",
     srcs = ["vm_warp_test.go"],
-    data = glob(["testdata/**"]),
     embed = [":saevm"],
     deps = [
         "//database/memdb",
