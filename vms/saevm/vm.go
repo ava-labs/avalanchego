@@ -48,7 +48,8 @@ import (
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	warpbackend "github.com/ava-labs/avalanchego/vms/saevm/warp/backend"
+	avawarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 // SinceGenesis is a harness around an [sae.VM], providing an `Initialize`
@@ -61,7 +62,9 @@ type SinceGenesis struct {
 	db           avadb.Database
 	mempool      *txpool.Mempool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
-	warpBackend  *warpbackend.Backend
+
+	// TODO(StephenButtolph): Remove. This is only used by the tests.
+	warpVerifier *saewarp.Verifier
 
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
@@ -91,11 +94,22 @@ type Config struct {
 	// per second.
 	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
-	// WarpOffChainMessages encodes off-chain messages (unrelated to any on-chain event ie. block or AddressedCall)
-	// that the node should be willing to sign.
-	// Note: only supports AddressedCall payloads as defined here:
-	// https://github.com/ava-labs/avalanchego/tree/7623ffd4be915a5185c9ed5e11fa9be15a6e1f00/vms/platformvm/warp/payload#addressedcall
+	// WarpOffChainMessages encodes off-chain messages (unrelated to any
+	// on-chain event ie. block or AddressedCall) that the node should be
+	// willing to sign.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
+}
+
+func (c Config) WarpMessages() ([]*avawarp.UnsignedMessage, error) {
+	msgs := make([]*avawarp.UnsignedMessage, len(c.WarpOffChainMessages))
+	for i, bytes := range c.WarpOffChainMessages {
+		msg, err := avawarp.ParseUnsignedMessage(bytes)
+		if err != nil {
+			return nil, fmt.Errorf("ailed to parse off-chain message at index %d: %w", i, err)
+		}
+		msgs[i] = msg
+	}
+	return msgs, nil
 }
 
 var ethDBPrefix = []byte("ethdb")
@@ -168,23 +182,10 @@ func (vm *SinceGenesis) Initialize(
 		}
 	}
 
-	// Initialize warp backend
-	offchainWarpMessages := make([][]byte, len(userConfig.WarpOffChainMessages))
-	for i, hexMsg := range userConfig.WarpOffChainMessages {
-		offchainWarpMessages[i] = []byte(hexMsg)
-	}
-	warpBackend, warpSignatureCache, err := warpbackend.New(
-		snowCtx.NetworkID,
-		snowCtx.ChainID,
-		snowCtx.WarpSigner,
-		&blockClient{vm: vm},
-		avaDB,
-		offchainWarpMessages,
-	)
+	warpMessages, err := userConfig.WarpMessages()
 	if err != nil {
-		return fmt.Errorf("warp backend: %w", err)
+		return err
 	}
-	vm.warpBackend = warpBackend
 
 	var desiredDelayExcess *acp226.DelayExcess
 	if userConfig.MinDelayTarget != nil {
@@ -198,6 +199,7 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	txs := txpool.NewTxs()
+	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := hook.NewPoints(
 		snowCtx,
 		avaDB,
@@ -205,7 +207,7 @@ func (vm *SinceGenesis) Initialize(
 		desiredDelayExcess,
 		desiredTargetExcess,
 		txs,
-		vm.warpBackend,
+		warpStorage,
 	)
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
@@ -270,7 +272,8 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	{ // ==========  Warp Handler  ==========
-		warpHandler := acp118.NewCachedHandler(warpSignatureCache, warpBackend, snowCtx.WarpSigner)
+		vm.warpVerifier = saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage)
+		warpHandler := acp118.NewHandler(vm.warpVerifier, snowCtx.WarpSigner)
 		if err := inner.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
 			return fmt.Errorf("network.AddHandler(warp): %w", err)
 		}
@@ -408,12 +411,12 @@ func (vm *SinceGenesis) Shutdown(ctx context.Context) error {
 	return vm.VM.Shutdown(ctx)
 }
 
-// blockClient adapts [SinceGenesis] to the [warpbackend.BlockClient] interface.
+// blockClient adapts [sae.VM] to the [saewarp.BlockClient] interface.
 type blockClient struct {
-	vm *SinceGenesis
+	vm *sae.VM
 }
 
-var _ warpbackend.BlockClient = (*blockClient)(nil)
+var _ saewarp.BlockClient = (*blockClient)(nil)
 
 func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
 	b, err := c.vm.GetBlock(ctx, blockID)

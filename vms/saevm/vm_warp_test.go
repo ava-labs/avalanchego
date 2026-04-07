@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
-	"github.com/ava-labs/avalanchego/graft/coreth/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/warp"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -105,11 +105,11 @@ func TestSendWarpMessage(t *testing.T) {
 	expectedBlockUnsignedMessage, err := avalancheWarp.NewUnsignedMessage(env.snowCtx.NetworkID, env.snowCtx.ChainID, expectedBlockHashPayload.Bytes())
 	require.NoError(err)
 
-	addressedErr := env.vm.warpBackend.Verify(env.ctx, expectedUnsignedMessage, nil)
+	addressedErr := env.vm.warpVerifier.Verify(env.ctx, expectedUnsignedMessage, nil)
 	require.NotNil(addressedErr)
-	require.Equal(int32(warp.ParseErrCode), addressedErr.Code)
+	require.Equal(int32(warp.TypeErrCode), addressedErr.Code)
 
-	blockErr := env.vm.warpBackend.Verify(env.ctx, expectedBlockUnsignedMessage, nil)
+	blockErr := env.vm.warpVerifier.Verify(env.ctx, expectedBlockUnsignedMessage, nil)
 	require.NotNil(blockErr)
 	require.Equal(int32(warp.VerifyErrCode), blockErr.Code)
 
@@ -130,8 +130,8 @@ func TestSendWarpMessage(t *testing.T) {
 	unsignedMessage, err := warpcontract.UnpackSendWarpEventDataToMessage(logData)
 	require.NoError(err)
 
-	require.Nil(env.vm.warpBackend.Verify(env.ctx, unsignedMessage, nil))
-	require.Nil(env.vm.warpBackend.Verify(env.ctx, expectedBlockUnsignedMessage, nil))
+	require.Nil(env.vm.warpVerifier.Verify(env.ctx, unsignedMessage, nil))
+	require.Nil(env.vm.warpVerifier.Verify(env.ctx, expectedBlockUnsignedMessage, nil))
 }
 
 func TestPredicateVerification(t *testing.T) {

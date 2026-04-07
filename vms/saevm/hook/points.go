@@ -43,7 +43,7 @@ var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
 type Points struct {
 	blockBuilder
 	db          database.Database
-	warpBackend precompileconfig.WarpMessageWriter
+	warpStorage *warp.Storage
 }
 
 func NewPoints(
@@ -53,7 +53,7 @@ func NewPoints(
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
 	pool *txpool.Txs,
-	warpBackend precompileconfig.WarpMessageWriter,
+	warpStorage *warp.Storage,
 ) *Points {
 	return &Points{
 		blockBuilder{
@@ -66,7 +66,7 @@ func NewPoints(
 			chainConfig:  chainConfig,
 		},
 		db,
-		warpBackend,
+		warpStorage,
 	}
 }
 
@@ -171,7 +171,7 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rec
 	rules := p.chainConfig.Rules(b.Number(), corethparams.IsMergeTODO, b.Time())
 	acceptCtx := &precompileconfig.AcceptContext{
 		SnowCtx: p.ctx,
-		Warp:    p.warpBackend,
+		Warp:    p.warpStorage,
 	}
 	if err := warp.HandlePrecompileAccept(rules, acceptCtx, receipts); err != nil {
 		return fmt.Errorf("failed to handle precompile accept for block %s (%d): %w", b.Hash(), b.NumberU64(), err)
