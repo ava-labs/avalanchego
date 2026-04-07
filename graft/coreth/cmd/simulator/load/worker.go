@@ -6,17 +6,25 @@ package load
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 )
 
+// TxWorkerClient is the RPC subset used by [ethereumTxWorker] to submit transactions,
+// observe accepted nonces, wait for receipts, and read the chain head height.
+type TxWorkerClient interface {
+	SendTransaction(ctx context.Context, tx *types.Transaction) error
+	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
+	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
+	BlockNumber(ctx context.Context) (uint64, error)
+}
+
 type ethereumTxWorker struct {
-	client *ethclient.Client
+	client TxWorkerClient
 
 	acceptedNonce uint64
 	address       common.Address
@@ -26,7 +34,7 @@ type ethereumTxWorker struct {
 
 // NewSingleAddressTxWorker creates and returns a new ethereumTxWorker that confirms transactions by checking the latest
 // nonce of [address] and assuming any transaction with a lower nonce was already accepted.
-func NewSingleAddressTxWorker(client *ethclient.Client, address common.Address) *ethereumTxWorker {
+func NewSingleAddressTxWorker(client TxWorkerClient, address common.Address) *ethereumTxWorker {
 	newHeads := make(chan *types.Header)
 	tw := &ethereumTxWorker{
 		client:   client,
@@ -39,7 +47,7 @@ func NewSingleAddressTxWorker(client *ethclient.Client, address common.Address) 
 
 // NewTxReceiptWorker creates and returns a new ethereumTxWorker that confirms transactions by checking for the
 // corresponding transaction receipt.
-func NewTxReceiptWorker(client *ethclient.Client) *ethereumTxWorker {
+func NewTxReceiptWorker(client TxWorkerClient) *ethereumTxWorker {
 	newHeads := make(chan *types.Header)
 	tw := &ethereumTxWorker{
 		client:   client,

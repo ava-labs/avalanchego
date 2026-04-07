@@ -151,3 +151,16 @@ func GetEnvWithDefault(envVar, defaultVal string) string {
 	}
 	return val
 }
+
+// Retrieve the nodes corresponding to the provided IDs
+func GetNodesForIDs(nodes []*Node, nodeIDs []ids.NodeID) []*Node {
+	desiredNodes := make([]*Node, 0, len(nodeIDs))
+	for _, node := range nodes {
+		for _, nodeID := range nodeIDs {
+			if node.NodeID == nodeID {
+				desiredNodes = append(desiredNodes, node)
+			}
+		}
+	}
+	return desiredNodes
+}
