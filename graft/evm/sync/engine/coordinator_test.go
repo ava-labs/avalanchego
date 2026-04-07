@@ -218,7 +218,7 @@ func TestCoordinator_PivotCycleBlockReplay(t *testing.T) {
 			blockHi:         510,
 			pivots:          []uint64{505},
 			wantFinalHeight: 505,
-			wantReplayedLo:  506, // slow syncer preserves blocks during pivots, but commit-target (505) is pruned before replay
+			wantReplayedLo:  506, // blocks 500-505 preserved during pivots by MinTargetHeight but pruned before replay (blockChain.Accept requires chaining from commit target)
 			wantReplayedHi:  510,
 		},
 		{

@@ -241,7 +241,9 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 		return errInvalidState
 	}
 
-	// Drop blocks <= commit target. FinalizeVM already applied that block.
+	// Drop blocks <= commit target. FinalizeVM already applied the commit-target
+	// block, and blocks below it cannot be accepted because blockChain.Accept
+	// requires sequential parent chaining from the commit target.
 	co.queue.removeThroughHeight(target.Height())
 
 	// Drain the queue in batches. Enqueues are allowed during batch execution. Any
@@ -292,10 +294,15 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 
 	co.setCommitTarget(newTarget)
 	co.targetEpoch.Add(1)
-	// Remove blocks from the queue that will never be executed. Use the minimum
-	// of the new target and the slowest syncer's target to preserve blocks that
-	// slower syncers (e.g., the atomic syncer) still need for gap filling during
-	// batch replay.
+	// Remove blocks below the effective target. The effective target is the
+	// minimum of the new pivot target and the slowest syncer's reported height
+	// (e.g., the atomic syncer stays at its initial target). This preserves
+	// blocks that may be needed later for syncer-specific gap filling.
+	//
+	// NOTE: these preserved blocks are NOT replayed via the normal batch
+	// replay loop (blockChain.Accept requires sequential parent chaining
+	// from the commit target). Atomic gap-fill requires a separate mechanism
+	// that applies atomic operations without full block acceptance.
 	pruneHeight := newTarget.Height()
 	if minTarget := co.syncerRegistry.MinTargetHeight(); minTarget < pruneHeight {
 		pruneHeight = minTarget

@@ -284,12 +284,9 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 	testSyncerVM(t, vmSetup, test)
 }
 
-// TestDynamicSyncWithBlockInjection verifies that blocks injected during dynamic
-// state sync trigger coordinator pivots and that blocks above the commit target
-// are batch-replayed after sync completes.
-//
-// The server generates real blocks with transactions, so the parent chain is
-// consistent and both hash and firewood schemes can be tested.
+// TestDynamicSyncWithBlockInjection verifies that blocks injected during
+// dynamic state sync trigger coordinator pivots and that blocks above the
+// commit target are batch-replayed after sync completes.
 func TestDynamicSyncWithBlockInjection(t *testing.T) {
 	const (
 		syncableInterval = 256
@@ -315,8 +312,7 @@ func TestDynamicSyncWithBlockInjection(t *testing.T) {
 				}
 			}
 
-			// Server VM: generate blocks without root patching so the chain
-			// stays consistent for the injected blocks' parent references.
+			// Server VM.
 			serverConfigJSON := fmt.Sprintf(`"commit-interval": %d, "state-sync-commit-interval": %d, "state-history": %d`,
 				syncableInterval, syncableInterval, syncableInterval,
 			)
@@ -328,7 +324,6 @@ func TestDynamicSyncWithBlockInjection(t *testing.T) {
 
 			generateAndAcceptBlocks(t, serverVM.vm, syncableInterval, txGenFn(serverVM.vm), nil)
 
-			// Generate extra blocks above the summary height for injection.
 			generateAndAcceptBlocks(t, serverVM.vm, extraBlockCount, txGenFn(serverVM.vm),
 				func(blk *types.Block) {
 					b, err := rlp.EncodeToBytes(blk)
@@ -338,8 +333,7 @@ func TestDynamicSyncWithBlockInjection(t *testing.T) {
 			)
 			serverHeight := serverVM.vm.LastAcceptedBlockInternal().Height()
 
-			// Syncer VM: dynamic sync enabled, high pivot interval to avoid
-			// session restarts (which hang when responses are gated).
+			// Syncer VM.
 			syncerConfigJSON := fmt.Sprintf(
 				`"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "state-sync-commit-interval": %d, "state-sync-dynamic-enabled": true, "state-sync-pivot-interval": %d`,
 				50, 4, syncableInterval, 1000,
@@ -353,7 +347,7 @@ func TestDynamicSyncWithBlockInjection(t *testing.T) {
 
 			require.NoError(t, syncerVM.vm.SetState(t.Context(), snow.StateSyncing))
 
-			// Wire AppRequest/AppResponse between server and syncer.
+			deadline, _ := t.Deadline()
 			serverVM.appSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 				go func() {
 					<-gate
@@ -365,11 +359,10 @@ func TestDynamicSyncWithBlockInjection(t *testing.T) {
 			syncerVM.appSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 				nodeID, hasItem := nodeSet.Pop()
 				require.True(t, hasItem)
-				require.NoError(t, serverVM.vm.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request))
+				require.NoError(t, serverVM.vm.AppRequest(ctx, nodeID, requestID, deadline, request))
 				return nil
 			}
 
-			// Start sync, inject, release gate.
 			summary, err := serverVM.vm.GetLastStateSummary(t.Context())
 			require.NoError(t, err)
 			parsedSummary, err := syncerVM.vm.ParseStateSummary(t.Context(), summary.Bytes())
