@@ -48,7 +48,7 @@ build_flags=()
 build_driver=$(
     docker buildx inspect 2>/dev/null \
         | awk '/^Driver:/ { print $2; exit }'
-)
+) || true
 if [[ "${build_driver}" == "docker-container" ]]; then
     build_flags+=(--load)
 fi
