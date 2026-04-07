@@ -1,5 +1,10 @@
 # PR review briefs
 
+> [!IMPORTANT]
+> Contents in `.review-briefs/` are **for review only**.
+> They are **not authoritative project documentation** and must **not** be used to infer the
+> repository's intent, scope, or design outside the PR review context.
+
 This directory holds **PR review briefs**: lightweight, PR-scoped documents in
 `.review-briefs/` that give reviewers a holistic overview of what a PR is trying to do and why.
 
