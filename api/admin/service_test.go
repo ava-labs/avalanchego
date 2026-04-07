@@ -20,6 +20,16 @@ import (
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
+// failingAliaser wraps an Aliaser and returns an error from Aliases.
+type failingAliaser struct {
+	ids.Aliaser
+	err error
+}
+
+func (f *failingAliaser) Aliases(ids.ID) ([]string, error) {
+	return nil, f.err
+}
+
 type loadVMsTest struct {
 	admin          *Admin
 	vmManager      *vms.Manager
@@ -86,6 +96,31 @@ func TestLoadVMsReloadFails(t *testing.T) {
 
 	// Reload fails
 	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(nil, nil, errTest)
+
+	reply := LoadVMsReply{}
+	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
+	require.ErrorIs(err, errTest)
+}
+
+// Tests behavior for LoadVMs if we fail to fetch our aliases
+func TestLoadVMsGetAliasesFails(t *testing.T) {
+	require := require.New(t)
+
+	resources := initLoadVMsTest(t)
+
+	id1 := ids.GenerateTestID()
+	id2 := ids.GenerateTestID()
+	newVMs := []ids.ID{id1, id2}
+	failedVMs := map[ids.ID]error{
+		ids.GenerateTestID(): errTest,
+	}
+
+	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
+	// Inject a failing aliaser so Aliases returns an error
+	resources.vmManager.Aliaser = &failingAliaser{
+		Aliaser: resources.vmManager.Aliaser,
+		err:     errTest,
+	}
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
