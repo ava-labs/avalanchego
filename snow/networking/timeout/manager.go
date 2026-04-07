@@ -102,9 +102,9 @@ func (m *Manager) RegisterRequest(
 	m.tm.Put(requestID, measureLatency, newTimeoutHandler)
 }
 
-// RegisterResponse registers that `nodeID` sent us a response of type `op`
+// RegisterResponse registers that [nodeID] sent us a response of type [op]
 // for the given chain. The response corresponds to the given
-// requestID we sent them. `latency` is the time between us
+// [requestID] we sent them. [latency] is the time between us
 // sending them the request and receiving their response.
 func (m *Manager) RegisterResponse(
 	nodeID ids.NodeID,
