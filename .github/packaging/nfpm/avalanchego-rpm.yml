@@ -1,5 +1,5 @@
 name: avalanchego
-arch: "${RPM_ARCH}"
+arch: "${PACKAGE_ARCH}"
 version: "${VERSION}"
 maintainer: "Ava Labs <security@avalabs.org>"
 description: "AvalancheGo node — the official Avalanche protocol implementation"
