@@ -53,7 +53,7 @@ go_test(
         "//snow/networking/sender/sendermock",
         "//snow/networking/sender/sendertest",
         "//snow/networking/timeout",
-        "//snow/networking/timeout/timeoutmock",
+        "//snow/networking/timeout/timeouttest",
         "//snow/networking/tracker",
         "//snow/snowtest",
         "//snow/validators",

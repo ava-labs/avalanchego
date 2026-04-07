@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "timeouttest",
+    srcs = ["manager.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/networking/timeout/timeouttest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//snow/networking/benchlist",
+        "//snow/networking/timeout",
+        "//utils/timer",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)
