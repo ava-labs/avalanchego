@@ -51,22 +51,8 @@ func (m *manager) startChainCreatorNoPChain() {
 }
 
 // newRouter returns a mock router that mocks the call of adding a chain to the router.
-func newRouter(t *testing.T) router.Router {
+func newRouter(t *testing.T, tm timeout.Manager) router.Router {
 	chainRouter := router.ChainRouter{}
-	benchlist := benchlist.NewNoBenchlist()
-	tm, err := timeout.NewManager(
-		&timer.AdaptiveTimeoutConfig{
-			InitialTimeout:     time.Millisecond,
-			MinimumTimeout:     time.Millisecond,
-			MaximumTimeout:     10 * time.Second,
-			TimeoutCoefficient: 1.25,
-			TimeoutHalflife:    5 * time.Minute,
-		},
-		benchlist,
-		prometheus.NewRegistry(),
-		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
 	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
@@ -177,7 +163,8 @@ func TestCreateSimplexChain(t *testing.T) {
 	healthChecker, err := health.New(logger, prometheus.DefaultRegisterer)
 	require.NoError(t, err)
 
-	router := newRouter(t)
+	tm := newTimeoutManager(t)
+	router := newRouter(t, tm)
 	managerConfig := &ManagerConfig{
 		NodeID:        nodeID,
 		StakingBLSKey: signer,
@@ -206,7 +193,7 @@ func TestCreateSimplexChain(t *testing.T) {
 		Health: healthChecker,
 
 		// Register the chain with router and timeout manager
-		TimeoutManager: newTimeoutManager(t),
+		TimeoutManager: tm,
 		Router:         router,
 	}
 
