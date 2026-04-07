@@ -4,6 +4,7 @@
 package hook
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -26,7 +28,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/warp"
 
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	ethparams "github.com/ava-labs/libevm/params"
 	saetypes "github.com/ava-labs/strevm/types"
 )
 
@@ -38,13 +43,18 @@ type params struct {
 }
 
 type blockBuilder struct {
-	ctx *snow.Context
+	ctx         *snow.Context
+	chainConfig *ethparams.ChainConfig
 
 	now func() time.Time
 	// When fields in params are set, the block builder will build blocks that
 	// move the network values towards their desired values.
 	desired      params
 	potentialTxs func() iter.Seq[*txpool.Tx]
+	// originalExtra, if set, indicates that this builder is reconstructing an
+	// existing block (e.g. during bootstrapping). Predicate results are copied
+	// from these bytes rather than re-verified.
+	originalExtra []byte
 }
 
 func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) {
@@ -155,9 +165,9 @@ func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash 
 
 var errEmptyBlock = errors.New("empty block")
 
-func (*blockBuilder) BuildBlock(
+func (b *blockBuilder) BuildBlock(
 	header *types.Header,
-	_ *block.Context,
+	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	poolTxs []*txpool.Tx,
@@ -176,7 +186,19 @@ func (*blockBuilder) BuildBlock(
 		return nil, fmt.Errorf("failed to marshal atomic transactions: %w", err)
 	}
 
-	// TODO: Include warp predicates
+	if b.originalExtra != nil {
+		header.Extra = bytes.Clone(b.originalExtra)
+	} else {
+		rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
+		predicateContext := &precompileconfig.PredicateContext{
+			SnowCtx:            b.ctx,
+			ProposerVMBlockCtx: blockCtx,
+		}
+		if err := warp.SetPredicateResultsInHeader(rules, predicateContext, header, txs); err != nil {
+			return nil, fmt.Errorf("could not set predicate results: %w", err)
+		}
+	}
+
 	headerExtra := customtypes.GetHeaderExtra(header)
 	headerExtra.SettledHeight = &settledHeight
 	return customtypes.NewBlockWithExtData(

@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -24,10 +25,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -43,6 +46,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
 	avadb "github.com/ava-labs/avalanchego/database"
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	warpbackend "github.com/ava-labs/avalanchego/vms/saevm/warp/backend"
 )
 
 // SinceGenesis is a harness around an [sae.VM], providing an `Initialize`
@@ -55,6 +61,7 @@ type SinceGenesis struct {
 	db           avadb.Database
 	mempool      *txpool.Mempool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
+	warpBackend  *warpbackend.Backend
 
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
@@ -83,6 +90,12 @@ type Config struct {
 	// specified, the node will default to use the parent block's target delay
 	// per second.
 	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
+
+	// WarpOffChainMessages encodes off-chain messages (unrelated to any on-chain event ie. block or AddressedCall)
+	// that the node should be willing to sign.
+	// Note: only supports AddressedCall payloads as defined here:
+	// https://github.com/ava-labs/avalanchego/tree/7623ffd4be915a5185c9ed5e11fa9be15a6e1f00/vms/platformvm/warp/payload#addressedcall
+	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
 }
 
 var ethDBPrefix = []byte("ethdb")
@@ -128,6 +141,19 @@ func (vm *SinceGenesis) Initialize(
 		c.LondonBlock = big.NewInt(0)
 		c.ShanghaiTime = utils.PointerTo(uint64(u.DurangoTime.Unix()))
 		c.CancunTime = utils.PointerTo(uint64(u.EtnaTime.Unix()))
+
+		chainConfigExtra := &extras.ChainConfig{
+			NetworkUpgrades: extras.GetNetworkUpgrades(u),
+			AvalancheContext: extras.AvalancheContext{
+				SnowCtx: snowCtx,
+			},
+		}
+		if chainConfigExtra.DurangoBlockTimestamp != nil {
+			chainConfigExtra.PrecompileUpgrades = append(chainConfigExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
+				Config: warpcontract.NewDefaultConfig(chainConfigExtra.DurangoBlockTimestamp),
+			})
+		}
+		corethparams.WithExtra(c, chainConfigExtra)
 	}
 
 	config, _, err := core.SetupGenesisBlock(db, tdb, genesis)
@@ -141,6 +167,24 @@ func (vm *SinceGenesis) Initialize(
 			return fmt.Errorf("json.Unmarshal(%T): %w", userConfig, err)
 		}
 	}
+
+	// Initialize warp backend
+	offchainWarpMessages := make([][]byte, len(userConfig.WarpOffChainMessages))
+	for i, hexMsg := range userConfig.WarpOffChainMessages {
+		offchainWarpMessages[i] = []byte(hexMsg)
+	}
+	warpBackend, warpSignatureCache, err := warpbackend.New(
+		snowCtx.NetworkID,
+		snowCtx.ChainID,
+		snowCtx.WarpSigner,
+		&blockClient{vm: vm},
+		avaDB,
+		offchainWarpMessages,
+	)
+	if err != nil {
+		return fmt.Errorf("warp backend: %w", err)
+	}
+	vm.warpBackend = warpBackend
 
 	var desiredDelayExcess *acp226.DelayExcess
 	if userConfig.MinDelayTarget != nil {
@@ -161,6 +205,7 @@ func (vm *SinceGenesis) Initialize(
 		desiredDelayExcess,
 		desiredTargetExcess,
 		txs,
+		vm.warpBackend,
 	)
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
@@ -204,7 +249,7 @@ func (vm *SinceGenesis) Initialize(
 		vm.pushGossiper = pushGossiper
 
 		if err := inner.AddHandler(p2p.AtomicTxGossipHandlerID, handler); err != nil {
-			return fmt.Errorf("network.AddHandler(...): %w", err)
+			return fmt.Errorf("network.AddHandler(atomic): %w", err)
 		}
 
 		var (
@@ -222,6 +267,13 @@ func (vm *SinceGenesis) Initialize(
 			cancel()
 			wg.Wait()
 		})
+	}
+
+	{ // ==========  Warp Handler  ==========
+		warpHandler := acp118.NewCachedHandler(warpSignatureCache, warpBackend, snowCtx.WarpSigner)
+		if err := inner.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
+			return fmt.Errorf("network.AddHandler(warp): %w", err)
+		}
 	}
 
 	return nil
@@ -354,4 +406,26 @@ func (vm *SinceGenesis) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	return vm.VM.Shutdown(ctx)
+}
+
+// blockClient adapts [SinceGenesis] to the [warpbackend.BlockClient] interface.
+type blockClient struct {
+	vm *SinceGenesis
+}
+
+var _ warpbackend.BlockClient = (*blockClient)(nil)
+
+func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
+	b, err := c.vm.GetBlock(ctx, blockID)
+	if err != nil {
+		return err
+	}
+	acceptedID, err := c.vm.GetBlockIDAtHeight(ctx, b.Height())
+	if err != nil {
+		return err
+	}
+	if acceptedID != blockID {
+		return avadb.ErrNotFound
+	}
+	return nil
 }
