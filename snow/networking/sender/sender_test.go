@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/router/routertest"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendertest"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -630,6 +629,67 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	}
 }
 
+type testInternalHandler struct {
+	requests []registeredRequest
+	internal []*message.InboundMessage
+}
+
+type registeredRequest struct {
+	nodeID     ids.NodeID
+	chainID    ids.ID
+	requestID  uint32
+	op         message.Op
+	failedMsg  *message.InboundMessage
+	engineType p2ppb.EngineType
+}
+
+func (h *testInternalHandler) RegisterRequest(
+	_ context.Context,
+	nodeID ids.NodeID,
+	chainID ids.ID,
+	requestID uint32,
+	op message.Op,
+	failedMsg *message.InboundMessage,
+	engineType p2ppb.EngineType,
+) {
+	h.requests = append(h.requests, registeredRequest{
+		nodeID: nodeID, chainID: chainID, requestID: requestID,
+		op: op, failedMsg: failedMsg, engineType: engineType,
+	})
+}
+
+func (h *testInternalHandler) HandleInternal(_ context.Context, msg *message.InboundMessage) {
+	h.internal = append(h.internal, msg)
+}
+
+func (h *testInternalHandler) popRequest(t *testing.T) registeredRequest {
+	t.Helper()
+	require.NotEmpty(t, h.requests, "expected a registered request")
+	req := h.requests[0]
+	h.requests = h.requests[1:]
+	return req
+}
+
+func (h *testInternalHandler) popInternalMessage(t *testing.T) *message.InboundMessage {
+	t.Helper()
+	require.NotEmpty(t, h.internal, "expected an internal message")
+	msg := h.internal[0]
+	h.internal = h.internal[1:]
+	return msg
+}
+
+func (*testInternalHandler) Benched(ids.ID, ids.NodeID)   {}
+func (*testInternalHandler) Unbenched(ids.ID, ids.NodeID) {}
+
+type testBenchlist struct {
+	benchlist.Manager
+	benched set.Set[ids.NodeID]
+}
+
+func (b *testBenchlist) IsBenched(_ ids.ID, nodeID ids.NodeID) bool {
+	return b.benched.Contains(nodeID)
+}
+
 func TestSender_Bootstrap_Requests(t *testing.T) {
 	var (
 		successNodeID = ids.GenerateTestNodeID()
@@ -824,12 +884,12 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			var (
-				msgCreator     = messagemock.NewOutboundMsgBuilder(ctrl)
-				externalSender = sendermock.NewExternalSender(ctrl)
-				testRouter     = routertest.New(t)
-				tm             = timeouttest.New(t, benchlist.NewNoBenchlist(), deadline)
-				nodeIDs        = set.Of(successNodeID, failedNodeID, ctx.NodeID)
-				nodeIDsCopy    set.Set[ids.NodeID]
+				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
+				externalSender      = sendermock.NewExternalSender(ctrl)
+				timeoutManager      = timeouttest.New(t, benchlist.NewNoBenchlist(), deadline)
+				testInternalHandler = &testInternalHandler{}
+				nodeIDs             = set.Of(successNodeID, failedNodeID, ctx.NodeID)
+				nodeIDsCopy         set.Set[ids.NodeID]
 			)
 			nodeIDsCopy.Union(nodeIDs)
 
@@ -841,8 +901,8 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				ctx,
 				msgCreator,
 				externalSender,
-				testRouter,
-				tm,
+				testInternalHandler,
+				timeoutManager,
 				p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
 				prometheus.NewRegistry(),
@@ -857,8 +917,20 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 
 			tt.sendF(require, sender, nodeIDsCopy)
 
+			// Verify requests were registered with the router
+			require.Len(testInternalHandler.requests, len(nodeIDs))
+			for range nodeIDs {
+				req := testInternalHandler.popRequest(t)
+				require.True(nodeIDs.Contains(req.nodeID))
+				require.Equal(ctx.ChainID, req.chainID)
+				require.Equal(requestID, req.requestID)
+				require.Equal(tt.expectedResponseOp, req.op)
+				expectedFailedMsg := tt.failedMsgF(req.nodeID)
+				require.Equal(expectedFailedMsg.Op, req.failedMsg.Op)
+			}
+
 			// Verify the message sent to ourselves
-			tt.assertMsgToMyself(require, testRouter.PopInternalMessage(t))
+			tt.assertMsgToMyself(require, testInternalHandler.popInternalMessage(t))
 		})
 	}
 }
@@ -866,6 +938,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 func TestSender_Bootstrap_Responses(t *testing.T) {
 	var (
 		destinationNodeID = ids.GenerateTestNodeID()
+		deadline          = time.Second
 		requestID         = uint32(1337)
 		summaryIDs        = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 		summary           = []byte{1, 2, 3}
@@ -1014,18 +1087,18 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			var (
-				msgCreator     = messagemock.NewOutboundMsgBuilder(ctrl)
-				externalSender = sendermock.NewExternalSender(ctrl)
-				testRouter     = routertest.New(t)
-				tm             = timeouttest.New(t, benchlist.NewNoBenchlist(), time.Second)
+				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
+				externalSender      = sendermock.NewExternalSender(ctrl)
+				timeoutManager      = timeouttest.New(t, benchlist.NewNoBenchlist(), deadline)
+				testInternalHandler = &testInternalHandler{}
 			)
 
 			sender, err := New(
 				ctx,
 				msgCreator,
 				externalSender,
-				testRouter,
-				tm,
+				testInternalHandler,
+				timeoutManager,
 				p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
 				prometheus.NewRegistry(),
@@ -1037,7 +1110,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				tt.sendF(require, sender, ctx.NodeID)
 
 				// Verify the message sent to ourselves
-				tt.assertMsgToMyself(require, testRouter.PopInternalMessage(t))
+				tt.assertMsgToMyself(require, testInternalHandler.popInternalMessage(t))
 			}
 
 			// Case: not sending to ourselves
@@ -1167,11 +1240,11 @@ func TestSender_Single_Request(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			var (
-				msgCreator     = messagemock.NewOutboundMsgBuilder(ctrl)
-				externalSender = sendermock.NewExternalSender(ctrl)
-				testBenchlist  = &benchlist.Controllable{}
-				testRouter     = routertest.New(t)
-				tm             = timeouttest.New(t, testBenchlist, deadline)
+				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
+				externalSender      = sendermock.NewExternalSender(ctrl)
+				bl                  = &testBenchlist{Manager: benchlist.NewNoBenchlist()}
+				timeoutManager      = timeouttest.New(t, bl, deadline)
+				testInternalHandler = &testInternalHandler{}
 			)
 
 			// Instantiate new registerers to avoid duplicate metrics
@@ -1182,8 +1255,8 @@ func TestSender_Single_Request(t *testing.T) {
 				ctx,
 				msgCreator,
 				externalSender,
-				testRouter,
-				tm,
+				testInternalHandler,
+				timeoutManager,
 				engineType,
 				subnets.New(ctx.NodeID, subnets.Config{}),
 				prometheus.NewRegistry(),
@@ -1194,16 +1267,22 @@ func TestSender_Single_Request(t *testing.T) {
 			{
 				tt.sendF(require, sender, ctx.NodeID)
 
+				req := testInternalHandler.popRequest(t)
+				require.Equal(ctx.NodeID, req.nodeID)
+				require.Equal(ctx.ChainID, req.chainID)
+				require.Equal(requestID, req.requestID)
+				require.Equal(tt.expectedResponseOp, req.op)
+				require.Equal(tt.failedMsgF(ctx.NodeID).Op, req.failedMsg.Op)
+				require.Equal(tt.expectedEngineType, req.engineType)
+
 				if tt.shouldFailMessageToSelf {
-					tt.assertMsg(require, testRouter.PopInternalMessage(t))
+					tt.assertMsg(require, testInternalHandler.popInternalMessage(t))
 				}
 			}
 
 			// Case: Node is benched
 			{
-				testBenchlist.Benched = map[ids.ID]set.Set[ids.NodeID]{
-					ctx.ChainID: set.Of(destinationNodeID),
-				}
+				bl.benched.Add(destinationNodeID)
 
 				// Make sure we're expecting the correct outbound message.
 				tt.setMsgCreatorExpect(msgCreator)
@@ -1213,12 +1292,18 @@ func TestSender_Single_Request(t *testing.T) {
 
 				tt.sendF(require, sender, destinationNodeID)
 
-				tt.assertMsg(require, testRouter.PopInternalMessage(t))
+				req := testInternalHandler.popRequest(t)
+				require.Equal(destinationNodeID, req.nodeID)
+				require.Equal(tt.expectedResponseOp, req.op)
+				require.Equal(tt.failedMsgF(destinationNodeID).Op, req.failedMsg.Op)
+				require.Equal(tt.expectedEngineType, req.engineType)
+
+				tt.assertMsg(require, testInternalHandler.popInternalMessage(t))
 			}
 
 			// Case: Node is not myself, not benched and send fails
 			{
-				testBenchlist.Benched = nil
+				bl.benched.Remove(destinationNodeID)
 
 				// Make sure we're making the correct outbound message.
 				tt.setMsgCreatorExpect(msgCreator)
@@ -1228,7 +1313,13 @@ func TestSender_Single_Request(t *testing.T) {
 
 				tt.sendF(require, sender, destinationNodeID)
 
-				tt.assertMsg(require, testRouter.PopInternalMessage(t))
+				req := testInternalHandler.popRequest(t)
+				require.Equal(destinationNodeID, req.nodeID)
+				require.Equal(tt.expectedResponseOp, req.op)
+				require.Equal(tt.failedMsgF(destinationNodeID).Op, req.failedMsg.Op)
+				require.Equal(tt.expectedEngineType, req.engineType)
+
+				tt.assertMsg(require, testInternalHandler.popInternalMessage(t))
 			}
 		})
 	}
