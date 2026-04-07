@@ -9,6 +9,7 @@ fi
 
 # Root-level directories to exclude from linting
 EXCLUDE_DIRS=(
+  .git    # Git metadata and remote refs are not source files
   graft    # Grafted modules have their own lint config
   .direnv  # direnv cache
   .idea    # GoLand
