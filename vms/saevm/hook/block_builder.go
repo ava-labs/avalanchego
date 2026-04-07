@@ -4,7 +4,6 @@
 package hook
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -18,8 +17,8 @@ import (
 	"github.com/ava-labs/strevm/hook"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -51,10 +50,6 @@ type blockBuilder struct {
 	// move the network values towards their desired values.
 	desired      params
 	potentialTxs func() iter.Seq[*txpool.Tx]
-	// originalExtra, if set, indicates that this builder is reconstructing an
-	// existing block (e.g. during bootstrapping). Predicate results are copied
-	// from these bytes rather than re-verified.
-	originalExtra []byte
 }
 
 func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) {
@@ -186,18 +181,15 @@ func (b *blockBuilder) BuildBlock(
 		return nil, fmt.Errorf("failed to marshal atomic transactions: %w", err)
 	}
 
-	if b.originalExtra != nil {
-		header.Extra = bytes.Clone(b.originalExtra)
-	} else {
-		rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
-		predicateContext := &precompileconfig.PredicateContext{
-			SnowCtx:            b.ctx,
-			ProposerVMBlockCtx: blockCtx,
-		}
-		if err := warp.SetPredicateResultsInHeader(rules, predicateContext, header, txs); err != nil {
-			return nil, fmt.Errorf("could not set predicate results: %w", err)
-		}
+	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
+	rulesExtra := corethparams.GetRulesExtra(rules)
+	predicateBytes, err := warp.PredicateBytes(b.ctx, blockCtx, rulesExtra, txs)
+	if err != nil {
+		return nil, fmt.Errorf("generating predicates: %w", err)
 	}
+	// TODO: Do not use [customheader.SetPredicateBytesInExtra] it assumes fee
+	// information is included in [types.Header.Extra].
+	header.Extra = customheader.SetPredicateBytesInExtra(rulesExtra.AvalancheRules, header.Extra, predicateBytes)
 
 	headerExtra := customtypes.GetHeaderExtra(header)
 	headerExtra.SettledHeight = &settledHeight

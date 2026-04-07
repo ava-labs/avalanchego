@@ -11,12 +11,14 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/params",
-        "//graft/coreth/plugin/evm/customheader",
+        "//graft/coreth/params/extras",
         "//graft/coreth/precompile/precompileconfig",
+        "//snow",
+        "//snow/engine/snowman/block",
         "//utils/set",
         "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//core/types",
-        "@com_github_ava_labs_libevm//log",
+        "@org_uber_go_zap//:zap",
     ],
 )
 
@@ -30,13 +32,14 @@ go_test(
     deps = [
         "//graft/coreth/core",
         "//graft/coreth/params",
+        "//graft/coreth/params/extras",
         "//graft/coreth/precompile/precompileconfig",
         "//snow/engine/snowman/block",
+        "//snow/snowtest",
         "//utils/set",
         "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",
-        "@org_uber_go_mock//gomock",
     ],
 )

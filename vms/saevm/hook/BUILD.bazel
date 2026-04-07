@@ -14,6 +14,7 @@ go_library(
         "//database",
         "//graft/coreth/core/extstate",
         "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/precompileconfig",
         "//graft/evm/constants",
