@@ -88,3 +88,26 @@ func TestDraftReviewEntriesEqualIgnoresReplyAnchorFields(t *testing.T) {
 
 	require.True(t, draftReviewEntriesEqual(left, right))
 }
+
+func TestDiffCommentsMessageReportsChangedAnchor(t *testing.T) {
+	t.Parallel()
+
+	live := []DraftReviewEntry{{
+		Kind: DraftReviewEntryKindNewThread,
+		Path: "a.go",
+		Line: 7,
+		Side: reviewSideRight,
+		Body: "live body",
+	}}
+	stored := []DraftReviewEntry{{
+		Kind: DraftReviewEntryKindNewThread,
+		Path: "a.go",
+		Line: 7,
+		Side: reviewSideRight,
+		Body: "stored body",
+	}}
+
+	message := diffCommentsMessage(live, stored)
+	require.Contains(t, message, "body differs")
+	require.Contains(t, message, "a.go:7")
+}

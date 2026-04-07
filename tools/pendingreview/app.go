@@ -65,6 +65,8 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runGetState(command)
 	case replaceCommentsCommand:
 		return a.runReplaceComments(ctx, command)
+	case upsertCommentCommand:
+		return a.runUpsertComment(ctx, command)
 	case deleteStateCommand:
 		return a.runDeleteState(command)
 	case updateBodyCommand:
@@ -378,6 +380,7 @@ func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCom
 		zap.String("configDir", command.ConfigDir),
 		zap.String("stateDir", command.StateDir),
 		zap.Bool("force", command.Force),
+		zap.Bool("createIfMissing", command.CreateIfMissing),
 	)
 
 	entries, err := loadCommentsFile(command.CommentsFile)
@@ -390,7 +393,7 @@ func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCom
 		return stacktrace.Wrap(err)
 	}
 
-	review, err := client.GetPendingReview(ctx, command.Repo, command.PRNumber, viewer.Login)
+	review, created, err := getOrCreatePendingReview(ctx, client, viewer.Login, command.Repo, command.PRNumber, command.CreateIfMissing, command.ReviewBody, command.ReviewBodyFile)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -420,7 +423,7 @@ func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCom
 		zap.Int("storedEntryCount", len(storedState.LastPublishedEntries)),
 		zap.Bool("force", command.Force),
 	)
-	if !foundStoredState && !command.Force {
+	if !foundStoredState && !command.Force && !created {
 		return stacktrace.Errorf("no stored review state for %s#%d as %s; run create first or use --force", command.Repo, command.PRNumber, viewer.Login)
 	}
 	if foundStoredState && storedState.ReviewID != "" && storedState.ReviewID != review.ID && !command.Force {
@@ -439,14 +442,15 @@ func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCom
 			zap.Int("desiredEntryCount", len(entries)),
 		)
 		if !draftReviewEntriesEqual(storedEntries, liveManagedEntries) {
+			diff := diffCommentsMessage(liveManagedEntries, storedEntries)
 			a.log.Info("refusing pending review comment replace because stored state diverged",
 				zap.String("repo", command.Repo),
 				zap.Int("prNumber", command.PRNumber),
 				zap.String("userLogin", viewer.Login),
 				zap.String("reviewID", review.ID),
-				zap.String("diff", diffCommentsMessage(liveManagedEntries, storedEntries)),
+				zap.String("diff", diff),
 			)
-			return stacktrace.Wrap(ErrReviewCommentsConflict)
+			return stacktrace.Wrap(stacktrace.Errorf("%w: %s", ErrReviewCommentsConflict, diff))
 		}
 	}
 
@@ -488,6 +492,97 @@ func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCom
 	)
 
 	if _, err := fmt.Fprintf(a.Stdout, "Replaced comments for pending review %s on %s#%d (%s)\n", displayReviewID(updatedReview), command.Repo, command.PRNumber, updatedReview.State); err != nil {
+		return stacktrace.Wrap(err)
+	}
+	if updatedReview.HTMLURL != "" {
+		if _, err := fmt.Fprintln(a.Stdout, updatedReview.HTMLURL); err != nil {
+			return stacktrace.Wrap(err)
+		}
+	}
+	return nil
+}
+
+func (a *App) runUpsertComment(ctx context.Context, command upsertCommentCommand) error {
+	body, err := resolveBodyInput(command.Body, command.BodyFile)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	a.log.Debug("entered upsert-comment command",
+		zap.String("repo", command.Repo),
+		zap.Int("prNumber", command.PRNumber),
+		zap.String("commentID", command.CommentID),
+		zap.String("path", command.Path),
+		zap.Int("line", command.Line),
+		zap.String("side", command.Side),
+		zap.Bool("force", command.Force),
+		zap.Bool("createIfMissing", command.CreateIfMissing),
+	)
+
+	client, viewer, err := a.newClientAndViewer(ctx, command.ConfigDir)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	review, created, err := getOrCreatePendingReview(ctx, client, viewer.Login, command.Repo, command.PRNumber, command.CreateIfMissing, command.ReviewBody, command.ReviewBodyFile)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	selector := upsertSelector{
+		CommentID: command.CommentID,
+		Kind:      DraftReviewEntryKindNewThread,
+		Path:      command.Path,
+		Line:      command.Line,
+		Side:      command.Side,
+		StartLine: command.StartLine,
+		StartSide: command.StartSide,
+	}
+	store := NewStateStore(a.log, command.StateDir)
+	storedState, foundStoredState, err := store.LoadIfExists(command.Repo, viewer.Login, command.PRNumber)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	desiredEntries, liveManagedEntries, err := buildUpsertDesiredEntries(review.Comments, viewer.Login, selector, body, storedState.LastPublishedEntries)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	if !foundStoredState && !command.Force && !created {
+		return stacktrace.Errorf("no stored review state for %s#%d as %s; run create first or use --force", command.Repo, command.PRNumber, viewer.Login)
+	}
+	if foundStoredState && storedState.ReviewID != "" && storedState.ReviewID != review.ID && !command.Force {
+		return stacktrace.Errorf("stored review state points to review %s but GitHub has pending review %s; run get, reconcile, then retry with --force if intended", storedState.ReviewID, displayReviewID(review))
+	}
+	if !command.Force && foundStoredState {
+		storedEntries := normalizeDraftReviewEntries(storedState.LastPublishedEntries)
+		storedRemaining, liveRemaining, err := removeTargetedEntriesForComparison(storedEntries, liveManagedEntries, selector)
+		if err != nil {
+			return stacktrace.Wrap(err)
+		}
+		if !draftReviewEntriesEqual(storedRemaining, liveRemaining) {
+			return stacktrace.Wrap(stacktrace.Errorf("%w: %s", ErrReviewCommentsConflict, diffCommentsMessage(liveRemaining, storedRemaining)))
+		}
+	}
+
+	if err := client.ReplacePendingReviewEntries(ctx, review.ID, review.Comments, desiredEntries); err != nil {
+		return stacktrace.Wrap(err)
+	}
+	updatedReview, err := client.GetPendingReview(ctx, command.Repo, command.PRNumber, viewer.Login)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	if err := store.Save(ReviewState{
+		Repo:                 command.Repo,
+		PRNumber:             command.PRNumber,
+		UserLogin:            viewer.Login,
+		ReviewID:             updatedReview.ID,
+		LastPublishedBody:    updatedReview.Body,
+		LastPublishedEntries: normalizeLiveReviewComments(updatedReview.Comments, viewer.Login),
+		HTMLURL:              updatedReview.HTMLURL,
+	}); err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	if _, err := fmt.Fprintf(a.Stdout, "Upserted comment for pending review %s on %s#%d (%s)\n", displayReviewID(updatedReview), command.Repo, command.PRNumber, updatedReview.State); err != nil {
 		return stacktrace.Wrap(err)
 	}
 	if updatedReview.HTMLURL != "" {
@@ -561,6 +656,8 @@ func commandName(cmd command) string {
 		return "get-state"
 	case replaceCommentsCommand:
 		return "replace-comments"
+	case upsertCommentCommand:
+		return "upsert-comment"
 	case deleteStateCommand:
 		return "delete-state"
 	case updateBodyCommand:
@@ -588,4 +685,45 @@ func resolveBodyInput(body string, bodyFile string) (string, error) {
 		return "", stacktrace.New("review body must not be empty")
 	}
 	return string(content), nil
+}
+
+const defaultCommentOnlyReviewBody = "Draft review for inline comments."
+
+func getOrCreatePendingReview(
+	ctx context.Context,
+	client *GitHubClient,
+	viewerLogin string,
+	repo string,
+	prNumber int,
+	createIfMissing bool,
+	reviewBody string,
+	reviewBodyFile string,
+) (Review, bool, error) {
+	review, err := client.GetPendingReview(ctx, repo, prNumber, viewerLogin)
+	if err == nil {
+		return review, false, nil
+	}
+	if !createIfMissing || !errors.Is(err, ErrNoPendingReview) {
+		return Review{}, false, err
+	}
+
+	body, err := resolveOptionalBodyInput(reviewBody, reviewBodyFile, defaultCommentOnlyReviewBody)
+	if err != nil {
+		return Review{}, false, err
+	}
+	review, err = client.CreatePendingReview(ctx, repo, prNumber, body)
+	return review, err == nil, err
+}
+
+func resolveOptionalBodyInput(body string, bodyFile string, defaultBody string) (string, error) {
+	switch {
+	case body != "" && bodyFile != "":
+		return "", stacktrace.New("at most one of --review-body or --review-body-file may be provided")
+	case body != "":
+		return body, nil
+	case bodyFile != "":
+		return resolveBodyInput("", bodyFile)
+	default:
+		return defaultBody, nil
+	}
 }

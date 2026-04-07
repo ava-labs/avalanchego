@@ -15,6 +15,7 @@ Use this skill when the user wants to:
 - create a pending review body
 - fetch the current pending review body and inline comments
 - update the current pending review body
+- upsert one managed inline comment by anchor or existing draft comment ID
 - replace the current managed inline comment set, including replies on existing
   review threads
 - delete the current pending review
@@ -62,7 +63,8 @@ The tool currently supports:
 - `create --pr <number> (--body <text> | --body-file <path>)`
 - `get --pr <number>`
 - `update-body --pr <number> (--body <text> | --body-file <path>) [--force]`
-- `replace-comments --pr <number> --comments-file <path> [--force]`
+- `replace-comments --pr <number> --comments-file <path> [--force] [--create-if-missing]`
+- `upsert-comment --pr <number> (--comment-id <id> | --path <path> --line <line> --side <side>) (--body <text> | --body-file <path>) [--force] [--create-if-missing]`
 - `delete --pr <number> [--ensure-absent]`
 - `get-state --pr <number> --user <login>`
 - `delete-state --pr <number> --user <login>`
@@ -121,7 +123,8 @@ reconciliation are:
 
 Treat `id`, `reply_to_comment_id`, and `user` as read-only metadata. Do not copy
 those fields into a `replace-comments` input file unless the write format
-explicitly requires them.
+explicitly requires them. `id` is useful as an `upsert-comment --comment-id`
+selector.
 
 ### Update Body
 
@@ -133,6 +136,28 @@ If the user wants you to revise only the top-level review body:
 
 Use `--force` only after reading the current pending review and intentionally
 reconciling the live edits.
+
+### Upsert One Inline Comment
+
+Prefer `upsert-comment` when the user wants to revise exactly one managed
+new-thread comment and you do not need to reconstruct unrelated comments:
+
+```bash
+./bin/gh-pending-review upsert-comment --pr <number> --path <path> --line <line> --side RIGHT --body-file <path> --create-if-missing --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
+```
+
+Use `--comment-id` instead of an anchor when the user identified the exact draft
+comment from `get`.
+
+Important behavior:
+
+- with anchor targeting, the command updates the one matching managed comment if
+  present, or creates it if absent
+- `--create-if-missing` removes the need for placeholder review-body setup in
+  comment-only workflows
+- without `--force`, unrelated managed comments still have to match stored state
+- if multiple managed comments match the same anchor, the command refuses the
+  update and requires `--comment-id` or `replace-comments`
 
 ### Replace Inline Comments
 
@@ -176,7 +201,10 @@ matches the reconciled text.
 
 Important behavior:
 
-- this is replace-only, not patch-in-place comment editing
+- this is the full-set write path; prefer it when multiple managed comments need
+  to change together or when you need thread replies in the same operation
+- `--create-if-missing` can create the draft review automatically for
+  comment-only workflows
 - the tool updates the existing pending review session in place rather than
   intentionally recreating the top-level review
 - the managed set may contain both new draft threads and replies to existing
@@ -236,13 +264,13 @@ When reconciling comments after a human GitHub edit:
 
 1. run `get`
 2. read the live pending review JSON
-3. identify the managed comment entries in `comments`
-4. apply any `!!` instruction to the live comment text
-5. remove the `!!` instruction text from the final comment body
-6. preserve the human note, shared context, and anchor fields that should stay
-7. write the desired managed set to a JSON file using the `replace-comments`
-   input format
-8. rerun `replace-comments` with `--force` only after that reconciliation
+3. identify whether the task is a one-comment edit or a multi-comment rewrite
+4. for a one-comment edit, prefer `upsert-comment`
+5. for a multi-comment rewrite, preserve the live managed set and use
+   `replace-comments`
+6. apply any `!!` instruction to the live comment text
+7. remove the `!!` instruction text from the final comment body
+8. rerun with `--force` only after intentional reconciliation
 
 For new-thread entries, the replacement file normally keeps `path`, `line`,
 `side`, and the reconciled `body`, while omitting `kind` unless a non-default
