@@ -4,8 +4,11 @@
 package routertest
 
 import (
+<<<<<<< remove-timeout-mocks
 	"context"
 	"sync"
+=======
+>>>>>>> router-mocks
 	"testing"
 	"time"
 
@@ -13,7 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+<<<<<<< remove-timeout-mocks
 	"github.com/ava-labs/avalanchego/message"
+=======
+>>>>>>> router-mocks
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -22,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
+<<<<<<< remove-timeout-mocks
 // Router wraps a real ChainRouter and records messages passed to
 // HandleInternal so tests can assert on their content.
 type Router struct {
@@ -63,6 +70,17 @@ func New(t testing.TB) *Router {
 			MinimumTimeout:     time.Millisecond,
 			MaximumTimeout:     10 * time.Second,
 			TimeoutCoefficient: 1.25,
+=======
+// New creates a new initialized Router for testing with its own timeout manager.
+// The timeout manager is automatically cleaned up when the test finishes.
+func New(t testing.TB) *router.ChainRouter {
+	tm, err := timeout.NewManager(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     500 * time.Millisecond,
+			MinimumTimeout:     500 * time.Millisecond,
+			MaximumTimeout:     500 * time.Millisecond,
+			TimeoutCoefficient: 1,
+>>>>>>> router-mocks
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
@@ -87,5 +105,9 @@ func New(t testing.TB) *Router {
 		router.HealthConfig{},
 		prometheus.NewRegistry(),
 	))
+<<<<<<< remove-timeout-mocks
 	return &Router{ChainRouter: chainRouter}
+=======
+	return chainRouter
+>>>>>>> router-mocks
 }
