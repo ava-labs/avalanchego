@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
+	synctypes "github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )
 
 // dynamicSyncTestEnv holds shared infrastructure for dynamic sync tests.
@@ -66,9 +67,9 @@ func newDynamicSyncTestEnv(t *testing.T, serverDB state.Database, c codec.Manage
 	}
 }
 
-// runSync creates a [HashDBDynamicSyncer] for root, runs it alongside the code
+// runSync creates a dynamic syncer for root, runs it alongside the code
 // syncer to completion, verifies DB consistency, and returns the syncer.
-func (e *dynamicSyncTestEnv) runSync(t *testing.T, root common.Hash, leafReqType message.LeafsRequestType) *HashDBDynamicSyncer {
+func (e *dynamicSyncTestEnv) runSync(t *testing.T, root common.Hash, leafReqType message.LeafsRequestType) *synctypes.DynamicSyncer {
 	t.Helper()
 	stateSyncer, err := NewHashDBDynamicSyncer(
 		e.mockClient, e.clientEthDB, root, e.codeQueue,
@@ -83,7 +84,7 @@ func (e *dynamicSyncTestEnv) runSync(t *testing.T, root common.Hash, leafReqType
 
 	synctest.AssertDBConsistency(t, root, e.clientDB, e.serverDB)
 
-	return stateSyncer.(*HashDBDynamicSyncer)
+	return stateSyncer
 }
 
 func TestDynamicSync_CompletesWithoutPivot(t *testing.T) {
@@ -190,13 +191,13 @@ func TestDynamicSync_UpdateTarget_SameRootDifferentHeight(t *testing.T) {
 		ds := env.runSync(t, root, leafReqType)
 
 		// Same root but higher height should update height without triggering a pivot.
-		prevHeight := ds.desiredHeight
+		prevHeight := ds.TargetHeight()
 		newHeight := prevHeight + 100
 		require.NoError(t, ds.UpdateTarget(&synctest.SyncTarget{
-			BlockRoot:   ds.desiredRoot,
+			BlockRoot:   ds.DesiredRoot(),
 			BlockHeight: newHeight,
 		}))
-		require.Equal(t, newHeight, ds.desiredHeight)
+		require.Equal(t, newHeight, ds.TargetHeight())
 	})
 }
 

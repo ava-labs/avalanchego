@@ -16,37 +16,49 @@ import (
 
 // Extender is the sync extender for the atomic VM.
 type Extender struct {
-	backend     *state.AtomicBackend
-	trie        *state.AtomicTrie
-	requestSize uint16 // maximum number of leaves to sync in a single request
+	backend        *state.AtomicBackend
+	trie           *state.AtomicTrie
+	requestSize    uint16 // maximum number of leaves to sync in a single request
+	dynamicEnabled bool   // whether to create a dynamic syncer that supports pivoting
 }
 
 // Initialize initializes the sync extender with the backend and trie and request size.
-func (e *Extender) Initialize(backend *state.AtomicBackend, trie *state.AtomicTrie, requestSize uint16) {
+func (e *Extender) Initialize(backend *state.AtomicBackend, trie *state.AtomicTrie, requestSize uint16, dynamicEnabled bool) {
 	e.backend = backend
 	e.trie = trie
 	e.requestSize = requestSize
+	e.dynamicEnabled = dynamicEnabled
 }
 
 // CreateSyncer creates the atomic syncer with the given client and verDB.
+// When dynamic mode is enabled, wraps the static syncer in an
+// AtomicDynamicSyncer that supports pivoting to new targets.
 func (e *Extender) CreateSyncer(client types.LeafClient, verDB *versiondb.Database, summary message.Syncable) (types.Syncer, error) {
 	atomicSummary, ok := summary.(*Summary)
 	if !ok {
 		return nil, fmt.Errorf("atomic sync extender: expected *Summary, got %T", summary)
 	}
 
+	opts := []SyncerOption{WithRequestSize(e.requestSize)}
 	syncer, err := NewSyncer(
 		client,
 		verDB,
 		e.trie,
 		atomicSummary.AtomicRoot,
 		atomicSummary.BlockNumber,
-		WithRequestSize(e.requestSize),
+		opts...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("atomic.NewSyncer failed: %w", err)
 	}
-	return syncer, nil
+	if !e.dynamicEnabled {
+		return syncer, nil
+	}
+	return NewAtomicDynamicSyncer(
+		syncer, client, verDB, e.trie,
+		atomicSummary.AtomicRoot, atomicSummary.BlockNumber,
+		opts...,
+	), nil
 }
 
 // OnFinishBeforeCommit implements the sync.Extender interface by marking the previously last accepted block for the shared memory cursor.

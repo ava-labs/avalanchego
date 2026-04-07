@@ -243,7 +243,7 @@ func (vm *VM) Initialize(
 	// Atomic backend is available now, we can initialize structs that depend on it
 	atomicTrie := vm.AtomicBackend.AtomicTrie()
 	syncProvider.Initialize(atomicTrie)
-	syncExtender.Initialize(vm.AtomicBackend, atomicTrie, vm.InnerVM.Config().StateSyncRequestSize)
+	syncExtender.Initialize(vm.AtomicBackend, atomicTrie, vm.InnerVM.Config().StateSyncRequestSize, vm.InnerVM.Config().StateSyncDynamicEnabled)
 	leafHandler.Initialize(atomicTrie.TrieDB(), atomicstate.TrieKeyLength, message.CorethCodec)
 
 	vm.SecpCache = secp256k1.NewRecoverCache(secpCacheSize)

@@ -13,73 +13,63 @@ import (
 )
 
 // Syncer is the common interface for all sync operations.
-// This provides a unified interface for atomic state sync and state trie sync.
 type Syncer interface {
-	// Sync completes the full sync operation, returning any errors encountered.
-	// The sync will respect context cancellation.
+	// Sync runs the full sync, respecting context cancellation.
 	Sync(ctx context.Context) error
-
-	// UpdateTarget updates the sync target while sync is in progress.
-	// Implementations may treat this as a no-op when dynamic target updates
-	// are not yet supported.
+	// UpdateTarget updates the sync target mid-sync. Static syncers may no-op.
 	UpdateTarget(newTarget message.Syncable) error
-
-	// Name returns a human-readable name for this syncer implementation.
+	// Name returns a human-readable name for logging.
 	Name() string
-
-	// ID returns a stable, machine-oriented identifier (e.g., "state_block_sync", "state_code_sync",
-	// "state_evm_state_sync", "state_atomic_sync"). Implementations should ensure this is unique and
-	// stable across renames for logging/metrics/deduplication.
+	// ID returns a stable machine-oriented identifier for metrics and dedup.
 	ID() string
 }
 
-// Finalizer provides a mechanism to perform cleanup operations after a sync operation.
-// This is useful for handling inflight requests, flushing to disk, or other cleanup tasks.
+// Finalizer flushes in-progress work (inflight requests, disk writes, etc.).
 type Finalizer interface {
-	// Finalize performs any necessary cleanup operations.
 	Finalize() error
 }
 
-// TargetReporter is an optional interface that syncers can implement to report
-// their current target height. The coordinator uses the minimum reported height
-// across all syncers to avoid pruning queued blocks that slower syncers still
-// need for gap filling during batch replay.
-//
-// Syncers that do not implement this interface are assumed to have no block
-// preservation requirements (effectively infinite target height).
+// TargetReporter reports the height a syncer is working toward. The
+// coordinator uses the minimum across all reporters to preserve queued
+// blocks that slower syncers still need. Syncers that do not implement
+// this are assumed to need no block preservation.
 type TargetReporter interface {
-	// TargetHeight returns the current target height this syncer is working toward.
-	// For static syncers this is the initial target; for dynamic syncers this is
-	// the latest desired height.
 	TargetHeight() uint64
 }
 
-// CodeRequestQueue is the interface for adding code hashes to the download
-// queue and finalizing it when the main trie is done syncing.
+// PivotSession represents one sync session inside a DynamicSyncer. When the
+// target changes, the current session is cancelled and Rebuild creates a
+// fresh session for the new target.
+type PivotSession interface {
+	// Run syncs to completion or until ctx is cancelled.
+	Run(ctx context.Context) error
+	// Rebuild cleans up the current session and returns a new one for the
+	// given root and height.
+	Rebuild(newRoot common.Hash, newHeight uint64) (PivotSession, error)
+	// ShouldPivot reports whether newRoot requires restarting. Returning
+	// false lets the loop bump the height without restarting.
+	ShouldPivot(newRoot common.Hash) bool
+	// OnSessionComplete is called once when sync finishes successfully.
+	OnSessionComplete() error
+}
+
+// CodeRequestQueue enqueues code hashes for the code syncer to fetch.
 type CodeRequestQueue interface {
-	// AddCode enqueues code hashes discovered during range proof commits
-	// for the code syncer to fetch from remote peers.
 	AddCode(context.Context, []common.Hash) error
-	// Finalize closes the code queue, signalling the code syncer to exit.
+	// Finalize closes the queue, signalling the code syncer to exit.
 	Finalize() error
 }
 
-// LeafClient is the interface for fetching leaves from the network.
-// This is defined here to avoid circular dependencies with the leaf package.
+// LeafClient fetches leaves from the network. Responses include verified
+// range proofs. Defined here to avoid circular deps with the leaf package.
 type LeafClient interface {
-	// GetLeafs synchronously sends the given request, returning a parsed LeafsResponse or error.
-	// Note: this verifies the response including the range proofs.
 	GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error)
 }
 
-// Extender is an interface that allows for extending the state sync process.
+// Extender hooks into the state sync lifecycle for VM-specific work
+// (e.g., atomic trie sync in coreth).
 type Extender interface {
-	// CreateSyncer creates a syncer instance for the given client, database, and summary.
 	CreateSyncer(client LeafClient, verDB *versiondb.Database, summary message.Syncable) (Syncer, error)
-
-	// OnFinishBeforeCommit is called before committing the sync results.
 	OnFinishBeforeCommit(lastAcceptedHeight uint64, summary message.Syncable) error
-
-	// OnFinishAfterCommit is called after committing the sync results.
 	OnFinishAfterCommit(summaryHeight uint64) error
 }

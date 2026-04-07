@@ -38,7 +38,6 @@ var (
 	_                           types.Syncer = (*HashDBSyncer)(nil)
 	errCodeRequestQueueRequired              = errors.New("code request queue is required")
 	errLeafsRequestSizeRequired              = errors.New("leafs request size must be > 0")
-	errPivotRequested                        = errors.New("state syncer: pivot requested")
 )
 
 // HashDBSyncer keeps the state of a single-root state sync session.

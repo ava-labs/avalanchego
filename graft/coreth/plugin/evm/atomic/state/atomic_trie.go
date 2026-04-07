@@ -238,6 +238,13 @@ func (a *AtomicTrie) LastAcceptedRoot() common.Hash {
 	return a.lastAcceptedRoot
 }
 
+// ResetToLastCommitted resets lastAcceptedRoot to the last committed root.
+// Called between dynamic syncer sessions to clear stale references from a
+// cancelled session.
+func (a *AtomicTrie) ResetToLastCommitted() {
+	a.lastAcceptedRoot = a.lastCommittedRoot
+}
+
 func (a *AtomicTrie) InsertTrie(nodes *trienode.NodeSet, root common.Hash) error {
 	if nodes != nil {
 		if err := a.trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
