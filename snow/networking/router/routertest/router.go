@@ -19,9 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-// New creates a new initialized Router (wrapping ChainRouter) for testing
-// with its own timeout manager. The timeout manager is automatically
-// cleaned up when the test finishes.
+// New creates a new initialized Router for testing with its own timeout manager.
+// The timeout manager is automatically cleaned up when the test finishes.
 func New(t testing.TB) *router.ChainRouter {
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
