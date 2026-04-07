@@ -46,6 +46,7 @@ The supported surface is intentionally small and pending-review-only:
 - fetch the authenticated user's current pending review, including inline
   comments and replies to existing threads
 - update the top-level review body
+- upsert one managed inline comment by anchor or existing draft comment ID
 - replace the managed inline comment set
 - delete the pending review
 - inspect or delete the local state used for conflict detection
@@ -55,7 +56,6 @@ Intentionally out of scope:
 - submitting a review
 - approve or request-changes flows
 - generic GitHub write operations outside pending review endpoints
-- patch-in-place mutation of individual inline comments
 
 ## Auth Boundary
 
@@ -103,7 +103,8 @@ gh-pending-review create --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-f
 gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--ensure-absent]
 gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
 gh-pending-review get-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR]
-gh-pending-review replace-comments --pr NUMBER [--repo OWNER/REPO] --comments-file PATH [--config-dir DIR] [--state-dir DIR] [--force]
+gh-pending-review replace-comments --pr NUMBER [--repo OWNER/REPO] --comments-file PATH [--config-dir DIR] [--state-dir DIR] [--force] [--create-if-missing] [--review-body TEXT | --review-body-file PATH]
+gh-pending-review upsert-comment --pr NUMBER [--repo OWNER/REPO] (--comment-id ID | --path PATH --line LINE --side SIDE [--start-line LINE --start-side SIDE]) (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force] [--create-if-missing] [--review-body TEXT | --review-body-file PATH]
 gh-pending-review delete-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR]
 gh-pending-review update-body --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force]
 gh-pending-review version
@@ -114,10 +115,14 @@ Notes:
 - the tool only operates on pending reviews owned by the authenticated user
 - `create` and `update-body` require exactly one of `--body` or `--body-file`
 - `replace-comments` requires `--comments-file`
+- `upsert-comment` requires exactly one target selector and exactly one of
+  `--body` or `--body-file`
 - `--repo` defaults to `ava-labs/avalanchego`
 - `get-state` and `delete-state` are local-only and do not talk to GitHub
 - `delete --ensure-absent` is idempotent: it clears stored state, deletes any
   live pending review, succeeds when no live draft exists, and verifies absence
+- `--create-if-missing` creates a pending review automatically for comment
+  writes; the default body is `Draft review for inline comments.`
 
 ## Workflow
 
@@ -170,6 +175,41 @@ Replace only the top-level review body:
 This updates the body in place when the live pending review still matches the
 tool's stored state.
 
+### Upsert One Inline Comment
+
+Edit or create one managed inline comment without reconstructing the whole
+managed set:
+
+```bash
+./bin/gh-pending-review upsert-comment \
+  --pr 5168 \
+  --path snow/engine/avalanche/bootstrap/bootstrapper.go \
+  --line 123 \
+  --side RIGHT \
+  --body-file /tmp/comment.md \
+  --create-if-missing \
+  --config-dir "$HOME/.config/gh-pending-review" \
+  --state-dir "$HOME/.local/state/gh-pending-review"
+```
+
+Targeting rules:
+
+- use `--comment-id` to revise one existing managed draft comment when you know
+  its GitHub comment ID from `get`
+- use `--path` / `--line` / `--side` to upsert a new-thread comment by anchor
+- with anchor targeting, the command updates the one matching managed comment if
+  present, or creates it if absent
+- `--create-if-missing` makes comment-only draft flows first-class by creating a
+  pending review automatically when none exists
+
+Safety model:
+
+- without `--force`, unrelated managed comments must still match stored state
+- the targeted comment is allowed to diverge from stored state so routine
+  one-comment rewrites do not require whole-set reconciliation
+- if multiple managed comments match the same anchor, the command refuses the
+  update and requires `--comment-id` or `replace-comments`
+
 ### Replace Inline Comments
 
 Replace the managed inline comment set:
@@ -182,7 +222,7 @@ Replace the managed inline comment set:
   --state-dir "$HOME/.local/state/gh-pending-review"
 ```
 
-This is a replace operation, not an edit-in-place operation. The current
+This is a replace operation for the full managed set. The current
 implementation:
 
 1. loads and validates the desired comment set from JSON
@@ -193,6 +233,10 @@ implementation:
 5. adds new draft threads and draft replies needed to reach the desired set
 6. reads the pending review back and saves the resulting body and entries in
    local state
+
+When no pending review exists yet, `replace-comments --create-if-missing`
+creates one first. Use `--review-body` or `--review-body-file` to override the
+default review body for that initial draft.
 
 The pending review itself is updated in place. Its inline comment set may
 change, but the command does not intentionally recreate the top-level review.
@@ -287,6 +331,21 @@ The failure is deliberate. The intended recovery flow is:
 Managed comments are compared by normalized content, not by the original input
 file order.
 
+### Single-Comment Upserts
+
+`upsert-comment` uses the same stored-state model, but narrows the write scope:
+
+- it loads the live managed comment set
+- it removes the targeted entry from the stored/live comparison
+- it refuses to continue if unrelated managed comments diverged, unless
+  `--force` is supplied
+- it applies the one-comment edit by rebuilding the desired managed set from the
+  current live review and updating only the targeted entry
+
+When a comment write is refused, the error now includes a small diff summary
+that identifies which managed entry changed, such as `body differs` or
+`live-only` / `stored-only` anchor mismatches.
+
 ## Comments File Format
 
 `replace-comments` reads a JSON array of objects. The default entry kind is a
@@ -351,12 +410,13 @@ Pending-review-specific output behavior:
 - `get-state` prints stored review state as JSON
 - `create` and `replace-comments` also print the review URL when GitHub returns
   one
+- `upsert-comment` also prints the review URL when GitHub returns one
 
 ## Operational Constraints
 
 - The tool never submits reviews. Human submission happens in the GitHub UI.
 - The tool only manipulates the authenticated user's own `PENDING` review.
-- Inline comment writes are replace-only at the managed-set level.
+- Inline comment writes support both full-set replacement and narrow single-comment upsert.
 - The managed set may contain both new draft threads and replies to existing
   review threads.
 

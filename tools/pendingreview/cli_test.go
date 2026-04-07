@@ -117,6 +117,46 @@ func TestParseReplaceCommentsCommand(t *testing.T) {
 	require.True(t, replaceCommentsCommand.Force)
 }
 
+func TestParseReplaceCommentsCommandCreateIfMissing(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"replace-comments", "--pr", "5168", "--comments-file", "/tmp/comments.json", "--create-if-missing", "--review-body", "inline"})
+	require.NoError(t, err)
+
+	replaceCommentsCommand, ok := command.(replaceCommentsCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.True(t, replaceCommentsCommand.CreateIfMissing)
+	require.Equal(t, "inline", replaceCommentsCommand.ReviewBody)
+}
+
+func TestParseUpsertCommentCommand(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"upsert-comment", "--pr", "5168", "--path", "a.go", "--line", "7", "--side", "RIGHT", "--body", "hello"})
+	require.NoError(t, err)
+
+	upsertCommentCommand, ok := command.(upsertCommentCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.Equal(t, 5168, upsertCommentCommand.PRNumber)
+	require.Equal(t, "a.go", upsertCommentCommand.Path)
+	require.Equal(t, 7, upsertCommentCommand.Line)
+	require.Equal(t, "RIGHT", upsertCommentCommand.Side)
+	require.Equal(t, "hello", upsertCommentCommand.Body)
+}
+
+func TestParseUpsertCommentCommandByCommentID(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"upsert-comment", "--pr", "5168", "--comment-id", "comment-1", "--body-file", "/tmp/body.txt", "--create-if-missing"})
+	require.NoError(t, err)
+
+	upsertCommentCommand, ok := command.(upsertCommentCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.Equal(t, "comment-1", upsertCommentCommand.CommentID)
+	require.Equal(t, "/tmp/body.txt", upsertCommentCommand.BodyFile)
+	require.True(t, upsertCommentCommand.CreateIfMissing)
+}
+
 func TestParseGetStateCommand(t *testing.T) {
 	t.Parallel()
 

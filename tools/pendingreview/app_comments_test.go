@@ -175,6 +175,228 @@ func TestRunReplaceCommentsDetectsConflict(t *testing.T) {
 		"--config-dir", t.TempDir(),
 	})
 	require.ErrorIs(t, err, ErrReviewCommentsConflict)
+	require.Contains(t, err.Error(), "different.go:8")
+	require.Contains(t, err.Error(), "old.go:5")
+}
+
+func TestRunReplaceCommentsCreatesReviewIfMissing(t *testing.T) {
+	t.Parallel()
+
+	commentsPath := filepath.Join(t.TempDir(), "comments.json")
+	require.NoError(t, os.WriteFile(commentsPath, []byte(`[{"path":"a.go","line":7,"side":"RIGHT","body":"new comment"}]`), 0o644))
+
+	var currentComments []map[string]any
+	created := false
+	server := newGraphQLTestServer(t, func(t *testing.T, query string, variables map[string]any) any {
+		switch {
+		case strings.Contains(query, "query Viewer"):
+			return map[string]any{"viewer": map[string]any{"login": "maru"}}
+		case strings.Contains(query, "query PullRequestContext"):
+			if !created {
+				return graphQLNoPendingReviewData()
+			}
+			return graphQLPullRequestData("Draft review for inline comments.", currentComments)
+		case strings.Contains(query, "mutation CreatePendingReview"):
+			require.Equal(t, "Draft review for inline comments.", variables["body"])
+			created = true
+			return map[string]any{
+				"addPullRequestReview": map[string]any{
+					"pullRequestReview": map[string]any{
+						"id":         "review-123",
+						"databaseId": 123,
+						"state":      reviewStatePending,
+						"body":       "Draft review for inline comments.",
+						"url":        "https://example.invalid/review/123",
+						"author":     map[string]any{"login": "maru"},
+					},
+				},
+			}
+		case strings.Contains(query, "mutation AddPendingReviewThread"):
+			currentComments = []map[string]any{
+				graphQLThreadComment("comment-1", "thread-1", "new comment", "a.go", 7),
+			}
+			return map[string]any{
+				"addPullRequestReviewThread": map[string]any{
+					"thread": map[string]any{
+						"id": "thread-1",
+						"comments": map[string]any{
+							"nodes": currentComments,
+						},
+					},
+				},
+			}
+		default:
+			require.FailNowf(t, "unexpected query", "query: %s", query)
+			return nil
+		}
+	})
+	defer server.Close()
+
+	stateDir := t.TempDir()
+	var stdout bytes.Buffer
+	app := NewApp(strings.NewReader(""), &stdout, io.Discard)
+	app.tokenProvider = staticTokenProvider{token: "test-token"}
+	app.httpClient = server.Client()
+	app.baseURL = server.URL
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"replace-comments",
+		"--pr", "5168",
+		"--comments-file", commentsPath,
+		"--create-if-missing",
+		"--state-dir", stateDir,
+		"--config-dir", t.TempDir(),
+	}))
+
+	store := NewStateStore(logging.NoLog{}, stateDir)
+	loaded, err := store.Load("ava-labs/avalanchego", "maru", 5168)
+	require.NoError(t, err)
+	require.Equal(t, "Draft review for inline comments.", loaded.LastPublishedBody)
+	require.Len(t, loaded.LastPublishedEntries, 1)
+	require.Contains(t, stdout.String(), "Replaced comments for pending review 123")
+}
+
+func TestRunUpsertCommentUpdatesSingleManagedComment(t *testing.T) {
+	t.Parallel()
+
+	stateDir := t.TempDir()
+	store := NewStateStore(logging.NoLog{}, stateDir)
+	require.NoError(t, store.Save(ReviewState{
+		Repo:                 "ava-labs/avalanchego",
+		PRNumber:             5168,
+		UserLogin:            "maru",
+		ReviewID:             "review-123",
+		LastPublishedBody:    "live body",
+		LastPublishedEntries: []DraftReviewEntry{{Kind: DraftReviewEntryKindNewThread, Path: "a.go", Line: 7, Side: reviewSideRight, Body: "old body"}},
+	}))
+
+	currentComments := []map[string]any{
+		graphQLThreadComment("comment-1", "thread-1", "old body", "a.go", 7),
+	}
+	server := newGraphQLTestServer(t, func(t *testing.T, query string, variables map[string]any) any {
+		switch {
+		case strings.Contains(query, "query Viewer"):
+			return map[string]any{"viewer": map[string]any{"login": "maru"}}
+		case strings.Contains(query, "query PullRequestContext"):
+			return graphQLPullRequestData("live body", currentComments)
+		case strings.Contains(query, "mutation DeletePendingReviewComment"):
+			require.Equal(t, "comment-1", variables["commentID"])
+			currentComments = nil
+			return map[string]any{"deletePullRequestReviewComment": map[string]any{"clientMutationId": "deleted"}}
+		case strings.Contains(query, "mutation AddPendingReviewThread"):
+			input := variables["input"].(map[string]any)
+			require.Equal(t, "review-123", input["pullRequestReviewId"])
+			require.Equal(t, "updated body", input["body"])
+			currentComments = []map[string]any{
+				graphQLThreadComment("comment-2", "thread-2", "updated body", "a.go", 7),
+			}
+			return map[string]any{
+				"addPullRequestReviewThread": map[string]any{
+					"thread": map[string]any{
+						"id": "thread-2",
+						"comments": map[string]any{
+							"nodes": currentComments,
+						},
+					},
+				},
+			}
+		default:
+			require.FailNowf(t, "unexpected query", "query: %s", query)
+			return nil
+		}
+	})
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	app := NewApp(strings.NewReader(""), &stdout, io.Discard)
+	app.tokenProvider = staticTokenProvider{token: "test-token"}
+	app.httpClient = server.Client()
+	app.baseURL = server.URL
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"upsert-comment",
+		"--pr", "5168",
+		"--path", "a.go",
+		"--line", "7",
+		"--side", "RIGHT",
+		"--body", "updated body",
+		"--state-dir", stateDir,
+		"--config-dir", t.TempDir(),
+	}))
+
+	loaded, err := store.Load("ava-labs/avalanchego", "maru", 5168)
+	require.NoError(t, err)
+	require.Len(t, loaded.LastPublishedEntries, 1)
+	require.Equal(t, "updated body", loaded.LastPublishedEntries[0].Body)
+	require.Contains(t, stdout.String(), "Upserted comment for pending review 123")
+}
+
+func TestRunUpsertCommentByCommentIDUsesStoredAnchor(t *testing.T) {
+	t.Parallel()
+
+	stateDir := t.TempDir()
+	store := NewStateStore(logging.NoLog{}, stateDir)
+	require.NoError(t, store.Save(ReviewState{
+		Repo:                 "ava-labs/avalanchego",
+		PRNumber:             5168,
+		UserLogin:            "maru",
+		ReviewID:             "review-123",
+		LastPublishedBody:    "live body",
+		LastPublishedEntries: []DraftReviewEntry{{Kind: DraftReviewEntryKindNewThread, Path: "a.go", Line: 7, Side: reviewSideRight, Body: "old body"}},
+	}))
+
+	currentComments := []map[string]any{
+		graphQLThreadComment("comment-1", "thread-1", "old body", "a.go", 7),
+	}
+	server := newGraphQLTestServer(t, func(t *testing.T, query string, variables map[string]any) any {
+		switch {
+		case strings.Contains(query, "query Viewer"):
+			return map[string]any{"viewer": map[string]any{"login": "maru"}}
+		case strings.Contains(query, "query PullRequestContext"):
+			return graphQLPullRequestData("live body", currentComments)
+		case strings.Contains(query, "mutation DeletePendingReviewComment"):
+			require.Equal(t, "comment-1", variables["commentID"])
+			currentComments = nil
+			return map[string]any{"deletePullRequestReviewComment": map[string]any{"clientMutationId": "deleted"}}
+		case strings.Contains(query, "mutation AddPendingReviewThread"):
+			input := variables["input"].(map[string]any)
+			require.Equal(t, "a.go", input["path"])
+			require.Equal(t, float64(7), input["line"])
+			require.Equal(t, reviewSideRight, input["side"])
+			require.Equal(t, "updated body", input["body"])
+			currentComments = []map[string]any{
+				graphQLThreadComment("comment-2", "thread-2", "updated body", "a.go", 7),
+			}
+			return map[string]any{
+				"addPullRequestReviewThread": map[string]any{
+					"thread": map[string]any{
+						"id": "thread-2",
+						"comments": map[string]any{
+							"nodes": currentComments,
+						},
+					},
+				},
+			}
+		default:
+			require.FailNowf(t, "unexpected query", "query: %s", query)
+			return nil
+		}
+	})
+	defer server.Close()
+
+	app := NewApp(strings.NewReader(""), io.Discard, io.Discard)
+	app.tokenProvider = staticTokenProvider{token: "test-token"}
+	app.httpClient = server.Client()
+	app.baseURL = server.URL
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"upsert-comment",
+		"--pr", "5168",
+		"--comment-id", "comment-1",
+		"--body", "updated body",
+		"--state-dir", stateDir,
+		"--config-dir", t.TempDir(),
+	}))
 }
 
 func TestRunCreateReadsBodyFile(t *testing.T) {
