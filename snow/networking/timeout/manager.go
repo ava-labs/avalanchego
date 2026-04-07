@@ -69,6 +69,8 @@ func (m *Manager) IsBenched(chainID ids.ID, nodeID ids.NodeID) bool {
 }
 
 // RegisterChain registers the existence of the given chain.
+// Must be called before any method calls that use the
+// ID of the chain.
 func (m *Manager) RegisterChain(ctx *snow.ConsensusContext) error {
 	if err := m.metrics.RegisterChain(ctx); err != nil {
 		return fmt.Errorf("couldn't register timeout metrics for chain %s: %w", ctx.ChainID, err)
@@ -100,8 +102,10 @@ func (m *Manager) RegisterRequest(
 	m.tm.Put(requestID, measureLatency, newTimeoutHandler)
 }
 
-// RegisterResponse registers that we received a response from [nodeID]
-// regarding the given request ID and chain.
+// RegisterResponse registers that `nodeID` sent us a response of type `op`
+// for the given chain. The response corresponds to the given
+// requestID we sent them. `latency` is the time between us
+// sending them the request and receiving their response.
 func (m *Manager) RegisterResponse(
 	nodeID ids.NodeID,
 	chainID ids.ID,
@@ -115,6 +119,7 @@ func (m *Manager) RegisterResponse(
 }
 
 // RemoveRequest marks that we no longer expect a response to this request.
+// Does not modify the timeout.
 func (m *Manager) RemoveRequest(requestID ids.RequestID) {
 	m.tm.Remove(requestID)
 }

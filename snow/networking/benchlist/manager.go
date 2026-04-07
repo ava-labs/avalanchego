@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Manager = (*manager)(nil)
@@ -183,21 +182,3 @@ func (noBenchlist) GetBenched(ids.NodeID) []ids.ID {
 }
 
 func (noBenchlist) Shutdown() {}
-
-// Controllable is a benchlist that allows callers to control which nodes
-// are benched by populating the Benched set.
-type Controllable struct {
-	noBenchlist
-	Benched map[ids.ID]set.Set[ids.NodeID] // chainID -> benched nodeIDs
-}
-
-func (b *Controllable) IsBenched(chainID ids.ID, nodeID ids.NodeID) bool {
-	if b.Benched == nil {
-		return false
-	}
-	nodes, ok := b.Benched[chainID]
-	if !ok {
-		return false
-	}
-	return nodes.Contains(nodeID)
-}
