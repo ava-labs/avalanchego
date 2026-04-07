@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendertest"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/networking/timeout/timeouttest"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -886,7 +885,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			var (
 				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender      = sendermock.NewExternalSender(ctrl)
-				timeoutManager      = timeouttest.New(t, benchlist.NewNoBenchlist(), deadline)
+				timeoutManager      = newTimeoutManager(t, benchlist.NewNoBenchlist(), deadline)
 				testInternalHandler = &testInternalHandler{}
 				nodeIDs             = set.Of(successNodeID, failedNodeID, ctx.NodeID)
 				nodeIDsCopy         set.Set[ids.NodeID]
@@ -1089,7 +1088,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			var (
 				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender      = sendermock.NewExternalSender(ctrl)
-				timeoutManager      = timeouttest.New(t, benchlist.NewNoBenchlist(), deadline)
+				timeoutManager      = newTimeoutManager(t, benchlist.NewNoBenchlist(), deadline)
 				testInternalHandler = &testInternalHandler{}
 			)
 
@@ -1243,7 +1242,7 @@ func TestSender_Single_Request(t *testing.T) {
 				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender      = sendermock.NewExternalSender(ctrl)
 				bl                  = &testBenchlist{Manager: benchlist.NewNoBenchlist()}
-				timeoutManager      = timeouttest.New(t, bl, deadline)
+				timeoutManager      = newTimeoutManager(t, bl, deadline)
 				testInternalHandler = &testInternalHandler{}
 			)
 
@@ -1323,6 +1322,28 @@ func TestSender_Single_Request(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newTimeoutManager(t testing.TB, benchlistMgr benchlist.Manager, initialTimeout time.Duration) *timeout.Manager {
+	t.Helper()
+	tm, err := timeout.NewManager(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     initialTimeout,
+			MinimumTimeout:     initialTimeout,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutCoefficient: 1.25,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlistMgr,
+		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+
+	go tm.Dispatch()
+	t.Cleanup(tm.Stop)
+
+	return tm
 }
 
 func noopSubscription(ctx context.Context) (common.Message, error) {
