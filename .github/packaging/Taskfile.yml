@@ -167,6 +167,7 @@ tasks:
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_DEB_OUTPUT_DIR}}:/output
           {{if .DEB_GPG_KEY_FILE}}-v {{.DEB_GPG_KEY_FILE}}:{{.DEB_GPG_KEY_FILE}}:ro{{end}}
+          -e FORMAT=DEB
           -e PACKAGE=avalanchego
           -e VERSION={{trimPrefix "v" .DEB_TAG}}
           -e TAG={{.DEB_TAG}}
@@ -176,7 +177,7 @@ tasks:
           {{if .DEB_GPG_KEY_FILE}}-e DEB_GPG_KEY_FILE={{.DEB_GPG_KEY_FILE}}{{end}}
           {{if .NFPM_DEB_PASSPHRASE}}-e NFPM_DEB_PASSPHRASE={{.NFPM_DEB_PASSPHRASE}}{{end}}
           {{.PACKAGING_DEB_DOCKER_IMAGE}}
-          .github/packaging/scripts/build-deb.sh
+          .github/packaging/scripts/build-package.sh
 
   build-subnet-evm-deb:
     desc: Builds DEB for subnet-evm
@@ -191,6 +192,7 @@ tasks:
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_DEB_OUTPUT_DIR}}:/output
           {{if .DEB_GPG_KEY_FILE}}-v {{.DEB_GPG_KEY_FILE}}:{{.DEB_GPG_KEY_FILE}}:ro{{end}}
+          -e FORMAT=DEB
           -e PACKAGE=subnet-evm
           -e VERSION={{trimPrefix "v" .DEB_TAG}}
           -e TAG={{.DEB_TAG}}
@@ -200,7 +202,7 @@ tasks:
           {{if .DEB_GPG_KEY_FILE}}-e DEB_GPG_KEY_FILE={{.DEB_GPG_KEY_FILE}}{{end}}
           {{if .NFPM_DEB_PASSPHRASE}}-e NFPM_DEB_PASSPHRASE={{.NFPM_DEB_PASSPHRASE}}{{end}}
           {{.PACKAGING_DEB_DOCKER_IMAGE}}
-          .github/packaging/scripts/build-deb.sh
+          .github/packaging/scripts/build-package.sh
 
   test-build-debs:
     desc: Builds and validates DEBs end-to-end
