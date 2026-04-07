@@ -15,14 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/registry/registrymock"
-	"github.com/ava-labs/avalanchego/vms/vmsmock"
+	"github.com/ava-labs/avalanchego/vms/vmstest"
 
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
 type loadVMsTest struct {
 	admin          *Admin
-	mockVMManager  *vmsmock.Manager
+	mockVMManager  *vmstest.Manager
 	mockVMRegistry *registrymock.VMRegistry
 }
 
@@ -30,7 +30,7 @@ func initLoadVMsTest(t *testing.T) *loadVMsTest {
 	ctrl := gomock.NewController(t)
 
 	mockVMRegistry := registrymock.NewVMRegistry(ctrl)
-	mockVMManager := vmsmock.NewManager(ctrl)
+	mockVMManager := &vmstest.Manager{}
 
 	return &loadVMsTest{
 		admin: &Admin{Config: Config{
@@ -66,8 +66,16 @@ func TestLoadVMsSuccess(t *testing.T) {
 	}
 
 	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
-	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
+	resources.mockVMManager.AliasesF = func(id ids.ID) ([]string, error) {
+		switch id {
+		case id1:
+			return alias1, nil
+		case id2:
+			return alias2, nil
+		default:
+			return nil, errTest
+		}
+	}
 
 	// execute test
 	reply := LoadVMsReply{}
@@ -105,8 +113,16 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
 	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
-	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)
+	resources.mockVMManager.AliasesF = func(id ids.ID) ([]string, error) {
+		switch id {
+		case id1:
+			return alias1, nil
+		case id2:
+			return nil, errTest
+		default:
+			return nil, errTest
+		}
+	}
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)

@@ -49,7 +49,7 @@ go_test(
         "//utils/logging",
         "//utils/rpc",
         "//vms/registry/registrymock",
-        "//vms/vmsmock",
+        "//vms/vmstest",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_mock//gomock",
     ],
