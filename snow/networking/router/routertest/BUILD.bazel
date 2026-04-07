@@ -7,8 +7,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
-        "//message",
-        "//proto/pb/p2p",
         "//snow/networking/benchlist",
         "//snow/networking/router",
         "//snow/networking/timeout",
