@@ -34,6 +34,17 @@ func TestParseDeleteCommandEnsureAbsent(t *testing.T) {
 	require.True(t, deleteCommand.EnsureAbsent)
 }
 
+func TestParseDeleteCommandJSON(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"delete", "--pr", "5168", "--json"})
+	require.NoError(t, err)
+
+	deleteCommand, ok := command.(deleteCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.True(t, deleteCommand.JSON)
+}
+
 func TestParseGetCommand(t *testing.T) {
 	t.Parallel()
 
@@ -44,6 +55,17 @@ func TestParseGetCommand(t *testing.T) {
 	require.True(t, ok, "unexpected command type %T", command)
 	require.Equal(t, 5168, getCommand.PRNumber)
 	require.NotEmpty(t, getCommand.StateDir)
+}
+
+func TestParseGetCommandPretty(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"get", "--pr", "5168", "--pretty"})
+	require.NoError(t, err)
+
+	getCommand, ok := command.(getCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.True(t, getCommand.Pretty)
 }
 
 func TestParseUpdateBodyCommand(t *testing.T) {
@@ -69,6 +91,17 @@ func TestParseUpdateBodyCommandForce(t *testing.T) {
 	updateBodyCommand, ok := command.(updateBodyCommand)
 	require.True(t, ok, "unexpected command type %T", command)
 	require.True(t, updateBodyCommand.Force)
+}
+
+func TestParseUpdateBodyCommandJSON(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"update-body", "--pr", "5168", "--body", "test", "--json"})
+	require.NoError(t, err)
+
+	updateBodyCommand, ok := command.(updateBodyCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.True(t, updateBodyCommand.JSON)
 }
 
 func TestParseCreateCommandBodyFile(t *testing.T) {
@@ -117,6 +150,17 @@ func TestParseReplaceCommentsCommand(t *testing.T) {
 	require.True(t, replaceCommentsCommand.Force)
 }
 
+func TestParseReplaceCommentsCommandJSON(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"replace-comments", "--pr", "5168", "--comments-file", "/tmp/comments.json", "--json"})
+	require.NoError(t, err)
+
+	replaceCommentsCommand, ok := command.(replaceCommentsCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.True(t, replaceCommentsCommand.JSON)
+}
+
 func TestParseReplaceCommentsCommandCreateIfMissing(t *testing.T) {
 	t.Parallel()
 
@@ -157,6 +201,17 @@ func TestParseUpsertCommentCommandByCommentID(t *testing.T) {
 	require.True(t, upsertCommentCommand.CreateIfMissing)
 }
 
+func TestParseUpsertCommentCommandJSON(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"upsert-comment", "--pr", "5168", "--path", "a.go", "--line", "7", "--side", "RIGHT", "--body", "hello", "--json"})
+	require.NoError(t, err)
+
+	upsertCommentCommand, ok := command.(upsertCommentCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.True(t, upsertCommentCommand.JSON)
+}
+
 func TestParseGetStateCommand(t *testing.T) {
 	t.Parallel()
 
@@ -170,6 +225,17 @@ func TestParseGetStateCommand(t *testing.T) {
 	require.NotEmpty(t, getStateCommand.StateDir)
 }
 
+func TestParseGetStateCommandPretty(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"get-state", "--pr", "5168", "--user", "maru", "--pretty"})
+	require.NoError(t, err)
+
+	getStateCommand, ok := command.(getStateCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.True(t, getStateCommand.Pretty)
+}
+
 func TestParseDeleteStateCommand(t *testing.T) {
 	t.Parallel()
 
@@ -181,4 +247,15 @@ func TestParseDeleteStateCommand(t *testing.T) {
 	require.Equal(t, 5168, deleteStateCommand.PRNumber)
 	require.Equal(t, "maru", deleteStateCommand.UserLogin)
 	require.NotEmpty(t, deleteStateCommand.StateDir)
+}
+
+func TestParseDeleteStateCommandJSON(t *testing.T) {
+	t.Parallel()
+
+	command, err := parseCommand([]string{"delete-state", "--pr", "5168", "--user", "maru", "--json"})
+	require.NoError(t, err)
+
+	deleteStateCommand, ok := command.(deleteStateCommand)
+	require.True(t, ok, "unexpected command type %T", command)
+	require.True(t, deleteStateCommand.JSON)
 }

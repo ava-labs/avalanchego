@@ -21,6 +21,7 @@ type createCommand struct {
 	BodyFile  string
 	ConfigDir string
 	StateDir  string
+	JSON      bool
 }
 
 func (createCommand) isCommand() {}
@@ -31,6 +32,7 @@ type deleteCommand struct {
 	ConfigDir    string
 	StateDir     string
 	EnsureAbsent bool
+	JSON         bool
 }
 
 func (deleteCommand) isCommand() {}
@@ -40,6 +42,7 @@ type getCommand struct {
 	PRNumber  int
 	ConfigDir string
 	StateDir  string
+	Pretty    bool
 }
 
 func (getCommand) isCommand() {}
@@ -49,6 +52,7 @@ type getStateCommand struct {
 	PRNumber  int
 	UserLogin string
 	StateDir  string
+	Pretty    bool
 }
 
 func (getStateCommand) isCommand() {}
@@ -61,6 +65,7 @@ type updateBodyCommand struct {
 	ConfigDir string
 	StateDir  string
 	Force     bool
+	JSON      bool
 }
 
 func (updateBodyCommand) isCommand() {}
@@ -70,6 +75,7 @@ type deleteStateCommand struct {
 	PRNumber  int
 	UserLogin string
 	StateDir  string
+	JSON      bool
 }
 
 func (deleteStateCommand) isCommand() {}
@@ -84,6 +90,7 @@ type replaceCommentsCommand struct {
 	CreateIfMissing bool
 	ReviewBody      string
 	ReviewBodyFile  string
+	JSON            bool
 }
 
 func (replaceCommentsCommand) isCommand() {}
@@ -105,6 +112,7 @@ type upsertCommentCommand struct {
 	CreateIfMissing bool
 	ReviewBody      string
 	ReviewBodyFile  string
+	JSON            bool
 }
 
 func (upsertCommentCommand) isCommand() {}
@@ -154,6 +162,7 @@ func parseCreateCommand(args []string) (command, error) {
 	bodyFile := flags.String("body-file", "", "path to a file containing the review body")
 	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
 	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
+	jsonOutput := flags.Bool("json", false, "print machine-readable JSON success output")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -175,6 +184,7 @@ func parseCreateCommand(args []string) (command, error) {
 		BodyFile:  *bodyFile,
 		ConfigDir: *configDir,
 		StateDir:  *stateDir,
+		JSON:      *jsonOutput,
 	}, nil
 }
 
@@ -187,6 +197,7 @@ func parseDeleteCommand(args []string) (command, error) {
 	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
 	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
 	ensureAbsent := flags.Bool("ensure-absent", false, "succeed if no pending review exists and clear stored state if present")
+	jsonOutput := flags.Bool("json", false, "print machine-readable JSON success output")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -204,6 +215,7 @@ func parseDeleteCommand(args []string) (command, error) {
 		ConfigDir:    *configDir,
 		StateDir:     *stateDir,
 		EnsureAbsent: *ensureAbsent,
+		JSON:         *jsonOutput,
 	}, nil
 }
 
@@ -215,6 +227,7 @@ func parseGetCommand(args []string) (command, error) {
 	prNumber := flags.Int("pr", 0, "pull request number")
 	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
 	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
+	pretty := flags.Bool("pretty", false, "pretty-print JSON output")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -231,6 +244,7 @@ func parseGetCommand(args []string) (command, error) {
 		PRNumber:  *prNumber,
 		ConfigDir: *configDir,
 		StateDir:  *stateDir,
+		Pretty:    *pretty,
 	}, nil
 }
 
@@ -242,6 +256,7 @@ func parseGetStateCommand(args []string) (command, error) {
 	prNumber := flags.Int("pr", 0, "pull request number")
 	userLogin := flags.String("user", "", "GitHub login associated with the stored review state")
 	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
+	pretty := flags.Bool("pretty", false, "pretty-print JSON output")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -261,6 +276,7 @@ func parseGetStateCommand(args []string) (command, error) {
 		PRNumber:  *prNumber,
 		UserLogin: *userLogin,
 		StateDir:  *stateDir,
+		Pretty:    *pretty,
 	}, nil
 }
 
@@ -275,6 +291,7 @@ func parseUpdateBodyCommand(args []string) (command, error) {
 	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
 	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
 	force := flags.Bool("force", false, "overwrite even if the review body differs from stored state")
+	jsonOutput := flags.Bool("json", false, "print machine-readable JSON success output")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -297,6 +314,7 @@ func parseUpdateBodyCommand(args []string) (command, error) {
 		ConfigDir: *configDir,
 		StateDir:  *stateDir,
 		Force:     *force,
+		JSON:      *jsonOutput,
 	}, nil
 }
 
@@ -308,6 +326,7 @@ func parseDeleteStateCommand(args []string) (command, error) {
 	prNumber := flags.Int("pr", 0, "pull request number")
 	userLogin := flags.String("user", "", "GitHub login associated with the stored review state")
 	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
+	jsonOutput := flags.Bool("json", false, "print machine-readable JSON success output")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -327,6 +346,7 @@ func parseDeleteStateCommand(args []string) (command, error) {
 		PRNumber:  *prNumber,
 		UserLogin: *userLogin,
 		StateDir:  *stateDir,
+		JSON:      *jsonOutput,
 	}, nil
 }
 
@@ -343,6 +363,7 @@ func parseReplaceCommentsCommand(args []string) (command, error) {
 	createIfMissing := flags.Bool("create-if-missing", false, "create a pending review automatically when mutating comments and no draft exists")
 	reviewBody := flags.String("review-body", "", "review body to use when creating a missing pending review")
 	reviewBodyFile := flags.String("review-body-file", "", "path to a file containing the review body for a missing pending review")
+	jsonOutput := flags.Bool("json", false, "print machine-readable JSON success output")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -370,6 +391,7 @@ func parseReplaceCommentsCommand(args []string) (command, error) {
 		CreateIfMissing: *createIfMissing,
 		ReviewBody:      *reviewBody,
 		ReviewBodyFile:  *reviewBodyFile,
+		JSON:            *jsonOutput,
 	}, nil
 }
 
@@ -393,6 +415,7 @@ func parseUpsertCommentCommand(args []string) (command, error) {
 	createIfMissing := flags.Bool("create-if-missing", false, "create a pending review automatically when mutating comments and no draft exists")
 	reviewBody := flags.String("review-body", "", "review body to use when creating a missing pending review")
 	reviewBodyFile := flags.String("review-body-file", "", "path to a file containing the review body for a missing pending review")
+	jsonOutput := flags.Bool("json", false, "print machine-readable JSON success output")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -459,6 +482,7 @@ func parseUpsertCommentCommand(args []string) (command, error) {
 		CreateIfMissing: *createIfMissing,
 		ReviewBody:      *reviewBody,
 		ReviewBodyFile:  *reviewBodyFile,
+		JSON:            *jsonOutput,
 	}, nil
 }
 
@@ -466,14 +490,14 @@ func Usage() string {
 	return `gh-pending-review creates and manages pending GitHub pull request reviews.
 
 Usage:
-  gh-pending-review create --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR]
-  gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--ensure-absent]
-  gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
-  gh-pending-review get-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR]
-  gh-pending-review replace-comments --pr NUMBER [--repo OWNER/REPO] --comments-file PATH [--config-dir DIR] [--state-dir DIR] [--force] [--create-if-missing] [--review-body TEXT | --review-body-file PATH]
-  gh-pending-review upsert-comment --pr NUMBER [--repo OWNER/REPO] (--comment-id ID | --path PATH --line LINE --side SIDE [--start-line LINE --start-side SIDE]) (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force] [--create-if-missing] [--review-body TEXT | --review-body-file PATH]
-  gh-pending-review delete-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR]
-  gh-pending-review update-body --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force]
+  gh-pending-review create --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--json]
+  gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--ensure-absent] [--json]
+  gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--pretty]
+  gh-pending-review get-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR] [--pretty]
+  gh-pending-review replace-comments --pr NUMBER [--repo OWNER/REPO] --comments-file PATH [--config-dir DIR] [--state-dir DIR] [--force] [--create-if-missing] [--review-body TEXT | --review-body-file PATH] [--json]
+  gh-pending-review upsert-comment --pr NUMBER [--repo OWNER/REPO] (--comment-id ID | --path PATH --line LINE --side SIDE [--start-line LINE --start-side SIDE]) (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force] [--create-if-missing] [--review-body TEXT | --review-body-file PATH] [--json]
+  gh-pending-review delete-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR] [--json]
+  gh-pending-review update-body --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force] [--json]
   gh-pending-review version
 
 Notes:
@@ -481,6 +505,8 @@ Notes:
   - It uses isolated gh auth from --config-dir.
   - It stores the last published review body and comment set locally to detect user edits before update.
   - replace-comments and upsert-comment can create a draft review automatically when passed --create-if-missing.
+  - Reads emit compact JSON by default; use --pretty for human-friendly formatting.
+  - Mutating commands can emit compact machine-readable success output with --json.
   - It never submits a review.
   - delete --ensure-absent is idempotent: it clears local state, deletes any live pending review, and verifies absence.
 `

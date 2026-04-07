@@ -99,14 +99,14 @@ Use a GitHub account with the repo access needed to create pending reviews.
 ## Command Surface
 
 ```text
-gh-pending-review create --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR]
-gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--ensure-absent]
-gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
-gh-pending-review get-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR]
-gh-pending-review replace-comments --pr NUMBER [--repo OWNER/REPO] --comments-file PATH [--config-dir DIR] [--state-dir DIR] [--force] [--create-if-missing] [--review-body TEXT | --review-body-file PATH]
-gh-pending-review upsert-comment --pr NUMBER [--repo OWNER/REPO] (--comment-id ID | --path PATH --line LINE --side SIDE [--start-line LINE --start-side SIDE]) (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force] [--create-if-missing] [--review-body TEXT | --review-body-file PATH]
-gh-pending-review delete-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR]
-gh-pending-review update-body --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force]
+gh-pending-review create --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--json]
+gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--ensure-absent] [--json]
+gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--pretty]
+gh-pending-review get-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR] [--pretty]
+gh-pending-review replace-comments --pr NUMBER [--repo OWNER/REPO] --comments-file PATH [--config-dir DIR] [--state-dir DIR] [--force] [--create-if-missing] [--review-body TEXT | --review-body-file PATH] [--json]
+gh-pending-review upsert-comment --pr NUMBER [--repo OWNER/REPO] (--comment-id ID | --path PATH --line LINE --side SIDE [--start-line LINE --start-side SIDE]) (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force] [--create-if-missing] [--review-body TEXT | --review-body-file PATH] [--json]
+gh-pending-review delete-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR] [--json]
+gh-pending-review update-body --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--force] [--json]
 gh-pending-review version
 ```
 
@@ -118,6 +118,9 @@ Notes:
 - `upsert-comment` requires exactly one target selector and exactly one of
   `--body` or `--body-file`
 - `--repo` defaults to `ava-labs/avalanchego`
+- reads emit compact JSON by default; pass `--pretty` for indented output
+- mutating commands can emit compact machine-readable success output with
+  `--json`
 - `get-state` and `delete-state` are local-only and do not talk to GitHub
 - `delete --ensure-absent` is idempotent: it clears stored state, deletes any
   live pending review, succeeds when no live draft exists, and verifies absence
@@ -406,11 +409,17 @@ wrapping.
 
 Pending-review-specific output behavior:
 
-- `get` prints the live pending review as JSON
-- `get-state` prints stored review state as JSON
-- `create` and `replace-comments` also print the review URL when GitHub returns
-  one
-- `upsert-comment` also prints the review URL when GitHub returns one
+- `get` prints the live pending review as compact JSON by default; use
+  `--pretty` for indented JSON
+- `get-state` prints stored review state as compact JSON by default; use
+  `--pretty` for indented JSON
+- mutating commands keep human-readable success output by default and support
+  compact machine-readable success output with `--json`
+- `create`, `replace-comments`, and `upsert-comment` print the review URL on the
+  default human-readable path when GitHub returns one
+
+Default logging is intentionally quiet. Set `GH_PENDING_REVIEW_LOG_LEVEL=debug`
+when you want the structured request/state logs during debugging.
 
 ## Operational Constraints
 

@@ -53,6 +53,35 @@ func TestRunGetIncludesComments(t *testing.T) {
 	require.Equal(t, "comment", review.Comments[0].Body)
 }
 
+func TestRunGetPrettyPrintsWhenRequested(t *testing.T) {
+	t.Parallel()
+
+	server := newGraphQLTestServer(t, func(t *testing.T, query string, _ map[string]any) any {
+		switch {
+		case strings.Contains(query, "query Viewer"):
+			return map[string]any{"viewer": map[string]any{"login": "maru"}}
+		case strings.Contains(query, "query PullRequestContext"):
+			return graphQLPullRequestData("body", []map[string]any{
+				graphQLThreadComment("comment-1", "thread-1", "comment", "a.go", 7),
+			})
+		default:
+			require.FailNowf(t, "unexpected query", "query: %s", query)
+			return nil
+		}
+	})
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	app := NewApp(strings.NewReader(""), &stdout, io.Discard)
+	app.tokenProvider = staticTokenProvider{token: "test-token"}
+	app.httpClient = server.Client()
+	app.baseURL = server.URL
+
+	require.NoError(t, app.Run(t.Context(), []string{"get", "--pr", "5168", "--pretty", "--state-dir", t.TempDir(), "--config-dir", t.TempDir()}))
+
+	require.Contains(t, stdout.String(), "\n  \"id\":")
+}
+
 func TestRunReplaceCommentsUpdatesPendingReviewEntries(t *testing.T) {
 	t.Parallel()
 
@@ -128,6 +157,87 @@ func TestRunReplaceCommentsUpdatesPendingReviewEntries(t *testing.T) {
 	require.Len(t, loaded.LastPublishedEntries, 1)
 	require.Equal(t, "new comment", loaded.LastPublishedEntries[0].Body)
 	require.Contains(t, stdout.String(), "Replaced comments for pending review 123")
+}
+
+func TestRunReplaceCommentsJSONOutput(t *testing.T) {
+	t.Parallel()
+
+	commentsPath := filepath.Join(t.TempDir(), "comments.json")
+	require.NoError(t, os.WriteFile(commentsPath, []byte(`[{"path":"a.go","line":7,"side":"RIGHT","body":"new comment"}]`), 0o644))
+
+	stateDir := t.TempDir()
+	store := NewStateStore(logging.NoLog{}, stateDir)
+	require.NoError(t, store.Save(ReviewState{
+		Repo:                 "ava-labs/avalanchego",
+		PRNumber:             5168,
+		UserLogin:            "maru",
+		ReviewID:             "review-123",
+		LastPublishedBody:    "live body",
+		LastPublishedEntries: []DraftReviewEntry{{Kind: DraftReviewEntryKindNewThread, Path: "old.go", Line: 5, Side: reviewSideRight, Body: "old comment"}},
+	}))
+
+	currentComments := []map[string]any{
+		graphQLThreadComment("comment-1", "thread-1", "old comment", "old.go", 5),
+	}
+	server := newGraphQLTestServer(t, func(t *testing.T, query string, variables map[string]any) any {
+		switch {
+		case strings.Contains(query, "query Viewer"):
+			return map[string]any{"viewer": map[string]any{"login": "maru"}}
+		case strings.Contains(query, "query PullRequestContext"):
+			return graphQLPullRequestData("live body", currentComments)
+		case strings.Contains(query, "mutation DeletePendingReviewComment"):
+			currentComments = nil
+			return map[string]any{"deletePullRequestReviewComment": map[string]any{"clientMutationId": "deleted"}}
+		case strings.Contains(query, "mutation AddPendingReviewThread"):
+			input := variables["input"].(map[string]any)
+			require.Equal(t, "new comment", input["body"])
+			currentComments = []map[string]any{
+				graphQLThreadComment("comment-2", "thread-2", "new comment", "a.go", 7),
+			}
+			return map[string]any{
+				"addPullRequestReviewThread": map[string]any{
+					"thread": map[string]any{
+						"id": "thread-2",
+						"comments": map[string]any{
+							"nodes": currentComments,
+						},
+					},
+				},
+			}
+		default:
+			require.FailNowf(t, "unexpected query", "query: %s", query)
+			return nil
+		}
+	})
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	app := NewApp(strings.NewReader(""), &stdout, io.Discard)
+	app.tokenProvider = staticTokenProvider{token: "test-token"}
+	app.httpClient = server.Client()
+	app.baseURL = server.URL
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"replace-comments",
+		"--pr", "5168",
+		"--comments-file", commentsPath,
+		"--state-dir", stateDir,
+		"--config-dir", t.TempDir(),
+		"--json",
+	}))
+
+	var result struct {
+		ReviewID string `json:"review_id"`
+		State    string `json:"state"`
+		HTMLURL  string `json:"html_url"`
+		Repo     string `json:"repo"`
+		PRNumber int    `json:"pr"`
+	}
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
+	require.Equal(t, "review-123", result.ReviewID)
+	require.Equal(t, reviewStatePending, result.State)
+	require.Equal(t, "ava-labs/avalanchego", result.Repo)
+	require.Equal(t, 5168, result.PRNumber)
 }
 
 func TestRunReplaceCommentsDetectsConflict(t *testing.T) {
@@ -532,6 +642,7 @@ func TestRunGetStatePrintsStoredReviewState(t *testing.T) {
 	require.Equal(t, "review-123", state.ReviewID)
 	require.Equal(t, "stored body", state.LastPublishedBody)
 	require.Len(t, state.LastPublishedEntries, 1)
+	require.NotContains(t, stdout.String(), "\n  ")
 }
 
 func TestRunDeleteStateDeletesStoredReviewState(t *testing.T) {
@@ -560,6 +671,43 @@ func TestRunDeleteStateDeletesStoredReviewState(t *testing.T) {
 	_, err := store.Load("ava-labs/avalanchego", "maru", 5168)
 	require.EqualError(t, err, "no stored review state for ava-labs/avalanchego#5168 as maru; run create first or use --force")
 	require.Contains(t, stdout.String(), "Deleted stored review state")
+}
+
+func TestRunDeleteStateJSONOutput(t *testing.T) {
+	t.Parallel()
+
+	stateDir := t.TempDir()
+	store := NewStateStore(logging.NoLog{}, stateDir)
+	require.NoError(t, store.Save(ReviewState{
+		Repo:              "ava-labs/avalanchego",
+		PRNumber:          5168,
+		UserLogin:         "maru",
+		ReviewID:          "review-123",
+		LastPublishedBody: "stored body",
+	}))
+
+	var stdout bytes.Buffer
+	app := NewApp(strings.NewReader(""), &stdout, io.Discard)
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"delete-state",
+		"--pr", "5168",
+		"--user", "maru",
+		"--state-dir", stateDir,
+		"--json",
+	}))
+
+	var result struct {
+		Repo      string `json:"repo"`
+		PRNumber  int    `json:"pr"`
+		UserLogin string `json:"user"`
+		Deleted   bool   `json:"deleted"`
+	}
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
+	require.Equal(t, "ava-labs/avalanchego", result.Repo)
+	require.Equal(t, 5168, result.PRNumber)
+	require.Equal(t, "maru", result.UserLogin)
+	require.True(t, result.Deleted)
 }
 
 func TestRunDeleteDeletesPendingReviewAndStoredReviewState(t *testing.T) {

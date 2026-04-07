@@ -30,7 +30,7 @@ type App struct {
 }
 
 func NewApp(stdin io.Reader, stdout io.Writer, stderr io.Writer) *App {
-	log := newDebugLogger(stderr)
+	log := newLogger(stderr)
 	baseURL := defaultGitHubAPIBaseURL
 	if override := os.Getenv("GH_PENDING_REVIEW_BASE_URL"); override != "" {
 		baseURL = override
@@ -127,6 +127,15 @@ func (a *App) runCreate(ctx context.Context, command createCommand) error {
 		zap.String("htmlURL", review.HTMLURL),
 	)
 
+	if command.JSON {
+		return stacktrace.Wrap(writeJSON(a.Stdout, mutationResult{
+			ReviewID: review.ID,
+			State:    review.State,
+			HTMLURL:  review.HTMLURL,
+			Repo:     command.Repo,
+			PRNumber: command.PRNumber,
+		}, false))
+	}
 	if _, err := fmt.Fprintf(a.Stdout, "Created pending review %s for %s#%d (%s)\n", displayReviewID(review), command.Repo, command.PRNumber, review.State); err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -167,6 +176,16 @@ func (a *App) runDelete(ctx context.Context, command deleteCommand) error {
 			zap.Int("prNumber", command.PRNumber),
 			zap.String("userLogin", viewer.Login),
 		)
+		if command.JSON {
+			return stacktrace.Wrap(writeJSON(a.Stdout, deleteResult{
+				Repo:           command.Repo,
+				PRNumber:       command.PRNumber,
+				UserLogin:      viewer.Login,
+				Deleted:        false,
+				VerifiedAbsent: true,
+				ClearedState:   true,
+			}, false))
+		}
 		_, err = fmt.Fprintf(a.Stdout, "No pending review found for %s#%d as %s; verified no pending review remains and cleared stored state if present.\n", command.Repo, command.PRNumber, viewer.Login)
 		return stacktrace.Wrap(err)
 	}
@@ -185,6 +204,17 @@ func (a *App) runDelete(ctx context.Context, command deleteCommand) error {
 	)
 
 	if !command.EnsureAbsent {
+		if command.JSON {
+			return stacktrace.Wrap(writeJSON(a.Stdout, deleteResult{
+				ReviewID:       review.ID,
+				Repo:           command.Repo,
+				PRNumber:       command.PRNumber,
+				UserLogin:      viewer.Login,
+				Deleted:        true,
+				VerifiedAbsent: false,
+				ClearedState:   true,
+			}, false))
+		}
 		_, err = fmt.Fprintf(a.Stdout, "Deleted pending review %s for %s#%d\n", displayReviewID(review), command.Repo, command.PRNumber)
 		return stacktrace.Wrap(err)
 	}
@@ -196,6 +226,17 @@ func (a *App) runDelete(ctx context.Context, command deleteCommand) error {
 				zap.Int("prNumber", command.PRNumber),
 				zap.String("userLogin", viewer.Login),
 			)
+			if command.JSON {
+				return stacktrace.Wrap(writeJSON(a.Stdout, deleteResult{
+					ReviewID:       review.ID,
+					Repo:           command.Repo,
+					PRNumber:       command.PRNumber,
+					UserLogin:      viewer.Login,
+					Deleted:        true,
+					VerifiedAbsent: true,
+					ClearedState:   true,
+				}, false))
+			}
 			_, err = fmt.Fprintf(a.Stdout, "Deleted pending review %s for %s#%d\nVerified no pending review remains for %s#%d as %s.\n", displayReviewID(review), command.Repo, command.PRNumber, command.Repo, command.PRNumber, viewer.Login)
 			return stacktrace.Wrap(err)
 		}
@@ -230,14 +271,7 @@ func (a *App) runGet(ctx context.Context, command getCommand) error {
 		zap.String("state", review.State),
 	)
 
-	encoded, err := json.MarshalIndent(review, "", "  ")
-	if err != nil {
-		return stacktrace.Wrap(err)
-	}
-	if _, err := fmt.Fprintln(a.Stdout, string(encoded)); err != nil {
-		return stacktrace.Wrap(err)
-	}
-	return nil
+	return stacktrace.Wrap(writeJSON(a.Stdout, review, command.Pretty))
 }
 
 func (a *App) runGetState(command getStateCommand) error {
@@ -246,14 +280,7 @@ func (a *App) runGetState(command getStateCommand) error {
 		return stacktrace.Wrap(err)
 	}
 
-	encoded, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return stacktrace.Wrap(err)
-	}
-	if _, err := fmt.Fprintln(a.Stdout, string(encoded)); err != nil {
-		return stacktrace.Wrap(err)
-	}
-	return nil
+	return stacktrace.Wrap(writeJSON(a.Stdout, state, command.Pretty))
 }
 
 func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) error {
@@ -360,6 +387,15 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 		zap.String("htmlURL", updated.HTMLURL),
 	)
 
+	if command.JSON {
+		return stacktrace.Wrap(writeJSON(a.Stdout, mutationResult{
+			ReviewID: updated.ID,
+			State:    updated.State,
+			HTMLURL:  updated.HTMLURL,
+			Repo:     command.Repo,
+			PRNumber: command.PRNumber,
+		}, false))
+	}
 	_, err = fmt.Fprintf(a.Stdout, "Updated pending review %s for %s#%d (%s)\n", displayReviewID(updated), command.Repo, command.PRNumber, updated.State)
 	return stacktrace.Wrap(err)
 }
@@ -367,6 +403,14 @@ func (a *App) runUpdateBody(ctx context.Context, command updateBodyCommand) erro
 func (a *App) runDeleteState(command deleteStateCommand) error {
 	if err := NewStateStore(a.log, command.StateDir).Delete(command.Repo, command.UserLogin, command.PRNumber); err != nil {
 		return stacktrace.Wrap(err)
+	}
+	if command.JSON {
+		return stacktrace.Wrap(writeJSON(a.Stdout, deleteStateResult{
+			Repo:      command.Repo,
+			PRNumber:  command.PRNumber,
+			UserLogin: command.UserLogin,
+			Deleted:   true,
+		}, false))
 	}
 	_, err := fmt.Fprintf(a.Stdout, "Deleted stored review state for %s#%d as %s\n", command.Repo, command.PRNumber, command.UserLogin)
 	return stacktrace.Wrap(err)
@@ -491,6 +535,15 @@ func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCom
 		zap.String("htmlURL", updatedReview.HTMLURL),
 	)
 
+	if command.JSON {
+		return stacktrace.Wrap(writeJSON(a.Stdout, mutationResult{
+			ReviewID: updatedReview.ID,
+			State:    updatedReview.State,
+			HTMLURL:  updatedReview.HTMLURL,
+			Repo:     command.Repo,
+			PRNumber: command.PRNumber,
+		}, false))
+	}
 	if _, err := fmt.Fprintf(a.Stdout, "Replaced comments for pending review %s on %s#%d (%s)\n", displayReviewID(updatedReview), command.Repo, command.PRNumber, updatedReview.State); err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -582,6 +635,15 @@ func (a *App) runUpsertComment(ctx context.Context, command upsertCommentCommand
 		return stacktrace.Wrap(err)
 	}
 
+	if command.JSON {
+		return stacktrace.Wrap(writeJSON(a.Stdout, mutationResult{
+			ReviewID: updatedReview.ID,
+			State:    updatedReview.State,
+			HTMLURL:  updatedReview.HTMLURL,
+			Repo:     command.Repo,
+			PRNumber: command.PRNumber,
+		}, false))
+	}
 	if _, err := fmt.Fprintf(a.Stdout, "Upserted comment for pending review %s on %s#%d (%s)\n", displayReviewID(updatedReview), command.Repo, command.PRNumber, updatedReview.State); err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -685,6 +747,48 @@ func resolveBodyInput(body string, bodyFile string) (string, error) {
 		return "", stacktrace.New("review body must not be empty")
 	}
 	return string(content), nil
+}
+
+type mutationResult struct {
+	ReviewID string `json:"review_id,omitempty"`
+	State    string `json:"state,omitempty"`
+	HTMLURL  string `json:"html_url,omitempty"`
+	Repo     string `json:"repo"`
+	PRNumber int    `json:"pr"`
+}
+
+type deleteResult struct {
+	ReviewID       string `json:"review_id,omitempty"`
+	Repo           string `json:"repo"`
+	PRNumber       int    `json:"pr"`
+	UserLogin      string `json:"user"`
+	Deleted        bool   `json:"deleted"`
+	VerifiedAbsent bool   `json:"verified_absent"`
+	ClearedState   bool   `json:"cleared_state"`
+}
+
+type deleteStateResult struct {
+	Repo      string `json:"repo"`
+	PRNumber  int    `json:"pr"`
+	UserLogin string `json:"user"`
+	Deleted   bool   `json:"deleted"`
+}
+
+func writeJSON(w io.Writer, value any, pretty bool) error {
+	var (
+		encoded []byte
+		err     error
+	)
+	if pretty {
+		encoded, err = json.MarshalIndent(value, "", "  ")
+	} else {
+		encoded, err = json.Marshal(value)
+	}
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	_, err = fmt.Fprintln(w, string(encoded))
+	return err
 }
 
 const defaultCommentOnlyReviewBody = "Draft review for inline comments."

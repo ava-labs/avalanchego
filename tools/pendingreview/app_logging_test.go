@@ -91,6 +91,46 @@ func TestRunCreateLogsStructuredOperations(t *testing.T) {
 	}
 }
 
+func TestDefaultLoggerDoesNotEmitSuccessLogs(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Query string `json:"query"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(payload.Query, "query Viewer"):
+			_, _ = io.WriteString(w, `{"data":{"viewer":{"login":"maru"}}}`)
+		case strings.Contains(payload.Query, "query PullRequestContext"):
+			_, _ = io.WriteString(w, `{"data":{"viewer":{"login":"maru"},"repository":{"pullRequest":{"id":"pr-1","reviewThreads":{"nodes":[]},"reviews":{"nodes":[{"id":"review-123","databaseId":123,"state":"PENDING","body":"body","url":"https://example.invalid/review/123","author":{"login":"maru"},"comments":{"nodes":[]}}]}}}}}`)
+		default:
+			require.FailNowf(t, "unexpected query", "query: %s", payload.Query)
+		}
+	}))
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	app := NewApp(strings.NewReader(""), &stdout, &stderr)
+	app.tokenProvider = staticTokenProvider{token: "test-token"}
+	app.httpClient = server.Client()
+	app.baseURL = server.URL
+
+	require.NoError(t, app.Run(t.Context(), []string{
+		"get",
+		"--repo", "ava-labs/avalanchego",
+		"--pr", "5168",
+		"--config-dir", t.TempDir(),
+		"--state-dir", t.TempDir(),
+	}))
+
+	require.NotEmpty(t, stdout.String())
+	require.Empty(t, stderr.String())
+}
+
 func TestRunUpdateBodyLogsStateComparison(t *testing.T) {
 	t.Parallel()
 
