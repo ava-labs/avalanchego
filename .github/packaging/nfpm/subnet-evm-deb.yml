@@ -5,6 +5,8 @@ maintainer: "Ava Labs <security@avalabs.org>"
 description: "Subnet-EVM plugin for AvalancheGo"
 homepage: "https://github.com/ava-labs/avalanchego"
 license: "BSD-3-Clause"
+depends:
+  - "libc6 (>= 2.34)"
 contents:
   - src: "${SUBNET_EVM_BINARY}"
     # SUBNET_EVM_VM_ID is sourced from graft/subnet-evm/scripts/constants.sh
