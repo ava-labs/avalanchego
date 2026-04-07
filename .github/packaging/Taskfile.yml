@@ -57,7 +57,7 @@ tasks:
   build-avalanchego-rpm:
     desc: Builds RPM for avalanchego
     vars:
-      RPM_ARCH: '{{.RPM_ARCH | default .PACKAGING_HOST_ARCH}}'
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_HOST_ARCH}}'
       RPM_TAG: '{{.PACKAGING_TAG}}'
     deps: [build-builder-docker-image]
     cmds:
@@ -70,7 +70,7 @@ tasks:
           -e PACKAGE=avalanchego
           -e VERSION={{trimPrefix "v" .RPM_TAG}}
           -e TAG={{.RPM_TAG}}
-          -e RPM_ARCH={{.RPM_ARCH}}
+          -e PACKAGE_ARCH={{.PACKAGE_ARCH}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
           {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
@@ -81,7 +81,7 @@ tasks:
   build-subnet-evm-rpm:
     desc: Builds RPM for subnet-evm
     vars:
-      RPM_ARCH: '{{.RPM_ARCH | default .PACKAGING_HOST_ARCH}}'
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_HOST_ARCH}}'
       RPM_TAG: '{{.PACKAGING_TAG}}'
     deps: [build-builder-docker-image]
     cmds:
@@ -94,7 +94,7 @@ tasks:
           -e PACKAGE=subnet-evm
           -e VERSION={{trimPrefix "v" .RPM_TAG}}
           -e TAG={{.RPM_TAG}}
-          -e RPM_ARCH={{.RPM_ARCH}}
+          -e PACKAGE_ARCH={{.PACKAGE_ARCH}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
           {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}

@@ -10,36 +10,35 @@
 #   GIT_COMMIT     - Full git commit hash used to build the binaries
 #
 # Optional env vars:
-#   RPM_ARCH       - RPM architecture ("x86_64" or "aarch64"), defaults to host
+#   PACKAGE_ARCH   - RPM architecture ("x86_64" or "aarch64"), defaults to host
 
 set -euo pipefail
 
 : "${TAG:?TAG must be set}"
 : "${GIT_COMMIT:?GIT_COMMIT must be set}"
 
-if [[ -z "${RPM_ARCH:-}" ]]; then
-    arch=$(uname -m)
-    case "${arch}" in
-        x86_64) RPM_ARCH="x86_64" ;;
-        arm64)  RPM_ARCH="aarch64" ;;
-        *)      RPM_ARCH="${arch}" ;;
-    esac
-fi
-
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RPM_DIR="${REPO_ROOT}/build/rpm"
 SCRIPTS_DIR="${REPO_ROOT}/.github/packaging/scripts"
 
-# Source VM ID from constants.sh (canonical definition)
-SUBNET_EVM_VM_ID=$(
-    grep '^DEFAULT_VM_ID=' "${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh" \
-    | cut -d'"' -f2
-)
+# shellcheck disable=SC1091
+source "${SCRIPTS_DIR}/lib-build-common.sh"
+
+resolve_subnet_evm_vm_id
+
+if [[ -z "${PACKAGE_ARCH:-}" ]]; then
+    arch=$(uname -m)
+    case "${arch}" in
+        x86_64) PACKAGE_ARCH="x86_64" ;;
+        arm64)  PACKAGE_ARCH="aarch64" ;;
+        *)      PACKAGE_ARCH="${arch}" ;;
+    esac
+fi
 
 # Verify expected files exist
 for f in \
-    "avalanchego-${TAG}-${RPM_ARCH}.rpm" \
-    "subnet-evm-${TAG}-${RPM_ARCH}.rpm" \
+    "avalanchego-${TAG}-${PACKAGE_ARCH}.rpm" \
+    "subnet-evm-${TAG}-${PACKAGE_ARCH}.rpm" \
 ; do
     if [[ ! -f "${RPM_DIR}/${f}" ]]; then
         echo "ERROR: expected file not found: ${RPM_DIR}/${f}" >&2
@@ -56,15 +55,15 @@ docker run --rm \
         # Import GPG key and verify signatures if available
         if [[ -f /rpms/RPM-GPG-KEY-avalanchego ]]; then
             rpm --import /rpms/RPM-GPG-KEY-avalanchego
-            rpm -K "/rpms/avalanchego-'"${TAG}"'-'"${RPM_ARCH}"'.rpm"
-            rpm -K "/rpms/subnet-evm-'"${TAG}"'-'"${RPM_ARCH}"'.rpm"
+            rpm -K "/rpms/avalanchego-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
+            rpm -K "/rpms/subnet-evm-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
         else
             echo "Skipping GPG verification (unsigned build)"
         fi
 
         # Install both packages
-        rpm -ivh "/rpms/avalanchego-'"${TAG}"'-'"${RPM_ARCH}"'.rpm"
-        rpm -ivh "/rpms/subnet-evm-'"${TAG}"'-'"${RPM_ARCH}"'.rpm"
+        rpm -ivh "/rpms/avalanchego-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
+        rpm -ivh "/rpms/subnet-evm-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
 
         # Run shared smoke test
         bash /smoke-test.sh \
