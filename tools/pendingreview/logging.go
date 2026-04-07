@@ -5,14 +5,23 @@ package pendingreview
 
 import (
 	"io"
+	"os"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-func newDebugLogger(w io.Writer) logging.Logger {
+const logLevelEnv = "GH_PENDING_REVIEW_LOG_LEVEL"
+
+func newLogger(w io.Writer) logging.Logger {
+	level := logging.Error
+	if configured := os.Getenv(logLevelEnv); configured != "" {
+		if parsed, err := logging.ToLevel(configured); err == nil {
+			level = parsed
+		}
+	}
 	return logging.NewLogger(
 		"pendingreview",
-		logging.NewWrappedCore(logging.Debug, nopWriteCloser{Writer: w}, logging.Plain.ConsoleEncoder()),
+		logging.NewWrappedCore(level, nopWriteCloser{Writer: w}, logging.Plain.ConsoleEncoder()),
 	)
 }
 

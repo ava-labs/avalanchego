@@ -81,6 +81,20 @@ The tool stores the last review body and comment set it published in the local
 state directory and uses that state as an optimistic-concurrency guard before
 overwriting GitHub edits.
 
+Token-efficiency defaults:
+
+- prefer the tool's compact default JSON reads; use `--pretty` only when a
+  human explicitly asked for formatted JSON
+- prefer `--json` on successful mutating commands so the agent can parse a
+  compact success record instead of prose output
+- parse `get` or `get-state` output locally; do not paste raw JSON into the
+  conversation unless the user explicitly asks for it
+- when reporting read results back to the user, summarize only the fields
+  needed for the current request
+- after a successful write, do not run an extra `get` just to narrate success
+  unless the user explicitly asked for verification or the workflow is in
+  conflict recovery
+
 ## Workflow
 
 ### Create
@@ -88,13 +102,13 @@ overwriting GitHub edits.
 When the user asks to post a pending review body:
 
 ```bash
-./bin/gh-pending-review create --pr <number> --body-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
+./bin/gh-pending-review create --pr <number> --body-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 ```
 
 Use `--body` instead of `--body-file` only when the body is short enough to be
 safe and readable inline.
 
-Return the created review ID and URL.
+Return the created review ID and URL from the compact JSON result.
 
 ### Read Back
 
@@ -111,8 +125,8 @@ Read the returned JSON and inspect:
 - any inline comments attached to that pending review
 - `!!` instructions in either place
 
-`get` returns JSON for the live pending review. The fields that matter for
-reconciliation are:
+`get` returns compact JSON for the live pending review by default. The fields
+that matter for reconciliation are:
 
 - top-level `body`
 - `comments[]` entries with:
@@ -131,7 +145,7 @@ selector.
 If the user wants you to revise only the top-level review body:
 
 ```bash
-./bin/gh-pending-review update-body --pr <number> --body-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
+./bin/gh-pending-review update-body --pr <number> --body-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 ```
 
 Use `--force` only after reading the current pending review and intentionally
@@ -143,7 +157,7 @@ Prefer `upsert-comment` when the user wants to revise exactly one managed
 new-thread comment and you do not need to reconstruct unrelated comments:
 
 ```bash
-./bin/gh-pending-review upsert-comment --pr <number> --path <path> --line <line> --side RIGHT --body-file <path> --create-if-missing --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
+./bin/gh-pending-review upsert-comment --pr <number> --path <path> --line <line> --side RIGHT --body-file <path> --create-if-missing --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 ```
 
 Use `--comment-id` instead of an anchor when the user identified the exact draft
@@ -165,7 +179,7 @@ If the user wants to replace the current managed inline comment set, write the
 desired comments to a JSON file and apply them with:
 
 ```bash
-./bin/gh-pending-review replace-comments --pr <number> --comments-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
+./bin/gh-pending-review replace-comments --pr <number> --comments-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 ```
 
 Prefer a simple temp file write such as a heredoc over complex shell quoting or
@@ -185,7 +199,7 @@ cat >"$tmp" <<'EOF'
   }
 ]
 EOF
-./bin/gh-pending-review replace-comments --pr <number> --comments-file "$tmp" --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
+./bin/gh-pending-review replace-comments --pr <number> --comments-file "$tmp" --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 rc=$?
 rm -f "$tmp"
 exit $rc
@@ -196,8 +210,8 @@ Do not shell-escape the JSON quotes.
 
 For reconciliation-sensitive comment updates, do not treat the task as complete
 until `replace-comments` succeeds. If a write fails, fix the command or payload
-and retry. When helpful, run `get` again to confirm the live comment body now
-matches the reconciled text.
+and retry. Only run `get` again after a successful write when the user asked
+for verification or a conflict/recovery flow still depends on the live readback.
 
 Important behavior:
 
@@ -294,7 +308,7 @@ These commands do not talk to GitHub and do not mutate pending reviews.
 If the instruction is to remove the pending review entirely:
 
 ```bash
-./bin/gh-pending-review delete --pr <number> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
+./bin/gh-pending-review delete --pr <number> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 ```
 
 If the goal is "make sure no pending review is left behind" in one command, use
@@ -334,6 +348,9 @@ based only on local state.
 - For write requests, completion means the pending-review write command
   succeeded. Do not stop after a failed mutation or after only reading the
   draft state.
+- For ordinary successful writes, report the compact result and stop. Do not
+  perform an additional readback just to restate content that was already
+  provided locally.
 - If there is no pending review for the authenticated user, say so plainly.
 - Preserve safety: do not submit the review.
 
