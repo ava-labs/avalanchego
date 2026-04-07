@@ -6,7 +6,7 @@
 #   PACKAGE        - "avalanchego" or "subnet-evm"
 #   VERSION        - Semantic version without "v" prefix (e.g., "1.14.1")
 #   TAG            - Git tag (e.g., "v1.14.1")
-#   RPM_ARCH       - RPM architecture name ("x86_64" or "aarch64")
+#   PACKAGE_ARCH       - RPM architecture name ("x86_64" or "aarch64")
 #   OUTPUT_DIR     - Directory for the output RPM (bind-mounted from host)
 #
 # Optional env vars:
@@ -19,7 +19,7 @@ set -euo pipefail
 : "${PACKAGE:?PACKAGE must be set (avalanchego or subnet-evm)}"
 : "${VERSION:?VERSION must be set}"
 : "${TAG:?TAG must be set}"
-: "${RPM_ARCH:?RPM_ARCH must be set}"
+: "${PACKAGE_ARCH:?PACKAGE_ARCH must be set}"
 : "${OUTPUT_DIR:?OUTPUT_DIR must be set}"
 
 REPO_ROOT="/build"
@@ -32,7 +32,7 @@ source "${PACKAGING_DIR}/scripts/lib-build-common.sh"
 export NFPM_CHANGELOG="${REPO_ROOT}/build/nfpm-changelog.yml"
 export NFPM_SIGNING_KEY="${REPO_ROOT}/build/gpg/signing-key.asc"
 
-echo "=== Building ${PACKAGE} RPM for ${RPM_ARCH} (tag: ${TAG}) ==="
+echo "=== Building ${PACKAGE} RPM for ${PACKAGE_ARCH} (tag: ${TAG}) ==="
 
 init_build_env
 build_binary "${PACKAGE}"
@@ -57,9 +57,9 @@ case "${PACKAGE}" in
     subnet-evm)  export SUBNET_EVM_BINARY="${BINARY_PATH}" ;;
 esac
 
-export VERSION RPM_ARCH
+export VERSION PACKAGE_ARCH
 
-RPM_FILENAME="${PACKAGE}-${TAG}-${RPM_ARCH}.rpm"
+RPM_FILENAME="${PACKAGE}-${TAG}-${PACKAGE_ARCH}.rpm"
 RPM_PATH="${OUTPUT_DIR}/${RPM_FILENAME}"
 
 run_nfpm_package \

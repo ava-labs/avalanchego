@@ -42,11 +42,7 @@ build_binary() {
             ;;
         subnet-evm)
             echo "Building subnet-evm..."
-            SUBNET_EVM_VM_ID=$(
-                grep '^DEFAULT_VM_ID=' "${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh" \
-                | cut -d'"' -f2
-            )
-            export SUBNET_EVM_VM_ID
+            resolve_subnet_evm_vm_id
             echo "Subnet-EVM VM ID: ${SUBNET_EVM_VM_ID}"
 
             SUBNET_EVM_BINARY="${REPO_ROOT}/build/subnet-evm"
@@ -60,6 +56,20 @@ build_binary() {
     esac
 
     echo "Binary built at: ${BINARY_PATH}"
+}
+
+# Resolve the subnet-evm VM ID from the canonical constants file.
+# Sets SUBNET_EVM_VM_ID (global) as a side effect.
+resolve_subnet_evm_vm_id() {
+    SUBNET_EVM_VM_ID=$(
+        grep '^DEFAULT_VM_ID=' "${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh" \
+        | cut -d'"' -f2
+    )
+    if [[ -z "${SUBNET_EVM_VM_ID}" ]]; then
+        echo "ERROR: could not resolve SUBNET_EVM_VM_ID" >&2
+        exit 1
+    fi
+    export SUBNET_EVM_VM_ID
 }
 
 # Generate the nfpm changelog file.
