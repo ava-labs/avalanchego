@@ -681,7 +681,6 @@ func (h *testInternalHandler) popInternalMessage(t *testing.T) *message.InboundM
 func (*testInternalHandler) Benched(ids.ID, ids.NodeID)   {}
 func (*testInternalHandler) Unbenched(ids.ID, ids.NodeID) {}
 
-<<<<<<< remove-timeout-mocks
 type testBenchlist struct {
 	benchlist.Manager
 	benched set.Set[ids.NodeID]
@@ -691,8 +690,6 @@ func (b *testBenchlist) IsBenched(_ ids.ID, nodeID ids.NodeID) bool {
 	return b.benched.Contains(nodeID)
 }
 
-=======
->>>>>>> router-mocks
 func TestSender_Bootstrap_Requests(t *testing.T) {
 	var (
 		successNodeID = ids.GenerateTestNodeID()
@@ -889,11 +886,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			var (
 				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender      = sendermock.NewExternalSender(ctrl)
-<<<<<<< remove-timeout-mocks
 				timeoutManager      = timeouttest.New(t, benchlist.NewNoBenchlist(), deadline)
-=======
-				timeoutManager      = timeoutmock.NewManager(ctrl)
->>>>>>> router-mocks
 				testInternalHandler = &testInternalHandler{}
 				nodeIDs             = set.Of(successNodeID, failedNodeID, ctx.NodeID)
 				nodeIDsCopy         set.Set[ids.NodeID]
@@ -916,12 +909,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			)
 			require.NoError(err)
 
-<<<<<<< remove-timeout-mocks
-=======
-			// Set the timeout (deadline)
-			timeoutManager.EXPECT().TimeoutDuration().Return(deadline).AnyTimes()
-
->>>>>>> router-mocks
 			// Make sure we're making the correct outbound message.
 			tt.setMsgCreatorExpect(msgCreator)
 
@@ -1102,11 +1089,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			var (
 				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender      = sendermock.NewExternalSender(ctrl)
-<<<<<<< remove-timeout-mocks
 				timeoutManager      = timeouttest.New(t, benchlist.NewNoBenchlist(), deadline)
-=======
-				timeoutManager      = timeoutmock.NewManager(ctrl)
->>>>>>> router-mocks
 				testInternalHandler = &testInternalHandler{}
 			)
 
@@ -1259,12 +1242,8 @@ func TestSender_Single_Request(t *testing.T) {
 			var (
 				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender      = sendermock.NewExternalSender(ctrl)
-<<<<<<< remove-timeout-mocks
 				bl                  = &testBenchlist{Manager: benchlist.NewNoBenchlist()}
 				timeoutManager      = timeouttest.New(t, bl, deadline)
-=======
-				timeoutManager      = timeoutmock.NewManager(ctrl)
->>>>>>> router-mocks
 				testInternalHandler = &testInternalHandler{}
 			)
 
@@ -1303,11 +1282,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Case: Node is benched
 			{
-<<<<<<< remove-timeout-mocks
 				bl.benched.Add(destinationNodeID)
-=======
-				timeoutManager.EXPECT().IsBenched(ctx.ChainID, destinationNodeID).Return(true)
->>>>>>> router-mocks
 
 				// Make sure we're expecting the correct outbound message.
 				tt.setMsgCreatorExpect(msgCreator)
@@ -1328,11 +1303,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Case: Node is not myself, not benched and send fails
 			{
-<<<<<<< remove-timeout-mocks
 				bl.benched.Remove(destinationNodeID)
-=======
-				timeoutManager.EXPECT().IsBenched(ctx.ChainID, destinationNodeID).Return(false)
->>>>>>> router-mocks
 
 				// Make sure we're making the correct outbound message.
 				tt.setMsgCreatorExpect(msgCreator)
