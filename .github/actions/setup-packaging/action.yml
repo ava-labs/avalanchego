@@ -1,0 +1,62 @@
+name: 'Set up packaging environment'
+description: 'Overlay packaging scripts, setup Go, resolve tag, import GPG key'
+
+inputs:
+  tag-input:
+    description: 'Explicit tag from workflow_dispatch (empty for auto-detect)'
+    required: false
+    default: ''
+  gpg-private-key:
+    description: 'GPG private key content (empty for unsigned PR builds)'
+    required: false
+    default: ''
+
+outputs:
+  tag:
+    description: 'Resolved package tag'
+    value: ${{ steps.get-tag.outputs.tag }}
+  gpg-key-file:
+    description: 'Path to temporary GPG key file (empty for unsigned builds)'
+    value: ${{ steps.import-gpg.outputs.gpg_key_file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Overlay packaging scripts from workflow branch
+      if: inputs.tag-input != ''
+      uses: actions/checkout@v4
+      with:
+        path: .packaging-overlay
+        sparse-checkout: .github/packaging
+
+    - name: Apply packaging overlay
+      if: inputs.tag-input != ''
+      shell: bash
+      run: |
+        cp -r .packaging-overlay/.github/packaging .github/packaging
+        rm -rf .packaging-overlay
+
+    - uses: ./.github/actions/setup-go-for-project
+
+    - name: Get tag
+      id: get-tag
+      shell: bash
+      run: |
+        if [[ -n "${{ inputs.tag-input }}" ]]; then
+          TAG="${{ inputs.tag-input }}"
+        elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+          TAG="${GITHUB_REF/refs\/tags\//}"
+        else
+          TAG="v0.0.0-pr.${GITHUB_SHA::8}"
+        fi
+        echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+    - name: Import GPG key
+      id: import-gpg
+      if: inputs.gpg-private-key != ''
+      shell: bash
+      run: |
+        GPG_KEY_FILE="$(mktemp)"
+        chmod 600 "${GPG_KEY_FILE}"
+        printf '%s' '${{ inputs.gpg-private-key }}' > "${GPG_KEY_FILE}"
+        echo "gpg_key_file=${GPG_KEY_FILE}" >> "$GITHUB_OUTPUT"

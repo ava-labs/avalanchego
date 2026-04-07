@@ -2,7 +2,7 @@
 
 # Shared functions for RPM and DEB package build scripts.
 #
-# Sourced (not executed) by build-rpm.sh and build-deb.sh.
+# Sourced (not executed) by build-package.sh.
 # All functions expect REPO_ROOT to be set by the caller.
 
 # Initialize the build environment inside the container.
