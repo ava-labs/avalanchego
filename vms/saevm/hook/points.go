@@ -105,7 +105,6 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 		potentialTxs: func() iter.Seq[*txpool.Tx] {
 			return slices.Values(txs)
 		},
-		originalExtra: header.Extra,
 	}, nil
 }
 
