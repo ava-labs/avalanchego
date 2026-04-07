@@ -63,7 +63,7 @@ The tool currently supports:
 - `get --pr <number>`
 - `update-body --pr <number> (--body <text> | --body-file <path>) [--force]`
 - `replace-comments --pr <number> --comments-file <path> [--force]`
-- `delete --pr <number>`
+- `delete --pr <number> [--ensure-absent]`
 - `get-state --pr <number> --user <login>`
 - `delete-state --pr <number> --user <login>`
 - `version`
@@ -268,6 +268,10 @@ If the instruction is to remove the pending review entirely:
 ```bash
 ./bin/gh-pending-review delete --pr <number> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
 ```
+
+If the goal is "make sure no pending review is left behind" in one command, use
+`--ensure-absent`. That makes delete idempotent: it succeeds when no live draft
+exists and still clears any stored local state for that PR.
 
 ## Conflict Handling
 

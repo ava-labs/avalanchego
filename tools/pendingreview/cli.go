@@ -26,10 +26,11 @@ type createCommand struct {
 func (createCommand) isCommand() {}
 
 type deleteCommand struct {
-	Repo      string
-	PRNumber  int
-	ConfigDir string
-	StateDir  string
+	Repo         string
+	PRNumber     int
+	ConfigDir    string
+	StateDir     string
+	EnsureAbsent bool
 }
 
 func (deleteCommand) isCommand() {}
@@ -159,6 +160,7 @@ func parseDeleteCommand(args []string) (command, error) {
 	prNumber := flags.Int("pr", 0, "pull request number")
 	configDir := flags.String("config-dir", defaultConfigDir(), "isolated gh config directory")
 	stateDir := flags.String("state-dir", defaultStateDir(), "local draft review state directory")
+	ensureAbsent := flags.Bool("ensure-absent", false, "succeed if no pending review exists and clear stored state if present")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, usageError(err.Error())
@@ -171,10 +173,11 @@ func parseDeleteCommand(args []string) (command, error) {
 	}
 
 	return deleteCommand{
-		Repo:      *repo,
-		PRNumber:  *prNumber,
-		ConfigDir: *configDir,
-		StateDir:  *stateDir,
+		Repo:         *repo,
+		PRNumber:     *prNumber,
+		ConfigDir:    *configDir,
+		StateDir:     *stateDir,
+		EnsureAbsent: *ensureAbsent,
 	}, nil
 }
 
@@ -340,7 +343,7 @@ func Usage() string {
 
 Usage:
   gh-pending-review create --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR]
-  gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
+  gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--ensure-absent]
   gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR]
   gh-pending-review get-state --pr NUMBER [--repo OWNER/REPO] --user LOGIN [--state-dir DIR]
   gh-pending-review replace-comments --pr NUMBER [--repo OWNER/REPO] --comments-file PATH [--config-dir DIR] [--state-dir DIR] [--force]
@@ -353,6 +356,7 @@ Notes:
   - It uses isolated gh auth from --config-dir.
   - It stores the last published review body and comment set locally to detect user edits before update.
   - It never submits a review.
+  - delete --ensure-absent is idempotent: it clears local state, deletes any live pending review, and verifies absence.
 `
 }
 

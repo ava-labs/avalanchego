@@ -6,6 +6,7 @@ package pendingreview
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -141,6 +142,7 @@ func (a *App) runDelete(ctx context.Context, command deleteCommand) error {
 		zap.Int("prNumber", command.PRNumber),
 		zap.String("configDir", command.ConfigDir),
 		zap.String("stateDir", command.StateDir),
+		zap.Bool("ensureAbsent", command.EnsureAbsent),
 	)
 
 	client, viewer, err := a.newClientAndViewer(ctx, command.ConfigDir)
@@ -148,14 +150,28 @@ func (a *App) runDelete(ctx context.Context, command deleteCommand) error {
 		return stacktrace.Wrap(err)
 	}
 
+	store := NewStateStore(a.log, command.StateDir)
 	review, err := client.GetPendingReview(ctx, command.Repo, command.PRNumber, viewer.Login)
 	if err != nil {
+		if !command.EnsureAbsent || !errors.Is(err, ErrNoPendingReview) {
+			return stacktrace.Wrap(err)
+		}
+		if err := store.Delete(command.Repo, viewer.Login, command.PRNumber); err != nil {
+			return stacktrace.Wrap(err)
+		}
+
+		a.log.Info("verified no pending review remains",
+			zap.String("repo", command.Repo),
+			zap.Int("prNumber", command.PRNumber),
+			zap.String("userLogin", viewer.Login),
+		)
+		_, err = fmt.Fprintf(a.Stdout, "No pending review found for %s#%d as %s; verified no pending review remains and cleared stored state if present.\n", command.Repo, command.PRNumber, viewer.Login)
 		return stacktrace.Wrap(err)
 	}
 	if err := client.DeletePendingReview(ctx, review.ID); err != nil {
 		return stacktrace.Wrap(err)
 	}
-	if err := NewStateStore(a.log, command.StateDir).Delete(command.Repo, viewer.Login, command.PRNumber); err != nil {
+	if err := store.Delete(command.Repo, viewer.Login, command.PRNumber); err != nil {
 		return stacktrace.Wrap(err)
 	}
 
@@ -166,8 +182,24 @@ func (a *App) runDelete(ctx context.Context, command deleteCommand) error {
 		zap.String("userLogin", viewer.Login),
 	)
 
-	_, err = fmt.Fprintf(a.Stdout, "Deleted pending review %s for %s#%d\n", displayReviewID(review), command.Repo, command.PRNumber)
-	return stacktrace.Wrap(err)
+	if !command.EnsureAbsent {
+		_, err = fmt.Fprintf(a.Stdout, "Deleted pending review %s for %s#%d\n", displayReviewID(review), command.Repo, command.PRNumber)
+		return stacktrace.Wrap(err)
+	}
+
+	if _, err := client.GetPendingReview(ctx, command.Repo, command.PRNumber, viewer.Login); err != nil {
+		if errors.Is(err, ErrNoPendingReview) {
+			a.log.Info("verified no pending review remains",
+				zap.String("repo", command.Repo),
+				zap.Int("prNumber", command.PRNumber),
+				zap.String("userLogin", viewer.Login),
+			)
+			_, err = fmt.Fprintf(a.Stdout, "Deleted pending review %s for %s#%d\nVerified no pending review remains for %s#%d as %s.\n", displayReviewID(review), command.Repo, command.PRNumber, command.Repo, command.PRNumber, viewer.Login)
+			return stacktrace.Wrap(err)
+		}
+		return stacktrace.Wrap(err)
+	}
+	return stacktrace.Errorf("pending review for %s#%d as %s still exists after delete", command.Repo, command.PRNumber, viewer.Login)
 }
 
 func (a *App) runGet(ctx context.Context, command getCommand) error {
