@@ -306,6 +306,14 @@ func TestRunReplaceCommentsCreatesReviewIfMissing(t *testing.T) {
 				return graphQLNoPendingReviewData()
 			}
 			return graphQLPullRequestData("Draft review for inline comments.", currentComments)
+		case strings.Contains(query, "query PullRequestID"):
+			return map[string]any{
+				"repository": map[string]any{
+					"pullRequest": map[string]any{
+						"id": "pr-1",
+					},
+				},
+			}
 		case strings.Contains(query, "mutation CreatePendingReview"):
 			require.Equal(t, "Draft review for inline comments.", variables["body"])
 			created = true
@@ -517,8 +525,14 @@ func TestRunCreateReadsBodyFile(t *testing.T) {
 
 	server := newGraphQLTestServer(t, func(t *testing.T, query string, variables map[string]any) any {
 		switch {
-		case strings.Contains(query, "query PullRequestContext"):
-			return graphQLPullRequestData("existing", nil)
+		case strings.Contains(query, "query PullRequestID"):
+			return map[string]any{
+				"repository": map[string]any{
+					"pullRequest": map[string]any{
+						"id": "pr-1",
+					},
+				},
+			}
 		case strings.Contains(query, "mutation CreatePendingReview"):
 			require.Equal(t, "body from file\n", variables["body"])
 			return map[string]any{
@@ -574,8 +588,8 @@ func TestRunUpdateBodyReadsBodyFile(t *testing.T) {
 		switch {
 		case strings.Contains(query, "query Viewer"):
 			return map[string]any{"viewer": map[string]any{"login": "maru"}}
-		case strings.Contains(query, "query PullRequestContext"):
-			return graphQLPullRequestData("live body", nil)
+		case strings.Contains(query, "query PullRequestPendingReview"):
+			return graphQLPullRequestMetadataData("live body")
 		case strings.Contains(query, "mutation UpdatePendingReviewBody"):
 			require.Equal(t, "review-123", variables["reviewID"])
 			require.Equal(t, "updated from file\n", variables["body"])
@@ -728,11 +742,11 @@ func TestRunDeleteDeletesPendingReviewAndStoredReviewState(t *testing.T) {
 		switch {
 		case strings.Contains(query, "query Viewer"):
 			return map[string]any{"viewer": map[string]any{"login": "maru"}}
-		case strings.Contains(query, "query PullRequestContext"):
+		case strings.Contains(query, "query PullRequestPendingReview"):
 			if deleted {
-				return graphQLNoPendingReviewData()
+				return graphQLNoPendingReviewMetadataData()
 			}
-			return graphQLPullRequestData("body", nil)
+			return graphQLPullRequestMetadataData("body")
 		case strings.Contains(query, "mutation DeletePendingReview"):
 			require.Equal(t, "review-123", variables["reviewID"])
 			deleted = true
@@ -782,8 +796,8 @@ func TestRunDeleteDeletesStoredStateWhenPendingReviewAlreadyAbsent(t *testing.T)
 		switch {
 		case strings.Contains(query, "query Viewer"):
 			return map[string]any{"viewer": map[string]any{"login": "maru"}}
-		case strings.Contains(query, "query PullRequestContext"):
-			return graphQLNoPendingReviewData()
+		case strings.Contains(query, "query PullRequestPendingReview"):
+			return graphQLNoPendingReviewMetadataData()
 		default:
 			require.FailNowf(t, "unexpected query", "query: %s", query)
 			return nil
@@ -870,6 +884,29 @@ func graphQLPullRequestData(body string, comments []map[string]any) map[string]a
 	}
 }
 
+func graphQLPullRequestMetadataData(body string) map[string]any {
+	return map[string]any{
+		"viewer": map[string]any{"login": "maru"},
+		"repository": map[string]any{
+			"pullRequest": map[string]any{
+				"id": "pr-1",
+				"reviews": map[string]any{
+					"nodes": []map[string]any{
+						{
+							"id":         "review-123",
+							"databaseId": 123,
+							"state":      reviewStatePending,
+							"body":       body,
+							"url":        "https://example.invalid/review/123",
+							"author":     map[string]any{"login": "maru"},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func graphQLNoPendingReviewData() map[string]any {
 	return map[string]any{
 		"viewer": map[string]any{"login": "maru"},
@@ -879,6 +916,20 @@ func graphQLNoPendingReviewData() map[string]any {
 				"reviewThreads": map[string]any{
 					"nodes": []map[string]any{},
 				},
+				"reviews": map[string]any{
+					"nodes": []map[string]any{},
+				},
+			},
+		},
+	}
+}
+
+func graphQLNoPendingReviewMetadataData() map[string]any {
+	return map[string]any{
+		"viewer": map[string]any{"login": "maru"},
+		"repository": map[string]any{
+			"pullRequest": map[string]any{
+				"id": "pr-1",
 				"reviews": map[string]any{
 					"nodes": []map[string]any{},
 				},

@@ -32,12 +32,12 @@ func TestRunDeleteEnsureAbsentDeletesReviewAndVerifiesAbsence(t *testing.T) {
 		switch {
 		case strings.Contains(query, "query Viewer"):
 			return map[string]any{"viewer": map[string]any{"login": "maru"}}
-		case strings.Contains(query, "query PullRequestContext"):
+		case strings.Contains(query, "query PullRequestPendingReview"):
 			getCount++
 			if getCount == 1 {
-				return graphQLPullRequestData("live body", nil)
+				return graphQLPullRequestMetadataData("live body")
 			}
-			return graphQLNoPendingReviewData()
+			return graphQLNoPendingReviewMetadataData()
 		case strings.Contains(query, "mutation DeletePendingReview"):
 			require.Equal(t, "review-123", variables["reviewID"])
 			return map[string]any{
@@ -88,8 +88,8 @@ func TestRunDeleteEnsureAbsentSucceedsWhenAlreadyAbsent(t *testing.T) {
 		switch {
 		case strings.Contains(query, "query Viewer"):
 			return map[string]any{"viewer": map[string]any{"login": "maru"}}
-		case strings.Contains(query, "query PullRequestContext"):
-			return graphQLNoPendingReviewData()
+		case strings.Contains(query, "query PullRequestPendingReview"):
+			return graphQLNoPendingReviewMetadataData()
 		default:
 			require.FailNowf(t, "unexpected query", "query: %s", query)
 			return nil

@@ -92,10 +92,18 @@ mutation CreatePendingReview($pullRequestID: ID!, $body: String!) {
 }
 
 func (c *GitHubClient) GetPendingReview(ctx context.Context, repo string, prNumber int, login string) (Review, error) {
+	return c.getPendingReview(ctx, repo, prNumber, login, true)
+}
+
+func (c *GitHubClient) GetPendingReviewMetadata(ctx context.Context, repo string, prNumber int, login string) (Review, error) {
+	return c.getPendingReview(ctx, repo, prNumber, login, false)
+}
+
+func (c *GitHubClient) getPendingReview(ctx context.Context, repo string, prNumber int, login string, includeComments bool) (Review, error) {
 	const maxAttempts = 5
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		pullRequest, err := c.pullRequestContext(ctx, repo, prNumber)
+		pullRequest, err := c.pullRequestPendingReview(ctx, repo, prNumber, includeComments)
 		if err != nil {
 			return Review{}, err
 		}
@@ -310,11 +318,36 @@ mutation DeletePendingReviewComment($commentID: ID!) {
 }
 
 func (c *GitHubClient) pullRequestID(ctx context.Context, repo string, prNumber int) (string, error) {
-	pullRequest, err := c.pullRequestContext(ctx, repo, prNumber)
+	owner, name, err := splitRepo(repo)
 	if err != nil {
 		return "", err
 	}
-	return pullRequest.ID, nil
+
+	var resp struct {
+		Repository struct {
+			PullRequest *struct {
+				ID string `json:"id"`
+			} `json:"pullRequest"`
+		} `json:"repository"`
+	}
+	if err := c.graphql(ctx, `
+query PullRequestID($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      id
+    }
+  }
+}`, map[string]any{
+		"owner":  owner,
+		"name":   name,
+		"number": prNumber,
+	}, &resp); err != nil {
+		return "", err
+	}
+	if resp.Repository.PullRequest == nil {
+		return "", stacktrace.Errorf("pull request not found for %s#%d", repo, prNumber)
+	}
+	return resp.Repository.PullRequest.ID, nil
 }
 
 func (c *GitHubClient) pullRequestContext(ctx context.Context, repo string, prNumber int) (pullRequestContext, error) {
@@ -397,6 +430,63 @@ query PullRequestContext($owner: String!, $name: String!, $number: Int!) {
 	reviews := make([]Review, 0, len(resp.Repository.PullRequest.Reviews.Nodes))
 	for _, review := range resp.Repository.PullRequest.Reviews.Nodes {
 		reviews = append(reviews, review.toReview(threadByCommentID))
+	}
+
+	return pullRequestContext{
+		ID:          resp.Repository.PullRequest.ID,
+		ViewerLogin: resp.Viewer.Login,
+		Reviews:     reviews,
+	}, nil
+}
+
+func (c *GitHubClient) pullRequestPendingReview(ctx context.Context, repo string, prNumber int, includeComments bool) (pullRequestContext, error) {
+	if includeComments {
+		return c.pullRequestContext(ctx, repo, prNumber)
+	}
+
+	owner, name, err := splitRepo(repo)
+	if err != nil {
+		return pullRequestContext{}, err
+	}
+
+	var resp struct {
+		Viewer     User `json:"viewer"`
+		Repository struct {
+			PullRequest *graphqlPullRequest `json:"pullRequest"`
+		} `json:"repository"`
+	}
+	if err := c.graphql(ctx, `
+query PullRequestPendingReview($owner: String!, $name: String!, $number: Int!) {
+  viewer { login }
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      id
+      reviews(first: 20, states: [PENDING]) {
+        nodes {
+          id
+          databaseId
+          state
+          body
+          url
+          author { login }
+        }
+      }
+    }
+  }
+}`, map[string]any{
+		"owner":  owner,
+		"name":   name,
+		"number": prNumber,
+	}, &resp); err != nil {
+		return pullRequestContext{}, err
+	}
+	if resp.Repository.PullRequest == nil {
+		return pullRequestContext{}, stacktrace.Errorf("pull request not found for %s#%d", repo, prNumber)
+	}
+
+	reviews := make([]Review, 0, len(resp.Repository.PullRequest.Reviews.Nodes))
+	for _, review := range resp.Repository.PullRequest.Reviews.Nodes {
+		reviews = append(reviews, review.toReview(nil))
 	}
 
 	return pullRequestContext{

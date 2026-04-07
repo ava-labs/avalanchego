@@ -41,8 +41,8 @@ func TestRunCreateLogsStructuredOperations(t *testing.T) {
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case strings.Contains(payload.Query, "query PullRequestContext"):
-			_, _ = io.WriteString(w, `{"data":{"viewer":{"login":"maru"},"repository":{"pullRequest":{"id":"pr-1","reviewThreads":{"nodes":[]},"reviews":{"nodes":[{"id":"review-0","databaseId":111,"state":"PENDING","body":"existing","url":"https://example.invalid/review/111","author":{"login":"maru"},"comments":{"nodes":[]}}]}}}}}`)
+		case strings.Contains(payload.Query, "query PullRequestID"):
+			_, _ = io.WriteString(w, `{"data":{"repository":{"pullRequest":{"id":"pr-1"}}}}`)
 		case strings.Contains(payload.Query, "mutation CreatePendingReview"):
 			_, _ = io.WriteString(w, `{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"review-123","databaseId":123,"state":"PENDING","body":"test","url":"https://example.invalid/review/123","author":{"login":"maru"}}}}}`)
 		default:
@@ -149,8 +149,8 @@ func TestRunUpdateBodyLogsStateComparison(t *testing.T) {
 		switch {
 		case strings.Contains(query, "query Viewer"):
 			return map[string]any{"viewer": map[string]any{"login": "maru"}}
-		case strings.Contains(query, "query PullRequestContext"):
-			return graphQLPullRequestData("live body", nil)
+		case strings.Contains(query, "query PullRequestPendingReview"):
+			return graphQLPullRequestMetadataData("live body")
 		case strings.Contains(query, "mutation UpdatePendingReviewBody"):
 			require.Equal(t, "review-123", variables["reviewID"])
 			require.Equal(t, "updated body", variables["body"])
