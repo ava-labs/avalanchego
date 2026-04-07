@@ -43,7 +43,6 @@ var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
 type Points struct {
 	blockBuilder
 	db          database.Database
-	txs         *txpool.Txs
 	warpBackend precompileconfig.WarpMessageWriter
 }
 
@@ -67,7 +66,6 @@ func NewPoints(
 			chainConfig:  chainConfig,
 		},
 		db,
-		pool,
 		warpBackend,
 	}
 }

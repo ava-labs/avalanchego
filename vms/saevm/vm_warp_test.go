@@ -10,7 +10,6 @@ import (
 	"os"
 	"testing"
 
-	libevmcommon "github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
@@ -27,11 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
-	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/coreth/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -46,7 +43,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
+	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	libevmcommon "github.com/ava-labs/libevm/common"
 )
 
 var (
@@ -205,7 +205,7 @@ func TestPredicateVerification(t *testing.T) {
 			require.Len(built.EthBlock().Transactions(), 1)
 
 			sut.acceptBlock(t, built)
-			sut.assertPredicateResult(t, built, validateTx, tt.validPredicate)
+			assertPredicateResult(t, built, validateTx, tt.validPredicate)
 
 			receipts := built.Receipts()
 			require.Len(receipts, 1)
@@ -337,7 +337,7 @@ func (s *sut) sendWarpTx(
 	return tx
 }
 
-func (s *sut) assertPredicateResult(
+func assertPredicateResult(
 	t *testing.T,
 	built *blocks.Block,
 	validateTx *types.Transaction,
