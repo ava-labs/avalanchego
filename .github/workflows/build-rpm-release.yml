@@ -12,6 +12,7 @@ on:
   pull_request:
     paths:
       - ".github/packaging/**"
+      - ".github/actions/setup-packaging/**"
       - ".github/workflows/build-rpm-release.yml"
 
 jobs:
