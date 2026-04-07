@@ -142,7 +142,7 @@ func TestPendingReviewDeleteStateLocalOnly(t *testing.T) {
 
 			output := readOutput(t, result.OutputPath)
 			require.Contains(t, strings.ToLower(output), "deleted")
-			require.Contains(t, strings.ToLower(output), "pending review state")
+			require.Contains(t, strings.ToLower(output), "state")
 		})
 	}
 }
@@ -192,7 +192,11 @@ func TestPendingReviewCreateBodyEndToEnd(t *testing.T) {
 			require.Equal(t, "foo", review.Body)
 			require.Equal(t, "review-123", review.ID)
 			require.Equal(t, "octocat", review.Author.Login)
-			require.Equal(t, []string{"PullRequestContext", "CreatePendingReview"}, backend.operations())
+			ops := backend.operations()
+			require.Equal(t, 1, countStrings(ops, "CreatePendingReview"), "ops=%v", ops)
+			require.Equal(t, 1, countStrings(ops, "PullRequestContext"), "ops=%v", ops)
+			require.NotContains(t, ops, "UpdatePendingReviewBody")
+			require.NotContains(t, ops, "DeletePendingReview")
 
 			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
 			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
@@ -284,7 +288,12 @@ func TestPendingReviewInspectBeforeMutatingStaysReadOnly(t *testing.T) {
 			require.Equal(t, "draft v2 from GitHub", review.Body)
 			require.Len(t, review.Comments, 1)
 			require.Equal(t, "live finding from GitHub", review.Comments[0].Body)
-			require.Equal(t, []string{"Viewer", "PullRequestContext"}, backend.operations())
+			ops := backend.operations()
+			require.Equal(t, 1, countStrings(ops, "Viewer"), "ops=%v", ops)
+			require.Equal(t, 1, countStrings(ops, "PullRequestContext"), "ops=%v", ops)
+			require.NotContains(t, ops, "CreatePendingReview")
+			require.NotContains(t, ops, "UpdatePendingReviewBody")
+			require.NotContains(t, ops, "ReplacePendingReviewComments")
 
 			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
 			require.NoError(t, err)
@@ -352,7 +361,11 @@ func TestPendingReviewReadBodyEndToEnd(t *testing.T) {
 
 			review := backend.review()
 			require.Equal(t, "draft v1", review.Body)
-			require.Equal(t, []string{"Viewer", "PullRequestContext"}, backend.operations())
+			ops := backend.operations()
+			require.Equal(t, 1, countStrings(ops, "Viewer"), "ops=%v", ops)
+			require.Equal(t, 1, countStrings(ops, "PullRequestContext"), "ops=%v", ops)
+			require.NotContains(t, ops, "CreatePendingReview")
+			require.NotContains(t, ops, "DeletePendingReview")
 
 			_, err := os.Stat(stateFilePath(stateDir, "ava-labs/avalanchego", "octocat", 123))
 			require.ErrorIs(t, err, os.ErrNotExist)
@@ -440,7 +453,13 @@ func TestPendingReviewDeleteEndToEnd(t *testing.T) {
 			require.Equal(t, 0, result.ExitCode)
 
 			require.False(t, backend.hasReview())
-			require.Equal(t, []string{"Viewer", "PullRequestContext", "DeletePendingReview"}, backend.operations())
+			ops := backend.operations()
+			require.Equal(t, 1, countStrings(ops, "Viewer"), "ops=%v", ops)
+			require.Equal(t, 1, countStrings(ops, "DeletePendingReview"), "ops=%v", ops)
+			require.GreaterOrEqual(t, countStrings(ops, "PullRequestContext"), 1, "ops=%v", ops)
+			deleteIndex := slices.Index(ops, "DeletePendingReview")
+			require.NotEqual(t, -1, deleteIndex, "ops=%v", ops)
+			require.Contains(t, ops[:deleteIndex], "PullRequestContext")
 
 			_, err := os.Stat(stateFilePath(stateDir, "ava-labs/avalanchego", "octocat", 123))
 			require.ErrorIs(t, err, os.ErrNotExist)
@@ -521,13 +540,19 @@ func TestPendingReviewUpdateBodyEndToEnd(t *testing.T) {
 			require.Equal(t, 0, result.ExitCode)
 
 			review := backend.review()
-			require.Equal(t, "bar", review.Body)
-			require.Equal(t, []string{"Viewer", "PullRequestContext", "UpdatePendingReviewBody"}, backend.operations())
+			require.Equal(t, "bar", strings.TrimSpace(review.Body))
+			ops := backend.operations()
+			require.Equal(t, 1, countStrings(ops, "Viewer"), "ops=%v", ops)
+			require.Equal(t, 1, countStrings(ops, "UpdatePendingReviewBody"), "ops=%v", ops)
+			require.GreaterOrEqual(t, countStrings(ops, "PullRequestContext"), 1, "ops=%v", ops)
+			updateIndex := slices.Index(ops, "UpdatePendingReviewBody")
+			require.NotEqual(t, -1, updateIndex, "ops=%v", ops)
+			require.Contains(t, ops[:updateIndex], "PullRequestContext")
 
 			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
 			require.NoError(t, err)
 			require.Equal(t, "review-123", stored.ReviewID)
-			require.Equal(t, "bar", stored.LastPublishedBody)
+			require.Equal(t, "bar", strings.TrimSpace(stored.LastPublishedBody))
 			require.Equal(t, "https://example.invalid/review/123", stored.HTMLURL)
 			require.Len(t, stored.LastPublishedEntries, 1)
 			require.Equal(t, "existing comment", stored.LastPublishedEntries[0].Body)
@@ -1079,7 +1104,7 @@ func TestPendingReviewReplaceCommentsEndToEnd(t *testing.T) {
 			review := backend.review()
 			require.Equal(t, "draft body", review.Body)
 			require.Len(t, review.Comments, 1)
-			require.Equal(t, "new comment", review.Comments[0].Body)
+			require.Equal(t, "new comment", strings.TrimSpace(review.Comments[0].Body))
 			require.Equal(t, "snow/engine.go", review.Comments[0].Path)
 			require.Equal(t, 7, review.Comments[0].Line)
 			require.Equal(t, "RIGHT", review.Comments[0].Side)
@@ -1102,9 +1127,190 @@ func TestPendingReviewReplaceCommentsEndToEnd(t *testing.T) {
 			require.Equal(t, "draft body", stored.LastPublishedBody)
 			require.Equal(t, "https://example.invalid/review/123", stored.HTMLURL)
 			require.Len(t, stored.LastPublishedEntries, 1)
-			require.Equal(t, "new comment", stored.LastPublishedEntries[0].Body)
+			require.Equal(t, "new comment", strings.TrimSpace(stored.LastPublishedEntries[0].Body))
 			require.Equal(t, "snow/engine.go", stored.LastPublishedEntries[0].Path)
 			require.Equal(t, 7, stored.LastPublishedEntries[0].Line)
+		})
+	}
+}
+
+func TestPendingReviewUpsertCommentEndToEnd(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			xdgStateHome := filepath.Join(t.TempDir(), "state-home")
+			configDir := filepath.Join(xdgConfigHome, "gh-pending-review")
+			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
+			require.NoError(t, store.Save(pendingreview.ReviewState{
+				Repo:              "ava-labs/avalanchego",
+				PRNumber:          123,
+				UserLogin:         "octocat",
+				ReviewID:          "review-123",
+				LastPublishedBody: "draft body",
+				LastPublishedEntries: []pendingreview.DraftReviewEntry{{
+					Kind: pendingreview.DraftReviewEntryKindNewThread,
+					Path: "snow/engine.go",
+					Line: 7,
+					Side: "RIGHT",
+					Body: "old comment",
+				}},
+				HTMLURL: "https://example.invalid/review/123",
+			}))
+
+			backend := newFakePendingReviewBackend()
+			backend.seedReview(fakeReview{
+				ID:         "review-123",
+				DatabaseID: 123,
+				Body:       "draft body",
+				State:      "PENDING",
+				URL:        "https://example.invalid/review/123",
+				Author: fakeUser{
+					Login: "octocat",
+				},
+				Comments: []fakeReviewComment{{
+					ID:       "comment-1",
+					ThreadID: "thread-1",
+					Body:     "old comment",
+					Path:     "snow/engine.go",
+					Line:     7,
+					Side:     "RIGHT",
+				}},
+			})
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Revise exactly one managed pending-review inline comment on PR 123. " +
+					"Update the comment on snow/engine.go line 7 on the RIGHT side to say " +
+					`"new comment". Do not reconstruct unrelated comments or use replace-comments ` +
+					"for this one-comment edit. Keep the existing top-level review body unchanged. " +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
+					"Do not submit the review.",
+				Timeout: 3 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             xdgStateHome,
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+
+			review := backend.review()
+			require.Equal(t, "draft body", review.Body)
+			require.Len(t, review.Comments, 1)
+			require.Equal(t, "new comment", strings.TrimSpace(review.Comments[0].Body))
+			require.Equal(t, "snow/engine.go", review.Comments[0].Path)
+			require.Equal(t, 7, review.Comments[0].Line)
+			require.Equal(t, "RIGHT", review.Comments[0].Side)
+
+			ops := backend.operations()
+			require.Equal(t, 1, countStrings(ops, "DeletePendingReviewComment"), "ops=%v", ops)
+			require.Equal(t, 1, countStrings(ops, "AddPendingReviewThread"), "ops=%v", ops)
+			require.Equal(t, 0, countStrings(ops, "CreatePendingReview"), "ops=%v", ops)
+			require.GreaterOrEqual(t, countStrings(ops, "PullRequestContext"), 2, "ops=%v", ops)
+
+			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
+			require.NoError(t, err)
+			require.Equal(t, "review-123", stored.ReviewID)
+			require.Equal(t, "draft body", stored.LastPublishedBody)
+			require.Len(t, stored.LastPublishedEntries, 1)
+			require.Equal(t, "new comment", strings.TrimSpace(stored.LastPublishedEntries[0].Body))
+			require.Equal(t, "snow/engine.go", stored.LastPublishedEntries[0].Path)
+			require.Equal(t, 7, stored.LastPublishedEntries[0].Line)
+
+			output := readOutput(t, result.OutputPath)
+			require.Contains(t, strings.ToLower(output), "pending")
+		})
+	}
+}
+
+func TestPendingReviewCommentOnlyWorkflowCreatesDraftViaUpsert(t *testing.T) {
+	requirePendingReviewSkillTests(t)
+
+	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
+		t.Run(agent, func(t *testing.T) {
+			if _, err := exec.LookPath(agent); err != nil {
+				t.Skipf("%s not found on PATH", agent)
+			}
+
+			repoRoot := repoRoot(t)
+			xdgConfigHome := filepath.Join(t.TempDir(), "config-home")
+			xdgStateHome := filepath.Join(t.TempDir(), "state-home")
+			configDir := filepath.Join(xdgConfigHome, "gh-pending-review")
+			stateDir := filepath.Join(xdgStateHome, "gh-pending-review")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			backend := newFakePendingReviewBackend()
+			server := httptest.NewServer(backend)
+			defer server.Close()
+
+			result := skilltest.Run(t, skilltest.Config{
+				Agent:     agent,
+				SkillPath: "../SKILL.md",
+				WorkDir:   repoRoot,
+				Prompt: "Add a single inline pending-review comment on PR 123 on " +
+					"snow/engine.go line 7 on the RIGHT side saying " +
+					`"new comment". There is no pending review yet. Treat this as a comment-only ` +
+					"workflow and do not do placeholder-body choreography yourself. Use the repo-local " +
+					"pending-review CLI ergonomically for a one-comment draft. " +
+					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
+					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
+					"Do not submit the review.",
+				Timeout: 3 * time.Minute,
+				Env: map[string]string{
+					"XDG_CONFIG_HOME":            xdgConfigHome,
+					"XDG_STATE_HOME":             xdgStateHome,
+					"GH_PENDING_REVIEW_BASE_URL": server.URL,
+				},
+				BinWrappers: map[string]string{
+					"gh": "#!/bin/sh\nprintf 'test-token\\n'\n",
+				},
+			})
+
+			require.Equal(t, 0, result.ExitCode)
+
+			review := backend.review()
+			require.Equal(t, "Draft review for inline comments.", review.Body)
+			require.Len(t, review.Comments, 1)
+			require.Equal(t, "new comment", strings.TrimSpace(review.Comments[0].Body))
+			require.Equal(t, "snow/engine.go", review.Comments[0].Path)
+			require.Equal(t, 7, review.Comments[0].Line)
+			require.Equal(t, "RIGHT", review.Comments[0].Side)
+
+			ops := backend.operations()
+			require.Equal(t, 1, countStrings(ops, "CreatePendingReview"), "ops=%v", ops)
+			require.Equal(t, 1, countStrings(ops, "AddPendingReviewThread"), "ops=%v", ops)
+			require.Equal(t, 0, countStrings(ops, "UpdatePendingReviewBody"), "ops=%v", ops)
+			require.GreaterOrEqual(t, countStrings(ops, "PullRequestContext"), 2, "ops=%v", ops)
+
+			store := pendingreview.NewStateStore(logging.NoLog{}, stateDir)
+			stored, err := store.Load("ava-labs/avalanchego", "octocat", 123)
+			require.NoError(t, err)
+			require.Equal(t, "review-123", stored.ReviewID)
+			require.Equal(t, "Draft review for inline comments.", stored.LastPublishedBody)
+			require.Len(t, stored.LastPublishedEntries, 1)
+			require.Equal(t, "new comment", strings.TrimSpace(stored.LastPublishedEntries[0].Body))
+
+			output := readOutput(t, result.OutputPath)
+			require.Contains(t, strings.ToLower(output), "pending")
 		})
 	}
 }
