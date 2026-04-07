@@ -5,6 +5,8 @@ maintainer: "Ava Labs <security@avalabs.org>"
 description: "AvalancheGo node — the official Avalanche protocol implementation"
 homepage: "https://github.com/ava-labs/avalanchego"
 license: "BSD-3-Clause"
+depends:
+  - "libc6 (>= 2.34)"
 contents:
   - src: "${AVALANCHEGO_BINARY}"
     dst: /usr/local/bin/avalanchego
