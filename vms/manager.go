@@ -62,6 +62,7 @@ func NewManager(log logging.Logger, aliaser ids.Aliaser) *Manager {
 	}
 }
 
+// Return a factory that can create new instances of the vm whose ID is vmID.
 func (m *Manager) GetFactory(vmID ids.ID) (Factory, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -72,6 +73,8 @@ func (m *Manager) GetFactory(vmID ids.ID) (Factory, error) {
 	return nil, fmt.Errorf("%q was %w", vmID, ErrNotFound)
 }
 
+// Map vmID to factory. factory creates new instances of the vm whose
+// ID is vmID.
 func (m *Manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Factory) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -106,6 +109,7 @@ func (m *Manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Fact
 	return commonVM.Shutdown(ctx)
 }
 
+// ListFactories returns all the IDs that have had factories registered.
 func (m *Manager) ListFactories() ([]ids.ID, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -113,6 +117,8 @@ func (m *Manager) ListFactories() ([]ids.ID, error) {
 	return maps.Keys(m.factories), nil
 }
 
+// Versions returns the primary alias of the VM mapped to the reported
+// version of the VM for all the registered VMs that reported versions.
 func (m *Manager) Versions() (map[string]string, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()

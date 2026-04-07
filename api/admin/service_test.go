@@ -20,16 +20,6 @@ import (
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
-// failingAliaser wraps an Aliaser and returns an error from Aliases.
-type failingAliaser struct {
-	ids.Aliaser
-	err error
-}
-
-func (f *failingAliaser) Aliases(ids.ID) ([]string, error) {
-	return nil, f.err
-}
-
 type loadVMsTest struct {
 	admin          *Admin
 	vmManager      *vms.Manager
@@ -100,6 +90,16 @@ func TestLoadVMsReloadFails(t *testing.T) {
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
 	require.ErrorIs(err, errTest)
+}
+
+// failingAliaser wraps an Aliaser and returns an error from Aliases.
+type failingAliaser struct {
+	ids.Aliaser
+	err error
+}
+
+func (f *failingAliaser) Aliases(ids.ID) ([]string, error) {
+	return nil, f.err
 }
 
 // Tests behavior for LoadVMs if we fail to fetch our aliases
