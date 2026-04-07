@@ -43,8 +43,10 @@ generate_changelog "${VERSION}"
 GPG_PUBLIC_KEY="${OUTPUT_DIR}/RPM-GPG-KEY-avalanchego"
 setup_gpg "${RPM_GPG_KEY_FILE:-}" "${GPG_PUBLIC_KEY}" "RPM"
 
-# For ephemeral keys (no passphrase), nfpm needs an empty passphrase
-if [[ -z "${RPM_GPG_KEY_FILE:-}" && -z "${NFPM_RPM_PASSPHRASE+x}" ]]; then
+# Ephemeral keys have no passphrase; nfpm needs the variable set to empty.
+# The workflow always exports NFPM_RPM_PASSPHRASE (from secrets) but skips
+# RPM_GPG_KEY_FILE on PR builds, so we must clear it unconditionally here.
+if [[ -z "${RPM_GPG_KEY_FILE:-}" ]]; then
     export NFPM_RPM_PASSPHRASE=""
 fi
 
