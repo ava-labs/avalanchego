@@ -67,6 +67,7 @@ tasks:
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_OUTPUT_DIR}}:/output
           {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
+          -e FORMAT=RPM
           -e PACKAGE=avalanchego
           -e VERSION={{trimPrefix "v" .RPM_TAG}}
           -e TAG={{.RPM_TAG}}
@@ -76,7 +77,7 @@ tasks:
           {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
           {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
           {{.PACKAGING_DOCKER_IMAGE}}
-          .github/packaging/scripts/build-rpm.sh
+          .github/packaging/scripts/build-package.sh
 
   build-subnet-evm-rpm:
     desc: Builds RPM for subnet-evm
@@ -91,6 +92,7 @@ tasks:
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_OUTPUT_DIR}}:/output
           {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
+          -e FORMAT=RPM
           -e PACKAGE=subnet-evm
           -e VERSION={{trimPrefix "v" .RPM_TAG}}
           -e TAG={{.RPM_TAG}}
@@ -100,7 +102,7 @@ tasks:
           {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
           {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
           {{.PACKAGING_DOCKER_IMAGE}}
-          .github/packaging/scripts/build-rpm.sh
+          .github/packaging/scripts/build-package.sh
 
   test-build-rpms:
     desc: Builds and validates RPMs end-to-end
