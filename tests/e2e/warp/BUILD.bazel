@@ -44,7 +44,6 @@ go_library(
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//accounts/abi/bind",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//ethclient",

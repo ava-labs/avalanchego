@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/load/contracts"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
@@ -38,10 +39,11 @@ func NewRandomTest(
 	source rand.Source,
 	tokenContract *contracts.ERC20,
 ) (*RandomWeightedTest, error) {
-	txOpts, err := bind.NewKeyedTransactorWithChainID(worker.PrivKey, chainID)
+	txOpts, err := e2e.NewKeyedTxOpts(worker.PrivKey, chainID, e2e.DefaultDeployGasLimit)
 	if err != nil {
 		return nil, err
 	}
+	txOpts.Nonce = new(big.Int).SetUint64(worker.Nonce)
 
 	_, tx, loadSimulator, err := contracts.DeployLoadSimulator(txOpts, worker.Client)
 	if err != nil {
@@ -53,6 +55,7 @@ func NewRandomTest(
 	}
 
 	worker.Nonce++
+	txOpts.Nonce = new(big.Int).SetUint64(worker.Nonce)
 
 	_, tx, trieContract, err := contracts.DeployTrieStressTest(txOpts, worker.Client)
 	if err != nil {
@@ -366,7 +369,7 @@ func executeContractTx(
 ) {
 	require := require.New(tc)
 
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
+	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce, e2e.DefaultContractCallGasLimit)
 	require.NoError(err)
 
 	tx, err := txFunc(txOpts)
@@ -375,12 +378,15 @@ func executeContractTx(
 	require.NoError(wallet.SendTx(tc.GetDefaultContextParent(), tx))
 }
 
-// newTxOpts returns transactions options for contract calls, with sending disabled
+// newTxOpts returns transactions options for contract calls, with sending disabled.
+// All gas-related fields are set explicitly to avoid pending-state RPC queries
+// that are not supported by all EVM backends (e.g. SAE).
 func newTxOpts(
 	key *ecdsa.PrivateKey,
 	chainID *big.Int,
 	maxFeeCap *big.Int,
 	nonce uint64,
+	gasLimit uint64,
 ) (*bind.TransactOpts, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {
@@ -389,6 +395,7 @@ func newTxOpts(
 	txOpts.Nonce = new(big.Int).SetUint64(nonce)
 	txOpts.GasFeeCap = maxFeeCap
 	txOpts.GasTipCap = common.Big1
+	txOpts.GasLimit = gasLimit
 	txOpts.NoSend = true
 	return txOpts, nil
 }

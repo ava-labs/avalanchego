@@ -126,10 +126,11 @@ func main() {
 		wsURI := wsURIs[i%len(wsURIs)]
 		client, err := ethclient.Dial(wsURI)
 		require.NoError(err)
+		wrappedClient := e2e.NewE2EClient(client)
 
 		workers[i] = load.Worker{
 			PrivKey: keys[i].ToECDSA(),
-			Client:  client,
+			Client:  wrappedClient,
 		}
 	}
 
@@ -169,9 +170,9 @@ func newTokenContract(
 	recipients []load.Worker,
 ) (*contracts.ERC20, error) {
 	client := deployer.Client
-	txOpts, err := bind.NewKeyedTransactorWithChainID(deployer.PrivKey, chainID)
+	txOpts, err := e2e.NewKeyedTxOpts(deployer.PrivKey, chainID, e2e.DefaultDeployGasLimit)
 	if err != nil {
-		return nil, fmt.Errorf("bind.NewKeyedTransactorWithChainID: %w", err)
+		return nil, fmt.Errorf("e2e.NewKeyedTxOpts: %w", err)
 	}
 
 	var (

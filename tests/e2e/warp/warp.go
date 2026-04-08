@@ -16,7 +16,6 @@ import (
 
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
@@ -86,7 +85,7 @@ type Subnet struct {
 type subnetValidator struct {
 	node *tmpnet.Node
 
-	client       *wrappedPendingClient
+	client       e2e.E2EClient
 	preFundedKey *ecdsa.PrivateKey
 }
 
@@ -115,7 +114,7 @@ func newSubnet(
 		tc.Log().Info("dialing eth client", zap.String("uri", uri))
 		client, err := ethclient.Dial(uri)
 		require.NoError(err)
-		s.Validators[i] = &subnetValidator{node: n, preFundedKey: keys[i].ToECDSA(), client: &wrappedPendingClient{Client: client}}
+		s.Validators[i] = &subnetValidator{node: n, preFundedKey: keys[i].ToECDSA(), client: e2e.NewE2EClient(client)}
 	}
 
 	client := s.Validators[0].client
@@ -671,14 +670,9 @@ func (w *warpTest) bindingsTest() {
 	client := w.sendingSubnet.Validators[0].client
 
 	tc.Log().Info("Deploying WarpTest proxy contract")
-	auth, err := bind.NewKeyedTransactorWithChainID(w.sendingSubnet.Validators[0].preFundedKey, w.sendingSubnet.ChainID)
+	auth, err := e2e.NewKeyedTxOpts(w.sendingSubnet.Validators[0].preFundedKey, w.sendingSubnet.ChainID, e2e.DefaultContractCallGasLimit)
 	require.NoError(err)
 	auth.Context = ctx
-	// need to set these so it won't hit API requests for gas price/nonce etc.
-	// otherwise it breaks with libevm hooks for coreth vs subnet-evm
-	auth.GasFeeCap = new(big.Int).Set(warpTxGasFeeCap)
-	auth.GasTipCap = new(big.Int).Set(warpTxGasTipCap)
-	auth.GasLimit = 1_000_000
 
 	proxyAddr, deployTx, warpTestContract, err := testbinding.DeployWarpTest(auth, client, warp.Module.Address)
 	require.NoError(err)
@@ -791,7 +785,7 @@ func (w *warpTest) buildReceiptWorkers() (sendingWorkers, receivingWorkers []txs
 func subscribeSendLogs(
 	ctx context.Context,
 	tc *e2e.GinkgoTestContext,
-	sendingClient *wrappedPendingClient,
+	sendingClient e2e.E2EClient,
 	numWorkers int,
 ) chan types.Log {
 	require := require.New(tc)
@@ -985,7 +979,7 @@ func (w *warpTest) loadTest() {
 // BuildBlockWithContext.
 func issueTxsToActivateProposerVMFork(
 	tc *e2e.GinkgoTestContext, chainID *big.Int, fundedKey *ecdsa.PrivateKey,
-	client *wrappedPendingClient,
+	client e2e.E2EClient,
 ) {
 	ctx := tc.DefaultContext()
 	addr := crypto.PubkeyToAddress(fundedKey.PublicKey)
@@ -1029,17 +1023,4 @@ func verifyPreFundedKeys(tc *e2e.GinkgoTestContext, validators []*subnetValidato
 		require.NoError(err)
 		require.GreaterOrEqual(balanceA.Cmp(warpLoadRequiredAmount), 0)
 	}
-}
-
-type wrappedPendingClient struct {
-	*ethclient.Client
-}
-
-func (w *wrappedPendingClient) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
-	var result hexutil.Uint64
-	client := w.Client
-	if err := client.Client().CallContext(ctx, &result, "eth_getTransactionCount", account, "pending"); err != nil {
-		return 0, err
-	}
-	return uint64(result), nil
 }

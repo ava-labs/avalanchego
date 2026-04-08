@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -77,12 +76,12 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 
 func issueTransaction(
 	tc tests.TestContext,
-	ethClient *ethclient.Client,
+	ethClient e2e.E2EClient,
 	senderKey *secp256k1.PrivateKey,
 ) {
 	ctx := tc.DefaultContext()
 	addr := senderKey.EthAddress()
-	acceptedNonce, err := ethClient.AcceptedNonceAt(ctx, addr)
+	acceptedNonce, err := ethClient.NonceAt(ctx, addr, nil)
 	require.NoError(tc, err)
 
 	gasPrice := e2e.SuggestGasPrice(tc, ethClient)
