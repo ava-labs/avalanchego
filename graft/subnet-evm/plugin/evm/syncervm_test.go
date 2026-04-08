@@ -296,7 +296,10 @@ func TestDynamicSyncWithBlockInjection(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
 			var extraBlockBytes [][]byte
-			gate := make(chan struct{})
+			var (
+				mu       sync.Mutex
+				injected bool
+			)
 
 			txGenFn := func(vm *VM) func(int, *core.BlockGen) {
 				return func(_ int, gen *core.BlockGen) {
@@ -350,7 +353,17 @@ func TestDynamicSyncWithBlockInjection(t *testing.T) {
 			deadline, _ := t.Deadline()
 			serverVM.appSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 				go func() {
-					<-gate
+					mu.Lock()
+					if !injected {
+						injected = true
+						for _, blkBytes := range extraBlockBytes {
+							blk, err := syncerVM.vm.ParseBlock(t.Context(), blkBytes)
+							require.NoError(t, err)
+							require.NoError(t, blk.Verify(t.Context()))
+							require.NoError(t, blk.Accept(t.Context()))
+						}
+					}
+					mu.Unlock()
 					require.NoError(t, syncerVM.vm.AppResponse(ctx, nodeID, requestID, response))
 				}()
 				return nil
@@ -371,17 +384,6 @@ func TestDynamicSyncWithBlockInjection(t *testing.T) {
 			syncMode, err := parsedSummary.Accept(t.Context())
 			require.NoError(t, err)
 			require.Equal(t, block.StateSyncDynamic, syncMode)
-
-			for i, blkBytes := range extraBlockBytes {
-				blk, err := syncerVM.vm.ParseBlock(t.Context(), blkBytes)
-				require.NoError(t, err)
-				if err := blk.Verify(t.Context()); err != nil {
-					t.Fatalf("Verify failed for block %d (height %d): %v\nSyncClient error: %v",
-						i, blk.Height(), err, syncerVM.vm.Client.Error())
-				}
-				require.NoError(t, blk.Accept(t.Context()))
-			}
-			close(gate)
 
 			msg, err := syncerVM.vm.WaitForEvent(t.Context())
 			require.NoError(t, err)

@@ -337,8 +337,11 @@ func DynamicSyncWithBlockInjectionTest(t *testing.T, testSetup *SyncTestSetup) {
 
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
-			var extraBlockBytes [][]byte
-			gate := make(chan struct{})
+			var (
+				extraBlockBytes [][]byte
+				mu              sync.Mutex
+				injected        bool
+			)
 			fork := upgradetest.Latest
 
 			serverConfig := fmt.Sprintf(`{"commit-interval": %d, "state-history": %d, "state-sync-commit-interval": %d}`,
@@ -402,8 +405,20 @@ func DynamicSyncWithBlockInjectionTest(t *testing.T, testSetup *SyncTestSetup) {
 
 			deadline, _ := t.Deadline()
 			serverTest.AppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+				// Inject before the first response. The mutex serializes all
+				// interceptors so no response flows until injection completes.
 				go func() {
-					<-gate
+					mu.Lock()
+					if !injected {
+						injected = true
+						for _, blkBytes := range extraBlockBytes {
+							blk, err := syncerVM.ParseBlock(t.Context(), blkBytes)
+							require.NoError(t, err)
+							require.NoError(t, blk.Verify(t.Context()))
+							require.NoError(t, blk.Accept(t.Context()))
+						}
+					}
+					mu.Unlock()
 					require.NoError(t, syncerVM.AppResponse(ctx, nodeID, requestID, response))
 				}()
 				return nil
@@ -424,17 +439,6 @@ func DynamicSyncWithBlockInjectionTest(t *testing.T, testSetup *SyncTestSetup) {
 			syncMode, err := parsedSummary.Accept(t.Context())
 			require.NoError(t, err)
 			require.Equal(t, block.StateSyncDynamic, syncMode)
-
-			for i, blkBytes := range extraBlockBytes {
-				blk, err := syncerVM.ParseBlock(t.Context(), blkBytes)
-				require.NoError(t, err)
-				if err := blk.Verify(t.Context()); err != nil {
-					t.Fatalf("Verify failed for block %d (height %d): %v\nSyncClient error: %v",
-						i, blk.Height(), err, syncerVM.SyncerClient().Error())
-				}
-				require.NoError(t, blk.Accept(t.Context()))
-			}
-			close(gate)
 
 			msg, err := syncerVM.WaitForEvent(t.Context())
 			require.NoError(t, err)
