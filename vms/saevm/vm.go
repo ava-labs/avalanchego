@@ -23,17 +23,19 @@ import (
 	"github.com/ava-labs/strevm/sae"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/api"
@@ -43,6 +45,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
 	avadb "github.com/ava-labs/avalanchego/database"
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 // SinceGenesis is a harness around an [sae.VM], providing an `Initialize`
@@ -55,6 +60,9 @@ type SinceGenesis struct {
 	db           avadb.Database
 	mempool      *txpool.Mempool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
+
+	// TODO(StephenButtolph): Remove. This is only used by the tests.
+	warpVerifier *saewarp.Verifier
 
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
@@ -72,18 +80,7 @@ func NewSinceGenesis(c sae.Config) *SinceGenesis {
 	}
 }
 
-type Config struct {
-	// GasTarget is the target gas per second that this node will attempt to use
-	// when creating blocks. If this config is not specified, the node will
-	// default to use the parent block's target gas per second.
-	GasTarget *gas.Gas `json:"gas-target,omitempty"`
-
-	// MinDelayTarget is the minimum delay between blocks (in milliseconds) that
-	// this node will attempt to use when creating blocks. If this config is not
-	// specified, the node will default to use the parent block's target delay
-	// per second.
-	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
-}
+const warpSignatureCacheSize = 512
 
 var ethDBPrefix = []byte("ethdb")
 
@@ -128,6 +125,19 @@ func (vm *SinceGenesis) Initialize(
 		c.LondonBlock = big.NewInt(0)
 		c.ShanghaiTime = utils.PointerTo(uint64(u.DurangoTime.Unix()))
 		c.CancunTime = utils.PointerTo(uint64(u.EtnaTime.Unix()))
+
+		chainConfigExtra := &extras.ChainConfig{
+			NetworkUpgrades: extras.GetNetworkUpgrades(u),
+			AvalancheContext: extras.AvalancheContext{
+				SnowCtx: snowCtx,
+			},
+		}
+		if chainConfigExtra.DurangoBlockTimestamp != nil {
+			chainConfigExtra.PrecompileUpgrades = append(chainConfigExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
+				Config: warpcontract.NewDefaultConfig(chainConfigExtra.DurangoBlockTimestamp),
+			})
+		}
+		corethparams.WithExtra(c, chainConfigExtra)
 	}
 
 	config, _, err := core.SetupGenesisBlock(db, tdb, genesis)
@@ -135,11 +145,14 @@ func (vm *SinceGenesis) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
-	var userConfig Config
-	if len(configBytes) > 0 {
-		if err := json.Unmarshal(configBytes, &userConfig); err != nil {
-			return fmt.Errorf("json.Unmarshal(%T): %w", userConfig, err)
-		}
+	userConfig, err := ParseConfig(configBytes)
+	if err != nil {
+		return err
+	}
+
+	warpMessages, err := userConfig.WarpMessages()
+	if err != nil {
+		return err
 	}
 
 	var desiredDelayExcess *acp226.DelayExcess
@@ -154,12 +167,15 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	txs := txpool.NewTxs()
+	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := hook.NewPoints(
 		snowCtx,
 		avaDB,
+		config,
 		desiredDelayExcess,
 		desiredTargetExcess,
 		txs,
+		warpStorage,
 	)
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
 	if err != nil {
@@ -203,7 +219,7 @@ func (vm *SinceGenesis) Initialize(
 		vm.pushGossiper = pushGossiper
 
 		if err := inner.AddHandler(p2p.AtomicTxGossipHandlerID, handler); err != nil {
-			return fmt.Errorf("network.AddHandler(...): %w", err)
+			return fmt.Errorf("network.AddHandler(atomic): %w", err)
 		}
 
 		var (
@@ -221,6 +237,18 @@ func (vm *SinceGenesis) Initialize(
 			cancel()
 			wg.Wait()
 		})
+	}
+
+	{ // ==========  Warp Handler  ==========
+		vm.warpVerifier = saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage)
+		warpHandler := acp118.NewCachedHandler(
+			lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
+			vm.warpVerifier,
+			snowCtx.WarpSigner,
+		)
+		if err := inner.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
+			return fmt.Errorf("network.AddHandler(warp): %w", err)
+		}
 	}
 
 	return nil
@@ -353,4 +381,26 @@ func (vm *SinceGenesis) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	return vm.VM.Shutdown(ctx)
+}
+
+// blockClient adapts [sae.VM] to the [saewarp.BlockClient] interface.
+type blockClient struct {
+	vm *sae.VM
+}
+
+var _ saewarp.BlockClient = (*blockClient)(nil)
+
+func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
+	b, err := c.vm.GetBlock(ctx, blockID)
+	if err != nil {
+		return err
+	}
+	acceptedID, err := c.vm.GetBlockIDAtHeight(ctx, b.Height())
+	if err != nil {
+		return err
+	}
+	if acceptedID != blockID {
+		return avadb.ErrNotFound
+	}
+	return nil
 }

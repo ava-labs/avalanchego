@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/strevm/hook"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/snow"
@@ -26,7 +27,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/warp"
 
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	ethparams "github.com/ava-labs/libevm/params"
 	saetypes "github.com/ava-labs/strevm/types"
 )
 
@@ -38,7 +42,8 @@ type params struct {
 }
 
 type blockBuilder struct {
-	ctx *snow.Context
+	ctx         *snow.Context
+	chainConfig *ethparams.ChainConfig
 
 	now func() time.Time
 	// When fields in params are set, the block builder will build blocks that
@@ -155,9 +160,9 @@ func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash 
 
 var errEmptyBlock = errors.New("empty block")
 
-func (*blockBuilder) BuildBlock(
+func (b *blockBuilder) BuildBlock(
 	header *types.Header,
-	_ *block.Context,
+	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	poolTxs []*txpool.Tx,
@@ -176,7 +181,16 @@ func (*blockBuilder) BuildBlock(
 		return nil, fmt.Errorf("failed to marshal atomic transactions: %w", err)
 	}
 
-	// TODO: Include warp predicates
+	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
+	rulesExtra := corethparams.GetRulesExtra(rules)
+	predicateBytes, err := warp.PredicateBytes(b.ctx, blockCtx, rulesExtra, txs)
+	if err != nil {
+		return nil, fmt.Errorf("generating predicates: %w", err)
+	}
+	// TODO: Do not use [customheader.SetPredicateBytesInExtra] it assumes fee
+	// information is included in [types.Header.Extra].
+	header.Extra = customheader.SetPredicateBytesInExtra(rulesExtra.AvalancheRules, header.Extra, predicateBytes)
+
 	headerExtra := customtypes.GetHeaderExtra(header)
 	headerExtra.SettledHeight = &settledHeight
 	return customtypes.NewBlockWithExtData(
