@@ -39,14 +39,12 @@ var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
 
 type Points struct {
 	blockBuilder
-	db          database.Database
-	chainConfig *ethparams.ChainConfig
+	db database.Database
 }
 
 func NewPoints(
 	ctx *snow.Context,
 	db database.Database,
-	chainConfig *ethparams.ChainConfig,
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
 	pool *txpool.Txs,
@@ -61,7 +59,6 @@ func NewPoints(
 			potentialTxs: pool.Iter,
 		},
 		db,
-		chainConfig,
 	}
 }
 

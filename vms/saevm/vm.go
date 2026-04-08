@@ -157,7 +157,6 @@ func (vm *SinceGenesis) Initialize(
 	hooks := hook.NewPoints(
 		snowCtx,
 		avaDB,
-		config,
 		desiredDelayExcess,
 		desiredTargetExcess,
 		txs,
