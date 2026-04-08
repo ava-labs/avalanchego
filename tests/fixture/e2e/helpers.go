@@ -144,7 +144,7 @@ func GetWalletBalances(tc tests.TestContext, wallet *primary.Wallet) (uint64, ui
 }
 
 // Create a new eth client targeting the specified node URI.
-func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) E2EClient {
+func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) EthClient {
 	tc.Log().Info("initializing a new eth client",
 		zap.Stringer("nodeID", nodeURI.NodeID),
 		zap.String("URI", nodeURI.URI),
@@ -198,7 +198,7 @@ func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
 
 // Sends an eth transaction and waits for the transaction receipt from the
 // execution of the transaction.
-func SendEthTransaction(tc tests.TestContext, ethClient E2EClient, signedTx *types.Transaction) *types.Receipt {
+func SendEthTransaction(tc tests.TestContext, ethClient EthClient, signedTx *types.Transaction) *types.Receipt {
 	require := require.New(tc)
 
 	txID := signedTx.Hash()
@@ -231,7 +231,7 @@ func SendEthTransaction(tc tests.TestContext, ethClient E2EClient, signedTx *typ
 
 // Determines the suggested gas price for the configured client that will
 // maximize the chances of transaction acceptance.
-func SuggestGasPrice(tc tests.TestContext, ethClient E2EClient) *big.Int {
+func SuggestGasPrice(tc tests.TestContext, ethClient EthClient) *big.Int {
 	gasPrice, err := ethClient.SuggestGasPrice(tc.DefaultContext())
 	require.NoError(tc, err)
 
@@ -247,7 +247,7 @@ func SuggestGasPrice(tc tests.TestContext, ethClient E2EClient) *big.Int {
 }
 
 // Helper simplifying use via an option of a gas price appropriate for testing.
-func WithSuggestedGasPrice(tc tests.TestContext, ethClient E2EClient) common.Option {
+func WithSuggestedGasPrice(tc tests.TestContext, ethClient EthClient) common.Option {
 	baseFee := SuggestGasPrice(tc, ethClient)
 	return common.WithBaseFee(baseFee)
 }
@@ -445,26 +445,26 @@ func FindP2PMessage[T any](
 	}
 }
 
-// E2EClient is the JSON-RPC client surface required by tests/load ([load.Worker],
+// EthClient is the JSON-RPC client surface required by tests/load ([load.Worker],
 // [load.Wallet]) and warp e2e ([subnetValidator].client).
-type E2EClient interface {
+type EthClient interface {
 	simulated.Client
 	EstimateBaseFee(ctx context.Context) (*big.Int, error)
 }
 
-// e2eClient is a wrapper around an ethclient.Client that allows for additional methods
+// ethClient is a wrapper around an ethclient.Client that allows for additional methods
 // required by tests/load ([load.Worker], [load.Wallet]) and warp e2e ([subnetValidator].client).
-type e2eClient struct {
+type ethClient struct {
 	*ethclient.Client
 }
 
-var _ E2EClient = (*e2eClient)(nil)
+var _ EthClient = (*ethClient)(nil)
 
-func NewE2EClient(client *ethclient.Client) *e2eClient {
-	return &e2eClient{Client: client}
+func NewE2EClient(client *ethclient.Client) *ethClient {
+	return &ethClient{Client: client}
 }
 
-func (w *e2eClient) PendingNonceAt(ctx context.Context, account libevmcommon.Address) (uint64, error) {
+func (w *ethClient) PendingNonceAt(ctx context.Context, account libevmcommon.Address) (uint64, error) {
 	var result hexutil.Uint64
 	client := w.Client
 	if err := client.Client().CallContext(ctx, &result, "eth_getTransactionCount", account, "pending"); err != nil {
@@ -476,7 +476,7 @@ func (w *e2eClient) PendingNonceAt(ctx context.Context, account libevmcommon.Add
 // EstimateBaseFee tries to estimate the base fee for the next block if it were created
 // immediately. There is no guarantee that this will be the base fee used in the next block
 // or that the next base fee will be higher or lower than the returned value.
-func (w *e2eClient) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
+func (w *ethClient) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 	var hex hexutil.Big
 	client := w.Client
 	err := client.Client().CallContext(ctx, &hex, "eth_baseFee")

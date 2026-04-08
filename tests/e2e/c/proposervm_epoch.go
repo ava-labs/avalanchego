@@ -76,7 +76,7 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 
 func issueTransaction(
 	tc tests.TestContext,
-	ethClient e2e.E2EClient,
+	ethClient e2e.EthClient,
 	senderKey *secp256k1.PrivateKey,
 ) {
 	ctx := tc.DefaultContext()

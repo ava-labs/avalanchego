@@ -24,7 +24,7 @@ type Wallet struct {
 	nonce   uint64
 	chainID *big.Int
 	signer  types.Signer
-	client  e2e.E2EClient
+	client  e2e.EthClient
 	metrics metrics
 }
 
@@ -32,7 +32,7 @@ func newWallet(
 	privKey *ecdsa.PrivateKey,
 	nonce uint64,
 	chainID *big.Int,
-	client e2e.E2EClient,
+	client e2e.EthClient,
 	metrics metrics,
 ) *Wallet {
 	return &Wallet{

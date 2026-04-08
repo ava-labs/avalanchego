@@ -85,7 +85,7 @@ type Subnet struct {
 type subnetValidator struct {
 	node *tmpnet.Node
 
-	client       e2e.E2EClient
+	client       e2e.EthClient
 	preFundedKey *ecdsa.PrivateKey
 }
 
@@ -785,7 +785,7 @@ func (w *warpTest) buildReceiptWorkers() (sendingWorkers, receivingWorkers []txs
 func subscribeSendLogs(
 	ctx context.Context,
 	tc *e2e.GinkgoTestContext,
-	sendingClient e2e.E2EClient,
+	sendingClient e2e.EthClient,
 	numWorkers int,
 ) chan types.Log {
 	require := require.New(tc)
@@ -979,7 +979,7 @@ func (w *warpTest) loadTest() {
 // BuildBlockWithContext.
 func issueTxsToActivateProposerVMFork(
 	tc *e2e.GinkgoTestContext, chainID *big.Int, fundedKey *ecdsa.PrivateKey,
-	client e2e.E2EClient,
+	client e2e.EthClient,
 ) {
 	ctx := tc.DefaultContext()
 	addr := crypto.PubkeyToAddress(fundedKey.PublicKey)
