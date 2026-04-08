@@ -27,9 +27,9 @@ var (
 )
 
 // Queue is a fan-in/fan-out bridge between code hash producers (leaf sync workers)
-// and the code syncer consumer. Producers call [AddCode] which persists durable
+// and the code syncer consumer. Producers call [Queue.AddCode] which persists durable
 // disk markers and appends hashes to an internal queue. A single sender goroutine
-// forwards them to the output channel. AddCode never blocks the caller.
+// forwards them to the output channel. [Queue.AddCode] never blocks the caller.
 //
 // Deduplication and local-code checks are the consumer's responsibility.
 type Queue struct {
@@ -61,8 +61,8 @@ func WithCapacity(n int) QueueOption {
 	})
 }
 
-// NewQueue creates a code queue. Call [Finalize] for normal completion
-// or [Shutdown] for cancellation. Both are safe to call in any order.
+// NewQueue creates a code queue. Call [Queue.Finalize] for normal completion
+// or [Queue.Shutdown] for cancellation. Both are safe to call in any order.
 func NewQueue(db ethdb.Database, opts ...QueueOption) (*Queue, error) {
 	q := &Queue{
 		db:       db,
@@ -95,7 +95,7 @@ func (q *Queue) CodeHashes() <-chan common.Hash {
 
 // AddCode persists code hashes as durable disk markers and enqueues them
 // for the sender goroutine. Never blocks the caller.
-// Returns [ErrQueueClosed] after [Shutdown] or [Finalize].
+// Returns [ErrQueueClosed] after [Queue.Shutdown] or [Queue.Finalize].
 func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
@@ -131,6 +131,7 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	q.pending = append(q.pending, codeHashes...)
 	q.pendingMu.Unlock()
 
+	// Signal coalescing: skip if the sender is already notified.
 	select {
 	case q.in <- struct{}{}:
 	default:
@@ -140,7 +141,7 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 }
 
 // Finalize waits for all pending hashes to be sent, then closes out.
-// Idempotent with [Shutdown].
+// Blocks if no consumer is draining [Queue.CodeHashes]. Idempotent with [Queue.Shutdown].
 func (q *Queue) Finalize() error {
 	q.stop(false)
 	return nil
@@ -148,7 +149,7 @@ func (q *Queue) Finalize() error {
 
 // Shutdown cancels the sender, waits for exit, then closes out.
 // Unsent hashes are safe as disk markers and will be recovered on restart.
-// Idempotent with [Finalize].
+// Idempotent with [Queue.Finalize].
 func (q *Queue) Shutdown() {
 	q.stop(true)
 }
@@ -172,7 +173,7 @@ func (q *Queue) stop(shouldCancel bool) {
 	<-q.senderDone
 }
 
-// sender forwards hashes from pending to out. It owns out and closes it on exit.
+// sender forwards hashes from pending to out. It owns `q.out` and closes it on exit.
 func (q *Queue) sender() {
 	defer func() {
 		close(q.out)
