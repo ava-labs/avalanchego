@@ -1,0 +1,63 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "pathdb",
+    srcs = [
+        "database.go",
+        "difflayer.go",
+        "disklayer.go",
+        "errors.go",
+        "history.go",
+        "journal.go",
+        "layertree.go",
+        "metrics.go",
+        "nodebuffer.go",
+        "testutils.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie/trienode",
+        "@com_github_ava_labs_libevm//trie/triestate",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_ava_labs_libevm//triedb/database",
+        "@com_github_ava_labs_libevm//triedb/pathdb",
+        "@com_github_victoriametrics_fastcache//:fastcache",
+        "@org_golang_x_crypto//sha3",
+        "@org_golang_x_exp//slices",
+    ],
+)
+
+graft_go_test(
+    name = "pathdb_test",
+    srcs = [
+        "database_test.go",
+        "difflayer_test.go",
+        "history_test.go",
+    ],
+    embed = [":pathdb"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie/testutil",
+        "@com_github_ava_labs_libevm//trie/trienode",
+        "@com_github_ava_labs_libevm//trie/triestate",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
+)

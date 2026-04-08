@@ -522,7 +522,7 @@ func packEtnaBlockTxs(
 func executeTx(
 	ctx context.Context,
 	parentID ids.ID,
-	stateDiff state.Diff,
+	stateDiff *state.Diff,
 	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,

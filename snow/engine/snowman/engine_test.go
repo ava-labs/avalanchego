@@ -3301,3 +3301,62 @@ func TestEngineAcceptedHeight(t *testing.T) {
 	require.Equal(blk1.Height(), h1)
 	require.Equal(blk2.Height(), h2)
 }
+
+func TestPChainProgressUpdaterCalledOnAccept(t *testing.T) {
+	require := require.New(t)
+
+	engCfg := DefaultConfig(t)
+
+	var updatedHeight uint64
+	var progressUpdated bool
+	engCfg.PChainProgressUpdater = &mockPChainProgressUpdater{
+		setProgressF: func(height uint64) {
+			progressUpdated = true
+			updatedHeight = height
+		},
+	}
+
+	vdr, _, sender, vm, te := setup(t, engCfg)
+
+	sender.Default(true)
+
+	blk := snowmantest.BuildChild(snowmantest.Genesis)
+
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case blk.ID():
+			return blk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	queryRequestID := new(uint32)
+	sender.SendPushQueryF = func(_ context.Context, _ set.Set[ids.NodeID], requestID uint32, _ []byte, _ uint64) {
+		*queryRequestID = requestID
+	}
+
+	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return blk, nil
+	}
+	require.NoError(te.Notify(t.Context(), common.PendingTxs))
+
+	require.False(progressUpdated)
+
+	// Vote for the block to accept it
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
+
+	require.Equal(snowtest.Accepted, blk.Status)
+	require.True(progressUpdated)
+	require.Equal(blk.Height(), updatedHeight)
+}
+
+type mockPChainProgressUpdater struct {
+	setProgressF func(height uint64)
+}
+
+func (m *mockPChainProgressUpdater) SetProgress(height uint64) {
+	m.setProgressF(height)
+}

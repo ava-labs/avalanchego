@@ -556,6 +556,7 @@ func testRepairWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme s
 			TriePrefetcherParallelism: 4,
 			SnapshotLimit:             0, // Disable snapshot by default
 			StateHistory:              32,
+			CommitInterval:            16,
 			StateScheme:               scheme,
 			ChainDataDir:              datadir,
 		}
@@ -610,6 +611,10 @@ func testRepairWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme s
 				lastAcceptedHash = canonblocks[i].Hash()
 			}
 			chain.DrainAcceptorQueue()
+			// Ensure on-disk triedb state matches snapshot for test.
+			if err := chain.triedb.Commit(canonblocks[tt.commitBlock-1].Root(), false); err != nil {
+				t.Fatalf("Failed to flush trie state: %v", err)
+			}
 		}
 	}
 	if _, err := chain.InsertChain(canonblocks[tt.commitBlock:]); err != nil {
