@@ -921,6 +921,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				require.Equal(tt.expectedResponseOp, req.op)
 				expectedFailedMsg := tt.failedMsgF(req.nodeID)
 				require.Equal(expectedFailedMsg.Op, req.failedMsg.Op)
+				require.Equal(p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED, req.engineType)
 			}
 
 			// Verify the message sent to ourselves
