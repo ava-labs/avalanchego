@@ -14,7 +14,7 @@ go_library(
         "//graft/coreth/params/extras",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/modules",
-        "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/precompile/precompileconfig",
         "//snow/snowtest",
         "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",

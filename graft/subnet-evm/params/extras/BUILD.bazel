@@ -14,10 +14,10 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/commontype",
+        "//graft/evm/precompile/precompileconfig",
         "//graft/evm/utils",
-        "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/precompile/modules",
-        "//graft/subnet-evm/precompile/precompileconfig",
         "//snow",
         "//upgrade",
         "//utils",
@@ -41,9 +41,9 @@ graft_go_test(
     ],
     embed = [":extras"],
     deps = [
+        "//graft/evm/commontype",
         "//graft/evm/utils",
         "//graft/evm/utils/utilstest",
-        "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/precompile/allowlist",
         "//graft/subnet-evm/precompile/contracts/deployerallowlist",
         "//graft/subnet-evm/precompile/contracts/feemanager",

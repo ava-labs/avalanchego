@@ -16,10 +16,10 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/eth",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/commontype",
         "//graft/evm/core/state/pruner",
         "//graft/evm/firewood",
         "//graft/evm/rpc",
-        "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/consensus",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/core/extstate",

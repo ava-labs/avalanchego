@@ -12,8 +12,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool/legacypool",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/commontype",
         "//graft/evm/utils",
-        "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/core/txpool",
         "//graft/subnet-evm/params",
@@ -42,7 +42,7 @@ graft_go_test(
     ],
     embed = [":legacypool"],
     deps = [
-        "//graft/subnet-evm/commontype",
+        "//graft/evm/commontype",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/core/txpool",
         "//graft/subnet-evm/params",

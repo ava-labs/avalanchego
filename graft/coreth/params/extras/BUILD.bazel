@@ -14,7 +14,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/precompile/modules",
-        "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/commontype",
+        "//graft/evm/precompile/precompileconfig",
         "//graft/evm/utils",
         "//snow",
         "//upgrade",

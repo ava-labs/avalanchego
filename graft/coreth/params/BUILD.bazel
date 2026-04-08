@@ -19,7 +19,7 @@ go_library(
         "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/modules",
-        "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/precompile/precompileconfig",
         "//snow",
         "//upgrade",
         "//utils",

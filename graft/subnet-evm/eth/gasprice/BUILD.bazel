@@ -11,8 +11,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/eth/gasprice",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/commontype",
         "//graft/evm/rpc",
-        "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/params",
         "//graft/subnet-evm/plugin/evm/customheader",
@@ -38,8 +38,8 @@ graft_go_test(
     ],
     embed = [":gasprice"],
     deps = [
+        "//graft/evm/commontype",
         "//graft/evm/rpc",
-        "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/consensus/dummy",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/params",

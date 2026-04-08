@@ -10,7 +10,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
@@ -101,6 +102,8 @@ type UpgradeConfig struct {
 type AvalancheContext struct {
 	SnowCtx *snow.Context
 }
+
+var _ precompileconfig.ChainConfig = (*ChainConfig)(nil)
 
 type ChainConfig struct {
 	NetworkUpgrades // Config for timestamps that enable network upgrades.
@@ -343,8 +346,9 @@ func (c *ChainConfig) IsPrecompileEnabled(address common.Address, timestamp uint
 
 // GetFeeConfig returns the original FeeConfig contained in the genesis ChainConfig.
 // Implements precompile.ChainConfig interface.
-func (c *ChainConfig) GetFeeConfig() commontype.FeeConfig {
-	return c.FeeConfig
+func (c *ChainConfig) GetFeeConfig() *commontype.FeeConfig {
+	cfg := c.FeeConfig
+	return &cfg
 }
 
 // AllowedFeeRecipients returns the original AllowedFeeRecipients parameter contained in the genesis ChainConfig.

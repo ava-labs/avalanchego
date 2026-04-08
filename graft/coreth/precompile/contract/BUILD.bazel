@@ -12,7 +12,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/contract",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/precompile/precompileconfig",
         "//snow",
         "//utils/set",
         "//vms/evm/predicate",
