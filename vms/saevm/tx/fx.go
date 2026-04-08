@@ -39,7 +39,7 @@ func (fxVM) Logger() logging.Logger {
 type fxTx []byte
 
 func toFxTx(u Unsigned) (secp256k1fx.UnsignedTx, error) {
-	b, err := c.Marshal(codecVersion, &u)
+	b, err := Codec.Marshal(CodecVersion, &u)
 	if err != nil {
 		return nil, err
 	}

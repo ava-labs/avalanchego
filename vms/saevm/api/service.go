@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -99,7 +98,7 @@ func (s *Service) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOs
 	limit := int(min(a.Limit, maxLimit))
 	utxos, endAddr, endUTXOID, err := avax.GetAtomicUTXOs(
 		s.ctx.SharedMemory,
-		atomic.Codec,
+		tx.Codec,
 		sourceChainID,
 		addrs,
 		startAddr,
@@ -112,7 +111,7 @@ func (s *Service) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOs
 
 	r.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		b, err := atomic.Codec.Marshal(atomic.CodecVersion, utxo)
+		b, err := tx.Codec.Marshal(tx.CodecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}

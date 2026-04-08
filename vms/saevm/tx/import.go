@@ -161,7 +161,7 @@ func (i *Import) VerifyCredentials(snowCtx *snow.Context, creds []verify.Verifia
 	}
 	for i, in := range i.ImportedInputs {
 		utxo := &avax.UTXO{}
-		if _, err := c.Unmarshal(utxoBytes[i], utxo); err != nil {
+		if _, err := Codec.Unmarshal(utxoBytes[i], utxo); err != nil {
 			return fmt.Errorf("%w: %w", errFailedToUnmarshalUTXO, err)
 		}
 		if inAssetID, utxoAssetID := in.AssetID(), utxo.AssetID(); utxoAssetID != inAssetID {

@@ -69,14 +69,14 @@ type Tx struct {
 
 func Parse(b []byte) (*Tx, error) {
 	tx := &Tx{}
-	if _, err := c.Unmarshal(b, &tx); err != nil {
-		return nil, fmt.Errorf("%T.Unmarshal(txBytes): %w", c, err)
+	if _, err := Codec.Unmarshal(b, &tx); err != nil {
+		return nil, fmt.Errorf("%T.Unmarshal(txBytes): %w", Codec, err)
 	}
 	return tx, nil
 }
 
 func (t *Tx) Bytes() ([]byte, error) {
-	return c.Marshal(codecVersion, t)
+	return Codec.Marshal(CodecVersion, t)
 }
 
 func (t *Tx) ID() (ids.ID, error) {
@@ -108,7 +108,7 @@ const (
 var errUnknownCredentialType = errors.New("unknown credential type")
 
 func (t *Tx) GasUsed() (uint64, error) {
-	size, err := c.Size(codecVersion, &t.Unsigned)
+	size, err := Codec.Size(CodecVersion, &t.Unsigned)
 	if err != nil {
 		return 0, err
 	}
@@ -205,7 +205,7 @@ func MarshalSlice(txs []*Tx) ([]byte, error) {
 	if len(txs) == 0 {
 		return nil, nil
 	}
-	return c.Marshal(codecVersion, &txs)
+	return Codec.Marshal(CodecVersion, &txs)
 }
 
 var errInefficientSlicePacking = errors.New("inefficient slice packing: empty slices should be packed as nil")
@@ -216,7 +216,7 @@ func ParseSlice(b []byte) ([]*Tx, error) {
 	}
 
 	var txs []*Tx
-	if _, err := c.Unmarshal(b, &txs); err != nil {
+	if _, err := Codec.Unmarshal(b, &txs); err != nil {
 		return nil, err
 	}
 	if len(txs) == 0 {

@@ -121,7 +121,7 @@ func (e *Export) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 	if !utils.IsSortedAndUnique(e.Ins) {
 		return errInputsNotSortedUnique
 	}
-	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
+	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, Codec) {
 		return errOutputsNotSorted
 	}
 
@@ -225,7 +225,7 @@ func (e *Export) AtomicOps(txID ids.ID) (ids.ID, *atomic.Requests, error) {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := c.Marshal(codecVersion, utxo)
+		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 		if err != nil {
 			return ids.ID{}, nil, err
 		}
