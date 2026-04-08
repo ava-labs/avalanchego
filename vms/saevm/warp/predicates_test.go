@@ -32,6 +32,7 @@ type predicater struct{}
 func (predicater) PredicateGas(predicate.Predicate, precompileconfig.Rules) (uint64, error) {
 	return 0, nil
 }
+
 func (predicater) VerifyPredicate(_ *precompileconfig.PredicateContext, pred predicate.Predicate) error {
 	if slices.Equal(pred, validPredicate) {
 		return nil
