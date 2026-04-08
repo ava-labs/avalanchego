@@ -43,7 +43,6 @@ func NewRandomTest(
 	if err != nil {
 		return nil, err
 	}
-	txOpts.Nonce = new(big.Int).SetUint64(worker.Nonce)
 
 	_, tx, loadSimulator, err := contracts.DeployLoadSimulator(txOpts, worker.Client)
 	if err != nil {
@@ -55,7 +54,6 @@ func NewRandomTest(
 	}
 
 	worker.Nonce++
-	txOpts.Nonce = new(big.Int).SetUint64(worker.Nonce)
 
 	_, tx, trieContract, err := contracts.DeployTrieStressTest(txOpts, worker.Client)
 	if err != nil {
@@ -385,14 +383,12 @@ func newTxOpts(
 	key *ecdsa.PrivateKey,
 	chainID *big.Int,
 	maxFeeCap *big.Int,
-	nonce uint64,
 	gasLimit uint64,
 ) (*bind.TransactOpts, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transaction opts: %w", err)
 	}
-	txOpts.Nonce = new(big.Int).SetUint64(nonce)
 	txOpts.GasFeeCap = maxFeeCap
 	txOpts.GasTipCap = common.Big1
 	txOpts.GasLimit = gasLimit

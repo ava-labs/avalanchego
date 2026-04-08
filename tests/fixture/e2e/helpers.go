@@ -159,7 +159,6 @@ func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) EthClient {
 // NewKeyedTxOpts creates a bind.TransactOpts pre-populated with gas fields
 // (GasFeeCap, GasTipCap, GasLimit) to avoid pending-state RPC queries that
 // are not supported by all EVM backends (e.g. SAE).
-// Callers should set Nonce explicitly to also avoid PendingNonceAt calls.
 func NewKeyedTxOpts(key *ecdsa.PrivateKey, chainID *big.Int, gasLimit uint64) (*bind.TransactOpts, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {
