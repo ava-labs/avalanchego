@@ -12,7 +12,6 @@ go_library(
         "metadata_codec.go",
         "metadata_delegator.go",
         "metadata_validator.go",
-        "mock_chain.go",
         "staker.go",
         "staker_diff_iterator.go",
         "staker_status.go",
@@ -66,7 +65,6 @@ go_library(
         "@com_github_google_btree//:btree",
         "@com_github_prometheus_client_golang//prometheus",
         "@org_golang_x_exp//maps",
-        "@org_uber_go_mock//gomock",
         "@org_uber_go_zap//:zap",
     ],
 )
@@ -81,7 +79,6 @@ go_test(
         "l1_validator_test.go",
         "metadata_delegator_test.go",
         "metadata_validator_test.go",
-        "mocks_generate_test.go",
         "staker_diff_iterator_test.go",
         "staker_test.go",
         "stakers_test.go",
