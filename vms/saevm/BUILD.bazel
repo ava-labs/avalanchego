@@ -4,12 +4,14 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "saevm",
     srcs = [
+        "config.go",
         "factory.go",
         "vm.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm",
     visibility = ["//visibility:public"],
     deps = [
+        "//cache/lru",
         "//database",
         "//database/prefixdb",
         "//graft/coreth/params",
@@ -30,12 +32,13 @@ go_library(
         "//vms/components/gas",
         "//vms/evm/acp226",
         "//vms/evm/database",
+        "//vms/platformvm/warp",
         "//vms/saevm/api",
         "//vms/saevm/hook",
         "//vms/saevm/hook/acp176",
         "//vms/saevm/tx",
         "//vms/saevm/txpool",
-        "//vms/saevm/warp/backend",
+        "//vms/saevm/warp",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
@@ -52,7 +55,10 @@ go_library(
 
 go_test(
     name = "saevm_test",
-    srcs = ["vm_warp_test.go"],
+    srcs = [
+        "config_test.go",
+        "vm_warp_test.go",
+    ],
     embed = [":saevm"],
     deps = [
         "//database/memdb",
@@ -62,7 +68,6 @@ go_test(
         "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/plugin/evm/vmtest",
         "//graft/coreth/precompile/contracts/warp",
-        "//graft/coreth/warp",
         "//ids",
         "//snow",
         "//snow/engine/common",
@@ -80,6 +85,7 @@ go_test(
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
+        "//vms/saevm/warp",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/txpool/legacypool",
         "@com_github_ava_labs_libevm//core/types",
