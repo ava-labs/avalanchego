@@ -193,7 +193,7 @@ type ManagerConfig struct {
 	Tracer                    trace.Tracer
 	Log                       logging.Logger
 	LogFactory                logging.Factory
-	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
+	VMManager                 *vms.Manager // Manage mappings from vm ID --> vm
 	BlockAcceptorGroup        snow.AcceptorGroup
 	TxAcceptorGroup           snow.AcceptorGroup
 	VertexAcceptorGroup       snow.AcceptorGroup
