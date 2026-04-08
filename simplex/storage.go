@@ -114,7 +114,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 
 	block, err := getBlock(context.TODO(), s.vm, seq)
 	if err != nil {
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			return nil, simplex.Finalization{}, simplex.ErrBlockNotFound
 		}
 		s.log.Error("Error retrieving block from storage", zap.Uint64("seq", seq), zap.Error(err))
