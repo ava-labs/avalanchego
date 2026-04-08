@@ -15,7 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -37,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/api"
@@ -49,7 +47,6 @@ import (
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	avawarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
@@ -81,36 +78,6 @@ func NewSinceGenesis(c sae.Config) *SinceGenesis {
 	return &SinceGenesis{
 		config: c,
 	}
-}
-
-type Config struct {
-	// GasTarget is the target gas per second that this node will attempt to use
-	// when creating blocks. If this config is not specified, the node will
-	// default to use the parent block's target gas per second.
-	GasTarget *gas.Gas `json:"gas-target,omitempty"`
-
-	// MinDelayTarget is the minimum delay between blocks (in milliseconds) that
-	// this node will attempt to use when creating blocks. If this config is not
-	// specified, the node will default to use the parent block's target delay
-	// per second.
-	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
-
-	// WarpOffChainMessages encodes off-chain messages (unrelated to any
-	// on-chain event ie. block or AddressedCall) that the node should be
-	// willing to sign.
-	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
-}
-
-func (c Config) WarpMessages() ([]*avawarp.UnsignedMessage, error) {
-	msgs := make([]*avawarp.UnsignedMessage, len(c.WarpOffChainMessages))
-	for i, bytes := range c.WarpOffChainMessages {
-		msg, err := avawarp.ParseUnsignedMessage(bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse off-chain message at index %d: %w", i, err)
-		}
-		msgs[i] = msg
-	}
-	return msgs, nil
 }
 
 const warpSignatureCacheSize = 512
@@ -178,11 +145,9 @@ func (vm *SinceGenesis) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
-	var userConfig Config
-	if len(configBytes) > 0 {
-		if err := json.Unmarshal(configBytes, &userConfig); err != nil {
-			return fmt.Errorf("json.Unmarshal(%T): %w", userConfig, err)
-		}
+	userConfig, err := ParseConfig(configBytes)
+	if err != nil {
+		return err
 	}
 
 	warpMessages, err := userConfig.WarpMessages()
