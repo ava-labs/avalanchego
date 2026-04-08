@@ -145,15 +145,9 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	}
 	path := filepath.Join(config.DatabaseDir, firewoodDir)
 
-	commitCount := uint64(1)
-	// Persist every N revisions only if not an archival node. Archive nodes must
-	// persist every commit so that all roots are recorded in RootStore and remain
-	// queryable after eviction from memory.
-	if !config.Archive {
-		// The Firewood constructor will check that commitCount is nonzero.
-		minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)
-		commitCount = min(config.DeferredCommitInterval, minDeferredPersistenceCommitCount)
-	}
+	// The Firewood constructor will check that commitCount is nonzero.
+	minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)
+	commitCount := min(config.DeferredCommitInterval, minDeferredPersistenceCommitCount)
 
 	options := []ffi.Option{
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),

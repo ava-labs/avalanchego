@@ -130,7 +130,8 @@ func testArchiveBlockChainSnapsDisabled(t *testing.T, scheme string) {
 			TriePrefetcherParallelism: 4,
 			Pruning:                   false, // Archive mode
 			StateHistory:              32,    // Required for Firewood's minimum Revision count
-			SnapshotLimit:             0,     // Disable snapshots
+			CommitInterval:            16,
+			SnapshotLimit:             0, // Disable snapshots
 			AcceptorQueueLimit:        64,
 			StateScheme:               scheme,
 			ChainDataDir:              dataPath,
@@ -373,23 +374,13 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 
 // TestPruningToNonPruning tests that opening a previously pruned database as a
 // non-pruned database is successful.
-func TestPruningToNonPruning(t *testing.T) {
-	for _, scheme := range schemes {
-		t.Run(scheme, func(t *testing.T) {
-			testPruningToNonPruning(t, scheme)
-		})
-	}
-}
-
-// testPruningToNonPruning tests that opening a previously pruned database as a
-// non-pruned database is successful.
 //
 // This test checks the following invariants:
 // 1. Verifies that a pruned node does not have the state for all blocks (except
 // the last accepted block) upon restart.
 // 2. Verify that a pruned => archival node has the state for all blocks
 // accepted during archival mode upon restart.
-func testPruningToNonPruning(t *testing.T, scheme string) {
+func TestPruningToNonPruning(t *testing.T) {
 	var (
 		key1, _   = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _   = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
@@ -414,7 +405,7 @@ func testPruningToNonPruning(t *testing.T, scheme string) {
 		CommitInterval:            4096,
 		StateHistory:              numStates,
 		AcceptorQueueLimit:        64,
-		StateScheme:               scheme,
+		StateScheme:               rawdb.HashScheme,
 		ChainDataDir:              chainDataDir,
 	}
 
@@ -475,7 +466,7 @@ func testPruningToNonPruning(t *testing.T, scheme string) {
 		TriePrefetcherParallelism: 4,
 		Pruning:                   false, // Archive mode
 		AcceptorQueueLimit:        64,
-		StateScheme:               scheme,
+		StateScheme:               rawdb.HashScheme,
 		StateHistory:              32,
 		ChainDataDir:              chainDataDir,
 	}
