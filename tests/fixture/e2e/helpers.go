@@ -458,9 +458,7 @@ type e2eClient struct {
 	*ethclient.Client
 }
 
-var (
-	_ E2EClient = (*e2eClient)(nil)
-)
+var _ E2EClient = (*e2eClient)(nil)
 
 func NewE2EClient(client *ethclient.Client) *e2eClient {
 	return &e2eClient{Client: client}
