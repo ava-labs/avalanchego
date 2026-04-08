@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/strevm/sae"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -105,12 +106,14 @@ func (c Config) WarpMessages() ([]*avawarp.UnsignedMessage, error) {
 	for i, bytes := range c.WarpOffChainMessages {
 		msg, err := avawarp.ParseUnsignedMessage(bytes)
 		if err != nil {
-			return nil, fmt.Errorf("ailed to parse off-chain message at index %d: %w", i, err)
+			return nil, fmt.Errorf("failed to parse off-chain message at index %d: %w", i, err)
 		}
 		msgs[i] = msg
 	}
 	return msgs, nil
 }
+
+const warpSignatureCacheSize = 512
 
 var ethDBPrefix = []byte("ethdb")
 
@@ -273,7 +276,11 @@ func (vm *SinceGenesis) Initialize(
 
 	{ // ==========  Warp Handler  ==========
 		vm.warpVerifier = saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage)
-		warpHandler := acp118.NewHandler(vm.warpVerifier, snowCtx.WarpSigner)
+		warpHandler := acp118.NewCachedHandler(
+			lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
+			vm.warpVerifier,
+			snowCtx.WarpSigner,
+		)
 		if err := inner.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
 			return fmt.Errorf("network.AddHandler(warp): %w", err)
 		}
