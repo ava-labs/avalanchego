@@ -43,6 +43,7 @@ const (
 
 var (
 	errCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
+	errInvalidABIConfig   = errors.New("failed to convert ABI config")
 	errNilBlockNumber     = errors.New("block number cannot be nil")
 )
 
@@ -201,7 +202,7 @@ func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
 	}
 	config, ok := abi.ConvertType(res[0], new(commontype.ACP224FeeConfig)).(*commontype.ACP224FeeConfig)
 	if !ok {
-		return commontype.ACP224FeeConfig{}, errors.New("failed to convert ABI config")
+		return commontype.ACP224FeeConfig{}, errInvalidABIConfig
 	}
 	return *config, nil
 }
