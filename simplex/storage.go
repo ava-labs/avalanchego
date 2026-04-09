@@ -193,15 +193,17 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 }
 
 func finalizationKey(seq uint64) []byte {
-	seqBuff := make([]byte, 8)
-	binary.BigEndian.PutUint64(seqBuff, seq)
-	return append(finalizationPrefix, seqBuff...)
+	seqBuff := make([]byte, len(finalizationPrefix)+8)
+	copy(seqBuff, finalizationPrefix)
+	binary.BigEndian.PutUint64(seqBuff[len(finalizationPrefix):], seq)
+	return seqBuff
 }
 
 func blacklistKey(seq uint64) []byte {
-	seqBuff := make([]byte, 8)
-	binary.BigEndian.PutUint64(seqBuff, seq)
-	return append(blacklistPrefix, seqBuff...)
+	seqBuff := make([]byte, len(blacklistPrefix)+8)
+	copy(seqBuff, blacklistPrefix)
+	binary.BigEndian.PutUint64(seqBuff[len(blacklistPrefix):], seq)
+	return seqBuff
 }
 
 // getGenesisBlock returns the genesis block wrapped as a Block instance.

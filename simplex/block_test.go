@@ -36,6 +36,12 @@ func TestBlockSerialization(t *testing.T) {
 			Seq:     1,
 			Prev:    genesisBlock.digest,
 		},
+		blacklist: simplex.Blacklist{
+			NodeCount: 3,
+			SuspectedNodes: []simplex.SuspectedNode{
+				{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 11},
+			},
+		},
 	}
 
 	// Serialize the block
@@ -86,27 +92,6 @@ func TestBlockSerialization(t *testing.T) {
 				return cBlock.MarshalCanoto()
 			}(),
 			expectedError: errFailedToParseBlacklist,
-			parseFunc: func(_ context.Context, _ []byte) (snowman.Block, error) {
-				return testBlock, nil
-			},
-		},
-		{
-			name: "valid blacklist",
-			blockBytes: func() []byte {
-				blacklist := simplex.Blacklist{
-					NodeCount: 3,
-					SuspectedNodes: []simplex.SuspectedNode{
-						{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 11},
-					},
-				}
-				cBlock := &canotoSimplexBlock{
-					Metadata:   b.metadata.Bytes(),
-					InnerBlock: testBlock.BytesV,
-					Blacklist:  blacklist.Bytes(),
-				}
-				return cBlock.MarshalCanoto()
-			}(),
-			expectedError: nil,
 			parseFunc: func(_ context.Context, _ []byte) (snowman.Block, error) {
 				return testBlock, nil
 			},
