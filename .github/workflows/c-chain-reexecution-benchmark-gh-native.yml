@@ -35,10 +35,10 @@ on:
         description: 'Dependencies to use (e.g., "firewood=abc123" or "firewood=abc,libevm=xyz")'
         default: ''
 
-# Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
-# entry in the corresponding JSON file.
-# schedule:
-#   - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
+  # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
+  # entry in the corresponding JSON file.
+  # schedule:
+  #   - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
 jobs:
   define-matrix:

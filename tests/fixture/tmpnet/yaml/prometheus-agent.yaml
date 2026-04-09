@@ -161,6 +161,7 @@ spec:
             - --config.file=/etc/prometheus/config/prometheus.yaml
             - --storage.agent.path=/prometheus
             - --agent
+            - --enable-feature=native-histograms
           volumeMounts:
             - name: config
               mountPath: /etc/prometheus/config/prometheus.yaml

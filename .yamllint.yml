@@ -6,6 +6,7 @@ ignore:
 rules:
   document-start: disable
   line-length: disable
+  comments-indentation: disable
   comments:
     min-spaces-from-content: 1
   truthy:
