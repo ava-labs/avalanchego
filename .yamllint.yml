@@ -11,4 +11,4 @@ rules:
     min-spaces-from-content: 1
   truthy:
     check-keys: false
-    allowed-values: ["true", "false", "TRUE"]
+    allowed-values: ["true", "false", "TRUE", "FALSE"]
