@@ -3,15 +3,27 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-NETWORK_DIR="${TMPNET_NETWORK_DIR:-$HOME/.tmpnet/networks/latest}"
+NETWORK_DIR="${HOME}/.tmpnet/networks/latest"
+if [ -f "${NETWORK_DIR}/network.env" ]; then
+  source "${NETWORK_DIR}/network.env"
+  NETWORK_DIR="${TMPNET_NETWORK_DIR:-${NETWORK_DIR}}"
+fi
 OUTPUT="${SCRIPT_DIR}/tx-frontend/public/nodes.json"
 CHAINS_FILE="${SCRIPT_DIR}/tx-frontend/public/chains.json"
 FUND_AMOUNT="100" # AVAX per node
 
-if [ ! -f "$OUTPUT" ]; then
-  echo "Run sync_nodes.sh first to generate nodes.json"
-  exit 1
-fi
+# Sync node URIs from the network directory
+echo "Syncing node URIs from ${NETWORK_DIR}..."
+uris=()
+for node_dir in "${NETWORK_DIR}"/NodeID-*; do
+  [ -d "$node_dir" ] || continue
+  process_file="${node_dir}/process.json"
+  [ -f "$process_file" ] || continue
+  uri=$(python3 -c "import json; print(json.load(open('${process_file}'))['uri'])" 2>/dev/null || true)
+  [ -n "$uri" ] && uris+=("\"${uri}\"")
+done
+printf '[%s]\n' "$(IFS=,; echo "${uris[*]}")" > "$OUTPUT"
+echo "Wrote ${#uris[@]} node URIs to ${OUTPUT}"
 
 # Build the list of EVM RPC endpoints to fund on
 # Always include C-Chain, plus any EVM chains from chains.json

@@ -44,6 +44,7 @@ interface ChainInfo {
   rpcPath: string;
   subnetId?: string;
   vm: string;
+  consensus?: string;
   conversionTx?: string;
   conversionId?: string;
   validatorCount?: number;
@@ -459,6 +460,15 @@ export default function Home() {
               }`}
             >
               {c.name}
+            {c.consensus && (
+              <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded ${
+                c.consensus === "simplex"
+                  ? "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+                  : "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
+              }`}>
+                {c.consensus}
+              </span>
+            )}
             </button>
           ))}
         </div>
@@ -496,6 +506,16 @@ export default function Home() {
             )}
             <span className="text-zinc-500 dark:text-zinc-400">VM</span>
             <span>{selectedChain.vm}</span>
+            {selectedChain.consensus && (
+              <>
+                <span className="text-zinc-500 dark:text-zinc-400">Consensus</span>
+                <span className={`font-medium ${
+                  selectedChain.consensus === "simplex"
+                    ? "text-purple-600 dark:text-purple-400"
+                    : ""
+                }`}>{selectedChain.consensus}</span>
+              </>
+            )}
             {chainBlockHeight !== null && (
               <>
                 <span className="text-zinc-500 dark:text-zinc-400">Block Height</span>

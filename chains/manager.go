@@ -584,7 +584,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		if chainParams.ID == constants.PlatformChainID {
 			beacons = chainParams.CustomBeacons
 		}
-
+		m.Log.Debug("Creating snowmansjknsknsnjk!!!!!!")
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
@@ -1197,7 +1197,7 @@ func (m *manager) createSnowmanChain(
 	if ctx.ChainID == constants.PlatformChainID {
 		minBlockDelay = m.ProposerMinBlockDelay
 	}
-	m.Log.Info("creating proposervm wrapper",
+	m.Log.Info("creating proposervm wrapper!!!!!",
 		zap.Time("activationTime", m.Upgrades.ApricotPhase4Time),
 		zap.Uint64("minPChainHeight", m.Upgrades.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
@@ -1737,7 +1737,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	})
 
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
-	m.Log.Info("creating simplex chain", zap.String("chain", primaryAlias))
+	m.Log.Info("creating simplex chain!!!!!", zap.String("chain", primaryAlias))
 
 	messageSender, err := m.createMessageSender(ctx, sb)
 	if err != nil {

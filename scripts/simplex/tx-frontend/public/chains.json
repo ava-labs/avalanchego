@@ -3,22 +3,25 @@
     "name": "P-Chain",
     "chainId": "P",
     "rpcPath": "/ext/bc/P",
-    "vm": "platformvm"
+    "vm": "platformvm",
+    "consensus": "snowman"
   },
   {
     "name": "C-Chain",
     "chainId": "C",
     "rpcPath": "/ext/bc/C/rpc",
-    "vm": "evm"
+    "vm": "evm",
+    "consensus": "snowman"
   },
   {
     "name": "simplexl1",
-    "chainId": "FojesDUYYy8g1rkx3Wqtw36kfJs854HMEp4ixuBmLkrp1NuuU",
-    "rpcPath": "/ext/bc/FojesDUYYy8g1rkx3Wqtw36kfJs854HMEp4ixuBmLkrp1NuuU/rpc",
-    "subnetId": "DzEwqEGRoVaJLYqMXXZbbMEig87NgkKAoR8JoKK3QQnvukkLp",
+    "chainId": "2PzL4PrNC9NC1FmbGpzQ1wpXmCE9tmCCyWpJ4ptkp446iHTtrF",
+    "rpcPath": "/ext/bc/2PzL4PrNC9NC1FmbGpzQ1wpXmCE9tmCCyWpJ4ptkp446iHTtrF/rpc",
+    "subnetId": "zpXP4yBgRpoJpkjC1krhLthfqkntieYq82RHRqBogZRb4fDfD",
     "vm": "subnet-evm",
-    "conversionTx": "j6UZtBDLahzVebdvj4W8wbbtoNkMXenzrkTmtfWFLKs5ntr83",
-    "conversionId": "2NZMckoGEq4qZTFRrteoK3hmUPceSQ5uc3FnN1tytSchvUKvmf",
+    "consensus": "simplex",
+    "conversionTx": "2Qj8e3gxGi76uGm2cNQQfXNkhCM4VWxnrUqDgVcpoXGPTfFJv8",
+    "conversionId": "2GsbjSEcD6E2CegYzPoE5tKZXB61kx7x32zQCdAUBAaNYZQFzX",
     "validatorCount": 5
   }
 ]

@@ -196,9 +196,10 @@ func (e *Engine) Start(ctx context.Context, _ uint32) error {
 		zap.Duration("MaxRebroadcastWait", e.epoch.MaxRebroadcastWait),
 	)
 	if err := e.epoch.Start(); err != nil {
+		e.logger.Error("Failed to start simplex epoch", zap.Error(err))
 		return fmt.Errorf("failed to start simplex epoch: %w", err)
 	}
-
+	e.logger.Info("Started simplex epoch, starting block builder ticker")
 	go e.tick()
 	e.consensusCtx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,

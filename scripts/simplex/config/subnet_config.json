@@ -1,0 +1,12 @@
+{
+  "snowParameters": {
+    "k": 20,
+    "alphaPreference": 15,
+    "alphaConfidence": 15,
+    "beta": 20,
+    "concurrentRepolls": 4,
+    "optimalProcessing": 10,
+    "maxOutstandingItems": 256,
+    "maxItemProcessingTime": 30000000000
+  }
+}

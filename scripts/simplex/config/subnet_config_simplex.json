@@ -1,0 +1,6 @@
+{
+  "simplexParameters": {
+    "maxNetworkDelay": 5000000000,
+    "maxRebroadcastWait": 5000000000
+  }
+}
