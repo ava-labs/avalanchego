@@ -5,7 +5,6 @@ package transitionvm
 
 import (
 	"context"
-	"net/http"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -30,9 +29,10 @@ type VM struct {
 }
 
 type current struct {
-	chain       chain
-	requests    *requests
-	connections *connections
+	chain        chain
+	requests     *requests
+	connections  *connections
+	httpHandlers *httpHandlers
 }
 
 func (v *VM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, fxs []*common.Fx, appSender common.AppSender) error {
@@ -45,14 +45,6 @@ func (v *VM) Shutdown(context.Context) error {
 
 func (v *VM) SetState(ctx context.Context, state snow.State) error {
 	return errUnimplemented
-}
-
-func (v *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
-	return nil, errUnimplemented
-}
-
-func (v *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
-	return nil, errUnimplemented
 }
 
 func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
