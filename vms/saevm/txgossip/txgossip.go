@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package txgossip provides a mempool for [Streaming Asynchronous Execution],
@@ -10,13 +10,13 @@ package txgossip
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 )
 
 var _ gossip.Gossipable = Transaction{}
@@ -64,7 +64,7 @@ type Set struct {
 
 // NewSet returns a new Set. Use [gossip.BloomSet.Add] or [Set.SendTx] to add
 // transactions to the pool, which SHOULD NOT be populated directly.
-func NewSet(logger logging.Logger, pool *txpool.TxPool, config gossip.BloomSetConfig) (*Set, error) {
+func NewSet(pool *txpool.TxPool, config gossip.BloomSetConfig) (*Set, error) {
 	s := &txSet{pool}
 	bs, err := gossip.NewBloomSet(s, config)
 	if err != nil {

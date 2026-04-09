@@ -1,4 +1,4 @@
-// Copyright (C) 2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sae
@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 )
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 //go:build !prod && !nocmpopts
@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
@@ -65,6 +66,14 @@ func ReceiptsByTxHash() cmp.Option {
 	})
 }
 
+// CmpByMerkleRoots returns a [cmp.Comparer] for [types.DerivableList] values,
+// equating them by their Merkle roots.
+func CmpByMerkleRoots[T types.DerivableList]() cmp.Option {
+	return cmp.Comparer(func(a, b T) bool {
+		return types.DeriveSha(a, trie.NewStackTrie(nil)) == types.DeriveSha(b, trie.NewStackTrie(nil))
+	})
+}
+
 // Blocks returns a set of [cmp.Options] for comparing [types.Block] values.
 // The [Headers] option MUST be used alongside this but isn't included
 // automatically, to avoid duplication.
@@ -96,10 +105,10 @@ func LoadAtomicPointers[T any]() cmp.Options {
 		// Although accepting an [atomic.Pointer] value copies a lock, this is
 		// unavoidable but OK in tests given the non-concurrency documentation
 		// above.
-		cmp.Transformer(fmt.Sprintf("atomicOf_%s", typeName[T]()), func(p atomic.Pointer[T]) *T { //nolint:govet
+		cmp.Transformer("atomicOf_"+typeName[T](), func(p atomic.Pointer[T]) *T { //nolint:govet
 			return p.Load()
 		}),
-		cmp.Transformer(fmt.Sprintf("pointerOfAtomicOf_%s", typeName[T]()), func(p *atomic.Pointer[T]) *T {
+		cmp.Transformer("pointerOfAtomicOf_"+typeName[T](), func(p *atomic.Pointer[T]) *T {
 			return p.Load()
 		}),
 	}
@@ -120,7 +129,7 @@ func NilSlicesAreEmpty[S ~[]E, E any]() cmp.Option {
 func typeName[T any]() string {
 	t := reflect.TypeFor[T]()
 	if t.Kind() == reflect.Pointer {
-		return fmt.Sprintf("pointerTo_%s", t.Elem().String())
+		return "pointerTo_" + t.Elem().String()
 	}
 	return t.String()
 }

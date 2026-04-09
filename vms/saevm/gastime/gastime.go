@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package gastime measures time based on the consumption of gas.
@@ -8,10 +8,10 @@ import (
 	"math"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/holiman/uint256"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
@@ -31,7 +31,7 @@ import (
 // [ACP-176]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates
 // [ACP-194]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution
 //
-//nolint:tagliatelle // Can't handle embedded field
+//nolint:tagliatelle,revive // tagliatelle: can't handle embedded field; struct-tag: canoto allows unexported fields
 type Time struct {
 	*proxytime.Time[gas.Gas] `canoto:"pointer,1"`
 	target                   gas.Gas `canoto:"uint,2"`
@@ -70,7 +70,7 @@ func SubSecond(hooks hook.Points, hdr *types.Header, rate gas.Gas) gas.Gas {
 	// [gas.Gas] is safe while the upper bound guarantees that the mul-div
 	// result can't overflow so we don't have to check the error.
 	g, _, _ := intmath.MulDivCeil(
-		gas.Gas(hooks.SubSecondBlockTime(hdr)), //nolint:gosec // See above
+		gas.Gas(hooks.SubSecondBlockTime(hdr)), //#nosec G115 -- See above
 		rate,
 		gas.Gas(time.Second),
 	)
@@ -190,7 +190,7 @@ func (tm *Time) SetTarget(t gas.Gas) {
 func (tm *Time) Tick(g gas.Gas) {
 	tm.Time.Tick(g)
 
-	R, T := tm.Rate(), tm.Target()
+	R, T := tm.Rate(), tm.Target()         //nolint:revive // unexported-naming: mathematical convention
 	quo, _, _ := intmath.MulDiv(g, R-T, R) // overflow is impossible as (R-T)/R < 1
 	tm.excess = intmath.BoundedAdd(tm.excess, quo, math.MaxUint64)
 }
@@ -203,7 +203,7 @@ func (tm *Time) FastForwardTo(to uint64, toFrac gas.Gas) {
 		return
 	}
 
-	R, T := tm.Rate(), tm.Target()
+	R, T := tm.Rate(), tm.Target() //nolint:revive // unexported-naming: mathematical convention
 
 	// Excess is reduced by the amount of gas skipped (g), multiplied by T/R.
 	// However, to avoid overflow, the implementation needs to be a bit more

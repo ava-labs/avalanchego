@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -22,9 +21,11 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -37,6 +38,7 @@ func (b *Block) SetInterimExecutionTime(t *proxytime.Time[gas.Gas]) {
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
+//nolint:revive // struct-tag: canoto allows unexported fields
 type executionResults struct {
 	byGas         gastime.Time `canoto:"value,1"`
 	baseFee       uint256.Int  `canoto:"fixed repeated uint,2"`

@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gasprice
@@ -7,11 +7,12 @@ import (
 	"math/big"
 	"slices"
 
-	"github.com/ava-labs/avalanchego/cache/lru"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rpc"
 	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 type transaction struct {
@@ -112,7 +113,7 @@ func (b *blockCache) getBlock(n uint64) *block {
 		return blk
 	}
 
-	blk, err := b.backend.BlockByNumber(rpc.BlockNumber(n)) //nolint:gosec // block numbers were previously resolved
+	blk, err := b.backend.BlockByNumber(rpc.BlockNumber(n)) //#nosec G115 -- Block numbers were previously resolved
 	if err != nil {
 		b.log.Error("fetching BlockByNumber",
 			zap.Uint64("number", n),

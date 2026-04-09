@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package saexec
@@ -12,7 +12,11 @@ import (
 func (e *Executor) sendPostExecutionEvents(b *types.Block, receipts types.Receipts) {
 	e.headEvents.Send(core.ChainHeadEvent{Block: b})
 
-	var logs []*types.Log
+	var n int
+	for _, r := range receipts {
+		n += len(r.Logs)
+	}
+	logs := make([]*types.Log, 0, n)
 	for _, r := range receipts {
 		logs = append(logs, r.Logs...)
 	}

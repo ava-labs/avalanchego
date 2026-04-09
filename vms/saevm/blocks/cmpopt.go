@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 //go:build !prod && !nocmpopts
@@ -6,13 +6,12 @@
 package blocks
 
 import (
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 // CmpOpt returns a configuration for [cmp.Diff] to compare [Block] instances in
@@ -43,11 +42,10 @@ func CmpOpt() cmp.Option {
 
 func (e *executionResults) equalForTests(f *executionResults) bool {
 	fn := cmputils.WithNilCheck(func(e, f *executionResults) bool {
-		return true &&
-			e.byGas.Rate() == f.byGas.Rate() &&
+		return e.byGas.Rate() == f.byGas.Rate() &&
 			e.byGas.Compare(f.byGas.Time) == 0 &&
 			e.receiptRoot == f.receiptRoot &&
-			saetest.MerkleRootsEqual(e.receipts, f.receipts) &&
+			cmp.Equal(e.receipts, f.receipts, cmputils.CmpByMerkleRoots[types.Receipts]()) &&
 			e.stateRootPost == f.stateRootPost
 	})
 	return fn(e, f)

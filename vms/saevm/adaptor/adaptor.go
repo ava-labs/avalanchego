@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package adaptor provides a generic alternative to the Snowman [block.ChainVM]
@@ -123,7 +123,7 @@ func (b Block[BP]) Reject(ctx context.Context) error { return b.vm.RejectBlock(c
 
 // ShouldVerifyWithContext returns true, indicating that the block
 // SHOULD be verified with [VerifyWithContext].
-func (b Block[BP]) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
+func (Block[BP]) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
 	return true, nil
 }
 

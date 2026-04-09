@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sae
@@ -18,18 +18,6 @@ import (
 	"time"
 
 	"github.com/arr4n/shed/testerr"
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -40,7 +28,6 @@ import (
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm"
-	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
@@ -52,16 +39,30 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
+
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 )
 
 func TestMain(m *testing.M) {
@@ -91,7 +92,6 @@ type SUT struct {
 	rawVM   *VM
 	genesis *blocks.Block
 	wallet  *saetest.Wallet
-	avaDB   database.Database
 	db      ethdb.Database
 	hooks   *hookstest.Stub
 	logger  *saetest.TBLogger
@@ -197,7 +197,6 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			keys,
 			types.LatestSigner(conf.genesis.Config),
 		),
-		avaDB:  conf.db,
 		db:     newEthDB(conf.db),
 		hooks:  conf.hooks,
 		logger: logger,
@@ -291,7 +290,7 @@ func withExecResultsDB(hdb database.HeightIndex) sutOption {
 	})
 }
 
-func withCommitInterval(interval uint64) sutOption {
+func withCommitInterval(interval uint64) sutOption { //nolint:unparam // always 16 for now but caller-controlled by design
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.DBConfig.TrieCommitInterval = interval
 	})
@@ -805,7 +804,7 @@ func TestAcceptBlock(t *testing.T) {
 	unsettled := []*blocks.Block{sut.genesis}
 	sut.genesis = nil // allow it to be GCd when appropriate
 
-	rng := rand.New(rand.NewPCG(0, 0)) //nolint:gosec // Reproducibility is useful for tests
+	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
 	for range 100 {
 		ffMillis := 100 + rng.IntN(1000*(1+saeparams.TauSeconds))
 		vmTime.advance(time.Millisecond * time.Duration(ffMillis))

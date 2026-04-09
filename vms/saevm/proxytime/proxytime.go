@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package proxytime measures the passage of time based on a proxy unit and
@@ -24,6 +24,8 @@ type Duration interface {
 
 // Time represents an instant in time, its passage measured by an arbitrary unit
 // of duration. It is not thread safe nor is the zero value valid.
+//
+//nolint:revive // struct-tag: canoto allows unexported fields
 type Time[D Duration] struct {
 	seconds uint64 `canoto:"uint,1"`
 	// invariant: fraction < hertz
@@ -58,7 +60,7 @@ func New[D Duration](unixSeconds uint64, hertz D) *Time[D] {
 // non-negative.
 func Of[D Duration](t time.Time) *Time[D] {
 	const hz = time.Second / time.Nanosecond
-	tm := New(uint64(t.Unix()), D(hz)) //nolint:gosec // Known to be non-negative
+	tm := New(uint64(t.Unix()), D(hz)) //#nosec G115 -- Known to be non-negative
 	tm.Tick(D(t.Nanosecond()))
 	return tm
 }

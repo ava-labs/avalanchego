@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package saexec
@@ -15,8 +15,6 @@ import (
 	"testing"
 
 	"github.com/arr4n/shed/testerr"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -26,7 +24,6 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm"
-	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
@@ -38,15 +35,19 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	saehookstest "github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
+
+	saehookstest "github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 )
 
 func TestMain(m *testing.M) {
@@ -108,7 +109,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),
 	)
-	chain := blockstest.NewChainBuilder(config, genesis, blockOpts)
+	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
 
 	saedbConfig := saedb.Config{
@@ -229,7 +230,7 @@ func TestSubscriptions(t *testing.T) {
 	precompile := common.Address{'p', 'r', 'e'}
 	stub := &libevmhookstest.Stub{
 		PrecompileOverrides: map[common.Address]libevm.PrecompiledContract{
-			precompile: vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, input []byte) (ret []byte, err error) {
+			precompile: vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, _ []byte) (ret []byte, err error) {
 				env.StateDB().AddLog(&types.Log{
 					Address: precompile,
 				})
@@ -322,7 +323,7 @@ func TestExecution(t *testing.T) {
 		EffectiveGasPrice: big.NewInt(1),
 	})
 
-	rng := rand.New(rand.NewPCG(0, 0)) //nolint:gosec // Reproducibility is useful for tests
+	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
 	var wantEscrowBalance uint64
 	for range 10 {
 		val := rng.Uint64N(100_000)
@@ -351,7 +352,7 @@ func TestExecution(t *testing.T) {
 
 	var logIndex uint
 	for i, r := range want {
-		ui := uint(i) //nolint:gosec // Known to not overflow
+		ui := uint(i) //#nosec G115 -- Known to not overflow
 
 		r.Status = 1
 		r.TransactionIndex = ui
@@ -602,7 +603,7 @@ func TestGasAccounting(t *testing.T) {
 
 		t.Run("CumulativeGasUsed", func(t *testing.T) {
 			for i, r := range b.Receipts() {
-				ui := uint64(i + 1) //nolint:gosec // Known to not overflow
+				ui := uint64(i + 1) //#nosec G115 -- Known to not overflow
 				assert.Equalf(t, ui*params.TxGas, r.CumulativeGasUsed, "%T.Receipts()[%d]", b, i)
 			}
 		})
@@ -989,7 +990,7 @@ func TestStateRootAvailability(t *testing.T) {
 
 	t.Run("all states", func(t *testing.T) {
 		// We haven't dropped any states.
-		checkStates(t, e, func(height uint64) bool { return true })
+		checkStates(t, e, func(uint64) bool { return true })
 	})
 
 	t.Run("remove in memory state", func(t *testing.T) {

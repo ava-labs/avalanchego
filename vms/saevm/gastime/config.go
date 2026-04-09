@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gastime
@@ -8,12 +8,12 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
+//nolint:revive // struct-tag: canoto allows unexported fields
 type config struct {
 	targetToExcessScaling gas.Gas   `canoto:"uint,1"`
 	minPrice              gas.Price `canoto:"uint,2"`

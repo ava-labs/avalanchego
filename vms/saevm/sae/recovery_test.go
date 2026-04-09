@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sae
@@ -12,9 +12,6 @@ import (
 	"time"
 
 	"github.com/arr4n/shed/testerr"
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -25,11 +22,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 func TestRecoverFromDatabase(t *testing.T) {
@@ -46,7 +47,7 @@ func TestRecoverFromDatabase(t *testing.T) {
 	}))
 	srcCtx := ctx
 
-	rng := rand.New(rand.NewPCG(0, 0)) //nolint:gosec // Deterministic replay for tests
+	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
 
 	for final := false; !final; {
 		// We need to test rebuilding from trie roots reflecting (a) the last

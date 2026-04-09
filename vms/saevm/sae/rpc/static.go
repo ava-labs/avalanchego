@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpc
@@ -7,10 +7,11 @@ import (
 	"context"
 	"math/big"
 
-	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
+
+	ethereum "github.com/ava-labs/libevm"
 )
 
 func (b *backend) ChainDb() ethdb.Database { //nolint:staticcheck // this name required by ethapi.Backend interface
@@ -21,7 +22,7 @@ func (b *backend) RPCTxFeeCap() float64 {
 	return b.config.TxFeeCap
 }
 
-func (b *backend) UnprotectedAllowed() bool {
+func (*backend) UnprotectedAllowed() bool {
 	return false
 }
 
@@ -37,11 +38,11 @@ func (*backend) ExtRPCEnabled() bool {
 // and no longer exposes the total difficulty of the chain at all via the API.
 //
 // TODO(JonathanOppenheimer): Once we update libevm, remove GetTd.
-func (b *backend) GetTd(ctx context.Context, hash common.Hash) *big.Int {
+func (*backend) GetTd(ctx context.Context, _ common.Hash) *big.Int {
 	return new(big.Int)
 }
 
-func (b *backend) SyncProgress() ethereum.SyncProgress {
+func (*backend) SyncProgress() ethereum.SyncProgress {
 	// Avalanchego does not expose APIs until after the node has fully synced.
 	return ethereum.SyncProgress{}
 }

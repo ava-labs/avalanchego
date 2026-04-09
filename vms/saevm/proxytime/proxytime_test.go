@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proxytime
@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
-	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	gocmp "github.com/google/go-cmp/cmp"
 )
 
 func frac(num, den uint64) FractionalSecond[uint64] {
@@ -218,7 +219,7 @@ func TestAsTime(t *testing.T) {
 	stdlib := time.Date(1986, time.October, 1, 0, 0, 0, 0, time.UTC)
 
 	const rate uint64 = 500
-	tm := New(uint64(stdlib.Unix()), rate) //nolint:gosec // Known to not overflow
+	tm := New(uint64(stdlib.Unix()), rate) //#nosec G115 -- Known to not overflow
 	if got, want := tm.AsTime(), stdlib; !got.Equal(want) {
 		t.Fatalf("%T.AsTime() at construction got %v; want %v", tm, got, want)
 	}

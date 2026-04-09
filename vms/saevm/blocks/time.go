@@ -1,4 +1,4 @@
-// Copyright (C) 2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -6,9 +6,9 @@ package blocks
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/core/types"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
@@ -23,7 +23,7 @@ func PreciseTime(hooks hook.Points, hdr *types.Header) time.Time {
 
 func preciseTime(hdr *types.Header, subSec time.Duration) time.Time { //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
 	return time.Unix(
-		int64(hdr.Time), //nolint:gosec // Won't overflow for a few millennia
+		int64(hdr.Time), //#nosec G115 -- Won't overflow for a few millennia
 		subSec.Nanoseconds(),
 	)
 }

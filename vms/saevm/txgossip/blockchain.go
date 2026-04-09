@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txgossip
@@ -11,12 +11,13 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
-
 	// Imported for [core.ChainHeadEvent] comment resolution. Already a
 	// downstream dependency.
 	_ "github.com/ava-labs/libevm/core"
+
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
+
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // A BlockChain is the union of [txpool.BlockChain] and [legacypool.BlockChain].

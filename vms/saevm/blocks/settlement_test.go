@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -65,9 +65,9 @@ func TestSettlementInvariants(t *testing.T) {
 
 	t.Run("before_MarkSettled", func(t *testing.T) {
 		require.False(t, b.Settled(), "Settled()")
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		defer cancel()
-		assert.ErrorIs(t, b.WaitUntilSettled(ctx), context.DeadlineExceeded, "WaitUntilSettled()")
+		require.ErrorIs(t, b.WaitUntilSettled(ctx), context.DeadlineExceeded, "WaitUntilSettled()")
 
 		if diff := cmp.Diff(parent, b.ParentBlock(), CmpOpt()); diff != "" {
 			t.Errorf("ParentBlock() diff (-constructor arg +got):\n%s", diff)
@@ -87,7 +87,7 @@ func TestSettlementInvariants(t *testing.T) {
 	t.Run("after_MarkSettled", func(t *testing.T) {
 		assert.Equal(t, b, lastSettledPtr.Load(), "Atomic pointer to last-settled block")
 		require.True(t, b.Settled(), "Settled()")
-		assert.NoError(t, b.WaitUntilSettled(context.Background()), "WaitUntilSettled()")
+		assert.NoError(t, b.WaitUntilSettled(t.Context()), "WaitUntilSettled()")
 		assert.NoError(t, b.CheckInvariants(Settled), "CheckInvariants(Settled)")
 
 		rec := saetest.NewLogRecorder(logging.Warn)
@@ -101,7 +101,7 @@ func TestSettlementInvariants(t *testing.T) {
 		assertNumErrorLogs(t, 1)
 		assert.Nil(t, b.LastSettled(), "LastSettled()")
 		assertNumErrorLogs(t, 2)
-		assert.ErrorIs(t, b.MarkSettled(&lastSettledPtr), errBlockResettled, "second call to MarkSettled()")
+		require.ErrorIs(t, b.MarkSettled(&lastSettledPtr), errBlockResettled, "second call to MarkSettled()")
 		assertNumErrorLogs(t, 3)
 		if t.Failed() {
 			t.FailNow()
@@ -222,7 +222,7 @@ func TestLastToSettleAt(t *testing.T) {
 	blocks := newChain(t, db, xdb, 0, 30, nil)
 	t.Run("helper_invariants", func(t *testing.T) {
 		for i, b := range blocks {
-			require.Equal(t, uint64(i), b.Height()) //nolint:gosec // Slice index won't overflow
+			require.Equal(t, uint64(i), b.Height()) //#nosec G115 -- Slice index won't overflow
 			require.Equal(t, b.BuildTime(), b.Height())
 		}
 	})
@@ -365,7 +365,7 @@ func TestLastToSettleAt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			settleAt := time.Unix(int64(tt.settleAt), 0) //nolint:gosec // Hard-coded, non-overflowing values
+			settleAt := time.Unix(int64(tt.settleAt), 0) //#nosec G115 -- Hard-coded, non-overflowing values
 			got, gotOK, err := LastToSettleAt(hookstest.NewStub(0), settleAt, tt.parent)
 			if err != nil || gotOK != tt.wantOK {
 				t.Fatalf("LastToSettleAt(%d, [parent height %d]) got (_, %t, %v); want (_, %t, nil)", tt.settleAt, tt.parent.Height(), gotOK, err, tt.wantOK)

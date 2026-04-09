@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockstest
@@ -60,11 +60,11 @@ func TestIntegration(t *testing.T) {
 	sdb, err := state.New(bc.Genesis().Root(), state.NewDatabase(db), nil)
 	require.NoError(t, err, "state.New(%T.Genesis().Root())", bc)
 
-	build := NewChainBuilder(config, NewBlock(t, bc.Genesis(), nil, nil))
+	build := NewChainBuilder(NewBlock(t, bc.Genesis(), nil, nil))
 	dest := common.Address{'d', 'e', 's', 't'}
 	for i := range numBlocks {
 		// Genesis is block 0
-		blockNum := uint64(i + 1) //nolint:gosec // Known to not overflow
+		blockNum := uint64(i + 1) //#nosec G115 -- Known to not overflow
 
 		var txs types.Transactions
 		for range txsPerAccountPerBlock {
@@ -127,7 +127,7 @@ func TestNewGenesis(t *testing.T) {
 	gen := NewGenesis(t, db, xdb, config, alloc)
 
 	assert.True(t, gen.Executed(), "genesis.Executed()")
-	assert.NoError(t, gen.WaitUntilSettled(t.Context()), "genesis.WaitUntilSettled()")
+	require.NoError(t, gen.WaitUntilSettled(t.Context()), "genesis.WaitUntilSettled()")
 	assert.Equal(t, gen.Hash(), gen.LastSettled().Hash(), "genesis.LastSettled().Hash() is self")
 
 	t.Run("alloc", func(t *testing.T) {

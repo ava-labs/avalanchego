@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package hookstest provides a test double for SAE's [hook] package.
@@ -10,10 +10,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -22,8 +18,13 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -123,14 +124,16 @@ func (s *Stub) BuildHeader(parent *types.Header) (*types.Header, error) {
 	hdr := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number, common.Big1),
-		Time:       uint64(now.Unix()), //nolint:gosec // Known non-negative
+		Time:       uint64(now.Unix()), //#nosec G115 -- Known non-negative
 		Extra:      e.MarshalCanoto(),
 	}
 	return hdr, nil
 }
 
-// PotentialEndOfBlockOps ignores its arguments and returns a sequence of ops
-// taken from [Stub.Ops] after removing [Stub.InvalidOpIDs].
+// PotentialEndOfBlockOps ignores its arguments and returns [Stub.Ops] as a
+// sequence.
+//
+//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (s *Stub) PotentialEndOfBlockOps(ctx context.Context, header *types.Header, lastSettledBlock common.Hash, source saetypes.BlockSource) iter.Seq[Op] {
 	return func(yield func(Op) bool) {
 		for _, op := range s.Ops {
@@ -160,7 +163,7 @@ func (*Stub) BuildBlock(
 // with the other arguments.
 func BuildBlock(
 	header *types.Header,
-	blockCtx *block.Context,
+	_ *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
@@ -189,7 +192,7 @@ func (s *Stub) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[Op], error)
 
 	return NewStub(s.Target, WithInvalidOpIDs(s.InvalidOpIDs), WithOps(e.ops), WithNow(func() time.Time {
 		return time.Unix(
-			int64(b.Time()), //nolint:gosec // Won't overflow for a few millennia
+			int64(b.Time()), //#nosec G115 -- Won't overflow for a few millennia
 			int64(e.subSec),
 		)
 	})), nil
@@ -203,7 +206,7 @@ func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, hook.GasPriceConfig) {
 // SubSecondBlockTime returns the sub-second time encoded and stored by
 // [Stub.BuildHeader] in the header's `Extra` field. If said field is empty,
 // SubSecondBlockTime returns 0.
-func (s *Stub) SubSecondBlockTime(hdr *types.Header) time.Duration {
+func (*Stub) SubSecondBlockTime(hdr *types.Header) time.Duration {
 	return getHeaderExtra(hdr, func(e extra) time.Duration { return e.subSec })
 }
 
@@ -214,7 +217,7 @@ func (*Stub) SettledHeight(hdr *types.Header) uint64 {
 }
 
 // EndOfBlockOps return the ops included in the block by [BuildBlock].
-func (s *Stub) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
+func (*Stub) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	eOps := getHeaderExtra(b.Header(), func(e extra) []Op { return e.ops })
 	hookOps := make([]hook.Op, len(eOps))
 	for i, op := range eOps {
@@ -254,6 +257,7 @@ func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) e
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
+//nolint:revive // struct-tag: canoto allows unexported fields
 type extra struct {
 	subSec        time.Duration `canoto:"int,1"` //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
 	ops           []Op          `canoto:"repeated value,2"`

@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -126,7 +126,7 @@ func ResolveRPCNumber(f Frontier, bn rpc.BlockNumber) (uint64, error) {
 	if bn < 0 {
 		return 0, fmt.Errorf("%s block unsupported", bn.String())
 	}
-	n := uint64(bn) //nolint:gosec // Non-negative check performed above
+	n := uint64(bn) //#nosec G115 -- Non-negative check performed above
 	if n > tip {
 		return 0, fmt.Errorf("%w: block %d", ErrFutureBlockNotResolved, n)
 	}
@@ -265,7 +265,7 @@ func FromNumberAndHash[T any](c Chain, hash common.Hash, rpcNum rpc.BlockNumber,
 	if rpcNum < 0 {
 		return nil, errors.New("named blocks not supported")
 	}
-	n := uint64(rpcNum) //nolint:gosec // Non-negative check performed above
+	n := uint64(rpcNum) //#nosec G115 -- Non-negative check performed above
 	if b, ok := c.ConsensusCriticalBlock(hash); ok {
 		if b.NumberU64() != n {
 			return nil, fmt.Errorf("%w: found block number %d for hash %#x, expected %d", ErrNotFound, b.NumberU64(), hash, n)

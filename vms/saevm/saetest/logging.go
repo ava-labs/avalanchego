@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package saetest
@@ -9,9 +9,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // logger is the common wrapper around [LogRecorder] and [tbLogger] handlers,

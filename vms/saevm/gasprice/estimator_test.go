@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gasprice
@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -19,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -99,7 +99,7 @@ func newSUT(tb testing.TB, c Config) *SUT {
 	xdb := saetest.NewExecutionResultsDB()
 	config := saetest.ChainConfig()
 	genesis := blockstest.NewGenesis(tb, db, xdb, config, types.GenesisAlloc{})
-	chain := blockstest.NewChainBuilder(config, genesis)
+	chain := blockstest.NewChainBuilder(genesis)
 
 	log := saetest.NewTBLogger(tb, logging.Debug)
 	e, err := NewEstimator(chain, log, c)
@@ -116,7 +116,7 @@ func newSUT(tb testing.TB, c Config) *SUT {
 
 const gasLimit = 1_000_000
 
-func (s *SUT) newBlock(tb testing.TB, time uint64, bounds *blocks.WorstCaseBounds, txs ...*types.Transaction) *blocks.Block {
+func (s *SUT) addBlock(tb testing.TB, time uint64, bounds *blocks.WorstCaseBounds, txs ...*types.Transaction) {
 	tb.Helper()
 	blk := s.chain.NewBlock(tb, txs, blockstest.WithEthBlockOptions(
 		blockstest.ModifyHeader(func(h *types.Header) {
@@ -130,7 +130,6 @@ func (s *SUT) newBlock(tb testing.TB, time uint64, bounds *blocks.WorstCaseBound
 		}),
 	))
 	blk.SetWorstCaseBounds(bounds)
-	return blk
 }
 
 func newDynamicFeeTx(gas, price uint64) *types.Transaction {
@@ -157,7 +156,7 @@ func TestSuggestTipCap(t *testing.T) {
 	cfg.Now = func() time.Time {
 		return clk
 	}
-	nowSec := uint64(clk.Unix()) //nolint:gosec // Guaranteed to be positive
+	nowSec := uint64(clk.Unix()) //#nosec G115 -- Known non-negative
 
 	type blockSpec struct {
 		time   uint64
@@ -277,7 +276,7 @@ func TestSuggestTipCap(t *testing.T) {
 				for i, price := range spec.txTips {
 					txs[i] = newDynamicFeeTx(1, price)
 				}
-				sut.newBlock(t, spec.time, nil, txs...)
+				sut.addBlock(t, spec.time, nil, txs...)
 			}
 
 			got, err := sut.SuggestGasTipCap(t.Context())
@@ -519,7 +518,7 @@ func TestFeeHistory(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sut := newSUT(t, cfg)
 			for _, spec := range tt.blocks {
-				sut.newBlock(t, 0, spec.bounds, spec.txs...)
+				sut.addBlock(t, 0, spec.bounds, spec.txs...)
 			}
 
 			a := tt.args

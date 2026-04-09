@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package worstcase provides the worst-case balance and nonce tracking needed
@@ -13,7 +13,6 @@ import (
 	"math/big"
 	"slices"
 
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state"
@@ -22,11 +21,13 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 // State tracks the worst-case gas price and account state as operations are

@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package saetest provides testing helpers for [Streaming Asynchronous
@@ -13,7 +13,6 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
@@ -21,8 +20,8 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/google/go-cmp/cmp"
 
+	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
@@ -62,16 +61,6 @@ func ChainConfig() *params.ChainConfig {
 // zero, and post-merge.
 func Rules() params.Rules {
 	return ChainConfig().Rules(new(big.Int), true, 0)
-}
-
-// MerkleRootsEqual returns whether the two arguments have the same Merkle root.
-func MerkleRootsEqual[T types.DerivableList](a, b T) bool {
-	return types.DeriveSha(a, TrieHasher()) == types.DeriveSha(b, TrieHasher())
-}
-
-// CmpByMerkleRoots returns a [cmp.Comparer] using [MerkleRootsEqual].
-func CmpByMerkleRoots[T types.DerivableList]() cmp.Option {
-	return cmp.Comparer(MerkleRootsEqual[T])
 }
 
 // An EventCollector collects all events received from an [event.Subscription].

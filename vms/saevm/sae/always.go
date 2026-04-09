@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sae
@@ -8,12 +8,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/snow"
-	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/triedb"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -39,6 +39,8 @@ func NewSinceGenesis[T hook.Transaction](hooks hook.PointsG[T], c Config) *Since
 }
 
 // Initialize initializes the VM.
+//
+//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (vm *SinceGenesis[_]) Initialize(
 	ctx context.Context,
 	snowCtx *snow.Context,
@@ -46,8 +48,8 @@ func (vm *SinceGenesis[_]) Initialize(
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
-	fxs []*snowcommon.Fx,
-	appSender snowcommon.AppSender,
+	fxs []*common.Fx,
+	appSender common.AppSender,
 ) error {
 	db := newEthDB(avaDB)
 	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)

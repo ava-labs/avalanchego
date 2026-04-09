@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sae
@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/arr4n/shed/testerr"
-	"github.com/ava-labs/avalanchego/utils"
-	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
@@ -25,9 +23,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	ethereum "github.com/ava-labs/libevm"
 )
 
 // TestStateQueryOnNonCanonicalBlock verifies that state-dependent RPC calls

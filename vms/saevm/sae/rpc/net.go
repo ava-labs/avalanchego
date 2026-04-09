@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpc
@@ -6,8 +6,9 @@ package rpc
 import (
 	"strconv"
 
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/libevm/common/hexutil"
+
+	"github.com/ava-labs/avalanchego/network/p2p"
 )
 
 // netAPI offers the `net` RPCs.
@@ -23,7 +24,7 @@ func newNetAPI(peers *p2p.Peers, chainID uint64) *netAPI {
 	}
 }
 
-func (s *netAPI) Listening() bool {
+func (*netAPI) Listening() bool {
 	return true // The node is always listening for p2p connections.
 }
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package gasprice provides gas price statistics and suggestions for timely
@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 )
@@ -138,7 +138,7 @@ func NewEstimator(backend Backend, log logging.Logger, c Config) (*Estimator, er
 	// blocks while new blocks are added concurrently.
 	const extraSlots = 5
 	size := max(c.SuggestedTipMaxBlocks, c.HistoryMaxBlocksFromHead+c.HistoryMaxBlocks) + extraSlots
-	cache := newBlockCache(log, backend, int(size)) //nolint:gosec // Overflow would require misconfiguration
+	cache := newBlockCache(log, backend, int(size)) //#nosec G115 -- Overflow would require misconfiguration
 	go func() {
 		defer sub.Unsubscribe() // `Unsubscribe` can fire twice on Close(), but it's safe to call multiple times.
 		for {
@@ -197,7 +197,7 @@ func (e *Estimator) SuggestGasTipCap(ctx context.Context) (tip *big.Int, _ error
 	var (
 		newest     = lastAcceptedNumber
 		tooOld     = intmath.BoundedSubtract(newest, e.c.SuggestedTipMaxBlocks, 0)
-		recentUnix = uint64(e.c.Now().Add(-e.c.SuggestedTipMaxDuration).Unix()) //nolint:gosec // Known non-negative
+		recentUnix = uint64(e.c.Now().Add(-e.c.SuggestedTipMaxDuration).Unix()) //#nosec G115 -- Known non-negative
 		tips       []transaction
 	)
 	for n := newest; n > tooOld; n-- {
@@ -215,7 +215,7 @@ func (e *Estimator) SuggestGasTipCap(ctx context.Context) (tip *big.Int, _ error
 	if n := len(tips); n > 0 {
 		slices.SortFunc(tips, transaction.Compare)
 
-		i := (n - 1) * int(e.c.SuggestedTipPercentile) / 100 //nolint:gosec // Known to be between (0, 100]
+		i := (n - 1) * int(e.c.SuggestedTipPercentile) / 100 //#nosec G115 -- Known to be between (0, 100]
 		price = tips[i].tip
 		price = math.BigMax(price, e.c.MinSuggestedTip)
 		price = math.BigMin(price, e.c.MaxSuggestedTip)

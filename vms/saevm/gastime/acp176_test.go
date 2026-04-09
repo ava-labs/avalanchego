@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gastime
@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +16,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 )
@@ -117,7 +117,7 @@ func FuzzWorstCasePrice(f *testing.F) {
 	) {
 		initTarget = max(initTarget, 1)
 
-		initUnix := int64(min(initTimestamp, math.MaxInt64)) //nolint:gosec // I can't believe I have to be explicit about this!
+		initUnix := int64(min(initTimestamp, math.MaxInt64)) //#nosec G115 -- Clamped to MaxInt64
 		worstcase := mustNew(t, time.Unix(initUnix, 0), gas.Gas(initTarget), gas.Gas(initExcess), DefaultGasPriceConfig())
 		actual := mustNew(t, time.Unix(initUnix, 0), gas.Gas(initTarget), gas.Gas(initExcess), DefaultGasPriceConfig())
 
@@ -130,28 +130,28 @@ func FuzzWorstCasePrice(f *testing.F) {
 		}{
 			{
 				time:   time0,
-				nanos:  time.Duration(nanos0 % 1e9), //nolint:gosec
+				nanos:  time.Duration(nanos0 % 1e9), //#nosec G115
 				used:   gas.Gas(used0),
 				limit:  gas.Gas(limit0),
 				target: gas.Gas(target0),
 			},
 			{
 				time:   time1,
-				nanos:  time.Duration(nanos1 % 1e9), //nolint:gosec
+				nanos:  time.Duration(nanos1 % 1e9), //#nosec G115
 				used:   gas.Gas(used1),
 				limit:  gas.Gas(limit1),
 				target: gas.Gas(target1),
 			},
 			{
 				time:   time2,
-				nanos:  time.Duration(nanos2 % 1e9), //nolint:gosec
+				nanos:  time.Duration(nanos2 % 1e9), //#nosec G115
 				used:   gas.Gas(used2),
 				limit:  gas.Gas(limit2),
 				target: gas.Gas(target2),
 			},
 			{
 				time:   time3,
-				nanos:  time.Duration(nanos3 % 1e9), //nolint:gosec
+				nanos:  time.Duration(nanos3 % 1e9), //#nosec G115
 				used:   gas.Gas(used3),
 				limit:  gas.Gas(limit3),
 				target: gas.Gas(target3),
@@ -166,7 +166,7 @@ func FuzzWorstCasePrice(f *testing.F) {
 			}
 			hook := hookstest.NewStub(block.target, hookstest.WithNow(func() time.Time {
 				return time.Unix(
-					int64(block.time), //nolint:gosec // Won't overflow for a few millennia
+					int64(block.time), //#nosec G115 -- Won't overflow for a few millennia
 					int64(block.nanos),
 				)
 			}))

@@ -27,7 +27,6 @@ go_library(
         "//vms/saevm/hook",
         "//vms/saevm/params",
         "//vms/saevm/proxytime",
-        "//vms/saevm/saetest",
         "//vms/saevm/types",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

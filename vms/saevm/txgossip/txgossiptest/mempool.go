@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package txgossiptest provides test helpers for mempool operations.
@@ -8,11 +8,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // WaitUntilPending waits until all transactions provided are marked as pending in `pool`.

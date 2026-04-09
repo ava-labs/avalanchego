@@ -1,12 +1,13 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpc
 
 import (
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/crypto"
+
+	"github.com/ava-labs/avalanchego/version"
 )
 
 // web3API offers the `web3` RPCs.

@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package intmath
@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const max = math.MaxUint64
+const max64 = math.MaxUint64
 
 func TestBoundedSubtract(t *testing.T) {
 	tests := []struct {
@@ -22,8 +22,8 @@ func TestBoundedSubtract(t *testing.T) {
 		{a: 2, b: 1, floor: 1, want: 1}, // a - b == floor
 		{a: 2, b: 2, floor: 1, want: 1}, // bounded
 		{a: 3, b: 1, floor: 1, want: 2},
-		{a: max, b: 10, floor: max - 9, want: max - 9}, // `a` threshold (`max+1`) would overflow uint64
-		{a: max, b: 10, floor: max - 11, want: max - 10},
+		{a: max64, b: 10, floor: max64 - 9, want: max64 - 9}, // `a` threshold (`max64+1`) would overflow uint64
+		{a: max64, b: 10, floor: max64 - 11, want: max64 - 10},
 	}
 
 	for _, tt := range tests {
@@ -50,9 +50,9 @@ func FuzzBoundedAdd(f *testing.F) {
 		{a: 1, b: 10, ceil: 10, want: 10},
 		{a: 1, b: 10, ceil: 11, want: 11},
 		{a: 1, b: 10, ceil: 12, want: 11},
-		{a: max, b: 0, ceil: 100, want: 100},
-		{a: max, b: 1, ceil: 100, want: 100},
-		{a: max, b: max, ceil: 0, want: 0},
+		{a: max64, b: 0, ceil: 100, want: 100},
+		{a: max64, b: 1, ceil: 100, want: 100},
+		{a: max64, b: max64, ceil: 0, want: 0},
 	}
 
 	for _, tt := range tests {
@@ -79,15 +79,15 @@ func TestBoundedMultiply(t *testing.T) {
 	tests := []struct {
 		a, b, ceil, want uint64
 	}{
-		{a: 2, b: 3, ceil: 10, want: 6},              // not bounded
-		{a: 2, b: 3, ceil: 6, want: 6},               // a*b == ceil
-		{a: 2, b: 3, ceil: 5, want: 5},               // bounded
-		{a: 0, b: 5, ceil: 10, want: 0},              // a == 0
-		{a: 0, b: 0, ceil: 0, want: 0},               // all zero
-		{a: 1, b: 1, ceil: 0, want: 0},               // ceil == 0 bounds everything
-		{a: 2, b: max, ceil: max, want: max},         // a*b would overflow uint64
-		{a: max, b: max, ceil: max, want: max},       // both at max, would overflow
-		{a: max, b: 2, ceil: max - 1, want: max - 1}, // a*b overflows, bounded to max-1
+		{a: 2, b: 3, ceil: 10, want: 6},                    // not bounded
+		{a: 2, b: 3, ceil: 6, want: 6},                     // a*b == ceil
+		{a: 2, b: 3, ceil: 5, want: 5},                     // bounded
+		{a: 0, b: 5, ceil: 10, want: 0},                    // a == 0
+		{a: 0, b: 0, ceil: 0, want: 0},                     // all zero
+		{a: 1, b: 1, ceil: 0, want: 0},                     // ceil == 0 bounds everything
+		{a: 2, b: max64, ceil: max64, want: max64},         // a*b would overflow uint64
+		{a: max64, b: max64, ceil: max64, want: max64},     // both at max, would overflow
+		{a: max64, b: 2, ceil: max64 - 1, want: max64 - 1}, // a*b overflows, bounded to max-1
 	}
 
 	for _, tt := range tests {
@@ -122,9 +122,9 @@ func TestMulDiv(t *testing.T) {
 			wantQuoCeil: 5, wantExtra: 0,
 		},
 		{
-			a: max, b: 4, div: 8, // must avoid overflow
-			wantQuo: max / 2, wantRem: 4,
-			wantQuoCeil: max/2 + 1, wantExtra: 4,
+			a: max64, b: 4, div: 8, // must avoid overflow
+			wantQuo: max64 / 2, wantRem: 4,
+			wantQuoCeil: max64/2 + 1, wantExtra: 4,
 		},
 	}
 
@@ -141,7 +141,7 @@ func TestMulDiv(t *testing.T) {
 		"MulDiv":     MulDiv[uint64],
 		"MulDivCeil": MulDivCeil[uint64],
 	} {
-		if _, _, err := fn(max, 2, 1); !errors.Is(err, ErrOverflow) {
+		if _, _, err := fn(max64, 2, 1); !errors.Is(err, ErrOverflow) {
 			t.Errorf("%s[uint64]([max uint64], 2, 1) got error %v; want %v", name, err, ErrOverflow)
 		}
 	}
@@ -157,10 +157,10 @@ func TestCeilDiv(t *testing.T) {
 		{num: 4, den: 1, want: 4},
 		{num: 4, den: 3, want: 2},
 		{num: 10, den: 3, want: 4},
-		{num: max, den: 2, want: 1 << 63}, // must not overflow
+		{num: max64, den: 2, want: 1 << 63}, // must not overflow
 	}
 
-	rng := rand.New(rand.NewPCG(0, 0)) //nolint:gosec // Reproducibility is valuable for tests
+	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
 	for range 50 {
 		l := uint64(rng.Uint32())
 		r := uint64(rng.Uint32())

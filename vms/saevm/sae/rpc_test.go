@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sae
@@ -15,9 +15,6 @@ import (
 	"time"
 
 	"github.com/arr4n/shed/testerr"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/version"
-	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -36,11 +33,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	ethereum "github.com/ava-labs/libevm"
 )
 
 var zeroAddr common.Address
@@ -259,7 +260,7 @@ func TestNetNamespace(t *testing.T) {
 			},
 			{
 				method: "net_version",
-				want:   fmt.Sprintf("%d", saetest.ChainConfig().ChainID.Uint64()),
+				want:   saetest.ChainConfig().ChainID.String(),
 			},
 		}...)
 	}
@@ -288,7 +289,7 @@ func TestTxPoolNamespace(t *testing.T) {
 		t.Helper()
 		return sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
 			To:        &addresses[i],
-			Gas:       params.TxGas + uint64(i), //nolint:gosec // Won't overflow
+			Gas:       params.TxGas + uint64(i), //#nosec G115 -- Won't overflow
 			GasFeeCap: big.NewInt(int64(i + 1)),
 			Value:     big.NewInt(int64(i + 10)),
 		})
@@ -616,7 +617,7 @@ func TestGetLogs(t *testing.T) {
 	emitter := common.Address{'l', 'o', 'g'}
 	precompile := vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, _ []byte) ([]byte, error) {
 		data := make([]byte, 8)
-		rng.Read(data) //nolint:gosec,errcheck // Never returns an error; signature only to implement io.Reader
+		_, _ = rng.Read(data)
 		env.StateDB().AddLog(&types.Log{
 			Address: env.Addresses().EVMSemantic.Self,
 			Data:    data, // Guarantee uniqueness as this is the data under test
@@ -683,10 +684,10 @@ func TestGetLogs(t *testing.T) {
 	ptr := func(h common.Hash) *common.Hash { return &h }
 
 	tests := []struct {
-		name            string
-		query           ethereum.FilterQuery
-		wantLogs        []types.Log
-		wantErrContains string
+		name     string
+		query    ethereum.FilterQuery
+		wantLogs []types.Log
+		wantErr  testerr.Want
 	}{
 		{
 			name: "genesis",
@@ -705,7 +706,7 @@ func TestGetLogs(t *testing.T) {
 			query: ethereum.FilterQuery{
 				BlockHash: &common.Hash{0xde, 0xad},
 			},
-			wantErrContains: "unknown block",
+			wantErr: testerr.Contains("unknown block"),
 		},
 		{
 			name: "on_disk",
@@ -753,11 +754,9 @@ func TestGetLogs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Logf("%T: %[1]v", tt.query)
 			got, err := sut.FilterLogs(ctx, tt.query)
-			if tt.wantErrContains != "" {
-				require.ErrorContains(t, err, tt.wantErrContains, "eth_getLogs(...)")
-				return
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("eth_getLogs(...) %s", diff)
 			}
-			require.NoErrorf(t, err, "eth_getLogs(...)")
 			if diff := cmp.Diff(tt.wantLogs, got, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("eth_getLogs(...) mismatch (-want +got):\n%s", diff)
 			}
@@ -824,7 +823,7 @@ func TestGetReceipts(t *testing.T) {
 			r.CumulativeGasUsed = totalGas
 			r.BlockHash = b.Hash()
 			r.BlockNumber = b.Number()
-			r.TransactionIndex = uint(i) //nolint:gosec // Known non-negative
+			r.TransactionIndex = uint(i) //#nosec G115 -- Known non-negative
 		}
 		return b, rs
 	}
@@ -1263,7 +1262,7 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 	}...)
 
 	for i, wantTx := range want.Transactions() {
-		txIdx := hexutil.Uint(i) //nolint:gosec // definitely won't overflow
+		txIdx := hexutil.Uint(i) //#nosec G115 -- Won't overflow
 		marshaled, err := wantTx.MarshalBinary()
 		require.NoErrorf(t, err, "%T.MarshalBinary()", wantTx)
 
@@ -1291,7 +1290,7 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 		}...)
 	}
 
-	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1) //nolint:gosec // Known to not overflow
+	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1) //#nosec G115 -- Known to not overflow
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getTransactionByBlockHashAndIndex",
@@ -1379,7 +1378,7 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 	}...)
 
 	for i, wantTx := range want.Transactions() {
-		txIdx := hexutil.Uint(i) //nolint:gosec // definitely won't overflow
+		txIdx := hexutil.Uint(i) //#nosec G115 -- Won't overflow
 		marshaled, err := wantTx.MarshalBinary()
 		require.NoErrorf(t, err, "%T.MarshalBinary()", wantTx)
 
@@ -1397,7 +1396,7 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 		}...)
 	}
 
-	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1) //nolint:gosec // Known to not overflow
+	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1) //#nosec G115 -- Known to not overflow
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getTransactionByBlockNumberAndIndex",
@@ -1445,9 +1444,9 @@ func (s *SUT) testGetByUnknownNumber(ctx context.Context, t *testing.T) {
 	}...)
 }
 
-func withTxFeeCap(cap float64) sutOption {
+func withTxFeeCap(feeCap float64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.RPCConfig.TxFeeCap = cap
+		c.vmConfig.RPCConfig.TxFeeCap = feeCap
 	})
 }
 

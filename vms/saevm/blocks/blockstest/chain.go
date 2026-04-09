@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockstest
@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm/options"
-	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -24,7 +23,6 @@ import (
 //
 // It is not safe for concurrent use.
 type ChainBuilder struct {
-	config         *params.ChainConfig
 	chain          []*blocks.Block
 	blocksByHash   sync.Map
 	acceptedBlocks event.FeedOf[*blocks.Block]
@@ -34,10 +32,9 @@ type ChainBuilder struct {
 
 // NewChainBuilder returns a new ChainBuilder starting from the provided block,
 // which MUST NOT be nil.
-func NewChainBuilder(config *params.ChainConfig, genesis *blocks.Block, defaultOpts ...ChainOption) *ChainBuilder {
+func NewChainBuilder(genesis *blocks.Block, defaultOpts ...ChainOption) *ChainBuilder {
 	c := &ChainBuilder{
-		config: config,
-		chain:  []*blocks.Block{genesis},
+		chain: []*blocks.Block{genesis},
 	}
 	c.SetDefaultOptions(defaultOpts...)
 	return c
@@ -151,7 +148,7 @@ func (cb *ChainBuilder) ResolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
 		if bn < 0 {
 			return 0, fmt.Errorf("%s block unsupported", bn)
 		}
-		n := uint64(bn) //nolint:gosec // Non-negative checked above
+		n := uint64(bn) //#nosec G115 -- Non-negative checked above
 		if n > head {
 			return 0, fmt.Errorf("%w: %d", ErrBlockNotFound, n)
 		}

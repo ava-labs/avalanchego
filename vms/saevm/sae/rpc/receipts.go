@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpc
@@ -121,6 +121,6 @@ func (ir immediateReceipts) GetTransactionReceipt(ctx context.Context, h common.
 		r.BlockNumber.Uint64(),
 		r.Signer,
 		r.Tx,
-		int(r.TransactionIndex), //nolint:gosec // Known to not overflow
+		int(r.TransactionIndex), //#nosec G115 -- Known to not overflow
 	), nil
 }

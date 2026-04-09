@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sae
@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/txpool"
@@ -18,13 +16,16 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // blockBuilder hides [blockBuilderG]'s generic type behind non-generic methods.
@@ -117,7 +118,7 @@ func (b *blockBuilderG[_]) rebuild(
 		ctx,
 		bCtx,
 		parent,
-		func(f txpool.PendingFilter) []*txgossip.LazyTransaction { return txs },
+		func(txpool.PendingFilter) []*txgossip.LazyTransaction { return txs },
 		rebuilder,
 	)
 }

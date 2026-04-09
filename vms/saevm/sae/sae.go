@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package sae implements the [Streaming Asynchronous Execution] (SAE) virtual
@@ -18,7 +18,7 @@ import (
 )
 
 func unix(t time.Time) uint64 {
-	return uint64(t.Unix()) //nolint:gosec // Guaranteed to be positive
+	return uint64(t.Unix()) //#nosec G115 -- Guaranteed to be positive
 }
 
 // uint256FromBig is a wrapper around [uint256.FromBig] with extra checks, for

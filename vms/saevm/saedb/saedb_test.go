@@ -1,11 +1,9 @@
-// Copyright (C) 2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package saedb
 
-import (
-	"testing"
-)
+import "testing"
 
 func FuzzTrieDBCommitHeights(f *testing.F) {
 	f.Fuzz(func(t *testing.T, e uint64) {

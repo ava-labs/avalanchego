@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sae
@@ -7,13 +7,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/event"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
@@ -21,7 +21,7 @@ import (
 // which MAY be nil.
 //
 // [preferred block]: https://github.com/ava-labs/avalanchego/tree/master/vms#set-preference
-func (vm *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
+func (vm *VM) SetPreference(ctx context.Context, id ids.ID, _ *block.Context) error {
 	b, err := vm.GetBlock(ctx, id)
 	if err != nil {
 		return err

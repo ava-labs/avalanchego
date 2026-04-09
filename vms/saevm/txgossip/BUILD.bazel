@@ -14,7 +14,6 @@ go_library(
     deps = [
         "//ids",
         "//network/p2p/gossip",
-        "//utils/logging",
         "//vms/saevm/saexec",
         "//vms/saevm/types",
         "@com_github_ava_labs_libevm//common",

@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpc
@@ -182,7 +182,7 @@ func (c *customAPI) NewAcceptedTransactions(ctx context.Context, fullTx *bool) (
 				for i, tx := range block.Transactions() {
 					var data any
 					if fullTx != nil && *fullTx {
-						data = ethapi.NewRPCTransaction(tx, hash, num, buildTime, uint64(i), baseFee, chainConfig) //nolint:gosec // i is non-negative
+						data = ethapi.NewRPCTransaction(tx, hash, num, buildTime, uint64(i), baseFee, chainConfig) //#nosec G115 -- i is non-negative
 					} else {
 						data = tx.Hash()
 					}

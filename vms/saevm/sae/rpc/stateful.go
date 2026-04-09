@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpc
@@ -44,7 +44,7 @@ func (b *backend) RPCGasCap() uint64 {
 	return b.config.GasCap
 }
 
-func (b *backend) Engine() consensus.Engine {
+func (*backend) Engine() consensus.Engine {
 	return (*coinbaseAsAuthor)(nil)
 }
 
@@ -131,6 +131,8 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 // trie data has not been pruned (or requires an archival node for older blocks).
 //
 // Reference: https://geth.ethereum.org/docs/developers/evm-tracing#state-availability
+//
+//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
 	root, err := b.postExecutionStateRoot(block.Hash(), block.NumberU64())
 	if err != nil {
@@ -152,6 +154,8 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 // Replay calls [saexec.Execute] - the same pipeline used by
 // [saexec.Executor] - with [noEndOfBlockOps] to suppress end-of-block
 // operations and [saexec.NullReceiptStore] to skip receipt broadcasting.
+//
+//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	var bCtx vm.BlockContext
 	if ethB.NumberU64() == 0 {

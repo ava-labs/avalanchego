@@ -1,18 +1,15 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -23,10 +20,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -42,7 +42,7 @@ func TestMarkExecuted(t *testing.T) {
 	txs := make(types.Transactions, 10)
 	for i := range txs {
 		txs[i] = types.NewTx(&types.LegacyTx{
-			Nonce:    uint64(i), //nolint:gosec // Won't overflow
+			Nonce:    uint64(i), //#nosec G115 -- Won't overflow
 			GasPrice: big.NewInt(gasPrice),
 			Gas:      params.TxGas,
 			To:       &common.Address{},
@@ -71,9 +71,9 @@ func TestMarkExecuted(t *testing.T) {
 		require.False(t, b.Executed(), "Executed()")
 		require.NoError(t, b.CheckInvariants(NotExecuted), "CheckInvariants(NotExecuted)")
 
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		defer cancel()
-		require.ErrorIs(t, context.DeadlineExceeded, b.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
+		require.ErrorIs(t, b.WaitUntilExecuted(ctx), context.DeadlineExceeded, "WaitUntilExecuted()")
 	})
 
 	gasTime := mustNewGasTime(t, time.Unix(42, 0), 1e6, 42, gastime.DefaultGasPriceConfig())
@@ -95,7 +95,7 @@ func TestMarkExecuted(t *testing.T) {
 			EffectiveGasPrice: big.NewInt(gasPrice),
 			BlockHash:         ethB.Hash(),
 			BlockNumber:       new(big.Int).Set(ethB.Number()),
-			TransactionIndex:  uint(i), //nolint:gosec // Won't overflow
+			TransactionIndex:  uint(i), //#nosec G115 -- Won't overflow
 		})
 	}
 	lastExecuted := new(atomic.Pointer[Block])
@@ -125,7 +125,7 @@ func TestMarkExecuted(t *testing.T) {
 			require.True(t, b.Executed(), "Executed()")
 			assert.NoError(t, b.CheckInvariants(Executed), "CheckInvariants(Executed)")
 
-			require.NoError(t, b.WaitUntilExecuted(context.Background()), "WaitUntilExecuted()")
+			require.NoError(t, b.WaitUntilExecuted(t.Context()), "WaitUntilExecuted()")
 
 			assert.Zero(t, b.ExecutedByGasTime().Compare(gasTime.Time), "ExecutedByGasTime().Compare([original input])")
 			assert.Zero(t, b.ExecutedBaseFee().Cmp(baseFee), "ExecutedBaseFee().Cmp([original input])")
@@ -144,7 +144,7 @@ func TestMarkExecuted(t *testing.T) {
 			t.Run("MarkExecuted_again", func(t *testing.T) {
 				rec := saetest.NewLogRecorder(logging.Warn)
 				b.log = rec
-				assert.ErrorIs(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), errMarkBlockExecutedAgain)
+				require.ErrorIs(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), errMarkBlockExecutedAgain)
 				// The database's head block might have been corrupted so this MUST
 				// be a fatal action.
 				assert.Len(t, rec.At(logging.Fatal), 1, "FATAL logs")
@@ -160,7 +160,7 @@ func TestMarkExecuted(t *testing.T) {
 				"ReadHeadBlock":      rawdb.ReadHeadBlock(db),
 				"ReadHeadHeader":     rawdb.ReadHeadHeader(db),
 			} {
-				t.Run(fmt.Sprintf("rawdb.%s", fn), func(t *testing.T) {
+				t.Run("rawdb."+fn, func(t *testing.T) {
 					require.NotNil(t, got)
 					assert.Equalf(t, b.Hash(), got.Hash(), "rawdb.%s()", fn)
 				})

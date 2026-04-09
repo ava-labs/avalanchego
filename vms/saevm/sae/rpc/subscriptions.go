@@ -1,4 +1,4 @@
-// Copyright (C) 2025-2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpc
@@ -19,15 +19,15 @@ func (b *backend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscri
 // reorgs makes chain-side and log-removal events impossible. As "pending"
 // refers to accepted but not executed blocks, pending logs are an oxymoron.
 
-func (b *backend) SubscribeChainSideEvent(chan<- core.ChainSideEvent) event.Subscription {
+func (*backend) SubscribeChainSideEvent(chan<- core.ChainSideEvent) event.Subscription {
 	return newNoopSubscription()
 }
 
-func (b *backend) SubscribeRemovedLogsEvent(chan<- core.RemovedLogsEvent) event.Subscription {
+func (*backend) SubscribeRemovedLogsEvent(chan<- core.RemovedLogsEvent) event.Subscription {
 	return newNoopSubscription()
 }
 
-func (b *backend) SubscribePendingLogsEvent(chan<- []*types.Log) event.Subscription {
+func (*backend) SubscribePendingLogsEvent(chan<- []*types.Log) event.Subscription {
 	return newNoopSubscription()
 }
 
