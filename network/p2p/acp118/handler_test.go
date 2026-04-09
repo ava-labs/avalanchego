@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -146,7 +147,7 @@ func TestHandler(t *testing.T) {
 			networkID := uint32(123)
 			chainID := ids.ID{1, 2, 3}
 			signer := warp.NewSigner(sk, networkID, chainID)
-			h := NewCachedHandler(tt.cacher, tt.verifier, signer)
+			h := NewCachedHandler(tt.cacher, tt.verifier, signer, logging.NoLog{})
 			clientNodeID := ids.GenerateTestNodeID()
 			serverNodeID := ids.GenerateTestNodeID()
 			c := p2ptest.NewClient(
