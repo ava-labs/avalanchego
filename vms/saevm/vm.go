@@ -61,9 +61,6 @@ type SinceGenesis struct {
 	mempool      *txpool.Mempool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
 
-	// TODO(StephenButtolph): Remove. This is only used by the tests.
-	warpVerifier *saewarp.Verifier
-
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
 	// resource it depends on.
@@ -240,10 +237,10 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	{ // ==========  Warp Handler  ==========
-		vm.warpVerifier = saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage)
+		warpVerifier := saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage)
 		warpHandler := acp118.NewCachedHandler(
 			lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
-			vm.warpVerifier,
+			warpVerifier,
 			snowCtx.WarpSigner,
 		)
 		if err := inner.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {

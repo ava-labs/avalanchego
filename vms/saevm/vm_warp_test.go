@@ -4,40 +4,29 @@
 package saevm
 
 import (
-	"context"
 	"math/big"
-	"net/http/httptest"
 	"os"
 	"testing"
 
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/ethclient"
-	"github.com/ava-labs/libevm/rpc"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/sae"
-	"github.com/ava-labs/strevm/saedb"
+	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
+
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
+	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -46,295 +35,126 @@ import (
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	libevmcommon "github.com/ava-labs/libevm/common"
 )
-
-var (
-	warpTxGasFeeCap = big.NewInt(225 * params.GWei)
-	warpTxGasTipCap = big.NewInt(params.GWei)
-)
-
-type sut struct {
-	ctx     context.Context
-	snowCtx *snow.Context
-	vm      *SinceGenesis
-	client  *ethclient.Client
-	chainID *big.Int
-	signer  types.Signer
-}
 
 func TestMain(m *testing.M) {
 	evm.RegisterAllLibEVMExtras()
 	os.Exit(m.Run())
 }
 
+// TestSendWarpMessage checks availability of warp verification requests
+// relative to block execution.
 func TestSendWarpMessage(t *testing.T) {
-	require := require.New(t)
-	env := newSut(t)
+	sut := newSUT(t)
 
 	payloadData := utils.RandomBytes(100)
+
 	warpSendMessageInput, err := warpcontract.PackSendWarpMessage(payloadData)
-	require.NoError(err)
+	require.NoError(t, err)
+	sut.sendWarpTx(t, warpSendMessageInput, nil /*unsigned message*/)
 
-	addressedPayload, err := payload.NewAddressedCall(vmtest.TestEthAddrs[0].Bytes(), payloadData)
-	require.NoError(err)
-	expectedUnsignedMessage, err := avalancheWarp.NewUnsignedMessage(
-		env.snowCtx.NetworkID,
-		env.snowCtx.ChainID,
-		addressedPayload.Bytes(),
-	)
-	require.NoError(err)
+	built := sut.buildAndVerifyBlock(t, nil)
+	require.Len(t, built.EthBlock().Transactions(), 1)
 
-	tx0 := types.NewTransaction(
-		uint64(0),
-		warpcontract.ContractAddress,
-		big.NewInt(1),
-		100_000,
-		big.NewInt(25*params.GWei),
-		warpSendMessageInput,
-	)
-	signedTx0, err := types.SignTx(tx0, env.signer, vmtest.TestKeys[0].ToECDSA())
-	require.NoError(err)
+	// The validator will not sign any messages, since the transaction is not executed yet.
 
-	require.NoError(env.client.SendTransaction(env.ctx, signedTx0))
+	addressedPayload, err := payload.NewAddressedCall(sut.wallet.Addresses()[0].Bytes(), payloadData)
+	require.NoError(t, err)
+	unsignedMessage := sut.newUnsignedWarpMessage(t, addressedPayload.Bytes())
+	sut.verifyWarpMessage(t, unsignedMessage.Bytes(), int32(warp.TypeErrCode))
 
-	built := env.buildBlock(t, nil)
+	blockHashPayload, err := payload.NewHash(built.ID())
+	require.NoError(t, err)
+	blockMessage := sut.newUnsignedWarpMessage(t, blockHashPayload.Bytes())
+	sut.verifyWarpMessage(t, blockMessage.Bytes(), int32(warp.VerifyErrCode))
 
-	expectedBlockHashPayload, err := payload.NewHash(built.ID())
-	require.NoError(err)
-	expectedBlockUnsignedMessage, err := avalancheWarp.NewUnsignedMessage(env.snowCtx.NetworkID, env.snowCtx.ChainID, expectedBlockHashPayload.Bytes())
-	require.NoError(err)
+	sut.acceptAndExecuteBlock(t, built)
 
-	addressedErr := env.vm.warpVerifier.Verify(env.ctx, expectedUnsignedMessage, nil)
-	require.NotNil(addressedErr)
-	require.Equal(int32(warp.TypeErrCode), addressedErr.Code)
-
-	blockErr := env.vm.warpVerifier.Verify(env.ctx, expectedBlockUnsignedMessage, nil)
-	require.NotNil(blockErr)
-	require.Equal(int32(warp.VerifyErrCode), blockErr.Code)
-
-	require.Len(built.EthBlock().Transactions(), 1)
-
-	env.acceptBlock(t, built)
-
+	// Receipts are generated after block execution
 	receipts := built.Receipts()
-	require.Len(receipts, 1)
-	require.Len(receipts[0].Logs, 1)
-	expectedTopics := []libevmcommon.Hash{
+	require.Len(t, receipts, 1)
+	require.Len(t, receipts[0].Logs, 1)
+	expectedTopics := []common.Hash{
 		warpcontract.WarpABI.Events["SendWarpMessage"].ID,
-		libevmcommon.BytesToHash(vmtest.TestEthAddrs[0].Bytes()),
-		libevmcommon.Hash(expectedUnsignedMessage.ID()),
+		common.BytesToHash(sut.wallet.Addresses()[0].Bytes()),
+		common.Hash(unsignedMessage.ID()),
 	}
-	require.Equal(expectedTopics, receipts[0].Logs[0].Topics)
-	logData := receipts[0].Logs[0].Data
-	unsignedMessage, err := warpcontract.UnpackSendWarpEventDataToMessage(logData)
-	require.NoError(err)
+	require.Equal(t, expectedTopics, receipts[0].Logs[0].Topics)
 
-	require.Nil(env.vm.warpVerifier.Verify(env.ctx, unsignedMessage, nil))
-	require.Nil(env.vm.warpVerifier.Verify(env.ctx, expectedBlockUnsignedMessage, nil))
+	// Unsigned warp message should have been emitted in the log.
+	logData := receipts[0].Logs[0].Data
+	loggedMessage, err := warpcontract.UnpackSendWarpEventDataToMessage(logData)
+	require.NoError(t, err)
+	require.Equal(t, unsignedMessage, loggedMessage)
+
+	// The messages should be verifiable after the block is executed.
+	sut.verifyWarpMessage(t, unsignedMessage.Bytes(), 0 /* valid message */)
+	sut.verifyWarpMessage(t, blockMessage.Bytes(), 0 /* valid message */)
 }
 
 func TestPredicateVerification(t *testing.T) {
-	sourceChainID := ids.GenerateTestID()
-	networkID := snowtest.Context(t, snowtest.CChainID).NetworkID
+	sut := newSUT(t)
 
-	sourceAddress := secp256k1.TestKeys()[0].EthAddress()
+	sourceAddress := sut.wallet.Addresses()[0]
 	addressedPayload, err := payload.NewAddressedCall(sourceAddress.Bytes(), []byte{1, 2, 3})
 	require.NoError(t, err)
-	addressedCallMessage, err := avalancheWarp.NewUnsignedMessage(
-		networkID,
-		sourceChainID,
-		addressedPayload.Bytes(),
-	)
-	require.NoError(t, err)
+	addressedCallMessage := sut.newUnsignedWarpMessage(t, addressedPayload.Bytes())
 	addressedCallTxPayload, err := warpcontract.PackGetVerifiedWarpMessage(0)
 	require.NoError(t, err)
 
 	blockHashPayload, err := payload.NewHash(ids.GenerateTestID())
 	require.NoError(t, err)
-	blockHashMessage, err := avalancheWarp.NewUnsignedMessage(
-		networkID,
-		sourceChainID,
-		blockHashPayload.Bytes(),
-	)
-	require.NoError(t, err)
+	blockHashMessage := sut.newUnsignedWarpMessage(t, blockHashPayload.Bytes())
 	blockHashTxPayload, err := warpcontract.PackGetVerifiedWarpBlockHash(0)
 	require.NoError(t, err)
 
 	tests := []struct {
 		name           string
 		validPredicate bool
-		unsignedMsg    *avalancheWarp.UnsignedMessage
+		signedMsg      *avalancheWarp.Message
 		txPayload      []byte
 	}{
 		{
 			name:           "valid warp message",
 			validPredicate: true,
-			unsignedMsg:    addressedCallMessage,
+			signedMsg:      sut.signWarpMessage(t, addressedCallMessage),
 			txPayload:      addressedCallTxPayload,
 		},
 		{
 			name:           "invalid warp message",
 			validPredicate: false,
-			unsignedMsg:    addressedCallMessage,
+			signedMsg:      fakeSign(t, addressedCallMessage),
 			txPayload:      addressedCallTxPayload,
 		},
 		{
 			name:           "valid warp block hash",
 			validPredicate: true,
-			unsignedMsg:    blockHashMessage,
+			signedMsg:      sut.signWarpMessage(t, blockHashMessage),
 			txPayload:      blockHashTxPayload,
 		},
 		{
 			name:           "invalid warp block hash",
 			validPredicate: false,
-			unsignedMsg:    blockHashMessage,
+			signedMsg:      fakeSign(t, blockHashMessage),
 			txPayload:      blockHashTxPayload,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			sut := newSut(t)
+			validateTx := sut.sendWarpTx(t, tt.txPayload, tt.signedMsg)
 
-			signedMsg := signWarpMessage(t, sut.snowCtx, tt.unsignedMsg, tt.validPredicate)
-			validateTx := sut.sendWarpTx(t, tt.txPayload, signedMsg)
+			built := sut.buildAndVerifyBlock(t, &block.Context{PChainHeight: 0})
+			require.Len(t, built.EthBlock().Transactions(), 1)
 
-			built := sut.buildBlock(t, &block.Context{PChainHeight: 0})
-			require.Len(built.EthBlock().Transactions(), 1)
-
-			sut.acceptBlock(t, built)
+			sut.acceptAndExecuteBlock(t, built)
 			assertPredicateResult(t, built, validateTx, tt.validPredicate)
 
 			receipts := built.Receipts()
-			require.Len(receipts, 1)
-			require.Equal(types.ReceiptStatusSuccessful, receipts[0].Status)
+			require.Len(t, receipts, 1)
+			require.Equal(t, types.ReceiptStatusSuccessful, receipts[0].Status)
 		})
 	}
-}
-
-func newSut(t *testing.T) *sut {
-	t.Helper()
-
-	require := require.New(t)
-	ctx := t.Context()
-
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	snowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Durango)
-
-	genesisBytes := []byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Durango]))
-
-	mempoolConf := legacypool.DefaultConfig
-	mempoolConf.Journal = "/dev/null"
-
-	vm := NewSinceGenesis(sae.Config{
-		MempoolConfig: mempoolConf,
-		DBConfig: saedb.Config{
-			TrieDBConfig: triedb.HashDefaults,
-		},
-	})
-
-	appSender := &enginetest.Sender{
-		SendAppGossipF: func(context.Context, engcommon.SendConfig, []byte) error { return nil },
-	}
-
-	require.NoError(vm.Initialize(
-		ctx,
-		snowCtx,
-		memdb.New(),
-		genesisBytes,
-		nil,
-		nil,
-		nil,
-		appSender,
-	))
-	t.Cleanup(func() {
-		require.NoError(vm.Shutdown(context.WithoutCancel(ctx)))
-	})
-
-	require.NoError(vm.SetState(ctx, snow.Bootstrapping))
-	require.NoError(vm.SetState(ctx, snow.NormalOp))
-
-	handlers, err := vm.CreateHandlers(ctx)
-	require.NoError(err)
-	server := httptest.NewServer(handlers["/ws"])
-	t.Cleanup(server.Close)
-
-	rpcClient, err := rpc.Dial("ws://" + server.Listener.Addr().String())
-	require.NoError(err)
-	t.Cleanup(rpcClient.Close)
-
-	client := ethclient.NewClient(rpcClient)
-	chainID, err := client.ChainID(ctx)
-	require.NoError(err)
-
-	lastID, err := vm.LastAccepted(ctx)
-	require.NoError(err)
-	require.NoError(vm.SetPreference(ctx, lastID, nil))
-
-	return &sut{
-		ctx:     ctx,
-		snowCtx: snowCtx,
-		vm:      vm,
-		client:  client,
-		chainID: chainID,
-		signer:  types.LatestSignerForChainID(chainID),
-	}
-}
-
-func (s *sut) buildBlock(t *testing.T, blockCtx *block.Context) *blocks.Block {
-	t.Helper()
-
-	require := require.New(t)
-
-	msg, err := s.vm.WaitForEvent(s.ctx)
-	require.NoError(err)
-	require.Equal(engcommon.PendingTxs, msg)
-
-	built, err := s.vm.BuildBlock(s.ctx, blockCtx)
-	require.NoError(err)
-	require.NoError(s.vm.VerifyBlock(s.ctx, blockCtx, built))
-	return built
-}
-
-func (s *sut) acceptBlock(t *testing.T, built *blocks.Block) {
-	t.Helper()
-
-	require := require.New(t)
-	require.NoError(s.vm.SetPreference(s.ctx, built.ID(), nil))
-	require.NoError(s.vm.AcceptBlock(s.ctx, built))
-	require.NoError(built.WaitUntilExecuted(s.ctx))
-}
-
-func (s *sut) sendWarpTx(
-	t *testing.T,
-	txPayload []byte,
-	signedMessage *avalancheWarp.Message,
-) *types.Transaction {
-	t.Helper()
-
-	require := require.New(t)
-
-	warpAddr := warpcontract.ContractAddress
-	tx, err := types.SignTx(types.NewTx(&types.DynamicFeeTx{
-		ChainID:   s.chainID,
-		Nonce:     0,
-		To:        &warpAddr,
-		Gas:       200_000,
-		GasFeeCap: new(big.Int).Set(warpTxGasFeeCap),
-		GasTipCap: new(big.Int).Set(warpTxGasTipCap),
-		Value:     big.NewInt(0),
-		Data:      txPayload,
-		AccessList: types.AccessList{{
-			Address:     warpcontract.ContractAddress,
-			StorageKeys: predicate.New(signedMessage.Bytes()),
-		}},
-	}), s.signer, vmtest.TestKeys[0].ToECDSA())
-	require.NoError(err)
-
-	require.NoError(s.client.SendTransaction(s.ctx, tx))
-	return tx
 }
 
 func assertPredicateResult(
@@ -344,8 +164,6 @@ func assertPredicateResult(
 	expectValid bool,
 ) {
 	t.Helper()
-
-	require := require.New(t)
 
 	rules := paramstest.ForkToChainConfig[upgradetest.Durango].Rules(
 		built.EthBlock().Number(),
@@ -358,91 +176,70 @@ func assertPredicateResult(
 		built.EthBlock().Extra(),
 	)
 	blockResults, err := predicate.ParseBlockResults(headerPredicateResultsBytes)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	txBits := blockResults.Get(validateTx.Hash(), warpcontract.ContractAddress)
 	if expectValid {
-		require.Zero(txBits.Len())
+		require.Zero(t, txBits.Len())
 		return
 	}
 
-	require.Equal(1, txBits.Len())
-	require.True(txBits.Contains(0))
+	require.Equal(t, 1, txBits.Len())
+	require.True(t, txBits.Contains(0))
 }
 
-func signWarpMessage(
+func (s *SUT) newUnsignedWarpMessage(t *testing.T, payload []byte) *avalancheWarp.UnsignedMessage {
+	t.Helper()
+
+	message, err := avalancheWarp.NewUnsignedMessage(s.snowCtx.NetworkID, s.snowCtx.ChainID, payload)
+	require.NoError(t, err)
+	return message
+}
+
+func (s *SUT) sendWarpTx(
 	t *testing.T,
-	snowCtx *snow.Context,
+	txPayload []byte,
+	signedMessage *avalancheWarp.Message,
+) *types.Transaction {
+	t.Helper()
+
+	var accessList types.AccessList
+	if signedMessage != nil {
+		accessList = types.AccessList{{
+			Address:     warpcontract.ContractAddress,
+			StorageKeys: predicate.New(signedMessage.Bytes()),
+		}}
+	}
+
+	warpAddr := warpcontract.ContractAddress
+	tx := s.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:         &warpAddr,
+		Gas:        200_000,
+		GasFeeCap:  big.NewInt(225 * params.GWei),
+		Value:      big.NewInt(0),
+		Data:       txPayload,
+		AccessList: accessList,
+	})
+
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
+	return tx
+}
+
+func (s *SUT) signWarpMessage(
+	t *testing.T,
 	unsignedMessage *avalancheWarp.UnsignedMessage,
-	validSignature bool,
 ) *avalancheWarp.Message {
 	t.Helper()
 
-	require := require.New(t)
-
-	nodeID0 := ids.GenerateTestNodeID()
-	secretKey0, err := localsigner.New()
-	require.NoError(err)
-
-	nodeID1 := ids.GenerateTestNodeID()
-	secretKey1, err := localsigner.New()
-	require.NoError(err)
-
-	sourceChainID := unsignedMessage.SourceChainID
-	subnetID := ids.GenerateTestID()
-	snowCtx.ValidatorState = &validatorstest.State{
-		GetMinimumHeightF: func(context.Context) (uint64, error) {
-			return 0, nil
-		},
-		GetCurrentHeightF: func(context.Context) (uint64, error) {
-			return 0, nil
-		},
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			require.Equal(sourceChainID, chainID)
-			return subnetID, nil
-		},
-		GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
-			validatorSet := validators.WarpSet{
-				Validators: []*validators.Warp{
-					{
-						PublicKey:      secretKey0.PublicKey(),
-						PublicKeyBytes: bls.PublicKeyToUncompressedBytes(secretKey0.PublicKey()),
-						Weight:         50,
-						NodeIDs:        []ids.NodeID{nodeID0},
-					},
-					{
-						PublicKey:      secretKey1.PublicKey(),
-						PublicKeyBytes: bls.PublicKeyToUncompressedBytes(secretKey1.PublicKey()),
-						Weight:         50,
-						NodeIDs:        []ids.NodeID{nodeID1},
-					},
-				},
-				TotalWeight: 100,
-			}
-			utils.Sort(validatorSet.Validators)
-
-			return map[ids.ID]validators.WarpSet{
-				subnetID: validatorSet,
-			}, nil
-		},
+	signatures := make([]*bls.Signature, len(s.validatorKeys))
+	for i, key := range s.validatorKeys {
+		signature, err := key.Sign(unsignedMessage.Bytes())
+		require.NoError(t, err)
+		signatures[i] = signature
 	}
 
-	if !validSignature {
-		warpSignature := &avalancheWarp.BitSetSignature{
-			Signers: set.NewBits().Bytes(),
-		}
-		signedMessage, err := avalancheWarp.NewMessage(unsignedMessage, warpSignature)
-		require.NoError(err)
-		return signedMessage
-	}
-
-	signature0, err := secretKey0.Sign(unsignedMessage.Bytes())
-	require.NoError(err)
-	signature1, err := secretKey1.Sign(unsignedMessage.Bytes())
-	require.NoError(err)
-
-	aggregatedSignature, err := bls.AggregateSignatures([]*bls.Signature{signature0, signature1})
-	require.NoError(err)
+	aggregatedSignature, err := bls.AggregateSignatures(signatures)
+	require.NoError(t, err)
 
 	signersBitSet := set.NewBits()
 	signersBitSet.Add(0)
@@ -454,6 +251,56 @@ func signWarpMessage(
 	copy(warpSignature.Signature[:], bls.SignatureToBytes(aggregatedSignature))
 
 	signedMessage, err := avalancheWarp.NewMessage(unsignedMessage, warpSignature)
-	require.NoError(err)
+	require.NoError(t, err)
 	return signedMessage
+}
+
+func fakeSign(t *testing.T, unsignedMessage *avalancheWarp.UnsignedMessage) *avalancheWarp.Message {
+	t.Helper()
+
+	warpSignature := &avalancheWarp.BitSetSignature{
+		Signers:   set.NewBits().Bytes(),
+		Signature: [96]byte{1, 2, 3},
+	}
+	signedMessage, err := avalancheWarp.NewMessage(unsignedMessage, warpSignature)
+	require.NoError(t, err)
+	return signedMessage
+}
+
+// verifyWarpMessage sends a message to the warp handler and verifies that the
+// response is as expected based on the provided error code. If `expected` is 0,
+// then a valid message is expected.
+func (s *SUT) verifyWarpMessage(t *testing.T, payloadData []byte, expected int32) {
+	t.Helper()
+
+	protoMsg := &sdk.SignatureRequest{Message: payloadData}
+	requestBytes, err := proto.Marshal(protoMsg)
+	require.NoError(t, err)
+
+	msg := p2p.PrefixMessage(p2p.ProtocolPrefix(acp118.HandlerID), requestBytes)
+	deadline, _ := s.ctx.Deadline() // deadline is ignored
+	require.NoError(t, s.vm.AppRequest(t.Context(), ids.GenerateTestNodeID(), 1, deadline, msg))
+
+	var (
+		responseBytes []byte
+		appErr        *engcommon.AppError
+	)
+	select {
+	case responseBytes = <-s.appResponse:
+	case appErr = <-s.appErr:
+	case <-t.Context().Done():
+		require.Fail(t, "waiting for app response", t.Context().Err())
+	}
+
+	switch expected {
+	case 0:
+		require.Nil(t, appErr)
+		// The response is a signature - out of scope for this test.
+		// Any response is good!
+		require.NotNil(t, responseBytes)
+	default:
+		require.Nil(t, responseBytes)
+		require.NotNil(t, appErr)
+		require.Equal(t, expected, appErr.Code)
+	}
 }
