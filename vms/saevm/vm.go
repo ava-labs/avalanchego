@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/sae"
@@ -41,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/api"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
@@ -177,7 +179,22 @@ func (vm *SinceGenesis) Initialize(
 		txs,
 		warpStorage,
 	)
-	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
+
+	var lastSync *types.Block
+	lastSyncBytes, err := state.ReadLastSync(db)
+	switch {
+	case err == nil:
+		lastSync = new(types.Block)
+		if err := rlp.DecodeBytes(lastSyncBytes, lastSync); err != nil {
+			return fmt.Errorf("rlp.DecodeBytes(..., %T): %v", lastSync, err)
+		}
+	case errors.Is(err, avadb.ErrNotFound):
+		lastSync = genesis.ToBlock()
+	default:
+		return err
+	}
+
+	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, lastSync, appSender)
 	if err != nil {
 		return err
 	}

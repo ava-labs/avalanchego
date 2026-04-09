@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/saevm/state"
 	"go.uber.org/zap"
 )
 
@@ -147,16 +148,19 @@ func (v *VM) transition(ctx context.Context, last snowman.Block) error {
 	v.transitionLock.Lock()
 	defer v.transitionLock.Unlock()
 
+	lastBytes := last.Bytes()
 	v.chainCtx.Log.Info("transitioning VMs",
 		zap.Stringer("lastID", last.ID()),
 		zap.Uint64("lastHeight", last.Height()),
 		zap.Time("lastTime", last.Timestamp()),
 	)
 
-	// TODO: Write any required information to disk here
-
 	if err := v.preTransitionChain.Shutdown(ctx); err != nil {
 		return fmt.Errorf("closing pre-transition chain: %w", err)
+	}
+
+	if err := state.WriteLastSync(v.db, lastBytes); err != nil {
+		return fmt.Errorf("saving last synchronous block: %w", err)
 	}
 
 	var (
