@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
+	"go.uber.org/zap"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
@@ -90,6 +91,7 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 	if err != nil {
 		return nil, err
 	}
+	b.chainContext.Log.Debug("preffered block", zap.Stringer("blockID", preferredBlk.ID()), zap.Stringer("Parent block id", preferredBlk.Parent()))
 
 	preferredState, err := preferredBlk.State()
 	if err != nil {

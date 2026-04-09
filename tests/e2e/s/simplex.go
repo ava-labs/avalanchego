@@ -50,14 +50,14 @@ func NewSimplexSubnetOrPanic(nodes ...*tmpnet.Node) *tmpnet.Subnet {
 	}
 
 	// declare the initial validator set for the simplex subnet
-	initialValidators := make([]simplex.SimplexValidatorInfo, 0, len(nodes))
+	initialValidators := make([]simplex.ValidatorInfo, 0, len(nodes))
 	for _, node := range nodes {
 		key, err := node.GetBLSSigningKey()
 		if err != nil {
 			panic(err)
 		}
 
-		initialValidators = append(initialValidators, simplex.SimplexValidatorInfo{
+		initialValidators = append(initialValidators, simplex.ValidatorInfo{
 			NodeID:    node.NodeID,
 			PublicKey: key.PublicKey().Compress(),
 		})
