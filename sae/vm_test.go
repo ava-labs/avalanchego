@@ -57,6 +57,7 @@ import (
 	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/blocks/blockstest"
 	"github.com/ava-labs/strevm/cmputils"
+	"github.com/ava-labs/strevm/hook"
 	"github.com/ava-labs/strevm/hook/hookstest"
 	saeparams "github.com/ava-labs/strevm/params"
 	"github.com/ava-labs/strevm/saetest"
@@ -702,6 +703,50 @@ func TestCustomTransactionInclusion(t *testing.T) {
 	for _, a := range accounts {
 		assert.Equalf(t, a.nonce, sdb.GetNonce(a.address), "%T.GetNonce([%s])", sdb, a.name)
 		assert.Equalf(t, uint256.NewInt(a.balance), sdb.GetBalance(a.address), "%T.GetBalance([%s])", sdb, a.name)
+	}
+}
+
+// TestVerifyWhenBootstrapping verifies that verification is skipped during
+// bootstrapping.
+func TestVerifyWhenBootstrapping(t *testing.T) {
+	op := hookstest.Op{
+		ID:        ids.GenerateTestID(),
+		Gas:       100_000,
+		GasFeeCap: *uint256.NewInt(params.Wei),
+	}
+	ctx, sut := newSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.Ops = []hookstest.Op{op}
+	}))
+
+	blk := sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t))
+
+	// Sanity check that the op was included in the block.
+	ops, err := sut.hooks.EndOfBlockOps(unwrap(t, blk).EthBlock())
+	require.NoErrorf(t, err, "%T.EndOfBlockOps()", sut.hooks)
+	require.Equal(t, []hook.Op{op.AsOp()}, ops, "ops included in block")
+
+	// Mark the op invalid to distinguish whether [snowman.Block.Verify]
+	// verifies the block ops.
+	sut.hooks.InvalidOpIDs = set.Of(op.ID)
+
+	tests := []struct {
+		consensusState snow.State
+		want           error
+	}{
+		{
+			consensusState: snow.NormalOp,
+			want:           errHashMismatch,
+		},
+		{
+			consensusState: snow.Bootstrapping,
+			want:           nil,
+		},
+	}
+	for _, test := range tests {
+		require.NoErrorf(t, sut.SetState(ctx, test.consensusState), "%T.SetState(%s)", sut, test.consensusState)
+		t.Run(test.consensusState.String(), func(t *testing.T) {
+			assert.ErrorIsf(t, blk.Verify(ctx), test.want, "%T.Verify()", blk)
+		})
 	}
 }
 

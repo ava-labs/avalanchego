@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -192,11 +191,6 @@ func TestWorstCase(t *testing.T) {
 			timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 
 			ctx, sut := newSUT(t, flags.numAccounts, sutOpt, timeOpt)
-			// If we don't wait for blocks to be executed then their results may
-			// not be ready once they need to be settled, which will result in a
-			// WARNING log, which is considered an error. VMs in a bootstrapping
-			// state will automatically wait for execution.
-			require.NoError(t, sut.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
 
 			addrs := sut.wallet.Addresses()
 			numEOAs := len(addrs)
@@ -249,6 +243,11 @@ func TestWorstCase(t *testing.T) {
 					default:
 						require.NoError(t, b.Verify(ctx), "Verify()")
 						require.NoError(t, b.Accept(ctx), "Accept()")
+
+						// Ensure the execution results are available for future
+						// LastToSettleAt calls.
+						require.NoError(t, unwrap(t, b).WaitUntilExecuted(ctx), "WaitUntilExecuted()")
+
 						accepted = true
 					}
 				}

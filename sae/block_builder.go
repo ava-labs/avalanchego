@@ -157,31 +157,9 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		)
 	}
 
-	bTime := blocks.PreciseTime(b.hooks, hdr)
-	pTime := blocks.PreciseTime(b.hooks, parent.Header())
-
-	// It is allowed for [hook.BlockBuilder] to further constrain the allowed
-	// block times. However, every block MUST at least satisfy these basic
-	// sanity checks.
-	if bTime.Unix() < saeparams.TauSeconds {
-		return nil, fmt.Errorf("%w: %d < %d", errBlockTimeUnderMinimum, hdr.Time, saeparams.TauSeconds)
-	}
-	if bTime.Compare(pTime) < 0 {
-		return nil, fmt.Errorf("%w: %s < %s", errBlockTimeBeforeParent, bTime.String(), pTime.String())
-	}
-	maxTime := b.now().Add(maxFutureBlockDuration)
-	if bTime.Compare(maxTime) > 0 {
-		return nil, fmt.Errorf("%w: %s > %s", errBlockTimeAfterMaximum, bTime.String(), maxTime.String())
-	}
-
-	// Underflow of Add(-tau) is prevented by the above check.
-	lastSettled, ok, err := blocks.LastToSettleAt(b.hooks, bTime.Add(-saeparams.Tau), parent)
+	lastSettled, err := lastToSettle(b.hooks, hdr, parent, b.now(), log)
 	if err != nil {
 		return nil, err
-	}
-	if !ok {
-		log.Warn("Execution lagging when determining last block to settle")
-		return nil, errExecutionLagging
 	}
 
 	log = log.With(
@@ -349,4 +327,40 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	}
 	block.SetWorstCaseBounds(bounds)
 	return block, nil
+}
+
+func lastToSettle(
+	hooks hook.Points,
+	hdr *types.Header,
+	parent *blocks.Block,
+	now time.Time,
+	log logging.Logger,
+) (*blocks.Block, error) {
+	bTime := blocks.PreciseTime(hooks, hdr)
+	pTime := blocks.PreciseTime(hooks, parent.Header())
+
+	// It is allowed for [hook.BlockBuilder] to further constrain the allowed
+	// block times. However, every block MUST at least satisfy these basic
+	// sanity checks.
+	if bTime.Unix() < saeparams.TauSeconds {
+		return nil, fmt.Errorf("%w: %d < %d", errBlockTimeUnderMinimum, hdr.Time, saeparams.TauSeconds)
+	}
+	if bTime.Compare(pTime) < 0 {
+		return nil, fmt.Errorf("%w: %s < %s", errBlockTimeBeforeParent, bTime.String(), pTime.String())
+	}
+	maxTime := now.Add(maxFutureBlockDuration)
+	if bTime.Compare(maxTime) > 0 {
+		return nil, fmt.Errorf("%w: %s > %s", errBlockTimeAfterMaximum, bTime.String(), maxTime.String())
+	}
+
+	// Underflow of Add(-tau) is prevented by the above check.
+	lastSettled, ok, err := blocks.LastToSettleAt(hooks, bTime.Add(-saeparams.Tau), parent)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		log.Warn("Execution lagging when determining last block to settle")
+		return nil, errExecutionLagging
+	}
+	return lastSettled, nil
 }

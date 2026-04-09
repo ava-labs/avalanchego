@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/libevm/common"
@@ -83,6 +84,10 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 		return fmt.Errorf("%w at height %d <= last-accepted (%d)", errBlockHeightTooLow, height, accepted)
 	}
 
+	if vm.consensusState.Get() == snow.Bootstrapping {
+		return vm.verifyWhenBootstrapping(b, parent)
+	}
+
 	rebuilt, err := vm.blockBuilder.rebuild(ctx, bCtx, parent, b)
 	if err != nil {
 		return err
@@ -101,6 +106,38 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 		return err
 	}
 	b.SetWorstCaseBounds(rebuilt.WorstCaseBounds())
+
+	vm.consensusCritical.Store(b.Hash(), b)
+	return nil
+}
+
+var (
+	errSettledRootMismatch   = errors.New("settled root mismatch")
+	errSettledHeightMismatch = errors.New("settled height mismatch")
+)
+
+// verifyWhenBootstrapping skips verification in its entirety. It is expected
+// for blocks to be verified by hash in the bootstrapping engine. This supports
+// hooks, such as Coreth and Subnet-EVM, that are unable to fully verify blocks
+// during bootstrapping.
+func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
+	header := b.Header()
+	lastSettled, err := lastToSettle(vm.hooks, header, parent, vm.config.Now(), vm.log())
+	if err != nil {
+		return err
+	}
+
+	// Sanity checks to ensure the in-memory settled block matches the expected
+	// settled block.
+	if got, want := lastSettled.PostExecutionStateRoot(), b.SettledStateRoot(); got != want {
+		return fmt.Errorf("%w: got %#x ; want %#x", errSettledRootMismatch, got, want)
+	}
+	if got, want := lastSettled.NumberU64(), vm.hooks.SettledHeight(header); got != want {
+		return fmt.Errorf("%w: got %d ; want %d", errSettledHeightMismatch, got, want)
+	}
+	if err := b.SetAncestors(parent, lastSettled); err != nil {
+		return err
+	}
 
 	vm.consensusCritical.Store(b.Hash(), b)
 	return nil
