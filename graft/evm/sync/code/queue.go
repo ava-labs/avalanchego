@@ -36,8 +36,8 @@ type Queue struct {
 	db  ethdb.Database
 	out chan common.Hash // output to consumer
 
-	cancel     context.CancelFunc
-	done       <-chan struct{} // cancelled on Shutdown
+	cancel      context.CancelFunc
+	done        <-chan struct{} // cancelled on Shutdown
 	forwardDone chan struct{}   // closed when forward() exits
 
 	closeMu     sync.RWMutex
