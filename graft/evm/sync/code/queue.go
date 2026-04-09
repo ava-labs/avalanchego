@@ -28,7 +28,7 @@ var (
 
 // Queue is a fan-in/fan-out bridge between code hash producers (leaf sync workers)
 // and the code syncer consumer. Producers call [Queue.AddCode] which persists durable
-// disk markers and appends hashes to an internal queue. A single sender goroutine
+// disk markers and appends hashes to an internal queue. A single background goroutine
 // forwards them to the output channel. [Queue.AddCode] never blocks the caller.
 //
 // Deduplication and local-code checks are the consumer's responsibility.
@@ -38,7 +38,7 @@ type Queue struct {
 
 	cancel     context.CancelFunc
 	done       <-chan struct{} // cancelled on Shutdown
-	senderDone chan struct{}   // closed when sender exits
+	forwardDone chan struct{}   // closed when forward() exits
 
 	closeMu     sync.RWMutex
 	closeInOnce sync.Once
@@ -72,17 +72,17 @@ func NewQueue(db ethdb.Database, opts ...QueueOption) (*Queue, error) {
 
 	q.out = make(chan common.Hash, q.capacity)
 	q.in = make(chan struct{}, 1)
-	q.senderDone = make(chan struct{})
+	q.forwardDone = make(chan struct{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	q.cancel = cancel
 	q.done = ctx.Done()
 
-	go q.sender()
+	go q.forward()
 
 	if err := q.init(); err != nil {
 		cancel()
-		<-q.senderDone
+		<-q.forwardDone
 		return nil, err
 	}
 	return q, nil
@@ -94,7 +94,7 @@ func (q *Queue) CodeHashes() <-chan common.Hash {
 }
 
 // AddCode persists code hashes as durable disk markers and enqueues them
-// for the sender goroutine. Never blocks the caller.
+// for the forwarder goroutine. Never blocks the caller.
 // Returns [ErrQueueClosed] after [Queue.Shutdown] or [Queue.Finalize].
 func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
@@ -131,7 +131,7 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	q.pending = append(q.pending, codeHashes...)
 	q.pendingMu.Unlock()
 
-	// Signal coalescing: skip if the sender is already notified.
+	// Signal coalescing: skip if the forwarder is already notified.
 	select {
 	case q.in <- struct{}{}:
 	default:
@@ -147,7 +147,7 @@ func (q *Queue) Finalize() error {
 	return nil
 }
 
-// Shutdown cancels the sender, waits for exit, then closes out.
+// Shutdown cancels the forwarder, waits for exit, then closes out.
 // Unsent hashes are safe as disk markers and will be recovered on restart.
 // Idempotent with [Queue.Finalize].
 func (q *Queue) Shutdown() {
@@ -161,7 +161,7 @@ func (q *Queue) markClosed() {
 }
 
 // stop waits for in-flight AddCode calls (via write lock), optionally cancels
-// the sender, signals no more work, and waits for the sender to exit.
+// the forwarder, signals no more work, and waits for the forwarder to exit.
 func (q *Queue) stop(shouldCancel bool) {
 	q.markClosed()
 	if shouldCancel {
@@ -170,23 +170,20 @@ func (q *Queue) stop(shouldCancel bool) {
 	q.closeInOnce.Do(func() {
 		close(q.in)
 	})
-	<-q.senderDone
+	<-q.forwardDone
 }
 
-// sender forwards hashes from pending to out. It owns `q.out` and closes it on exit.
-func (q *Queue) sender() {
+// forward moves hashes from pending to `q.out`. It owns `q.out` and closes it on exit.
+func (q *Queue) forward() {
 	defer func() {
 		close(q.out)
-		close(q.senderDone)
+		close(q.forwardDone)
 	}()
 	for {
 		select {
 		case _, ok := <-q.in:
-			if !ok {
-				q.drainPending()
-				return
-			}
-			if q.drainPending() {
+			stop := q.drainPending()
+			if !ok || stop {
 				return
 			}
 		case <-q.done:
