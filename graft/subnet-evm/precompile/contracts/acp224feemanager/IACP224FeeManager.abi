@@ -16,9 +16,9 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "targetGas",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
             "internalType": "bool",
@@ -26,14 +26,14 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "minGasPrice",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "timeToDouble",
-            "type": "uint256"
+            "type": "uint64"
           }
         ],
         "indexed": false,
@@ -49,9 +49,9 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "targetGas",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
             "internalType": "bool",
@@ -59,14 +59,14 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "minGasPrice",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "timeToDouble",
-            "type": "uint256"
+            "type": "uint64"
           }
         ],
         "indexed": false,
@@ -121,9 +121,9 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "targetGas",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
             "internalType": "bool",
@@ -131,14 +131,14 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "minGasPrice",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "timeToDouble",
-            "type": "uint256"
+            "type": "uint64"
           }
         ],
         "internalType": "struct IACP224FeeManager.FeeConfig",
@@ -217,9 +217,9 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "targetGas",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
             "internalType": "bool",
@@ -227,14 +227,14 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "minGasPrice",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "timeToDouble",
-            "type": "uint256"
+            "type": "uint64"
           }
         ],
         "internalType": "struct IACP224FeeManager.FeeConfig",
