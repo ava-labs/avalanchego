@@ -10,7 +10,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -20,10 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
@@ -42,14 +46,22 @@ import (
 )
 
 type SUT struct {
-	ctx           context.Context
-	snowCtx       *snow.Context
-	vm            *SinceGenesis
-	client        *ethclient.Client
-	chainID       *big.Int
-	wallet        *saetest.Wallet
+	ctx     context.Context
+	snowCtx *snow.Context
+	vm      *SinceGenesis
+	client  *ethclient.Client
+	chainID *big.Int
+
+	// Wallet for issuing transactions
+	ethWallet     *saetest.Wallet
 	validatorKeys []*localsigner.LocalSigner
 
+	// For issuing atomic transactions
+	atomicKey    *secp256k1.PrivateKey
+	atomicMemory *avalancheatomic.Memory
+	avaxClient   *rpc.Client
+
+	// See [SUT.verifyWarpMessage]
 	appResponse chan []byte
 	appErr      chan *engcommon.AppError
 }
@@ -57,26 +69,30 @@ type SUT struct {
 func newSUT(t *testing.T) *SUT {
 	t.Helper()
 
+	// TODO(alarso16): this will need to be parameterizable
+	const fork = upgradetest.Durango
+	upgrades := upgradetest.GetConfig(fork)
+
 	// Test will fail if any error log from libevm, or warn log from SAE, is emitted.
 	// Some warn logs from libevm are expected.
 	log.SetDefault(log.NewLogger(ethtest.NewTBLogHandler(t, log.LevelError)))
 	logger := saetest.NewTBLogger(t, logging.Info)
 	ctx := logger.CancelOnError(t.Context())
 
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	snowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Durango)
-	snowCtx.Log = logger
-	validatorState, validatorKeys := createValidatorState()
-	snowCtx.ValidatorState = validatorState
+	baseDB := memdb.New()
+	atomicMemory := avalancheatomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
+	snowCtx, validatorKeys := newSnowCtx(t, upgrades, atomicMemory)
 
 	mempoolConf := legacypool.DefaultConfig
 	mempoolConf.Journal = "/dev/null"
 
 	const numKeys = 1
 	keychain := saetest.NewUNSAFEKeyChain(t, numKeys)
+	atomicKey, err := secp256k1.NewPrivateKey()
+	require.NoError(t, err)
 	g := &core.Genesis{
-		Config:     paramstest.ForkToChainConfig[upgradetest.Durango],
-		Alloc:      saetest.MaxAllocFor(keychain.Addresses()...),
+		Config:     paramstest.ForkToChainConfig[fork],
+		Alloc:      saetest.MaxAllocFor(append(keychain.Addresses(), atomicKey.EthAddress())...),
 		Timestamp:  saeparams.TauSeconds,
 		Difficulty: big.NewInt(0),
 	}
@@ -101,7 +117,7 @@ func newSUT(t *testing.T) *SUT {
 	require.NoError(t, vm.Initialize(
 		ctx,
 		snowCtx,
-		memdb.New(),
+		baseDB,
 		genesisBytes,
 		nil,
 		nil,
@@ -119,12 +135,18 @@ func newSUT(t *testing.T) *SUT {
 	server := httptest.NewServer(handlers["/ws"])
 	t.Cleanup(server.Close)
 
-	rpcClient, err := rpc.Dial("ws://" + server.Listener.Addr().String())
+	uri := server.Listener.Addr().String()
+	rpcClient, err := rpc.Dial("ws://" + uri)
 	require.NoError(t, err)
 	t.Cleanup(rpcClient.Close)
 
 	client := ethclient.NewClient(rpcClient)
 	chainID, err := client.ChainID(ctx)
+	require.NoError(t, err)
+
+	avaxServer := httptest.NewServer(handlers[avaxHTTPExtensionPath])
+	t.Cleanup(avaxServer.Close)
+	avaxClient, err := rpc.Dial("http://" + avaxServer.Listener.Addr().String())
 	require.NoError(t, err)
 
 	// TODO(alarso16): delete this - it should be on the VM
@@ -138,13 +160,16 @@ func newSUT(t *testing.T) *SUT {
 		vm:      vm,
 		client:  client,
 		chainID: chainID,
-		wallet: saetest.NewWalletWithKeyChain(
+		ethWallet: saetest.NewWalletWithKeyChain(
 			keychain,
 			types.LatestSigner(g.Config),
 		),
 		validatorKeys: validatorKeys,
 		appResponse:   appResponseCh,
 		appErr:        appErrCh,
+		atomicKey:     atomicKey,
+		atomicMemory:  atomicMemory,
+		avaxClient:    avaxClient,
 	}
 }
 
@@ -169,7 +194,18 @@ func (s *SUT) acceptAndExecuteBlock(t *testing.T, built *blocks.Block) {
 	require.NoError(t, built.WaitUntilExecuted(s.ctx))
 }
 
-func createValidatorState() (*validatorstest.State, []*localsigner.LocalSigner) {
+func newSnowCtx(t *testing.T, upgrades upgrade.Config, atomicMemory *avalancheatomic.Memory) (*snow.Context, []*localsigner.LocalSigner) {
+	t.Helper()
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	snowCtx.NetworkUpgrades = upgrades
+	validatorState, validatorKeys := newValidatorState(snowCtx.SubnetID)
+	snowCtx.ValidatorState = validatorState
+	snowCtx.SharedMemory = atomicMemory.NewSharedMemory(snowCtx.ChainID)
+	return snowCtx, validatorKeys
+}
+
+func newValidatorState(subnetID ids.ID) (*validatorstest.State, []*localsigner.LocalSigner) {
 	const (
 		numValidators      = 2
 		weightPerValidator = 50
@@ -183,7 +219,6 @@ func createValidatorState() (*validatorstest.State, []*localsigner.LocalSigner) 
 		nodeIDs[i] = ids.GenerateTestNodeID()
 	}
 
-	subnetID := ids.GenerateTestID()
 	return &validatorstest.State{
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			return map[ids.NodeID]*validators.GetValidatorOutput{}, nil

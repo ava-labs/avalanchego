@@ -61,6 +61,9 @@ type SinceGenesis struct {
 	mempool      *txpool.Mempool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
 
+	// TODO(alarso16): remove later
+	hooks *hook.Points
+
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
 	// resource it depends on.
@@ -183,6 +186,7 @@ func (vm *SinceGenesis) Initialize(
 	vm.db = avaDB
 	vm.mempool = txpool.New(txs, snowCtx, inner.GethRPCBackends())
 	vm.onClose = append(vm.onClose, vm.mempool.Close)
+	vm.hooks = hooks
 
 	metrics := prometheus.NewRegistry()
 	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {

@@ -58,7 +58,7 @@ func TestSendWarpMessage(t *testing.T) {
 
 	// The validator will not sign any messages, since the transaction is not executed yet.
 
-	addressedPayload, err := payload.NewAddressedCall(sut.wallet.Addresses()[0].Bytes(), payloadData)
+	addressedPayload, err := payload.NewAddressedCall(sut.ethWallet.Addresses()[0].Bytes(), payloadData)
 	require.NoError(t, err)
 	unsignedMessage := sut.newUnsignedWarpMessage(t, addressedPayload.Bytes())
 	sut.verifyWarpMessage(t, unsignedMessage.Bytes(), int32(warp.TypeErrCode))
@@ -76,7 +76,7 @@ func TestSendWarpMessage(t *testing.T) {
 	require.Len(t, receipts[0].Logs, 1)
 	expectedTopics := []common.Hash{
 		warpcontract.WarpABI.Events["SendWarpMessage"].ID,
-		common.BytesToHash(sut.wallet.Addresses()[0].Bytes()),
+		common.BytesToHash(sut.ethWallet.Addresses()[0].Bytes()),
 		common.Hash(unsignedMessage.ID()),
 	}
 	require.Equal(t, expectedTopics, receipts[0].Logs[0].Topics)
@@ -95,7 +95,7 @@ func TestSendWarpMessage(t *testing.T) {
 func TestPredicateVerification(t *testing.T) {
 	sut := newSUT(t)
 
-	sourceAddress := sut.wallet.Addresses()[0]
+	sourceAddress := sut.ethWallet.Addresses()[0]
 	addressedPayload, err := payload.NewAddressedCall(sourceAddress.Bytes(), []byte{1, 2, 3})
 	require.NoError(t, err)
 	addressedCallMessage := sut.newUnsignedWarpMessage(t, addressedPayload.Bytes())
@@ -212,7 +212,7 @@ func (s *SUT) sendWarpTx(
 	}
 
 	warpAddr := warpcontract.ContractAddress
-	tx := s.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+	tx := s.ethWallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:         &warpAddr,
 		Gas:        200_000,
 		GasFeeCap:  big.NewInt(225 * params.GWei),
