@@ -142,6 +142,22 @@ jobs:
       - name: Runs all lint checks
         shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh lint-all-ci
+  yamllint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: yamllint -c .yamllint.yml .
+  tausecondslint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for TauSeconds misuse with time.Add()
+        run: |
+          if grep -rn '\.Add([^)]*TauSeconds' --include='*.go' .; then
+            echo "ERROR: Use params.Tau (time.Duration) with time.Add(), not TauSeconds (int)"
+            echo "TauSeconds would be interpreted as nanoseconds, not seconds"
+            exit 1
+          fi
   links-lint:
     name: Markdown Links Lint
     runs-on: ubuntu-latest
@@ -270,7 +286,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-nix
-        # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
+      # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
       - name: Deploy kind with chaos mesh
         shell: bash
         run: ./scripts/run_task.sh test-robustness

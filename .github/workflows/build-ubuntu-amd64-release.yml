@@ -120,7 +120,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: noble
-          path:  /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
+          path: /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
 
       - name: Cleanup
         run: |

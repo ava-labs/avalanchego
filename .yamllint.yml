@@ -1,0 +1,13 @@
+extends: default
+
+ignore:
+  - header_upstream.yml
+
+rules:
+  document-start: disable
+  line-length: disable
+  comments:
+    min-spaces-from-content: 1
+  truthy:
+    check-keys: false
+    allowed-values: ["true", "false", "TRUE"]
