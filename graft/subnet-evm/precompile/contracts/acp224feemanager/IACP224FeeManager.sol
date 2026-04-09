@@ -10,8 +10,6 @@ interface IACP224FeeManager is IAllowList {
     /// @notice Configuration parameters for the dynamic fee mechanism
     /// @dev Fields are ordered so each mode flag precedes the parameter(s) it governs,
     ///      reducing the risk of mis-ordering arguments.
-    ///      uint256 fields (targetGas, minGasPrice, timeToDouble) MUST fit in uint64.
-    ///      Values exceeding uint64 range will be rejected by the precompile.
     struct FeeConfig {
         bool    validatorTargetGas; // When true, validators control targetGas via node preferences
         uint64 targetGas;           // Target gas consumption per second (T)
