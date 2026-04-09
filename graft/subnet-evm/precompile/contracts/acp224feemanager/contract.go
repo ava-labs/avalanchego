@@ -43,10 +43,7 @@ const (
 
 var (
 	errCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
-	errInvalidUint64      = errors.New("value is not a valid uint64")
-	errNilBigInt          = errors.New("nil big.Int value")
 	errNilBlockNumber     = errors.New("block number cannot be nil")
-	errInvalidABIConfig   = errors.New("failed to convert ABI config")
 )
 
 // storageSlot returns a storage key with the "acp224" namespace prefix
@@ -63,50 +60,6 @@ var (
 	feeConfigStorageKey       = storageSlot('f', 'c')
 	feeConfigLastChangedAtKey = storageSlot('l', 'c', 'a')
 )
-
-// abiFeeConfig uses *big.Int fields to match the Solidity uint256 types.
-type abiFeeConfig struct {
-	ValidatorTargetGas bool
-	TargetGas          *big.Int
-	StaticPricing      bool
-	MinGasPrice        *big.Int
-	TimeToDouble       *big.Int
-}
-
-func toABIFeeConfig(c commontype.ACP224FeeConfig) abiFeeConfig {
-	return abiFeeConfig{
-		ValidatorTargetGas: c.ValidatorTargetGas,
-		TargetGas:          new(big.Int).SetUint64(c.TargetGas),
-		StaticPricing:      c.StaticPricing,
-		MinGasPrice:        new(big.Int).SetUint64(c.MinGasPrice),
-		TimeToDouble:       new(big.Int).SetUint64(c.TimeToDouble),
-	}
-}
-
-func fromABIFeeConfig(c abiFeeConfig) (commontype.ACP224FeeConfig, error) {
-	for _, field := range []struct {
-		name string
-		val  *big.Int
-	}{
-		{"targetGas", c.TargetGas},
-		{"minGasPrice", c.MinGasPrice},
-		{"timeToDouble", c.TimeToDouble},
-	} {
-		if field.val == nil {
-			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", errNilBigInt, field.name)
-		}
-		if !field.val.IsUint64() {
-			return commontype.ACP224FeeConfig{}, fmt.Errorf("%w: %s", errInvalidUint64, field.name)
-		}
-	}
-	return commontype.ACP224FeeConfig{
-		ValidatorTargetGas: c.ValidatorTargetGas,
-		TargetGas:          c.TargetGas.Uint64(),
-		StaticPricing:      c.StaticPricing,
-		MinGasPrice:        c.MinGasPrice.Uint64(),
-		TimeToDouble:       c.TimeToDouble.Uint64(),
-	}, nil
-}
 
 // GetACP224FeeManagerAllowListStatus returns the role of [address] for the allow list.
 func GetACP224FeeManagerAllowListStatus(stateDB contract.StateReader, contractAddr common.Address, address common.Address) allowlist.Role {
@@ -153,21 +106,14 @@ func PackGetFeeConfig() ([]byte, error) {
 
 // PackGetFeeConfigOutput ABI-encodes [config] as getFeeConfig return data.
 func PackGetFeeConfigOutput(config commontype.ACP224FeeConfig) ([]byte, error) {
-	return ACP224FeeManagerABI.PackOutput("getFeeConfig", toABIFeeConfig(config))
+	return ACP224FeeManagerABI.PackOutput("getFeeConfig", config)
 }
 
 // UnpackGetFeeConfigOutput decodes ABI-encoded getFeeConfig return data.
 func UnpackGetFeeConfigOutput(output []byte) (commontype.ACP224FeeConfig, error) {
-	// Same copyAtomic workaround as UnpackSetFeeConfigInput.
-	res, err := ACP224FeeManagerABI.Unpack("getFeeConfig", output)
-	if err != nil {
-		return commontype.ACP224FeeConfig{}, err
-	}
-	abiConfig, ok := abi.ConvertType(res[0], new(abiFeeConfig)).(*abiFeeConfig)
-	if !ok {
-		return commontype.ACP224FeeConfig{}, errInvalidABIConfig
-	}
-	return fromABIFeeConfig(*abiConfig)
+	var config commontype.ACP224FeeConfig
+	err := ACP224FeeManagerABI.UnpackIntoInterface(&config, "getFeeConfig", output)
+	return config, err
 }
 
 //nolint:revive // unused params are part of RunStatefulPrecompileFunc signature
@@ -237,7 +183,7 @@ func getFeeConfigLastChangedAt(
 
 // PackSetFeeConfig packs [config] into ABI-encoded calldata including the 4-byte selector.
 func PackSetFeeConfig(config commontype.ACP224FeeConfig) ([]byte, error) {
-	return ACP224FeeManagerABI.Pack("setFeeConfig", toABIFeeConfig(config))
+	return ACP224FeeManagerABI.Pack("setFeeConfig", config)
 }
 
 // UnpackSetFeeConfigInput assumes [input] does not include the 4-byte selector.
@@ -253,11 +199,11 @@ func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
 	if err != nil {
 		return commontype.ACP224FeeConfig{}, err
 	}
-	abiConfig, ok := abi.ConvertType(res[0], new(abiFeeConfig)).(*abiFeeConfig)
+	config, ok := abi.ConvertType(res[0], new(commontype.ACP224FeeConfig)).(*commontype.ACP224FeeConfig)
 	if !ok {
-		return commontype.ACP224FeeConfig{}, errInvalidABIConfig
+		return commontype.ACP224FeeConfig{}, errors.New("failed to convert ABI config")
 	}
-	return fromABIFeeConfig(*abiConfig)
+	return *config, nil
 }
 
 func setFeeConfig(

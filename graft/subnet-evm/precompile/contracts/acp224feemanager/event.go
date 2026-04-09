@@ -15,33 +15,14 @@ type FeeConfigUpdatedEventData struct {
 	NewFeeConfig commontype.ACP224FeeConfig
 }
 
-type abiFeeConfigUpdatedEventData struct {
-	OldFeeConfig abiFeeConfig
-	NewFeeConfig abiFeeConfig
-}
-
 // PackFeeConfigUpdatedEvent returns topic hashes and ABI-encoded non-indexed data.
 func PackFeeConfigUpdatedEvent(sender common.Address, oldConfig commontype.ACP224FeeConfig, newConfig commontype.ACP224FeeConfig) ([]common.Hash, []byte, error) {
-	return ACP224FeeManagerABI.PackEvent("FeeConfigUpdated", sender, toABIFeeConfig(oldConfig), toABIFeeConfig(newConfig))
+	return ACP224FeeManagerABI.PackEvent("FeeConfigUpdated", sender, oldConfig, newConfig)
 }
 
 // UnpackFeeConfigUpdatedEventData decodes the non-indexed portion of a FeeConfigUpdated log.
 func UnpackFeeConfigUpdatedEventData(dataBytes []byte) (FeeConfigUpdatedEventData, error) {
-	abiData := abiFeeConfigUpdatedEventData{}
-	err := ACP224FeeManagerABI.UnpackIntoInterface(&abiData, "FeeConfigUpdated", dataBytes)
-	if err != nil {
-		return FeeConfigUpdatedEventData{}, err
-	}
-	oldConfig, err := fromABIFeeConfig(abiData.OldFeeConfig)
-	if err != nil {
-		return FeeConfigUpdatedEventData{}, err
-	}
-	newConfig, err := fromABIFeeConfig(abiData.NewFeeConfig)
-	if err != nil {
-		return FeeConfigUpdatedEventData{}, err
-	}
-	return FeeConfigUpdatedEventData{
-		OldFeeConfig: oldConfig,
-		NewFeeConfig: newConfig,
-	}, nil
+	var data FeeConfigUpdatedEventData
+	err := ACP224FeeManagerABI.UnpackIntoInterface(&data, "FeeConfigUpdated", dataBytes)
+	return data, err
 }
