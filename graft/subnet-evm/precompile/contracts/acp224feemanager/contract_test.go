@@ -346,7 +346,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 		},
 	}
 
-	precompiletest.RunPrecompileTests(t, Module, tests)
+	allowlisttest.RunPrecompileWithAllowListTests(t, Module, tests)
 }
 
 func TestUnpackSetFeeConfigInput_malformed(t *testing.T) {
