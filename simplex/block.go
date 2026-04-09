@@ -12,10 +12,12 @@ import (
 	"sync"
 
 	"github.com/ava-labs/simplex"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/tree"
 )
 
@@ -97,6 +99,11 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 		return nil, fmt.Errorf("failed to verify block: %w", err)
 	}
 
+	err := b.blockTracker.vm.SetPreference(ctx, b.vmBlock.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to set preference: %w", err)
+	}
+
 	return b, nil
 }
 
@@ -153,6 +160,10 @@ type blockTracker struct {
 
 	// handles block acceptance and rejection of inner blocks
 	tree tree.Tree
+
+	logger logging.Logger
+
+	vm block.ChainVM
 }
 
 func newBlockTracker() *blockTracker {
@@ -195,6 +206,12 @@ func (bt *blockTracker) verifyAndTrackBlock(ctx context.Context, block *Block) e
 	// track the block
 	bt.simplexDigestsToBlock[block.digest] = block
 	bt.tree.Add(block.vmBlock)
+	bt.logger.Info("verified and tracked block",
+		zap.Stringer("blockDigest", block.digest),
+		zap.Stringer("blockID", block.vmBlock.ID()),
+		zap.Uint64("round", block.metadata.Round),
+		zap.Uint64("seq", block.metadata.Seq),
+	)
 	return nil
 }
 

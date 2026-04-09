@@ -41,7 +41,6 @@ tmp/
 *.fls
 *.gz
 *.pdf
-*.wal
 
 .coverage
 
