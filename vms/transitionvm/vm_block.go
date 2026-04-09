@@ -44,11 +44,10 @@ func (p *preBlock) Accept(ctx context.Context) error {
 	if err := p.Block.Accept(ctx); err != nil {
 		return err
 	}
-
 	if time := p.Timestamp(); time.Before(p.v.transitionTime) {
 		return nil
 	}
-	return p.v.transition(ctx)
+	return p.v.transition(ctx, p.Block)
 }
 
 func (p *preBlock) Reject(ctx context.Context) error {

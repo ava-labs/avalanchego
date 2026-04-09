@@ -9,12 +9,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
+	"go.uber.org/zap"
 )
 
 var _ chain = &VM{}
@@ -32,7 +35,7 @@ type VM struct {
 	transitionTime      time.Time
 
 	// chain parameters
-	chainCtx     *snow.Context
+	chainCtx     *snow.Context // Has modified Lock and Metrics fields
 	db           database.Database
 	genesisBytes []byte
 	upgradeBytes []byte
@@ -67,7 +70,30 @@ func (v *VM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	v.chainCtx = chainCtx
+	gatherer := metrics.NewPrefixGatherer()
+	if err := chainCtx.Metrics.Register("transition", gatherer); err != nil {
+		return err
+	}
+
+	v.chainCtx = &snow.Context{
+		NetworkID:       chainCtx.NetworkID,
+		SubnetID:        chainCtx.SubnetID,
+		ChainID:         chainCtx.ChainID,
+		NodeID:          chainCtx.NodeID,
+		PublicKey:       chainCtx.PublicKey,
+		NetworkUpgrades: chainCtx.NetworkUpgrades,
+		XChainID:        chainCtx.XChainID,
+		CChainID:        chainCtx.CChainID,
+		AVAXAssetID:     chainCtx.AVAXAssetID,
+		Log:             chainCtx.Log,
+		Lock:            sync.RWMutex{},
+		SharedMemory:    chainCtx.SharedMemory,
+		BCLookup:        chainCtx.BCLookup,
+		Metrics:         gatherer,
+		WarpSigner:      chainCtx.WarpSigner,
+		ValidatorState:  chainCtx.ValidatorState,
+		ChainDataDir:    chainCtx.ChainDataDir,
+	}
 	v.db = db
 	v.genesisBytes = genesisBytes
 	v.upgradeBytes = upgradeBytes
@@ -84,7 +110,7 @@ func (v *VM) Initialize(
 	)
 	err := v.preTransitionChain.Initialize(
 		ctx,
-		chainCtx, // TODO: FIXME
+		chainCtx,
 		db,
 		genesisBytes,
 		upgradeBytes,
@@ -113,13 +139,19 @@ func (v *VM) Initialize(
 	return nil
 }
 
-func (v *VM) transition(ctx context.Context) error {
+func (v *VM) transition(ctx context.Context, last snowman.Block) error {
 	// We must cancel the context before grabbing the lock to ensure that
 	// [VM.WaitForEvent] does not block indefinitely.
 	v.current.ctxCancel()
 
 	v.transitionLock.Lock()
 	defer v.transitionLock.Unlock()
+
+	v.chainCtx.Log.Info("transitioning VMs",
+		zap.Stringer("lastID", last.ID()),
+		zap.Uint64("lastHeight", last.Height()),
+		zap.Time("lastTime", last.Timestamp()),
+	)
 
 	// TODO: Write any required information to disk here
 
@@ -136,7 +168,7 @@ func (v *VM) transition(ctx context.Context) error {
 	)
 	err := v.postTransitionChain.Initialize(
 		ctx,
-		v.chainCtx, // TODO: FIXME
+		v.chainCtx,
 		v.db,
 		v.genesisBytes,
 		v.upgradeBytes,
