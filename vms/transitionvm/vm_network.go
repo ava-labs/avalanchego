@@ -5,11 +5,31 @@ package transitionvm
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+type connections struct {
+	lock  sync.Mutex
+	nodes map[ids.NodeID]*version.Application
+}
+
+func (c *connections) add(nodeID ids.NodeID, v *version.Application) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.nodes[nodeID] = v
+}
+
+func (c *connections) remove(nodeID ids.NodeID) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	delete(c.nodes, nodeID)
+}
 
 func (v *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
 	v.transitionLock.RLock()
