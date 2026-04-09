@@ -56,6 +56,7 @@ func (h *httpHandlers) set(newHandlers map[string]http.Handler) {
 			handler = oldHandler
 		}
 		handler.set(newHandler)
+		h.routes[path] = handler
 	}
 	for path, oldHandler := range h.routes {
 		if _, ok := newHandlers[path]; ok {

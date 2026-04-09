@@ -21,9 +21,9 @@ import (
 	"go.uber.org/zap"
 )
 
-var _ chain = &VM{}
+var _ Chain = &VM{}
 
-type chain interface {
+type Chain interface {
 	block.ChainVM
 	block.BuildBlockWithContextChainVM
 	block.SetPreferenceWithContextChainVM
@@ -31,8 +31,8 @@ type chain interface {
 
 type VM struct {
 	// transition parameters
-	preTransitionChain  chain
-	postTransitionChain chain
+	preTransitionChain  Chain
+	postTransitionChain Chain
 	transitionTime      time.Time
 
 	// chain parameters
@@ -51,7 +51,7 @@ type VM struct {
 }
 
 type current struct {
-	chain          chain
+	chain          Chain
 	consensusState snow.State
 	requests       *requests
 	connections    *connections

@@ -27,23 +27,27 @@ func (f *Factory) New(log logging.Logger) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	pre, ok := preIntf.(chain)
+	pre, ok := preIntf.(Chain)
 	if !ok {
-		return nil, fmt.Errorf("%w: %T", errInvalidVMType, preIntf)
+		return nil, fmt.Errorf("pre: %w: %T", errInvalidVMType, preIntf)
 	}
 
 	postIntf, err := f.PostFactory.New(log)
 	if err != nil {
 		return nil, err
 	}
-	post, ok := postIntf.(chain)
+	post, ok := postIntf.(Chain)
 	if !ok {
-		return nil, fmt.Errorf("%w: %T", errInvalidVMType, postIntf)
+		return nil, fmt.Errorf("post: %w: %T", errInvalidVMType, postIntf)
 	}
 
 	return &VM{
 		preTransitionChain:  pre,
 		postTransitionChain: post,
 		transitionTime:      f.TransitionTime,
+
+		current: &current{
+			chain: pre,
+		},
 	}, nil
 }

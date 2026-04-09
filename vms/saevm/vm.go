@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"net/http"
 	"slices"
 	"sync"
@@ -103,43 +102,9 @@ func (vm *SinceGenesis) Initialize(
 	db := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
 	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
 
-	genesis := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
+	genesis, err := parseGenesis(snowCtx, genesisBytes)
+	if err != nil {
 		return fmt.Errorf("json.Unmarshal(%T): %w", genesis, err)
-	}
-
-	{
-		c := genesis.Config
-		u := snowCtx.NetworkUpgrades
-
-		c.HomesteadBlock = big.NewInt(0)
-		c.DAOForkBlock = big.NewInt(0)
-		c.DAOForkSupport = true
-		c.EIP150Block = big.NewInt(0)
-		c.EIP155Block = big.NewInt(0)
-		c.EIP158Block = big.NewInt(0)
-		c.ByzantiumBlock = big.NewInt(0)
-		c.ConstantinopleBlock = big.NewInt(0)
-		c.PetersburgBlock = big.NewInt(0)
-		c.IstanbulBlock = big.NewInt(0)
-		c.MuirGlacierBlock = big.NewInt(0)
-		c.BerlinBlock = big.NewInt(0)
-		c.LondonBlock = big.NewInt(0)
-		c.ShanghaiTime = utils.PointerTo(uint64(u.DurangoTime.Unix()))
-		c.CancunTime = utils.PointerTo(uint64(u.EtnaTime.Unix()))
-
-		chainConfigExtra := &extras.ChainConfig{
-			NetworkUpgrades: extras.GetNetworkUpgrades(u),
-			AvalancheContext: extras.AvalancheContext{
-				SnowCtx: snowCtx,
-			},
-		}
-		if chainConfigExtra.DurangoBlockTimestamp != nil {
-			chainConfigExtra.PrecompileUpgrades = append(chainConfigExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
-				Config: warpcontract.NewDefaultConfig(chainConfigExtra.DurangoBlockTimestamp),
-			})
-		}
-		corethparams.WithExtra(c, chainConfigExtra)
 	}
 
 	config, _, err := core.SetupGenesisBlock(db, tdb, genesis)
@@ -269,6 +234,37 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	return nil
+}
+
+// TODO: copied from coreth
+func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
+	g := new(core.Genesis)
+	if err := json.Unmarshal(bytes, g); err != nil {
+		return nil, fmt.Errorf("parsing genesis: %w", err)
+	}
+
+	// Populate the Avalanche config extras.
+	configExtra := corethparams.GetExtra(g.Config)
+	configExtra.AvalancheContext = extras.AvalancheContext{
+		SnowCtx: ctx,
+	}
+	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
+
+	// If Durango is scheduled, schedule the Warp Precompile at the same time.
+	if configExtra.DurangoBlockTimestamp != nil {
+		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
+			Config: warpcontract.NewDefaultConfig(configExtra.DurangoBlockTimestamp),
+		})
+	}
+	if err := configExtra.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid chain config: %w", err)
+	}
+
+	// Align all the Ethereum upgrades to the Avalanche upgrades
+	if err := corethparams.SetEthUpgrades(g.Config); err != nil {
+		return nil, fmt.Errorf("setting eth upgrades: %w", err)
+	}
+	return g, nil
 }
 
 const (
