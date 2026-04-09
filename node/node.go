@@ -384,7 +384,7 @@ type Node struct {
 	MeterDBMetricsGatherer metrics.MultiGatherer
 
 	VMAliaser ids.Aliaser
-	VMManager vms.Manager
+	VMManager *vms.Manager
 
 	// VM endpoint registry
 	VMRegistry registry.VMRegistry

@@ -22,7 +22,7 @@ type VMRegistry interface {
 // VMRegistryConfig defines configurations for VMRegistry
 type VMRegistryConfig struct {
 	VMGetter  VMGetter
-	VMManager vms.Manager
+	VMManager *vms.Manager
 }
 
 type vmRegistry struct {
