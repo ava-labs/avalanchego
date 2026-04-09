@@ -681,6 +681,16 @@ func (h *testInternalHandler) popInternalMessage(t *testing.T) *message.InboundM
 func (*testInternalHandler) Benched(ids.ID, ids.NodeID)   {}
 func (*testInternalHandler) Unbenched(ids.ID, ids.NodeID) {}
 
+func requireRegisteredRequest(t *testing.T, expectedReq, actualReq registeredRequest) {
+	require := require.New(t)
+	require.Equal(expectedReq.nodeID, actualReq.nodeID)
+	require.Equal(expectedReq.chainID, actualReq.chainID)
+	require.Equal(expectedReq.requestID, actualReq.requestID)
+	require.Equal(expectedReq.op, actualReq.op)
+	require.Equal(expectedReq.failedMsg.Op, actualReq.failedMsg.Op)
+	require.Equal(expectedReq.engineType, actualReq.engineType)
+}
+
 func TestSender_Bootstrap_Requests(t *testing.T) {
 	var (
 		successNodeID = ids.GenerateTestNodeID()
@@ -915,13 +925,17 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			require.Len(testInternalHandler.requests, len(nodeIDs))
 			for range nodeIDs {
 				req := testInternalHandler.popRequest(t)
+				expectedReq := registeredRequest{
+					nodeID:     req.nodeID,
+					chainID:    ctx.ChainID,
+					requestID:  requestID,
+					op:         tt.expectedResponseOp,
+					failedMsg:  tt.failedMsgF(req.nodeID),
+					engineType: p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
+				}
+
 				require.True(nodeIDs.Contains(req.nodeID))
-				require.Equal(ctx.ChainID, req.chainID)
-				require.Equal(requestID, req.requestID)
-				require.Equal(tt.expectedResponseOp, req.op)
-				expectedFailedMsg := tt.failedMsgF(req.nodeID)
-				require.Equal(expectedFailedMsg.Op, req.failedMsg.Op)
-				require.Equal(p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED, req.engineType)
+				requireRegisteredRequest(t, expectedReq, req)
 			}
 
 			// Verify the message sent to ourselves
@@ -1268,12 +1282,15 @@ func TestSender_Single_Request(t *testing.T) {
 				tt.sendF(require, sender, ctx.NodeID)
 
 				req := testInternalHandler.popRequest(t)
-				require.Equal(ctx.NodeID, req.nodeID)
-				require.Equal(ctx.ChainID, req.chainID)
-				require.Equal(requestID, req.requestID)
-				require.Equal(tt.expectedResponseOp, req.op)
-				require.Equal(tt.failedMsgF(ctx.NodeID).Op, req.failedMsg.Op)
-				require.Equal(tt.expectedEngineType, req.engineType)
+				expectedReq := registeredRequest{
+					nodeID:     ctx.NodeID,
+					chainID:    ctx.ChainID,
+					requestID:  requestID,
+					op:         tt.expectedResponseOp,
+					failedMsg:  tt.failedMsgF(req.nodeID),
+					engineType: tt.expectedEngineType,
+				}
+				requireRegisteredRequest(t, expectedReq, req)
 
 				if tt.shouldFailMessageToSelf {
 					tt.assertMsg(require, testInternalHandler.popInternalMessage(t))
