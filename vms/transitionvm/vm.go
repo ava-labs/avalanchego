@@ -6,11 +6,10 @@ package transitionvm
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -24,7 +23,9 @@ type chain interface {
 }
 
 type VM struct {
+	transitionTime time.Time
 	transitionLock sync.RWMutex
+	transitioned   bool
 	current        *current
 }
 
@@ -39,7 +40,7 @@ func (v *VM) Initialize(ctx context.Context, chainCtx *snow.Context, db database
 	return errUnimplemented
 }
 
-func (v *VM) Shutdown(context.Context) error {
+func (v *VM) transition(ctx context.Context) error {
 	return errUnimplemented
 }
 
@@ -49,24 +50,4 @@ func (v *VM) SetState(ctx context.Context, state snow.State) error {
 
 func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	return 0, errUnimplemented
-}
-
-func (v *VM) BuildBlock(context.Context) (snowman.Block, error) {
-	return nil, errUnimplemented
-}
-
-func (v *VM) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
-	return nil, errUnimplemented
-}
-
-func (v *VM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
-	return nil, errUnimplemented
-}
-
-func (v *VM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
-	return nil, errUnimplemented
-}
-
-func (v *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
-	return ids.ID{}, errUnimplemented
 }

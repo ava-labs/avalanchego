@@ -39,6 +39,13 @@ func (v *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return v.current.chain.LastAccepted(ctx)
 }
 
+func (v *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	v.transitionLock.RLock()
+	defer v.transitionLock.RUnlock()
+
+	return v.current.chain.GetBlockIDAtHeight(ctx, height)
+}
+
 func (v *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
 	v.transitionLock.RLock()
 	defer v.transitionLock.RUnlock()
@@ -58,4 +65,11 @@ func (v *VM) Version(ctx context.Context) (string, error) {
 	defer v.transitionLock.RUnlock()
 
 	return v.current.chain.Version(ctx)
+}
+
+func (v *VM) Shutdown(ctx context.Context) error {
+	v.transitionLock.RLock()
+	defer v.transitionLock.RUnlock()
+
+	return v.current.chain.Shutdown(ctx)
 }
