@@ -139,8 +139,7 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 		{
 			name: "both equal",
 			a:    utils.PointerTo(DefaultACP224FeeConfig()),
-			b: utils.PointerTo(
-				DefaultACP224FeeConfig()),
+			b:    utils.PointerTo(DefaultACP224FeeConfig()),
 			want: true,
 		},
 		{
