@@ -55,11 +55,13 @@ func NewCachedHandler(
 	cacher cache.Cacher[ids.ID, []byte],
 	verifier Verifier,
 	signer warp.Signer,
+	log logging.Logger,
 ) *Handler {
 	return &Handler{
 		signatureCache: cacher,
 		verifier:       verifier,
 		signer:         signer,
+		log:            log,
 	}
 }
 

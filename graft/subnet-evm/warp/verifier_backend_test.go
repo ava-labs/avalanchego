@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/evm/metrics/metricstest"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
@@ -116,7 +117,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 					[][]byte{offchainMessage.Bytes()},
 				)
 				require.NoError(t, err)
-				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner)
+				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner, logging.NoLog{})
 
 				requestBytes, expectedResponse := test.setup(warpBackend)
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
@@ -222,7 +223,7 @@ func TestBlockSignatures(t *testing.T) {
 					nil,
 				)
 				require.NoError(t, err)
-				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner)
+				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner, logging.NoLog{})
 
 				requestBytes, expectedResponse := test.setup()
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
@@ -325,7 +326,7 @@ func TestUptimeSignatures(t *testing.T) {
 			nil,
 		)
 		require.NoError(t, err)
-		handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner)
+		handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner, logging.NoLog{})
 
 		// sourceAddress nonZero
 		protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID())

@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/metrics/metricstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
@@ -100,7 +101,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				}
 				warpBackend, err := NewBackend(snowCtx.NetworkID, snowCtx.ChainID, snowCtx.WarpSigner, warptest.EmptyBlockClient, database, sigCache, [][]byte{offchainMessage.Bytes()})
 				require.NoError(t, err)
-				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner)
+				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner, logging.NoLog{})
 
 				requestBytes, expectedResponse := test.setup(warpBackend)
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
@@ -211,7 +212,7 @@ func TestBlockSignatures(t *testing.T) {
 					nil,
 				)
 				require.NoError(t, err)
-				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner)
+				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner, logging.NoLog{})
 
 				requestBytes, expectedResponse := test.setup()
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
