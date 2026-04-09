@@ -37,6 +37,9 @@ func (p *preBlock) Verify(ctx context.Context) error {
 	return p.Block.Verify(ctx)
 }
 
+// Accept is basically the only function that does not immediately prevent
+// transitions. This is because Accept is the function that actually triggers
+// the transition.
 func (p *preBlock) Accept(ctx context.Context) error {
 	if err := p.Block.Accept(ctx); err != nil {
 		return err

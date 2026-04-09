@@ -9,11 +9,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 type connections struct {
-	lock  sync.Mutex
+	lock  sync.RWMutex
 	nodes map[ids.NodeID]*version.Application
 }
 
@@ -29,6 +30,18 @@ func (c *connections) remove(nodeID ids.NodeID) {
 	defer c.lock.Unlock()
 
 	delete(c.nodes, nodeID)
+}
+
+func (c *connections) reconnect(ctx context.Context, connector validators.Connector) error {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	for nodeID, v := range c.nodes {
+		if err := connector.Connected(ctx, nodeID, v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (v *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
