@@ -305,9 +305,8 @@ func TestTxPoolNamespace(t *testing.T) {
 	queuedTx := makeTx(queuedAccount)
 	queuedRPCTx := ethapi.NewRPCPendingTransaction(queuedTx, nil, saetest.ChainConfig())
 
-	sut.mustSendTx(t, pendingTx)
-	sut.mustSendTx(t, queuedTx)
-	sut.syncMempool(t)
+	sut.mustSendTx(t, queuedTx, pendingTx)
+	sut.waitUntilTxsPending(t, pendingTx)
 
 	// TODO: This formatting is copied from libevm, consider exposing it somehow
 	// or removing the dependency on the exact format.
@@ -451,7 +450,7 @@ func TestFilterAPIs(t *testing.T) {
 		GasPrice: big.NewInt(1),
 		Gas:      1e6,
 	})
-	sut.mustSendTx(t, tx)
+	sut.sendTxsAndWaitUntilPending(t, tx)
 	sut.testRPC(ctx, t, rpcTest{
 		method:     "eth_getFilterChanges",
 		args:       []any{txFilterID},
@@ -775,8 +774,7 @@ func TestEthPendingTransactions(t *testing.T) {
 		GasFeeCap: big.NewInt(1),
 		Value:     big.NewInt(100),
 	})
-	sut.mustSendTx(t, tx)
-	sut.requireInMempool(t, tx.Hash())
+	sut.sendTxsAndWaitUntilPending(t, tx)
 
 	// eth_pendingTransactions filters results to only transactions from
 	// accounts configured in the AccountManager, which is always empty.
@@ -931,8 +929,7 @@ func TestGetTransactionCount(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.mustSendTx(t, tx)
-	sut.requireInMempool(t, tx.Hash())
+	sut.sendTxsAndWaitUntilPending(t, tx)
 
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_getTransactionCount",
@@ -1007,8 +1004,7 @@ func TestFillTransaction(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.mustSendTx(t, tx)
-	sut.requireInMempool(t, tx.Hash())
+	sut.sendTxsAndWaitUntilPending(t, tx)
 
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_fillTransaction",
@@ -1030,8 +1026,7 @@ func TestResend(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.mustSendTx(t, tx)
-	sut.requireInMempool(t, tx.Hash())
+	sut.sendTxsAndWaitUntilPending(t, tx)
 
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_resend",
@@ -1213,8 +1208,7 @@ func TestDebugGetRawTransaction(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.mustSendTx(t, mempoolTx)
-	sut.syncMempool(t)
+	sut.sendTxsAndWaitUntilPending(t, mempoolTx)
 
 	mempoolMarshaled, err := mempoolTx.MarshalBinary()
 	require.NoErrorf(t, err, "%T.MarshalBinary()", mempoolTx)

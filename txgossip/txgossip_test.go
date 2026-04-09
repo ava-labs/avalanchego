@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/strevm/saedb"
 	"github.com/ava-labs/strevm/saetest"
 	"github.com/ava-labs/strevm/saexec"
+	"github.com/ava-labs/strevm/txgossip/txgossiptest"
 )
 
 func TestMain(m *testing.M) {
@@ -126,22 +127,24 @@ func TestExecutorIntegration(t *testing.T) {
 
 	const txPerAccount = 5
 	const numTxs = numAccounts * txPerAccount
+	signedTxs := make([]*types.Transaction, 0, numTxs)
 	for range txPerAccount {
 		for i := range numAccounts {
-			tx := s.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
+			signedTxs = append(signedTxs, s.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
 				To:        &common.Address{},
 				Gas:       params.TxGas,
 				GasFeeCap: big.NewInt(100),
 				GasTipCap: big.NewInt(1 + rng.Int64N(3)),
-			})
-			require.NoErrorf(t, s.Add(Transaction{tx}), "%T.Add()", s.Set)
+			}))
 		}
 	}
 
+	for _, tx := range signedTxs {
+		require.NoErrorf(t, s.Add(Transaction{tx}), "%T.Add()", s.set)
+	}
+	txgossiptest.WaitUntilPending(t, ctx, s.Pool, signedTxs...)
+
 	t.Run("Iterate_after_Add", func(t *testing.T) {
-		// Note that calls to [txpool.TxPool.Sync] are only necessary in tests,
-		// and MUST NOT be replicated in production.
-		require.NoErrorf(t, s.Pool.Sync(), "%T.Sync()", s.Pool)
 		require.Lenf(t, slices.Collect(s.Iterate), numTxs, "slices.Collect(%T.Iterate)", s.Set)
 	})
 	if t.Failed() {
@@ -177,9 +180,11 @@ func TestExecutorIntegration(t *testing.T) {
 	b := s.chain.NewBlock(t, txs)
 	require.NoErrorf(t, s.exec.Enqueue(ctx, b), "%T.Enqueue([txs from %T.TransactionsByPriority()])", s.exec, s.Set)
 
+	// After the block is executed, a [core.ChainHeadEvent] triggers a reorg
+	// in the mempool. We can't be explicitly notified when the reorg completes,
+	// so polling is necessary.
 	assert.EventuallyWithTf(
 		t, func(c *assert.CollectT) {
-			require.NoErrorf(c, s.Pool.Sync(), "%T.Sync()", s.Pool)
 			assert.Zerof(c, s.Len(), "%T.Len()", s.Set)
 			assert.Emptyf(c, slices.Collect(s.Iterate), "slices.Collect(%T.Iterate)", s.Set)
 			for _, tx := range txs {
@@ -195,6 +200,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// consecutive transactions. Successful execution demonstrates correct
 		// nonce ordering across the board.
 		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+
 		for i, r := range b.Receipts() {
 			assert.Equalf(t, types.ReceiptStatusSuccessful, r.Status, "%T[%d].Status", r, i)
 		}
@@ -202,8 +208,6 @@ func TestExecutorIntegration(t *testing.T) {
 }
 
 func TestP2PIntegration(t *testing.T) {
-	ctx := t.Context()
-
 	w := newWallet(t, 1)
 	txViaGossip := Transaction{w.SetNonceAndSign(t, 0, &types.LegacyTx{
 		To:       &common.Address{},
@@ -264,7 +268,7 @@ func TestP2PIntegration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := saetest.NewTBLogger(t, logging.Debug)
-			ctx = logger.CancelOnError(ctx)
+			ctx := logger.CancelOnError(t.Context())
 
 			sendID := ids.GenerateTestNodeID()
 			recvID := ids.GenerateTestNodeID()
@@ -306,7 +310,7 @@ func TestP2PIntegration(t *testing.T) {
 
 			require.NoErrorf(t, send.Add(txViaGossip), "%T.Add()", send.Set)
 			require.NoErrorf(t, send.SendTx(ctx, txViaRPC.Transaction), "%T.SendTx()", send.Set)
-			require.NoErrorf(t, send.Pool.Sync(), "sender %T.Sync()", send.Pool)
+			txgossiptest.WaitUntilPending(t, ctx, send.Pool, txViaRPC.Transaction, txViaGossip.Transaction)
 
 			t.Run("confirm_setup", func(t *testing.T) {
 				for _, tx := range bothTxs {
@@ -325,7 +329,6 @@ func TestP2PIntegration(t *testing.T) {
 			assert.EventuallyWithTf(
 				t, func(c *assert.CollectT) {
 					require.NoError(t, gossiper.Gossip(ctx))
-					require.NoError(c, recv.Pool.Sync())
 					// Check for the tx from RPC as this is received regardless
 					// of push or pull semantics.
 					require.True(c, recv.Has(txViaRPC.GossipID()))
