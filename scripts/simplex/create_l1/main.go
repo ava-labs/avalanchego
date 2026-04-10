@@ -343,11 +343,24 @@ func configureAndRestartNodes(ctx context.Context, network *tmpnet.Network, resu
 		subnetConfigContent = base64.StdEncoding.EncodeToString(marshaledConfigs)
 	}
 
+	// Build the base64-encoded chain config to enable debug logging on the L1
+	chainConfigMap := map[string]json.RawMessage{
+		result.ChainID.String(): json.RawMessage(`{"log-level":"debug"}`),
+	}
+	marshaledChainConfigs, err := json.Marshal(chainConfigMap)
+	if err != nil {
+		log.Fatalf("failed to marshal chain configs: %s", err)
+	}
+	chainConfigContent := base64.StdEncoding.EncodeToString(marshaledChainConfigs)
+
 	for _, node := range network.Nodes {
 		node.Flags[config.TrackSubnetsKey] = result.SubnetID.String()
 		if subnetConfigContent != "" {
 			node.Flags[config.SubnetConfigContentKey] = subnetConfigContent
 		}
+		node.Flags[config.ChainConfigContentKey] = chainConfigContent
+		node.Flags[config.LogLevelKey] = "debug"
+		node.Flags[config.LogDisplayLevelKey] = "debug"
 		if err := node.Write(); err != nil {
 			log.Fatalf("failed to write config for %s: %s", node.NodeID, err)
 		}

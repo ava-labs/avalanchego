@@ -195,17 +195,24 @@ func (e *Engine) Start(ctx context.Context, _ uint32) error {
 		zap.Duration("MaxProposalWait", e.epoch.MaxProposalWait),
 		zap.Duration("MaxRebroadcastWait", e.epoch.MaxRebroadcastWait),
 	)
+
+	// Set NormalOp BEFORE starting the epoch so that the VM's block builder
+	// is initialized before the epoch can trigger block building via WaitForEvent.
+	e.consensusCtx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
+		State: snow.NormalOp,
+	})
+	if err := e.vm.SetState(ctx, snow.NormalOp); err != nil {
+		return fmt.Errorf("failed to set VM state to NormalOp: %w", err)
+	}
+
 	if err := e.epoch.Start(); err != nil {
 		e.logger.Error("Failed to start simplex epoch", zap.Error(err))
 		return fmt.Errorf("failed to start simplex epoch: %w", err)
 	}
 	e.logger.Info("Started simplex epoch, starting block builder ticker")
 	go e.tick()
-	e.consensusCtx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
-		State: snow.NormalOp,
-	})
-	return e.vm.SetState(ctx, snow.NormalOp)
+	return nil
 }
 
 // getTickInterval defines a reasonable tick interval for simplex to advance time.
