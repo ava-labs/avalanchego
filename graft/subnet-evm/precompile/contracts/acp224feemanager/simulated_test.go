@@ -4,7 +4,10 @@
 // simulated_test.go validates the ACP-224 fee manager precompile through its
 // generated Go bindings, exercising the full
 // Solidity interface -> ABI encoding -> precompile -> ABI decoding -> Go
-// binding path on a simulated backend.
+// binding path on a simulated backend. Some tests overlap with
+// contract_test.go (e.g. authorization, fee config validation) but the overlap
+// is intentional. contract_test.go tests the precompile logic directly, while
+// these tests verify the ABI round-trip.
 //
 // Errors from the precompile lose their identity when serialized as EVM revert
 // data, so error assertions use ErrorContains instead of ErrorIs.
