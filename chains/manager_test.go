@@ -142,7 +142,7 @@ func TestCreateSimplexChain(t *testing.T) {
 			LoggerName: "chain_logger",
 		}),
 
-		VMManager:  *vms.NewManager(logging.NoLog{}, ids.NewAliaser()),
+		VMManager:  vms.NewManager(logging.NoLog{}, ids.NewAliaser()),
 		Validators: validators,
 
 		// For handler initialization
