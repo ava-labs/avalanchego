@@ -209,7 +209,7 @@ func TestACP224FeeManagerRun(t *testing.T) {
 				return mustPackSetFeeConfigInput(t, testFeeConfig)
 			},
 			SuppliedGas: setFeeConfigGasCost,
-			ExpectedErr: errCannotSetFeeConfig,
+			ExpectedErr: ErrCannotSetFeeConfig,
 		},
 		{
 			Name:   "setFeeConfig_from_Enabled",

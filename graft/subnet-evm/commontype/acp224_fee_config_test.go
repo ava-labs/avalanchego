@@ -61,7 +61,7 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 				MinGasPrice:        1,
 				TimeToDouble:       60,
 			},
-			want: errTargetGasMustBeZero,
+			want: ErrTargetGasMustBeZero,
 		},
 		{
 			name: "targetGas below minimum",
@@ -70,7 +70,7 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 				MinGasPrice:  1,
 				TimeToDouble: 60,
 			},
-			want: errTargetGasTooLowACP224,
+			want: ErrTargetGasTooLowACP224,
 		},
 		{
 			name: "targetGas at minimum boundary",
@@ -88,7 +88,7 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 				MinGasPrice:   1,
 				TimeToDouble:  60,
 			},
-			want: errTimeToDoubleMustBeZero,
+			want: ErrTimeToDoubleMustBeZero,
 		},
 		{
 			name: "timeToDouble must be positive when staticPricing is false",
@@ -96,7 +96,7 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 				TargetGas:   MinTargetGasACP224,
 				MinGasPrice: 1,
 			},
-			want: errTimeToDoubleTooLow,
+			want: ErrTimeToDoubleTooLow,
 		},
 	}
 

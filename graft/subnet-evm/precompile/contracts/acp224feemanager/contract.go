@@ -42,7 +42,7 @@ const (
 )
 
 var (
-	errCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
+	ErrCannotSetFeeConfig = errors.New("non-enabled cannot call setFeeConfig")
 	errInvalidABIConfig   = errors.New("failed to convert ABI config")
 	errNilBlockNumber     = errors.New("block number cannot be nil")
 )
@@ -226,7 +226,7 @@ func setFeeConfig(
 	stateDB := accessibleState.GetStateDB()
 	callerStatus := GetACP224FeeManagerAllowListStatus(stateDB, addr, caller)
 	if !callerStatus.IsEnabled() {
-		return nil, remainingGas, fmt.Errorf("%w: %s", errCannotSetFeeConfig, caller)
+		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotSetFeeConfig, caller)
 	}
 
 	feeConfig, err := UnpackSetFeeConfigInput(input)
