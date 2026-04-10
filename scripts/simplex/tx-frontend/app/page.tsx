@@ -114,7 +114,8 @@ async function fetchPChainBlocks(
 
 async function fetchNodeInfo(
   uri: string,
-  address: string | null
+  address: string | null,
+  chainRpcPath?: string
 ): Promise<NodeInfo> {
   const base: NodeInfo = {
     uri,
@@ -132,7 +133,8 @@ async function fetchNodeInfo(
     base.nodeID = idRes?.result?.nodeID ?? null;
     base.healthy = healthRes?.result?.healthy ?? false;
 
-    const provider = new JsonRpcProvider(`${uri}/ext/bc/C/rpc`);
+    const rpcPath = chainRpcPath || "/ext/bc/C/rpc";
+    const provider = new JsonRpcProvider(`${uri}${rpcPath}`);
     base.blockHeight = await provider.getBlockNumber();
 
     if (address) {
@@ -155,7 +157,8 @@ export default function Home() {
   const [connected, setConnected] = useState(false);
   const [activeNode, setActiveNode] = useState("");
   const [shouldAutoConnect, setShouldAutoConnect] = useState(false);
-  const [fromNodeIndex, setFromNodeIndex] = useState<number | null>(null);
+  const fromNodeIndex = nodes.findIndex((n) => n.uri === activeNode);
+
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("1");
   const [sentTxs, setSentTxs] = useState<TxRecord[]>([]);
@@ -250,16 +253,19 @@ export default function Home() {
   const pollNetwork = useCallback(async () => {
     if (!activeNode) return;
     try {
-      // Refresh node statuses
+      // Refresh node statuses with balances from the selected chain
+      const chainRpcPath = selectedChain && selectedChain.vm !== "platformvm"
+        ? selectedChain.rpcPath
+        : "/ext/bc/C/rpc";
       const infos = await Promise.all(
-        nodeEntries.map((e) => fetchNodeInfo(e.uri, e.address))
+        nodeEntries.map((e) => fetchNodeInfo(e.uri, e.address, chainRpcPath))
       );
       setNodes(infos);
 
-      // Sender balance (always from C-chain)
-      const cProvider = new JsonRpcProvider(`${activeNode}/ext/bc/C/rpc`);
-      const wallet = new Wallet(EWOQ_PRIVATE_KEY, cProvider);
-      const bal = await cProvider.getBalance(wallet.address);
+      // Sender balance from selected chain (or C-chain for non-EVM)
+      const provider = new JsonRpcProvider(`${activeNode}${chainRpcPath}`);
+      const wallet = new Wallet(EWOQ_PRIVATE_KEY, provider);
+      const bal = await provider.getBalance(wallet.address);
       setBalance(formatEther(bal));
 
       // Poll selected chain for txs (only EVM chains)
@@ -329,7 +335,7 @@ export default function Home() {
 
   const sendTx = async () => {
     const rpcUrl = getChainRpcUrl();
-    if (!rpcUrl || !to || !amount || fromNodeIndex === null) return;
+    if (!rpcUrl || !to || !amount || fromNodeIndex < 0) return;
     setSending(true);
     setError("");
     try {
@@ -424,7 +430,6 @@ export default function Home() {
                 )}
                 {node.balance !== null && (
                   <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Balance{" "}
                     <span
                       className={`${mono} font-medium text-foreground`}
                     >
@@ -535,22 +540,19 @@ export default function Home() {
               <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">
                 From
               </label>
-              <div className="flex flex-wrap gap-2">
-                {nodes
-                  .filter((n) => n.address)
-                  .map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setFromNodeIndex(i)}
-                      className={`px-3 py-1 text-xs rounded border cursor-pointer transition-colors ${
-                        fromNodeIndex === i
-                          ? "bg-green-600 text-white border-green-600"
-                          : "bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 hover:border-green-400"
-                      }`}
-                    >
-                      Node {i + 1}
-                    </button>
-                  ))}
+              <div className={`px-3 py-2 text-sm rounded border bg-zinc-50 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 ${mono}`}>
+                {fromNodeIndex >= 0 ? (
+                  <span>
+                    <span className="font-medium">Node {fromNodeIndex + 1}</span>
+                    {nodes[fromNodeIndex]?.address && (
+                      <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
+                        {nodes[fromNodeIndex].address!.slice(0, 10)}...{nodes[fromNodeIndex].address!.slice(-6)}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-zinc-400">Select an active node above</span>
+                )}
               </div>
             </div>
             <div>
@@ -596,7 +598,7 @@ export default function Home() {
             <button
               onClick={sendTx}
               disabled={
-                sending || !to || !amount || !connected || fromNodeIndex === null
+                sending || !to || !amount || !connected || fromNodeIndex < 0
               }
               className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded font-medium cursor-pointer"
             >
