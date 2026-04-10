@@ -1790,7 +1790,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	}
 
 	walLocation := getChainWALLocation(ctx.ChainDataDir, ctx.ChainID)
-	chainWal, err := wal.New(walLocation)
+	chainWal := wal.New(walLocation)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create simplex wal: %w", err)
 	}

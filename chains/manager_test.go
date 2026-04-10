@@ -51,7 +51,7 @@ func (m *manager) startChainCreatorNoPChain() {
 }
 
 // newRouter returns a mock router that mocks the call of adding a chain to the router.
-func newRouter(t *testing.T, tm timeout.Manager) router.Router {
+func newRouter(t *testing.T, tm *timeout.Manager) router.Router {
 	chainRouter := router.ChainRouter{}
 	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
@@ -69,7 +69,7 @@ func newRouter(t *testing.T, tm timeout.Manager) router.Router {
 	return &chainRouter
 }
 
-func newTimeoutManager(t *testing.T) timeout.Manager {
+func newTimeoutManager(t *testing.T) *timeout.Manager {
 	require := require.New(t)
 
 	config := &timer.AdaptiveTimeoutConfig{
