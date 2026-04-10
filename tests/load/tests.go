@@ -367,7 +367,7 @@ func executeContractTx(
 ) {
 	require := require.New(tc)
 
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce, e2e.DefaultContractCallGasLimit)
+	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, e2e.DefaultContractCallGasLimit)
 	require.NoError(err)
 
 	tx, err := txFunc(txOpts)
