@@ -2,24 +2,24 @@
   "simplexParameters": {
     "initialValidators": [
       {
-        "nodeID": "NodeID-2arivFuwgTECi5mfz7nN9dV5DJLB6cP9w",
-        "publicKey": "goW/vj0EaVKqXXo+dwlvr/E7Gt3ogGiizbpSR8/JnuBvhTASOeDbJkY/2LqXQkT7"
+        "nodeID": "NodeID-33BMq1TzybzuWejy32KuucARxoKX2uYJp",
+        "publicKey": "lSv7NrLmlGSyz3GEsDpXYW5ny80FUE8+6nzX4caKHJrDNPD7/lOha7WXi4jv3dyJ"
       },
       {
-        "nodeID": "NodeID-6Roraz6eYb6avtt4mnANWYnZvqo8eXx2P",
-        "publicKey": "r/XHULPFZhA4n/65VvkyFZ9lFSv2qKlGZ9Djnwo+ML/6GZht7RPtwbnJu4vfjdgi"
+        "nodeID": "NodeID-7fji92Dmdke7seH6DACKHvxPrUQ36Erp9",
+        "publicKey": "l/dAydY6jSCWW8blaOUaSGOq9sN/41oEbX1RsCVm2d24i7KYk89cWuZBCmpw2QEJ"
       },
       {
-        "nodeID": "NodeID-HHvLFHNoupik6nU2dMVxLgHink6xecYP9",
-        "publicKey": "rmpkAaP0QtQROTmhXh4tpDRg2XMjugj/j352D0dbUAjP/Mf+Wlg9brWKWzVTMBJc"
+        "nodeID": "NodeID-7xZHRuFEhavBvPCe7xPECJc5zBLevxfew",
+        "publicKey": "iuPz1wFX4pW0ziYUkROUbuuoT8hNCHrx9dWgP4Zl6Hr4LYeST3a/QEysQs6wYK6c"
       },
       {
-        "nodeID": "NodeID-K19fA4vdKgCMxr6VVv5ybTY5KrkCdN5tw",
-        "publicKey": "gDee5AEX1ybXltguCvODkopIKV9WgSlmrNZ5TeYtinXJ5AxmcLNiUi9KFOKb4PJO"
+        "nodeID": "NodeID-CyqXdoZ6frrACPxsiz8b2zbj3CjFyWvUD",
+        "publicKey": "pB5sQW/KAHIiatwpZWAjT4PVwRB8I61bmxC3KBR95CtbTI1WmtLL0wMU/lrKLvSk"
       },
       {
-        "nodeID": "NodeID-LvacYHiQ1pRFvzqmBkMRnHN8hACsZfGYn",
-        "publicKey": "lVlrGGtCzp9pXFKMsfV/8VtDw7TsH0Yllioi6oXpks/D4wxehwN0vxAx3Kc61b/k"
+        "nodeID": "NodeID-F3c1UswC2mijvUnAZa1e8D5Dm5oTNuQts",
+        "publicKey": "k9QGDhTzMaewtUOs3qL11T1c9g5ubqcv6kHMqhEkFEZR154W5EIS4nA8+wjvQsOe"
       }
     ],
     "maxNetworkDelay": 5000000000,

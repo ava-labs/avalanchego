@@ -1,68 +1,71 @@
 # Simplex Local Network
 
-Scripts for running a local 5-node AvalancheGo network with an L1 chain, plus a web dashboard for interacting with it.
+Run a local 5-node AvalancheGo network with a Simplex-consensus L1 chain and a web dashboard for sending transactions.
 
 ## Prerequisites
 
 - Go toolchain
 - Node.js / npm
-- AvalancheGo source (this repo)
+- Python 3
 
 ## Quick Start
 
-### 1. Start the network
+### 1. Clean up any previous network
 
 ```bash
-./scripts/simplex/start_network.sh
+./scripts/simplex/clean.sh
 ```
 
-Starts a 5-node local network using `tmpnetctl`. Nodes get dynamic ports assigned automatically.
+Kills leftover AvalancheGo processes, removes tmpnet data, and deletes generated files.
 
-### 2. Set environment and sync node info
+### 2. Build AvalancheGo
 
 ```bash
-source ~/.tmpnet/networks/latest/network.env
-./scripts/simplex/sync_nodes.sh
+./scripts/build.sh
 ```
 
-Writes node URIs to `tx-frontend/public/nodes.json` so the frontend can discover them.
-
-### 3. Fund node accounts
+### 3. Build the subnet-evm plugin
 
 ```bash
-./scripts/simplex/fund_nodes.sh
+mkdir -p ~/.avalanchego/plugins
+go build -o ~/.avalanchego/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy ./graft/subnet-evm/plugin/
 ```
 
-Generates a deterministic C-Chain address per node and funds each with 100 AVAX from the pre-funded ewoq key. Updates `nodes.json` with addresses.
+Compiles the subnet-evm binary and installs it as a plugin. The plugin ID (`srEX...`) is the VM ID that the L1 chain will reference.
 
-### 4. Create an L1
+Note: If running `start-network` you see `failed to register VM ... RPCChainVM protocol version mismatch between AvalancheGo and Virtual Machine plugin`, delete the old plugins with `rm -rf ~/.avalanchego/plugins` and re-run this step.
+
+### 4. Start the network
+
+```bash
+./scripts/run_tmpnetctl.sh start-network --node-count=5 --avalanchego-path=./build/avalanchego
+```
+
+Starts a 5-node local network. Nodes get dynamic ports assigned automatically.
+
+### 5. Create the L1
 
 ```bash
 ./scripts/simplex/create_l1.sh
 ```
 
-This script:
-1. Builds the subnet-evm plugin and installs it to all nodes
-2. Creates a subnet on the P-Chain
-3. Creates a chain using subnet-evm with the genesis in `genesis.json`
-4. Converts the subnet to an L1 with all 5 nodes as validators
-5. Updates node configs to track the new subnet
-6. Restarts the network
-7. Writes chain info to `tx-frontend/public/chains.json`
+Issues three P-Chain transactions (CreateSubnet, CreateChain, ConvertSubnetToL1), injects BLS keys into the Simplex config, restarts the network, and writes chain metadata to `tx-frontend/public/chains.json`.
 
-### 5. Re-sync and fund the L1
-
-After restart, ports change and the L1 chain needs funding:
+To use Snowball consensus instead of Simplex:
 
 ```bash
-source ~/.tmpnet/networks/latest/network.env
-./scripts/simplex/sync_nodes.sh
+./scripts/simplex/create_l1.sh ./scripts/simplex/config/subnet_config.json
+```
+
+### 6. Fund accounts
+
+```bash
 ./scripts/simplex/fund_nodes.sh
 ```
 
-This funds node addresses on both the C-Chain and the L1 chain.
+Syncs node URIs from the tmpnet directory, generates a deterministic address per node, and funds each with 100 AVAX from the pre-funded ewoq key on both the C-Chain and L1 chain. Writes node info to `tx-frontend/public/nodes.json`.
 
-### 6. Start the frontend
+### 7. Start the dashboard
 
 ```bash
 cd scripts/simplex/tx-frontend
@@ -72,44 +75,66 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-### 7. Stop the network
+### 8. Stop or clean
 
 ```bash
-source ~/.tmpnet/networks/latest/network.env
+# Stop the network (keeps data):
 ./scripts/simplex/stop_network.sh
+
+# Full cleanup (kills processes, removes tmpnet data, deletes generated files):
+./scripts/simplex/clean.sh
 ```
 
-## Frontend Features
+## Verifying
 
-- **Node cards** — shows all 5 nodes with health status, block height, balance, and NodeID. Click to switch which node handles API calls.
-- **Chain pills** — switch between P-Chain, C-Chain, and L1 chains. Each shows its own transactions.
-- **P-Chain view** — displays P-Chain transactions (CreateSubnet, CreateChain, ConvertSubnetToL1, etc.) with type badges.
-- **Send transactions** — pick a From and To node, enter an amount, and send AVAX between node accounts on any EVM chain.
-- **Transaction history** — live-updating sent and on-chain transactions, sorted by block number.
+Check node health:
+
+```bash
+./scripts/simplex/check_network.sh
+```
+
+Send a test transaction from the CLI:
+
+```bash
+go run ./scripts/simplex/send_tx/ \
+  --nodes=scripts/simplex/tx-frontend/public/nodes.json \
+  --chains=scripts/simplex/tx-frontend/public/chains.json
+```
+
+## Dashboard Features
+
+- **Node cards** -- health status, block height, balance, and NodeID for each node. Click a card to route API calls through that node.
+- **Chain selector** -- switch between P-Chain, C-Chain, and L1 chains.
+- **P-Chain view** -- shows P-Chain blocks with transaction type badges (CreateSubnet, CreateChain, ConvertSubnetToL1, etc.).
+- **Send transactions** -- pick a sender and receiver node, enter an amount, and send AVAX on any EVM chain.
+- **Live updates** -- balances, block heights, and transaction history refresh automatically.
 
 ## File Structure
 
 ```
 scripts/simplex/
-  start_network.sh       # Start 5-node network
-  stop_network.sh        # Stop network
-  check_network.sh       # Health check all nodes
-  sync_nodes.sh          # Write node URIs to nodes.json
-  fund_nodes.sh          # Fund node accounts on all EVM chains
-  create_l1.sh           # Create L1 (subnet + chain + conversion)
-  create_l1/main.go      # Go tool for L1 creation
-  subnet_config.json     # Consensus parameters (snowball, swappable to simplex)
-  genesis.json           # Subnet-EVM chain genesis
-  tx-frontend/           # Next.js dashboard app
+  clean.sh                       # Kill processes, remove tmpnet data
+  stop_network.sh                # Stop the network
+  check_network.sh               # Health-check all nodes
+  fund_nodes.sh                  # Sync node URIs + fund accounts
+  create_l1.sh                   # Create L1 (subnet + chain + convert)
+  create_l1/main.go              # Go tool for L1 creation
+  send_tx/main.go                # Go tool for test transactions
+  config/
+    genesis.json                 # Subnet-EVM chain genesis
+    subnet_config_simplex.json   # Simplex consensus parameters (default)
+    subnet_config.json           # Snowball consensus parameters (alternative)
+  tx-frontend/                   # Next.js dashboard
     public/
-      nodes.json         # Auto-generated node URIs + addresses
-      chains.json        # Auto-generated chain info
+      nodes.json                 # Generated: node URIs + addresses
+      chains.json                # Generated: chain metadata
     app/
-      page.tsx           # Main dashboard page
+      page.tsx                   # Dashboard UI
 ```
 
 ## Configuration
 
-- **`subnet_config.json`** — Snowball consensus parameters. Will be swapped for Simplex parameters later.
-- **`genesis.json`** — Subnet-EVM genesis. Pre-funds the ewoq address (`0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`).
+- **`config/subnet_config_simplex.json`** -- Simplex consensus parameters (used by default).
+- **`config/subnet_config.json`** -- Snowball consensus parameters (pass as argument to `create_l1.sh` to use).
+- **`config/genesis.json`** -- Subnet-EVM genesis. Pre-funds the ewoq address (`0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`).
 - Node accounts use deterministic keys derived from `sha256("simplex-node-{i}")`.

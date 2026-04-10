@@ -15,13 +15,13 @@
   },
   {
     "name": "simplexl1",
-    "chainId": "2ptrH5qteqwk6uMEbyxBpESCQzMLpj3ubbHhVFHYJVHWj3VuDm",
-    "rpcPath": "/ext/bc/2ptrH5qteqwk6uMEbyxBpESCQzMLpj3ubbHhVFHYJVHWj3VuDm/rpc",
-    "subnetId": "uoAmaAQk3V5NULsUfvbvVegZKfaZywBwmnVDNztJBggb4YBDU",
+    "chainId": "yf1CyC5VqWz7HWyoh3f8QvXrqDGJwHUWknss8FX6PtWjZXWL6",
+    "rpcPath": "/ext/bc/yf1CyC5VqWz7HWyoh3f8QvXrqDGJwHUWknss8FX6PtWjZXWL6/rpc",
+    "subnetId": "2N26Thm2WTXZVkT7gGYB8rm9FU32grgXrTDMQS3Furq7U7tPqo",
     "vm": "subnet-evm",
     "consensus": "simplex",
-    "conversionTx": "27hKJkYFmWSf4G7K5wa5yBpW3obXiYondLk5g3YboA6XrmP8a1",
-    "conversionId": "26wFV9Exe5QUXF7YoNqR1QTEwxnEsVDbVSmP6y2gw1ek4jbPKG",
+    "conversionTx": "tdmp9rPNxRUJYkKF4Qr9ntxqQXWvdnzZSFmeD4NTd3bD1YFZa",
+    "conversionId": "2aLzhE8jppxAGaLFJVBwsNZ9nuCjs46U7VsMadmjxSggUZmmvj",
     "validatorCount": 5
   }
 ]
