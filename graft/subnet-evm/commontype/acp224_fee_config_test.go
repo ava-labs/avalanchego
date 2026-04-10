@@ -148,7 +148,7 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 			a:    utils.PointerTo(DefaultACP224FeeConfig()),
 			b: func() *ACP224FeeConfig {
 				c := DefaultACP224FeeConfig()
-				c.TargetGas = 20_000_000
+				c.TargetGas++
 				return &c
 			}(),
 			want: false,
