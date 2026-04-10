@@ -93,13 +93,17 @@ Check node health:
 ./scripts/simplex/check_network.sh
 ```
 
-Send a test transaction from the CLI:
+## Sending a test transaction
+
+`send_tx` is a Go tool that sends 1 AVAX on the L1 chain using the pre-funded ewoq key. It connects to the first node's RPC endpoint, sends the transaction, and waits up to 30 seconds for it to be mined.
 
 ```bash
 go run ./scripts/simplex/send_tx/ \
   --nodes=scripts/simplex/tx-frontend/public/nodes.json \
   --chains=scripts/simplex/tx-frontend/public/chains.json
 ```
+
+It will print the chain ID, ewoq balance, current block number, and the transaction hash once confirmed.
 
 ## Dashboard Features
 

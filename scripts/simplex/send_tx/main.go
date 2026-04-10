@@ -31,12 +31,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to read nodes file: %s", err)
 	}
-	var nodeURIs []string
-	if err := json.Unmarshal(nodesData, &nodeURIs); err != nil {
+	type nodeEntry struct {
+		URI     string `json:"uri"`
+		Address string `json:"address"`
+	}
+	var nodes []nodeEntry
+	if err := json.Unmarshal(nodesData, &nodes); err != nil {
 		log.Fatalf("failed to parse nodes file: %s", err)
 	}
-	if len(nodeURIs) == 0 {
-		log.Fatal("no node URIs found")
+	if len(nodes) == 0 {
+		log.Fatal("no nodes found")
+	}
+	nodeURIs := make([]string, len(nodes))
+	for i, n := range nodes {
+		nodeURIs[i] = n.URI
 	}
 
 	// Read chains to find the simplex L1 chain RPC path
