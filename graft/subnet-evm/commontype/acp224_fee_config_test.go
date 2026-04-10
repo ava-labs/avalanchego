@@ -175,7 +175,7 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, tt.a.Equal(tt.b), "Equal()")
+			require.Equalf(t, tt.want, tt.a.Equal(tt.b), "%T(%[1]+v).Equal(%+v)", tt.a, tt.b)
 		})
 	}
 }
