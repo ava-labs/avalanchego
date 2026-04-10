@@ -86,7 +86,10 @@ function test_single_import {
 }
 
 function test_require_error_is_no_funcs_as_params {
-  if find . -type f -name '*.go' "${FIND_EXCLUDES[@]}" -print0 | xargs -0 grep -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n'; then
+  # Detects require.ErrorIs calls with nested function calls as arguments,
+  # e.g. require.ErrorIs(t, someFunc(), err). The regex skips double-quoted
+  # strings ("...") so that "()" inside message literals doesn't false-positive.
+  if find . -type f -name '*.go' "${FIND_EXCLUDES[@]}" -print0 | xargs -0 grep -zo -P 'require.ErrorIs\(("(?:[^"\\]|\\.)*"|[^)"])+\)[^\n]*\)\n'; then
     echo ""
     return 1
   fi

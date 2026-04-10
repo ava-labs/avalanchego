@@ -66,7 +66,7 @@ type Wallet interface {
 func NewWallet(
 	builder Builder,
 	signer Signer,
-	avaxClient client.Client,
+	avaxClient *client.Client,
 	ethClient *ethclient.Client,
 	backend Backend,
 ) Wallet {
@@ -83,7 +83,7 @@ type wallet struct {
 	Backend
 	builder    Builder
 	signer     Signer
-	avaxClient client.Client
+	avaxClient *client.Client
 	ethClient  *ethclient.Client
 }
 
@@ -168,7 +168,7 @@ func (w *wallet) IssueAtomicTx(
 		return w.Backend.AcceptAtomicTx(ctx, tx)
 	}
 
-	if err := awaitTxAccepted(w.avaxClient, ctx, txID, ops.PollFrequency()); err != nil {
+	if err := awaitTxAccepted(ctx, w.avaxClient, txID, ops.PollFrequency()); err != nil {
 		return err
 	}
 
@@ -200,8 +200,8 @@ func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
 
 // TODO: Upstream this function into coreth.
 func awaitTxAccepted(
-	c client.Client,
 	ctx context.Context,
+	c *client.Client,
 	txID ids.ID,
 	freq time.Duration,
 	options ...rpc.Option,

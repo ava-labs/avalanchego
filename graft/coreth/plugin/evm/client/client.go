@@ -20,46 +20,29 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// Interface compliance
-var _ Client = (*client)(nil)
-
 var errInvalidAddr = errors.New("invalid hex address")
 
-// Client interface for interacting with EVM [chain]
-type Client interface {
-	IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error)
-	GetAtomicTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (atomic.Status, error)
-	GetAtomicTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error)
-	GetAtomicUTXOs(ctx context.Context, addrs []ids.ShortID, sourceChain string, limit uint32, startAddress ids.ShortID, startUTXOID ids.ID, options ...rpc.Option) ([][]byte, ids.ShortID, ids.ID, error)
-	StartCPUProfiler(ctx context.Context, options ...rpc.Option) error
-	StopCPUProfiler(ctx context.Context, options ...rpc.Option) error
-	MemoryProfile(ctx context.Context, options ...rpc.Option) error
-	LockProfile(ctx context.Context, options ...rpc.Option) error
-	SetLogLevel(ctx context.Context, level slog.Level, options ...rpc.Option) error
-	GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.Config, error)
-}
-
-// Client implementation for interacting with EVM [chain]
-type client struct {
+// Client for interacting with EVM [chain]
+type Client struct {
 	requester      rpc.EndpointRequester
 	adminRequester rpc.EndpointRequester
 }
 
 // NewClient returns a Client for interacting with EVM [chain]
-func NewClient(uri, chain string) Client {
-	return &client{
+func NewClient(uri, chain string) *Client {
+	return &Client{
 		requester:      rpc.NewEndpointRequester(fmt.Sprintf("%s/ext/bc/%s/avax", uri, chain)),
 		adminRequester: rpc.NewEndpointRequester(fmt.Sprintf("%s/ext/bc/%s/admin", uri, chain)),
 	}
 }
 
 // NewCChainClient returns a Client for interacting with the C Chain
-func NewCChainClient(uri string) Client {
+func NewCChainClient(uri string) *Client {
 	return NewClient(uri, "C")
 }
 
 // IssueTx issues a transaction to a node and returns the TxID
-func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
+func (c *Client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
@@ -79,7 +62,7 @@ type GetAtomicTxStatusReply struct {
 }
 
 // GetAtomicTxStatus returns the status of [txID]
-func (c *client) GetAtomicTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (atomic.Status, error) {
+func (c *Client) GetAtomicTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (atomic.Status, error) {
 	res := &GetAtomicTxStatusReply{}
 	err := c.requester.SendRequest(ctx, "avax.getAtomicTxStatus", &api.JSONTxID{
 		TxID: txID,
@@ -88,7 +71,7 @@ func (c *client) GetAtomicTxStatus(ctx context.Context, txID ids.ID, options ...
 }
 
 // GetAtomicTx returns the byte representation of [txID]
-func (c *client) GetAtomicTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error) {
+func (c *Client) GetAtomicTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest(ctx, "avax.getAtomicTx", &api.GetTxArgs{
 		TxID:     txID,
@@ -103,7 +86,7 @@ func (c *client) GetAtomicTx(ctx context.Context, txID ids.ID, options ...rpc.Op
 
 // GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
 // from [sourceChain]
-func (c *client) GetAtomicUTXOs(ctx context.Context, addrs []ids.ShortID, sourceChain string, limit uint32, startAddress ids.ShortID, startUTXOID ids.ID, options ...rpc.Option) ([][]byte, ids.ShortID, ids.ID, error) {
+func (c *Client) GetAtomicUTXOs(ctx context.Context, addrs []ids.ShortID, sourceChain string, limit uint32, startAddress ids.ShortID, startUTXOID ids.ID, options ...rpc.Option) ([][]byte, ids.ShortID, ids.ID, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest(ctx, "avax.getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   ids.ShortIDsToStrings(addrs),
@@ -135,19 +118,19 @@ func (c *client) GetAtomicUTXOs(ctx context.Context, addrs []ids.ShortID, source
 	return utxos, endAddr, endUTXOID, err
 }
 
-func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
+func (c *Client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
 	return c.adminRequester.SendRequest(ctx, "admin.startCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) error {
+func (c *Client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) error {
 	return c.adminRequester.SendRequest(ctx, "admin.stopCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) MemoryProfile(ctx context.Context, options ...rpc.Option) error {
+func (c *Client) MemoryProfile(ctx context.Context, options ...rpc.Option) error {
 	return c.adminRequester.SendRequest(ctx, "admin.memoryProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) error {
+func (c *Client) LockProfile(ctx context.Context, options ...rpc.Option) error {
 	return c.adminRequester.SendRequest(ctx, "admin.lockProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
@@ -156,7 +139,7 @@ type SetLogLevelArgs struct {
 }
 
 // SetLogLevel dynamically sets the log level for the C Chain
-func (c *client) SetLogLevel(ctx context.Context, level slog.Level, options ...rpc.Option) error {
+func (c *Client) SetLogLevel(ctx context.Context, level slog.Level, options ...rpc.Option) error {
 	return c.adminRequester.SendRequest(ctx, "admin.setLogLevel", &SetLogLevelArgs{
 		Level: level.String(),
 	}, &api.EmptyReply{}, options...)
@@ -167,7 +150,7 @@ type ConfigReply struct {
 }
 
 // GetVMConfig returns the current config of the VM
-func (c *client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.Config, error) {
+func (c *Client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*config.Config, error) {
 	res := &ConfigReply{}
 	err := c.adminRequester.SendRequest(ctx, "admin.getVMConfig", struct{}{}, res, options...)
 	return res.Config, err
