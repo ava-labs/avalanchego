@@ -61,8 +61,8 @@ type SinceGenesis struct {
 	mempool      *txpool.Mempool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
 
-	// TODO(StephenButtolph): Remove. This is only used by the tests.
-	warpVerifier *saewarp.Verifier
+	// TODO(alarso16): remove later
+	hooks *hook.Points
 
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
@@ -186,6 +186,7 @@ func (vm *SinceGenesis) Initialize(
 	vm.db = avaDB
 	vm.mempool = txpool.New(txs, snowCtx, inner.GethRPCBackends())
 	vm.onClose = append(vm.onClose, vm.mempool.Close)
+	vm.hooks = hooks
 
 	metrics := prometheus.NewRegistry()
 	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {
@@ -240,10 +241,10 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	{ // ==========  Warp Handler  ==========
-		vm.warpVerifier = saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage)
+		warpVerifier := saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage)
 		warpHandler := acp118.NewCachedHandler(
 			lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
-			vm.warpVerifier,
+			warpVerifier,
 			snowCtx.WarpSigner,
 		)
 		if err := inner.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
