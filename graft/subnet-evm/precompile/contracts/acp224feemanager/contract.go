@@ -239,11 +239,11 @@ func setFeeConfig(
 		return nil, remainingGas, errNilBlockNumber
 	}
 
+	oldConfig := GetStoredFeeConfig(stateDB, self)
+
 	if err := StoreFeeConfig(stateDB, self, feeConfig, blockNumber); err != nil {
 		return nil, remainingGas, err
 	}
-
-	oldConfig := GetStoredFeeConfig(stateDB, self)
 	topics, data, err := PackFeeConfigUpdatedEvent(
 		caller,
 		oldConfig,
