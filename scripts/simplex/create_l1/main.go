@@ -30,6 +30,7 @@ type l1Result struct {
 	ChainID              ids.ID
 	ConvertTxID          ids.ID
 	ConversionID         ids.ID
+	ChainName            string
 	ConsensusType        string
 	Validators           []*txs.ConvertSubnetToL1Validator
 	ConversionValidators []message.SubnetToL1ConversionValidatorData
@@ -42,6 +43,7 @@ func main() {
 	chainsOutput := flag.String("chains-output", "", "Path to write chains.json for the frontend")
 	configPath := flag.String("config", "", "Path to subnet config JSON file")
 	resolvedConfigOutput := flag.String("resolved-config-output", "", "Path to write the resolved subnet config (with validators populated)")
+	chainName := flag.String("name", "simplexl1", "Name for the L1 chain")
 	flag.Parse()
 
 	if *networkDir == "" {
@@ -73,7 +75,7 @@ func main() {
 	}
 
 	// Issue P-Chain transactions to create the subnet, chain, and convert to L1
-	result := createL1(ctx, network, genesisBytes, configBytes, consensusType)
+	result := createL1(ctx, network, genesisBytes, configBytes, consensusType, *chainName)
 
 	// Write the resolved config (with validators injected) to disk
 	if *resolvedConfigOutput != "" && result.ResolvedConfigBytes != nil {
@@ -136,6 +138,7 @@ func createL1(
 	genesisBytes []byte,
 	configBytes []byte,
 	consensusType string,
+	chainName string,
 ) l1Result {
 	apiURI := network.Nodes[0].GetAccessibleURI()
 	log.Printf("using node API: %s", apiURI)
@@ -178,7 +181,7 @@ func createL1(
 		genesisBytes,
 		constants.SubnetEVMID,
 		nil,
-		"simplexl1",
+		chainName,
 	)
 	if err != nil {
 		log.Fatalf("failed to create chain: %s", err)
@@ -215,6 +218,7 @@ func createL1(
 		ChainID:              chainID,
 		ConvertTxID:          convertTx.ID(),
 		ConversionID:         conversionID,
+		ChainName:            chainName,
 		ConsensusType:        consensusType,
 		Validators:           validators,
 		ConversionValidators: conversionValidators,
@@ -244,6 +248,7 @@ func collectValidators(
 
 		log.Printf("  node %s: BLS key collected", nodeID)
 
+		// All validators get equal weight so they have equal voting power in consensus.
 		validators = append(validators, &txs.ConvertSubnetToL1Validator{
 			NodeID:                nodeID.Bytes(),
 			Weight:                units.Schmeckle,
@@ -416,7 +421,7 @@ func writeChainsJSON(outputPath string, result l1Result) {
 			Consensus: "snowman",
 		},
 		{
-			Name:           "simplexl1",
+			Name:           result.ChainName,
 			ChainID:        result.ChainID.String(),
 			RPCPath:        fmt.Sprintf("/ext/bc/%s/rpc", result.ChainID),
 			SubnetID:       result.SubnetID.String(),
