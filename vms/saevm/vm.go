@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/sae"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -102,20 +103,48 @@ func (vm *SinceGenesis) Initialize(
 	db := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
 	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
 
+	snowCtx.Log.Info("parsing genesis")
+
 	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
 		return fmt.Errorf("json.Unmarshal(%T): %w", genesis, err)
 	}
 
-	config, _, err := core.SetupGenesisBlock(db, tdb, genesis)
+	snowCtx.Log.Info("establishing last synchronous block")
+
+	var lastSync *types.Block
+	lastSyncBytes, err := state.ReadLastSync(avaDB)
+	switch {
+	case err == nil:
+		lastSync = new(types.Block)
+		if err := rlp.DecodeBytes(lastSyncBytes, lastSync); err != nil {
+			return fmt.Errorf("rlp.DecodeBytes(..., %T): %v", lastSync, err)
+		}
+	case errors.Is(err, avadb.ErrNotFound):
+		lastSync = genesis.ToBlock()
+	default:
+		return err
+	}
+
+	snowCtx.Log.Info("setting up the genesis",
+		zap.Stringer("lastID", ids.ID(lastSync.Hash())),
+		zap.Uint64("lastHeight", lastSync.NumberU64()),
+	)
+
+	// TODO: Are these reasonable?
+	config, _, err := core.SetupGenesisBlock(db, tdb, genesis, lastSync.Hash(), false)
 	if err != nil {
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
+
+	snowCtx.Log.Info("parsing user config")
 
 	userConfig, err := ParseConfig(configBytes)
 	if err != nil {
 		return err
 	}
+
+	snowCtx.Log.Info("parsing warp message overrides")
 
 	warpMessages, err := userConfig.WarpMessages()
 	if err != nil {
@@ -145,19 +174,7 @@ func (vm *SinceGenesis) Initialize(
 		warpStorage,
 	)
 
-	var lastSync *types.Block
-	lastSyncBytes, err := state.ReadLastSync(db)
-	switch {
-	case err == nil:
-		lastSync = new(types.Block)
-		if err := rlp.DecodeBytes(lastSyncBytes, lastSync); err != nil {
-			return fmt.Errorf("rlp.DecodeBytes(..., %T): %v", lastSync, err)
-		}
-	case errors.Is(err, avadb.ErrNotFound):
-		lastSync = genesis.ToBlock()
-	default:
-		return err
-	}
+	snowCtx.Log.Info("constructing the sae VM")
 
 	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, lastSync, appSender)
 	if err != nil {
@@ -169,10 +186,14 @@ func (vm *SinceGenesis) Initialize(
 	vm.mempool = txpool.New(txs, snowCtx, inner.GethRPCBackends())
 	vm.onClose = append(vm.onClose, vm.mempool.Close)
 
+	snowCtx.Log.Info("registering coreth metrics")
+
 	metrics := prometheus.NewRegistry()
 	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {
 		return fmt.Errorf("failed to register metrics: %w", err)
 	}
+
+	snowCtx.Log.Info("p2p gossip")
 
 	{ // ==========  P2P Gossip  ==========
 		gossipSet, err := gossip.NewBloomSet(vm.mempool, gossip.BloomSetConfig{})
@@ -221,6 +242,8 @@ func (vm *SinceGenesis) Initialize(
 		})
 	}
 
+	snowCtx.Log.Info("warp handlers")
+
 	{ // ==========  Warp Handler  ==========
 		vm.warpVerifier = saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage)
 		warpHandler := acp118.NewCachedHandler(
@@ -232,6 +255,8 @@ func (vm *SinceGenesis) Initialize(
 			return fmt.Errorf("network.AddHandler(warp): %w", err)
 		}
 	}
+
+	snowCtx.Log.Info("initialized saevm")
 
 	return nil
 }

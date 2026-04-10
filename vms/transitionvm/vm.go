@@ -148,21 +148,25 @@ func (v *VM) transition(ctx context.Context, last snowman.Block) error {
 	v.transitionLock.Lock()
 	defer v.transitionLock.Unlock()
 
+	lastID := last.ID()
 	lastBytes := last.Bytes()
 	v.chainCtx.Log.Info("transitioning VMs",
-		zap.Stringer("lastID", last.ID()),
+		zap.Stringer("lastID", lastID),
 		zap.Uint64("lastHeight", last.Height()),
 		zap.Time("lastTime", last.Timestamp()),
 	)
 
+	v.chainCtx.Log.Info("shutting down pre-transition VM")
 	if err := v.preTransitionChain.Shutdown(ctx); err != nil {
 		return fmt.Errorf("closing pre-transition chain: %w", err)
 	}
 
+	v.chainCtx.Log.Info("writing last synchronous block")
 	if err := state.WriteLastSync(v.db, lastBytes); err != nil {
 		return fmt.Errorf("saving last synchronous block: %w", err)
 	}
 
+	v.chainCtx.Log.Info("initializing post-transition VM")
 	var (
 		postTransitionRequests requests
 		postTransitionSender   = sender{
@@ -183,13 +187,27 @@ func (v *VM) transition(ctx context.Context, last snowman.Block) error {
 	if err != nil {
 		return fmt.Errorf("initializing post-transition chain: %w", err)
 	}
+
+	v.chainCtx.Log.Info("initializing post-transition VM consensus state",
+		zap.Stringer("state", v.current.consensusState),
+	)
 	if err := v.postTransitionChain.SetState(ctx, v.current.consensusState); err != nil {
 		return fmt.Errorf("setting post-transition consensus state: %w", err)
 	}
+
+	v.chainCtx.Log.Info("initializing post-transition VM preference",
+		zap.Stringer("state", v.current.consensusState),
+	)
+	if err := v.postTransitionChain.SetPreference(ctx, lastID); err != nil {
+		return fmt.Errorf("setting post-transition preference: %w", err)
+	}
+
+	v.chainCtx.Log.Info("connecting post-transition VM to peers")
 	if err := v.current.connections.reconnect(ctx, v.postTransitionChain); err != nil {
 		return fmt.Errorf("reconnecting to post-transition vm: %w", err)
 	}
 
+	v.chainCtx.Log.Info("remapping http handlers to post-transition VM")
 	newHandlers, err := v.postTransitionChain.CreateHandlers(ctx)
 	if err != nil {
 		return fmt.Errorf("creating post-ransition http handlers", err)
@@ -200,5 +218,7 @@ func (v *VM) transition(ctx context.Context, last snowman.Block) error {
 	v.current.requests = &postTransitionRequests
 	v.current.ctx, v.current.ctxCancel = context.WithCancel(context.Background())
 	v.transitioned = true
+
+	v.chainCtx.Log.Info("transition finished successfully")
 	return nil
 }

@@ -110,9 +110,7 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 	), nil
 }
 
-func (b *blockBuilder) PotentialEndOfBlockOps(header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {
-	ctx := context.TODO()
-
+func (b *blockBuilder) PotentialEndOfBlockOps(ctx context.Context, header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {
 	seq := b.potentialTxs()
 	return func(yield func(*txpool.Tx) bool) {
 		// Transactions are verified against the last executed state. We must
