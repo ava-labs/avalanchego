@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -99,7 +100,9 @@ func TestSimplexEngineNilParameters(t *testing.T) {
 
 	config := configs[0]
 	config.Params = nil
-	_, err := NewEngine(ctx, config)
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	consensusCtx := snowtest.ConsensusContext(snowCtx)
+	_, err := NewEngine(ctx, consensusCtx, config)
 	require.ErrorIs(t, err, errNilSimplexParameters)
 }
 
@@ -192,7 +195,10 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 		Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		AnyTimes()
 
-	engine, err := NewEngine(ctx, config)
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	consensusCtx := snowtest.ConsensusContext(snowCtx)
+
+	engine, err := NewEngine(ctx, consensusCtx, config)
 	require.NoError(t, err)
 
 	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
@@ -421,7 +427,6 @@ var (
 	canotoBlock = &canotoSimplexBlock{
 		Metadata:   blockMetadata.Bytes(),
 		InnerBlock: []byte("inner-block"),
-		Blacklist:  emptyBlacklist.Bytes(),
 	}
 
 	blockBytes = canotoBlock.MarshalCanoto()
@@ -858,7 +863,9 @@ func setupEngine(t *testing.T) (*Engine, []*Config) {
 
 	config := configs[0]
 	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	engine, err := NewEngine(ctx, config)
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	consensusCtx := snowtest.ConsensusContext(snowCtx)
+	engine, err := NewEngine(ctx, consensusCtx, config)
 	require.NoError(t, err)
 
 	// ensure any go-routines started by the engine are cleaned up after the test finishes
