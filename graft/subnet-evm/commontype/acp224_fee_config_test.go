@@ -126,6 +126,7 @@ func FuzzACP224FeeConfigPacking(f *testing.F) {
 		got := new(ACP224FeeConfig)
 		got.UnpackFrom(in.Pack())
 		require.Equalf(t, *in, *got, "%T.UnpackFrom(%[1]T.Pack()) round trip", in)
+		require.Truef(t, got.Equal(in), "%T.Equal([packed original]), got)
 	})
 }
 
