@@ -826,6 +826,7 @@ func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 			r := rand.New(rand.NewSource(randSeed))
 			for _, ts := range validTokenSizes {
 				runRandDBTest(
+					t,
 					require,
 					r,
 					generateRandTest(
@@ -854,6 +855,7 @@ func FuzzMerkleDBInitialValuesRandomizedActions(f *testing.F) {
 		r := rand.New(rand.NewSource(randSeed))
 		for _, ts := range validTokenSizes {
 			runRandDBTest(
+				t,
 				require,
 				r,
 				generateInitialValues(
@@ -890,10 +892,10 @@ const (
 	opMax // boundary value, not an actual op
 )
 
-func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tokenSize int) {
+func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt randTest, tokenSize int) {
 	config := NewConfig()
 	config.BranchFactor = tokenSizeToBranchFactor[tokenSize]
-	db, err := New(context.Background(), memdb.New(), config)
+	db, err := New(t.Context(), memdb.New(), config)
 	require.NoError(err)
 
 	maxProofLen := 100
@@ -907,7 +909,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 		pastRoots            = []ids.ID{}
 	)
 
-	startRoot, err := db.GetMerkleRoot(context.Background())
+	startRoot, err := db.GetMerkleRoot(t.Context())
 	require.NoError(err)
 
 	for i, step := range rt {
@@ -924,7 +926,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			uncommittedDeletes.Add(ToKey(step.key))
 			delete(uncommittedKeyValues, ToKey(step.key))
 		case opGenerateRangeProof:
-			root, err := db.GetMerkleRoot(context.Background())
+			root, err := db.GetMerkleRoot(t.Context())
 			require.NoError(err)
 
 			if len(pastRoots) > 0 {
@@ -940,7 +942,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				end = maybe.Some(step.value)
 			}
 
-			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, maxProofLen)
+			rangeProof, err := db.GetRangeProofAtRoot(t.Context(), root, start, end, maxProofLen)
 			if root == ids.Empty {
 				require.ErrorIs(err, ErrEmptyProof)
 				continue
@@ -949,7 +951,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			require.LessOrEqual(len(rangeProof.KeyChanges), maxProofLen)
 
 			require.NoError(rangeProof.Verify(
-				context.Background(),
+				t.Context(),
 				start,
 				end,
 				root,
@@ -958,7 +960,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				maxProofLen,
 			))
 		case opGenerateChangeProof:
-			root, err := db.GetMerkleRoot(context.Background())
+			root, err := db.GetMerkleRoot(t.Context())
 			require.NoError(err)
 
 			if len(pastRoots) > 1 {
@@ -975,7 +977,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				end = maybe.Some(step.value)
 			}
 
-			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, start, end, maxProofLen)
+			changeProof, err := db.GetChangeProof(t.Context(), startRoot, root, start, end, maxProofLen)
 			if startRoot == root {
 				require.ErrorIs(err, errSameRoot)
 				continue
@@ -991,7 +993,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			require.NoError(err)
 
 			require.NoError(changeProofDB.VerifyChangeProof(
-				context.Background(),
+				t.Context(),
 				changeProof,
 				start,
 				end,
@@ -999,7 +1001,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				maxProofLen,
 			))
 		case opWriteBatch:
-			oldRoot, err := db.GetMerkleRoot(context.Background())
+			oldRoot, err := db.GetMerkleRoot(t.Context())
 			require.NoError(err)
 
 			require.NoError(currentBatch.Write())
@@ -1017,7 +1019,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			}
 			uncommittedDeletes.Clear()
 
-			newRoot, err := db.GetMerkleRoot(context.Background())
+			newRoot, err := db.GetMerkleRoot(t.Context())
 			require.NoError(err)
 
 			if oldRoot != newRoot {
@@ -1055,18 +1057,18 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				})
 			}
 
-			view, err := newDB.NewView(context.Background(), ViewChanges{BatchOps: ops})
+			view, err := newDB.NewView(t.Context(), ViewChanges{BatchOps: ops})
 			require.NoError(err)
 
 			// Check that the root of the view is the same as the root of [db]
-			newRoot, err := view.GetMerkleRoot(context.Background())
+			newRoot, err := view.GetMerkleRoot(t.Context())
 			require.NoError(err)
 
-			dbRoot, err := db.GetMerkleRoot(context.Background())
+			dbRoot, err := db.GetMerkleRoot(t.Context())
 			require.NoError(err)
 			require.Equal(dbRoot, newRoot)
 		default:
-			require.FailNow("unknown op")
+			t.Fatal("unknown op")
 		}
 	}
 }

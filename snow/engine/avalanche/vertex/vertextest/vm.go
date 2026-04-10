@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -41,7 +39,7 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 		return vm.LinearizeF(ctx, stopVertexID)
 	}
 	if vm.CantLinearize && vm.T != nil {
-		require.FailNow(vm.T, errLinearize.Error())
+		vm.T.Fatal(errLinearize.Error())
 	}
 	return errLinearize
 }
@@ -51,7 +49,7 @@ func (vm *VM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {
 		return vm.ParseTxF(ctx, b)
 	}
 	if vm.CantParse && vm.T != nil {
-		require.FailNow(vm.T, errParse.Error())
+		vm.T.Fatal(errParse.Error())
 	}
 	return nil, errParse
 }

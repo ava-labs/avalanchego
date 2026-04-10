@@ -6,8 +6,6 @@ package enginetest
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -38,7 +36,7 @@ func (s *BootstrapTracker) IsBootstrapped() bool {
 		return s.IsBootstrappedF()
 	}
 	if s.CantIsBootstrapped && s.T != nil {
-		require.FailNow(s.T, "Unexpectedly called IsBootstrapped")
+		s.T.Fatal("Unexpectedly called IsBootstrapped")
 	}
 	return false
 }
@@ -50,7 +48,7 @@ func (s *BootstrapTracker) Bootstrapped(chainID ids.ID) {
 	if s.BootstrappedF != nil {
 		s.BootstrappedF(chainID)
 	} else if s.CantBootstrapped && s.T != nil {
-		require.FailNow(s.T, "Unexpectedly called Bootstrapped")
+		s.T.Fatal("Unexpectedly called Bootstrapped")
 	}
 }
 
@@ -58,7 +56,7 @@ func (s *BootstrapTracker) AllBootstrapped() <-chan struct{} {
 	if s.OnBootstrapCompletedF != nil {
 		return s.OnBootstrapCompletedF()
 	} else if s.CantOnBootstrapCompleted && s.T != nil {
-		require.FailNow(s.T, "Unexpectedly called OnBootstrapCompleted")
+		s.T.Fatal("Unexpectedly called OnBootstrapCompleted")
 	}
 	return nil
 }

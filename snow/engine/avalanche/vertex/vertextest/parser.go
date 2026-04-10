@@ -8,8 +8,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
@@ -35,7 +33,7 @@ func (p *Parser) ParseVtx(ctx context.Context, b []byte) (avalanche.Vertex, erro
 		return p.ParseVtxF(ctx, b)
 	}
 	if p.CantParseVtx && p.T != nil {
-		require.FailNow(p.T, errParse.Error())
+		p.T.Fatal(errParse.Error())
 	}
 	return nil, errParse
 }

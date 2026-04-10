@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 var errParse = errors.New("unexpectedly called Parse")
@@ -31,7 +29,7 @@ func (p *TestParser) Parse(ctx context.Context, b []byte) (Job, error) {
 		return p.ParseF(ctx, b)
 	}
 	if p.CantParse && p.T != nil {
-		require.FailNow(p.T, errParse.Error())
+		p.T.Fatal(errParse.Error())
 	}
 	return nil, errParse
 }

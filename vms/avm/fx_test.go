@@ -6,8 +6,6 @@ package avm
 import (
 	"errors"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -50,7 +48,7 @@ func (fx *FxTest) Initialize(vm interface{}) error {
 		return nil
 	}
 	if fx.T != nil {
-		require.FailNow(fx.T, errCalledInitialize.Error())
+		fx.T.Fatal(errCalledInitialize.Error())
 	}
 	return errCalledInitialize
 }
@@ -63,7 +61,7 @@ func (fx *FxTest) Bootstrapping() error {
 		return nil
 	}
 	if fx.T != nil {
-		require.FailNow(fx.T, errCalledBootstrapping.Error())
+		fx.T.Fatal(errCalledBootstrapping.Error())
 	}
 	return errCalledBootstrapping
 }
@@ -76,7 +74,7 @@ func (fx *FxTest) Bootstrapped() error {
 		return nil
 	}
 	if fx.T != nil {
-		require.FailNow(fx.T, errCalledBootstrapped.Error())
+		fx.T.Fatal(errCalledBootstrapped.Error())
 	}
 	return errCalledBootstrapped
 }
@@ -89,7 +87,7 @@ func (fx *FxTest) VerifyTransfer(tx, in, cred, utxo interface{}) error {
 		return nil
 	}
 	if fx.T != nil {
-		require.FailNow(fx.T, errCalledVerifyTransfer.Error())
+		fx.T.Fatal(errCalledVerifyTransfer.Error())
 	}
 	return errCalledVerifyTransfer
 }
@@ -102,7 +100,7 @@ func (fx *FxTest) VerifyOperation(tx, op, cred interface{}, utxos []interface{})
 		return nil
 	}
 	if fx.T != nil {
-		require.FailNow(fx.T, errCalledVerifyOperation.Error())
+		fx.T.Fatal(errCalledVerifyOperation.Error())
 	}
 	return errCalledVerifyOperation
 }

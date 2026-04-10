@@ -8,8 +8,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -44,7 +42,7 @@ func (vm *StateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, error) {
 		return vm.StateSyncEnabledF(ctx)
 	}
 	if vm.CantStateSyncEnabled && vm.T != nil {
-		require.FailNow(vm.T, errStateSyncEnabled.Error())
+		vm.T.Fatal(errStateSyncEnabled.Error())
 	}
 	return false, errStateSyncEnabled
 }
@@ -54,7 +52,7 @@ func (vm *StateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (bloc
 		return vm.GetOngoingSyncStateSummaryF(ctx)
 	}
 	if vm.CantStateSyncGetOngoingSummary && vm.T != nil {
-		require.FailNow(vm.T, errStateSyncGetOngoingSummary.Error())
+		vm.T.Fatal(errStateSyncGetOngoingSummary.Error())
 	}
 	return nil, errStateSyncGetOngoingSummary
 }
@@ -64,7 +62,7 @@ func (vm *StateSyncableVM) GetLastStateSummary(ctx context.Context) (block.State
 		return vm.GetLastStateSummaryF(ctx)
 	}
 	if vm.CantGetLastStateSummary && vm.T != nil {
-		require.FailNow(vm.T, errGetLastStateSummary.Error())
+		vm.T.Fatal(errGetLastStateSummary.Error())
 	}
 	return nil, errGetLastStateSummary
 }
@@ -74,7 +72,7 @@ func (vm *StateSyncableVM) ParseStateSummary(ctx context.Context, summaryBytes [
 		return vm.ParseStateSummaryF(ctx, summaryBytes)
 	}
 	if vm.CantParseStateSummary && vm.T != nil {
-		require.FailNow(vm.T, errParseStateSummary.Error())
+		vm.T.Fatal(errParseStateSummary.Error())
 	}
 	return nil, errParseStateSummary
 }
@@ -84,7 +82,7 @@ func (vm *StateSyncableVM) GetStateSummary(ctx context.Context, summaryHeight ui
 		return vm.GetStateSummaryF(ctx, summaryHeight)
 	}
 	if vm.CantGetStateSummary && vm.T != nil {
-		require.FailNow(vm.T, errGetStateSummary.Error())
+		vm.T.Fatal(errGetStateSummary.Error())
 	}
 	return nil, errGetStateSummary
 }

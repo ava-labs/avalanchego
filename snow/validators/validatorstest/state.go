@@ -8,8 +8,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
@@ -48,7 +46,7 @@ func (vm *State) GetMinimumHeight(ctx context.Context) (uint64, error) {
 		return vm.GetMinimumHeightF(ctx)
 	}
 	if vm.CantGetMinimumHeight && vm.T != nil {
-		require.FailNow(vm.T, errMinimumHeight.Error())
+		vm.T.Fatal(errMinimumHeight.Error())
 	}
 	return 0, errMinimumHeight
 }
@@ -58,7 +56,7 @@ func (vm *State) GetCurrentHeight(ctx context.Context) (uint64, error) {
 		return vm.GetCurrentHeightF(ctx)
 	}
 	if vm.CantGetCurrentHeight && vm.T != nil {
-		require.FailNow(vm.T, errCurrentHeight.Error())
+		vm.T.Fatal(errCurrentHeight.Error())
 	}
 	return 0, errCurrentHeight
 }
@@ -68,7 +66,7 @@ func (vm *State) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error
 		return vm.GetSubnetIDF(ctx, chainID)
 	}
 	if vm.CantGetSubnetID && vm.T != nil {
-		require.FailNow(vm.T, errSubnetID.Error())
+		vm.T.Fatal(errSubnetID.Error())
 	}
 	return ids.Empty, errSubnetID
 }
@@ -81,7 +79,7 @@ func (vm *State) GetWarpValidatorSets(
 		return vm.GetWarpValidatorSetsF(ctx, height)
 	}
 	if vm.CantGetWarpValidatorSets && vm.T != nil {
-		require.FailNow(vm.T, errGetWarpValidatorSets.Error())
+		vm.T.Fatal(errGetWarpValidatorSets.Error())
 	}
 	return nil, errGetWarpValidatorSets
 }
@@ -95,7 +93,7 @@ func (vm *State) GetValidatorSet(
 		return vm.GetValidatorSetF(ctx, height, subnetID)
 	}
 	if vm.CantGetValidatorSet && vm.T != nil {
-		require.FailNow(vm.T, errGetValidatorSet.Error())
+		vm.T.Fatal(errGetValidatorSet.Error())
 	}
 	return nil, errGetValidatorSet
 }
@@ -108,7 +106,7 @@ func (vm *State) GetCurrentValidatorSet(
 		return vm.GetCurrentValidatorSetF(ctx, subnetID)
 	}
 	if vm.CantGetCurrentValidatorSet && vm.T != nil {
-		require.FailNow(vm.T, errGetCurrentValidatorSet.Error())
+		vm.T.Fatal(errGetCurrentValidatorSet.Error())
 	}
 	return nil, 0, errGetCurrentValidatorSet
 }

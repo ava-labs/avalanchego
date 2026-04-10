@@ -20,6 +20,5 @@ go_library(
         "//snow/engine/common",
         "//utils/set",
         "//version",
-        "@com_github_stretchr_testify//require",
     ],
 )

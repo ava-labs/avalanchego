@@ -284,7 +284,7 @@ func TestAppGossipMessageForUnregisteredHandler(t *testing.T) {
 			ctx := t.Context()
 			handler := &TestHandler{
 				AppGossipF: func(context.Context, ids.NodeID, []byte) {
-					require.Fail("should not be called")
+					t.Fatal("should not be called")
 				},
 			}
 			network, err := NewNetwork(
@@ -327,7 +327,7 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 			ctx := t.Context()
 			handler := &TestHandler{
 				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
-					require.Fail("should not be called")
+					t.Fatal("should not be called")
 					return nil, nil
 				},
 			}
@@ -431,10 +431,10 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 			ctx := t.Context()
 			handler := &TestHandler{
 				AppGossipF: func(context.Context, ids.NodeID, []byte) {
-					require.Fail("should not be called")
+					t.Fatal("should not be called")
 				},
 				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
-					require.Fail("should not be called")
+					t.Fatal("should not be called")
 					return nil, nil
 				},
 			}
@@ -908,7 +908,7 @@ func TestNetworkValidators_ConnectAndDisconnect(t *testing.T) {
 				len(tt.disconnectedPeers),
 				len(tt.wantConnectedValidators),
 			); s.Len() != 1 {
-				require.Fail("tests vectors must be of same length")
+				t.Fatal("tests vectors must be of same length")
 			}
 
 			validatorState := &validatorstest.State{}

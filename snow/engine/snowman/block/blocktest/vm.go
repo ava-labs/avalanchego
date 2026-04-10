@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -59,7 +57,7 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return vm.BuildBlockF(ctx)
 	}
 	if vm.CantBuildBlock && vm.T != nil {
-		require.FailNow(vm.T, errBuildBlock.Error())
+		vm.T.Fatal(errBuildBlock.Error())
 	}
 	return nil, errBuildBlock
 }
@@ -69,7 +67,7 @@ func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 		return vm.ParseBlockF(ctx, b)
 	}
 	if vm.CantParseBlock && vm.T != nil {
-		require.FailNow(vm.T, errParseBlock.Error())
+		vm.T.Fatal(errParseBlock.Error())
 	}
 	return nil, errParseBlock
 }
@@ -79,7 +77,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
 		return vm.GetBlockF(ctx, id)
 	}
 	if vm.CantGetBlock && vm.T != nil {
-		require.FailNow(vm.T, errGetBlock.Error())
+		vm.T.Fatal(errGetBlock.Error())
 	}
 	return nil, errGetBlock
 }
@@ -89,7 +87,7 @@ func (vm *VM) SetPreference(ctx context.Context, id ids.ID) error {
 		return vm.SetPreferenceF(ctx, id)
 	}
 	if vm.CantSetPreference && vm.T != nil {
-		require.FailNow(vm.T, "Unexpectedly called SetPreference")
+		vm.T.Fatal("Unexpectedly called SetPreference")
 	}
 	return nil
 }
@@ -99,7 +97,7 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 		return vm.LastAcceptedF(ctx)
 	}
 	if vm.CantLastAccepted && vm.T != nil {
-		require.FailNow(vm.T, errLastAccepted.Error())
+		vm.T.Fatal(errLastAccepted.Error())
 	}
 	return ids.Empty, errLastAccepted
 }
@@ -109,7 +107,7 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 		return vm.GetBlockIDAtHeightF(ctx, height)
 	}
 	if vm.CantGetBlockIDAtHeight && vm.T != nil {
-		require.FailNow(vm.T, errGetAncestor.Error())
+		vm.T.Fatal(errGetAncestor.Error())
 	}
 	return ids.Empty, errGetBlockIDAtHeight
 }

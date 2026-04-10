@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -109,7 +107,7 @@ func (vm *VM) Initialize(
 		)
 	}
 	if vm.CantInitialize && vm.T != nil {
-		require.FailNow(vm.T, errInitialize.Error())
+		vm.T.Fatal(errInitialize.Error())
 	}
 	return errInitialize
 }
@@ -120,7 +118,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	}
 	if vm.CantSetState {
 		if vm.T != nil {
-			require.FailNow(vm.T, errSetState.Error())
+			vm.T.Fatal(errSetState.Error())
 		}
 		return errSetState
 	}
@@ -133,7 +131,7 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	}
 	if vm.CantShutdown {
 		if vm.T != nil {
-			require.FailNow(vm.T, errShutdown.Error())
+			vm.T.Fatal(errShutdown.Error())
 		}
 		return errShutdown
 	}
@@ -145,7 +143,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 		return vm.CreateHandlers(ctx)
 	}
 	if vm.CantCreateHandlers && vm.T != nil {
-		require.FailNow(vm.T, errCreateHandlers.Error())
+		vm.T.Fatal(errCreateHandlers.Error())
 	}
 	return nil, nil
 }
@@ -155,7 +153,7 @@ func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 		return vm.NewHTTPHandlerF(ctx)
 	}
 	if vm.CantNewHTTPHandler && vm.T != nil {
-		require.FailNow(vm.T, errNewHTTPHandler.Error())
+		vm.T.Fatal(errNewHTTPHandler.Error())
 	}
 	return nil, nil
 }
@@ -165,7 +163,7 @@ func (vm *VM) HealthCheck(ctx context.Context) (interface{}, error) {
 		return vm.HealthCheckF(ctx)
 	}
 	if vm.CantHealthCheck && vm.T != nil {
-		require.FailNow(vm.T, errHealthCheck.Error())
+		vm.T.Fatal(errHealthCheck.Error())
 	}
 	return nil, errHealthCheck
 }
@@ -178,7 +176,7 @@ func (vm *VM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		return nil
 	}
 	if vm.T != nil {
-		require.FailNow(vm.T, errAppRequest.Error())
+		vm.T.Fatal(errAppRequest.Error())
 	}
 	return errAppRequest
 }
@@ -191,7 +189,7 @@ func (vm *VM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil
 	}
 	if vm.T != nil {
-		require.FailNow(vm.T, errAppRequestFailed.Error())
+		vm.T.Fatal(errAppRequestFailed.Error())
 	}
 	return errAppRequestFailed
 }
@@ -204,7 +202,7 @@ func (vm *VM) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint
 		return nil
 	}
 	if vm.T != nil {
-		require.FailNow(vm.T, errAppResponse.Error())
+		vm.T.Fatal(errAppResponse.Error())
 	}
 	return errAppResponse
 }
@@ -217,7 +215,7 @@ func (vm *VM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) erro
 		return nil
 	}
 	if vm.T != nil {
-		require.FailNow(vm.T, errAppGossip.Error())
+		vm.T.Fatal(errAppGossip.Error())
 	}
 	return errAppGossip
 }
@@ -227,7 +225,7 @@ func (vm *VM) Connected(ctx context.Context, id ids.NodeID, nodeVersion *version
 		return vm.ConnectedF(ctx, id, nodeVersion)
 	}
 	if vm.CantConnected && vm.T != nil {
-		require.FailNow(vm.T, errConnected.Error())
+		vm.T.Fatal(errConnected.Error())
 	}
 	return nil
 }
@@ -237,7 +235,7 @@ func (vm *VM) Disconnected(ctx context.Context, id ids.NodeID) error {
 		return vm.DisconnectedF(ctx, id)
 	}
 	if vm.CantDisconnected && vm.T != nil {
-		require.FailNow(vm.T, errDisconnected.Error())
+		vm.T.Fatal(errDisconnected.Error())
 	}
 	return nil
 }
@@ -247,7 +245,7 @@ func (vm *VM) Version(ctx context.Context) (string, error) {
 		return vm.VersionF(ctx)
 	}
 	if vm.CantVersion && vm.T != nil {
-		require.FailNow(vm.T, errVersion.Error())
+		vm.T.Fatal(errVersion.Error())
 	}
 	return "", nil
 }

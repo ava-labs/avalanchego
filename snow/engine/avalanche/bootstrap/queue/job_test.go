@@ -8,8 +8,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -49,7 +47,7 @@ func (j *TestJob) ID() ids.ID {
 		return j.IDF()
 	}
 	if j.CantID && j.T != nil {
-		require.FailNow(j.T, "Unexpectedly called ID")
+		j.T.Fatal("Unexpectedly called ID")
 	}
 	return ids.Empty
 }
@@ -59,7 +57,7 @@ func (j *TestJob) MissingDependencies(ctx context.Context) (set.Set[ids.ID], err
 		return j.MissingDependenciesF(ctx)
 	}
 	if j.CantMissingDependencies && j.T != nil {
-		require.FailNow(j.T, "Unexpectedly called MissingDependencies")
+		j.T.Fatal("Unexpectedly called MissingDependencies")
 	}
 	return set.Set[ids.ID]{}, nil
 }
@@ -69,7 +67,7 @@ func (j *TestJob) Execute(ctx context.Context) error {
 		return j.ExecuteF(ctx)
 	}
 	if j.CantExecute && j.T != nil {
-		require.FailNow(j.T, errExecute.Error())
+		j.T.Fatal(errExecute.Error())
 	}
 	return errExecute
 }
@@ -79,7 +77,7 @@ func (j *TestJob) Bytes() []byte {
 		return j.BytesF()
 	}
 	if j.CantBytes && j.T != nil {
-		require.FailNow(j.T, "Unexpectedly called Bytes")
+		j.T.Fatal("Unexpectedly called Bytes")
 	}
 	return nil
 }
@@ -89,7 +87,7 @@ func (j *TestJob) HasMissingDependencies(ctx context.Context) (bool, error) {
 		return j.HasMissingDependenciesF(ctx)
 	}
 	if j.CantHasMissingDependencies && j.T != nil {
-		require.FailNow(j.T, errHasMissingDependencies.Error())
+		j.T.Fatal(errHasMissingDependencies.Error())
 	}
 	return false, errHasMissingDependencies
 }

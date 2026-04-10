@@ -7,8 +7,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
 )
 
 // WaitGroupWithTimeout waits for wg with timeout, failing the test with msg on timeout.
@@ -23,7 +21,7 @@ func WaitGroupWithTimeout(t *testing.T, wg *sync.WaitGroup, timeout time.Duratio
 	case <-ch:
 		return
 	case <-time.After(timeout):
-		require.FailNow(t, msg)
+		t.Fatal(msg)
 	}
 }
 
@@ -34,7 +32,7 @@ func WaitErrWithTimeout(t *testing.T, ch <-chan error, timeout time.Duration) er
 	case err := <-ch:
 		return err
 	case <-time.After(timeout):
-		require.FailNow(t, "timed out waiting for RunSyncerTasks to complete")
+		t.Fatal("timed out waiting for RunSyncerTasks to complete")
 		return nil
 	}
 }
@@ -46,6 +44,6 @@ func WaitSignalWithTimeout(t *testing.T, ch <-chan struct{}, timeout time.Durati
 	case <-ch:
 		return
 	case <-time.After(timeout):
-		require.FailNow(t, msg)
+		t.Fatal(msg)
 	}
 }

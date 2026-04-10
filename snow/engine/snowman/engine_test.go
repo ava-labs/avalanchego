@@ -248,7 +248,7 @@ func TestEngineQuery(t *testing.T) {
 		case parent.ID(), child.ID():
 			return nil, errUnknownBlock
 		}
-		require.FailNow(errUnknownBlock.Error())
+		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 	vm.ParseBlockF = nil
@@ -290,7 +290,7 @@ func TestEngineQuery(t *testing.T) {
 			case child.ID():
 				return child, nil
 			}
-			require.FailNow(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock.Error())
 			return nil, errUnknownBlock
 		}
 
@@ -401,7 +401,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		case blk1.ID():
 			return nil, errUnknownBlock
 		}
-		require.FailNow(errUnknownBlock.Error())
+		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -425,7 +425,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			case blkID == blk1.ID():
 				return blk1, nil
 			}
-			require.FailNow(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock.Error())
 			return nil, errUnknownBlock
 		}
 
@@ -593,7 +593,7 @@ func TestEngineBuildBlock(t *testing.T) {
 	}
 
 	sender.SendPullQueryF = func(context.Context, set.Set[ids.NodeID], uint32, ids.ID, uint64) {
-		require.FailNow("should not be sending pulls when we are the block producer")
+		t.Fatal("should not be sending pulls when we are the block producer")
 	}
 
 	pushSent := new(bool)
@@ -839,7 +839,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		case blk.ID():
 			return nil, errUnknownBlock
 		}
-		require.FailNow(errUnknownBlock.Error())
+		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -892,7 +892,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		case blk.ID():
 			return nil, errUnknownBlock
 		}
-		require.FailNow(errUnknownBlock.Error())
+		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -1551,7 +1551,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		case blk.ID():
 			return blk, nil
 		}
-		require.FailNow(errUnknownBlock.Error())
+		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -1727,7 +1727,7 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		case bytes.Equal(b, nonPreferredBlk.Bytes()):
 			return nonPreferredBlk, nil
 		default:
-			require.FailNow(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock.Error())
 			return nil, errUnknownBlock
 		}
 	}
@@ -1785,7 +1785,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		case bytes.Equal(b, blk2.Bytes()):
 			return blk2, nil
 		default:
-			require.FailNow(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock.Error())
 			return nil, errUnknownBlock
 		}
 	}
@@ -1945,7 +1945,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		case bytes.Equal(b, blk3.Bytes()):
 			return blk3, nil
 		default:
-			require.FailNow(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock.Error())
 			return nil, errUnknownBlock
 		}
 	}
@@ -2003,7 +2003,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		switch blkID {
 		case blk1.ID():
-			require.FailNow("Unexpectedly sent a Get request for blk1")
+			t.Fatal("Unexpectedly sent a Get request for blk1")
 		case blk2.ID():
 			t.Logf("sending get for blk2 with %d", requestID)
 			*sendReqID = requestID
@@ -2015,7 +2015,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 			*reqVdr = inVdr
 			return
 		default:
-			require.FailNow("Unexpectedly sent a Get request for unknown block")
+			t.Fatal("Unexpectedly sent a Get request for unknown block")
 		}
 	}
 
@@ -2218,7 +2218,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		case blk.ID():
 			return blk, nil
 		}
-		require.FailNow(errUnknownBlock.Error())
+		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -2330,7 +2330,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 		case blk.ID():
 			return blk, nil
 		}
-		require.FailNow(errUnknownBlock.Error())
+		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
