@@ -14,6 +14,10 @@ func ReadLastSync(db database.KeyValueReader) ([]byte, error) {
 	return db.Get(lastSyncKey)
 }
 
+func HasLastSync(db database.KeyValueReader) (bool, error) {
+	return db.Has(lastSyncKey)
+}
+
 func WriteLastSync(db database.KeyValueWriter, b []byte) error {
 	return db.Put(lastSyncKey, b)
 }

@@ -1229,7 +1229,7 @@ func (n *Node) initVMs() error {
 		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Factory{
 			PreFactory:     &coreth.Factory{},
 			PostFactory:    &saevm.Factory{},
-			TransitionTime: time.Now().Add(15 * time.Second),
+			TransitionTime: time.Date(2026, time.April, 10, 12+5, 34, 0, 0, time.Local),
 		}),
 	)
 	if err != nil {

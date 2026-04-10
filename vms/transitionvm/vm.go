@@ -102,40 +102,34 @@ func (v *VM) Initialize(
 	v.fxs = fxs
 	v.appSender = appSender
 
-	var (
-		preTransitionRequests requests
-		preTransitionSender   = sender{
-			AppSender: appSender,
-			requests:  &preTransitionRequests,
-		}
-	)
-	err := v.preTransitionChain.Initialize(
-		ctx,
-		chainCtx,
-		db,
-		genesisBytes,
-		upgradeBytes,
-		configBytes,
-		fxs,
-		&preTransitionSender,
-	)
-	if err != nil {
-		return fmt.Errorf("initializing pre-transition chain: %w", err)
-	}
-
-	stageContext, stageCancel := context.WithCancel(context.Background())
 	v.current = &current{
 		chain:          v.preTransitionChain,
 		consensusState: snow.Initializing,
-		requests:       &preTransitionRequests,
 		connections: &connections{
 			nodes: make(map[ids.NodeID]*version.Application),
 		},
 		httpHandlers: &httpHandlers{
 			routes: make(map[string]*httpHandler),
 		},
-		ctx:       stageContext,
-		ctxCancel: stageCancel,
+	}
+
+	chainCtx.Log.Info("checking for last synchronous block")
+	has, err := state.HasLastSync(v.db)
+	if err != nil {
+		return fmt.Errorf("checking for last synchronous block: %w", err)
+	}
+
+	if has {
+		chainCtx.Log.Info("initializing post-transition VM")
+		if err := v.initChain(ctx, v.postTransitionChain, v.chainCtx); err != nil {
+			return fmt.Errorf("initializing post-transition VM: %w", err)
+		}
+		v.transitioned = true
+	} else {
+		chainCtx.Log.Info("initializing pre-transition VM")
+		if err := v.initChain(ctx, v.preTransitionChain, chainCtx); err != nil {
+			return fmt.Errorf("initializing pre-transition VM: %w", err)
+		}
 	}
 	return nil
 }
@@ -167,58 +161,61 @@ func (v *VM) transition(ctx context.Context, last snowman.Block) error {
 	}
 
 	v.chainCtx.Log.Info("initializing post-transition VM")
-	var (
-		postTransitionRequests requests
-		postTransitionSender   = sender{
-			AppSender: v.appSender,
-			requests:  &postTransitionRequests,
-		}
-	)
-	err := v.postTransitionChain.Initialize(
-		ctx,
-		v.chainCtx,
-		v.db,
-		v.genesisBytes,
-		v.upgradeBytes,
-		v.configBytes,
-		v.fxs,
-		&postTransitionSender,
-	)
-	if err != nil {
-		return fmt.Errorf("initializing post-transition chain: %w", err)
-	}
-
-	v.chainCtx.Log.Info("initializing post-transition VM consensus state",
-		zap.Stringer("state", v.current.consensusState),
-	)
-	if err := v.postTransitionChain.SetState(ctx, v.current.consensusState); err != nil {
-		return fmt.Errorf("setting post-transition consensus state: %w", err)
+	if err := v.initChain(ctx, v.postTransitionChain, v.chainCtx); err != nil {
+		return fmt.Errorf("initializing post-transition VM: %w", err)
 	}
 
 	v.chainCtx.Log.Info("initializing post-transition VM preference",
-		zap.Stringer("state", v.current.consensusState),
+		zap.Stringer("blkID", lastID),
 	)
 	if err := v.postTransitionChain.SetPreference(ctx, lastID); err != nil {
 		return fmt.Errorf("setting post-transition preference: %w", err)
 	}
 
-	v.chainCtx.Log.Info("connecting post-transition VM to peers")
-	if err := v.current.connections.reconnect(ctx, v.postTransitionChain); err != nil {
-		return fmt.Errorf("reconnecting to post-transition vm: %w", err)
+	v.transitioned = true
+	v.chainCtx.Log.Info("transition finished successfully")
+	return nil
+}
+
+func (v *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context) error {
+	var (
+		requests requests
+		sender   = sender{
+			AppSender: v.appSender,
+			requests:  &requests,
+		}
+	)
+	err := chain.Initialize(
+		ctx,
+		chainCtx,
+		v.db,
+		v.genesisBytes,
+		v.upgradeBytes,
+		v.configBytes,
+		v.fxs,
+		&sender,
+	)
+	if err != nil {
+		return fmt.Errorf("initializing chain: %w", err)
 	}
 
-	v.chainCtx.Log.Info("remapping http handlers to post-transition VM")
-	newHandlers, err := v.postTransitionChain.CreateHandlers(ctx)
+	if v.current.consensusState != snow.Initializing {
+		if err := chain.SetState(ctx, v.current.consensusState); err != nil {
+			return fmt.Errorf("setting consensus state: %w", err)
+		}
+	}
+	if err := v.current.connections.reconnect(ctx, chain); err != nil {
+		return fmt.Errorf("reconnecting to vm: %w", err)
+	}
+
+	newHandlers, err := chain.CreateHandlers(ctx)
 	if err != nil {
-		return fmt.Errorf("creating post-ransition http handlers", err)
+		return fmt.Errorf("creating http handlers", err)
 	}
 	v.current.httpHandlers.set(newHandlers)
 
-	v.current.chain = v.postTransitionChain
-	v.current.requests = &postTransitionRequests
+	v.current.chain = chain
+	v.current.requests = &requests
 	v.current.ctx, v.current.ctxCancel = context.WithCancel(context.Background())
-	v.transitioned = true
-
-	v.chainCtx.Log.Info("transition finished successfully")
 	return nil
 }
