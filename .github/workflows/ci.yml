@@ -142,11 +142,6 @@ jobs:
       - name: Runs all lint checks
         shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh lint-all-ci
-  yamllint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: yamllint -c .yamllint.yml .
   links-lint:
     name: Markdown Links Lint
     runs-on: ubuntu-latest
