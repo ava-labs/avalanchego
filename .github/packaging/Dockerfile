@@ -18,9 +18,14 @@ ARG TARGETARCH
 # - gnupg2: GPG signing of RPM packages
 # - git: version detection in build scripts
 RUN dnf install -y \
+        'dnf-command(config-manager)' \
         gcc \
         gnupg2 \
         git \
+        rpm-sign \
+    && dnf config-manager --set-enabled crb \
+    && dnf install -y epel-release \
+    && dnf install -y gnupg-pkcs11-scd \
     && dnf clean all
 
 # Install Go (with SHA256 verification)

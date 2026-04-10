@@ -11,6 +11,7 @@
 #
 # Optional env vars:
 #   RPM_ARCH       - RPM architecture ("x86_64" or "aarch64"), defaults to host
+#   REQUIRE_SIGNATURE - "1" to fail if the RPM public key is absent
 
 set -euo pipefail
 
@@ -28,6 +29,7 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RPM_DIR="${REPO_ROOT}/build/rpm"
+REQUIRE_SIGNATURE="${REQUIRE_SIGNATURE:-0}"
 
 # Source VM ID from constants.sh (canonical definition)
 SUBNET_EVM_VM_ID=$(
@@ -56,6 +58,9 @@ docker run --rm \
             rpm --import /rpms/RPM-GPG-KEY-avalanchego
             rpm -K "/rpms/avalanchego-'"${TAG}"'-'"${RPM_ARCH}"'.rpm"
             rpm -K "/rpms/subnet-evm-'"${TAG}"'-'"${RPM_ARCH}"'.rpm"
+        elif [[ "'"${REQUIRE_SIGNATURE}"'" == "1" ]]; then
+            echo "ERROR: required RPM signing public key is missing" >&2
+            exit 1
         else
             echo "Skipping GPG verification (unsigned build)"
         fi
