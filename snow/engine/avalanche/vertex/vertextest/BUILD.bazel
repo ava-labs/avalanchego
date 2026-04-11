@@ -17,6 +17,5 @@ go_library(
         "//snow/consensus/snowstorm",
         "//snow/engine/avalanche/vertex",
         "//snow/engine/snowman/block/blocktest",
-        "@com_github_stretchr_testify//require",
     ],
 )

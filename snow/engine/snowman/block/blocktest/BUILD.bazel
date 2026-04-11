@@ -16,6 +16,5 @@ go_library(
         "//snow/consensus/snowman",
         "//snow/engine/enginetest",
         "//snow/engine/snowman/block",
-        "@com_github_stretchr_testify//require",
     ],
 )
