@@ -682,6 +682,7 @@ func (*testInternalHandler) Unbenched(ids.ID, ids.NodeID) {}
 
 type testBenchlist struct {
 	benchlist.Manager
+
 	benched set.Set[ids.NodeID]
 }
 

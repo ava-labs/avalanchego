@@ -91,6 +91,7 @@ func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 
 type testNode struct {
 	simplexparams.ValidatorInfo
+
 	signFunc SignFunc
 }
 
