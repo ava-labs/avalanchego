@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 
 	"google.golang.org/protobuf/proto"
 
@@ -678,8 +679,7 @@ func addPathInfo(
 		shouldInsertRightChildren = insertChildrenGreaterThan.HasValue()
 	)
 
-	for i := len(proofPath) - 1; i >= 0; i-- {
-		proofNode := proofPath[i]
+	for _, proofNode := range slices.Backward(proofPath) {
 		key := proofNode.Key
 
 		if key.hasPartialByte() && !proofNode.ValueOrHash.IsNothing() {

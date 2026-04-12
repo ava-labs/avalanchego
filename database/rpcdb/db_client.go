@@ -6,6 +6,7 @@ package rpcdb
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"sync"
 
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -151,8 +152,7 @@ type batch struct {
 func (b *batch) Write() error {
 	request := &rpcdbpb.WriteBatchRequest{}
 	keySet := set.NewSet[string](len(b.Ops))
-	for i := len(b.Ops) - 1; i >= 0; i-- {
-		op := b.Ops[i]
+	for _, op := range slices.Backward(b.Ops) {
 		key := string(op.Key)
 		if keySet.Contains(key) {
 			continue
