@@ -187,7 +187,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		case vtxID2:
 			return vtx2, nil
 		default:
-			t.Fatal(errUnknownVertex.Error())
+			t.Fatal(errUnknownVertex)
 			return nil, errUnknownVertex
 		}
 	}
