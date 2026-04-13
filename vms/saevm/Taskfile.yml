@@ -1,0 +1,19 @@
+# https://taskfile.dev
+# To run on a system without task installed: `go tool github.com/go-task/task/v3/cmd/task`
+
+version: '3'
+
+tasks:
+  extend_fuzz_corpus:
+    requires:
+      vars: [PACKAGE, TARGET]
+    vars:
+      CORPUS_DIR: './{{.PACKAGE}}/testdata/fuzz/{{.TARGET}}'
+      CACHE_DIR:
+        sh: go env GOCACHE
+      GO_MODULE:
+        sh: go list -m
+    cmds:
+      - cmd: go test -fuzz "^{{.TARGET}}$" -fuzztime "{{default "5m" .FUZZTIME}}" "./{{.PACKAGE}}"
+      - cmd: '[ -d "{{.CORPUS_DIR}}" ] || mkdir -p "{{.CORPUS_DIR}}"'
+      - cmd: cp -r "{{.CACHE_DIR}}/fuzz/{{.GO_MODULE}}/{{.PACKAGE}}/{{.TARGET}}/" "{{.CORPUS_DIR}}/"
