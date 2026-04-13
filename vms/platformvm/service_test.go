@@ -1567,7 +1567,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					require.Equal(avajson.Uint32(expectedDeactivationOwner.Threshold), v.DeactivationOwner.Threshold)
 					return v.NodeID
 				default:
-					t.Fatalf("unexpected validator type, got: %T", vdr)
+					t.Fatalf("unexpected validator type: %T", vdr)
 					return ids.NodeID{}
 				}
 			}
