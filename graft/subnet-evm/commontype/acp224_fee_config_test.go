@@ -7,10 +7,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/libevm/common"
 )
 
 func TestACP224FeeConfigVerify(t *testing.T) {
