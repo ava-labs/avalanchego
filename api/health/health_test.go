@@ -50,7 +50,7 @@ func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
 func TestDuplicatedRegistrations(t *testing.T) {
 	require := require.New(t)
 
-	check := CheckerFunc(func(context.Context) (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (any, error) {
 		return "", nil
 	})
 
@@ -73,7 +73,7 @@ func TestDuplicatedRegistrations(t *testing.T) {
 func TestDefaultFailing(t *testing.T) {
 	require := require.New(t)
 
-	check := CheckerFunc(func(context.Context) (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (any, error) {
 		return "", nil
 	})
 
@@ -114,7 +114,7 @@ func TestDefaultFailing(t *testing.T) {
 func TestPassingChecks(t *testing.T) {
 	require := require.New(t)
 
-	check := CheckerFunc(func(context.Context) (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (any, error) {
 		return "", nil
 	})
 
@@ -175,7 +175,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 	require := require.New(t)
 
 	var shouldCheckErr utils.Atomic[bool]
-	check := CheckerFunc(func(context.Context) (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (any, error) {
 		if shouldCheckErr.Get() {
 			return errUnhealthy.Error(), errUnhealthy
 		}
@@ -233,7 +233,7 @@ func TestDeadlockRegression(t *testing.T) {
 	require.NoError(err)
 
 	var lock sync.Mutex
-	check := CheckerFunc(func(context.Context) (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (any, error) {
 		lock.Lock()
 		time.Sleep(time.Nanosecond)
 		lock.Unlock()
@@ -255,7 +255,7 @@ func TestDeadlockRegression(t *testing.T) {
 func TestTags(t *testing.T) {
 	require := require.New(t)
 
-	check := CheckerFunc(func(context.Context) (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (any, error) {
 		return "", nil
 	})
 

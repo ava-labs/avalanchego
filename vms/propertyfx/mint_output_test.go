@@ -12,7 +12,7 @@ import (
 )
 
 func TestMintOutputState(t *testing.T) {
-	intf := interface{}(&MintOutput{})
+	intf := any(&MintOutput{})
 	_, ok := intf.(verify.State)
 	require.True(t, ok)
 }

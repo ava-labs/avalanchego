@@ -1549,9 +1549,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	return nodeConfig, nil
 }
 
-func providedFlags(v *viper.Viper) map[string]interface{} {
+func providedFlags(v *viper.Viper) map[string]any {
 	settings := v.AllSettings()
-	customSettings := make(map[string]interface{}, len(settings))
+	customSettings := make(map[string]any, len(settings))
 	for key, val := range settings {
 		if v.IsSet(key) {
 			customSettings[key] = val

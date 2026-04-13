@@ -154,10 +154,10 @@ func TestHealthCheckSubnet(t *testing.T) {
 				}
 				require.ErrorIs(err, ErrNotConnectedEnoughStake)
 
-				detailsMap, ok := details.(map[string]interface{})
+				detailsMap, ok := details.(map[string]any)
 				require.True(ok)
 				require.Equal(
-					map[string]interface{}{
+					map[string]any{
 						"percentConnected":       expectedPercentConnected,
 						"disconnectedValidators": set.Of(vdrIDsList[index+1:]...),
 					},

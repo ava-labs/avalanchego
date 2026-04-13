@@ -107,7 +107,7 @@ func NewSystemThrottler(
 		targeter:              targeter,
 		tracker:               tracker,
 		timerPool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				// Satisfy invariant that timer is stopped and drained.
 				return timerpkg.StoppedTimer()
 			},

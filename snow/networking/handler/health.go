@@ -14,7 +14,7 @@ import (
 
 var ErrNotConnectedEnoughStake = errors.New("not connected to enough stake")
 
-func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
+func (h *handler) HealthCheck(ctx context.Context) (any, error) {
 	state := h.ctx.State.Get()
 	engine, ok := h.engineManager.Get(state.Type).Get(state.State)
 	if !ok {
@@ -27,7 +27,7 @@ func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 	}
 	engineIntf, engineErr := engine.HealthCheck(ctx)
 	networkingIntf, networkingErr := h.networkHealthCheck()
-	intf := map[string]interface{}{
+	intf := map[string]any{
 		"engine":     engineIntf,
 		"networking": networkingIntf,
 	}
@@ -40,9 +40,9 @@ func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, fmt.Errorf("engine: %w; networking: %w", engineErr, networkingErr)
 }
 
-func (h *handler) networkHealthCheck() (interface{}, error) {
+func (h *handler) networkHealthCheck() (any, error) {
 	percentConnected := h.peerTracker.ConnectedPercent()
-	details := map[string]interface{}{
+	details := map[string]any{
 		"percentConnected":       percentConnected,
 		"disconnectedValidators": h.getDisconnectedValidators(),
 	}

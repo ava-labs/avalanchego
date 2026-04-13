@@ -20,9 +20,9 @@ var (
 
 // Codec marshals and unmarshals
 type Codec interface {
-	MarshalInto(interface{}, *wrappers.Packer) error
-	UnmarshalFrom(*wrappers.Packer, interface{}) error
+	MarshalInto(any, *wrappers.Packer) error
+	UnmarshalFrom(*wrappers.Packer, any) error
 
 	// Returns the size, in bytes, of [value] when it's marshaled
-	Size(value interface{}) (int, error)
+	Size(value any) (int, error)
 }

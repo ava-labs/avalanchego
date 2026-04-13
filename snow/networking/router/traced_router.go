@@ -153,7 +153,7 @@ func (r *tracedRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 	r.router.Unbenched(chainID, nodeID)
 }
 
-func (r *tracedRouter) HealthCheck(ctx context.Context) (interface{}, error) {
+func (r *tracedRouter) HealthCheck(ctx context.Context) (any, error) {
 	ctx, span := r.tracer.Start(ctx, "tracedRouter.HealthCheck")
 	defer span.End()
 

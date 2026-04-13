@@ -62,7 +62,7 @@ func (c *linearCodec) SkipRegistrations(num int) {
 
 // RegisterType is used to register types that may be unmarshaled into an interface
 // [val] is a value of the type being registered
-func (c *linearCodec) RegisterType(val interface{}) error {
+func (c *linearCodec) RegisterType(val any) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

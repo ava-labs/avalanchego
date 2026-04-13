@@ -27,11 +27,11 @@ type FxTest struct {
 	CantVerifyTransfer,
 	CantVerifyOperation bool
 
-	InitializeF      func(vm interface{}) error
+	InitializeF      func(vm any) error
 	BootstrappingF   func() error
 	BootstrappedF    func() error
-	VerifyTransferF  func(tx, in, cred, utxo interface{}) error
-	VerifyOperationF func(tx, op, cred interface{}, utxos []interface{}) error
+	VerifyTransferF  func(tx, in, cred, utxo any) error
+	VerifyOperationF func(tx, op, cred any, utxos []any) error
 }
 
 func (fx *FxTest) Default(cant bool) {
@@ -42,7 +42,7 @@ func (fx *FxTest) Default(cant bool) {
 	fx.CantVerifyOperation = cant
 }
 
-func (fx *FxTest) Initialize(vm interface{}) error {
+func (fx *FxTest) Initialize(vm any) error {
 	if fx.InitializeF != nil {
 		return fx.InitializeF(vm)
 	}
@@ -81,7 +81,7 @@ func (fx *FxTest) Bootstrapped() error {
 	return errCalledBootstrapped
 }
 
-func (fx *FxTest) VerifyTransfer(tx, in, cred, utxo interface{}) error {
+func (fx *FxTest) VerifyTransfer(tx, in, cred, utxo any) error {
 	if fx.VerifyTransferF != nil {
 		return fx.VerifyTransferF(tx, in, cred, utxo)
 	}
@@ -94,7 +94,7 @@ func (fx *FxTest) VerifyTransfer(tx, in, cred, utxo interface{}) error {
 	return errCalledVerifyTransfer
 }
 
-func (fx *FxTest) VerifyOperation(tx, op, cred interface{}, utxos []interface{}) error {
+func (fx *FxTest) VerifyOperation(tx, op, cred any, utxos []any) error {
 	if fx.VerifyOperationF != nil {
 		return fx.VerifyOperationF(tx, op, cred, utxos)
 	}

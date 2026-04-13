@@ -362,7 +362,7 @@ func (e *tracedEngine) Start(ctx context.Context, startReqID uint32) error {
 	return e.engine.Start(ctx, startReqID)
 }
 
-func (e *tracedEngine) HealthCheck(ctx context.Context) (interface{}, error) {
+func (e *tracedEngine) HealthCheck(ctx context.Context) (any, error) {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.HealthCheck")
 	defer span.End()
 

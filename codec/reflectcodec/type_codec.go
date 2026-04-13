@@ -80,7 +80,7 @@ func New(typer TypeCodec, tagNames []string) codec.Codec {
 	}
 }
 
-func (c *genericCodec) Size(value interface{}) (int, error) {
+func (c *genericCodec) Size(value any) (int, error) {
 	if value == nil {
 		return 0, codec.ErrMarshalNil
 	}
@@ -290,7 +290,7 @@ func (c *genericCodec) size(
 }
 
 // To marshal an interface, [value] must be a pointer to the interface
-func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error {
+func (c *genericCodec) MarshalInto(value any, p *wrappers.Packer) error {
 	if value == nil {
 		return codec.ErrMarshalNil
 	}
@@ -497,7 +497,7 @@ func (c *genericCodec) marshal(
 
 // UnmarshalFrom unmarshals [p.Bytes] into [dest], where [dest] must be a pointer or
 // interface
-func (c *genericCodec) UnmarshalFrom(p *wrappers.Packer, dest interface{}) error {
+func (c *genericCodec) UnmarshalFrom(p *wrappers.Packer, dest any) error {
 	if dest == nil {
 		return codec.ErrUnmarshalNil
 	}

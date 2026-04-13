@@ -442,7 +442,7 @@ func TestStakerEquals(t *testing.T) {
 
 	require.Equal(t,
 		expectedStakerFieldCount,
-		reflect.TypeOf(Staker{}).NumField(),
+		reflect.TypeFor[Staker]().NumField(),
 		"Staker struct field count changed; update Staker.Equals and this test",
 	)
 

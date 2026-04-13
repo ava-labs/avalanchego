@@ -71,7 +71,7 @@ linters:
     # - iotamixing
     - mirror
     - misspell
-    # - modernize
+    - modernize
     - nakedret
     - nilerr
     # - noctx

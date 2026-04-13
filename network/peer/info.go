@@ -14,7 +14,7 @@ import (
 
 type Info struct {
 	IP             netip.AddrPort  `json:"ip"`
-	PublicIP       netip.AddrPort  `json:"publicIP,omitempty"`
+	PublicIP       netip.AddrPort  `json:"publicIP"`
 	ID             ids.NodeID      `json:"nodeID"`
 	Version        string          `json:"version"`
 	UpgradeTime    uint64          `json:"upgradeTime"`

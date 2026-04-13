@@ -251,9 +251,9 @@ func (*Engine) Notify(_ context.Context, _ common.Message) error {
 	return nil
 }
 
-func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
+func (e *Engine) HealthCheck(ctx context.Context) (any, error) {
 	vmIntf, vmErr := e.vm.HealthCheck(ctx)
-	intf := map[string]interface{}{
+	intf := map[string]any{
 		"consensus": struct{}{},
 		"vm":        vmIntf,
 	}

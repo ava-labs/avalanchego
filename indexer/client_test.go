@@ -19,10 +19,10 @@ import (
 type mockClient struct {
 	require        *require.Assertions
 	expectedMethod string
-	onSendRequestF func(reply interface{}) error
+	onSendRequestF func(reply any) error
 }
 
-func (mc *mockClient) SendRequest(_ context.Context, method string, _ interface{}, reply interface{}, _ ...rpc.Option) error {
+func (mc *mockClient) SendRequest(_ context.Context, method string, _ any, reply any, _ ...rpc.Option) error {
 	mc.require.Equal(mc.expectedMethod, method)
 	return mc.onSendRequestF(reply)
 }
@@ -35,7 +35,7 @@ func TestIndexClient(t *testing.T) {
 		client.Requester = &mockClient{
 			require:        require,
 			expectedMethod: "index.getIndex",
-			onSendRequestF: func(reply interface{}) error {
+			onSendRequestF: func(reply any) error {
 				*(reply.(*GetIndexResponse)) = GetIndexResponse{Index: 5}
 				return nil
 			},
@@ -53,7 +53,7 @@ func TestIndexClient(t *testing.T) {
 		client.Requester = &mockClient{
 			require:        require,
 			expectedMethod: "index.getLastAccepted",
-			onSendRequestF: func(reply interface{}) error {
+			onSendRequestF: func(reply any) error {
 				*(reply.(*FormattedContainer)) = FormattedContainer{
 					ID:    id,
 					Bytes: bytesStr,
@@ -77,7 +77,7 @@ func TestIndexClient(t *testing.T) {
 		client.Requester = &mockClient{
 			require:        require,
 			expectedMethod: "index.getContainerRange",
-			onSendRequestF: func(reply interface{}) error {
+			onSendRequestF: func(reply any) error {
 				*(reply.(*GetContainerRangeResponse)) = GetContainerRangeResponse{Containers: []FormattedContainer{{
 					ID:    id,
 					Bytes: bytesStr,
@@ -96,7 +96,7 @@ func TestIndexClient(t *testing.T) {
 		client.Requester = &mockClient{
 			require:        require,
 			expectedMethod: "index.isAccepted",
-			onSendRequestF: func(reply interface{}) error {
+			onSendRequestF: func(reply any) error {
 				*(reply.(*IsAcceptedResponse)) = IsAcceptedResponse{IsAccepted: true}
 				return nil
 			},
@@ -114,7 +114,7 @@ func TestIndexClient(t *testing.T) {
 		client.Requester = &mockClient{
 			require:        require,
 			expectedMethod: "index.getContainerByID",
-			onSendRequestF: func(reply interface{}) error {
+			onSendRequestF: func(reply any) error {
 				*(reply.(*FormattedContainer)) = FormattedContainer{
 					ID:    id,
 					Bytes: bytesStr,

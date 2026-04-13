@@ -115,7 +115,7 @@ func GetNodeWebsocketURIs(
 }
 
 // Marshal to json with default prefix and indent.
-func DefaultJSONMarshal(v interface{}) ([]byte, error) {
+func DefaultJSONMarshal(v any) ([]byte, error) {
 	bytes, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return nil, stacktrace.Errorf("failed to marshal to json: %w", err)

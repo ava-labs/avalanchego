@@ -89,7 +89,7 @@ func TestCredentialSerialize(t *testing.T) {
 }
 
 func TestCredentialNotState(t *testing.T) {
-	intf := interface{}(&Credential{})
+	intf := any(&Credential{})
 	_, ok := intf.(verify.State)
 	require.False(t, ok)
 }

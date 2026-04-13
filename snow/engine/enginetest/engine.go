@@ -131,7 +131,7 @@ type Engine struct {
 	AcceptedStateSummaryF    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error
 	ConnectedF               func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF            func(ctx context.Context, nodeID ids.NodeID) error
-	HealthF                  func(context.Context) (interface{}, error)
+	HealthF                  func(context.Context) (any, error)
 	GetVMF                   func() common.VM
 	AppRequestF              func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF             func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
@@ -609,7 +609,7 @@ func (e *Engine) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	return errDisconnected
 }
 
-func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
+func (e *Engine) HealthCheck(ctx context.Context) (any, error) {
 	if e.HealthF != nil {
 		return e.HealthF(ctx)
 	}

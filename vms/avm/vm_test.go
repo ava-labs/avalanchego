@@ -97,7 +97,7 @@ func TestFxInitializationFailure(t *testing.T) {
 		[]*common.Fx{{ // fxs
 			ID: ids.Empty,
 			Fx: &FxTest{
-				InitializeF: func(interface{}) error {
+				InitializeF: func(any) error {
 					return errUnknownFx
 				},
 			},
@@ -585,7 +585,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 func TestImportTxNotState(t *testing.T) {
 	require := require.New(t)
 
-	intf := interface{}(&txs.ImportTx{})
+	intf := any(&txs.ImportTx{})
 	_, ok := intf.(verify.State)
 	require.False(ok)
 }

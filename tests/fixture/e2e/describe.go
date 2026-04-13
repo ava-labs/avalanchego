@@ -15,25 +15,25 @@ const (
 )
 
 // DescribeXChain annotates the tests for X-Chain.
-func DescribeXChain(text string, args ...interface{}) bool {
+func DescribeXChain(text string, args ...any) bool {
 	args = append(args, ginkgo.Label("x"))
 	return ginkgo.Describe("[X-Chain] "+text, args...)
 }
 
 // DescribeXChainSerial annotates serial tests for X-Chain.
-func DescribeXChainSerial(text string, args ...interface{}) bool {
+func DescribeXChainSerial(text string, args ...any) bool {
 	args = append(args, ginkgo.Serial)
 	return DescribeXChain(text, args...)
 }
 
 // DescribePChain annotates the tests for P-Chain.
-func DescribePChain(text string, args ...interface{}) bool {
+func DescribePChain(text string, args ...any) bool {
 	args = append(args, ginkgo.Label("p"))
 	return ginkgo.Describe("[P-Chain] "+text, args...)
 }
 
 // DescribeCChain annotates the tests for C-Chain.
-func DescribeCChain(text string, args ...interface{}) bool {
+func DescribeCChain(text string, args ...any) bool {
 	args = append(args, ginkgo.Label("c"))
 	return ginkgo.Describe("[C-Chain] "+text, args...)
 }

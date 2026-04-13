@@ -313,7 +313,7 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 }
 
 // HealthCheck returns information about the consensus health.
-func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
+func (ts *Topological) HealthCheck(context.Context) (any, error) {
 	var errs []error
 
 	numProcessingBlks := ts.NumProcessing()
@@ -347,7 +347,7 @@ func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 		errs = append(errs, err)
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"processingBlocks":       numProcessingBlks,
 		"longestProcessingBlock": maxTimeProcessing.String(), // .String() is needed here to ensure a human readable format
 		"avgAcceptanceTime":      avgAcceptanceTime.String(),

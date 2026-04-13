@@ -44,12 +44,10 @@ func TestGossiperShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 
 	wg := &sync.WaitGroup{}
-	wg.Add(1)
 
-	go func() {
+	wg.Go(func() {
 		Every(ctx, logging.NoLog{}, gossiper, time.Second)
-		wg.Done()
-	}()
+	})
 
 	cancel()
 	wg.Wait()

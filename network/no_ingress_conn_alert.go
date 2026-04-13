@@ -22,11 +22,11 @@ type validatorRetriever interface {
 	GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*validators.Validator, bool)
 }
 
-func checkNoIngressConnections(selfID ids.NodeID, ingressConnections ingressConnectionCounter, validators validatorRetriever) (interface{}, error) {
+func checkNoIngressConnections(selfID ids.NodeID, ingressConnections ingressConnectionCounter, validators validatorRetriever) (any, error) {
 	connCount := ingressConnections.IngressConnCount()
 	_, areWeValidator := validators.GetValidator(constants.PrimaryNetworkID, selfID)
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"ingressConnectionCount":  connCount,
 		"primaryNetworkValidator": areWeValidator,
 	}

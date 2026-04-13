@@ -237,7 +237,7 @@ func (db *Database) Close() error {
 	return err
 }
 
-func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
+func (db *Database) HealthCheck(ctx context.Context) (any, error) {
 	start := time.Now()
 	result, err := db.db.HealthCheck(ctx)
 	duration := time.Since(start)

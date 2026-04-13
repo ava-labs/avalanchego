@@ -6,6 +6,7 @@ package rpcdb
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"sync"
 
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -133,7 +134,7 @@ func (db *DatabaseClient) Close() error {
 	return ErrEnumToError[resp.Err]
 }
 
-func (db *DatabaseClient) HealthCheck(ctx context.Context) (interface{}, error) {
+func (db *DatabaseClient) HealthCheck(ctx context.Context) (any, error) {
 	health, err := db.client.HealthCheck(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, err
@@ -151,8 +152,8 @@ type batch struct {
 func (b *batch) Write() error {
 	request := &rpcdbpb.WriteBatchRequest{}
 	keySet := set.NewSet[string](len(b.Ops))
-	for i := len(b.Ops) - 1; i >= 0; i-- {
-		op := b.Ops[i]
+	for _, v := range slices.Backward(b.Ops) {
+		op := v
 		key := string(op.Key)
 		if keySet.Contains(key) {
 			continue

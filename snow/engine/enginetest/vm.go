@@ -53,7 +53,7 @@ type VM struct {
 	NewHTTPHandlerF   func(context.Context) (http.Handler, error)
 	ConnectedF        func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF     func(ctx context.Context, nodeID ids.NodeID) error
-	HealthCheckF      func(context.Context) (interface{}, error)
+	HealthCheckF      func(context.Context) (any, error)
 	AppRequestF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
 	AppGossipF        func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
@@ -160,7 +160,7 @@ func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 	return nil, nil
 }
 
-func (vm *VM) HealthCheck(ctx context.Context) (interface{}, error) {
+func (vm *VM) HealthCheck(ctx context.Context) (any, error) {
 	if vm.HealthCheckF != nil {
 		return vm.HealthCheckF(ctx)
 	}

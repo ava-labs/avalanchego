@@ -78,10 +78,10 @@ func TestNotifierStopWhileSubscribing(_ *testing.T) {
 }
 
 func TestNotifierWaitForPrefChangeAfterNotify(t *testing.T) {
-	var notifiedCount uint32
+	var notifiedCount atomic.Uint32
 
 	engine := Notifier(notifier(func(_ context.Context, _ Message) error {
-		atomic.AddUint32(&notifiedCount, 1)
+		notifiedCount.Add(1)
 		return nil
 	}))
 
@@ -93,21 +93,21 @@ func TestNotifierWaitForPrefChangeAfterNotify(t *testing.T) {
 	defer nf.Close()
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadUint32(&notifiedCount) == 1
+		return notifiedCount.Load() == 1
 	}, time.Minute, 10*time.Millisecond)
 
 	require.Never(t, func() bool {
-		return atomic.LoadUint32(&notifiedCount) != 1
+		return notifiedCount.Load() != 1
 	}, time.Millisecond*100, 10*time.Millisecond)
 
 	nf.CheckForEvent()
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadUint32(&notifiedCount) == 2
+		return notifiedCount.Load() == 2
 	}, time.Minute, 10*time.Millisecond)
 
 	require.Never(t, func() bool {
-		return atomic.LoadUint32(&notifiedCount) != 2
+		return notifiedCount.Load() != 2
 	}, time.Millisecond*100, 10*time.Millisecond)
 }
 

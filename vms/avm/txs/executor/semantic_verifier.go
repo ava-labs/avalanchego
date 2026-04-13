@@ -192,7 +192,7 @@ func (v *SemanticVerifier) verifyOperation(
 	var (
 		opAssetID = op.AssetID()
 		numUTXOs  = len(op.UTXOIDs)
-		utxos     = make([]interface{}, numUTXOs)
+		utxos     = make([]any, numUTXOs)
 	)
 	for i, utxoID := range op.UTXOIDs {
 		utxo, err := v.State.GetUTXO(utxoID.InputID())
@@ -243,7 +243,7 @@ func (v *SemanticVerifier) verifyFxUsage(
 	return errIncompatibleFx
 }
 
-func (v *SemanticVerifier) getFx(val interface{}) (int, error) {
+func (v *SemanticVerifier) getFx(val any) (int, error) {
 	valType := reflect.TypeOf(val)
 	fx, exists := v.TypeToFxIndex[valType]
 	if !exists {

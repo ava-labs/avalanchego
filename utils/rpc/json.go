@@ -26,8 +26,8 @@ func SendJSONRequest(
 	ctx context.Context,
 	uri *url.URL,
 	method string,
-	params interface{},
-	reply interface{},
+	params any,
+	reply any,
 	options ...Option,
 ) error {
 	requestBodyBytes, err := rpc.EncodeClientRequest(method, params)

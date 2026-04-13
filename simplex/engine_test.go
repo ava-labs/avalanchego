@@ -52,11 +52,11 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 
 func TestHealthCheck(t *testing.T) {
 	vmHealthErr := errors.New("vm health error")
-	vmHealthResult := map[string]interface{}{"healthy": true}
+	vmHealthResult := map[string]any{"healthy": true}
 
 	tests := []struct {
 		name        string
-		vmResult    interface{}
+		vmResult    any
 		vmErr       error
 		expectedErr error
 	}{
@@ -77,14 +77,14 @@ func TestHealthCheck(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			engine, _ := setupEngine(t)
-			engine.vm.(*wrappedVM).VM.VM.HealthCheckF = func(context.Context) (interface{}, error) {
+			engine.vm.(*wrappedVM).VM.VM.HealthCheckF = func(context.Context) (any, error) {
 				return tt.vmResult, tt.vmErr
 			}
 
 			result, err := engine.HealthCheck(t.Context())
 			require.ErrorIs(t, err, tt.expectedErr)
 
-			resultMap, ok := result.(map[string]interface{})
+			resultMap, ok := result.(map[string]any)
 			require.True(t, ok)
 			require.Contains(t, resultMap, "consensus")
 			require.Contains(t, resultMap, "vm")

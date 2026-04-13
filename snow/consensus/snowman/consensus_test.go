@@ -70,7 +70,7 @@ func runConsensusTests(t *testing.T, factory Factory) {
 	}
 }
 
-func getTestName(i interface{}) string {
+func getTestName(i any) string {
 	return strings.Split(path.Base(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()), ".")[1]
 }
 
