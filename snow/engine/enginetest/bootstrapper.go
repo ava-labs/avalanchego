@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -34,8 +36,8 @@ func (b *Bootstrapper) Clear(ctx context.Context) error {
 	if b.ClearF != nil {
 		return b.ClearF(ctx)
 	}
-	if b.CantClear && b.T != nil {
-		b.T.Fatal(errClear)
+	if b.T != nil {
+		require.False(b.T, b.CantClear, errClear.Error())
 	}
 	return errClear
 }

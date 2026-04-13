@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -33,8 +35,8 @@ func (vm *SetPreferenceVM) SetPreferenceWithContext(ctx context.Context, id ids.
 	if vm.SetPreferenceWithContextF != nil {
 		return vm.SetPreferenceWithContextF(ctx, id, blockCtx)
 	}
-	if vm.CantSetPreferenceWithContext && vm.T != nil {
-		vm.T.Fatal(errSetPreferenceWithContext)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantSetPreferenceWithContext, errSetPreferenceWithContext.Error())
 	}
 	return errSetPreferenceWithContext
 }

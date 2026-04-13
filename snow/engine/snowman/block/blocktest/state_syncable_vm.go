@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -41,8 +43,8 @@ func (vm *StateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, error) {
 	if vm.StateSyncEnabledF != nil {
 		return vm.StateSyncEnabledF(ctx)
 	}
-	if vm.CantStateSyncEnabled && vm.T != nil {
-		vm.T.Fatal(errStateSyncEnabled)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantStateSyncEnabled, errStateSyncEnabled.Error())
 	}
 	return false, errStateSyncEnabled
 }
@@ -51,8 +53,8 @@ func (vm *StateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (bloc
 	if vm.GetOngoingSyncStateSummaryF != nil {
 		return vm.GetOngoingSyncStateSummaryF(ctx)
 	}
-	if vm.CantStateSyncGetOngoingSummary && vm.T != nil {
-		vm.T.Fatal(errStateSyncGetOngoingSummary)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantStateSyncGetOngoingSummary, errStateSyncGetOngoingSummary.Error())
 	}
 	return nil, errStateSyncGetOngoingSummary
 }
@@ -61,8 +63,8 @@ func (vm *StateSyncableVM) GetLastStateSummary(ctx context.Context) (block.State
 	if vm.GetLastStateSummaryF != nil {
 		return vm.GetLastStateSummaryF(ctx)
 	}
-	if vm.CantGetLastStateSummary && vm.T != nil {
-		vm.T.Fatal(errGetLastStateSummary)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetLastStateSummary, errGetLastStateSummary.Error())
 	}
 	return nil, errGetLastStateSummary
 }
@@ -71,8 +73,8 @@ func (vm *StateSyncableVM) ParseStateSummary(ctx context.Context, summaryBytes [
 	if vm.ParseStateSummaryF != nil {
 		return vm.ParseStateSummaryF(ctx, summaryBytes)
 	}
-	if vm.CantParseStateSummary && vm.T != nil {
-		vm.T.Fatal(errParseStateSummary)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantParseStateSummary, errParseStateSummary.Error())
 	}
 	return nil, errParseStateSummary
 }
@@ -81,8 +83,8 @@ func (vm *StateSyncableVM) GetStateSummary(ctx context.Context, summaryHeight ui
 	if vm.GetStateSummaryF != nil {
 		return vm.GetStateSummaryF(ctx, summaryHeight)
 	}
-	if vm.CantGetStateSummary && vm.T != nil {
-		vm.T.Fatal(errGetStateSummary)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetStateSummary, errGetStateSummary.Error())
 	}
 	return nil, errGetStateSummary
 }

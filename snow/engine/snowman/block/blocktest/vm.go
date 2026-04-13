@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -56,8 +58,8 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	if vm.BuildBlockF != nil {
 		return vm.BuildBlockF(ctx)
 	}
-	if vm.CantBuildBlock && vm.T != nil {
-		vm.T.Fatal(errBuildBlock)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantBuildBlock, errBuildBlock.Error())
 	}
 	return nil, errBuildBlock
 }
@@ -66,8 +68,8 @@ func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 	if vm.ParseBlockF != nil {
 		return vm.ParseBlockF(ctx, b)
 	}
-	if vm.CantParseBlock && vm.T != nil {
-		vm.T.Fatal(errParseBlock)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantParseBlock, errParseBlock.Error())
 	}
 	return nil, errParseBlock
 }
@@ -76,8 +78,8 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
 	if vm.GetBlockF != nil {
 		return vm.GetBlockF(ctx, id)
 	}
-	if vm.CantGetBlock && vm.T != nil {
-		vm.T.Fatal(errGetBlock)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetBlock, errGetBlock.Error())
 	}
 	return nil, errGetBlock
 }
@@ -86,8 +88,8 @@ func (vm *VM) SetPreference(ctx context.Context, id ids.ID) error {
 	if vm.SetPreferenceF != nil {
 		return vm.SetPreferenceF(ctx, id)
 	}
-	if vm.CantSetPreference && vm.T != nil {
-		vm.T.Fatal("Unexpectedly called SetPreference")
+	if vm.T != nil {
+		require.False(vm.T, vm.CantSetPreference, "Unexpectedly called SetPreference")
 	}
 	return nil
 }
@@ -96,8 +98,8 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	if vm.LastAcceptedF != nil {
 		return vm.LastAcceptedF(ctx)
 	}
-	if vm.CantLastAccepted && vm.T != nil {
-		vm.T.Fatal(errLastAccepted)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantLastAccepted, errLastAccepted.Error())
 	}
 	return ids.Empty, errLastAccepted
 }
@@ -106,8 +108,8 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 	if vm.GetBlockIDAtHeightF != nil {
 		return vm.GetBlockIDAtHeightF(ctx, height)
 	}
-	if vm.CantGetBlockIDAtHeight && vm.T != nil {
-		vm.T.Fatal(errGetAncestor)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetBlockIDAtHeight, errGetAncestor.Error())
 	}
 	return ids.Empty, errGetBlockIDAtHeight
 }

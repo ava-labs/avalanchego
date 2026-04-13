@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -44,8 +46,8 @@ func (s *StateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) 
 	if s.AcceptF != nil {
 		return s.AcceptF(ctx)
 	}
-	if s.CantAccept && s.T != nil {
-		s.T.Fatal(errAccept)
+	if s.T != nil {
+		require.False(s.T, s.CantAccept, errAccept.Error())
 	}
 	return block.StateSyncSkipped, errAccept
 }

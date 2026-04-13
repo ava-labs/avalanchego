@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
@@ -45,8 +47,8 @@ func (vm *State) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	if vm.GetMinimumHeightF != nil {
 		return vm.GetMinimumHeightF(ctx)
 	}
-	if vm.CantGetMinimumHeight && vm.T != nil {
-		vm.T.Fatal(errMinimumHeight)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetMinimumHeight, errMinimumHeight.Error())
 	}
 	return 0, errMinimumHeight
 }
@@ -55,8 +57,8 @@ func (vm *State) GetCurrentHeight(ctx context.Context) (uint64, error) {
 	if vm.GetCurrentHeightF != nil {
 		return vm.GetCurrentHeightF(ctx)
 	}
-	if vm.CantGetCurrentHeight && vm.T != nil {
-		vm.T.Fatal(errCurrentHeight)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetCurrentHeight, errCurrentHeight.Error())
 	}
 	return 0, errCurrentHeight
 }
@@ -65,8 +67,8 @@ func (vm *State) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error
 	if vm.GetSubnetIDF != nil {
 		return vm.GetSubnetIDF(ctx, chainID)
 	}
-	if vm.CantGetSubnetID && vm.T != nil {
-		vm.T.Fatal(errSubnetID)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetSubnetID, errSubnetID.Error())
 	}
 	return ids.Empty, errSubnetID
 }
@@ -78,8 +80,8 @@ func (vm *State) GetWarpValidatorSets(
 	if vm.GetWarpValidatorSetsF != nil {
 		return vm.GetWarpValidatorSetsF(ctx, height)
 	}
-	if vm.CantGetWarpValidatorSets && vm.T != nil {
-		vm.T.Fatal(errGetWarpValidatorSets)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetWarpValidatorSets, errGetWarpValidatorSets.Error())
 	}
 	return nil, errGetWarpValidatorSets
 }
@@ -92,8 +94,8 @@ func (vm *State) GetValidatorSet(
 	if vm.GetValidatorSetF != nil {
 		return vm.GetValidatorSetF(ctx, height, subnetID)
 	}
-	if vm.CantGetValidatorSet && vm.T != nil {
-		vm.T.Fatal(errGetValidatorSet)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetValidatorSet, errGetValidatorSet.Error())
 	}
 	return nil, errGetValidatorSet
 }
@@ -105,8 +107,8 @@ func (vm *State) GetCurrentValidatorSet(
 	if vm.GetCurrentValidatorSetF != nil {
 		return vm.GetCurrentValidatorSetF(ctx, subnetID)
 	}
-	if vm.CantGetCurrentValidatorSet && vm.T != nil {
-		vm.T.Fatal(errGetCurrentValidatorSet)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetCurrentValidatorSet, errGetCurrentValidatorSet.Error())
 	}
 	return nil, 0, errGetCurrentValidatorSet
 }

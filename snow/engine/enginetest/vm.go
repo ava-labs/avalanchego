@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -106,8 +108,8 @@ func (vm *VM) Initialize(
 			appSender,
 		)
 	}
-	if vm.CantInitialize && vm.T != nil {
-		vm.T.Fatal(errInitialize)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantInitialize, errInitialize.Error())
 	}
 	return errInitialize
 }
@@ -142,8 +144,8 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	if vm.CreateHandlersF != nil {
 		return vm.CreateHandlers(ctx)
 	}
-	if vm.CantCreateHandlers && vm.T != nil {
-		vm.T.Fatal(errCreateHandlers)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantCreateHandlers, errCreateHandlers.Error())
 	}
 	return nil, nil
 }
@@ -152,8 +154,8 @@ func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 	if vm.NewHTTPHandlerF != nil {
 		return vm.NewHTTPHandlerF(ctx)
 	}
-	if vm.CantNewHTTPHandler && vm.T != nil {
-		vm.T.Fatal(errNewHTTPHandler)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantNewHTTPHandler, errNewHTTPHandler.Error())
 	}
 	return nil, nil
 }
@@ -162,8 +164,8 @@ func (vm *VM) HealthCheck(ctx context.Context) (interface{}, error) {
 	if vm.HealthCheckF != nil {
 		return vm.HealthCheckF(ctx)
 	}
-	if vm.CantHealthCheck && vm.T != nil {
-		vm.T.Fatal(errHealthCheck)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantHealthCheck, errHealthCheck.Error())
 	}
 	return nil, errHealthCheck
 }
@@ -224,8 +226,8 @@ func (vm *VM) Connected(ctx context.Context, id ids.NodeID, nodeVersion *version
 	if vm.ConnectedF != nil {
 		return vm.ConnectedF(ctx, id, nodeVersion)
 	}
-	if vm.CantConnected && vm.T != nil {
-		vm.T.Fatal(errConnected)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantConnected, errConnected.Error())
 	}
 	return nil
 }
@@ -234,8 +236,8 @@ func (vm *VM) Disconnected(ctx context.Context, id ids.NodeID) error {
 	if vm.DisconnectedF != nil {
 		return vm.DisconnectedF(ctx, id)
 	}
-	if vm.CantDisconnected && vm.T != nil {
-		vm.T.Fatal(errDisconnected)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantDisconnected, errDisconnected.Error())
 	}
 	return nil
 }
@@ -244,8 +246,8 @@ func (vm *VM) Version(ctx context.Context) (string, error) {
 	if vm.VersionF != nil {
 		return vm.VersionF(ctx)
 	}
-	if vm.CantVersion && vm.T != nil {
-		vm.T.Fatal(errVersion)
+	if vm.T != nil {
+		require.False(vm.T, vm.CantVersion, errVersion.Error())
 	}
 	return "", nil
 }

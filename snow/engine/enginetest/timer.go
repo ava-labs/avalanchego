@@ -6,6 +6,8 @@ package enginetest
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // Timer is a test timer
@@ -20,7 +22,7 @@ type Timer struct {
 func (t *Timer) RegisterTimeout(delay time.Duration) {
 	if t.RegisterTimeoutF != nil {
 		t.RegisterTimeoutF(delay)
-	} else if t.CantRegisterTimout && t.T != nil {
-		t.T.Fatal("Unexpectedly called RegisterTimeout")
+	} else if t.T != nil {
+		require.False(t.T, t.CantRegisterTimout, "Unexpectedly called RegisterTimeout")
 	}
 }

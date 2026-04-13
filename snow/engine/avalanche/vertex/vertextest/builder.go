@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -33,8 +35,8 @@ func (b *Builder) BuildStopVtx(ctx context.Context, parentIDs []ids.ID) (avalanc
 	if b.BuildStopVtxF != nil {
 		return b.BuildStopVtxF(ctx, parentIDs)
 	}
-	if b.CantBuildVtx && b.T != nil {
-		b.T.Fatal(errBuild)
+	if b.T != nil {
+		require.False(b.T, b.CantBuildVtx, errBuild.Error())
 	}
 	return nil, errBuild
 }
