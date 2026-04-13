@@ -6,6 +6,7 @@ package network
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"sync"
@@ -53,6 +54,10 @@ const (
 	ErrValidatorSetDiffInvalidPreviousTimestamp
 	ErrValidatorSetDiffInvalidCurrentTimestamp
 	ErrValidatorSetDiffMismatch
+
+	ErrValidatorSetMetadataInvalidJustification
+	ErrValidatorSetMetadataShardCountMismatch
+	ErrValidatorSetMetadataShardHashMismatch
 )
 
 var _ acp118.Verifier = (*signatureRequestVerifier)(nil)
@@ -104,8 +109,7 @@ func (s signatureRequestVerifier) Verify(
 		return nil
 		// return s.verifyValidatorSetDiff(ctx, payload)
 	case *message.ValidatorSetMetadata:
-		return nil
-		// return s.verifySubsetUpdate(ctx, payload)
+		return s.verifyValidatorSetMetadata(ctx, payload, justification)
 	default:
 		return &common.AppError{
 			Code:    ErrUnsupportedWarpAddressedCallPayloadType,
@@ -470,6 +474,137 @@ func (s signatureRequestVerifier) verifyValidatorSetState(
 		zap.Stringer("blockchainID", msg.BlockchainID),
 		zap.Uint64("pChainHeight", msg.PChainHeight),
 		zap.Stringer("validatorSetHash", msg.ValidatorSetHash),
+	)
+
+	return nil
+}
+
+func (s signatureRequestVerifier) verifyValidatorSetMetadata(
+	ctx context.Context,
+	msg *message.ValidatorSetMetadata,
+	justification []byte,
+) *common.AppError {
+	if len(justification) != 8 {
+		return &common.AppError{
+			Code:    ErrValidatorSetMetadataInvalidJustification,
+			Message: fmt.Sprintf("justification must be 8 bytes encoding shard size, got %d bytes", len(justification)),
+		}
+	}
+	shardSize := binary.BigEndian.Uint64(justification)
+	if shardSize == 0 {
+		return &common.AppError{
+			Code:    ErrValidatorSetMetadataInvalidJustification,
+			Message: "shard size must be greater than zero",
+		}
+	}
+
+	s.log.Debug("verifying validator set metadata",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Uint64("shardSize", shardSize),
+		zap.Int("numShardHashes", len(msg.ShardHashes)),
+	)
+
+	minHeight, err := s.vdrsState.GetMinimumHeight(ctx)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get minimum height: " + err.Error(),
+		}
+	}
+	if msg.PChainHeight < minHeight {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid height. provided %d. current minimum %d", msg.PChainHeight, minHeight),
+		}
+	}
+
+	blockID, err := s.state.GetBlockIDAtHeight(msg.PChainHeight)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get block ID at height: " + err.Error(),
+		}
+	}
+	statelessBlock, err := s.state.GetStatelessBlock(blockID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get block: " + err.Error(),
+		}
+	}
+	banffBlock, ok := statelessBlock.(block.BanffBlock)
+	if !ok {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "block is not a Banff block",
+		}
+	}
+
+	blockTime := banffBlock.Timestamp()
+	if msg.PChainTimestamp != uint64(blockTime.Unix()) {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid block time. provided %d. expected %d", msg.PChainTimestamp, blockTime),
+		}
+	}
+
+	canonicalValidatorSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, msg.PChainHeight, msg.BlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get canonical validator set: " + err.Error(),
+		}
+	}
+
+	validators := make([]*message.Validator, len(canonicalValidatorSet.Validators))
+	for i, validator := range canonicalValidatorSet.Validators {
+		validators[i] = &message.Validator{
+			UncompressedPublicKeyBytes: [96]byte(validator.PublicKey.Serialize()),
+			Weight:                     validator.Weight,
+		}
+	}
+
+	numValidators := uint64(len(validators))
+	numShards := (numValidators + shardSize - 1) / shardSize
+	if numShards == 0 {
+		numShards = 1
+	}
+
+	if uint64(len(msg.ShardHashes)) != numShards {
+		return &common.AppError{
+			Code:    ErrValidatorSetMetadataShardCountMismatch,
+			Message: fmt.Sprintf("shard count mismatch: message has %d, expected %d (validators=%d, shardSize=%d)", len(msg.ShardHashes), numShards, numValidators, shardSize),
+		}
+	}
+
+	for i := uint64(0); i < numShards; i++ {
+		start := i * shardSize
+		end := start + shardSize
+		if end > numValidators {
+			end = numValidators
+		}
+		shard := validators[start:end]
+		shardBytes, err := message.Codec.Marshal(message.CodecVersion, shard)
+		if err != nil {
+			return &common.AppError{
+				Code:    common.ErrUndefined.Code,
+				Message: fmt.Sprintf("failed to marshal shard %d: %s", i, err),
+			}
+		}
+		hash := sha256.Sum256(shardBytes)
+		if msg.ShardHashes[i] != ids.ID(hash) {
+			return &common.AppError{
+				Code:    ErrValidatorSetMetadataShardHashMismatch,
+				Message: fmt.Sprintf("shard %d hash mismatch: provided %q, expected %q", i, msg.ShardHashes[i], ids.ID(hash)),
+			}
+		}
+	}
+
+	s.log.Info("validator set metadata verified",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Int("numShards", len(msg.ShardHashes)),
 	)
 
 	return nil
