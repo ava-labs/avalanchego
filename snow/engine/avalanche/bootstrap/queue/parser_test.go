@@ -30,8 +30,8 @@ func (p *TestParser) Parse(ctx context.Context, b []byte) (Job, error) {
 	if p.ParseF != nil {
 		return p.ParseF(ctx, b)
 	}
-	if p.CantParse && p.T != nil {
-		require.False(p.T, p.CantParse, errParse)
+	if p.T != nil {
+		require.False(p.T, p.CantParse, "unexpectedly called Parse")
 	}
 	return nil, errParse
 }
