@@ -246,9 +246,9 @@ func TestEngineQuery(t *testing.T) {
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case parent.ID(), child.ID():
-			return nil, errUnknownBlock
+		default:
+			t.Fatal(errUnknownBlock.Error())
 		}
-		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 	vm.ParseBlockF = nil
@@ -289,8 +289,9 @@ func TestEngineQuery(t *testing.T) {
 				return parent, nil
 			case child.ID():
 				return child, nil
+			default:
+				t.Fatal(errUnknownBlock.Error())
 			}
-			t.Fatal(errUnknownBlock.Error())
 			return nil, errUnknownBlock
 		}
 
@@ -400,8 +401,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 			return blk0, nil
 		case blk1.ID():
 			return nil, errUnknownBlock
+		default:
+			t.Fatal(errUnknownBlock.Error())
 		}
-		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -424,8 +426,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 				return blk0, nil
 			case blkID == blk1.ID():
 				return blk1, nil
+			default:
+				t.Fatal(errUnknownBlock.Error())
 			}
-			t.Fatal(errUnknownBlock.Error())
 			return nil, errUnknownBlock
 		}
 
@@ -838,8 +841,9 @@ func TestEngineAbandonChit(t *testing.T) {
 			return snowmantest.Genesis, nil
 		case blk.ID():
 			return nil, errUnknownBlock
+		default:
+			t.Fatal(errUnknownBlock.Error())
 		}
-		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -891,8 +895,9 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 			return snowmantest.Genesis, nil
 		case blk.ID():
 			return nil, errUnknownBlock
+		default:
+			t.Fatal(errUnknownBlock.Error())
 		}
-		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -1550,8 +1555,9 @@ func TestEngineDoubleChit(t *testing.T) {
 			return snowmantest.Genesis, nil
 		case blk.ID():
 			return blk, nil
+		default:
+			t.Fatal(errUnknownBlock.Error())
 		}
-		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -2217,8 +2223,9 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 			return snowmantest.Genesis, nil
 		case blk.ID():
 			return blk, nil
+		default:
+			t.Fatal(errUnknownBlock.Error())
 		}
-		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -2329,8 +2336,9 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 			return snowmantest.Genesis, nil
 		case blk.ID():
 			return blk, nil
+		default:
+			t.Fatal(errUnknownBlock.Error())
 		}
-		t.Fatal(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 

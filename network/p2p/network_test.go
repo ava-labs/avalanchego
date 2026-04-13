@@ -902,14 +902,13 @@ func TestNetworkValidators_ConnectAndDisconnect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			if s := set.Of(
+			s := set.Of(
 				len(tt.validators),
 				len(tt.connectedPeers),
 				len(tt.disconnectedPeers),
 				len(tt.wantConnectedValidators),
-			); s.Len() != 1 {
-				t.Fatal("tests vectors must be of same length")
-			}
+			)
+			require.Equal(1, s.Len(), "malformed test vector setup")
 
 			validatorState := &validatorstest.State{}
 			validatorSet := NewValidators(

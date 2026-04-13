@@ -21,26 +21,17 @@ type MockListener struct {
 }
 
 func (ml *MockListener) Accept() (net.Conn, error) {
-	if ml.OnAcceptF == nil {
-		ml.t.Fatal("unexpectedly called Accept")
-		return nil, nil
-	}
+	require.NotNil(ml.t, ml.OnAcceptF, "unexpectedly called Accept")
 	return ml.OnAcceptF()
 }
 
 func (ml *MockListener) Close() error {
-	if ml.OnCloseF == nil {
-		ml.t.Fatal("unexpectedly called Close")
-		return nil
-	}
+	require.NotNil(ml.t, ml.OnCloseF, "unexpectedly called Close")
 	return ml.OnCloseF()
 }
 
 func (ml *MockListener) Addr() net.Addr {
-	if ml.OnAddrF == nil {
-		ml.t.Fatal("unexpectedly called Addr")
-		return nil
-	}
+	require.NotNil(ml.t, ml.OnAddrF, "unexpectedly called Addr")
 	return ml.OnAddrF()
 }
 

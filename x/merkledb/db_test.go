@@ -822,15 +822,13 @@ func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 			if size == 0 {
 				t.SkipNow()
 			}
-			require := require.New(t)
 			r := rand.New(rand.NewSource(randSeed))
 			for _, ts := range validTokenSizes {
 				runRandDBTest(
 					t,
-					require,
 					r,
 					generateRandTest(
-						require,
+						t,
 						r,
 						size,
 						0.01, /*checkHashProbability*/
@@ -851,15 +849,13 @@ func FuzzMerkleDBInitialValuesRandomizedActions(f *testing.F) {
 		if numSteps == 0 {
 			t.SkipNow()
 		}
-		require := require.New(t)
 		r := rand.New(rand.NewSource(randSeed))
 		for _, ts := range validTokenSizes {
 			runRandDBTest(
 				t,
-				require,
 				r,
 				generateInitialValues(
-					require,
+					t,
 					r,
 					initialValues,
 					numSteps,
@@ -892,10 +888,13 @@ const (
 	opMax // boundary value, not an actual op
 )
 
-func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt randTest, tokenSize int) {
+func runRandDBTest(t testing.TB, r *rand.Rand, rt randTest, tokenSize int) {
+	require := require.New(t)
+	ctx := t.Context()
+
 	config := NewConfig()
 	config.BranchFactor = tokenSizeToBranchFactor[tokenSize]
-	db, err := New(t.Context(), memdb.New(), config)
+	db, err := New(ctx, memdb.New(), config)
 	require.NoError(err)
 
 	maxProofLen := 100
@@ -909,7 +908,7 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 		pastRoots            = []ids.ID{}
 	)
 
-	startRoot, err := db.GetMerkleRoot(t.Context())
+	startRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 
 	for i, step := range rt {
@@ -926,7 +925,7 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 			uncommittedDeletes.Add(ToKey(step.key))
 			delete(uncommittedKeyValues, ToKey(step.key))
 		case opGenerateRangeProof:
-			root, err := db.GetMerkleRoot(t.Context())
+			root, err := db.GetMerkleRoot(ctx)
 			require.NoError(err)
 
 			if len(pastRoots) > 0 {
@@ -942,7 +941,7 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 				end = maybe.Some(step.value)
 			}
 
-			rangeProof, err := db.GetRangeProofAtRoot(t.Context(), root, start, end, maxProofLen)
+			rangeProof, err := db.GetRangeProofAtRoot(ctx, root, start, end, maxProofLen)
 			if root == ids.Empty {
 				require.ErrorIs(err, ErrEmptyProof)
 				continue
@@ -951,7 +950,7 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 			require.LessOrEqual(len(rangeProof.KeyChanges), maxProofLen)
 
 			require.NoError(rangeProof.Verify(
-				t.Context(),
+				ctx,
 				start,
 				end,
 				root,
@@ -960,7 +959,7 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 				maxProofLen,
 			))
 		case opGenerateChangeProof:
-			root, err := db.GetMerkleRoot(t.Context())
+			root, err := db.GetMerkleRoot(ctx)
 			require.NoError(err)
 
 			if len(pastRoots) > 1 {
@@ -977,7 +976,7 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 				end = maybe.Some(step.value)
 			}
 
-			changeProof, err := db.GetChangeProof(t.Context(), startRoot, root, start, end, maxProofLen)
+			changeProof, err := db.GetChangeProof(ctx, startRoot, root, start, end, maxProofLen)
 			if startRoot == root {
 				require.ErrorIs(err, errSameRoot)
 				continue
@@ -993,7 +992,7 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 			require.NoError(err)
 
 			require.NoError(changeProofDB.VerifyChangeProof(
-				t.Context(),
+				ctx,
 				changeProof,
 				start,
 				end,
@@ -1001,7 +1000,7 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 				maxProofLen,
 			))
 		case opWriteBatch:
-			oldRoot, err := db.GetMerkleRoot(t.Context())
+			oldRoot, err := db.GetMerkleRoot(ctx)
 			require.NoError(err)
 
 			require.NoError(currentBatch.Write())
@@ -1019,7 +1018,7 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 			}
 			uncommittedDeletes.Clear()
 
-			newRoot, err := db.GetMerkleRoot(t.Context())
+			newRoot, err := db.GetMerkleRoot(ctx)
 			require.NoError(err)
 
 			if oldRoot != newRoot {
@@ -1057,14 +1056,14 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 				})
 			}
 
-			view, err := newDB.NewView(t.Context(), ViewChanges{BatchOps: ops})
+			view, err := newDB.NewView(ctx, ViewChanges{BatchOps: ops})
 			require.NoError(err)
 
 			// Check that the root of the view is the same as the root of [db]
-			newRoot, err := view.GetMerkleRoot(t.Context())
+			newRoot, err := view.GetMerkleRoot(ctx)
 			require.NoError(err)
 
-			dbRoot, err := db.GetMerkleRoot(t.Context())
+			dbRoot, err := db.GetMerkleRoot(ctx)
 			require.NoError(err)
 			require.Equal(dbRoot, newRoot)
 		default:
@@ -1074,12 +1073,14 @@ func runRandDBTest(t testing.TB, require *require.Assertions, r *rand.Rand, rt r
 }
 
 func generateRandTestWithKeys(
-	require *require.Assertions,
+	t testing.TB,
 	r *rand.Rand,
 	allKeys [][]byte,
 	size uint,
 	checkHashProbability float64,
 ) randTest {
+	require := require.New(t)
+
 	const nilEndProbability = 0.1
 
 	genKey := func() []byte {
@@ -1157,7 +1158,7 @@ func generateRandTestWithKeys(
 }
 
 func generateInitialValues(
-	require *require.Assertions,
+	t testing.TB,
 	r *rand.Rand,
 	numInitialKeyValues uint,
 	size uint,
@@ -1205,12 +1206,12 @@ func generateInitialValues(
 		steps = append(steps, step)
 	}
 	steps = append(steps, randTestStep{op: opWriteBatch})
-	steps = append(steps, generateRandTestWithKeys(require, r, allKeys, size, percentChanceToFullHash)...)
+	steps = append(steps, generateRandTestWithKeys(t, r, allKeys, size, percentChanceToFullHash)...)
 	return steps
 }
 
-func generateRandTest(require *require.Assertions, r *rand.Rand, size uint, percentChanceToFullHash float64) randTest {
-	return generateRandTestWithKeys(require, r, [][]byte{}, size, percentChanceToFullHash)
+func generateRandTest(t testing.TB, r *rand.Rand, size uint, percentChanceToFullHash float64) randTest {
+	return generateRandTestWithKeys(t, r, [][]byte{}, size, percentChanceToFullHash)
 }
 
 // Inserts [n] random key/value pairs into each database.

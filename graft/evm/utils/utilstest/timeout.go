@@ -32,7 +32,7 @@ func WaitErrWithTimeout(t *testing.T, ch <-chan error, timeout time.Duration) er
 	case err := <-ch:
 		return err
 	case <-time.After(timeout):
-		t.Fatal("timed out waiting for RunSyncerTasks to complete")
+		t.Fatal("timed out waiting for error")
 		return nil
 	}
 }
